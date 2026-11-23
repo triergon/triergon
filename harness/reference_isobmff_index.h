@@ -56,50 +56,69 @@ static int seek_view_has_negative_size(const AVFormatContext *format)
     return 0;
 }
 
+/* The demuxer's own backward seek: av_seek_frame on the track, then the first
+ * packet the track yields. The landing is the index entry that packet was read
+ * from, the one entry with its position and decode time. A refused seek, or a
+ * seek after which the track yields no packet, has no landing. */
 static int track_seek_main(AVFormatContext *format, AVStream *stream,
                            const SeekView *seek, ViewWork *work)
 {
+    AVPacket *packet = av_packet_alloc();
+    if (!packet)
+        return AVERROR(ENOMEM);
+    int code = 0;
     if (seek->eof) {
-        AVPacket *packet = av_packet_alloc();
-        if (!packet)
-            return AVERROR(ENOMEM);
-        int code;
         while ((code = av_read_frame(format, packet)) >= 0)
             av_packet_unref(packet);
-        av_packet_free(&packet);
         /* A negative public index size cannot describe a packet. The MOV
          * reader reports ENOMEM when it reaches this malformed size. */
         if (code == AVERROR(ENOMEM) && seek_view_has_negative_size(format))
-            return AVERROR_INVALIDDATA;
-        if (code != AVERROR_EOF)
-            return code;
+            code = AVERROR_INVALIDDATA;
+        else if (code == AVERROR_EOF)
+            code = 0;
     }
-    const int count = avformat_index_get_entries_count(stream);
-    const AVIndexEntry *landing =
-        avformat_index_get_entry_from_timestamp(stream, seek->ticks[0], AVSEEK_FLAG_BACKWARD);
-    if (!landing) {
-        /* SeekJob falls back to the first key when a backward lookup finds none. */
-        for (int ordinal = 0; ordinal < count; ++ordinal) {
-            const AVIndexEntry *entry = avformat_index_get_entry(stream, ordinal);
-            if (entry->flags & AVINDEX_KEYFRAME) {
-                landing = entry;
-                break;
-            }
+    int landed = 0;
+    if (code >= 0) {
+        const int sought =
+            av_seek_frame(format, stream->index, seek->ticks[0], AVSEEK_FLAG_BACKWARD);
+        if (sought >= 0) {
+            while ((code = av_read_frame(format, packet)) >= 0 &&
+                   packet->stream_index != stream->index)
+                av_packet_unref(packet);
+            landed = code >= 0;
+            if (code == AVERROR_EOF)
+                code = 0;
+        } else if (work->trace) {
+            fprintf(stderr, "MOV seek refused: %s\n", av_err2str(sought));
         }
     }
-    if (!landing) {
-        const uint64_t absent = 0;
-        mov_view_row(work, 3, &absent, 1, NULL, 0);
-        return 0;
+    if (code < 0 || !landed) {
+        av_packet_free(&packet);
+        if (code >= 0) {
+            const uint64_t absent = 0;
+            mov_view_row(work, 3, &absent, 1, NULL, 0);
+        }
+        return code;
     }
-    int ordinal = 0;
-    while (ordinal < count && avformat_index_get_entry(stream, ordinal) != landing)
-        ++ordinal;
-    if (ordinal == count)
+    const int count = avformat_index_get_entries_count(stream);
+    int ordinal = -1;
+    for (int at = 0; at < count; ++at) {
+        const AVIndexEntry *entry = avformat_index_get_entry(stream, at);
+        if (entry->pos == packet->pos && entry->timestamp == packet->dts) {
+            if (ordinal >= 0)
+                ordinal = count;
+            else
+                ordinal = at;
+        }
+    }
+    av_packet_free(&packet);
+    if (ordinal < 0 || ordinal == count)
         return AVERROR_BUG;
+    const AVIndexEntry *landing = avformat_index_get_entry(stream, ordinal);
     const uint64_t fields[] = {
         1, (uint64_t)landing->timestamp, (uint64_t)landing->pos, (uint64_t)landing->size,
-        (uint64_t)(int64_t)landing->flags, (uint64_t)(int64_t)landing->min_distance, ordinal,
+        (uint64_t)(int64_t)landing->flags, (uint64_t)(int64_t)landing->min_distance,
+        (uint64_t)ordinal,
     };
     mov_view_row(work, 3, fields, sizeof(fields) / sizeof(*fields), NULL, 0);
     return 0;

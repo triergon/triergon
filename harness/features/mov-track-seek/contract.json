@@ -8,9 +8,9 @@
   "runner": "cargo xtask report",
   "reference": "ffmpeg-isobmff-views-native",
   "contract": [
-    "Open the preloaded movie and seek one track by ID and demux timestamp using SeekJob. FFmpeg uses +noparse+nofillin, a backward public index lookup, and the first available index key when that lookup returns null. Both sides check MOV open admission before a landing is compared.",
+    "Open the preloaded movie and seek one track by ID and demux timestamp using SeekJob. FFmpeg opens with +noparse+nofillin and seeks the track with av_seek_frame and AVSEEK_FLAG_BACKWARD; its landing is the public index entry of the first packet the track then yields, the one entry with that packet's position and decode time. Both sides check MOV open admission before a landing is compared.",
     "Run both fresh and after draining packets and payloads to EOF. The candidate uses the existing complete-source index view, with the strict or bounded recovery opener named by the case.",
-    "Fold kind 3, entry presence, timestamp, absolute file position, size, signed index flags, minimum distance, and zero-based index ordinal in that order. No reference landing is kind 3 with presence zero. An input refusal is kind 8. A negative public index size that causes ENOMEM in the drain is a format refusal.",
+    "Fold kind 3, entry presence, timestamp, absolute file position, size, signed index flags, minimum distance, and zero-based index ordinal in that order. A refused reference seek, or one after which the track yields no packet, is kind 3 with presence zero. An input refusal is kind 8. A negative public index size that causes ENOMEM in the drain is a format refusal.",
     "Arguments are track ID, timestamp, EOF flag, window bytes, work quantum and candidate table policy. Input loading and argument parsing precede the observation window."
   ],
   "required_profiles": [
@@ -8893,236 +8893,666 @@
       "cause": "both workers refuse the input or request"
     }
   ],
+  "pending_module_requirements": [
+    "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2).",
+    "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3.",
+    "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+  ],
+  "open_cases": [
+    {
+      "id": "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at1099511627776-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2999-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2999-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at2999-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3500-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3500-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3500-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3999-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3999-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at3999-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4999-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4999-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at4999-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5500-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5500-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-edit-two-repeat-one-t1-at5500-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at1099511627776-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at1099511627776-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at1099511627776-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2999-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2999-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at2999-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3500-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3500-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3500-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3999-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3999-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at3999-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4999-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4999-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at4999-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5000-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5000-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5000-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5001-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5001-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5001-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5500-eof0-w1",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5500-eof0-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "unit-r-edits-repeat-t1-at5500-eof1-w65536",
+      "requirement": "SeekJob refuses a query at or after the first rolled-back timestamp of a repeated edit list (Unsupported: seek query between overlapping index clocks). Land on the last key entry at or before the query in index order, as the demuxer's seek does: entry 4 at 2000 and entry 7 at 4000 of r-edits-repeat, entry 4 at 2000 of edit-two-repeat-one, the sync samples the edit list presents there (ISO/IEC 14496-12:2015 8.6.6, 8.6.2)."
+    },
+    {
+      "id": "plan-follow-clock-later-minimum-four-t1-mid-eof-seek-ordinary",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "plan-follow-clock-later-minimum-four-t1-mid-seek-ordinary",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-f-ctts-v1-t1-at3000-eof0-w1",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-f-ctts-v1-t1-at3000-eof0-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-f-ctts-v1-t1-at3000-eof1-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-f-ctts-v1-t1-at3500-eof0-w1",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-f-ctts-v1-t1-at3500-eof0-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-f-ctts-v1-t1-at3500-eof1-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2000-eof0-w1",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2000-eof0-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2000-eof1-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2001-eof0-w1",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2001-eof0-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2001-eof1-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2999-eof0-w1",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2999-eof0-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-r-ctts-v1-t1-at2999-eof1-w65536",
+      "requirement": "SeekJob searches the query as given. The demuxer's backward seek searches for the last key entry at or before the query minus a per-track shift, observed as 1000 ticks in r-ctts-v1 and f-ctts-v1 and 100 in the later-minimum-four movie, all three with negative version-1 ctts offsets; at 2000 to 2999 ticks of r-ctts-v1 it lands on entry 0 where SeekJob lands on entry 3."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at-1-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at-1-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at-1-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at-9223372036854775807-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at-9223372036854775807-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at-9223372036854775807-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at0-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at0-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at0-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at1000-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at1000-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at1000-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at1099511627776-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at1099511627776-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at1099511627776-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at2000-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at2000-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at2000-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at2999-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at2999-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at2999-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at3000-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at3000-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at3000-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at3500-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at3500-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at3500-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at5000-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at5000-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at5000-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at5500-eof0-w1",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at5500-eof0-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    },
+    {
+      "id": "unit-null-index-clock-t1-at5500-eof1-w65536",
+      "requirement": "SeekJob refuses an index whose decode times reach 2^63 (Unsupported: seek over a null index clock); version-1 tfdt is unsigned 64-bit (ISO/IEC 14496-12:2015 8.8.12.2), so 2^63 and 2^63+3000 are valid decode times. Every query lies before both fragments, and SeekJob's documented fallback then names the first key, sample 1. The reference reads the times as signed and lands on sample 4 at -2^63+3000 (30 cases) or on sample 1 with the null time and flags -1 (3 cases)."
+    }
+  ],
   "open_deviations": [
     {
-      "reading": "Repeated edits with non-increasing demux index timestamps",
-      "clause": "ISO/IEC 14496-12:2015 §8.6.6.3 and Apple QuickTime File Format ‘Edit list atom (elst)’ permit multiple mappings from movie time to media time; neither defines choosing an entry in a rolled-back demux index. SeekJob::poll documents its ordered-index precondition",
-      "candidate": "refuses a query at or beyond the first overlapping clock with Unsupported",
-      "reference": "returns an entry from its public backward index lookup, for example ordinal 4 at 2000 ticks",
-      "compat": "compat::mov::seek overlapping_edit_index would reproduce the reference choice on repeated edits",
+      "reading": "A chunk offset outside the file is reported as file position zero",
+      "clause": "ISO/IEC 14496-12:2015 8.7.5.3: a chunk offset is the offset of the chunk in its file; co64 holds 2^64-4097 or 2^63 for chunk 3 of a 759-byte file",
+      "candidate": "refuses the index because sample 4 lies outside the media (Invalid: sample outside media extent)",
+      "reference": "lands on sample 4 at 3000 ticks and reports it at position 0, where the file holds its ftyp box",
       "cases": [
-        "unit-r-edits-repeat-t1-at2000-eof0-w65536",
-        "unit-r-edits-repeat-t1-at2000-eof1-w65536",
-        "unit-r-edits-repeat-t1-at2000-eof0-w1",
-        "unit-r-edits-repeat-t1-at2001-eof0-w65536",
-        "unit-r-edits-repeat-t1-at2001-eof1-w65536",
-        "unit-r-edits-repeat-t1-at2001-eof0-w1",
-        "unit-r-edits-repeat-t1-at2999-eof0-w65536",
-        "unit-r-edits-repeat-t1-at2999-eof1-w65536",
-        "unit-r-edits-repeat-t1-at2999-eof0-w1",
-        "unit-r-edits-repeat-t1-at3000-eof0-w65536",
-        "unit-r-edits-repeat-t1-at3000-eof1-w65536",
-        "unit-r-edits-repeat-t1-at3000-eof0-w1",
-        "unit-r-edits-repeat-t1-at3001-eof0-w65536",
-        "unit-r-edits-repeat-t1-at3001-eof1-w65536",
-        "unit-r-edits-repeat-t1-at3001-eof0-w1",
-        "unit-r-edits-repeat-t1-at3500-eof0-w65536",
-        "unit-r-edits-repeat-t1-at3500-eof1-w65536",
-        "unit-r-edits-repeat-t1-at3500-eof0-w1",
-        "unit-r-edits-repeat-t1-at3999-eof0-w65536",
-        "unit-r-edits-repeat-t1-at3999-eof1-w65536",
-        "unit-r-edits-repeat-t1-at3999-eof0-w1",
-        "unit-r-edits-repeat-t1-at4000-eof0-w65536",
-        "unit-r-edits-repeat-t1-at4000-eof1-w65536",
-        "unit-r-edits-repeat-t1-at4000-eof0-w1",
-        "unit-r-edits-repeat-t1-at4001-eof0-w65536",
-        "unit-r-edits-repeat-t1-at4001-eof1-w65536",
-        "unit-r-edits-repeat-t1-at4001-eof0-w1",
-        "unit-r-edits-repeat-t1-at4999-eof0-w65536",
-        "unit-r-edits-repeat-t1-at4999-eof1-w65536",
-        "unit-r-edits-repeat-t1-at4999-eof0-w1",
-        "unit-r-edits-repeat-t1-at5000-eof0-w65536",
-        "unit-r-edits-repeat-t1-at5000-eof1-w65536",
-        "unit-r-edits-repeat-t1-at5000-eof0-w1",
-        "unit-r-edits-repeat-t1-at5001-eof0-w65536",
-        "unit-r-edits-repeat-t1-at5001-eof1-w65536",
-        "unit-r-edits-repeat-t1-at5001-eof0-w1",
-        "unit-r-edits-repeat-t1-at5500-eof0-w65536",
-        "unit-r-edits-repeat-t1-at5500-eof1-w65536",
-        "unit-r-edits-repeat-t1-at5500-eof0-w1",
-        "unit-r-edits-repeat-t1-at1099511627776-eof0-w65536",
-        "unit-r-edits-repeat-t1-at1099511627776-eof1-w65536",
-        "unit-r-edits-repeat-t1-at1099511627776-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at2000-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at2000-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at2000-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at2001-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at2001-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at2001-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at2999-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at2999-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at2999-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at3000-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at3000-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at3000-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at3001-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at3001-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at3001-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at3500-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at3500-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at3500-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at3999-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at3999-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at3999-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at4000-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at4000-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at4000-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at4001-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at4001-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at4001-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at4999-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at4999-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at4999-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at5000-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at5000-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at5000-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at5001-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at5001-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at5001-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at5500-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at5500-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at5500-eof0-w1",
-        "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w65536",
-        "unit-edit-two-repeat-one-t1-at1099511627776-eof1-w65536",
-        "unit-edit-two-repeat-one-t1-at1099511627776-eof0-w1"
-      ]
-    },
-    {
-      "reading": "Unsigned fragment clock equals the signed demux null sentinel",
-      "clause": "ISO/IEC 14496-12:2015 §§8.8.12.2–.3: version-1 tfdt is unsigned 64-bit. SeekJob::poll excludes the demux null timestamp from its signed search domain",
-      "candidate": "refuses to treat 2^63 as a signed seek timestamp",
-      "reference": "can return the index entry with raw timestamp bits 2^63 and flags -1",
-      "cases": [
-        "unit-null-index-clock-t1-at-9223372036854775807-eof0-w65536",
-        "unit-null-index-clock-t1-at-9223372036854775807-eof1-w65536",
-        "unit-null-index-clock-t1-at-9223372036854775807-eof0-w1",
-        "unit-null-index-clock-t1-at-1-eof0-w65536",
-        "unit-null-index-clock-t1-at-1-eof1-w65536",
-        "unit-null-index-clock-t1-at-1-eof0-w1",
-        "unit-null-index-clock-t1-at0-eof0-w65536",
-        "unit-null-index-clock-t1-at0-eof1-w65536",
-        "unit-null-index-clock-t1-at0-eof0-w1",
-        "unit-null-index-clock-t1-at1000-eof0-w65536",
-        "unit-null-index-clock-t1-at1000-eof1-w65536",
-        "unit-null-index-clock-t1-at1000-eof0-w1",
-        "unit-null-index-clock-t1-at2000-eof0-w65536",
-        "unit-null-index-clock-t1-at2000-eof1-w65536",
-        "unit-null-index-clock-t1-at2000-eof0-w1",
-        "unit-null-index-clock-t1-at2999-eof0-w65536",
-        "unit-null-index-clock-t1-at2999-eof1-w65536",
-        "unit-null-index-clock-t1-at2999-eof0-w1",
-        "unit-null-index-clock-t1-at3000-eof0-w65536",
-        "unit-null-index-clock-t1-at3000-eof1-w65536",
-        "unit-null-index-clock-t1-at3000-eof0-w1",
-        "unit-null-index-clock-t1-at3500-eof0-w65536",
-        "unit-null-index-clock-t1-at3500-eof1-w65536",
-        "unit-null-index-clock-t1-at3500-eof0-w1",
-        "unit-null-index-clock-t1-at5000-eof0-w65536",
-        "unit-null-index-clock-t1-at5000-eof1-w65536",
-        "unit-null-index-clock-t1-at5000-eof0-w1",
-        "unit-null-index-clock-t1-at5500-eof0-w65536",
-        "unit-null-index-clock-t1-at5500-eof1-w65536",
-        "unit-null-index-clock-t1-at5500-eof0-w1",
-        "unit-null-index-clock-t1-at1099511627776-eof0-w65536",
-        "unit-null-index-clock-t1-at1099511627776-eof1-w65536",
-        "unit-null-index-clock-t1-at1099511627776-eof0-w1"
-      ]
-    },
-    {
-      "reading": "An index backed by sample ranges outside the available media",
-      "clause": "ISO/IEC 14496-12:2015 §§8.1.1.1, 8.7.3.2.2 and 8.7.5.3: a chunk offset addresses the containing file and its sample sizes give the byte extents of its samples",
-      "candidate": "refuses the index whose complete-source validation encounters an impossible co64 position, an overflowing sample end, or an oversize final sample",
-      "reference": "can publish a landing at offset zero or an earlier index entry, keep a negative public size, or return no entry",
-      "compat": "compat::mov::seek partial_index would expose index entries before an invalid sample range",
-      "cases": [
-        "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w65536",
-        "unit-sample-end-overflow-t1-at-9223372036854775807-eof1-w65536",
-        "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w1",
-        "unit-sample-end-overflow-t1-at-1-eof0-w65536",
-        "unit-sample-end-overflow-t1-at-1-eof1-w65536",
-        "unit-sample-end-overflow-t1-at-1-eof0-w1",
-        "unit-sample-end-overflow-t1-at0-eof0-w65536",
-        "unit-sample-end-overflow-t1-at0-eof1-w65536",
-        "unit-sample-end-overflow-t1-at0-eof0-w1",
-        "unit-sample-end-overflow-t1-at1000-eof0-w65536",
-        "unit-sample-end-overflow-t1-at1000-eof1-w65536",
-        "unit-sample-end-overflow-t1-at1000-eof0-w1",
-        "unit-sample-end-overflow-t1-at2000-eof0-w65536",
-        "unit-sample-end-overflow-t1-at2000-eof1-w65536",
-        "unit-sample-end-overflow-t1-at2000-eof0-w1",
-        "unit-sample-end-overflow-t1-at2999-eof0-w65536",
-        "unit-sample-end-overflow-t1-at2999-eof1-w65536",
-        "unit-sample-end-overflow-t1-at2999-eof0-w1",
-        "unit-sample-end-overflow-t1-at3000-eof0-w65536",
-        "unit-sample-end-overflow-t1-at3000-eof1-w65536",
-        "unit-sample-end-overflow-t1-at3000-eof0-w1",
-        "unit-sample-end-overflow-t1-at3500-eof0-w65536",
-        "unit-sample-end-overflow-t1-at3500-eof1-w65536",
-        "unit-sample-end-overflow-t1-at3500-eof0-w1",
-        "unit-sample-end-overflow-t1-at5000-eof0-w65536",
-        "unit-sample-end-overflow-t1-at5000-eof1-w65536",
-        "unit-sample-end-overflow-t1-at5000-eof0-w1",
-        "unit-sample-end-overflow-t1-at5500-eof0-w65536",
-        "unit-sample-end-overflow-t1-at5500-eof1-w65536",
-        "unit-sample-end-overflow-t1-at5500-eof0-w1",
+        "unit-sample-end-overflow-t1-at1099511627776-eof0-w1",
         "unit-sample-end-overflow-t1-at1099511627776-eof0-w65536",
         "unit-sample-end-overflow-t1-at1099511627776-eof1-w65536",
-        "unit-sample-end-overflow-t1-at1099511627776-eof0-w1",
-        "unit-signed-position-t1-at-9223372036854775807-eof0-w65536",
-        "unit-signed-position-t1-at-9223372036854775807-eof1-w65536",
-        "unit-signed-position-t1-at-9223372036854775807-eof0-w1",
-        "unit-signed-position-t1-at-1-eof0-w65536",
-        "unit-signed-position-t1-at-1-eof1-w65536",
-        "unit-signed-position-t1-at-1-eof0-w1",
-        "unit-signed-position-t1-at0-eof0-w65536",
-        "unit-signed-position-t1-at0-eof1-w65536",
-        "unit-signed-position-t1-at0-eof0-w1",
-        "unit-signed-position-t1-at1000-eof0-w65536",
-        "unit-signed-position-t1-at1000-eof1-w65536",
-        "unit-signed-position-t1-at1000-eof0-w1",
-        "unit-signed-position-t1-at2000-eof0-w65536",
-        "unit-signed-position-t1-at2000-eof1-w65536",
-        "unit-signed-position-t1-at2000-eof0-w1",
-        "unit-signed-position-t1-at2999-eof0-w65536",
-        "unit-signed-position-t1-at2999-eof1-w65536",
-        "unit-signed-position-t1-at2999-eof0-w1",
-        "unit-signed-position-t1-at3000-eof0-w65536",
-        "unit-signed-position-t1-at3000-eof1-w65536",
-        "unit-signed-position-t1-at3000-eof0-w1",
-        "unit-signed-position-t1-at3500-eof0-w65536",
-        "unit-signed-position-t1-at3500-eof1-w65536",
-        "unit-signed-position-t1-at3500-eof0-w1",
-        "unit-signed-position-t1-at5000-eof0-w65536",
-        "unit-signed-position-t1-at5000-eof1-w65536",
-        "unit-signed-position-t1-at5000-eof0-w1",
-        "unit-signed-position-t1-at5500-eof0-w65536",
-        "unit-signed-position-t1-at5500-eof1-w65536",
-        "unit-signed-position-t1-at5500-eof0-w1",
+        "unit-sample-end-overflow-t1-at3000-eof0-w1",
+        "unit-sample-end-overflow-t1-at3000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at3000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at3500-eof0-w1",
+        "unit-sample-end-overflow-t1-at3500-eof0-w65536",
+        "unit-sample-end-overflow-t1-at3500-eof1-w65536",
+        "unit-sample-end-overflow-t1-at5000-eof0-w1",
+        "unit-sample-end-overflow-t1-at5000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at5000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at5500-eof0-w1",
+        "unit-sample-end-overflow-t1-at5500-eof0-w65536",
+        "unit-sample-end-overflow-t1-at5500-eof1-w65536",
+        "unit-signed-position-t1-at1099511627776-eof0-w1",
         "unit-signed-position-t1-at1099511627776-eof0-w65536",
         "unit-signed-position-t1-at1099511627776-eof1-w65536",
-        "unit-signed-position-t1-at1099511627776-eof0-w1",
-        "unit-signed-size-t1-at-9223372036854775807-eof0-w65536",
-        "unit-signed-size-t1-at-9223372036854775807-eof0-w1",
-        "unit-signed-size-t1-at-1-eof0-w65536",
+        "unit-signed-position-t1-at3000-eof0-w1",
+        "unit-signed-position-t1-at3000-eof0-w65536",
+        "unit-signed-position-t1-at3000-eof1-w65536",
+        "unit-signed-position-t1-at3500-eof0-w1",
+        "unit-signed-position-t1-at3500-eof0-w65536",
+        "unit-signed-position-t1-at3500-eof1-w65536",
+        "unit-signed-position-t1-at5000-eof0-w1",
+        "unit-signed-position-t1-at5000-eof0-w65536",
+        "unit-signed-position-t1-at5000-eof1-w65536",
+        "unit-signed-position-t1-at5500-eof0-w1",
+        "unit-signed-position-t1-at5500-eof0-w65536",
+        "unit-signed-position-t1-at5500-eof1-w65536"
+      ]
+    },
+    {
+      "reading": "Recovery policy the standard leaves open: a damaged later chunk does not stop the demuxer from landing on valid earlier entries",
+      "clause": "ISO/IEC 14496-12:2015 8.7.5.3 and 8.7.3.2.2 make a chunk outside the file or a 2^29-byte final sample invalid and say nothing of the valid samples before it; the compat seek validates every media range before it publishes a landing (crates/isobmff README, Seek)",
+      "candidate": "refuses the whole index once validation reaches the invalid range (Invalid: sample outside media extent)",
+      "reference": "lands on sample 1 at position 28 for queries before 3000 ticks of the co64 movies, and on sample 1 at 675 or sample 4 at 711 of signed-size.mov on a fresh seek",
+      "cases": [
+        "unit-sample-end-overflow-t1-at-1-eof0-w1",
+        "unit-sample-end-overflow-t1-at-1-eof0-w65536",
+        "unit-sample-end-overflow-t1-at-1-eof1-w65536",
+        "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w1",
+        "unit-sample-end-overflow-t1-at-9223372036854775807-eof0-w65536",
+        "unit-sample-end-overflow-t1-at-9223372036854775807-eof1-w65536",
+        "unit-sample-end-overflow-t1-at0-eof0-w1",
+        "unit-sample-end-overflow-t1-at0-eof0-w65536",
+        "unit-sample-end-overflow-t1-at0-eof1-w65536",
+        "unit-sample-end-overflow-t1-at1000-eof0-w1",
+        "unit-sample-end-overflow-t1-at1000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at1000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at2000-eof0-w1",
+        "unit-sample-end-overflow-t1-at2000-eof0-w65536",
+        "unit-sample-end-overflow-t1-at2000-eof1-w65536",
+        "unit-sample-end-overflow-t1-at2999-eof0-w1",
+        "unit-sample-end-overflow-t1-at2999-eof0-w65536",
+        "unit-sample-end-overflow-t1-at2999-eof1-w65536",
+        "unit-signed-position-t1-at-1-eof0-w1",
+        "unit-signed-position-t1-at-1-eof0-w65536",
+        "unit-signed-position-t1-at-1-eof1-w65536",
+        "unit-signed-position-t1-at-9223372036854775807-eof0-w1",
+        "unit-signed-position-t1-at-9223372036854775807-eof0-w65536",
+        "unit-signed-position-t1-at-9223372036854775807-eof1-w65536",
+        "unit-signed-position-t1-at0-eof0-w1",
+        "unit-signed-position-t1-at0-eof0-w65536",
+        "unit-signed-position-t1-at0-eof1-w65536",
+        "unit-signed-position-t1-at1000-eof0-w1",
+        "unit-signed-position-t1-at1000-eof0-w65536",
+        "unit-signed-position-t1-at1000-eof1-w65536",
+        "unit-signed-position-t1-at2000-eof0-w1",
+        "unit-signed-position-t1-at2000-eof0-w65536",
+        "unit-signed-position-t1-at2000-eof1-w65536",
+        "unit-signed-position-t1-at2999-eof0-w1",
+        "unit-signed-position-t1-at2999-eof0-w65536",
+        "unit-signed-position-t1-at2999-eof1-w65536",
         "unit-signed-size-t1-at-1-eof0-w1",
-        "unit-signed-size-t1-at0-eof0-w65536",
+        "unit-signed-size-t1-at-1-eof0-w65536",
+        "unit-signed-size-t1-at-9223372036854775807-eof0-w1",
+        "unit-signed-size-t1-at-9223372036854775807-eof0-w65536",
         "unit-signed-size-t1-at0-eof0-w1",
-        "unit-signed-size-t1-at1000-eof0-w65536",
+        "unit-signed-size-t1-at0-eof0-w65536",
         "unit-signed-size-t1-at1000-eof0-w1",
-        "unit-signed-size-t1-at2000-eof0-w65536",
-        "unit-signed-size-t1-at2000-eof0-w1",
-        "unit-signed-size-t1-at2999-eof0-w65536",
-        "unit-signed-size-t1-at2999-eof0-w1",
-        "unit-signed-size-t1-at3000-eof0-w65536",
-        "unit-signed-size-t1-at3000-eof0-w1",
-        "unit-signed-size-t1-at3500-eof0-w65536",
-        "unit-signed-size-t1-at3500-eof0-w1",
-        "unit-signed-size-t1-at5000-eof0-w65536",
-        "unit-signed-size-t1-at5000-eof0-w1",
-        "unit-signed-size-t1-at5500-eof0-w65536",
-        "unit-signed-size-t1-at5500-eof0-w1",
+        "unit-signed-size-t1-at1000-eof0-w65536",
+        "unit-signed-size-t1-at1099511627776-eof0-w1",
         "unit-signed-size-t1-at1099511627776-eof0-w65536",
-        "unit-signed-size-t1-at1099511627776-eof0-w1"
+        "unit-signed-size-t1-at2000-eof0-w1",
+        "unit-signed-size-t1-at2000-eof0-w65536",
+        "unit-signed-size-t1-at2999-eof0-w1",
+        "unit-signed-size-t1-at2999-eof0-w65536",
+        "unit-signed-size-t1-at3000-eof0-w1",
+        "unit-signed-size-t1-at3000-eof0-w65536",
+        "unit-signed-size-t1-at3500-eof0-w1",
+        "unit-signed-size-t1-at3500-eof0-w65536",
+        "unit-signed-size-t1-at5000-eof0-w1",
+        "unit-signed-size-t1-at5000-eof0-w65536",
+        "unit-signed-size-t1-at5500-eof0-w1",
+        "unit-signed-size-t1-at5500-eof0-w65536"
+      ]
+    },
+    {
+      "reading": "Seek policy the standard leaves open: a query within the composition shift of the smallest tick has no preceding key",
+      "clause": "ISO/IEC 14496-12:2015 8.6.1 and 8.6.2 define sample times and sync samples but no seek; SeekJob documents the first key entry as its landing when none precedes the query",
+      "candidate": "lands on the first key entry: r-ctts-v1 entry 0 at -1000 ticks, position 731; f-ctts-v1 entry 0 at 0, position 771",
+      "reference": "lands on the last key entry, entry 3 at 2000 (position 767) or 3000 (position 975): the query -2^63+1 less the 1000-tick composition shift wraps to the top of the signed range",
+      "cases": [
+        "unit-f-ctts-v1-t1-at-9223372036854775807-eof0-w1",
+        "unit-f-ctts-v1-t1-at-9223372036854775807-eof0-w65536",
+        "unit-f-ctts-v1-t1-at-9223372036854775807-eof1-w65536",
+        "unit-r-ctts-v1-t1-at-9223372036854775807-eof0-w1",
+        "unit-r-ctts-v1-t1-at-9223372036854775807-eof0-w65536",
+        "unit-r-ctts-v1-t1-at-9223372036854775807-eof1-w65536"
       ]
     }
   ]
