@@ -11,7 +11,7 @@
 )]
 #![expect(
     clippy::expect_used,
-    reason = "the decoder worker preserves panic diagnostics on legacy argument and I/O failures"
+    reason = "a missing argument, an unreadable input or a failed write ends the worker with status 101, which the fuzz campaigns read as a crash"
 )]
 #![expect(
     clippy::print_stdout,
@@ -50,7 +50,9 @@ impl<E: std::fmt::Debug> From<E> for Refusal {
     }
 }
 
-// The worker diagnostic names are part of its trace format.
+/// A refused H.264 or HEVC access unit as a `decode error` line prints it. The video
+/// lanes' recorded diagnostics name the invalid-data and limit classes `InvalidData` and
+/// `ResourceLimit`; every other error, like every audio refusal, prints its `Debug` form.
 struct VideoRefusal(String);
 
 impl From<triergon_codec_h264::DecodeError> for VideoRefusal {
@@ -228,16 +230,9 @@ fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
     let mut downmix = Downmix::default();
     let mut pcm = Vec::new();
     let mut bytes = Vec::new();
-    audio_units(codec, data, |unit| match decoder.decode(unit, &mut frame) {
-        Ok(_) if frame.samples_per_channel == 0 => {}
-        Ok(levels) => {
-            pcm.clear();
-            downmix.mix(&frame, levels.unwrap_or_default(), &mut pcm);
-            bytes.clear();
-            bytes.extend(pcm.iter().flat_map(|s| s.to_le_bytes()));
-            out.emit(&bytes);
-        }
-        Err(error) => eprintln!("decode error: {}", error.0),
+    audio_units(codec, data, |unit| {
+        let decoded = decoder.decode(unit, &mut frame);
+        emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
     });
 }
 
