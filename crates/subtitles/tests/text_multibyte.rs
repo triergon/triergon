@@ -321,6 +321,29 @@ const BIG5_PLANE2: &[u8] = include_bytes!("../src/text/charset/mapping-data/big5
 const WINDOWS932: &[u8] = include_bytes!("../src/text/charset/mapping-data/windows932.bin");
 const WINDOWS949: &[u8] = include_bytes!("../src/text/charset/mapping-data/windows949.bin");
 
+#[test]
+fn encoding_standard_tables_match_the_verified_index_outputs() {
+    use triergon_harness_protocol::{hex, md5};
+
+    // The index identifiers and SHA-256 pins, including the reproduction
+    // commands, are in multibyte-mapping-data/SOURCE-LOCK.json.
+    let ranges = include_bytes!("../src/text/charset/mapping-data/gb18030_ranges.bin");
+    for (name, table, digest) in [
+        ("Big5", BIG5, "09c63c3998177fd6627bbaf7b4c1205a"),
+        (
+            "Big5 plane 2",
+            BIG5_PLANE2,
+            "25c4b9540b8c43b9e8597cd292370005",
+        ),
+        ("Shift_JIS", WINDOWS932, "29ada05a815e8e65b3414c936cbf6054"),
+        ("EUC-KR", WINDOWS949, "35b6d1280cd2f0a1b6ea82e1123496fd"),
+        ("GBK", GBK, "a86a3473b4e35ab4383a8fffe11984ba"),
+        ("GB18030 ranges", ranges, "89ab967460c5c2aec609f241d084bfcf"),
+    ] {
+        assert_eq!(hex(&md5::digest(table)), digest, "{name}");
+    }
+}
+
 // These profiles' tables come from the Encoding Standard's indexes or the
 // receiver's C library. Compare the public decoder, including the direct ASCII
 // path, with every one- and two-byte table result.

@@ -4,7 +4,7 @@ Mapping data, sources and licences for `text::charset::multibyte`. Each profile
 is selected explicitly with `MultibyteCharset::from_label`, `Charset::Multibyte`
 or `Encoding::Multibyte`; no label or content is guessed.
 
-A strict profile follows the current definition of its charset: the decoder of the
+A strict profile follows the current definition of its charset: fatal decoding in the
 WHATWG Encoding Standard for its label, and for a `cp` label the Windows code page as
 Windows converts it. A `Receiver` profile follows the C library of the reference build
 instead, and is what `compat::charset::receiver_charset` selects.
@@ -56,8 +56,9 @@ and `gb18030_ranges.bin`, the four-byte ranges below U+10000 as `(u16 pointer, u
 scalar)` records. `ShiftJis` and `EucKr` decode `windows932.bin` and `windows949.bin`:
 `cargo xtask subtitle-views charset-tables shift_jis INDEX` and `... euc-kr INDEX`
 check that `index-jis0208.txt` and `index-euc-kr.txt` give those tables' records
-beyond ASCII, with Shift_JIS's 0x80, which the decoder gives as itself. The tests decode every one- and
-two-byte input of the Big5 tables and check hand-picked pointers of `index-big5.txt` with their code points.
+beyond ASCII, with Shift_JIS's 0x80, which the decoder gives as itself. The tests
+check digests of all six verified table files offline, decode every one- and
+two-byte input of the Big5 tables and check selected index pointers and code points.
 The receiver tables are `receiver_gbk.bin`, `receiver_shift_jis.bin` and
 `receiver_euc_kr.bin` from the Microsoft and Unicode tables above, and the GNU Big5
 charmap, with its free-distribution notice, `charset/mapping-data/RECEIVER-BIG5-DATA.txt`
