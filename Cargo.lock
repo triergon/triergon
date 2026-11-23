@@ -77,6 +77,7 @@ dependencies = [
  "triergon-framing",
  "triergon-harness-protocol",
  "triergon-harness-runner",
+ "triergon-harness-test-support",
  "triergon-hls",
  "triergon-isobmff",
  "triergon-matroska",
@@ -119,6 +120,7 @@ dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
  "triergon-harness-runner",
+ "triergon-harness-test-support",
  "triergon-mpegts",
  "triergon-subtitles",
  "triergon-worker-entry",
@@ -346,6 +348,7 @@ dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
  "triergon-harness-runner",
+ "triergon-harness-test-support",
  "triergon-worker-entry",
 ]
 
@@ -360,6 +363,10 @@ dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
 ]
+
+[[package]]
+name = "triergon-harness-test-support"
+version = "0.0.0"
 
 [[package]]
 name = "triergon-hls"
@@ -402,6 +409,7 @@ dependencies = [
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
+ "triergon-harness-test-support",
 ]
 
 [[package]]
@@ -493,3 +501,6 @@ version = "0.0.0"
 [[package]]
 name = "xtask"
 version = "0.0.0"
+dependencies = [
+ "triergon-harness-test-support",
+]

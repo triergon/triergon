@@ -1,6 +1,6 @@
 //! The integration tests of `triergon-mpegts`, one test binary.
-#[path = "../../../../xtask/src/sha256.rs"]
-mod sha256;
+use triergon_harness_test_support::sha256;
+
 mod support;
 
 mod clock_views;

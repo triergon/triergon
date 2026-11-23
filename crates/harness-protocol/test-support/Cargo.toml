@@ -1,0 +1,12 @@
+[package]
+name = "triergon-harness-test-support"
+version = "0.0.0"
+description = "JSON corpus and SHA-256 input handling for tests and repository tooling"
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true

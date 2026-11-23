@@ -37,12 +37,8 @@ mod pgs;
 mod sink;
 mod teletext;
 mod text;
-// The repository's JSON reader, for tests that read a corpus; the parts they
-// do not call are unused here.
 #[cfg(test)]
-#[allow(dead_code)]
-#[path = "../../../xtask/src/json.rs"]
-mod json;
+use triergon_harness_test_support::json;
 
 use container::Result;
 use sink::Sink;

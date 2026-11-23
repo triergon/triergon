@@ -1,13 +1,6 @@
 use super::*;
 
-// These tests reuse the repository's JSON reader and SHA-256; the helpers they do
-// not call are unused here.
-#[allow(dead_code)]
-#[path = "../../../xtask/src/json.rs"]
-mod json;
-#[allow(dead_code)]
-#[path = "../../../xtask/src/sha256.rs"]
-mod sha256;
+use triergon_harness_test_support::{json, sha256};
 
 fn cases() -> Vec<json::Value> {
     let manifest = json::parse_strict(include_str!(

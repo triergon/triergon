@@ -1,0 +1,810 @@
+//! JSON for harness data files and worker output, with Python's `json` semantics.
+//!
+//! Objects keep their key order. Numbers keep integer/float identity: integers
+//! keep their digits, floats are held in Python's shortest `repr`, so a document
+//! read and written back is byte-identical to Python's `json.loads`/`json.dumps`.
+//! `NaN`, `Infinity` and `-Infinity` are accepted, as Python accepts them.
+
+use std::fmt;
+
+/// An owned JSON value. An object's members retain their original order.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Value {
+    /// The null literal.
+    Null,
+    /// A Boolean literal.
+    Bool(bool),
+    /// A number whose digits are kept separately from its numeric value.
+    Number(Number),
+    /// A decoded Unicode string.
+    String(String),
+    /// Values in their document order.
+    Array(Vec<Value>),
+    /// Object members in their document order.
+    Object(Vec<(String, Value)>),
+}
+
+/// A JSON number as written in the source.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Number(String);
+
+impl Number {
+    /// An integer (as opposed to a float) in Python's sense.
+    pub fn is_integer(&self) -> bool {
+        !self.0.contains(['.', 'e', 'E', 'N', 'I'])
+    }
+
+    /// Return the integer if it fits a signed 128-bit value.
+    pub fn as_i128(&self) -> Option<i128> {
+        if self.is_integer() {
+            self.0.parse().ok()
+        } else {
+            None
+        }
+    }
+
+    /// Numeric equality as Python's `==` on ints, floats and `Decimal`s: exact
+    /// decimal values, so `48000 == 48000.0` and `1.50 == 1.5`, while an integer
+    /// beyond binary64 never equals a nearby float.
+    pub fn equals(&self, other: &Number) -> bool {
+        match (decimal(&self.0), decimal(&other.0)) {
+            (Some(a), Some(b)) => a == b,
+            _ => match (self.0.as_str(), other.0.as_str()) {
+                ("NaN", _) | (_, "NaN") => false,
+                (a, b) => a == b,
+            },
+        }
+    }
+
+    /// Return the stored number spelling.
+    pub fn text(&self) -> &str {
+        &self.0
+    }
+
+    /// Convert to binary64, including the non-finite number spellings.
+    pub fn as_f64(&self) -> f64 {
+        match self.0.as_str() {
+            "NaN" => f64::NAN,
+            "Infinity" => f64::INFINITY,
+            "-Infinity" => f64::NEG_INFINITY,
+            text => text.parse().unwrap_or(f64::NAN),
+        }
+    }
+}
+
+impl Value {
+    /// Member `key` of an object; `None` for other values or a missing key.
+    /// A repeated key resolves to its last occurrence, as in Python.
+    /// Look up an object member by name.
+    pub fn get(&self, key: &str) -> Option<&Value> {
+        match self {
+            Value::Object(members) => members.iter().rev().find(|(k, _)| k == key).map(|(_, v)| v),
+            _ => None,
+        }
+    }
+
+    /// Borrow the contents of a string value.
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    /// Convert a number value to binary64.
+    pub fn as_f64(&self) -> Option<f64> {
+        match self {
+            Value::Number(n) => Some(n.as_f64()),
+            _ => None,
+        }
+    }
+
+    /// Borrow the elements of an array.
+    pub fn as_array(&self) -> Option<&[Value]> {
+        match self {
+            Value::Array(items) => Some(items),
+            _ => None,
+        }
+    }
+
+    /// Python truthiness: false, null, zero, and empty strings, arrays and objects
+    /// are false.
+    /// Test the value using Python's truth-value rules.
+    pub fn truthy(&self) -> bool {
+        match self {
+            Value::Null => false,
+            Value::Bool(b) => *b,
+            Value::Number(n) => n.as_f64() != 0.0,
+            Value::String(s) => !s.is_empty(),
+            Value::Array(items) => !items.is_empty(),
+            Value::Object(members) => !members.is_empty(),
+        }
+    }
+}
+
+impl Value {
+    /// Build a number from a signed integer.
+    pub fn int(value: impl Into<i128>) -> Value {
+        Value::Number(Number(value.into().to_string()))
+    }
+
+    /// A float written as Python's `repr` writes it (`1.0`, `0.95`, `1e-05`).
+    /// Build a number from a binary64 float.
+    pub fn float(value: f64) -> Value {
+        Value::Number(Number(python_float(value)))
+    }
+
+    /// Build a JSON string.
+    pub fn str(value: impl Into<String>) -> Value {
+        Value::String(value.into())
+    }
+
+    /// Build an object in the order in which its members arrive.
+    pub fn object<K: Into<String>>(members: impl IntoIterator<Item = (K, Value)>) -> Value {
+        Value::Object(members.into_iter().map(|(k, v)| (k.into(), v)).collect())
+    }
+
+    /// Build an array of strings.
+    pub fn strings<S: Into<String>>(items: impl IntoIterator<Item = S>) -> Value {
+        Value::Array(items.into_iter().map(|s| Value::String(s.into())).collect())
+    }
+}
+
+/// A finite JSON number as (negative, significant digits, exponent), normalised
+/// so equal values compare equal; `None` for `NaN` and infinities.
+fn decimal(text: &str) -> Option<(bool, String, i128)> {
+    let (negative, body) = text
+        .strip_prefix('-')
+        .map_or((false, text), |rest| (true, rest));
+    let (mantissa, exponent) = match body.find(['e', 'E']) {
+        Some(at) => (&body[..at], i128::from(body[at + 1..].parse::<i64>().ok()?)),
+        None => (body, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    if whole.is_empty()
+        || !whole
+            .bytes()
+            .chain(fraction.bytes())
+            .all(|b| b.is_ascii_digit())
+    {
+        return None;
+    }
+    let digits = format!("{whole}{fraction}");
+    let digits = digits.trim_start_matches('0');
+    let trimmed = digits.trim_end_matches('0');
+    if trimmed.is_empty() {
+        return Some((false, String::new(), 0));
+    }
+    let exponent = exponent - fraction.len() as i128 + (digits.len() - trimmed.len()) as i128;
+    Some((negative, trimmed.to_owned(), exponent))
+}
+
+/// Python's `str(Decimal(text))` for a JSON number's text.
+pub fn decimal_text(text: &str) -> String {
+    let (negative, body) = text
+        .strip_prefix('-')
+        .map_or((false, text), |rest| (true, rest));
+    let (mantissa, exponent) = match body.find(['e', 'E']) {
+        Some(at) => {
+            let Ok(exponent) = body[at + 1..].parse::<i64>() else {
+                return text.to_owned();
+            };
+            (&body[..at], i128::from(exponent))
+        }
+        None => (body, 0),
+    };
+    let (whole, fraction) = mantissa.split_once('.').unwrap_or((mantissa, ""));
+    let raw = format!("{whole}{fraction}");
+    let coefficient = raw.trim_start_matches('0');
+    let coefficient = if coefficient.is_empty() {
+        "0"
+    } else {
+        coefficient
+    };
+    let exponent = exponent - fraction.len() as i128;
+    let adjusted = exponent + coefficient.len() as i128 - 1;
+    let sign = if negative { "-" } else { "" };
+    let text = if exponent <= 0 && adjusted >= -6 {
+        if exponent == 0 {
+            coefficient.to_owned()
+        } else {
+            let point = coefficient.len() as i128 + exponent;
+            if point > 0 {
+                format!(
+                    "{}.{}",
+                    &coefficient[..point as usize],
+                    &coefficient[point as usize..]
+                )
+            } else {
+                format!("0.{}{coefficient}", "0".repeat((-point) as usize))
+            }
+        }
+    } else {
+        let (first, rest) = coefficient.split_at(1);
+        let fraction = if rest.is_empty() {
+            String::new()
+        } else {
+            format!(".{rest}")
+        };
+        format!(
+            "{first}{fraction}E{}{adjusted}",
+            if adjusted >= 0 { "+" } else { "" }
+        )
+    };
+    format!("{sign}{text}")
+}
+
+/// The text Python writes back for a JSON number it read.
+fn canonical_number(raw: &str) -> String {
+    if !raw.contains(['.', 'e', 'E']) {
+        // An integer; only "-0" changes ("0").
+        return if raw.trim_start_matches('-').bytes().all(|b| b == b'0') {
+            "0".into()
+        } else {
+            raw.into()
+        };
+    }
+    python_float(raw.parse().unwrap_or(f64::NAN))
+}
+
+/// Python's shortest round-trip float `repr`.
+#[expect(
+    clippy::expect_used,
+    reason = "LowerExp for finite floats always emits a decimal exponent"
+)]
+fn python_float(value: f64) -> String {
+    if value.is_nan() {
+        return "NaN".into();
+    }
+    if value.is_infinite() {
+        return if value > 0.0 { "Infinity" } else { "-Infinity" }.into();
+    }
+    let mut scientific = format!("{:e}", value.abs());
+    // The shortest digits that round-trip; where two such strings are equally
+    // close (an exact tie), Python takes the correctly rounded (half-even) one.
+    let length =
+        scientific.find('e').expect("exponent form") - usize::from(scientific.contains('.'));
+    let rounded = format!("{:.*e}", length - 1, value.abs());
+    if rounded.parse::<f64>() == Ok(value.abs()) {
+        scientific = rounded;
+    }
+    let (mantissa, exponent) = scientific.split_once('e').expect("exponent form");
+    let exponent: i32 = exponent.parse().expect("integer exponent");
+    let digits: String = mantissa.chars().filter(|c| *c != '.').collect();
+    let sign = if value.is_sign_negative() { "-" } else { "" };
+    if (-4..16).contains(&exponent) {
+        let point = exponent + 1;
+        let text = if point <= 0 {
+            format!("0.{}{digits}", "0".repeat((-point) as usize))
+        } else if point as usize >= digits.len() {
+            format!("{digits}{}.0", "0".repeat(point as usize - digits.len()))
+        } else {
+            format!(
+                "{}.{}",
+                &digits[..point as usize],
+                &digits[point as usize..]
+            )
+        };
+        format!("{sign}{text}")
+    } else {
+        let (first, rest) = digits.split_at(1);
+        let fraction = if rest.is_empty() {
+            String::new()
+        } else {
+            format!(".{rest}")
+        };
+        let exp_sign = if exponent < 0 { '-' } else { '+' };
+        format!("{sign}{first}{fraction}e{exp_sign}{:02}", exponent.abs())
+    }
+}
+
+/// `json.dumps(value, indent=indent)` as Python writes it, ASCII-only.
+pub fn to_python(value: &Value, indent: Option<usize>) -> String {
+    let mut out = String::new();
+    write_value(&mut out, value, indent, 0);
+    out
+}
+
+/// `json.dumps(value, sort_keys=True, separators=(",", ":"))`: the canonical
+/// form whose SHA-256 identifies a document.
+pub fn canonical(value: &Value) -> String {
+    let mut out = String::new();
+    write_compact(&mut out, value, true);
+    out
+}
+
+/// Compact JSON with object members in their recorded order.
+pub fn observations(value: &Value) -> String {
+    let mut out = String::new();
+    write_compact(&mut out, value, false);
+    out
+}
+
+fn write_compact(out: &mut String, value: &Value, sort: bool) {
+    match value {
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                write_compact(out, item, sort);
+            }
+            out.push(']');
+        }
+        Value::Object(members) => {
+            out.push('{');
+            let mut write = |index: usize, key: &str, member: &Value| {
+                if index > 0 {
+                    out.push(',');
+                }
+                write_string(out, key);
+                out.push(':');
+                write_compact(out, member, sort);
+            };
+            if sort {
+                let mut ordered: Vec<_> = members.iter().collect();
+                ordered.sort_by(|(key, _), (other, _)| key.cmp(other));
+                ordered.dedup_by(|(key, _), (other, _)| key == other);
+                for (index, (key, member)) in ordered.into_iter().enumerate() {
+                    write(index, key, member);
+                }
+            } else {
+                for (index, (key, member)) in members.iter().enumerate() {
+                    write(index, key, member);
+                }
+            }
+            out.push('}');
+        }
+        other => write_value(out, other, None, 0),
+    }
+}
+
+fn write_value(out: &mut String, value: &Value, indent: Option<usize>, level: usize) {
+    match value {
+        Value::Null => out.push_str("null"),
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Number(Number(raw)) => out.push_str(raw),
+        Value::String(s) => write_string(out, s),
+        Value::Array(items) if items.is_empty() => out.push_str("[]"),
+        Value::Object(members) if members.is_empty() => out.push_str("{}"),
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                separator(out, indent, level + 1, i == 0);
+                write_value(out, item, indent, level + 1);
+            }
+            close(out, indent, level, ']');
+        }
+        Value::Object(members) => {
+            out.push('{');
+            for (i, (key, item)) in members.iter().enumerate() {
+                separator(out, indent, level + 1, i == 0);
+                write_string(out, key);
+                out.push_str(": ");
+                write_value(out, item, indent, level + 1);
+            }
+            close(out, indent, level, '}');
+        }
+    }
+}
+
+fn separator(out: &mut String, indent: Option<usize>, level: usize, first: bool) {
+    match indent {
+        Some(width) => {
+            if !first {
+                out.push(',');
+            }
+            out.push('\n');
+            out.push_str(&" ".repeat(width * level));
+        }
+        None if !first => out.push_str(", "),
+        None => {}
+    }
+}
+
+fn close(out: &mut String, indent: Option<usize>, level: usize, bracket: char) {
+    if let Some(width) = indent {
+        out.push('\n');
+        out.push_str(&" ".repeat(width * level));
+    }
+    out.push(bracket);
+}
+
+fn write_string(out: &mut String, s: &str) {
+    out.push('"');
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            '\u{8}' => out.push_str("\\b"),
+            '\u{c}' => out.push_str("\\f"),
+            ' '..='~' => out.push(c),
+            _ => {
+                let mut units = [0u16; 2];
+                for unit in c.encode_utf16(&mut units) {
+                    out.push_str(&format!("\\u{unit:04x}"));
+                }
+            }
+        }
+    }
+    out.push('"');
+}
+
+/// A malformed document or a violation of the selected parsing rules.
+#[derive(Debug, PartialEq)]
+pub struct Error {
+    /// Diagnostic for the violated syntax or rule.
+    pub message: String,
+    /// One-based line number for a syntax error.
+    pub line: usize,
+    /// One-based column number for a syntax error.
+    pub column: usize,
+    /// Character offset, as Python reports it.
+    pub offset: usize,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.offset == usize::MAX {
+            // A protocol rule, not a syntax position.
+            return f.write_str(&self.message);
+        }
+        write!(
+            f,
+            "{}: line {} column {} (char {})",
+            self.message, self.line, self.column, self.offset
+        )
+    }
+}
+
+/// The JSON document in the file at `path`; an error names the file.
+pub fn read(path: &std::path::Path) -> Result<Value, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    parse(&text).map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Writes `value` to `path` indented by two spaces as Python's `json.dump` does, with a
+/// final newline, creating the directory it is in.
+pub fn write(path: &std::path::Path, value: &Value) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+    }
+    std::fs::write(path, to_python(value, Some(2)) + "\n")
+        .map_err(|e| format!("{}: {e}", path.display()))
+}
+
+/// Parse one JSON document; surrounding whitespace is allowed, trailing data is not.
+pub fn parse(text: &str) -> Result<Value, Error> {
+    parse_with(text, ParseMode::Python)
+}
+
+/// Strict protocol parsing: duplicate keys, `NaN` and `Infinity` and floats
+/// beyond binary64 are errors, and floats keep their exact decimal text.
+pub fn parse_strict(text: &str) -> Result<Value, Error> {
+    parse_with(text, ParseMode::Strict)
+}
+
+/// Read stored observations, preserving number spellings and invalid clock values.
+pub fn parse_observations(text: &str) -> Result<Value, Error> {
+    parse_with(text, ParseMode::Observations)
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+enum ParseMode {
+    Python,
+    Strict,
+    Observations,
+}
+
+fn parse_with(text: &str, mode: ParseMode) -> Result<Value, Error> {
+    let mut parser = Parser {
+        text: text.as_bytes(),
+        pos: 0,
+        depth: 0,
+        mode,
+    };
+    parser.whitespace();
+    let value = parser.value()?;
+    parser.whitespace();
+    if parser.pos != parser.text.len() {
+        return Err(parser.error("Extra data"));
+    }
+    Ok(value)
+}
+
+const MAX_DEPTH: usize = 512;
+
+struct Parser<'a> {
+    text: &'a [u8],
+    pos: usize,
+    depth: usize,
+    mode: ParseMode,
+}
+
+impl Parser<'_> {
+    fn error(&self, message: impl Into<String>) -> Error {
+        let before = &self.text[..self.pos.min(self.text.len())];
+        #[allow(clippy::naive_bytecount)] // Error path only.
+        let line = before.iter().filter(|&&b| b == b'\n').count() + 1;
+        let start = before
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(0, |i| i + 1);
+        // Python counts characters, not bytes.
+        let chars = |bytes: &[u8]| bytes.iter().filter(|&&b| b & 0xc0 != 0x80).count();
+        Error {
+            message: message.into(),
+            line,
+            column: chars(&before[start..]) + 1,
+            offset: chars(before),
+        }
+    }
+
+    fn peek(&self) -> Option<u8> {
+        self.text.get(self.pos).copied()
+    }
+
+    fn whitespace(&mut self) {
+        while matches!(self.peek(), Some(b' ' | b'\t' | b'\n' | b'\r')) {
+            self.pos += 1;
+        }
+    }
+
+    fn literal(&mut self, word: &str) -> bool {
+        if self.text[self.pos..].starts_with(word.as_bytes()) {
+            self.pos += word.len();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn value(&mut self) -> Result<Value, Error> {
+        match self.peek() {
+            Some(b'{') => self.nested(Self::object),
+            Some(b'[') => self.nested(Self::array),
+            Some(b'"') => Ok(Value::String(self.string()?)),
+            Some(b'-' | b'0'..=b'9' | b'N' | b'I') => self.number(),
+            _ if self.literal("true") => Ok(Value::Bool(true)),
+            _ if self.literal("false") => Ok(Value::Bool(false)),
+            _ if self.literal("null") => Ok(Value::Null),
+            _ => Err(self.error("Expecting value")),
+        }
+    }
+
+    fn nested(&mut self, f: fn(&mut Self) -> Result<Value, Error>) -> Result<Value, Error> {
+        if self.depth == MAX_DEPTH {
+            return Err(self.error("Nesting too deep"));
+        }
+        self.depth += 1;
+        let value = f(self);
+        self.depth -= 1;
+        value
+    }
+
+    fn object(&mut self) -> Result<Value, Error> {
+        self.pos += 1;
+        let mut members = Vec::new();
+        self.whitespace();
+        if self.peek() == Some(b'}') {
+            self.pos += 1;
+            return Ok(Value::Object(members));
+        }
+        loop {
+            self.whitespace();
+            if self.peek() != Some(b'"') {
+                return Err(self.error("Expecting property name enclosed in double quotes"));
+            }
+            let key = self.string()?;
+            self.whitespace();
+            if self.peek() != Some(b':') {
+                return Err(self.error("Expecting ':' delimiter"));
+            }
+            self.pos += 1;
+            self.whitespace();
+            if self.mode != ParseMode::Python && members.iter().any(|(k, _)| *k == key) {
+                return Err(Error {
+                    message: format!("duplicate JSON field: {key}"),
+                    line: 0,
+                    column: 0,
+                    offset: usize::MAX,
+                });
+            }
+            members.push((key, self.value()?));
+            self.whitespace();
+            match self.peek() {
+                Some(b',') => self.pos += 1,
+                Some(b'}') => {
+                    self.pos += 1;
+                    return Ok(Value::Object(members));
+                }
+                _ => return Err(self.error("Expecting ',' delimiter")),
+            }
+        }
+    }
+
+    fn array(&mut self) -> Result<Value, Error> {
+        self.pos += 1;
+        let mut items = Vec::new();
+        self.whitespace();
+        if self.peek() == Some(b']') {
+            self.pos += 1;
+            return Ok(Value::Array(items));
+        }
+        loop {
+            self.whitespace();
+            items.push(self.value()?);
+            self.whitespace();
+            match self.peek() {
+                Some(b',') => self.pos += 1,
+                Some(b']') => {
+                    self.pos += 1;
+                    return Ok(Value::Array(items));
+                }
+                _ => return Err(self.error("Expecting ',' delimiter")),
+            }
+        }
+    }
+
+    fn number(&mut self) -> Result<Value, Error> {
+        let start = self.pos;
+        for word in ["NaN", "Infinity", "-Infinity"] {
+            if self.literal(word) {
+                if self.mode == ParseMode::Strict {
+                    return Err(Error {
+                        message: format!("non-finite JSON constant: {word}"),
+                        line: 0,
+                        column: 0,
+                        offset: usize::MAX,
+                    });
+                }
+                return Ok(Value::Number(Number(word.to_owned())));
+            }
+        }
+        if self.peek() == Some(b'-') {
+            self.pos += 1;
+        }
+        match self.peek() {
+            Some(b'0') => self.pos += 1,
+            Some(b'1'..=b'9') => self.digits(),
+            _ => {
+                self.pos = start;
+                return Err(self.error("Expecting value"));
+            }
+        }
+        if self.peek() == Some(b'.') && self.text.get(self.pos + 1).is_some_and(u8::is_ascii_digit)
+        {
+            self.pos += 1;
+            self.digits();
+        }
+        if matches!(self.peek(), Some(b'e' | b'E')) {
+            let mark = self.pos;
+            self.pos += 1;
+            if matches!(self.peek(), Some(b'+' | b'-')) {
+                self.pos += 1;
+            }
+            if self.peek().is_some_and(|b| b.is_ascii_digit()) {
+                self.digits();
+            } else {
+                self.pos = mark;
+            }
+        }
+        let raw = std::str::from_utf8(&self.text[start..self.pos])
+            .map_err(|_| self.error("Expecting value"))?;
+        let float = raw.contains(['.', 'e', 'E']);
+        if self.mode == ParseMode::Strict && float && !raw.parse::<f64>().is_ok_and(f64::is_finite)
+        {
+            return Err(Error {
+                message: "JSON number exceeds the finite binary64 protocol range".into(),
+                line: 0,
+                column: 0,
+                offset: usize::MAX,
+            });
+        }
+        Ok(Value::Number(Number(if self.mode == ParseMode::Python {
+            canonical_number(raw)
+        } else {
+            raw.to_owned()
+        })))
+    }
+
+    fn digits(&mut self) {
+        while self.peek().is_some_and(|b| b.is_ascii_digit()) {
+            self.pos += 1;
+        }
+    }
+
+    fn string(&mut self) -> Result<String, Error> {
+        self.pos += 1;
+        let mut out = String::new();
+        loop {
+            let run = self.pos;
+            while self
+                .peek()
+                .is_some_and(|b| b != b'"' && b != b'\\' && b >= 0x20)
+            {
+                self.pos += 1;
+            }
+            // The input is a &str, so any run between ASCII delimiters is valid UTF-8.
+            let text = std::str::from_utf8(&self.text[run..self.pos])
+                .map_err(|_| self.error("Invalid string"))?;
+            out.push_str(text);
+            match self.peek() {
+                Some(b'"') => {
+                    self.pos += 1;
+                    return Ok(out);
+                }
+                Some(b'\\') => {
+                    self.pos += 1;
+                    self.escape(&mut out)?;
+                }
+                Some(_) => return Err(self.error("Invalid control character")),
+                None => return Err(self.error("Unterminated string")),
+            }
+        }
+    }
+
+    fn escape(&mut self, out: &mut String) -> Result<(), Error> {
+        let c = match self.peek() {
+            Some(b'"') => '"',
+            Some(b'\\') => '\\',
+            Some(b'/') => '/',
+            Some(b'b') => '\u{8}',
+            Some(b'f') => '\u{c}',
+            Some(b'n') => '\n',
+            Some(b'r') => '\r',
+            Some(b't') => '\t',
+            Some(b'u') => {
+                self.pos += 1;
+                let first = self.hex4()?;
+                let code = if (0xd800..0xdc00).contains(&first)
+                    && self.text[self.pos..].starts_with(b"\\u")
+                {
+                    let mark = self.pos;
+                    self.pos += 2;
+                    let second = self.hex4()?;
+                    if (0xdc00..0xe000).contains(&second) {
+                        0x10000 + ((first - 0xd800) << 10) + (second - 0xdc00)
+                    } else {
+                        self.pos = mark;
+                        first
+                    }
+                } else {
+                    first
+                };
+                // Lone surrogates cannot be held in a Rust string.
+                out.push(char::from_u32(code).ok_or_else(|| self.error("Unpaired surrogate"))?);
+                return Ok(());
+            }
+            _ => return Err(self.error("Invalid \\escape")),
+        };
+        self.pos += 1;
+        out.push(c);
+        Ok(())
+    }
+
+    fn hex4(&mut self) -> Result<u32, Error> {
+        let digits = self
+            .text
+            .get(self.pos..self.pos + 4)
+            .ok_or_else(|| self.error("Invalid \\uXXXX escape"))?;
+        let mut value = 0;
+        for &d in digits {
+            let digit = char::from(d)
+                .to_digit(16)
+                .ok_or_else(|| self.error("Invalid \\uXXXX escape"))?;
+            value = value * 16 + digit;
+        }
+        self.pos += 4;
+        Ok(value)
+    }
+}
+
+// Worker crates include this file by path; a path relative to it resolves from each.
+#[cfg(test)]
+#[path = "json/tests.rs"]
+mod tests;

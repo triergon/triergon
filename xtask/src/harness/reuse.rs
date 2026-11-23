@@ -35,8 +35,9 @@ pub const RESULT: &str = "gate-result.json";
 /// the build's shared inputs ([`super::provenance::shared_inputs`]): the code
 /// that measures, records and grades, the oracles, the reviewed input lists and
 /// the observers it loads. Any change re-measures every feature.
-const CODE: [&str; 14] = [
+const CODE: [&str; 15] = [
     "xtask/src",
+    "crates/harness-protocol/test-support",
     "harness/oracles.py",
     "harness/fate/samples.json",
     "harness/fonts/corpus.json",
