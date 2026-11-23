@@ -154,10 +154,10 @@ pub mod mov {
     }
 
     pub mod pcm {
-        //! [`PcmCursor`] groups QuickTime version 0 PCM samples into demux packets.
+        //! [`PcmCursor`] groups QuickTime version 0 and 1 PCM samples into demux packets.
         //! [`PcmReader`] reads the grouped payloads.
         pub use super::pcm_packets::{
-            PcmCursor, PcmLimits, PcmPacket, PcmPayload, PcmReader, PcmStream,
+            PcmCursor, PcmDescription, PcmLimits, PcmPacket, PcmPayload, PcmReader, PcmStream,
         };
     }
 }

@@ -17,6 +17,28 @@ const STEREO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-s16be-stereo-front.mov
 const SWITCH: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-description-1-2-1-unused3.mov");
 const LONG: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-long-chunk-2049.mov");
 
+#[test]
+fn version_one_sound_description_preserves_pcm_frames() {
+    assert_extended_pcm(include_bytes!(
+        "../../../harness/features/quicktime-pcm-samples/variants/sound-v1.mov"
+    ));
+}
+
+fn assert_extended_pcm(raw: &[u8]) {
+    let parsed = Parsed::new(raw);
+    let stream = PcmStream::new(&parsed.header, &parsed.table, Some(*b"qt  ")).unwrap();
+    assert_eq!(stream.demux().codec, "pcm_s16be");
+    assert_eq!(stream.initial().channels(), 1);
+    let mut input = parsed.input();
+    let mut cursor = parsed.cursor(&input);
+    for (start, end) in [(28, 44), (44, 60)] {
+        let packet = next(&mut cursor, &mut input, 1).unwrap().unwrap();
+        assert_eq!(packet.source_range(), &(start..end));
+        assert_eq!(packet.demux_range(), &(start..end));
+    }
+    assert!(next(&mut cursor, &mut input, 1).unwrap().is_none());
+}
+
 struct Parsed {
     pool: Budget,
     header: TrackHeader,

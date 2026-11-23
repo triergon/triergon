@@ -68,21 +68,17 @@ impl SoundDescriptionV0 {
     /// since `raw ` is also a video entry code; `Error::Invalid` otherwise, and
     /// `Error::Unsupported` for a version 1 or 2 description.
     pub fn parse(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
-        if header.handler != *b"soun"
-            || fields::fourcc(header.raw_hdlr.payload(), 8)? != header.handler
-        {
-            return Err(Error::Invalid("QT sound description needs sound handler"));
-        }
+        Self::parse_prefix(header, entry, 0)
+    }
+
+    pub(crate) fn parse_prefix(
+        header: &TrackHeader,
+        entry: &SampleDescription,
+        version: u16,
+    ) -> Result<Self> {
+        check_sound_description(header, entry)?;
         let body = entry.raw().payload();
-        if entry.index == 0
-            || entry.format != entry.raw().header().kind
-            || entry.data_reference_index != fields::u16_at(body, 6)?
-        {
-            return Err(Error::Invalid(
-                "QT sound entry fields differ from raw source",
-            ));
-        }
-        if fields::u16_at(body, 8)? != 0 {
+        if fields::u16_at(body, 8)? != version {
             return Err(Error::Unsupported("QT sound description version1/2"));
         }
         fields::slice(body, 0, 28)?;
@@ -167,6 +163,25 @@ impl SoundDescriptionV0 {
             sample_rate_16_16: self.sample_rate_16_16,
         })
     }
+}
+
+pub(crate) fn check_sound_description(
+    header: &TrackHeader,
+    entry: &SampleDescription,
+) -> Result<()> {
+    if header.handler != *b"soun" || fields::fourcc(header.raw_hdlr.payload(), 8)? != header.handler
+    {
+        return Err(Error::Invalid("QT sound description needs sound handler"));
+    }
+    if entry.index == 0
+        || entry.format != entry.raw().header().kind
+        || entry.data_reference_index != fields::u16_at(entry.raw().payload(), 6)?
+    {
+        return Err(Error::Invalid(
+            "QT sound entry fields differ from raw source",
+        ));
+    }
+    Ok(())
 }
 
 /// One whole PCM sample with its description and layout; from [`PcmSampleReader`].

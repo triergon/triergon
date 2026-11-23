@@ -9,7 +9,7 @@ use crate::{
     compat::mov::{clocks::MediaClock, view::StreamView},
     fields,
     movie::TrackHeader,
-    quicktime::{PcmEncoding, SoundDescriptionV0},
+    quicktime::PcmEncoding,
     table::{
         SampleCursor, SampleTable,
         rows::{Offsets, Words},
@@ -51,6 +51,9 @@ fn bounded(value: u64, maximum: u64) -> Result<()> {
     }
     Ok(())
 }
+mod description;
+pub use description::PcmDescription;
+
 fn header_binding(header: &TrackHeader) -> Result<()> {
     let raw = TrackHeader::parse(&header.raw_tkhd, &header.raw_mdhd, &header.raw_hdlr)?;
     if (
@@ -76,7 +79,7 @@ fn header_binding(header: &TrackHeader) -> Result<()> {
 #[derive(Clone, Debug)]
 pub struct PcmStream {
     demux: StreamView,
-    initial: SoundDescriptionV0,
+    initial: PcmDescription,
 }
 impl PcmStream {
     /// The stream of a PCM track. `Error::Unsupported` outside a `qt  ` major-brand
@@ -99,8 +102,7 @@ impl PcmStream {
             .descriptions()
             .first()
             .ok_or(Error::Invalid("PCM initial description absent"))?;
-        let initial = SoundDescriptionV0::parse(header, entry)?;
-        let layout = initial.pcm_layout()?;
+        let initial = PcmDescription::parse(header, entry)?;
         if initial.revision() != 0 || initial.vendor() != [0; 4] || entry.data_reference_index != 1
         {
             return Err(Error::Unsupported(
@@ -152,7 +154,7 @@ impl PcmStream {
         Ok(Self {
             demux: StreamView {
                 track_id: header.track_id,
-                codec: match layout.encoding() {
+                codec: match initial.encoding() {
                     PcmEncoding::Unsigned8 => "pcm_u8",
                     PcmEncoding::Signed8 => "pcm_s8",
                     PcmEncoding::Signed16BigEndian => "pcm_s16be",
@@ -177,7 +179,7 @@ impl PcmStream {
         &self.demux
     }
     /// The track's first sound description.
-    pub fn initial(&self) -> &SoundDescriptionV0 {
+    pub fn initial(&self) -> &PcmDescription {
         &self.initial
     }
 }
@@ -188,8 +190,8 @@ impl PcmStream {
 /// reach into another chunk; the source samples it covers are kept beside them.
 #[derive(Clone, Debug)]
 pub struct PcmPacket {
-    initial: SoundDescriptionV0,
-    description: SoundDescriptionV0,
+    initial: PcmDescription,
+    description: PcmDescription,
     raw_table: BoxView,
     samples: Range<u64>,
     source_range: Range<u64>,
@@ -204,11 +206,11 @@ pub struct PcmPacket {
 }
 impl PcmPacket {
     /// The sound description that `stsc` names for the packet's chunk.
-    pub fn source_description(&self) -> &SoundDescriptionV0 {
+    pub fn source_description(&self) -> &PcmDescription {
         &self.description
     }
     /// The track's first sound description, whose frame size sets the bytes read.
-    pub fn initial_description(&self) -> &SoundDescriptionV0 {
+    pub fn initial_description(&self) -> &PcmDescription {
         &self.initial
     }
     /// The track's `stbl` box.
@@ -283,7 +285,7 @@ struct Group {
     first: u64,
     source_range: Range<u64>,
     demux_range: Range<u64>,
-    description: SoundDescriptionV0,
+    description: PcmDescription,
 }
 
 /// The chunk tables of a PCM track and where the packets have reached in them.
@@ -331,7 +333,7 @@ pub struct PcmCursor<'a> {
     header: &'a TrackHeader,
     table: &'a SampleTable,
     source_cursor: SampleCursor<'a>,
-    initial: SoundDescriptionV0,
+    initial: PcmDescription,
     media: Range<u64>,
     limits: PcmLimits,
     pool: Budget,
@@ -370,8 +372,7 @@ impl<'a> PcmCursor<'a> {
             .descriptions()
             .first()
             .ok_or(Error::Invalid("PCM initial description absent"))?;
-        let initial = SoundDescriptionV0::parse(header, entry)?;
-        initial.pcm_layout()?;
+        let initial = PcmDescription::parse(header, entry)?;
         Ok(Self {
             header,
             table,
@@ -536,8 +537,8 @@ impl<'a> PcmCursor<'a> {
             }
             sample.require_within(self.media.clone())?;
             let expected = self.source_done.checked_add(1).ok_or(Error::Overflow)?;
-            let frame = u64::try_from(group.description.pcm_layout()?.frame_bytes())
-                .map_err(|_| Error::Overflow)?;
+            let frame =
+                u64::try_from(group.description.frame_bytes()).map_err(|_| Error::Overflow)?;
             if sample.ordinal != expected
                 || sample.description_index != group.description.source().index
                 || sample.duration_ticks != 1
@@ -623,7 +624,7 @@ impl Grouping {
         &mut self,
         header: &TrackHeader,
         table: &SampleTable,
-        initial: &SoundDescriptionV0,
+        initial: &PcmDescription,
         media: &Range<u64>,
         limits: PcmLimits,
         source_done: u64,
@@ -656,10 +657,8 @@ impl Grouping {
                 .map_err(|_| Error::Overflow)?,
             )
             .ok_or(Error::Invalid("PCM description absent"))?;
-        let description = SoundDescriptionV0::parse(header, entry)?;
-        description.pcm_layout()?;
-        let initial_bytes =
-            u64::try_from(initial.pcm_layout()?.frame_bytes()).map_err(|_| Error::Overflow)?;
+        let description = PcmDescription::parse(header, entry)?;
+        let initial_bytes = u64::try_from(initial.frame_bytes()).map_err(|_| Error::Overflow)?;
         let start = self
             .offsets
             .get(self.chunk - 1)?

@@ -272,7 +272,7 @@ Limits of the reader:
 | Edit lists | `elst` v0/v1; empty edits; rate-one point mapping |
 | Seek and indexes | sync/preroll plans, movie-time and composition targets, `sidx`, `tfra`/`mfro`, `roll`/`prol` groups |
 | Codec configuration | AAC `AudioSpecificConfig` (incl. QuickTime `wave`), DTS core signalling, AC-3/E-AC-3, opaque `avcC`/`hvcC`/`av1C`/`vpcC` |
-| QuickTime PCM | v0 unsigned 8-bit, signed 8-bit and signed 16-bit big-endian (`quicktime::PcmSampleReader`, `compat::mov::pcm::PcmCursor`); sound description versions 1 and 2 are refused |
+| QuickTime PCM | Unsigned 8-bit, signed 8-bit and signed 16-bit big-endian. `quicktime::PcmSampleReader` reads version 0. `compat::mov::pcm::PcmCursor` also accepts uncompressed version 1 descriptions. |
 | FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
 
 `AacConfigurationJob` returns the AudioSpecificConfig bytes of an `mp4a` entry
