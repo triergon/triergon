@@ -368,9 +368,9 @@ fn the_listed_table_counts_each_form_once_per_case_and_target() {
         [
             "| Comparison | departs | policy | unimplemented | refuses | defect | listed | cases |",
             "|---|---|---|---|---|---|---|---|",
-            "| [`codecs/m`](../harness/codecs/m.json) |  |  | 1 |  | 1 | 2 | 3 |",
+            "| [`codecs/m`](../harness/codecs/m.json) |  |  | 1 |  | 1 | 2 |  |",
             "| [`f`](../harness/features/f/contract.json) | 2 / 3 | 2 |  | 1 | 1 | 4 / 5 | 7 |",
-            "| **Total** | 2 / 3 | 2 | 1 | 1 | 2 | 6 / 7 | 10 |",
+            "| **Total** | 2 / 3 | 2 | 1 | 1 | 2 | 6 / 7 | 7 |",
         ]
     );
     let page: Vec<&str> = PAGE_TEXT.lines().collect();

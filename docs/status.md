@@ -69,19 +69,20 @@ case no row counts agrees with the reference. The columns count cases:
 - **defect**: Triergon's, not yet fixed.
 
 A case with two causes counts under both and once under **listed**; **cases** is how
-many the comparison holds, so the others are those its report requires to agree. Where
-the two targets differ, a cell reads Linux AArch64 / ARMv7. Only **refuses** counts as agreement
+many the comparison holds, so the others are those its report requires to agree (a
+codec manifest shares its vectors between lanes and shows no such count). Where the two
+targets differ, a cell reads Linux AArch64 / ARMv7. Only **refuses** counts as agreement
 with the specification; every other listed case withholds its comparison's acceptance.
 `cargo xtask status --write` writes the table from the registry and
 `cargo xtask check-design` fails when it differs.
 
 | Comparison | departs | policy | unimplemented | refuses | defect | listed | cases |
 |---|---|---|---|---|---|---|---|
-| [`codecs/correctness-manifest`](../harness/codecs/correctness-manifest.json) |  | 1 | 35 | 1 |  | 37 | 810 |
-| [`codecs/nodither-streams`](../harness/codecs/nodither-streams.json) | 7 |  |  |  |  | 7 | 12 |
-| [`codecs/play-manifest`](../harness/codecs/play-manifest.json) | 8 | 1 |  |  |  | 9 | 12 |
-| [`codecs/reader-seeks`](../harness/codecs/reader-seeks.json) | 20 | 10 |  |  |  | 30 | 92 |
-| [`codecs/session-cases`](../harness/codecs/session-cases.json) | 40 | 189 | 31 |  | 1 | 261 | 223 |
+| [`codecs/correctness-manifest`](../harness/codecs/correctness-manifest.json) |  | 1 | 35 | 1 |  | 37 |  |
+| [`codecs/nodither-streams`](../harness/codecs/nodither-streams.json) | 7 |  |  |  |  | 7 |  |
+| [`codecs/play-manifest`](../harness/codecs/play-manifest.json) | 8 | 1 |  |  |  | 9 |  |
+| [`codecs/reader-seeks`](../harness/codecs/reader-seeks.json) | 20 | 10 |  |  |  | 30 |  |
+| [`codecs/session-cases`](../harness/codecs/session-cases.json) | 40 | 189 | 31 |  | 1 | 261 |  |
 | [`aac-adts-frames`](../harness/features/aac-adts-frames/contract.json) | 4 |  | 7 |  |  | 11 | 96 |
 | [`adts-sync`](../harness/features/adts-sync/contract.json) | 7 |  |  |  |  | 7 | 104 |
 | [`ass-parse-host`](../harness/features/ass-parse-host/contract.json) |  | 4 / 2 |  |  |  | 4 / 2 | 15 |
@@ -147,7 +148,7 @@ with the specification; every other listed case withholds its comparison's accep
 | [`tx3g-configuration`](../harness/features/tx3g-configuration/contract.json) | 56 |  |  |  |  | 56 | 84 |
 | [`video-nal-input`](../harness/features/video-nal-input/contract.json) | 2 |  | 52 |  |  | 54 | 597 |
 | [`vobsub-index`](../harness/features/vobsub-index/contract.json) | 3 |  |  |  |  | 3 | 210 |
-| **Total** | 2266 / 2247 | 2322 / 2314 | 191 | 39 | 10 | 4708 / 4681 | 44382 |
+| **Total** | 2266 / 2247 | 2322 / 2314 | 191 | 39 | 10 | 4708 / 4681 | 43233 |
 
 ## Linux AArch64
 

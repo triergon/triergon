@@ -896,9 +896,10 @@ pub fn listed_table(data: &[(String, Value)]) -> Vec<String> {
     lines
 }
 
-/// How many cases the comparison of registry file `file` holds, where the harness
-/// data says: the rows of a feature's manifest or the pins of a generated one, the
-/// pins of a container pin file, the vectors or cases of a codec manifest.
+/// How many cases the comparison of registry file `file` holds, where one file of the
+/// harness data says: the rows of a feature's manifest or the pins of a generated
+/// one, and the pins of a container pin file. A codec manifest's lanes share their
+/// vectors with other manifests, so it has no such count.
 fn case_count(data: &[(String, Value)], file: &str, document: &Value) -> Option<usize> {
     let beside = |name: &str| {
         let (directory, _) = file.rsplit_once('/')?;
@@ -918,7 +919,7 @@ fn case_count(data: &[(String, Value)], file: &str, document: &Value) -> Option<
     } else if file.ends_with("/container-pins.json") {
         len(document.get("pins"))
     } else {
-        len(document.get("vectors")).or_else(|| len(document.get("cases")))
+        None
     }
 }
 
