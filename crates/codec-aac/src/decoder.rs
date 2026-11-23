@@ -54,13 +54,20 @@ pub(crate) enum FixedLayout {
     Raw(Policy),
 }
 
+/// Signal history of the prediction tool selected by this channel's profile.
+#[derive(Debug)]
+enum Prediction {
+    None,
+    Main(pred::PredState),
+    Ltp(ltp::LtpState),
+}
+
 /// Persistent per-channel state.
 #[derive(Debug)]
 pub(crate) struct ChannelState {
     pub overlap: [f32; 1024],
     pub prev_shape: WindowShape,
-    pub pred: Option<pred::PredState>,
-    pub ltp: Option<ltp::LtpState>,
+    prediction: Prediction,
 }
 
 impl ChannelState {
@@ -68,15 +75,10 @@ impl ChannelState {
         Ok(ChannelState {
             overlap: [0.0; 1024],
             prev_shape: WindowShape::Sine,
-            pred: if aot == ObjectType::Main {
-                Some(pred::PredState::new(budget)?)
-            } else {
-                None
-            },
-            ltp: if aot == ObjectType::Ltp {
-                Some(ltp::LtpState::new(budget)?)
-            } else {
-                None
+            prediction: match aot {
+                ObjectType::Lc => Prediction::None,
+                ObjectType::Main => Prediction::Main(pred::PredState::new(budget)?),
+                ObjectType::Ltp => Prediction::Ltp(ltp::LtpState::new(budget)?),
             },
         })
     }
@@ -84,11 +86,10 @@ impl ChannelState {
     fn reset(&mut self) {
         self.overlap.fill(0.0);
         self.prev_shape = WindowShape::Sine;
-        if let Some(p) = &mut self.pred {
-            p.reset();
-        }
-        if let Some(l) = &mut self.ltp {
-            l.reset();
+        match &mut self.prediction {
+            Prediction::None => {}
+            Prediction::Main(predictor) => predictor.reset(),
+            Prediction::Ltp(predictor) => predictor.reset(),
         }
     }
 }
@@ -729,7 +730,7 @@ impl Core {
     ) -> Result<()> {
         let e: &mut ElementState = &mut self.elements[ei];
         parse_ics(br, cfg, false, false, &mut e.cd[chan], &mut self.random)?;
-        if let Some(p) = &mut e.ch[chan].pred {
+        if let Prediction::Main(p) = &mut e.ch[chan].prediction {
             pred::apply(p, &mut e.cd[chan], cfg);
         }
         e.decoded = true;
@@ -776,13 +777,11 @@ impl Core {
         if common && ms_present != 0 {
             apply_ms(&mut a[0], &mut b[0], &ms_mask);
         }
-        if cfg.aot == ObjectType::Main {
-            if let Some(p) = &mut e.ch[0].pred {
-                pred::apply(p, &mut a[0], cfg);
-            }
-            if let Some(p) = &mut e.ch[1].pred {
-                pred::apply(p, &mut b[0], cfg);
-            }
+        if let Prediction::Main(p) = &mut e.ch[0].prediction {
+            pred::apply(p, &mut a[0], cfg);
+        }
+        if let Prediction::Main(p) = &mut e.ch[1].prediction {
+            pred::apply(p, &mut b[0], cfg);
         }
         apply_intensity(
             &a[0],
@@ -998,7 +997,7 @@ pub(crate) fn process_channel(
     tag: u8,
     ch_in_elem: usize,
 ) {
-    if let Some(l) = &mut st.ltp {
+    if let Prediction::Ltp(l) = &mut st.prediction {
         ltp::apply(l, fb, cd, st.prev_shape, cfg);
     }
     crate::cce::apply_spectral(cce, kind, tag, ch_in_elem, cd, false);
@@ -1013,7 +1012,7 @@ pub(crate) fn process_channel(
         &mut st.overlap,
         out,
     );
-    if let Some(l) = &mut st.ltp {
+    if let Prediction::Ltp(l) = &mut st.prediction {
         ltp::update(l, out, &st.overlap);
     }
     crate::cce::apply_time(cce, kind, tag, ch_in_elem, &mut out[..1024]);
