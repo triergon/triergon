@@ -186,8 +186,8 @@ impl Motion {
     }
 }
 
-/// A coded or reference picture: a frame or one of its fields. The discriminants are the
-/// field bits of [`FrameStore::fields`] (a frame fills both).
+/// A coded or reference picture: a frame or one of its fields. A field's
+/// discriminant is its bit in [`DecodedFields`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[repr(u8)]
 pub(crate) enum Structure {
@@ -229,6 +229,31 @@ impl Structure {
     }
 }
 
+/// Which fields of a frame store have decoded samples.
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+pub(crate) enum DecodedFields {
+    Empty = 0,
+    Top = 1,
+    Bottom = 2,
+    Both = 3,
+}
+
+impl DecodedFields {
+    pub(crate) fn include(&mut self, structure: Structure) {
+        let field = if structure == Structure::Frame {
+            Self::Both as u8
+        } else {
+            structure as u8
+        };
+        *self = match *self as u8 | field {
+            1 => Self::Top,
+            2 => Self::Bottom,
+            _ => Self::Both,
+        };
+    }
+}
+
 /// How a frame store's content was coded (Table 8-7 PicCodingStruct).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) enum Coding {
@@ -259,8 +284,7 @@ pub(crate) struct FrameStore {
     /// Frame motion in `motion[0]`, or top / bottom field motion in `motion[0]` / `motion[1]`.
     pub(crate) motion: [Motion; 2],
     pub(crate) uid: u32,
-    /// Decoded fields: bit 0 top, bit 1 bottom (3 = frame or both fields).
-    pub(crate) fields: u8,
+    pub(crate) fields: DecodedFields,
     pub(crate) coding: Coding,
     pub(crate) frame_num: u32,
     pub(crate) long_term_frame_idx: u32,
@@ -279,7 +303,7 @@ impl FrameStore {
             buf: None,
             motion: [Motion::empty(budget), Motion::empty(budget)],
             uid: 0,
-            fields: 0,
+            fields: DecodedFields::Empty,
             coding: Coding::default(),
             frame_num: 0,
             long_term_frame_idx: 0,
@@ -292,14 +316,14 @@ impl FrameStore {
     }
     /// The field `field` is decoded.
     pub(crate) fn has_field(&self, field: Structure) -> bool {
-        self.fields & field as u8 != 0
+        self.fields as u8 & field as u8 != 0
     }
     /// PicOrderCnt of the frame / complementary field pair (8-1): min of the decoded fields.
     pub(crate) fn frame_poc(&self) -> i32 {
         match self.fields {
-            1 => self.poc[0],
-            2 => self.poc[1],
-            _ => self.poc[0].min(self.poc[1]),
+            DecodedFields::Top => self.poc[0],
+            DecodedFields::Bottom => self.poc[1],
+            DecodedFields::Empty | DecodedFields::Both => self.poc[0].min(self.poc[1]),
         }
     }
 }

@@ -40,7 +40,9 @@ use mbinfo::{MbInfo, MbWidth, SliceDbk};
 use nal::{parse_header, unescape};
 use output::output_picture;
 pub use output::{ColourDescription, Picture, Plane};
-use picture::{Coding, FrameBuf, FrameStore, MBF_INTRA, Motion, OutputInfo, RefPic, Structure};
+use picture::{
+    Coding, DecodedFields, FrameBuf, FrameStore, MBF_INTRA, Motion, OutputInfo, RefPic, Structure,
+};
 use ps::{PocType, Pps, Sps, Vui};
 use slice::{Mmco, SliceHeader, SliceType};
 use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
@@ -226,11 +228,7 @@ fn keep_decoded(
     if spare_motion.len() < MAX_SPARE {
         spare_motion.push(spare);
     }
-    fs.fields |= if structure == Structure::Frame {
-        3
-    } else {
-        structure as u8
-    };
+    fs.fields.include(structure);
     PictureScratch {
         mbs: pic.mbs,
         slices: pic.slices,
@@ -656,7 +654,7 @@ impl Decoder {
         if second_field {
             fs.poc[structure.index()] = poc[structure.index()];
         } else {
-            fs.fields = 0;
+            fs.fields = DecodedFields::Empty;
             fs.coding = if sh.field_pic {
                 Coding::Fields
             } else if sh.mbaff {
@@ -810,7 +808,7 @@ impl Decoder {
             } else {
                 [0, 0]
             };
-            fs.fields = 3;
+            fs.fields = DecodedFields::Both;
             fs.coding = Coding::Frame;
             fs.frame_num = unused;
             fs.poc = poc;
