@@ -286,51 +286,7 @@ pub(crate) fn parse_slice_header(
                 }
                 sh.st_rps = sps.st_rps[idx];
             }
-            if sps.long_term_refs_present {
-                let nsps = sps.num_long_term_ref_pics_sps;
-                let num_lt_sps = if nsps > 0 {
-                    r.ue_max(nsps, "num_long_term_sps")?
-                } else {
-                    0
-                };
-                let num_lt_pics = r.ue_max(32, "num_long_term_pics")?;
-                if num_lt_sps + num_lt_pics > 32 {
-                    return Err(DecodeError::Invalid("too many long-term pictures"));
-                }
-                sh.num_long_term_sps = num_lt_sps;
-                for i in 0..num_lt_sps + num_lt_pics {
-                    let mut e = LongTermEntry::default();
-                    if i < num_lt_sps {
-                        let idx = if nsps > 1 {
-                            r.read(ceil_log2(nsps))?
-                        } else {
-                            0
-                        };
-                        if idx >= nsps {
-                            return Err(DecodeError::Invalid("lt_idx_sps"));
-                        }
-                        e.poc_lsb = sps.lt_ref_pic_poc_lsb[idx as usize];
-                        e.used_by_curr = sps.lt_used_by_curr[idx as usize];
-                    } else {
-                        e.poc_lsb = r.read(sps.log2_max_poc_lsb)?;
-                        e.used_by_curr = r.flag()?;
-                    }
-                    e.msb_present = r.flag()?;
-                    if e.msb_present {
-                        e.delta_poc_msb_cycle = r.ue()?;
-                    }
-                    sh.long_term[sh.num_long_term] = e;
-                    sh.num_long_term += 1;
-                }
-                // DeltaPocMsbCycleLt accumulation (7-52).
-                for i in 0..sh.num_long_term {
-                    if i != 0 && i as u32 != num_lt_sps {
-                        let p = sh.long_term[i - 1].delta_poc_msb_cycle;
-                        sh.long_term[i].delta_poc_msb_cycle =
-                            sh.long_term[i].delta_poc_msb_cycle.wrapping_add(p);
-                    }
-                }
-            }
+            parse_long_term_refs(&mut r, sps, &mut sh)?;
             if sps.temporal_mvp {
                 sh.temporal_mvp = r.flag()?;
             }
@@ -340,77 +296,7 @@ pub(crate) fn parse_slice_header(
             sh.sao_chroma = r.flag()?;
         }
         if sh.slice_type != SliceType::I {
-            sh.num_ref_idx = [
-                pps.num_ref_idx_l0_default,
-                if st == SliceType::B {
-                    pps.num_ref_idx_l1_default
-                } else {
-                    0
-                },
-            ];
-            if r.flag()? {
-                sh.num_ref_idx[0] = r.ue_max(14, "num_ref_idx_l0_active_minus1")? + 1;
-                if st == SliceType::B {
-                    sh.num_ref_idx[1] = r.ue_max(14, "num_ref_idx_l1_active_minus1")? + 1;
-                }
-            }
-            let total = sh.num_pic_total_curr();
-            if total == 0 {
-                return Err(DecodeError::Invalid("P/B slice without reference pictures"));
-            }
-            if pps.lists_modification_present && total > 1 {
-                let bits = ceil_log2(total);
-                sh.rpl_mod[0] = r.flag()?;
-                if sh.rpl_mod[0] {
-                    for i in 0..sh.num_ref_idx[0] as usize {
-                        let v = r.read(bits)?;
-                        if v >= total {
-                            return Err(DecodeError::Invalid("list_entry_l0"));
-                        }
-                        sh.list_entry[0][i] = v as u8;
-                    }
-                }
-                if st == SliceType::B {
-                    sh.rpl_mod[1] = r.flag()?;
-                    if sh.rpl_mod[1] {
-                        for i in 0..sh.num_ref_idx[1] as usize {
-                            let v = r.read(bits)?;
-                            if v >= total {
-                                return Err(DecodeError::Invalid("list_entry_l1"));
-                            }
-                            sh.list_entry[1][i] = v as u8;
-                        }
-                    }
-                }
-            }
-            if st == SliceType::B {
-                sh.mvd_l1_zero = r.flag()?;
-            }
-            if pps.cabac_init_present {
-                sh.cabac_init = r.flag()?;
-            }
-            if sh.temporal_mvp {
-                if st == SliceType::B {
-                    sh.collocated_from_l0 = r.flag()?;
-                }
-                if (sh.collocated_from_l0 && sh.num_ref_idx[0] > 1)
-                    || (!sh.collocated_from_l0 && sh.num_ref_idx[1] > 1)
-                {
-                    let lim = if sh.collocated_from_l0 {
-                        sh.num_ref_idx[0]
-                    } else {
-                        sh.num_ref_idx[1]
-                    } - 1;
-                    sh.collocated_ref_idx = r.ue_max(lim, "collocated_ref_idx")?;
-                }
-            }
-            if (pps.weighted_pred && st == SliceType::P)
-                || (pps.weighted_bipred && st == SliceType::B)
-            {
-                sh.pwt = Some(parse_pwt(&mut r, &sh)?);
-            }
-            let five_minus = r.ue_max(4, "five_minus_max_num_merge_cand")?;
-            sh.max_num_merge_cand = 5 - five_minus;
+            parse_inter_slice(&mut r, pps, &mut sh)?;
         }
         let qd = r.se()?;
         sh.slice_qp = pps.init_qp + qd;
@@ -462,4 +348,129 @@ pub(crate) fn parse_slice_header(
     r.align();
     sh.data_offset = r.position() >> 3;
     Ok(sh)
+}
+
+/// Long-term reference pictures and their accumulated POC MSB cycles (7-52).
+fn parse_long_term_refs(r: &mut BitCursor<'_>, sps: &Sps, sh: &mut SliceHeader) -> Result<()> {
+    if sps.long_term_refs_present {
+        let nsps = sps.num_long_term_ref_pics_sps;
+        let num_lt_sps = if nsps > 0 {
+            r.ue_max(nsps, "num_long_term_sps")?
+        } else {
+            0
+        };
+        let num_lt_pics = r.ue_max(32, "num_long_term_pics")?;
+        if num_lt_sps + num_lt_pics > 32 {
+            return Err(DecodeError::Invalid("too many long-term pictures"));
+        }
+        sh.num_long_term_sps = num_lt_sps;
+        for i in 0..num_lt_sps + num_lt_pics {
+            let mut e = LongTermEntry::default();
+            if i < num_lt_sps {
+                let idx = if nsps > 1 {
+                    r.read(ceil_log2(nsps))?
+                } else {
+                    0
+                };
+                if idx >= nsps {
+                    return Err(DecodeError::Invalid("lt_idx_sps"));
+                }
+                e.poc_lsb = sps.lt_ref_pic_poc_lsb[idx as usize];
+                e.used_by_curr = sps.lt_used_by_curr[idx as usize];
+            } else {
+                e.poc_lsb = r.read(sps.log2_max_poc_lsb)?;
+                e.used_by_curr = r.flag()?;
+            }
+            e.msb_present = r.flag()?;
+            if e.msb_present {
+                e.delta_poc_msb_cycle = r.ue()?;
+            }
+            sh.long_term[sh.num_long_term] = e;
+            sh.num_long_term += 1;
+        }
+        // DeltaPocMsbCycleLt accumulation (7-52).
+        for i in 0..sh.num_long_term {
+            if i != 0 && i as u32 != num_lt_sps {
+                let p = sh.long_term[i - 1].delta_poc_msb_cycle;
+                sh.long_term[i].delta_poc_msb_cycle =
+                    sh.long_term[i].delta_poc_msb_cycle.wrapping_add(p);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Reference lists, motion prediction, and weighting of a P or B slice.
+fn parse_inter_slice(r: &mut BitCursor<'_>, pps: &Pps, sh: &mut SliceHeader) -> Result<()> {
+    let st = sh.slice_type;
+    sh.num_ref_idx = [
+        pps.num_ref_idx_l0_default,
+        if st == SliceType::B {
+            pps.num_ref_idx_l1_default
+        } else {
+            0
+        },
+    ];
+    if r.flag()? {
+        sh.num_ref_idx[0] = r.ue_max(14, "num_ref_idx_l0_active_minus1")? + 1;
+        if st == SliceType::B {
+            sh.num_ref_idx[1] = r.ue_max(14, "num_ref_idx_l1_active_minus1")? + 1;
+        }
+    }
+    let total = sh.num_pic_total_curr();
+    if total == 0 {
+        return Err(DecodeError::Invalid("P/B slice without reference pictures"));
+    }
+    if pps.lists_modification_present && total > 1 {
+        let bits = ceil_log2(total);
+        sh.rpl_mod[0] = r.flag()?;
+        if sh.rpl_mod[0] {
+            for i in 0..sh.num_ref_idx[0] as usize {
+                let v = r.read(bits)?;
+                if v >= total {
+                    return Err(DecodeError::Invalid("list_entry_l0"));
+                }
+                sh.list_entry[0][i] = v as u8;
+            }
+        }
+        if st == SliceType::B {
+            sh.rpl_mod[1] = r.flag()?;
+            if sh.rpl_mod[1] {
+                for i in 0..sh.num_ref_idx[1] as usize {
+                    let v = r.read(bits)?;
+                    if v >= total {
+                        return Err(DecodeError::Invalid("list_entry_l1"));
+                    }
+                    sh.list_entry[1][i] = v as u8;
+                }
+            }
+        }
+    }
+    if st == SliceType::B {
+        sh.mvd_l1_zero = r.flag()?;
+    }
+    if pps.cabac_init_present {
+        sh.cabac_init = r.flag()?;
+    }
+    if sh.temporal_mvp {
+        if st == SliceType::B {
+            sh.collocated_from_l0 = r.flag()?;
+        }
+        if (sh.collocated_from_l0 && sh.num_ref_idx[0] > 1)
+            || (!sh.collocated_from_l0 && sh.num_ref_idx[1] > 1)
+        {
+            let lim = if sh.collocated_from_l0 {
+                sh.num_ref_idx[0]
+            } else {
+                sh.num_ref_idx[1]
+            } - 1;
+            sh.collocated_ref_idx = r.ue_max(lim, "collocated_ref_idx")?;
+        }
+    }
+    if (pps.weighted_pred && st == SliceType::P) || (pps.weighted_bipred && st == SliceType::B) {
+        sh.pwt = Some(parse_pwt(r, sh)?);
+    }
+    let five_minus = r.ue_max(4, "five_minus_max_num_merge_cand")?;
+    sh.max_num_merge_cand = 5 - five_minus;
+    Ok(())
 }
