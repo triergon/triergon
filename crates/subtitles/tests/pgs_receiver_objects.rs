@@ -7,8 +7,8 @@
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::ReceiverDecoder;
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, Status};
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
 
 /// `(x, y, width, height, stride, pixels)` of one rectangle.
 type Rectangle = (u16, u16, u16, u16, u16, Vec<u8>);
@@ -41,8 +41,8 @@ fn presented(packets: &[&str], limits: DisplayLimits) -> Vec<Option<Vec<Rectangl
                     .poll(&mut WorkBudget::new(quantum), &cancel)
                     .unwrap()
                 {
-                    RecoveryStatus::OutputReady => break decoder.take_output(&cancel).unwrap(),
-                    RecoveryStatus::Yield => {}
+                    Status::OutputReady => break decoder.take_output(&cancel).unwrap(),
+                    Status::Yield => {}
                     status => panic!("packet {index}: {status:?}"),
                 }
             };

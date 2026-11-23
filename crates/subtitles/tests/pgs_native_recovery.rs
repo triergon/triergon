@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverPacket, Refusal};
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverPacket, Refusal, Status};
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
 
 fn stamp() -> PacketClock {
     PacketClock {
@@ -70,7 +70,7 @@ fn ready(decoder: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
         let mut work = WorkBudget::new(quantum);
         let status = decoder.poll(&mut work, &cancel).unwrap();
         assert!(work.spent() <= quantum);
-        if status == RecoveryStatus::OutputReady {
+        if status == Status::OutputReady {
             return decoder.take_output(&cancel).unwrap();
         }
     }
@@ -262,7 +262,7 @@ fn work_zero_preserves_every_observed_allocation_boundary_for_valid_and_recovery
             d.poll(&mut zero, &c).unwrap();
             assert_eq!((b.used(), d.work_spent()), before);
             assert_eq!(zero.spent(), 0);
-            if d.poll(&mut WorkBudget::new(1), &c).unwrap() == RecoveryStatus::OutputReady {
+            if d.poll(&mut WorkBudget::new(1), &c).unwrap() == Status::OutputReady {
                 complete = true;
                 break;
             }
@@ -299,16 +299,16 @@ fn allocation_pressure_retry_keeps_paid_work_and_owners() {
                 d.poll(&mut WorkBudget::new(0), &c).unwrap();
                 assert_eq!(b.used(), before);
             }
-            Ok(RecoveryStatus::OutputReady) => {
+            Ok(Status::OutputReady) => {
                 drop(blocker);
                 complete = true;
                 break;
             }
-            Ok(RecoveryStatus::Yield) => {}
+            Ok(Status::Yield) => {}
             other => panic!("unexpected pressured status {other:?}"),
         }
         drop(blocker);
-        if d.poll(&mut WorkBudget::new(1), &c).unwrap() == RecoveryStatus::OutputReady {
+        if d.poll(&mut WorkBudget::new(1), &c).unwrap() == Status::OutputReady {
             complete = true;
             break;
         }
@@ -335,7 +335,7 @@ fn cancellation_before_during_and_after_ready_releases_private_graph_and_is_stic
         let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
         d.push(&mut bytes, stamp(), &c).unwrap();
         for _ in 0..steps {
-            if d.poll(&mut WorkBudget::new(1), &c).unwrap() == RecoveryStatus::OutputReady {
+            if d.poll(&mut WorkBudget::new(1), &c).unwrap() == Status::OutputReady {
                 break;
             }
         }
@@ -375,7 +375,7 @@ fn exceeded_limits_are_errors_not_refusals() {
         let error = loop {
             match d.poll(&mut WorkBudget::new(4096), &c) {
                 Err(e) => break e,
-                Ok(RecoveryStatus::Yield) => {}
+                Ok(Status::Yield) => {}
                 other => panic!("resource error disappeared {other:?}"),
             }
         };
@@ -608,7 +608,7 @@ fn limits_still_apply_after_a_packet_without_a_display() {
         let error = loop {
             match d.poll(&mut WorkBudget::new(4096), &c) {
                 Err(e) => break e,
-                Ok(RecoveryStatus::Yield) => {}
+                Ok(Status::Yield) => {}
                 other => panic!("receiver bound bypassed after strict refusal {other:?}"),
             }
         };

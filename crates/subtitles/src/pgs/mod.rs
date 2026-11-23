@@ -6,9 +6,7 @@
 pub(crate) mod receiver;
 mod segment;
 
-pub use receiver::{
-    DisplayConfig, DisplayLimits, PacketClock, RecoveredEvent, RecoveredRect, RecoveryStatus,
-};
+pub use receiver::{DisplayConfig, DisplayLimits, PacketClock};
 pub use segment::{
     Composition, CompositionObject, CompositionObjects, Crop, Envelope, ObjectFragment,
     ObjectStart, Palette, PaletteEntry, Segment, SegmentIter, SupClock, Window, Windows,

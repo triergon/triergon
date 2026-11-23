@@ -33,14 +33,16 @@ pub mod pgs {
     //! The PGS receiver: FFmpeg's `pgssub` decoder.
     //!
     //! [`ReceiverDecoder`] returns what the reference returns for every packet
-    //! it decodes, malformed ones included: the first display of each packet,
-    //! its presentation PTS, rectangles, palettes and pixels, forced flags and
-    //! the `forced_subs_only` palette. A packet the reference refuses carries a
+    //! it decodes, malformed ones included: the first display of each packet
+    //! as a [`Subtitle`], with its presentation PTS and its [`Rect`]s
+    //! (palettes, pixels, forced flags and the `forced_subs_only` palette). A packet the reference refuses carries a
     //! [`Refusal`]; the receiver keeps the state its earlier segments left and
     //! decodes the next packet.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::pgs::receiver::{ReceiverDecoder, ReceiverPacket, Refusal};
+    pub use crate::pgs::receiver::{
+        ReceiverDecoder, ReceiverPacket, Rect, Refusal, Status, Subtitle,
+    };
 }
 pub mod dvd {
     //! FFmpeg's DVD subtitle receiver and the packets its demuxers deliver.

@@ -194,13 +194,13 @@ pub struct PgsQueuePicture<'a> {
     pub start_ns: i64,
     /// The presentation canvas in pixels, when each side lies within 160 to 8,192.
     pub canvas: Option<[u16; 2]>,
-    rectangles: &'a [pgs::RecoveredRect],
+    rectangles: &'a [compat::pgs::Rect],
 }
 
 impl<'a> PgsQueuePicture<'a> {
     /// The displayable rectangles: nonempty, at most 8,192 pixels on a side, and with
     /// every pixel present.
-    pub fn rectangles(self) -> impl Iterator<Item = &'a pgs::RecoveredRect> {
+    pub fn rectangles(self) -> impl Iterator<Item = &'a compat::pgs::Rect> {
         self.rectangles.iter().filter(|r| {
             r.width > 0
                 && r.height > 0
@@ -365,14 +365,14 @@ impl<M> PgsBridge<M> {
             return Ok(PgsStep::NeedPacket);
         }
         match self.decoder.poll(w, c)? {
-            pgs::RecoveryStatus::Yield => Ok(PgsStep::Yield),
-            pgs::RecoveryStatus::Ended => Ok(PgsStep::Finished),
-            pgs::RecoveryStatus::NeedPacket => {
+            compat::pgs::Status::Yield => Ok(PgsStep::Yield),
+            compat::pgs::Status::Ended => Ok(PgsStep::Finished),
+            compat::pgs::Status::NeedPacket => {
                 self.pending = None;
                 self.pushed = false;
                 Ok(PgsStep::NeedPacket)
             }
-            pgs::RecoveryStatus::OutputReady => Ok(PgsStep::Output(PgsOutput {
+            compat::pgs::Status::OutputReady => Ok(PgsStep::Output(PgsOutput {
                 packet: self
                     .pending
                     .as_ref()

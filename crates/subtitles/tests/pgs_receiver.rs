@@ -12,8 +12,8 @@
 use std::fmt::Write as _;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::ReceiverDecoder;
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, Status};
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
 
 struct Fixture {
     forced_only: bool,
@@ -85,8 +85,8 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
         let packet = loop {
             let mut work = WorkBudget::new(quantum);
             match decoder.poll(&mut work, &cancel).unwrap() {
-                RecoveryStatus::OutputReady => break decoder.take_output(&cancel).unwrap(),
-                RecoveryStatus::Yield => assert!(work.spent() <= quantum),
+                Status::OutputReady => break decoder.take_output(&cancel).unwrap(),
+                Status::Yield => assert!(work.spent() <= quantum),
                 status => panic!("packet {index}: {status:?}"),
             }
         };
@@ -118,7 +118,7 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
     while decoder
         .poll(&mut WorkBudget::new(quantum), &cancel)
         .unwrap()
-        != RecoveryStatus::Ended
+        != Status::Ended
     {}
     out
 }

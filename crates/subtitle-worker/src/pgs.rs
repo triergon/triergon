@@ -18,10 +18,8 @@ use std::sync::atomic::AtomicBool;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_mpegts::PacketFormat;
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, Refusal};
-use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayLimits, PacketClock, RecoveredRect, RecoveryStatus,
-};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, Rect, Refusal, Status};
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
 
 /// The candidate's pool limit: the prepared packets and one display set.
 const POOL_BYTES: usize = 1 << 30;
@@ -108,8 +106,8 @@ impl Prepared for Pgs {
                     .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
                     .at(index)?
                 {
-                    RecoveryStatus::OutputReady => break decoder.take_output(&cancel).at(index)?,
-                    RecoveryStatus::Yield => {}
+                    Status::OutputReady => break decoder.take_output(&cancel).at(index)?,
+                    Status::Yield => {}
                     status => return Err(format!("pgs: unexpected {status:?}").into()),
                 }
             };
@@ -142,7 +140,7 @@ impl Prepared for Pgs {
         while decoder
             .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
             .at(end)?
-            != RecoveryStatus::Ended
+            != Status::Ended
         {}
         Ok(())
     }
@@ -180,7 +178,7 @@ impl Prepared for Pgs {
 
 /// One rectangle as the reference's API presents it: 256 palette words and
 /// the forced flag (`AV_SUBTITLE_FLAG_FORCED`).
-fn report(sink: &mut Sink<'_>, rect: &RecoveredRect) -> Result<()> {
+fn report(sink: &mut Sink<'_>, rect: &Rect) -> Result<()> {
     let bitmap = Bitmap {
         palette: rect.palette(),
         pixels: rect.pixels().as_ref(),

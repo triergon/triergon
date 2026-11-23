@@ -163,7 +163,7 @@ pub enum Refusal {
 
 /// One presented rectangle.
 #[derive(Debug)]
-pub struct RecoveredRect {
+pub struct Rect {
     /// The composition object it presents.
     pub reference: CompositionObject,
     /// Column of the top-left corner on the canvas: the composition
@@ -196,7 +196,7 @@ enum ReceiverPalette {
 
 const HIDDEN_PALETTE: [u32; 256] = [0; 256];
 
-impl RecoveredRect {
+impl Rect {
     /// `height` rows of `width` palette indices, row after row; empty when
     /// the rectangle has no pixels.
     pub fn pixels(&self) -> &Bytes {
@@ -214,17 +214,17 @@ impl RecoveredRect {
 
 /// One subtitle the receiver presents.
 #[derive(Debug)]
-pub struct RecoveredEvent {
+pub struct Subtitle {
     /// Presentation time in microseconds, ties away from zero: the PTS of the
     /// packet whose PCS this display is the first to present (zero before
     /// any PCS), else this packet's own; `None` when that PTS is unknown.
     pub pts_microseconds: Option<i64>,
-    rectangles: BudgetVec<RecoveredRect>,
+    rectangles: BudgetVec<Rect>,
 }
-impl RecoveredEvent {
+impl Subtitle {
     /// The rectangles in composition-object order, at most two; none for a
     /// display that clears the screen.
-    pub fn rectangles(&self) -> &[RecoveredRect] {
+    pub fn rectangles(&self) -> &[Rect] {
         self.rectangles.as_slice()
     }
 }
@@ -236,7 +236,7 @@ pub struct ReceiverPacket {
     raw: Bytes,
     /// The clock the packet was pushed with.
     pub clock: PacketClock,
-    event: Option<RecoveredEvent>,
+    event: Option<Subtitle>,
     refusal: Option<Refusal>,
     /// Canvas width and height after the packet: the size of the latest PCS
     /// the receiver accepted, `[0, 0]` before one or after a PCS whose size
@@ -250,7 +250,7 @@ impl ReceiverPacket {
         &self.raw
     }
     /// The subtitle the reference returns for this packet.
-    pub fn receiver_output(&self) -> Option<&RecoveredEvent> {
+    pub fn receiver_output(&self) -> Option<&Subtitle> {
         self.event.as_ref()
     }
     /// Set when the reference's decode call fails on this packet.
@@ -261,7 +261,7 @@ impl ReceiverPacket {
 
 /// What [`ReceiverDecoder::poll`] reached.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RecoveryStatus {
+pub enum Status {
     /// No packet is active: push the next one, or finish the input.
     NeedPacket,
     /// The work budget ran out; poll again with more.
@@ -321,7 +321,7 @@ enum Placement {
 #[derive(Debug)]
 struct Draft {
     pts: Option<i64>,
-    rectangles: BudgetVec<RecoveredRect>,
+    rectangles: BudgetVec<Rect>,
     palette: Option<ReceiverPalette>,
     pixels: usize,
 }
@@ -353,7 +353,7 @@ pub struct ReceiverDecoder {
     limits: DisplayLimits,
     config: DisplayConfig,
     /// The packet's subtitle, once its first END is displayed.
-    event: Option<RecoveredEvent>,
+    event: Option<Subtitle>,
     receiver: Receiver,
     phase: Phase,
     credit: usize,
@@ -509,7 +509,7 @@ impl ReceiverDecoder {
     /// `Error::Cancelled` and the `Error::Limit` of [`DisplayLimits`]
     /// included, fails the decoder: every call returns it until
     /// [`reset`](Self::reset).
-    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<RecoveryStatus> {
+    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -517,10 +517,10 @@ impl ReceiverDecoder {
             return Err(self.poison(Error::Cancelled));
         }
         match self.phase {
-            Phase::Ready => return Ok(RecoveryStatus::OutputReady),
-            Phase::Idle => return Ok(RecoveryStatus::NeedPacket),
-            Phase::Ended => return Ok(RecoveryStatus::Ended),
-            _ if work.remaining() == 0 => return Ok(RecoveryStatus::Yield),
+            Phase::Ready => return Ok(Status::OutputReady),
+            Phase::Idle => return Ok(Status::NeedPacket),
+            Phase::Ended => return Ok(Status::Ended),
+            _ if work.remaining() == 0 => return Ok(Status::Yield),
             _ => {}
         }
         match self.run(work, cancel) {
@@ -532,13 +532,13 @@ impl ReceiverDecoder {
 
     /// The decode loop: every phase of a packet, until it is ready or the
     /// caller's work runs out.
-    fn run(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<RecoveryStatus> {
+    fn run(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if work.remaining() == 0 {
-                return Ok(RecoveryStatus::Yield);
+                return Ok(Status::Yield);
             }
             let phase = self.phase;
             let next = match phase {
@@ -549,13 +549,13 @@ impl ReceiverDecoder {
                 Phase::StoreEvent => self.store_event(work, cancel)?,
                 Phase::Finish => self.finish(work, cancel)?,
                 Phase::Eof => self.end_of_stream(work, cancel)?,
-                Phase::Idle => return Ok(RecoveryStatus::NeedPacket),
-                Phase::Ready => return Ok(RecoveryStatus::OutputReady),
-                Phase::Ended => return Ok(RecoveryStatus::Ended),
+                Phase::Idle => return Ok(Status::NeedPacket),
+                Phase::Ready => return Ok(Status::OutputReady),
+                Phase::Ended => return Ok(Status::Ended),
             };
             match next {
                 Some(next) => self.done(next),
-                None => return Ok(RecoveryStatus::Yield),
+                None => return Ok(Status::Yield),
             }
         }
     }
@@ -779,7 +779,7 @@ impl ReceiverDecoder {
         };
         self.draft()?
             .rectangles
-            .try_push(RecoveredRect {
+            .try_push(Rect {
                 reference: reference.object,
                 x,
                 y,
@@ -836,7 +836,7 @@ impl ReceiverDecoder {
             Planes::Kept(planes) | Planes::Fresh(planes) => self.planes = Planes::Kept(planes),
             Planes::None => {}
         }
-        self.event = Some(RecoveredEvent {
+        self.event = Some(Subtitle {
             pts_microseconds: draft.pts,
             rectangles: draft.rectangles,
         });

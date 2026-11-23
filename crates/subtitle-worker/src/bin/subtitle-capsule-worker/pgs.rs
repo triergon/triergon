@@ -16,8 +16,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
 use triergon_harness_protocol::digest::fold_bytes;
 use triergon_harness_runner::{Invocation, Result, Totals, measure};
-use triergon_subtitles::compat::pgs::ReceiverDecoder;
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, Status};
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
 
 pub const PREFIX: &str = "pgs-";
 const OPERATION: &str = "pgs-receiver-display";
@@ -244,7 +244,7 @@ fn decode(
             let status = decoder
                 .poll(&mut WorkBudget::new(quantum), cancel)
                 .map_err(drop)?;
-            if status == RecoveryStatus::OutputReady {
+            if status == Status::OutputReady {
                 output = Some(decoder.take_output(cancel).map_err(drop)?);
                 break;
             }
@@ -291,7 +291,7 @@ fn decode(
         if decoder
             .poll(&mut WorkBudget::new(quantum), cancel)
             .map_err(drop)?
-            == RecoveryStatus::Ended
+            == Status::Ended
         {
             return Ok(());
         }

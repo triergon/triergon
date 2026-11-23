@@ -53,7 +53,7 @@ fn decode(d: &mut ReceiverDecoder, b: &Budget, raw: &[u8]) -> ReceiverPacket {
     let mut input = Some(Bytes::copy_from_slice(b, raw).unwrap());
     d.push(&mut input, clock(), &cancel).unwrap();
     loop {
-        if d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() == RecoveryStatus::OutputReady {
+        if d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() == Status::OutputReady {
             return d.take_output(&cancel).unwrap();
         }
     }
@@ -102,11 +102,11 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
         let hold = b.reserve(b.available()).unwrap();
         match d.poll(&mut WorkBudget::new(4096), &cancel) {
             Err(Error::Backpressure { .. }) => pressured += 1,
-            Ok(RecoveryStatus::OutputReady) => break d.take_output(&cancel).unwrap(),
+            Ok(Status::OutputReady) => break d.take_output(&cancel).unwrap(),
             other => panic!("unexpected {other:?}"),
         }
         drop(hold);
-        if d.poll(&mut WorkBudget::new(1), &cancel).unwrap() == RecoveryStatus::OutputReady {
+        if d.poll(&mut WorkBudget::new(1), &cancel).unwrap() == Status::OutputReady {
             break d.take_output(&cancel).unwrap();
         }
     };

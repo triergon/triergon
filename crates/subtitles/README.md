@@ -65,12 +65,12 @@ PGS receiver is polled: `push(&mut packet, clock, &cancel)`, then `poll` until
 | --- | --- |
 | `text` | `Extractor` (packets), `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
 | `dvb` | `SourceConfiguration`, `DvbPacket`: a service's configuration and its packets with their original clocks |
-| `pgs` | `SegmentIter`: segments of a packet or SUP stream; `DisplayLimits`, `DisplayConfig` and the outputs of the PGS receiver |
+| `pgs` | `SegmentIter`: segments of a packet or SUP stream; `PacketClock`, and the PGS receiver's `DisplayLimits` and `DisplayConfig` |
 | `dvd` | `vobsub` (`.idx` text), `program_stream` (MPEG-2 program streams) |
 | `cc` | `video::nal::{Codec, Framing}`: how a video stream carries its NAL units, for `compat::cc::VideoCoding` |
 | `context` | `Builder`: track header, metadata and attachment bytes handed to a renderer |
 | `compat::dvb` | `ReceiverDecoder`, `Status`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
-| `compat::pgs` | `ReceiverDecoder`, `Refusal` |
+| `compat::pgs` | `ReceiverDecoder`, `Status`, `ReceiverPacket`, `Subtitle`, `Rect`, `Refusal` |
 | `compat::dvd` | `Decoder`, `Settings`, `ifo_palette`, `VobSubIndex`, `SubpictureParser`, `mp4_configuration` |
 | `compat::cc` | `Decoder`, `Options`, `CaptionExtractor`, `SccPackets` |
 | `compat::teletext` | `Decoder`, `Options`, `Format`, `PageSelection` |

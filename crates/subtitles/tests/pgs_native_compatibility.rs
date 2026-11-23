@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverPacket};
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverPacket, Status};
+use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
     out.push(kind);
@@ -75,10 +75,10 @@ fn ready(d: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
         let mut work = WorkBudget::new(quantum);
         let status = d.poll(&mut work, &cancel).unwrap();
         assert!(work.spent() <= quantum);
-        if status == RecoveryStatus::OutputReady {
+        if status == Status::OutputReady {
             return d.take_output(&cancel).unwrap();
         }
-        assert_eq!(status, RecoveryStatus::Yield);
+        assert_eq!(status, Status::Yield);
     }
     panic!("native compatibility did not finish bounded input");
 }
@@ -185,7 +185,7 @@ fn small_work_and_zero_work_keep_one_native_operation_and_exact_owned_result() {
         let mut zero = WorkBudget::new(0);
         assert_eq!(
             d.poll(&mut zero, &AtomicBool::new(false)).unwrap(),
-            RecoveryStatus::Yield
+            Status::Yield
         );
         assert_eq!((zero.spent(), d.work_spent(), b.used()), (0, 0, before));
         assert_picture(&ready(&mut d, quantum), false);
@@ -228,7 +228,7 @@ fn funded_pressure_retries_do_not_repeat_work_or_lose_the_packet_owner() {
     assert_eq!(
         d.poll(&mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        RecoveryStatus::Yield
+        Status::Yield
     );
     assert_eq!(d.work_spent(), paid);
     let out = ready(&mut d, 1);
@@ -279,10 +279,7 @@ fn cancellation_during_funding_is_sticky_releases_private_graph_and_reset_recove
     let c = AtomicBool::new(false);
     let mut d = decoder(&b, false);
     push(&mut d, &b, &picture());
-    assert_eq!(
-        d.poll(&mut WorkBudget::new(1), &c).unwrap(),
-        RecoveryStatus::Yield
-    );
+    assert_eq!(d.poll(&mut WorkBudget::new(1), &c).unwrap(), Status::Yield);
     assert_eq!(d.work_spent(), 1);
     c.store(true, Ordering::Relaxed);
     assert_eq!(d.poll(&mut WorkBudget::new(0), &c), Err(Error::Cancelled));
@@ -313,7 +310,7 @@ fn cancelled_push_preserves_input_and_cancelled_take_discards_unpublished_output
     d.push(&mut owned, clock(), &c).unwrap();
     let mut ready = false;
     for _ in 0..1_000_000 {
-        if d.poll(&mut WorkBudget::new(4096), &c).unwrap() == RecoveryStatus::OutputReady {
+        if d.poll(&mut WorkBudget::new(4096), &c).unwrap() == Status::OutputReady {
             ready = true;
             break;
         }
@@ -350,7 +347,7 @@ fn cumulative_work_limit_poison_cannot_be_bypassed_by_small_quanta_or_reset_retr
                     error = Some(value);
                     break;
                 }
-                Ok(status) => assert_eq!(status, RecoveryStatus::Yield),
+                Ok(status) => assert_eq!(status, Status::Yield),
             }
         }
         let error = error.expect("finite native work ceiling must refuse input");
@@ -402,17 +399,14 @@ fn end_of_input_presents_nothing_pending() {
     push(&mut d, &b, &raw);
     assert_picture(&ready(&mut d, 1), false);
     d.finish_input(&c).unwrap();
-    assert_eq!(
-        d.poll(&mut WorkBudget::new(0), &c).unwrap(),
-        RecoveryStatus::Yield
-    );
+    assert_eq!(d.poll(&mut WorkBudget::new(0), &c).unwrap(), Status::Yield);
     let before = d.work_spent();
     let mut final_work = WorkBudget::new(1);
-    assert_eq!(d.poll(&mut final_work, &c).unwrap(), RecoveryStatus::Yield);
+    assert_eq!(d.poll(&mut final_work, &c).unwrap(), Status::Yield);
     assert_eq!(final_work.spent(), 1);
     assert_eq!(d.work_spent(), before + 1);
     let mut zero = WorkBudget::new(0);
-    assert_eq!(d.poll(&mut zero, &c).unwrap(), RecoveryStatus::Ended);
+    assert_eq!(d.poll(&mut zero, &c).unwrap(), Status::Ended);
     assert_eq!(zero.spent(), 0);
     assert_eq!(d.work_spent(), before + 1);
     assert!(d.take_output(&c).is_err());
