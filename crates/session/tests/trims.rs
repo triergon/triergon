@@ -149,6 +149,35 @@ fn a_quicktime_aac_track_decodes_raw_packets_and_preserves_eight_speakers() {
     assert_eq!(count, 174);
 }
 
+#[test]
+fn a_matroska_aac_track_decodes_raw_packets_with_its_codec_private() {
+    let fixture = include_bytes!("../../matroska/tests/shared_bounded/hevc-aac.mkv");
+    let budget = Budget::new(32 << 20).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(fixture), &budget).unwrap();
+    let mut packet = source.next_packet().unwrap();
+    let reader = source.reader();
+    let track = (0..reader.track_count())
+        .filter_map(|index| reader.track(index))
+        .find(|track| track.kind() == MediaKind::Audio)
+        .unwrap();
+    assert_eq!(track.codec_tag(), b"A_AAC");
+    assert!(!track.configuration().is_empty());
+    let id = track.id();
+    let mut decoder = TrackDecoder::new_in(track, &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    let mut samples = 0;
+    while let Some(current) = packet {
+        if current.track() == id {
+            decoder.decode(&current, &mut frame).unwrap();
+            assert_eq!(frame.sample_rate, 48_000);
+            assert_eq!(frame.layout.speakers(), &[Speaker::FrontCenter]);
+            samples += frame.samples_per_channel;
+        }
+        packet = source.next_packet().unwrap();
+    }
+    assert_eq!(samples, 192_496);
+}
+
 fn tone_power(samples: &[f32], frequency: f64) -> f64 {
     let phase_step = std::f64::consts::TAU * frequency / 44_100.0;
     let (sin, cos) = samples
