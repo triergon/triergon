@@ -817,16 +817,18 @@ fn colour_metadata_obeys_byte_and_track_budgets_and_retains_source_after_drop() 
 }
 
 #[test]
-fn invalid_or_duplicate_colour_cannot_become_playable_packets() {
-    for data in [
-        element(0x55d0, &element(0x55d1, &f64::NAN.to_be_bytes())),
-        [uint(0x55b1, 9), uint(0x55b1, 1)].concat(),
-    ] {
-        assert!(matches!(
-            BlockingReader::open(Cursor::new(colour_track_fixture(&data)), Limits::default()),
-            Err(Error::Invalid(_))
-        ));
-    }
+fn colour_values_are_reported_as_written_repeats_keep_the_first_and_bad_widths_fail() {
+    let open = |colour: &[u8]| {
+        BlockingReader::open(Cursor::new(colour_track_fixture(colour)), Limits::default())
+    };
+    let nan = element(0x55d0, &element(0x55d1, &f64::NAN.to_be_bytes()));
+    let mastering = open(&nan).unwrap().tracks()[0].colour.unwrap().mastering;
+    assert!(mastering.unwrap().chromaticity[0].is_some_and(f64::is_nan));
+    let repeated = [uint(0x55b1, 9), uint(0x55b1, 1)].concat();
+    let colour = open(&repeated).unwrap().tracks()[0].colour.unwrap();
+    assert_eq!(colour.matrix_coefficients, 9);
+    let three_byte_float = element(0x55d0, &element(0x55d1, &[0; 3]));
+    assert!(matches!(open(&three_byte_float), Err(Error::Invalid(_))));
 }
 
 #[test]

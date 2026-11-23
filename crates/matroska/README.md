@@ -177,8 +177,12 @@ or cancellation the caller must seek or `reset` before reading more packets.
 
 **Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
-exact `f64`. Zero-length numbers take the schema default. Duplicates, bad widths,
-non-finite values, negative luminance and chromaticity outside [0, 1] fail.
+exact `f64`. Zero-length numbers take the schema default. Values are reported as written:
+RFC 9559 gives chromaticity the range [0, 1] and luminance a lower bound of 0, but
+neither it nor RFC 8794 (§11.1.6.6) tells a reader to refuse a value outside a range,
+so a non-finite, negative or out-of-range value is reported, not judged. A repeated
+Colour, Colour child or MasteringMetadata child is ignored after its first occurrence
+(RFC 8794 §12). A number wider than its type allows fails the track.
 
 **Block addition mappings.** `TrackExtensions` reports MaxBlockAdditionID and each
 BlockAdditionMapping as written. A mapping field the reader does not need to read blocks

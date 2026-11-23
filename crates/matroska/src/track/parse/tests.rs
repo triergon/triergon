@@ -174,3 +174,23 @@ fn raw_tracks_job_preserves_mixed_encoding_order_and_all_hdr_source_floats() {
     }
     assert_eq!(payload.unwrap().as_ref(), b"Pabc");
 }
+
+#[test]
+fn a_repeated_colour_keeps_the_first() {
+    let colour = |range: u64| element(0x55b0, &uint(0x55b9, range));
+    let raw = track(1, 1, &element(0xe0, &[colour(1), colour(2)].concat()));
+    let pool = Budget::new(64 * 1024).unwrap();
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let mut job = TracksJob::new(source, None, Limits::default(), 4096, &pool, 1, 1).unwrap();
+    let config = loop {
+        match job
+            .step(&mut WorkBudget::new(1 << 20), &AtomicBool::new(false))
+            .unwrap()
+        {
+            ParseStep::Yield => (),
+            ParseStep::Event(value) => break value,
+            other => panic!("repeated Colour: {other:?}"),
+        }
+    };
+    assert_eq!(config.tracks()[0].colour.unwrap().range, 1);
+}

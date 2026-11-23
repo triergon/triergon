@@ -5,14 +5,16 @@ use crate::{Error, Result};
 
 pub(crate) mod parse;
 
-/// All ten source floats, without rational quantization or filling absent fields.
+/// All ten source floats as written, without rational quantization or filling absent
+/// fields. Values outside the schema's ranges (chromaticity 0 to 1, luminance at least
+/// 0) are reported, not refused.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MasteringMetadata {
     /// CIE xy coordinates in R, G, B, white-point order.
     pub chromaticity: [Option<f64>; 8],
-    /// LuminanceMax: peak mastering display luminance in cd/m², finite and nonnegative.
+    /// LuminanceMax: peak mastering display luminance in cd/m².
     pub luminance_max: Option<f64>,
-    /// LuminanceMin: minimum mastering display luminance in cd/m², finite and nonnegative.
+    /// LuminanceMin: minimum mastering display luminance in cd/m².
     pub luminance_min: Option<f64>,
 }
 
@@ -351,25 +353,47 @@ mod source_tests {
         assert!(c.trace_fields().is_err());
     }
     #[test]
-    fn malformed_metadata_duplicates_and_non_finite_or_out_of_range_values_fail() {
+    fn malformed_widths_and_elements_fail() {
         for data in [
             e(0x55b1, &[0; 9]),
-            [e(0x55b1, &[1]), e(0x55b1, &[2])].concat(),
-            [e(0x55d0, &[]), e(0x55d0, &[])].concat(),
-            e(0x55d0, &[e(0x55d1, &[]), e(0x55d1, &[])].concat()),
             e(0x55d0, &e(0x55d1, &[1, 2, 3])),
             vec![0x55, 0xb1, 0x82, 0],
         ] {
             assert!(parse(&data).is_err(), "{data:?}");
         }
-        for id in [0x55d1, 0x55d9, 0x55da] {
-            for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.] {
-                assert!(parse(&e(0x55d0, &e(id, &value.to_be_bytes()))).is_err());
-            }
+    }
+    #[test]
+    fn repeated_children_keep_the_first_and_values_are_reported_as_written() {
+        let c = parse(&[e(0x55b1, &[1]), e(0x55b1, &[2])].concat()).unwrap();
+        assert_eq!(c.matrix_coefficients, 1);
+        let mastering = |luminance: f64| e(0x55d0, &e(0x55d9, &luminance.to_be_bytes()));
+        let c = parse(&[mastering(5.), mastering(7.)].concat()).unwrap();
+        assert_eq!(c.mastering.unwrap().luminance_max, Some(5.));
+        let c = parse(&e(
+            0x55d0,
+            &[e(0x55d1, &[]), e(0x55d1, &0.5_f64.to_be_bytes())].concat(),
+        ))
+        .unwrap();
+        assert_eq!(c.mastering.unwrap().chromaticity[0], Some(0.));
+        for (id, value) in [
+            (0x55d1, 1.0001),
+            (0x55d1, -1.),
+            (0x55d9, f64::INFINITY),
+            (0x55da, f64::NEG_INFINITY),
+            (0x55d9, f64::MAX),
+            (0x55da, f64::NAN),
+        ] {
+            let m = parse(&e(0x55d0, &e(id, &value.to_be_bytes())))
+                .unwrap()
+                .mastering
+                .unwrap();
+            let read = match id {
+                0x55d1 => m.chromaticity[0],
+                0x55d9 => m.luminance_max,
+                _ => m.luminance_min,
+            };
+            assert_eq!(read.map(f64::to_bits), Some(value.to_bits()), "{id:x}");
         }
-        assert!(parse(&e(0x55d0, &e(0x55d1, &1.0001_f64.to_be_bytes()))).is_err());
-        let c = parse(&e(0x55d0, &e(0x55d9, &f64::MAX.to_be_bytes()))).unwrap();
-        assert_eq!(c.mastering.unwrap().luminance_max, Some(f64::MAX));
     }
     #[cfg(feature = "reference-trace")]
     #[test]

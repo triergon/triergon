@@ -316,10 +316,8 @@ impl TrackJob {
                             match child.id {
                                 0xb0 => t.width = ebml::uint(bytes)?,
                                 0xba => t.height = ebml::uint(bytes)?,
-                                0x55b0 => {
-                                    if t.colour.is_some() {
-                                        return Err(Error::Invalid("duplicate Colour"));
-                                    }
+                                // A repeated Colour is ignored (RFC 8794 §12).
+                                0x55b0 if t.colour.is_none() => {
                                     self.colour =
                                         Some(ColourJob::new(self.source.clone(), child.payload));
                                     self.phase = TrackPhase::Colour;

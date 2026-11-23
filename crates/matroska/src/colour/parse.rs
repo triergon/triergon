@@ -50,13 +50,13 @@ impl ColourJob {
         }
         result
     }
-    fn mark(seen: &mut u16, bit: u32) -> Result<()> {
+    /// Marks a child as seen: `false` for a repeat, which RFC 8794 §12 lets a reader
+    /// ignore (only the first occurrence of these maxOccurs-1 children counts).
+    fn first(seen: &mut u16, bit: u32) -> bool {
         let mask = 1 << bit;
-        if *seen & mask != 0 {
-            return Err(Error::Invalid("duplicate colour metadata"));
-        }
+        let first = *seen & mask == 0;
         *seen |= mask;
-        Ok(())
+        first
     }
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep<Colour>> {
         loop {
@@ -76,7 +76,9 @@ impl ColourJob {
                             continue;
                         }
                         let index = (child.id - 0x55d1) as u32;
-                        Self::mark(&mut self.master_seen, index)?;
+                        if !Self::first(&mut self.master_seen, index) {
+                            continue;
+                        }
                         let bytes = &self.source[child.payload];
                         let value = match bytes.len() {
                             0 => 0.,
@@ -92,9 +94,6 @@ impl ColourJob {
                             ),
                             _ => return Err(Error::Invalid("HDR float width")),
                         };
-                        if !value.is_finite() || value < 0. || (index < 8 && value > 1.) {
-                            return Err(Error::Invalid("HDR float range"));
-                        }
                         let out = self
                             .out
                             .mastering
@@ -115,7 +114,9 @@ impl ColourJob {
                 ParseStep::Event(None) => self.done = true,
                 ParseStep::Event(Some(child)) => {
                     if child.id == 0x55d0 {
-                        Self::mark(&mut self.seen, 13)?;
+                        if !Self::first(&mut self.seen, 13) {
+                            continue;
+                        }
                         self.out.mastering = Some(MasteringMetadata::default());
                         self.master_seen = 0;
                         self.mastering = Some(ChildCursor::new(child.payload));
@@ -124,7 +125,9 @@ impl ColourJob {
                     if !(0x55b1..=0x55bd).contains(&child.id) {
                         continue;
                     }
-                    Self::mark(&mut self.seen, (child.id - 0x55b1) as u32)?;
+                    if !Self::first(&mut self.seen, (child.id - 0x55b1) as u32) {
+                        continue;
+                    }
                     let bytes = &self.source[child.payload];
                     let v = if bytes.is_empty() && matches!(child.id, 0x55b1 | 0x55ba | 0x55bb) {
                         2
