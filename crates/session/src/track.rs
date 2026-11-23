@@ -9,6 +9,7 @@ use triergon_framing::{
 };
 
 use crate::compat::aac::Policy;
+use crate::discard::decode_discarding;
 use crate::{AudioCodec, Discard, audio_codec, audio_configuration, audio_decoder_in};
 
 /// The decoder of one container audio track. It chooses the decoder from the track's
@@ -31,8 +32,8 @@ impl core::fmt::Debug for TrackDecoder {
 }
 
 impl TrackDecoder {
-    /// The pool [`TrackDecoder::new`] creates: the largest default of the decoders it
-    /// chooses from.
+    /// The capacity of the pool [`TrackDecoder::new`] creates, equal to the default
+    /// limit for AAC and Vorbis. Use [`Self::new_in`] with a larger pool as needed.
     pub const DEFAULT_STORAGE_BYTES: usize = 32 << 20;
 
     /// The decoder for `track`. AAC uses raw LC packets when the track supplies an
@@ -118,9 +119,14 @@ impl TrackDecoder {
         packet: &impl PacketInfo,
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, Error> {
-        let levels = self.decoder.decode(packet.payload(), out)?;
-        Discard::of(packet).apply(out, &mut self.delay);
-        Ok(levels)
+        decode_discarding(
+            self.decoder.as_mut(),
+            packet.payload(),
+            out,
+            &mut self.delay,
+            || Discard::of(packet),
+        )
+        .map(|(levels, _)| levels)
     }
 
     /// End of stream: replace `out` with the samples the decoder still holds back.

@@ -7,6 +7,7 @@
 //! therefore yields nothing, and `flush` and `load` discard everything queued.
 use crate::Discard;
 use crate::SessionState;
+use crate::discard::decode_discarding;
 use crate::lane::{OnRefusal, Phase, Refusals};
 use crate::mix::Downmix;
 use crate::queue::{FeedError, QueueLimits, UnitQueue, packet_pts};
@@ -267,9 +268,14 @@ impl<F: PcmForm> AudioSession<F> {
             && let Some(unit) = self.queue.pop_if(due)
         {
             consumed += 1;
-            match decoder.decode(&unit.data, &mut self.frame) {
-                Ok(levels) => {
-                    let skipped = unit.discard.apply(&mut self.frame, &mut self.delay);
+            match decode_discarding(
+                decoder.as_mut(),
+                &unit.data,
+                &mut self.frame,
+                &mut self.delay,
+                || unit.discard,
+            ) {
+                Ok((levels, skipped)) => {
                     self.output
                         .append(&self.frame, levels, unit.pts, skipped, out);
                 }

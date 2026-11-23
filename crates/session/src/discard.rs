@@ -1,7 +1,19 @@
 //! The decoded samples a container marks for discarding.
-use triergon_codec::AudioFrame;
+use triergon_codec::{AudioFrame, DownmixLevels, DynAudioDecoder, Error};
 use triergon_core::container::{PacketInfo, Trim};
 use triergon_core::{Rounding, TimeBase};
+
+#[inline(always)]
+pub(crate) fn decode_discarding(
+    decoder: &mut DynAudioDecoder,
+    payload: &[u8],
+    frame: &mut AudioFrame,
+    delay: &mut usize,
+    discard: impl FnOnce() -> Discard,
+) -> Result<(Option<DownmixLevels>, usize), Error> {
+    let levels = decoder.decode(payload, frame)?;
+    Ok((levels, discard().apply(frame, delay)))
+}
 
 /// What a container says about discarding one packet's decoded output: its
 /// [`Trim`] and any samples before time zero (Matroska CodecDelay, Opus pre-skip in
