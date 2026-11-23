@@ -95,6 +95,57 @@ struct CurPic {
     col: ColMotion,
 }
 
+/// Random-access state from the first slice header to picture admission.
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+enum SequenceEntry {
+    Running,
+    SuppressRasl,
+    AfterEos,
+    AfterEosSuppressRasl,
+    AwaitingIrap,
+    /// An IRAP was seen, but no picture has started yet.
+    FirstIrapSeen,
+}
+
+impl SequenceEntry {
+    fn is_first_picture(self) -> bool {
+        matches!(self, Self::AwaitingIrap | Self::FirstIrapSeen)
+    }
+
+    fn suppresses_rasl(self) -> bool {
+        matches!(
+            self,
+            Self::SuppressRasl | Self::AfterEosSuppressRasl | Self::FirstIrapSeen
+        )
+    }
+
+    fn observe_irap(&mut self, nal_type: u8) {
+        *self = match *self {
+            Self::AwaitingIrap | Self::FirstIrapSeen => Self::FirstIrapSeen,
+            Self::AfterEos | Self::AfterEosSuppressRasl => Self::AfterEosSuppressRasl,
+            _ if hevc::is_idr(nal_type) || hevc::is_bla(nal_type) => Self::SuppressRasl,
+            _ => Self::Running,
+        };
+    }
+
+    fn end_sequence(&mut self) {
+        *self = match *self {
+            Self::Running => Self::AfterEos,
+            Self::SuppressRasl => Self::AfterEosSuppressRasl,
+            state => state,
+        };
+    }
+
+    fn picture_started(&mut self) {
+        *self = match *self {
+            Self::FirstIrapSeen | Self::AfterEosSuppressRasl => Self::SuppressRasl,
+            Self::AfterEos => Self::Running,
+            state => state,
+        };
+    }
+}
+
 /// H.265 decoder of Annex B access units or NAL units into [`Picture`]s in output order.
 ///
 /// A failed call abandons the picture it was decoding (what was decoded is still output)
@@ -127,10 +178,7 @@ struct Context {
     budget: Budget,
     layout_cache: Option<(Shared<Sps>, Shared<Pps>, Arc<Layout>)>,
     prev_tid0_poc: i32,
-    first_picture: bool,
-    after_eos: bool,
-    no_rasl_output: bool,
-    seen_irap: bool,
+    entry: SequenceEntry,
 }
 
 impl Default for Decoder {
@@ -236,7 +284,7 @@ impl Decoder {
                 if self.ctx.cur.is_some() {
                     self.ctx.finish_picture()?;
                 }
-                self.ctx.after_eos = true;
+                self.ctx.entry.end_sequence();
             }
             0..=9 | 16..=21 | hevc::VPS | hevc::SPS | hevc::PPS => {
                 nal::unescape_rbsp(nalu, &mut self.rbsp)?;
@@ -264,10 +312,7 @@ impl Context {
             pool: Arc::default(),
             budget: budget.clone(),
             prev_tid0_poc: 0,
-            first_picture: true,
-            after_eos: false,
-            no_rasl_output: true,
-            seen_irap: false,
+            entry: SequenceEntry::AwaitingIrap,
             pending_pts: None,
         }
     }
@@ -283,9 +328,7 @@ impl Context {
         self.cur = None;
         self.dpb.discard(|_| {});
         self.out.clear();
-        self.first_picture = true;
-        self.seen_irap = false;
-        self.no_rasl_output = true;
+        self.entry = SequenceEntry::AwaitingIrap;
     }
 
     fn decode_rbsp(&mut self, rbsp: &[u8], h: NalHeader) -> Result<()> {
@@ -316,13 +359,11 @@ impl Context {
         if first {
             // RASL pictures associated with an IRAP with NoRaslOutputFlag = 1 are not decoded.
             if hevc::is_irap(t) {
-                self.seen_irap = true;
-                self.no_rasl_output =
-                    hevc::is_idr(t) || hevc::is_bla(t) || self.first_picture || self.after_eos;
-            } else if !self.seen_irap {
+                self.entry.observe_irap(t);
+            } else if matches!(self.entry, SequenceEntry::AwaitingIrap) {
                 return Ok(());
             }
-            if hevc::is_rasl(t) && self.no_rasl_output {
+            if hevc::is_rasl(t) && self.entry.suppresses_rasl() {
                 return Ok(());
             }
         } else if self.cur.is_none() {
@@ -444,7 +485,8 @@ impl Context {
         };
         let poc = self.picture_order_count(&sps, sh, irap);
         let max_lsb = 1i32 << sps.log2_max_poc_lsb;
-        if irap && self.no_rasl_output {
+        let irap_no_rasl_output = irap && self.entry.suppresses_rasl();
+        if irap_no_rasl_output {
             self.dpb.mark_unused();
         }
         let rps = if hevc::is_idr(t) {
@@ -457,9 +499,9 @@ impl Context {
         // C.5.2.2 output and removal of pictures before decoding the current picture.
         self.dpb.hevc_remove(
             HevcPicture {
-                irap_no_rasl_output: irap && self.no_rasl_output,
+                irap_no_rasl_output,
                 cra: t == hevc::CRA,
-                first: self.first_picture,
+                first: self.entry.is_first_picture(),
                 no_output_of_prior_pics: sh.no_output_of_prior_pics,
             },
             limits(&sps),
@@ -484,8 +526,7 @@ impl Context {
         {
             self.prev_tid0_poc = poc;
         }
-        self.first_picture = false;
-        self.after_eos = false;
+        self.entry.picture_started();
         self.cur = Some(CurPic {
             frame,
             poc,
@@ -508,7 +549,7 @@ impl Context {
     fn picture_order_count(&self, sps: &Sps, sh: &SliceHeader, irap: bool) -> i32 {
         let max_lsb = 1i32 << sps.log2_max_poc_lsb;
         let lsb = sh.poc_lsb as i32;
-        let poc_msb = if irap && self.no_rasl_output {
+        let poc_msb = if irap && self.entry.suppresses_rasl() {
             0
         } else {
             let prev_lsb = self.prev_tid0_poc & (max_lsb - 1);
