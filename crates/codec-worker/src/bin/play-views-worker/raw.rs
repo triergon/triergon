@@ -16,14 +16,7 @@ use triergon::{
 use triergon_harness_protocol::digest::signed;
 use triergon_harness_protocol::md5;
 
-#[allow(
-    dead_code,
-    reason = "the shared example also contains its CLI summary and ASS rendering"
-)]
-#[path = "../../../../triergon/examples/play/pipeline.rs"]
-mod pipeline;
-
-use pipeline::{Observer, Options};
+use super::pipeline::{self, Observer, Options};
 use triergon_harness_runner::{Operation, Totals};
 
 fn options(arguments: &[OsString]) -> std::result::Result<Options, String> {
@@ -62,10 +55,9 @@ fn options(arguments: &[OsString]) -> std::result::Result<Options, String> {
         .ok_or("invalid canvas")?;
     Ok(Options {
         canvas,
-        format: None,
         video,
         audio,
-        transport: Some(if atsc { open_atsc } else { open_dvb }),
+        transport: if atsc { open_atsc } else { open_dvb },
     })
 }
 

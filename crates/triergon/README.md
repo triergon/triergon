@@ -71,7 +71,8 @@ let images = renderer.render(script, time_ms)?.images;
 # }
 ```
 
-The [play example](examples/play.rs) shows source opening, track selection,
+The [play example](examples/play/main.rs) uses `open_blocking` to read a Matroska file.
+It shows track selection,
 decoder configuration, draining both sessions at EOF, and rendering an ASS
 script at a requested time. From the workspace root:
 

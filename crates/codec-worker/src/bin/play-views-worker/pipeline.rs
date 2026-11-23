@@ -24,20 +24,11 @@ use triergon::{
     },
 };
 
-pub(super) type ExampleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub(super) type PlayResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 const WINDOW: usize = 64 * 1024;
 const WIDTH: usize = 640;
 const HEIGHT: usize = 360;
-
-#[derive(Default)]
-pub(super) struct Playback {
-    pub(super) video_frames: usize,
-    pub(super) rgba_bytes: usize,
-    pub(super) audio_samples: usize,
-    pub(super) sample_rate: u32,
-    pub(super) subtitle_images: usize,
-}
 
 fn read_file(pool: &Budget, path: &Path) -> Result<Bytes> {
     let mut file = File::open(path)?;
@@ -53,54 +44,16 @@ pub(super) type TransportOpen =
 #[derive(Clone, Copy)]
 pub(super) struct Options {
     pub(super) canvas: Canvas,
-    pub(super) format: Option<Format>,
     pub(super) video: Option<usize>,
     pub(super) audio: Option<usize>,
-    pub(super) transport: Option<TransportOpen>,
+    pub(super) transport: TransportOpen,
 }
 
 pub(super) trait Observer {
-    fn packet(&mut self, _index: usize, _packet: &impl PacketInfo) -> Result<()> {
-        Ok(())
-    }
-
-    fn picture(&mut self, _picture: &Published) -> Result<()> {
-        Ok(())
-    }
-
-    fn pcm(&mut self, _block: &PcmBlock) -> Result<()> {
-        Ok(())
-    }
-
-    fn subtitle(&mut self, _now_ms: i64, _frame: Frame<'_>) -> Result<()> {
-        Ok(())
-    }
-}
-
-#[derive(Default)]
-struct Count(Playback);
-
-impl Observer for Count {
-    fn picture(&mut self, picture: &Published) -> Result<()> {
-        self.0.video_frames += 1;
-        self.0.rgba_bytes = picture.rgba.len();
-        Ok(())
-    }
-
-    fn pcm(&mut self, block: &PcmBlock) -> Result<()> {
-        self.0.audio_samples += block.samples.len() / 2;
-        self.0.sample_rate = block.sample_rate;
-        Ok(())
-    }
-
-    fn subtitle(&mut self, _: i64, frame: Frame<'_>) -> Result<()> {
-        self.0.subtitle_images = frame
-            .images
-            .iter()
-            .filter(|image| image.rows().flatten().any(|&alpha| alpha != 0))
-            .count();
-        Ok(())
-    }
+    fn packet(&mut self, index: usize, packet: &impl PacketInfo) -> Result<()>;
+    fn picture(&mut self, picture: &Published) -> Result<()>;
+    fn pcm(&mut self, block: &PcmBlock) -> Result<()>;
+    fn subtitle(&mut self, now_ms: i64, frame: Frame<'_>) -> Result<()>;
 }
 
 fn play_source<S: Source>(
@@ -230,7 +183,7 @@ impl<O: Observer> Decode<'_, O> {
         info: impl Fn(&T) -> &dyn TrackInfo,
         packet: &impl PacketInfo,
         cancel: &AtomicBool,
-    ) -> ExampleResult<()> {
+    ) -> PlayResult<()> {
         let (index, track) = tracks
             .clone()
             .find(|(_, track)| info(track).id() == packet.track())
@@ -327,7 +280,7 @@ pub(super) fn play_with(
     media: Bytes,
     opts: Options,
     observer: &mut impl Observer,
-) -> ExampleResult<()> {
+) -> PlayResult<()> {
     let caps = SourceCapabilities {
         length: Some(media.len() as u64),
         random_access: true,
@@ -341,12 +294,6 @@ pub(super) fn play_with(
         ProbeProgress::Selected(_)
     ) {}
     let selected = probe.finish()?;
-    if opts
-        .format
-        .is_some_and(|expected| expected != selected.format)
-    {
-        return Err(Error::Unsupported("unexpected playback container").into());
-    }
     let mut decode = Decode {
         pool,
         format: selected.format,
@@ -359,11 +306,7 @@ pub(super) fn play_with(
     if matches!(selected.format, Format::Ts(_)) {
         let format = selected.format;
         drop(selected);
-        let reader = if let Some(open) = opts.transport {
-            open(pool, id, caps, format)?
-        } else {
-            AnyReader::open(&media, pool, id, caps)?
-        };
+        let reader = (opts.transport)(pool, id, caps, format)?;
         let mut driver = Blocking::seekable(reader, Cursor::new(media), pool);
         while let Some(packet) = driver.next_packet()? {
             let reader = driver.reader();
@@ -386,27 +329,6 @@ pub(super) fn play_with(
     Ok(())
 }
 
-pub(super) fn play(media: &Path, subtitles: &Path, now_ms: i64) -> ExampleResult<Playback> {
-    let pool = Budget::new(128 << 20)?;
-    let canvas = Canvas::new(WIDTH, HEIGHT).ok_or(Error::Invalid("example canvas"))?;
-    let mut observer = Count::default();
-    play_with_subtitles(
-        &pool,
-        read_file(&pool, media)?,
-        Options {
-            canvas,
-            format: Some(Format::Matroska),
-            video: None,
-            audio: None,
-            transport: None,
-        },
-        subtitles,
-        &[now_ms],
-        &mut observer,
-    )?;
-    Ok(observer.0)
-}
-
 pub(super) fn play_with_subtitles(
     pool: &Budget,
     media: Bytes,
@@ -414,7 +336,7 @@ pub(super) fn play_with_subtitles(
     subtitles: &Path,
     times_ms: &[i64],
     observer: &mut impl Observer,
-) -> ExampleResult<()> {
+) -> PlayResult<()> {
     play_with(pool, media, opts, observer)?;
     let options = ScriptOptions {
         extract_fonts: true,
@@ -427,4 +349,77 @@ pub(super) fn play_with_subtitles(
         observer.subtitle(now_ms, renderer.render(&mut script, now_ms)?)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Default)]
+    struct Output {
+        pictures: usize,
+        audio_samples: usize,
+    }
+
+    impl Observer for Output {
+        fn packet(&mut self, _: usize, _: &impl PacketInfo) -> Result<()> {
+            Ok(())
+        }
+
+        fn subtitle(&mut self, _: i64, _: Frame<'_>) -> Result<()> {
+            Ok(())
+        }
+
+        fn picture(&mut self, _: &Published) -> Result<()> {
+            self.pictures += 1;
+            Ok(())
+        }
+
+        fn pcm(&mut self, block: &PcmBlock) -> Result<()> {
+            self.audio_samples += block.samples.len() / 2;
+            Ok(())
+        }
+    }
+
+    fn play_mp4(input: &[u8]) -> PlayResult<Output> {
+        let pool = Budget::new(128 << 20)?;
+        let mut output = Output::default();
+        assert_eq!(
+            triergon::probe(input),
+            triergon::Probed::Format(triergon::SourceFormat::Isobmff)
+        );
+        play_with(
+            &pool,
+            Bytes::copy_from_slice(&pool, input)?,
+            Options {
+                canvas: Canvas::new(64, 36).ok_or(Error::Invalid("example canvas"))?,
+                video: Some(0),
+                audio: Some(1),
+                transport: |_, _, _, _| Err(Error::Invalid("expected MP4")),
+            },
+            &mut output,
+        )?;
+        Ok(output)
+    }
+
+    #[test]
+    fn mp4_playback_loads_the_video_and_audio_sample_descriptions() -> PlayResult<()> {
+        let input =
+            include_bytes!("../../../../playback/tests/fixtures/mp4/encoded-hevc-aac-front.mp4");
+        let output = play_mp4(input)?;
+        assert_eq!(output.pictures, 2);
+        assert_eq!(output.audio_samples, 2048);
+        Ok(())
+    }
+
+    #[test]
+    fn mp4_playback_stops_aac_pcm_at_the_final_sample_boundary() -> PlayResult<()> {
+        let input = include_bytes!(
+            "../../../../playback/tests/fixtures/mp4/avc-aac-quicktime-reordered.mov"
+        );
+        let output = play_mp4(input)?;
+        assert_eq!(output.pictures, 100);
+        assert_eq!(output.audio_samples, 173 * 1024 + 272);
+        Ok(())
+    }
 }

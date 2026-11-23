@@ -3,6 +3,7 @@
 #![cfg_attr(not(test), no_main)]
 
 mod facade;
+mod pipeline;
 mod raw;
 
 use std::process::ExitCode;

@@ -650,7 +650,6 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "xtask/src/play_views/mod.rs",
             "xtask/src/play_views/seek.rs",
             "harness/features/facade-seek/container-pins.json",
-            "crates/triergon/examples/play/pipeline.rs",
             "harness/codecs/play-manifest.json",
             "harness/codecs/play-workloads.json",
             "xtask/src/codecs/correctness/play.rs",
