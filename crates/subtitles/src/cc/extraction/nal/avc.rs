@@ -264,11 +264,10 @@ impl Recent {
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct AvcState {
     order: AvcOrder,
-    /// The reorder depth, and whether (and which) a bitstream restriction
-    /// stated it.
+    /// The reorder depth, and the depth a bitstream restriction states, if
+    /// the SPS has one.
     depth: u32,
-    stated: bool,
-    stated_depth: u32,
+    stated: Option<u32>,
     /// Pictures decoded, and whether the start of the stream is held.
     pub(super) decoded: u32,
     holds: bool,
@@ -393,18 +392,11 @@ impl AvcState {
     /// again), its MaxDpbFrames (Table A-1), and whether the start is held.
     #[inline(always)]
     fn configure(&mut self, fields: &AvcSps) {
-        if let Some(stated) = fields.vui.max_num_reorder_frames {
-            if !self.stated || self.stated_depth != stated {
-                self.depth = stated;
-            }
-            self.stated = true;
-            self.stated_depth = stated;
-        } else {
-            if self.stated {
-                self.depth = 0;
-            }
-            self.stated = false;
+        let stated = fields.vui.max_num_reorder_frames;
+        if stated != self.stated {
+            self.depth = stated.unwrap_or(0);
         }
+        self.stated = stated;
         self.dpb_frames = max_dpb_frames(
             fields.profile_idc,
             fields.constraint_set3,
@@ -412,7 +404,7 @@ impl AvcState {
             fields.frame_mbs,
         )
         .unwrap_or(16);
-        self.holds = !self.stated && self.dpb_frames >= 2;
+        self.holds = self.stated.is_none() && self.dpb_frames >= 2;
     }
 
     /// Counts the picture against the start hold, whose early decoder it
@@ -446,7 +438,7 @@ impl AvcState {
                 self.untimed_run = false;
             }
             untimed = self.untimed_run && !header.bipredictive();
-            if !self.stated && before == 0 && after == 1 && !self.early.ended {
+            if self.stated.is_none() && before == 0 && after == 1 && !self.early.ended {
                 self.untimed_run = true;
             }
         }
@@ -605,7 +597,7 @@ impl NalDecode {
         let far = state.recent.len >= FAR_BACK && state.recent.last(FAR_BACK).all(|q| order < q);
         if far {
             self.avc_output_waiting(out);
-        } else if !state.stated {
+        } else if state.stated.is_none() {
             state.depth = state.depth.max(displaced);
             if header.bipredictive() {
                 // After a B picture at least one picture waits (observed
@@ -758,7 +750,7 @@ impl NalDecode {
         out: &mut FrameQueue,
     ) {
         let state = &self.progress.avc;
-        if !far && state.stated && slice.reference && state.decoded <= START_WINDOW + 1 {
+        if !far && state.stated.is_some() && slice.reference && state.decoded <= START_WINDOW + 1 {
             let depth = state.depth as usize;
             self.pictures
                 .bump_while_waiting_more_than(depth, collect(&mut self.leaving));
@@ -896,7 +888,7 @@ impl NalDecode {
         let index = state.decoded.saturating_sub(1);
         let mut depth = state.depth as usize;
         let analysing = self.progress.shown.is_some_and(|shown| shown.waits());
-        if index < START_WINDOW || state.b_seen && !state.stated || analysing {
+        if index < START_WINDOW || state.b_seen && state.stated.is_none() || analysing {
             depth = depth.max(1);
         }
         self.pictures
