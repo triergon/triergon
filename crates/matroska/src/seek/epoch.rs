@@ -1,4 +1,4 @@
-//! Bounded state reconstruction on the existing envelope/InputCursor. A raw
+//! Bounded state reconstruction on the envelope's InputCursor. A raw
 //! CueCodecState offset is never accepted as an arbitrary binary leaf pointer.
 //! Only a CodecState child of a structurally valid BlockGroup for the proper
 //! Track can establish the referenced initialization (RFC9559 §§5.1.3.5.6,16,22.1).

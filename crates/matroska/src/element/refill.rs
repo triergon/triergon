@@ -62,7 +62,7 @@ impl ElementReader {
         {
             return Err(Error::Invalid("header refill request identity changed"));
         }
-        // Zero is the existing real EOF-probe request, never a manufactured
+        // Zero is the real EOF-probe request, never a manufactured
         // parent/scan EOF. Narrow/malformed-edge canonical hints stay exact.
         if exact.maximum == 0 {
             return Ok(None);

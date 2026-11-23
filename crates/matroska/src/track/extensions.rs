@@ -192,7 +192,7 @@ enum Phase {
     Done,
 }
 /// Real retained cursors and bounded name validation. This job reads only the
-/// existing charged TrackEntry bytes and performs no transport or time work.
+/// charged TrackEntry bytes and performs no transport or time work.
 #[derive(Debug)]
 pub struct TrackExtensionsJob {
     raw: SharedBytes,
@@ -326,7 +326,7 @@ impl TrackExtensionsJob {
                                 self.cursor = Some(ChildCursor::new(span.payload()));
                                 self.phase = Phase::Mapping;
                             }
-                            _ => (), // Complete original TrackEntry remains in the owner.
+                            _ => (), // The whole TrackEntry stays in the owner.
                         }
                     }
                     _ => return Err(Error::Invalid("track extension root transition")),

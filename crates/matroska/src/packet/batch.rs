@@ -62,8 +62,8 @@ pub(crate) fn scan_track_is_plain(track: &Track) -> bool {
     track.packet_decoder.is_none() && track.packet_prefix.is_empty()
 }
 
-/// Source parameters only; all timestamp/duration validation remains in the
-/// existing PacketFields constructor, including its nullable rounded PTS view.
+/// Source parameters only; all timestamp/duration validation is in the
+/// PacketFields constructor, including its nullable rounded PTS view.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FrameParameters {
     pub cluster_ticks: u64,
@@ -285,7 +285,7 @@ enum Phase {
     Done,
 }
 /// The ordinary one-frame batch needs no pointer-vector allocation. Laced
-/// batches keep the existing precharged arena and validate every frame first.
+/// batches keep a precharged arena and validate every frame first.
 #[derive(Debug)]
 enum Staged {
     Single(Option<Packet>),
@@ -366,7 +366,7 @@ impl Staged {
 }
 /// Only one of these progress jobs is live at a time. Lace stays live while
 /// a frame is restored, so RestoreJob deliberately remains a separate field.
-/// This union needs no new allocation and preserves the original pool minima.
+/// This union needs no allocation of its own and keeps the pool minima.
 #[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
@@ -608,7 +608,7 @@ impl PacketBatchJob {
                             self.job = BatchWork::Idle;
                             self.phase = Phase::Publish;
                             // All laces, checksums and configuration allocations
-                            // succeeded before this existing transaction handoff.
+                            // succeeded before this transaction handoff.
                             return Ok(ParseStep::Yield);
                         }
                         other => return crate::step::pending(other),
@@ -819,7 +819,7 @@ impl PacketBatchJob {
                     )?;
                     self.staged.prepare()?;
                     // Timing, limits and capacity are now validated. Consume
-                    // the existing handle without an Arc clone/drop pair.
+                    // the handle without an Arc clone/drop pair.
                     let storage = self.ready.take().required("missing restored frame")?;
                     let range = 0..storage.len();
                     let mut packet = Some(fields.finish(PacketData { storage, range }));
@@ -845,9 +845,8 @@ impl PacketBatchJob {
                         let packet = self.staged.peek(self.publish)?;
                         let kind = self.live_configuration()?.tracks()[packet.track].kind;
                         // Consumer recovery selection at the real replay input
-                        // boundary. The pinned public-API observations retain
-                        // all subtitle packets in this prefix, including known
-                        // ends before the cutoff. This is not a visibility test:
+                        // boundary. Every subtitle packet in this prefix is kept,
+                        // including known ends before the cutoff. This is not a visibility test:
                         // None and every source timestamp/duration stay intact.
                         let keep = keep_recovery_packet(kind, packet, cutoff)?;
                         if !keep {

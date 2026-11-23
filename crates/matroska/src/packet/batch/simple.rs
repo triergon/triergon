@@ -1,5 +1,5 @@
 //! Small ordinary SimpleBlock transaction. Header grammar, track validation,
-//! packet time/fields, source owners and publication use the original helpers.
+//! packet time/fields, source owners and publication use the batch's helpers.
 //! Non-plain cases promote their already validated facts to the full batch.
 use super::*;
 use std::mem::size_of;
@@ -126,7 +126,7 @@ impl SimplePacketJob {
     pub(crate) fn needs_batch(&self) -> bool {
         matches!(self.phase, SimplePhase::Promote)
     }
-    /// Caller has observed Promote after the original Header/Track admissions.
+    /// Caller has observed Promote after the Header/Track admissions.
     /// Infallible assembly only; no source parsing, allocation or charged work.
     pub(crate) fn take_batch(&mut self, limits: Limits) -> PacketBatchJob {
         let len = self.source.len();
@@ -203,7 +203,7 @@ impl SimplePacketJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<SimpleProgress> {
-        // A completed phase falls directly into its successor. Each original
+        // A completed phase falls directly into its successor. Each
         // bounded operation retains its own cancellation and work gate.
         if matches!(self.phase, SimplePhase::Header) {
             check(cancel)?;
@@ -403,7 +403,7 @@ impl SimplePacketJob {
     }
 }
 // The absent full-batch restore/job/group/config-change fields contribute zero
-// slots on this plain path. The retained owner order is exactly unchanged.
+// slots on this plain path. The retained owner order is the batch's.
 crate::storage::usage::storage!(SimplePacketJob, |s| [
     s.source,
     s.configuration,

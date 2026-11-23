@@ -117,7 +117,7 @@ impl SeekPlanJob {
     // different Clusters, replay starts at the earliest physical Cluster, matching
     // the observed native cross-Cluster suffix. This is an explicit format replay
     // policy, not a claim about native index internals or a normative tie winner.
-    // Equal-Cluster reference ordering remains unchanged and separately unproven.
+    // Equal-Cluster reference ordering is source order and not otherwise proven.
     pub(crate) fn new(
         configuration: Configuration,
         track: usize,

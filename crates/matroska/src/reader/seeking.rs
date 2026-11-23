@@ -57,7 +57,7 @@ pub(super) struct SubtitleRecovery {
     generation: u64,
 }
 
-/// Applies only before the original validated RAP's real physical boundary.
+/// Applies only before the validated RAP's physical boundary.
 /// The record holds no source owner, output packet, queue or independent cursor.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct ReplayPrefix {
@@ -67,7 +67,7 @@ pub(super) struct ReplayPrefix {
     pub generation: u64,
 }
 
-/// A borrow of the existing controller's source/configuration context, not a
+/// A borrow of the controller's source/configuration context, not a
 /// second owner, input cursor or timestamp implementation.
 pub(super) struct ScanContext<'a> {
     pub configuration: Option<&'a Configuration>,
@@ -85,7 +85,7 @@ enum SimplePhase {
     Drain,
     Complete,
 }
-/// Scalar progress only. Its actual byte owner stays in the envelope's existing
+/// Scalar progress only. Its actual byte owner stays in the envelope's
 /// span/direct slots until fallback or successful admission of a discard.
 #[derive(Debug)]
 pub(super) struct ScanSimple {
@@ -141,7 +141,7 @@ impl ScanSimple {
     pub(super) fn finish(&mut self) {
         self.phase = SimplePhase::Complete;
     }
-    /// False means resume the unchanged full body, never an early packet error.
+    /// False means resume the whole body as it is, never an early packet error.
     pub(super) fn step_prefix(
         &mut self,
         bytes: &[u8],
@@ -499,7 +499,7 @@ impl Reader {
             .required("missing first Cluster")?;
         if first.offset() == completion.location.cluster_offset() {
             // This is already complete beginning-of-source replay, including
-            // negative CodecDelay and the original initial-trim distinction.
+            // negative CodecDelay and the initial-trim distinction.
             return Ok(false);
         }
         let delay_ns = completion.plan.subtitle_recovery_delay_ns;
@@ -582,7 +582,7 @@ impl Reader {
                 generation: recovery.generation,
             });
             // A scanned replay boundary cannot replace an outstanding proof
-            // about the original target CueCodecState. The existing epoch job
+            // about the target CueCodecState. The epoch job
             // validates that reference and snapshots the earlier real boundary.
             if self.epoch_reference.is_some() {
                 scanned_boundary = None;
@@ -1020,7 +1020,7 @@ impl Reader {
                         || Ok(location.clone()),
                     );
                     // Keep payload/configuration/group owners through every
-                    // fallible consideration, then drop at the old arm boundary.
+                    // fallible consideration, then drop them here.
                     drop(packet);
                     result?;
                 }

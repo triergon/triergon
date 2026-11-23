@@ -125,7 +125,7 @@ enum BodyStage {
     /// A collected leaf's `target` capacity is set and paid for.
     Sized,
 }
-/// Exclusive ownership transitions in the existing span/direct slots.
+/// Which of the span and direct slots owns a body's bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum BodyTransfer {
     Copy,
@@ -683,7 +683,7 @@ impl ElementReader {
                             let old = self.input.position();
                             // The known ID/size width bounds this read to a header;
                             // InputCursor also caps it to available bytes and work.
-                            // Preserve typed scanning's original failure position:
+                            // Keep the typed scan's failure position exact:
                             // at most one byte can expose an exhausted scan budget.
                             let target = if pause_for_admission {
                                 let scan = usize::try_from(self.scan_left).unwrap_or(usize::MAX);
@@ -796,7 +796,7 @@ impl ElementReader {
                         }
                         continue;
                     }
-                    // Private scan notifications use the existing typed bridge.
+                    // Private scan notifications go through the typed delivery.
                     // The actual span stays in this body's ordinary owner slots.
                     if matches!(body.scan, ScanBody::Prefix | ScanBody::Complete) {
                         return Ok(ParseStep::Yield);
@@ -821,8 +821,8 @@ impl ElementReader {
                             && let Ok(bytes) = Bytes::copy_from_slice(self.input.budget(), span)
                         {
                             // The whole leaf fits this quantum. Copy and charge
-                            // the backing storage and header together, keeping
-                            // the existing publication step.
+                            // the backing storage and header together, before
+                            // the publication step.
                             work.take(span_work);
                             body.direct = Some(bytes);
                             body.span = None;
@@ -840,8 +840,8 @@ impl ElementReader {
                                 .ok_or(Error::Invalid("borrowed body commit range"))?;
                         } else {
                             // Direct and discarded bodies need no empty pool
-                            // owner. Construct the existing exact builder only
-                            // after the original bounded copy work is available.
+                            // owner. Construct the exact builder only once the
+                            // bounded copy work is available.
                             let buffer = body
                                 .buffer
                                 .get_or_insert_with(|| BudgetVec::new(self.input.budget()));
@@ -885,7 +885,7 @@ impl ElementReader {
                                 let buffer = match body.buffer.take() {
                                     Some(buffer) => buffer,
                                     // Empty collected leaves have no copy phase.
-                                    // Freeze still follows the original one-unit
+                                    // Freeze still follows the one-unit
                                     // publication check and recovers on pressure.
                                     None if body.target == 0 => BudgetVec::new(self.input.budget()),
                                     None => return Err(Error::Invalid("missing body builder")),

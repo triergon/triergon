@@ -6,7 +6,7 @@ pub(crate) enum DecodeStep {
     Header(SharedBytes),
     Zlib,
 }
-/// Eight is the existing explicit ContentEncoding policy. Inline steps avoid
+/// At most eight ContentEncoding stages are accepted. Inline steps avoid
 /// uncharged recursive Vec clones in retained tracks.
 #[derive(Debug, Clone)]
 pub(crate) struct Decoder {

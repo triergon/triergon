@@ -177,7 +177,7 @@ enum State {
     Epoch(EpochRestoreJob),
 }
 
-/// Retained format jobs on the existing envelope's sole InputCursor. Every lace
+/// Retained format jobs on the envelope's one InputCursor. Every lace
 /// and checksum in a packet batch validates before its first packet is emitted.
 #[derive(Debug)]
 pub struct Reader {
@@ -649,8 +649,8 @@ impl Reader {
         Ok(Some(plan))
     }
 
-    // Engine-only supply certificate. Public canonical NeedInput and the old
-    // ordinary refill policy remain separate. This expanded response policy is
+    // Engine-only supply certificate, separate from the public canonical
+    // NeedInput and the ordinary refill policy. This expanded response policy is
     // an explicit new blocking seek contract, not an ordinary-hint override.
     fn blocking_seek_header_refill(
         &self,
@@ -1374,7 +1374,7 @@ impl Reader {
                     return Ok(Some(ParseStep::Yield));
                 }
                 self.envelope.admit_typed_leaf(*header, *maximum, false)?;
-                // A block touching a finite scan stop keeps the old
+                // A block touching a finite scan stop keeps the ordinary
                 // body/stop scheduling, including work-boundary cases.
                 if scan_prefix
                     && header.id == SIMPLE_BLOCK

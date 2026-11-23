@@ -29,7 +29,7 @@ impl std::ops::Deref for PacketData {
     }
 }
 impl PacketData {
-    /// Share the restored frame in its original charged allocation.
+    /// Share the restored frame in the charged allocation that holds it.
     pub fn shared_bytes(&self) -> Result<Option<triergon_core::Bytes>> {
         self.storage
             .as_core()

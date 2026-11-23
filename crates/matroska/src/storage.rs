@@ -42,7 +42,7 @@ impl SharedBytes {
             None => Err(Error::Invalid("empty byte span range")),
         }
     }
-    /// Consumes this view without cloning its existing shared-owner handle.
+    /// Consumes this view without cloning its shared-owner handle.
     /// A successful subspan retains the complete backing allocation's charge.
     #[inline]
     pub(crate) fn into_slice(self, range: Range<usize>) -> Result<Self> {

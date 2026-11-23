@@ -89,7 +89,7 @@ impl Configuration {
             .get(track)?
             .as_ref()
     }
-    /// Initial CodecPrivate uses the existing content-restoration result. A
+    /// Initial CodecPrivate is the content-restoration result. A
     /// CodecState view carries its written bytes and explicit origin; this API
     /// does not guess a frame/private content-encoding scope for CodecState.
     pub fn initialization(&self, track: usize) -> Option<Initialization<'_>> {
@@ -103,7 +103,7 @@ impl Configuration {
     }
 
     /// Share a nonempty effective record for a parser that needs owned bytes.
-    /// The original pool and complete allocation remain charged to the handle.
+    /// The source pool and complete allocation remain charged to the handle.
     pub fn initialization_bytes(&self, track: usize) -> Option<Bytes> {
         let (data, _) = self.initialization_storage(track)?;
         data.as_core().filter(|bytes| !bytes.is_empty()).cloned()

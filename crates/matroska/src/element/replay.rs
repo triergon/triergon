@@ -130,7 +130,7 @@ impl ElementReader {
         let (cluster, segment) = self.replay_block_context(header)?;
         Ok(self.replay_location_from_context(header, cluster_time, cluster, segment))
     }
-    /// Validate before mutating the existing value. Earlier cloned locations
+    /// Validate before mutating the slot's value. Earlier cloned locations
     /// remain independent; only this slot's scalar wire context changes.
     #[inline]
     pub(crate) fn refresh_block_replay_location(
@@ -179,7 +179,7 @@ impl ElementReader {
         self.expected_cluster = false;
         Ok(request)
     }
-    /// Keep one scan limit for the whole seek operation. The existing normal
+    /// Keep one scan limit for the whole seek operation. The normal
     /// packet reader's per-block refill cannot refill this remaining count.
     pub(crate) fn step_seek_operation(
         &mut self,
@@ -310,7 +310,7 @@ impl ElementReader {
             }
         }
     }
-    /// The existing seek byte policy, with the ordinary typed leaf admission
+    /// The seek byte policy, with the ordinary typed leaf admission
     /// boundary exposed to the state-history job. One parser and one cursor.
     /// With `admission`, that job's own admission rule is applied inside the
     /// envelope instead of pausing for it after each leaf header.

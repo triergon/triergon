@@ -1,4 +1,4 @@
-//! std Read/Seek supply adapter for the reader's existing core cursor. It owns
+//! std Read/Seek supply adapter for the reader's core cursor. It owns
 //! no parser, pool, timestamps or input cursor. A read awaiting freeze remains
 //! pending, so output pressure cannot repeat I/O or drop an unread partial chunk.
 //! The public blocking reader drives the retained typed jobs through this supply
@@ -309,7 +309,7 @@ impl<R: Read> InputFeeder<R> {
                 return self.read_inline_header(input, request, cancel);
             }
             // Only expanded header supply uses immutable views. Exact body
-            // refills keep their historical capacity-N/direct-body/work path.
+            // refills keep the capacity-N/direct-body/work path.
             // Inline headers and the pre-read exact fallback above are literal.
             if (inline_header || discard) && self.owned.is_some() {
                 return self.read_owned_header(input, request, cancel);

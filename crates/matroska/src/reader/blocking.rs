@@ -156,7 +156,7 @@ impl<R: Read> BlockingReader<R> {
         )? {
             ParseStep::NeedInput(request) => {
                 let header = self.reader.needs_header_input();
-                // Ordinary canonical refill stays unchanged. The seek engine
+                // Ordinary canonical refill as the reader asks. The seek engine
                 // can separately certify a whole core-owned input response,
                 // bounded by its active stop, parent/source and scan allowance.
                 // Existing pre-read exact-prefix pressure fallback is retained.
@@ -243,7 +243,7 @@ impl<R: Read> BlockingReader<R> {
         Ok(())
     }
     /// Closes parser jobs and pending supply before returning the input source.
-    /// Caller-retained packet/configuration aliases retain their original charge.
+    /// Caller-retained packet/configuration aliases keep their charge.
     pub fn into_inner(self) -> R {
         let Self { reader, input, .. } = self;
         drop(reader);
@@ -450,8 +450,8 @@ fn capabilities(random_access: bool) -> SourceCapabilities {
 impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
     /// Explicit immutable-input operation. The complete caller-supplied input capability
     /// owner must already belong to this pool; windows and packet views retain
-    /// that full charge. No source is buffered here. Generic Read/Seek and its
-    /// default OwnedExact payload policy remain unchanged.
+    /// that full charge. No source is buffered here; the generic Read/Seek
+    /// constructors keep the default OwnedExact payload policy.
     pub fn open_owned_seekable_in(
         source: triergon_core::OwnedInputBytes,
         limits: Limits,

@@ -1,5 +1,5 @@
-//! Compile-time projection of the same typed demux/state jobs. The existing
-//! legacy packet API has no configuration snapshot in its return contract.
+//! Compile-time projection of the same typed demux/state jobs. The plain packet
+//! API (`next_packet`) has no configuration snapshot in its return contract.
 use super::*;
 
 #[derive(Debug)]
@@ -26,8 +26,8 @@ pub(super) trait PacketProjection {
     fn packet(value: TypedPacket) -> Result<Self::Event> {
         Self::event(Event::Packet(value))
     }
-    // The generic mapping remains fallible and keeps its original owner/error
-    // order. Typed projection can return the identical progress value directly.
+    // The generic mapping is fallible and keeps the job's owner/error order.
+    // Typed projection returns the progress value directly.
     fn progress(result: Result<ParseStep<Event>>) -> Result<ParseStep<Self::Event>> {
         match result? {
             ParseStep::Event(event) => Ok(ParseStep::Event(Self::event(event)?)),

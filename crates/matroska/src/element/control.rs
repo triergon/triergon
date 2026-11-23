@@ -133,7 +133,7 @@ impl ElementReader {
         self.phase = Phase::Between;
         Ok(crate::storage::SharedBytes::from_core(bytes))
     }
-    /// A late controller debit error dropped the old owned event. Match its
+    /// A late controller debit error drops the owned event. Match its
     /// phase/drop boundary rather than retaining a leaf after that failure.
     pub(crate) fn discard_compact_leaf(&mut self) {
         if matches!(&self.phase, Phase::Body(body) if body.transfer == super::BodyTransfer::Ready) {
@@ -267,10 +267,10 @@ impl ElementReader {
 
 impl super::BodyState {
     fn builder_descriptor_active(&self) -> bool {
-        // begin() historically installs an empty builder workspace. Deferring
-        // its pool owner must preserve the real descriptor visit and the
+        // A collected body counts as an empty builder workspace from begin()
+        // on, before its pool owner exists, so the descriptor visit and the
         // indices used by the bounded pressure walk. Drain/completion and
-        // retained-leaf publication are the original workspace-drop points.
+        // retained-leaf publication are the workspace-drop points.
         self.buffer.is_some()
             || (self.transfer != super::BodyTransfer::Ready
                 && !matches!(self.scan, ScanBody::Drain | ScanBody::Complete))
@@ -287,7 +287,7 @@ impl crate::storage::usage::Storage for super::BodyState {
         if self.builder_descriptor_active() {
             if index == 0 {
                 // This is an actual field inspection, including its deferred
-                // empty state. The unchanged Pressure job charges/checks each
+                // empty state. The Pressure job charges/checks each
                 // visit; no work is prepaid and no owner is manufactured.
                 return self.buffer.as_ref().map_or(Ok(None), |buffer| {
                     crate::storage::usage::Storage::storage_owner(buffer, 0)

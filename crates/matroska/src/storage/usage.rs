@@ -303,7 +303,7 @@ impl Storage for crate::track::Track {
 /// Ephemeral view of an operation and its explicit immutable input owner.
 /// Existing Bytes identity deduplication counts windows/packets/root once.
 /// No second source handle is retained in Reader and ordinary callers keep
-/// their original graph, slots and pressure-work sequence.
+/// their own graph, slots and pressure-work sequence.
 pub(crate) struct WithSource<'a> {
     pub graph: &'a dyn Storage,
     pub source: &'a dyn Storage,

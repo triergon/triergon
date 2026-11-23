@@ -2,7 +2,7 @@
 //! Independent ASCII/zero reductions permit compiler vectorization; UTF-8
 //! fallback still passes at most four bytes to safe std validation at a time.
 //! The constructor seals the exact immutable span after validation, without a
-//! second whole-span scan. SharedText::as_str remains the existing safe view.
+//! second whole-span scan. `SharedText::as_str` is the safe view.
 use super::{SharedBytes, SharedText};
 use crate::{
     Error, Result,
@@ -97,7 +97,7 @@ impl TextCheck {
             if self.have == 0 && !self.bad_utf8 {
                 // bit0: zero; bit1: outside printable ASCII; bit7: non-ASCII.
                 // All lanes are inspected once without scalar dependencies or
-                // a data-dependent early exit. Complex fields use the original
+                // a data-dependent early exit. Complex fields use the
                 // scalar state below, including cross-batch UTF-8 continuations.
                 let flags = batch.iter().fold(0_u8, |flags, &byte| {
                     flags
