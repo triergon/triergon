@@ -218,7 +218,7 @@ impl<M> PgsOutput<M> {
     /// queue. A zero-rectangle event clears the track. An absent event or an
     /// event whose rectangles cannot be displayed leaves the queue unchanged.
     pub fn packet_clock_action(&self) -> Result<Option<PgsQueueAction<'_>>> {
-        let Some(event) = self.decoded.receiver_output() else {
+        let Some(event) = self.decoded.subtitle() else {
             return Ok(None);
         };
         let start_ns = packet_queue_start_ns(self.packet.input().clock)?;
@@ -226,7 +226,7 @@ impl<M> PgsOutput<M> {
         if rectangles.is_empty() {
             return Ok(Some(PgsQueueAction::Clear { at_ns: start_ns }));
         }
-        let [width, height] = self.decoded.context_canvas;
+        let [width, height] = self.decoded.canvas;
         let canvas =
             queue_canvas_dimensions(u32::from(width), u32::from(height)).then_some([width, height]);
         let picture = PgsQueuePicture {
@@ -258,8 +258,8 @@ impl<M> PgsBridge<M> {
     pub fn new(
         pool: &Budget,
         scope: BitmapScope,
-        limits: pgs::DisplayLimits,
-        config: pgs::DisplayConfig,
+        limits: compat::pgs::Limits,
+        config: compat::pgs::Options,
     ) -> Result<Self> {
         let decoder = compat::pgs::ReceiverDecoder::new(pool, limits, config)?;
         Ok(Self {

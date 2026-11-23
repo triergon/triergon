@@ -257,15 +257,15 @@ fn bitmap_input(b: &Budget, raw: &[u8]) -> bitmap_bridge::BitmapInput<&'static s
 #[test]
 fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
     use bitmap_bridge::*;
-    use triergon_subtitles::pgs;
+    use triergon_subtitles::compat::pgs;
     let b = pool();
     let raw =
         include_bytes!("../../../playback/tests/fixtures/bitmap/original-pgs-two-pixel.packet");
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
+        pgs::Limits::default(),
+        pgs::Options::default(),
     )
     .unwrap();
     let cancel = off();
@@ -298,7 +298,7 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
             .raw
             .shares_storage_with(retained.decoded.raw_packet())
     );
-    let event = retained.decoded.receiver_output().unwrap();
+    let event = retained.decoded.subtitle().unwrap();
     assert_eq!(event.pts_microseconds, Some(100_000));
     assert_eq!(event.rectangles().len(), 1);
     assert_eq!(event.rectangles()[0].pixels().as_ref(), &[1, 2]);
@@ -345,7 +345,7 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
         "original caller packet metadata"
     );
     assert_eq!(
-        retained.decoded.receiver_output().unwrap().rectangles()[0]
+        retained.decoded.subtitle().unwrap().rectangles()[0]
             .pixels()
             .as_ref(),
         &[1, 2]
@@ -357,15 +357,15 @@ fn pgs_compatibility_bridge_keeps_the_first_event_and_fences_packet_owners() {
 #[test]
 fn pgs_packet_clock_queue_distinguishes_a_clear_from_no_output() {
     use bitmap_bridge::*;
-    use triergon_subtitles::pgs;
+    use triergon_subtitles::compat::pgs;
 
     let b = pool();
     let cancel = off();
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
+        pgs::Limits::default(),
+        pgs::Options::default(),
     )
     .unwrap();
     let pcs = [0x16, 0, 11, 7, 128, 4, 56, 0x10, 0, 1, 0x80, 0, 0, 0];
@@ -402,7 +402,7 @@ fn pgs_packet_clock_queue_distinguishes_a_clear_from_no_output() {
 #[test]
 fn bitmap_foreign_pool_rejection_returns_original_packet_without_poisoning_session() {
     use bitmap_bridge::*;
-    use triergon_subtitles::pgs;
+    use triergon_subtitles::compat::pgs;
     let b = pool();
     let foreign = pool();
     let raw =
@@ -410,8 +410,8 @@ fn bitmap_foreign_pool_rejection_returns_original_packet_without_poisoning_sessi
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
+        pgs::Limits::default(),
+        pgs::Options::default(),
     )
     .unwrap();
     let input = bitmap_input(&foreign, raw);
@@ -438,15 +438,15 @@ fn bitmap_foreign_pool_rejection_returns_original_packet_without_poisoning_sessi
 #[test]
 fn bitmap_reset_uses_new_source_fence_and_keeps_old_output() {
     use bitmap_bridge::*;
-    use triergon_subtitles::pgs;
+    use triergon_subtitles::compat::pgs;
     let b = pool();
     let raw =
         include_bytes!("../../../playback/tests/fixtures/bitmap/original-pgs-two-pixel.packet");
     let mut bridge = PgsBridge::new(
         &b,
         bitmap_scope(),
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
+        pgs::Limits::default(),
+        pgs::Options::default(),
     )
     .unwrap();
     bridge
@@ -489,7 +489,7 @@ fn bitmap_reset_uses_new_source_fence_and_keeps_old_output() {
     };
     assert_eq!(old.packet.input().scope.generation, 7);
     assert_eq!(next.packet.input().scope.generation, 8);
-    let rectangles = old.decoded.receiver_output().unwrap().rectangles();
+    let rectangles = old.decoded.subtitle().unwrap().rectangles();
     assert_eq!(rectangles[0].pixels().as_ref(), &[1, 2]);
 }
 

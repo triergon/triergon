@@ -60,10 +60,8 @@ fn decode(d: &mut ReceiverDecoder, b: &Budget, raw: &[u8]) -> ReceiverPacket {
 }
 
 fn receiver(b: &Budget, forced_only: bool) -> ReceiverDecoder {
-    let config = DisplayConfig {
-        receiver_forced_only: forced_only,
-    };
-    ReceiverDecoder::new(b, DisplayLimits::default(), config).unwrap()
+    let options = Options { forced_only };
+    ReceiverDecoder::new(b, Limits::default(), options).unwrap()
 }
 
 #[test]
@@ -71,7 +69,7 @@ fn rectangles_share_one_owned_palette_and_forced_only_hides_the_rest() {
     let b = Budget::new(1 << 20).unwrap();
     let mut d = receiver(&b, true);
     let out = decode(&mut d, &b, &picture(&[(0x40, 3), (0, 5)]));
-    let rects = out.receiver_output().unwrap().rectangles();
+    let rects = out.subtitle().unwrap().rectangles();
     assert_eq!(rects.len(), 2);
     let ReceiverPalette::Owned(owned) = &rects[0].palette else {
         panic!("forced rectangle without the composition palette");
@@ -89,7 +87,7 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
         let b = Budget::new(1 << 20).unwrap();
         let mut d = receiver(&b, false);
         let out = decode(&mut d, &b, &raw);
-        let rect = &out.receiver_output().unwrap().rectangles()[0];
+        let rect = &out.subtitle().unwrap().rectangles()[0];
         (d.work_spent(), rect.pixels().to_vec(), *rect.palette())
     };
     let b = Budget::new(1 << 20).unwrap();
@@ -111,7 +109,7 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
         }
     };
     assert!(pressured >= 3, "every allocation met pressure once");
-    let rect = &out.receiver_output().unwrap().rectangles()[0];
+    let rect = &out.subtitle().unwrap().rectangles()[0];
     assert_eq!(
         (d.work_spent(), rect.pixels().to_vec(), *rect.palette()),
         expected
@@ -121,7 +119,7 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
 /// Each presented rectangle as `(x, y, width, height, stride, pixels)`.
 fn presented(packet: &ReceiverPacket) -> Vec<Rectangle> {
     packet
-        .receiver_output()
+        .subtitle()
         .unwrap()
         .rectangles()
         .iter()

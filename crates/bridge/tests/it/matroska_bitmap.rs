@@ -146,7 +146,7 @@ fn matroska_bitmap_tracks_feed_their_receivers_without_copying_frames() {
         MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack, MatroskaDvbStep,
     };
     use triergon_matroska::Event as MkvEvent;
-    use triergon_subtitles::{dvb, pgs};
+    use triergon_subtitles::{compat::pgs, dvb};
 
     fn group(number: u8, delta: i16, duration: u8, data: &[u8]) -> Vec<u8> {
         let payload = [&[0x80 | number], &delta.to_be_bytes()[..], &[0], data].concat();
@@ -265,8 +265,8 @@ fn matroska_bitmap_tracks_feed_their_receivers_without_copying_frames() {
     let mut pgs = PgsBridge::new(
         &pool,
         pgs_track.scope(),
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
+        pgs::Limits::default(),
+        pgs::Options::default(),
     )
     .unwrap();
     let mut pgs_count = 0;
@@ -467,7 +467,7 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
     use bitmap_bridge::{PgsBridge, PgsQueueAction, PgsStep};
     use matroska_feed::{MatroskaBitmapClockProbe, MatroskaBitmapTrack};
     use triergon_matroska::Event as MkvEvent;
-    use triergon_subtitles::pgs;
+    use triergon_subtitles::compat::pgs;
 
     type Timing = (Option<i64>, Option<i64>);
     let timed = |pts, duration| (Some(pts), Some(duration));
@@ -613,8 +613,8 @@ fn matroska_bitmap_probe_matches_ffmpeg_startup_clocks() {
             PgsBridge::new(
                 &pool,
                 track.scope(),
-                pgs::DisplayLimits::default(),
-                pgs::DisplayConfig::default(),
+                pgs::Limits::default(),
+                pgs::Options::default(),
             )
             .unwrap()
         });

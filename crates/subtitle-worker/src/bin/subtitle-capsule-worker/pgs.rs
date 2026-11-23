@@ -16,8 +16,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
 use triergon_harness_protocol::digest::fold_bytes;
 use triergon_harness_runner::{Invocation, Result, Totals, measure};
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, Status};
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
+use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, Status};
+use triergon_subtitles::pgs::PacketClock;
 
 pub const PREFIX: &str = "pgs-";
 const OPERATION: &str = "pgs-receiver-display";
@@ -41,7 +41,7 @@ struct Record {
 
 struct Case {
     header: Vec<u8>,
-    config: DisplayConfig,
+    config: Options,
     timebase: Option<TimeBase>,
     records: Vec<Record>,
 }
@@ -143,8 +143,8 @@ fn parse(pool: &Budget, raw: &[u8]) -> Result<Case> {
     }
     Ok(Case {
         header,
-        config: DisplayConfig {
-            receiver_forced_only: flags & 1 != 0,
+        config: Options {
+            forced_only: flags & 1 != 0,
         },
         timebase: TimeBase::new(u64::from(numerator), u64::from(denominator)).ok(),
         records,
@@ -213,7 +213,7 @@ impl Work {
 }
 
 fn open(pool: &Budget, case: &Case) -> std::result::Result<ReceiverDecoder, ()> {
-    ReceiverDecoder::new(pool, DisplayLimits::default(), case.config).map_err(drop)
+    ReceiverDecoder::new(pool, Limits::default(), case.config).map_err(drop)
 }
 
 /// Decode every record, folding each published subtitle. `Err` is a refusal.
@@ -253,7 +253,7 @@ fn decode(
         if output.refusal().is_some() {
             return Err(());
         }
-        let Some(event) = output.receiver_output() else {
+        let Some(event) = output.subtitle() else {
             continue;
         };
         let size = i32::try_from(record.payload.len()).map_err(drop)?;
@@ -266,8 +266,8 @@ fn decode(
         work.data(&event.pts_microseconds.unwrap_or(0).to_le_bytes());
         work.u32(0);
         work.u32(u32::MAX);
-        work.i32(i32::from(output.context_canvas[0]));
-        work.i32(i32::from(output.context_canvas[1]));
+        work.i32(i32::from(output.canvas[0]));
+        work.i32(i32::from(output.canvas[1]));
         work.u32(event.rectangles().len() as u32);
         work.events += 1;
         for (order, r) in event.rectangles().iter().enumerate() {

@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverPacket, Status};
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
+use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, ReceiverPacket, Status};
+use triergon_subtitles::pgs::PacketClock;
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
     out.push(kind);
@@ -54,9 +54,9 @@ fn clock() -> PacketClock {
 fn decoder(b: &Budget, forced: bool) -> ReceiverDecoder {
     ReceiverDecoder::new(
         b,
-        DisplayLimits::default(),
-        DisplayConfig {
-            receiver_forced_only: forced,
+        Limits::default(),
+        Options {
+            forced_only: forced,
         },
     )
     .unwrap()
@@ -84,9 +84,9 @@ fn ready(d: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
 }
 
 fn assert_picture(out: &ReceiverPacket, forced: bool) {
-    assert_eq!(out.context_canvas, [16, 1]);
+    assert_eq!(out.canvas, [16, 1]);
     assert_eq!(out.clock, clock());
-    let event = out.receiver_output().unwrap();
+    let event = out.subtitle().unwrap();
     assert_eq!(event.pts_microseconds, Some(1_000_000));
     assert_eq!(event.rectangles().len(), 1);
     let r = &event.rectangles()[0];
@@ -128,21 +128,21 @@ fn constructor_refuses_limits_above_the_format_ceilings() {
     let b = Budget::new(4096).unwrap();
     let baseline = b.used();
     for limits in [
-        DisplayLimits {
+        Limits {
             max_objects: 65,
-            ..DisplayLimits::default()
+            ..Limits::default()
         },
-        DisplayLimits {
+        Limits {
             max_palettes: 9,
-            ..DisplayLimits::default()
+            ..Limits::default()
         },
-        DisplayLimits {
+        Limits {
             max_references: 256,
-            ..DisplayLimits::default()
+            ..Limits::default()
         },
     ] {
         assert!(matches!(
-            ReceiverDecoder::new(&b, limits, DisplayConfig::default()),
+            ReceiverDecoder::new(&b, limits, Options::default()),
             Err(Error::Limit { .. })
         ));
         assert_eq!(b.used(), baseline);
@@ -161,16 +161,16 @@ fn duplicate_display_keeps_later_hidden_caches_and_final_canvas_for_next_packet(
     raw.extend_from_slice(&pcs(32, 2, 0, &[7]));
     push(&mut d, &b, &raw);
     let clear = ready(&mut d, 1);
-    assert!(clear.receiver_output().unwrap().rectangles().is_empty());
-    assert_eq!(clear.context_canvas, [32, 2]);
+    assert!(clear.subtitle().unwrap().rectangles().is_empty());
+    assert_eq!(clear.canvas, [32, 2]);
     let mut next = pcs(32, 2, 0, &[7]);
     segment(&mut next, 0x80, &[]);
     push(&mut d, &b, &next);
     let restored = ready(&mut d, 7);
-    let r = &restored.receiver_output().unwrap().rectangles()[0];
+    let r = &restored.subtitle().unwrap().rectangles()[0];
     assert_eq!(r.pixels().as_ref(), &[1, 2]);
     assert_eq!((r.palette()[1], r.palette()[2]), (0xffff_ffff, 0x8000_0000));
-    assert_eq!(restored.context_canvas, [32, 2]);
+    assert_eq!(restored.canvas, [32, 2]);
     assert_eq!(clear.raw_packet().as_ref(), raw);
 }
 
@@ -258,11 +258,11 @@ fn rejected_foreign_busy_and_oversized_input_preserve_the_exact_caller_owner() {
     drop(ready(&mut d, 4096));
     let mut limited = ReceiverDecoder::new(
         &b,
-        DisplayLimits {
+        Limits {
             max_packet_bytes: 1,
-            ..DisplayLimits::default()
+            ..Limits::default()
         },
-        DisplayConfig::default(),
+        Options::default(),
     )
     .unwrap();
     assert!(matches!(
@@ -332,11 +332,11 @@ fn cumulative_work_limit_poison_cannot_be_bypassed_by_small_quanta_or_reset_retr
         let baseline = b.used();
         let mut d = ReceiverDecoder::new(
             &b,
-            DisplayLimits {
+            Limits {
                 max_work: 1,
-                ..DisplayLimits::default()
+                ..Limits::default()
             },
-            DisplayConfig::default(),
+            Options::default(),
         )
         .unwrap();
         push(&mut d, &b, &picture());
@@ -379,7 +379,7 @@ fn retained_native_outputs_survive_reset_and_decoder_drop_with_all_charges() {
         assert_picture(out, true);
         assert_eq!(out.raw_packet().as_ref(), picture());
     }
-    let alias = outputs[0].receiver_output().unwrap().rectangles()[0]
+    let alias = outputs[0].subtitle().unwrap().rectangles()[0]
         .pixels()
         .clone();
     drop(outputs);
@@ -429,7 +429,7 @@ fn unknown_pts_retains_raw_dts_without_inventing_native_presentation_time() {
         .unwrap();
     let out = ready(&mut d, 7);
     assert_eq!(out.clock, raw_clock);
-    assert_eq!(out.receiver_output().unwrap().pts_microseconds, None);
+    assert_eq!(out.subtitle().unwrap().pts_microseconds, None);
 }
 
 // This is functional transcript reproduction, not a benchmark adapter. Recorded
@@ -462,7 +462,7 @@ type Rect = (u16, u16, u16, Vec<u8>);
 
 /// Each rectangle's geometry and pixels.
 fn rects(out: &ReceiverPacket) -> Vec<Rect> {
-    out.receiver_output()
+    out.subtitle()
         .unwrap()
         .rectangles()
         .iter()
@@ -510,17 +510,13 @@ fn a_held_display_keeps_its_planes_and_a_released_one_is_written_again_in_place(
     let mut d = decoder(&b, false);
     push(&mut d, &b, &display(&[(7, 8, 2, NINES)]));
     let held = ready(&mut d, 4096);
-    let held_plane = held.receiver_output().unwrap().rectangles()[0]
-        .pixels()
-        .clone();
+    let held_plane = held.subtitle().unwrap().rectangles()[0].pixels().clone();
     push(&mut d, &b, &display(&[(7, 2, 1, &[1, 2, 0, 0])]));
     let next = ready(&mut d, 4096);
     // The held rectangles are untouched and share nothing with the new ones.
     assert_eq!(rects(&held), [(8, 2, 8, vec![9; 16])]);
     assert_eq!(rects(&next), [(2, 1, 2, vec![1, 2])]);
-    let next_plane = next.receiver_output().unwrap().rectangles()[0]
-        .pixels()
-        .clone();
+    let next_plane = next.subtitle().unwrap().rectangles()[0].pixels().clone();
     assert!(!next_plane.shares_storage_with(&held_plane));
     let address = next_plane.storage_address();
     drop((held, held_plane, next, next_plane));
@@ -528,6 +524,6 @@ fn a_held_display_keeps_its_planes_and_a_released_one_is_written_again_in_place(
     push(&mut d, &b, &display(&[(7, 3, 1, &[3, 4, 5, 0, 0])]));
     let again = ready(&mut d, 4096);
     assert_eq!(rects(&again), [(3, 1, 3, vec![3, 4, 5])]);
-    let plane = again.receiver_output().unwrap().rectangles()[0].pixels();
+    let plane = again.subtitle().unwrap().rectangles()[0].pixels();
     assert_eq!(plane.storage_address(), address);
 }

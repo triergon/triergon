@@ -6,7 +6,7 @@
 //! (composition objects, palette entries, object data) stop at the segment end.
 
 use super::super::{CompositionObject, Crop};
-use super::{DisplayLimits, PacketClock, Refusal, reserve_amortised, reserve_room};
+use super::{Limits, PacketClock, Refusal, reserve_amortised, reserve_room};
 use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
@@ -88,7 +88,7 @@ fn stored(
     encoded: &mut BudgetVec<u8>,
     additional: usize,
     declared: usize,
-    limits: &DisplayLimits,
+    limits: &Limits,
 ) -> Result<()> {
     let requested = encoded
         .len()
@@ -109,7 +109,7 @@ const CONTINUATION_BYTES: usize = 0xffff - 4;
 fn first_part(
     data: &[u8],
     declared: usize,
-    limits: &DisplayLimits,
+    limits: &Limits,
     budget: &Budget,
 ) -> Result<BudgetVec<u8>> {
     held(data.len(), limits)?;
@@ -123,7 +123,7 @@ fn first_part(
 }
 
 /// `requested` RLE bytes of one object, refused beyond `limits.max_encoded`.
-fn held(requested: usize, limits: &DisplayLimits) -> Result<()> {
+fn held(requested: usize, limits: &Limits) -> Result<()> {
     if requested > limits.max_encoded {
         return Err(Error::Limit {
             requested,
@@ -134,7 +134,7 @@ fn held(requested: usize, limits: &DisplayLimits) -> Result<()> {
 }
 
 /// The count after one more fragment of an object.
-fn next_fragment(fragments: usize, limits: &DisplayLimits) -> Result<usize> {
+fn next_fragment(fragments: usize, limits: &Limits) -> Result<usize> {
     if fragments >= limits.max_fragments {
         return Err(Error::Limit {
             requested: fragments + 1,
@@ -179,7 +179,7 @@ impl Object {
         id: u16,
         fragment: &'a [u8],
         canvas: [u16; 2],
-        limits: &DisplayLimits,
+        limits: &Limits,
         budget: &Budget,
     ) -> Result<Update<'a>> {
         let [l0, l1, l2, w0, w1, h0, h1, data @ ..] = fragment else {
@@ -215,7 +215,7 @@ impl Object {
 
     /// A continuation fragment's data, accepted while it fits the length the
     /// first fragment declared. Room for it is reserved here.
-    fn continuation<'a>(&mut self, data: &'a [u8], limits: &DisplayLimits) -> Result<Update<'a>> {
+    fn continuation<'a>(&mut self, data: &'a [u8], limits: &Limits) -> Result<Update<'a>> {
         if self.width == 0 || data.len() > self.declared - self.encoded.len() {
             return Ok(Update::Keep);
         }
@@ -322,7 +322,7 @@ impl Receiver {
         raw: &[u8],
         body: std::ops::Range<usize>,
         subtitle_pts: Option<i64>,
-        limits: &DisplayLimits,
+        limits: &Limits,
     ) -> Result<()> {
         self.presentation = subtitle_pts;
         let at = body.start;
@@ -385,7 +385,7 @@ impl Receiver {
         &mut self,
         raw: &[u8],
         body: std::ops::Range<usize>,
-        limits: &DisplayLimits,
+        limits: &Limits,
         budget: &Budget,
     ) -> Result<()> {
         let id = byte(raw, body.start);
@@ -444,7 +444,7 @@ impl Receiver {
     pub(super) fn object_fragment(
         &mut self,
         body: &[u8],
-        limits: &DisplayLimits,
+        limits: &Limits,
         budget: &Budget,
     ) -> Result<Option<Refusal>> {
         let [id_high, id_low, _version, flags, fragment @ ..] = body else {
@@ -533,7 +533,7 @@ mod tests {
     /// refuses the packet, and a replacement shows its declared RLE length.
     fn outcome(fragment: &[u8]) -> String {
         let budget = Budget::new(1 << 20).unwrap();
-        let update = Object::start(1, fragment, [16, 4], &DisplayLimits::default(), &budget);
+        let update = Object::start(1, fragment, [16, 4], &Limits::default(), &budget);
         match update.unwrap() {
             Update::Keep => "keep".into(),
             Update::Unallocated(object) => {

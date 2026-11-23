@@ -12,8 +12,8 @@
 use std::fmt::Write as _;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, Status};
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
+use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, Status};
+use triergon_subtitles::pgs::PacketClock;
 
 struct Fixture {
     forced_only: bool,
@@ -70,10 +70,10 @@ fn hex_of(bytes: impl IntoIterator<Item = String>) -> String {
 fn decode(fixture: &Fixture, quantum: u64) -> String {
     let budget = Budget::new(64 << 20).unwrap();
     let cancel = AtomicBool::new(false);
-    let config = DisplayConfig {
-        receiver_forced_only: fixture.forced_only,
+    let config = Options {
+        forced_only: fixture.forced_only,
     };
-    let mut decoder = ReceiverDecoder::new(&budget, DisplayLimits::default(), config).unwrap();
+    let mut decoder = ReceiverDecoder::new(&budget, Limits::default(), config).unwrap();
     let mut out = String::new();
     for (index, (clock, data)) in fixture.packets.iter().enumerate() {
         if data.is_empty() {
@@ -93,7 +93,7 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
         if packet.refusal().is_some() {
             writeln!(out, "refused {index}").unwrap();
         }
-        let Some(event) = packet.receiver_output() else {
+        let Some(event) = packet.subtitle() else {
             continue;
         };
         let pts = event.pts_microseconds.map_or("-".into(), |v| v.to_string());

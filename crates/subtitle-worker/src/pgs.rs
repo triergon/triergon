@@ -18,8 +18,8 @@ use std::sync::atomic::AtomicBool;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_mpegts::PacketFormat;
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, Rect, Refusal, Status};
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock};
+use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, Rect, Refusal, Status};
+use triergon_subtitles::pgs::PacketClock;
 
 /// The candidate's pool limit: the prepared packets and one display set.
 const POOL_BYTES: usize = 1 << 30;
@@ -80,17 +80,17 @@ impl Prepared for Pgs {
         let cancel = AtomicBool::new(false);
         // The reference's own ceilings: objects no larger than a canvas it
         // accepts, 24-bit object lengths, no fragment, packet or work bound.
-        let limits = DisplayLimits {
+        let limits = Limits {
             max_object_pixels: 1 << 28,
             max_display_pixels: 1 << 29,
             max_encoded: 1 << 24,
             max_fragments: usize::MAX,
             max_packet_bytes: usize::MAX,
             max_work: usize::MAX,
-            ..DisplayLimits::default()
+            ..Limits::default()
         };
-        let config = DisplayConfig {
-            receiver_forced_only: self.forced_only,
+        let config = Options {
+            forced_only: self.forced_only,
         };
         let mut decoder = ReceiverDecoder::new(&self.pool, limits, config)?;
         sink.header(self.packets.len(), None)?;
@@ -119,7 +119,7 @@ impl Prepared for Pgs {
                 };
                 sink.refused(index, code)?;
             }
-            if let Some(event) = out.receiver_output() {
+            if let Some(event) = out.subtitle() {
                 let rects = event.rectangles();
                 sink.begin(EventHead {
                     packet: index as u64,

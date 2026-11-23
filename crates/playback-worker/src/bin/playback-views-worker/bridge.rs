@@ -772,7 +772,7 @@ fn canvas(pool: &Budget, index: usize, number: u64, prefix: &[Output]) -> Result
         loop {
             match pgs.step(&mut work(), CANCEL)? {
                 PgsStep::Output(picture) => {
-                    let [width, height] = picture.decoded.context_canvas;
+                    let [width, height] = picture.decoded.canvas;
                     if width > 0 && height > 0 {
                         return Ok([width, height]);
                     }

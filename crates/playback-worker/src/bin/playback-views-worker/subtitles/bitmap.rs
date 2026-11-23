@@ -20,8 +20,12 @@ use triergon_mpegts::{
 };
 use triergon_playback::{ByteSource, Event, Output, Player, TrackKey, TsEvent, mp4::Mp4Event};
 use triergon_subtitles::{
-    compat::{dvb::ReceiverDecoder, dvd::Limits as DvdLimits},
-    pgs::{DisplayConfig, DisplayLimits, PacketClock},
+    compat::{
+        dvb::ReceiverDecoder,
+        dvd::Limits as DvdLimits,
+        pgs::{Limits as PgsLimits, Options as PgsOptions},
+    },
+    pgs::PacketClock,
 };
 
 fn clock(clock: PacketClock, pts: Option<i64>) -> Result<u64> {
@@ -75,9 +79,9 @@ fn pgs_receiver<M>(
     Ok(PgsBridge::new(
         pool,
         scope,
-        DisplayLimits::default(),
-        DisplayConfig {
-            receiver_forced_only: case.option("forced_subs_only") == Some("1"),
+        PgsLimits::default(),
+        PgsOptions {
+            forced_only: case.option("forced_subs_only") == Some("1"),
         },
     )?)
 }
@@ -204,7 +208,7 @@ fn drain_pgs<M>(bridge: &mut PgsBridge<M>, records: &mut Records) -> Result<()> 
                 if records.trace {
                     println!("# PGS queue {queue_start:?}");
                 }
-                if let Some(event) = output.decoded.receiver_output() {
+                if let Some(event) = output.decoded.subtitle() {
                     picture(
                         records,
                         event.pts_microseconds.map_or(ABSENT, |pts| pts as u64),
@@ -241,7 +245,7 @@ fn drain_pgs<M>(bridge: &mut PgsBridge<M>, records: &mut Records) -> Result<()> 
 
 fn checked_pgs_queue<M>(output: &PgsOutput<M>) -> Result<Option<i64>> {
     let action = output.packet_clock_action()?;
-    let Some(event) = output.decoded.receiver_output() else {
+    let Some(event) = output.decoded.subtitle() else {
         return if action.is_none() {
             Ok(None)
         } else {
@@ -285,7 +289,7 @@ fn checked_pgs_queue<M>(output: &PgsOutput<M>) -> Result<Option<i64>> {
             Ok(Some(at_ns))
         }
         Some(PgsQueueAction::Show(picture)) if !displayable.is_empty() => {
-            let dimensions = output.decoded.context_canvas;
+            let dimensions = output.decoded.canvas;
             let canvas = dimensions
                 .iter()
                 .all(|side| (160..=8192).contains(side))

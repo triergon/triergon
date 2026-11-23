@@ -53,7 +53,7 @@ impl PacketClock {
 /// decoder with `Error::Limit` until [`ReceiverDecoder::reset`], except where
 /// a field says otherwise.
 #[derive(Clone, Copy, Debug)]
-pub struct DisplayLimits {
+pub struct Limits {
     /// Largest area of one object a display decodes, in pixels.
     pub max_object_pixels: usize,
     /// Largest total area of the objects one display decodes, in pixels.
@@ -78,7 +78,7 @@ pub struct DisplayLimits {
     pub max_work: usize,
 }
 
-impl Default for DisplayLimits {
+impl Default for Limits {
     fn default() -> Self {
         Self {
             max_object_pixels: 8 * 1024 * 1024,
@@ -94,7 +94,7 @@ impl Default for DisplayLimits {
     }
 }
 
-impl DisplayLimits {
+impl Limits {
     /// The ceilings of the format's identifier spaces.
     fn validate(self) -> Result<()> {
         for (requested, maximum) in [
@@ -112,10 +112,10 @@ impl DisplayLimits {
 
 /// The decoder options that change the output.
 #[derive(Clone, Copy, Debug, Default)]
-pub struct DisplayConfig {
+pub struct Options {
     /// Hide every rectangle without the forced flag (`forced_subs_only`): it
     /// keeps its pixels and takes an all-zero palette.
-    pub receiver_forced_only: bool,
+    pub forced_only: bool,
 }
 
 /// Room for `additional` more items in `items`, which never needs more than
@@ -230,7 +230,7 @@ impl Subtitle {
 }
 
 /// One decoded packet. Segments after its first display still update the
-/// decoder's caches and `context_canvas`.
+/// decoder's caches and `canvas`.
 #[derive(Debug)]
 pub struct ReceiverPacket {
     raw: Bytes,
@@ -241,7 +241,7 @@ pub struct ReceiverPacket {
     /// Canvas width and height after the packet: the size of the latest PCS
     /// the receiver accepted, `[0, 0]` before one or after a PCS whose size
     /// it rejects.
-    pub context_canvas: [u16; 2],
+    pub canvas: [u16; 2],
 }
 
 impl ReceiverPacket {
@@ -250,7 +250,7 @@ impl ReceiverPacket {
         &self.raw
     }
     /// The subtitle the reference returns for this packet.
-    pub fn receiver_output(&self) -> Option<&Subtitle> {
+    pub fn subtitle(&self) -> Option<&Subtitle> {
         self.event.as_ref()
     }
     /// Set when the reference's decode call fails on this packet.
@@ -350,8 +350,8 @@ enum Planes {
 #[derive(Debug)]
 pub struct ReceiverDecoder {
     budget: Budget,
-    limits: DisplayLimits,
-    config: DisplayConfig,
+    limits: Limits,
+    options: Options,
     /// The packet's subtitle, once its first END is displayed.
     event: Option<Subtitle>,
     receiver: Receiver,
@@ -382,12 +382,12 @@ impl ReceiverDecoder {
     ///
     /// `Error::Limit` when `limits` allows more than 64 objects, 8 palettes
     /// or 255 composition objects.
-    pub fn new(budget: &Budget, limits: DisplayLimits, config: DisplayConfig) -> Result<Self> {
+    pub fn new(budget: &Budget, limits: Limits, options: Options) -> Result<Self> {
         limits.validate()?;
         Ok(Self {
             budget: budget.clone(),
             limits,
-            config,
+            options,
             event: None,
             receiver: Receiver::new(budget),
             phase: Phase::Idle,
@@ -416,7 +416,7 @@ impl ReceiverDecoder {
     /// active or its output not taken, and after
     /// [`finish_input`](Self::finish_input); `Error::ForeignPool` for bytes
     /// of another budget; `Error::Limit` beyond
-    /// [`DisplayLimits::max_packet_bytes`]. `Error::Cancelled` when `cancel`
+    /// [`Limits::max_packet_bytes`]. `Error::Cancelled` when `cancel`
     /// is set, which fails the decoder until [`reset`](Self::reset); a failed
     /// decoder returns its failure.
     pub fn push(
@@ -506,7 +506,7 @@ impl ReceiverDecoder {
     ///
     /// `Error::Backpressure` when the pool refuses memory: the call can be
     /// repeated, and work already paid is not charged again. Any other error,
-    /// `Error::Cancelled` and the `Error::Limit` of [`DisplayLimits`]
+    /// `Error::Cancelled` and the `Error::Limit` of [`Limits`]
     /// included, fails the decoder: every call returns it until
     /// [`reset`](Self::reset).
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
@@ -772,7 +772,7 @@ impl ReceiverDecoder {
             Placement::Object => ((reference.x, reference.y), reference.object.forced()),
             Placement::Missing => ((0, 0), false),
         };
-        let palette = if self.config.receiver_forced_only && !reference.object.forced() {
+        let palette = if self.options.forced_only && !reference.object.forced() {
             ReceiverPalette::Hidden
         } else {
             self.composition_palette()?
@@ -857,7 +857,7 @@ impl ReceiverDecoder {
             clock,
             event: self.event.take(),
             refusal: self.refusal,
-            context_canvas: self.receiver.canvas,
+            canvas: self.receiver.canvas,
         });
         Ok(Some(Phase::Ready))
     }

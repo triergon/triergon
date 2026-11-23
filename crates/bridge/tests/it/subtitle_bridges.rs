@@ -24,8 +24,8 @@ use triergon_playback::{
     *,
 };
 use triergon_subtitles::cc::video::nal::{Codec, Framing};
-use triergon_subtitles::compat::{cc, teletext};
-use triergon_subtitles::{pgs, text};
+use triergon_subtitles::compat::{cc, pgs, teletext};
+use triergon_subtitles::text;
 
 const ID: SourceId = SourceId(77);
 const PACKET_LIMIT: usize = 1 << 20;
@@ -203,8 +203,8 @@ fn ts_pgs_reaches_the_pgs_bridge() {
     let mut pgs = PgsBridge::new(
         &b,
         track.scope(),
-        pgs::DisplayLimits::default(),
-        pgs::DisplayConfig::default(),
+        pgs::Limits::default(),
+        pgs::Options::default(),
     )
     .unwrap();
     let mut actions = Vec::new();
