@@ -40,13 +40,14 @@ fn mul(a: f32, b: f32, c: f32, d: f32) -> (f32, f32) {
 /// `1 <= q < radix` and `k < span` are stored `q` major in split real and imaginary
 /// parts, so a stage reads them as contiguous runs.
 #[derive(Debug)]
+#[repr(C)]
 struct Stage {
+    re: BudgetVec<f32>,
+    im: BudgetVec<f32>,
     radix: usize,
     span: usize,
     /// Blocks of `radix * span` points in the transform.
     blocks: usize,
-    re: BudgetVec<f32>,
-    im: BudgetVec<f32>,
 }
 
 impl Stage {
