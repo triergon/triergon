@@ -57,7 +57,10 @@ fn build_ps_input(root: &Path) -> Result<PathBuf, String> {
         .output()
         .map_err(|e| format!("build the AAC QMF input example: {e}"))?;
     if !output.status.success() {
-        return Err(format!("build the AAC QMF input example: {}", output.status));
+        return Err(format!(
+            "build the AAC QMF input example: {}",
+            output.status
+        ));
     }
     String::from_utf8_lossy(&output.stdout)
         .lines()
