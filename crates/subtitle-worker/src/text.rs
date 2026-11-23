@@ -324,7 +324,7 @@ impl Receiver for mov_text::Decoder {
                     // The decode call returns the packet size for a subtitle.
                     let returned = match &output.decoded {
                         mov_text::Decoded::Subtitle(_) => {
-                            i32::try_from(output.input.payload.len()).map_err(drop)?
+                            i32::try_from(packet.payload.len()).map_err(drop)?
                         }
                         mov_text::Decoded::Nothing => 0,
                         mov_text::Decoded::Refused => INVALID_DATA,
