@@ -93,6 +93,7 @@ impl Work {
 }
 
 /// One session. A failure inside it is a broken invariant of the corpus and panics.
+// One function on purpose: the timed operation of the Matroska video workloads; a split is a hot-path change not yet measured.
 fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
     let cancel = AtomicBool::new(false);
     let id = SourceId(31);

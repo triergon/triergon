@@ -324,6 +324,7 @@ impl Session {
     /// Route one source event: the first active PMT binds the observer, the
     /// selected PID's transport packets feed it, and every context the observer
     /// alone cannot take is refused.
+    // One function on purpose: the step of each source event inside the timed loop; a split is a hot-path change not yet measured.
     fn observe(
         &mut self,
         input: &InputCursor,
@@ -664,6 +665,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
 }
 
 /// One packet attempt: its fold, or the typed refusal that ended it.
+// One function on purpose: the timed loop of the PES workloads; a split is a hot-path change not yet measured.
 fn packet_operation(
     pool: &Budget,
     request: &Request,

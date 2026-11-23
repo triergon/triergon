@@ -175,6 +175,7 @@ struct Tracks {
 
 /// Checks each track, folds the configurations the session compares and
 /// prepares the edit plans.
+// One function on purpose: the track setup inside the timed operation; a split is a hot-path change not yet measured.
 #[inline(never)]
 fn prepare_tracks(
     pool: &Budget,

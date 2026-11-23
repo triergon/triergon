@@ -326,6 +326,7 @@ struct Work {
     digest: u64,
 }
 
+// One function on purpose: the timed operation of the progressive workloads; a split is a hot-path change not yet measured.
 fn operation(
     path: &Path,
     has_dts: bool,

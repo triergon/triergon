@@ -307,6 +307,7 @@ impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
     }
 }
 
+// One function on purpose: the fold of each access unit inside the timed loop; a split is a hot-path change not yet measured.
 fn fold_packet<const TRACE: bool>(
     totals: &mut Totals,
     packet: PacketProjection<'_>,
@@ -470,6 +471,7 @@ fn fold_continuity<const TRACE: bool>(
     Ok(totals)
 }
 
+// One function on purpose: the timed loop of every access-unit workload; a split is a hot-path change not yet measured.
 fn operation<const TRACE: bool>(
     pool: &Budget,
     request: &Request,

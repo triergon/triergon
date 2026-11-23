@@ -185,6 +185,7 @@ fn execute(
     Ok(out)
 }
 
+// One function on purpose: the reads of each seek inside the timed loop; a split is a hot-path change not yet measured.
 fn drain(
     reader: &mut Reader,
     input: &Request,

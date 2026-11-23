@@ -88,6 +88,7 @@ impl<'g> Runner<'g> {
         Ok(outline)
     }
 
+    // One function on purpose: one arm per case kind of `harness/reference_raster.h`, inside the timed loop; a split is a hot-path change not yet measured.
     pub fn perform(&mut self, case: Option<&Case>, sink: &mut impl Values) -> io::Result<()> {
         self.work = WorkBudget::new(CASE_WORK);
         let Some(case) = case else {

@@ -149,6 +149,7 @@ fn feeds(
     Ok(feeds)
 }
 
+// One function on purpose: the timed operation of the Matroska audio workloads; a split is a hot-path change not yet measured.
 fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Result<Work> {
     let cancel = AtomicBool::new(false);
     let id = SourceId(41);
