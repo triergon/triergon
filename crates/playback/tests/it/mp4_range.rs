@@ -1013,10 +1013,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         Limits, Next,
         compat::mov::{
             edits::{EncodedEditContext, EncodedEditJob},
-            encoded::{
-                EncodedConfigSequence, EncodedInitial,
-                EncodedSelection, EncodedStreamJob,
-            },
+            encoded::{EncodedConfigSequence, EncodedInitial, EncodedSelection, EncodedStreamJob},
         },
         movie::EntryLayout,
     };
@@ -1066,13 +1063,12 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         };
         let refusal = Some(C::Unsupported("encoded codec requires range playback"));
         assert_eq!(
-            EncodedInitial::new(table, &configs, &first, &opened.input, )
-                .err(),
+            EncodedInitial::new(table, &configs, &first, &opened.input,).err(),
             refusal,
             "initial catalogue"
         );
         assert_eq!(
-            EncodedConfigSequence::new(table, &configs, &opened.input, ).err(),
+            EncodedConfigSequence::new(table, &configs, &opened.input,).err(),
             refusal,
             "configuration sequence"
         );
