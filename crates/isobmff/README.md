@@ -282,7 +282,8 @@ and no optional `frma` format atom.
 Empty `sbgp` runs associate no samples. Samples beyond the last run use the group
 default when present. The recovery view retains the version-1 grouping type
 parameter with its mapping. It skips unknown grouping types and refuses groups
-that can change the demux view's key-frame flags.
+that can change the demux view's key-frame flags. A version-1 `sgpd` can state
+the length of each recovery description individually.
 
 ## Behaviour and limits
 

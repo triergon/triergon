@@ -376,7 +376,8 @@ recovery_case!(recovery_fragment_namespace, "fragment-namespace");
 recovery_case!(recovery_grouping_parameter, "grouping-parameter", false);
 recovery_case!(
     recovery_variable_length_unadmitted,
-    "variable-length-unadmitted"
+    "variable-length-unadmitted",
+    false
 );
 recovery_case!(recovery_duplicate_description, "duplicate-description");
 recovery_case!(

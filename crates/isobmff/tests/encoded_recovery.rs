@@ -313,12 +313,16 @@ fn version_one_grouping_parameter_is_kept_with_its_mapping() {
 }
 #[test]
 fn variable_lengths_do_not_trigger_repeated_prefix_parsing() {
+    let source = Source::new(fixture("variable-length-unadmitted"));
+    let plan = source.plan(1).unwrap();
     assert_eq!(
-        Source::new(fixture("variable-length-unadmitted"))
-            .plan(1)
-            .unwrap_err(),
-        Error::Unsupported("encoded variable or extended recovery entries")
+        selection(&plan, RecoveryKind::Roll, 2)
+            .description
+            .unwrap()
+            .distance,
+        -1
     );
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn duplicate_context_does_not_silently_replace_prior_backing() {

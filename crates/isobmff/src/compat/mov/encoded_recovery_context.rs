@@ -53,7 +53,7 @@ impl RecoveryContextReceiver {
             groups: 0,
             has_recovery_groups: false,
             scan: Some(table.raw().children(0, Limits::default())?),
-            strict: RecoveryWalk::new_with_recovery_contexts(table, maximum)?,
+            strict: RecoveryWalk::new(table, maximum)?,
         })
     }
     pub(crate) fn poll(

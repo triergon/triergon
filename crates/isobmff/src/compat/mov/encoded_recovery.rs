@@ -152,7 +152,6 @@ pub(crate) struct RecoveryWalk {
     facts: RecoveryFacts,
     maximum_indices: [u32; 2],
     limits: RecoveryLimits,
-    extended: bool,
     error_backing: Option<crate::boxes::BoxView>,
 }
 impl RecoveryWalk {
@@ -170,14 +169,8 @@ impl RecoveryWalk {
                 max_descriptions: 64,
                 max_runs: u32::try_from(maximum).unwrap_or(u32::MAX),
             },
-            extended: false,
             error_backing: None,
         })
-    }
-    pub(crate) fn new_with_recovery_contexts(table: &SampleTable, maximum: u64) -> Result<Self> {
-        let mut out = Self::new(table, maximum)?;
-        out.extended = true;
-        Ok(out)
     }
     pub(crate) fn error_backing(&self) -> Option<&crate::boxes::BoxView> {
         self.error_backing.as_ref()
@@ -207,11 +200,7 @@ impl RecoveryWalk {
                     } => {
                         if *row != source.entry_count() {
                             let index = row.checked_add(1).ok_or(Error::Overflow)?;
-                            let next = if self.extended {
-                                source.validation_at(index, *offset)
-                            } else {
-                                source.locate(index)
-                            };
+                            let next = source.validation_at(index, *offset);
                             let mut lookup =
                                 source_result(next, source.raw(), &mut self.error_backing)?;
                             if source_result(
@@ -362,8 +351,7 @@ impl RecoveryWalk {
                             &mut self.error_backing,
                         )?;
                         if source.entry_count() != 0
-                            && source.fixed_entry_length() != 2
-                            && !(self.extended && source.fixed_entry_length() == 0)
+                            && !matches!(source.fixed_entry_length(), 0 | 2)
                         {
                             return source_result(
                                 Err(Error::Unsupported(
