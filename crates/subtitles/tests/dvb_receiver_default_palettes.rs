@@ -16,13 +16,12 @@ struct Case {
 #[path = "native-defaults-support/cases.rs"]
 mod cases;
 
-// Independently tabulated EN300743 Tables36-38 percentages, projected under the
-// existing named SourceNearest8 convention. No production colour routine is used
-// to obtain these expected components. Native observations never alter this art.
+// The expected components are EN 300 743 Tables 36 to 38 tabulated by hand,
+// rounded to nearest; no library colour routine computes them.
 
 /// The receiver decoder against the recorded output of the reference
 /// decoder: the subtitle clock, rectangle, index plane and ARGB words.
-fn native_case(at: usize) {
+fn check(at: usize) {
     let case = &cases::CASES[at];
     let pool = Budget::new(4 << 20).unwrap();
     let cancel = AtomicBool::new(false);
@@ -63,16 +62,16 @@ fn native_case(at: usize) {
 }
 
 #[test]
-fn native_absent_cds_preserves_actual_automatic_palette_and_unused_entries() {
-    native_case(0);
+fn absent_cds_preserves_actual_automatic_palette_and_unused_entries() {
+    check(0);
 }
 
 #[test]
-fn native_partial_four_bit_palette_preserves_fixed_unredefined_entries() {
-    native_case(1);
+fn partial_four_bit_palette_preserves_fixed_unredefined_entries() {
+    check(1);
 }
 
 #[test]
-fn native_partial_eight_bit_palette_preserves_all256_entries() {
-    native_case(2);
+fn partial_eight_bit_palette_preserves_all256_entries() {
+    check(2);
 }

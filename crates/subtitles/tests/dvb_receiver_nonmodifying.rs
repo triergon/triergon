@@ -17,7 +17,7 @@ struct Case {
 mod cases;
 /// The receiver decoder against the recorded output of the reference
 /// decoder: the subtitle clock, rectangle, index plane and palette.
-fn check_native(index: usize) {
+fn check(index: usize) {
     let case = &cases::CASES[index];
     let pool = Budget::new(4 << 20).unwrap();
     let cancel = AtomicBool::new(false);

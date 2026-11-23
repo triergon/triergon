@@ -71,30 +71,30 @@ fn check(index: usize) {
     });
 }
 #[test]
-fn native_shared_ancillary_end() {
+fn shared_ancillary_end() {
     check(0);
 }
 #[test]
-fn native_nonempty_ancillary_end_tolerance() {
+fn nonempty_ancillary_end_tolerance() {
     check(1);
 }
 #[test]
-fn native_composition_end_control() {
+fn composition_end_control() {
     check(2);
 }
 #[test]
-fn native_shared_composition_end_tolerance() {
+fn shared_composition_end_tolerance() {
     check(3);
 }
 #[test]
-fn native_foreign_end_filter_control() {
+fn foreign_end_filter_control() {
     check(4);
 }
 
 /// A packet whose last five bytes are no segment, and one that ends after
 /// the object data: the receiver presents what the packet held.
 #[test]
-fn native_complete_prefix_is_presented() {
+fn complete_prefix_is_presented() {
     for bytes in [
         &include_bytes!("native-dvb-fixtures/input/tail106.dvb")[..],
         &include_bytes!("native-dvb-fixtures/input/prefix101.dvb")[..],
@@ -106,7 +106,7 @@ fn native_complete_prefix_is_presented() {
     }
 }
 #[test]
-fn native_default_clut_presents_the_automatic_palette() {
+fn default_clut_presents_the_automatic_palette() {
     let pool = Budget::new(4 << 20).unwrap();
     receive(
         &pool,
@@ -126,7 +126,7 @@ fn native_default_clut_presents_the_automatic_palette() {
 }
 
 #[test]
-fn native_display_size_is_the_first_definition_or_the_default() {
+fn display_size_is_the_first_definition_or_the_default() {
     let pool = Budget::new(4 << 20).unwrap();
     let original = cases::CASES[0].payload;
     assert_eq!(original[1], 0x14);

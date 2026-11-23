@@ -139,7 +139,7 @@ fn pinned_parser_split_controls_cover_headers_bodies_and_timestamp_continuation(
 }
 
 #[test]
-fn native_group_ceiling_preserves_oversized_pes_and_allows_next_stamp() {
+fn group_ceiling_preserves_oversized_pes_and_allows_next_stamp() {
     let pool = Budget::new(256 * 1024).unwrap();
     let mut parser = PesParser::new(&pool);
     let mut data = vec![0x20, 0, 0x0f, 0x13, 0, 1, 0xff, 0xfa];

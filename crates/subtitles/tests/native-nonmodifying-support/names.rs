@@ -1,24 +1,24 @@
 #[test]
-fn native_dvb2_literal_flag0(){check_native(0);}
+fn dvb2_literal_flag0(){check(0);}
 #[test]
-fn native_dvb2_literal_flag1(){check_native(1);}
+fn dvb2_literal_flag1(){check(1);}
 #[test]
-fn native_dvb2_run_flag0(){check_native(2);}
+fn dvb2_run_flag0(){check(2);}
 #[test]
-fn native_dvb2_run_flag1(){check_native(3);}
+fn dvb2_run_flag1(){check(3);}
 #[test]
-fn native_dvb4_literal_flag0(){check_native(4);}
+fn dvb4_literal_flag0(){check(4);}
 #[test]
-fn native_dvb4_literal_flag1(){check_native(5);}
+fn dvb4_literal_flag1(){check(5);}
 #[test]
-fn native_dvb4_run_flag0(){check_native(6);}
+fn dvb4_run_flag0(){check(6);}
 #[test]
-fn native_dvb4_run_flag1(){check_native(7);}
+fn dvb4_run_flag1(){check(7);}
 #[test]
-fn native_dvb8_literal_flag0(){check_native(8);}
+fn dvb8_literal_flag0(){check(8);}
 #[test]
-fn native_dvb8_literal_flag1(){check_native(9);}
+fn dvb8_literal_flag1(){check(9);}
 #[test]
-fn native_dvb8_run_flag0(){check_native(10);}
+fn dvb8_run_flag0(){check(10);}
 #[test]
-fn native_dvb8_run_flag1(){check_native(11);}
+fn dvb8_run_flag1(){check(11);}

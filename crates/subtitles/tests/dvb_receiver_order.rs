@@ -23,7 +23,7 @@ mod cases;
 
 /// The receiver decoder against the recorded output of the reference
 /// decoder: rectangle order and geometry, index planes, palettes and clock.
-fn check_native(index: usize) {
+fn check(index: usize) {
     let case = &cases::CASES[index];
     let pool = Budget::new(4 << 20).unwrap();
     let cancel = AtomicBool::new(false);
@@ -62,18 +62,18 @@ fn check_native(index: usize) {
 }
 
 #[test]
-fn native_original_is_reverse_pcs() {
-    check_native(0);
+fn original_is_reverse_pcs() {
+    check(0);
 }
 #[test]
-fn native_rcs_arrival_swap_does_not_change_reverse_pcs() {
-    check_native(1);
+fn rcs_arrival_swap_does_not_change_reverse_pcs() {
+    check(1);
 }
 #[test]
-fn native_renamed_ids_do_not_sort_the_output() {
-    check_native(2);
+fn renamed_ids_do_not_sort_the_output() {
+    check(2);
 }
 #[test]
-fn native_nonascending_pcs_tolerance_keeps_literal_reverse() {
-    check_native(3);
+fn nonascending_pcs_tolerance_keeps_literal_reverse() {
+    check(3);
 }

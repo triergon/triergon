@@ -80,7 +80,7 @@ fn ready(d: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
         }
         assert_eq!(status, Status::Yield);
     }
-    panic!("native compatibility did not finish bounded input");
+    panic!("the receiver did not finish bounded input");
 }
 
 fn assert_picture(out: &ReceiverPacket, forced: bool) {
@@ -103,14 +103,14 @@ fn assert_picture(out: &ReceiverPacket, forced: bool) {
 }
 
 #[test]
-fn native_application_output_has_literal_pixels_palette_geometry_and_raw_clock() {
+fn output_has_literal_pixels_palette_geometry_and_raw_clock() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let baseline = b.used();
     let mut d = decoder(&b, false);
     assert_eq!(
         b.used(),
         baseline,
-        "constructing native compatibility needs no strict Source allocation"
+        "constructing the receiver allocates nothing"
     );
     let raw = picture();
     push(&mut d, &b, &raw);
@@ -175,7 +175,7 @@ fn duplicate_display_keeps_later_hidden_caches_and_final_canvas_for_next_packet(
 }
 
 #[test]
-fn small_work_and_zero_work_keep_one_native_operation_and_exact_owned_result() {
+fn small_work_and_zero_work_keep_one_operation_and_exact_owned_result() {
     let mut totals = Vec::new();
     for quantum in [1, 7, 4096] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
@@ -315,10 +315,7 @@ fn cancelled_push_preserves_input_and_cancelled_take_discards_unpublished_output
             break;
         }
     }
-    assert!(
-        ready,
-        "native output must become ready before cancelled take"
-    );
+    assert!(ready, "the output must be ready before a cancelled take");
     c.store(true, Ordering::Relaxed);
     assert!(matches!(d.take_output(&c), Err(Error::Cancelled)));
     drop(held);
@@ -350,7 +347,7 @@ fn cumulative_work_limit_poison_cannot_be_bypassed_by_small_quanta_or_reset_retr
                 Ok(status) => assert_eq!(status, Status::Yield),
             }
         }
-        let error = error.expect("finite native work ceiling must refuse input");
+        let error = error.expect("a finite work ceiling must refuse input");
         assert!(matches!(error, Error::Limit { .. }));
         assert_eq!((d.work_spent(), b.used()), (1, baseline));
         assert_eq!(
@@ -363,7 +360,7 @@ fn cumulative_work_limit_poison_cannot_be_bypassed_by_small_quanta_or_reset_retr
 }
 
 #[test]
-fn retained_native_outputs_survive_reset_and_decoder_drop_with_all_charges() {
+fn retained_outputs_survive_reset_and_decoder_drop_with_all_charges() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let baseline = b.used();
     let mut d = decoder(&b, true);
@@ -417,7 +414,7 @@ fn end_of_input_presents_nothing_pending() {
 }
 
 #[test]
-fn unknown_pts_retains_raw_dts_without_inventing_native_presentation_time() {
+fn unknown_pts_retains_raw_dts_without_a_presentation_time() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let mut d = decoder(&b, false);
     let raw_clock = PacketClock {
@@ -431,9 +428,6 @@ fn unknown_pts_retains_raw_dts_without_inventing_native_presentation_time() {
     assert_eq!(out.clock, raw_clock);
     assert_eq!(out.subtitle().unwrap().pts_microseconds, None);
 }
-
-// This is functional transcript reproduction, not a benchmark adapter. Recorded
-// input/native expected bytes are read only by tests, never by production code.
 
 /// One epoch display of the objects `(id, width, height, rle)` on a 16x4 canvas.
 fn display(objects: &[(u16, u16, u16, &[u8])]) -> Vec<u8> {

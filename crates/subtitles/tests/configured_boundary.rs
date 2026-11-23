@@ -155,7 +155,7 @@ fn declared_clock_ratio_and_inferred_dts_do_not_replace_source_facts() {
 }
 
 #[test]
-fn unknown_and_known_native_sentinel_integer_are_separate_source_values() {
+fn unknown_and_known_sentinel_integer_are_separate_source_values() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let original = Bytes::copy_from_slice(&budget, &PRIVATE).unwrap();
     let configuration = SourceConfiguration::from_matroska_private(

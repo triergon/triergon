@@ -34,10 +34,10 @@ fn finish(decoder: &mut Decoder, quantum: u64) -> Output {
         {
             Status::Pending => (),
             Status::OutputReady => return decoder.take_output(&cancel).unwrap(),
-            s => panic!("unexpected native status {s:?}"),
+            s => panic!("unexpected status {s:?}"),
         }
     }
-    panic!("native progress bound")
+    panic!("progress bound")
 }
 /// The subtitle of `output`; `None` for nothing or a refusal.
 fn subtitle(output: Output) -> Option<Subtitle> {
@@ -76,7 +76,7 @@ fn box_bytes(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
 }
 
 #[test]
-fn native_plain_literal_and_source_identity_at_work_one_seven_and_large() {
+fn plain_literal_and_source_identity_at_work_one_seven_and_large() {
     for q in [1, 7, 4096] {
         let out = run(&sample("Å水e\u{301}😀".as_bytes(), &[]), q);
         assert_eq!(ass(&out), "0,0,Default,,0,0,0,,Å水e\u{301}😀".as_bytes());
@@ -96,21 +96,21 @@ fn native_plain_literal_and_source_identity_at_work_one_seven_and_large() {
     }
 }
 #[test]
-fn native_newlines_and_ass_markup_are_distinct_from_original_source() {
+fn newlines_and_ass_markup_are_distinct_from_original_source() {
     let bytes = sample(b"A\r\n{\\b1}B\\NC\n", &[]);
     let out = run(&bytes, 1);
     assert_eq!(ass(&out), b"0,0,Default,,0,0,0,,A\\N{\\b1}B\\NC\\N");
     assert_eq!(out.input.payload.as_ref(), bytes);
 }
 #[test]
-fn native_nul_boundary_retains_whole_source_and_ignores_invalid_suffix_only_in_view() {
+fn nul_boundary_retains_whole_source_and_ignores_invalid_suffix_only_in_view() {
     let bytes = sample(b"a\0\xffb", &[]);
     let out = run(&bytes, 1);
     assert_eq!(ass(&out), b"0,0,Default,,0,0,0,,a");
     assert_eq!(out.input.payload.as_ref(), bytes);
 }
 #[test]
-fn utf16_and_invalid_utf8_are_explicit_native_refusals_without_rewriting_source() {
+fn utf16_and_invalid_utf8_are_explicit_refusals_without_rewriting_source() {
     for b in [
         &[0, 4, 0xfe, 0xff, 0, 65][..],
         &[0, 1, 0xff][..],
@@ -138,14 +138,14 @@ fn clear_empty_and_short_invalid_calls_do_not_fabricate_subtitles() {
     }
 }
 #[test]
-fn native_length_clamp_and_bad_box_refusal_leave_source_grammar_unchanged() {
+fn length_clamp_and_bad_box_refusal_leave_source_grammar_unchanged() {
     let out = run(&[0, 9, b'A'], 1);
     assert_eq!(ass(&out), b"0,0,Default,,0,0,0,,A");
     let bad = sample(b"a", &[0, 0, 0, 0, b't', b'w', b'r', b'p']);
     assert!(matches!(run(&bad, 1).decoded, Decoded::Refused));
 }
 #[test]
-fn wrap_and_unknown_modifier_are_native_selected_views_of_complete_owned_input() {
+fn wrap_and_unknown_modifier_are_selected_views_of_complete_owned_input() {
     let mut boxes = box_bytes(b"twrp", &[0]);
     boxes.extend(box_bytes(b"zzzz", b"kept\0bytes"));
     boxes.extend(box_bytes(b"twrp", &[1]));
@@ -209,7 +209,7 @@ fn unset_context_clock_never_invents_time_from_exact_source_timing() {
     assert_eq!(s.end_display_ms, 0);
 }
 #[test]
-fn known_clock_uses_nearest_away_and_explicit_native_duration_wrapping() {
+fn known_clock_uses_nearest_away_and_explicit_duration_wrapping() {
     let pool = Budget::new(65536).unwrap();
     let options = Options {
         packet_timebase: Some(TimeBase::new(1, 2000).unwrap()),
@@ -328,7 +328,7 @@ fn take_cancel_reset_and_context_drop_preserve_retained_output_owners() {
     assert_eq!(pool.used(), Budget::control_storage_bytes());
 }
 #[test]
-fn core_limits_are_distinct_from_native_data_refusal_and_remain_sticky() {
+fn core_limits_are_distinct_from_data_refusal_and_remain_sticky() {
     let pool = Budget::new(65536).unwrap();
     let limits = Limits {
         maximum_ass_bytes: 4,
@@ -425,7 +425,7 @@ fn configuration_backing_and_header_remain_owned_after_decoder_drop() {
 }
 
 #[test]
-fn native_configuration_and_style_count_limits_are_explicit_core_errors() {
+fn configuration_and_style_count_limits_are_explicit_core_errors() {
     let pool = Budget::new(65536).unwrap();
     let c = captured::CASES
         .iter()

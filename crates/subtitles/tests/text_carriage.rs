@@ -223,7 +223,7 @@ fn snapshot(actual: &Snapshot, original: &Source, case: &Case) {
     match (&actual.stream, &case.stream) {
         (None, None) => {}
         (Some(a), Some(b)) => stream(a, b),
-        _ => panic!("native stream presence differs"),
+        _ => panic!("stream presence differs"),
     }
     assert_eq!(actual.packets.len(), case.packets.len());
     for (actual, expected) in actual.packets.as_slice().iter().zip(case.packets) {
@@ -411,7 +411,7 @@ fn raw_packet_carriage_does_not_inherit_strict_text_validation() {
     run_case(index);
 }
 #[test]
-fn native_outputs_retain_source_and_configuration_after_session_teardown() {
+fn outputs_retain_source_and_configuration_after_session_teardown() {
     let pool = Budget::new(1 << 20).unwrap();
     let baseline = pool.used();
     let case = cases::ALL

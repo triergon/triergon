@@ -62,7 +62,7 @@ fn case(data: &[u8]) -> Case {
 
 /// The receiver decoder against the recorded output of the reference
 /// decoder: its ARGB words, the index plane and the subtitle clock.
-fn native_guard(data: &[u8]) {
+fn check(data: &[u8]) {
     let case = case(data);
     let pool = Budget::new(4 << 20).unwrap();
     let cancel = AtomicBool::new(false);
@@ -88,51 +88,51 @@ fn native_guard(data: &[u8]) {
 
 #[test]
 fn full_rgb_rounding_and_clipping() {
-    native_guard(include_bytes!("explicit-clut-fixtures/full-rgb.case"));
+    check(include_bytes!("explicit-clut-fixtures/full-rgb.case"));
 }
 #[test]
 fn all_full_range_transparency_values() {
-    native_guard(include_bytes!("explicit-clut-fixtures/full-alpha.case"));
+    check(include_bytes!("explicit-clut-fixtures/full-alpha.case"));
 }
 #[test]
 fn unused_encoded_rgb_is_preserved() {
-    native_guard(include_bytes!("explicit-clut-fixtures/unused-full.case"));
+    check(include_bytes!("explicit-clut-fixtures/unused-full.case"));
 }
 #[test]
 fn full_range_two_bit_palette() {
-    native_guard(include_bytes!("explicit-clut-fixtures/full-depth2.case"));
+    check(include_bytes!("explicit-clut-fixtures/full-depth2.case"));
 }
 #[test]
 fn full_range_four_bit_palette() {
-    native_guard(include_bytes!("explicit-clut-fixtures/full-depth4.case"));
+    check(include_bytes!("explicit-clut-fixtures/full-depth4.case"));
 }
 #[test]
 fn reduced_nonfinal_conversion() {
-    native_guard(include_bytes!(
+    check(include_bytes!(
         "explicit-clut-fixtures/reduced-nonfinal.case"
     ));
 }
 #[test]
-fn reduced_final_fresh_keeps_native_default() {
-    native_guard(include_bytes!(
+fn reduced_final_fresh_keeps_the_default() {
+    check(include_bytes!(
         "explicit-clut-fixtures/reduced-final-fresh.case"
     ));
 }
 #[test]
 fn reduced_final_retains_prior_two_bit_entry() {
-    native_guard(include_bytes!("explicit-clut-fixtures/reduced-tail2.case"));
+    check(include_bytes!("explicit-clut-fixtures/reduced-tail2.case"));
 }
 #[test]
 fn reduced_final_retains_prior_four_bit_entry() {
-    native_guard(include_bytes!("explicit-clut-fixtures/reduced-tail4.case"));
+    check(include_bytes!("explicit-clut-fixtures/reduced-tail4.case"));
 }
 #[test]
 fn reduced_final_retains_prior_eight_bit_entry() {
-    native_guard(include_bytes!("explicit-clut-fixtures/reduced-tail8.case"));
+    check(include_bytes!("explicit-clut-fixtures/reduced-tail8.case"));
 }
 #[test]
-fn native_yzero_companions_keep_raw_facts() {
-    native_guard(include_bytes!(
+fn yzero_companions_keep_raw_facts() {
+    check(include_bytes!(
         "explicit-clut-fixtures/transparent-companions.case"
     ));
 }

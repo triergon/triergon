@@ -590,14 +590,12 @@ fn all_single_byte_mappings_match_independent_python_codecs() {
 }
 
 #[test]
-fn explicit_cp1251_matches_complete_native_ass_bytes_while_native_stop_stays_preserved() {
+fn explicit_cp1251_matches_complete_ass_bytes_and_the_stop_is_kept() {
     let raw = b"2,0,Default,,0,0,0,,\xcf\xf0\xe8\xe2\xe5\xf2";
     let expected = b"2,0,Default,,0,0,0,,\xd0\x9f\xd1\x80\xd0\xb8\xd0\xb2\xd0\xb5\xd1\x82";
     for q in [1, 7, 4096] {
         assert_eq!(converted(raw, Charset::Windows1251, q), expected);
     }
-    // The native observer ends with -22 after preserving this subtitle; that
-    // outcome is not converted to success.
 }
 #[test]
 fn tx3g_config_backpressure_retry_keeps_exact_font_record_and_raw_owner() {
