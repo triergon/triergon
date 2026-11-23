@@ -2,7 +2,7 @@
 use std::collections::VecDeque;
 use triergon_codec::{
     AudioDecoder, AudioFrame, ChannelLayout, Colour, DownmixLevels, Error, PictureView, Plane,
-    Speaker, VideoDecoder,
+    SampleAspectRatio, Speaker, VideoDecoder,
 };
 use triergon_session::{
     AudioSession, Canvas, FeedError, OnRefusal, PcmBlock, Planar, QueueLimits, SessionState,
@@ -58,7 +58,7 @@ impl VideoDecoder for Script {
                 },
             ],
             pts,
-            sar: (1, 1),
+            sar: Some(SampleAspectRatio::SQUARE),
             colour: Colour {
                 matrix: 1,
                 full_range: true,

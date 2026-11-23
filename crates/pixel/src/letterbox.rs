@@ -974,6 +974,7 @@ impl Direct {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::view::SampleAspectRatio;
 
     #[test]
     fn fit_follows_the_decrease_rule_and_floor_offsets() {
@@ -1158,7 +1159,7 @@ mod tests {
                     plane(&chroma[..], cs, top / 2 * cs + left / 2),
                 ],
                 pts: None,
-                sar: (1, 1),
+                sar: Some(SampleAspectRatio::SQUARE),
                 colour: Colour {
                     matrix: 1,
                     full_range: false,
@@ -1205,7 +1206,7 @@ mod tests {
                     plane(&chroma[..], width / 2),
                 ],
                 pts: None,
-                sar: (1, 1),
+                sar: Some(SampleAspectRatio::SQUARE),
                 colour: Colour {
                     matrix: 1,
                     full_range: false,

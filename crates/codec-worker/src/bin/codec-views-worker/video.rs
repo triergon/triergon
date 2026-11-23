@@ -9,7 +9,7 @@ use triergon_codec_hevc as hevc;
 use triergon_harness_protocol::{digest::signed, interleaved::InterleavedDigest, md5};
 use triergon_harness_runner::{BenchLine, Boundary, Invocation, Mode, Timer};
 use triergon_pixel::letterbox::{Canvas, Scaler};
-use triergon_pixel::{Colour, PictureView, Plane};
+use triergon_pixel::{Colour, PictureView, Plane, SampleAspectRatio};
 
 use triergon_codec_hevc::AccessUnitSplitter;
 use triergon_harness_protocol::digest::fold_bytes;
@@ -260,7 +260,7 @@ impl Picture {
                     }
                 }),
                 pts: picture.pts,
-                sar: picture.sar,
+                sar: SampleAspectRatio::new(picture.sar.0, picture.sar.1),
                 colour: Colour {
                     matrix: picture.colour.matrix,
                     full_range: picture.colour.full_range,
@@ -286,7 +286,7 @@ impl Picture {
                     }
                 }),
                 pts: picture.pts,
-                sar: picture.sar,
+                sar: SampleAspectRatio::new(picture.sar.0, picture.sar.1),
                 colour: Colour {
                     matrix: picture.colour.matrix,
                     full_range: picture.colour.full_range,

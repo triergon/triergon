@@ -34,7 +34,7 @@ Decoded picture in, letterboxed RGBA out:
 
 ```rust
 use triergon_pixel::letterbox::{Canvas, Scaler};
-use triergon_pixel::{Colour, PictureView, Plane};
+use triergon_pixel::{Colour, PictureView, Plane, SampleAspectRatio};
 
 // A 64x36 8-bit 4:2:0 picture, lent the way a decoder lends its output.
 let (luma, chroma) = (vec![235u8; 64 * 36], vec![128u8; 32 * 18]);
@@ -48,7 +48,7 @@ let view = PictureView {
         Plane::U8 { data: &chroma, stride: 32, offset: 0 },
     ],
     pts: None,
-    sar: (1, 1),
+    sar: Some(SampleAspectRatio::SQUARE),
     colour: Colour { matrix: 1, full_range: false },
 };
 let canvas = Canvas::default();                     // 1920x1080; Canvas::new(w, h) for another size
@@ -63,7 +63,7 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 
 | Area | Coverage |
 |---|---|
-| Picture views | `PictureView`: cropped `width`/`height`, `bit_depth`, three `Plane`s (`U8` or `U16` samples with `stride` and `offset`), caller `pts`, `sar`, `Colour` (H.273 `matrix` code and `full_range`) |
+| Picture views | `PictureView`: cropped `width`/`height`, `bit_depth`, three `Plane`s (`U8` or `U16` samples with `stride` and `offset`), caller `pts`, `sar` (`Option<SampleAspectRatio>`), `Colour` (H.273 `matrix` code and `full_range`) |
 | Coded picture | `Picture` at the macroblock-aligned size of a `Geometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
 | RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass; width-dependent conversion or filtering at every width |
 | Letterbox input | 4:2:0, 8-bit and high bit depth (10-bit verified); limited and full range |

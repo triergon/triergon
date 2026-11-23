@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::picture::{AnyFrame, SharedFrame};
 use crate::ps::Sps;
-use triergon_codec::{Colour, PictureView};
+use triergon_codec::{Colour, PictureView, SampleAspectRatio};
 
 /// Colour description from the VUI (Annex E.2.1). Code points follow Rec. ITU-T H.273;
 /// 2 means "unspecified" and is the value when the stream does not signal one.
@@ -223,7 +223,7 @@ impl Picture {
                 self.planes[2].view(),
             ],
             pts: self.pts,
-            sar: self.sar,
+            sar: SampleAspectRatio::new(self.sar.0, self.sar.1),
             colour: Colour {
                 matrix: self.colour.matrix,
                 full_range: self.colour.full_range,

@@ -22,7 +22,7 @@ pub use division::{Divisor, divide, divide_u32};
 pub use error::DecodeError;
 pub use layout::{ChannelLayout, Speaker};
 pub use triergon_core::{Budget, BudgetVec, Charged, Error, Reservation};
-pub use triergon_pixel::{Colour, PictureView, Plane};
+pub use triergon_pixel::{Colour, PictureView, Plane, SampleAspectRatio};
 pub use window::{kbd_window, vorbis_window};
 
 /// A video codec a workspace decoder decodes.

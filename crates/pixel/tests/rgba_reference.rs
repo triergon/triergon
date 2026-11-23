@@ -2,7 +2,7 @@
 //! (the same pseudo-random pictures through FFmpeg 9.0.2's `scale,pad,format=rgba`
 //! chain).
 use triergon_pixel::letterbox::{Canvas, Scaler};
-use triergon_pixel::{Colour, PictureView, Plane};
+use triergon_pixel::{Colour, PictureView, Plane, SampleAspectRatio};
 
 const FIXTURES: &str = include_str!("fixtures/rgba-reference-digests.txt");
 
@@ -62,7 +62,7 @@ fn letterbox(
         bit_depth: bits,
         planes,
         pts: None,
-        sar: (1, 1),
+        sar: Some(SampleAspectRatio::SQUARE),
         colour,
     };
     let mut rgba = vec![0_u8; Canvas::default().bytes()];
@@ -188,7 +188,7 @@ fn raw_letterbox() {
             bit_depth: bits,
             planes,
             pts: None,
-            sar: (1, 1),
+            sar: Some(SampleAspectRatio::SQUARE),
             colour,
         };
         let start = std::time::Instant::now();

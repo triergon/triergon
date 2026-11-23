@@ -46,7 +46,9 @@ use std::sync::Arc;
 use tables::*;
 use triergon_bitstream::BitReader;
 pub use triergon_codec::DecodeError;
-use triergon_codec::{Budget, BudgetVec, Colour, Error, PictureView, VideoDecoder};
+use triergon_codec::{
+    Budget, BudgetVec, Colour, Error, PictureView, SampleAspectRatio, VideoDecoder,
+};
 use triergon_framing::nal::AnnexBUnits;
 use triergon_framing::picture_output::levels::max_dpb_mbs;
 use triergon_framing::picture_output::{
@@ -1286,7 +1288,7 @@ impl VideoDecoder for Decoder {
                 plane(&picture.planes[2]),
             ],
             pts: picture.pts,
-            sar: picture.sar,
+            sar: SampleAspectRatio::new(picture.sar.0, picture.sar.1),
             colour: Colour {
                 matrix: picture.colour.matrix,
                 full_range: picture.colour.full_range,

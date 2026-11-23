@@ -1,4 +1,5 @@
 //! Borrowed views of decoded pictures, as decoders hand them to sessions.
+use std::num::NonZeroU32;
 
 /// One plane of a decoded picture; samples at the picture's bit depth.
 ///
@@ -61,6 +62,32 @@ pub struct Colour {
     pub full_range: bool,
 }
 
+/// The shape of one sample: its width over its height, both nonzero.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SampleAspectRatio {
+    /// The width, relative to `height`.
+    pub width: NonZeroU32,
+    /// The height, relative to `width`.
+    pub height: NonZeroU32,
+}
+
+impl SampleAspectRatio {
+    /// Square samples.
+    pub const SQUARE: Self = Self {
+        width: NonZeroU32::MIN,
+        height: NonZeroU32::MIN,
+    };
+
+    /// `width:height`; `None` when either is zero, as a stream writes an unspecified ratio.
+    #[inline]
+    pub const fn new(width: u32, height: u32) -> Option<Self> {
+        match (NonZeroU32::new(width), NonZeroU32::new(height)) {
+            (Some(width), Some(height)) => Some(Self { width, height }),
+            _ => None,
+        }
+    }
+}
+
 /// A decoded 4:2:0 picture in output order, borrowed from the decoder.
 #[derive(Clone, Copy, Debug)]
 pub struct PictureView<'a> {
@@ -75,9 +102,8 @@ pub struct PictureView<'a> {
     pub planes: [Plane<'a>; 3],
     /// Presentation time in the caller's ticks, passed through.
     pub pts: Option<i64>,
-    /// Sample aspect ratio as (numerator, denominator); (0, 0) or (1, 1) when
-    /// square or unknown.
-    pub sar: (u32, u32),
+    /// The sample aspect ratio the stream signals; `None` when it signals none.
+    pub sar: Option<SampleAspectRatio>,
     /// How to convert the samples to RGB.
     pub colour: Colour,
 }

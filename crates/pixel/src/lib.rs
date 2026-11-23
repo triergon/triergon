@@ -20,5 +20,5 @@ mod ycbcr;
 pub use convert::{Converter, Orientation, rgba_to_yuv420};
 pub use error::{Error, Result};
 pub use picture::{Geometry, Picture};
-pub use view::{Colour, PictureView, Plane};
+pub use view::{Colour, PictureView, Plane, SampleAspectRatio};
 pub use ycbcr::{ChannelRounding, YcbcrMatrix};

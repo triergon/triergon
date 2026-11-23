@@ -2,7 +2,7 @@
 //! fixed-size reads of sample rows.
 
 use triergon_core::{Budget, BudgetVec, Error};
-use triergon_pixel::{Colour, Geometry, PictureView, Plane};
+use triergon_pixel::{Colour, Geometry, PictureView, Plane, SampleAspectRatio};
 
 /// A YUV 4:2:0 picture at the coded size, laid out like `triergon_pixel::Picture`.
 #[derive(Debug)]
@@ -69,7 +69,7 @@ impl Planes {
                 plane(&self.cr[..], g.chroma_stride()),
             ],
             pts: None,
-            sar: (1, 1),
+            sar: Some(SampleAspectRatio::SQUARE),
             colour: Colour {
                 matrix: 2,
                 full_range: false,
