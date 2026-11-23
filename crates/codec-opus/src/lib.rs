@@ -264,6 +264,3 @@ impl AudioDecoder for Decoder {
         Decoder::reset(self);
     }
 }
-
-#[cfg(test)]
-mod tests;

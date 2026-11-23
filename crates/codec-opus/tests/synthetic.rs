@@ -1,5 +1,6 @@
-use super::*;
-use triergon_codec::Speaker;
+//! Opus packet decoding through the public API.
+
+use triergon_codec_opus::{AudioFrame, Budget, DecodeError, Decoder, Limits, Speaker};
 
 /// An `OpusHead` for `channels` with mapping `family` (and its table when not 0).
 fn head(channels: u8, family: u8, streams: u8, coupled: u8, mapping: &[u8], gain: i16) -> Vec<u8> {
