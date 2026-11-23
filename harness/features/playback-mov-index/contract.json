@@ -2302,7 +2302,7 @@
       "clause": "ISO/IEC 14496-12:2015 sections 4.2 and 8.1.1 define a size-zero final box as extending through EOF. The playback recovery opener confirms the end of the input.",
       "candidate": "Emits six 12-byte samples and ends when the source confirms EOF for both the opaque-tail and ordinary cases.",
       "reference": "Emits the same samples, then reports invalid data at root offset 0x7fffffffffffffff.",
-      "compat": "compat::mov::report_unknown_final_box_error for consumers reproducing the reference terminal return code.",
+      "compat": "No built policy reproduces the reference's terminal return code for an unknown final box.",
       "cases": [
         "terminal-open-ended--opaque-tail-terminal-pipe-known-1-1",
         "terminal-open-ended--opaque-tail-terminal-pipe-known-1-4096",
@@ -2335,7 +2335,7 @@
       "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.7.3.2 define sample extents. The recovering playback API explicitly surfaces Mp4ShortPacket before closing the known source.",
       "candidate": "Emits the identical truncated final packet with its corruption flag and ends after delivering it.",
       "reference": "Emits the same packets and logs the short sample, then returns invalid data.",
-      "compat": "compat::mov::report_error_after_terminal_short_packet for consumers reproducing the reference terminal return code.",
+      "compat": "No built policy reproduces the reference's error after a terminal short packet.",
       "cases": [
         "terminal-mp4--bad-truncate-final-byte-pipe-known-1-1",
         "terminal-mp4--bad-truncate-final-byte-pipe-known-1-4096",

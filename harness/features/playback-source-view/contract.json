@@ -512,7 +512,7 @@
       "clause": "ISO/IEC 14496-12:2015 sections 8.7.3\u20135 and 8.8.8 locate samples within each track without prescribing a demux API merge order across tracks",
       "candidate": "Delivers samples in ascending byte position. The regular file delivers positions 1227 before 1239. The fragmented file delivers 1339 before 1351 and 1671 before 1683.",
       "reference": "Delivers those pairs in reverse order. Track catalogue, per-track sequence, packet bytes, clocks and flags, and the terminal status agree.",
-      "compat": "A consumer replaying the native demux merge would use compat::mov::intertrack_demux_order.",
+      "compat": "No built policy replays the native demux merge across tracks; the source view keeps byte order.",
       "cases": [
         "mp4-forward-regular-r-multitrack",
         "mp4-forward-regular-f-multitrack"
@@ -523,7 +523,7 @@
       "clause": "ITU-T H.222.0 (08/2023) section 2.4.4.10/Table 2-34 and section 2.6.1/Table 2-45 leave stream type 0x06 and descriptor tags 0x59 and 0x6a private. ETSI EN 300 468 V1.16.1 section 6.2.41 and Annex D.2\u20133 give those tags meaning within DVB.",
       "candidate": "In an unspecified namespace, keeps private PES tracks opaque. In the default programme the subtitle PID 258 has no codec configuration or language.",
       "reference": "Recognizes AC-3 on PID 257 when selected and DVB subtitles on PID 258 in the default programme, with language eng and configuration 0001000214. Packet and terminal folds agree.",
-      "compat": "A consumer selecting DVB decoders from an unlabelled service would use compat::pes::infer_dvb_from_private_tags.",
+      "compat": "No built policy infers DVB declarations from private tags in an unlabelled service.",
       "cases": [
         "ts-program-program-private-avc-dvb",
         "source-program-private-avc-dvb"
@@ -534,7 +534,7 @@
       "clause": "ITU-T H.222.0 (08/2023) sections 2.4.4 and 2.4.4.9\u201310 apply the latest current PMT to current data. Section 2.6.1/Table 2-45 leaves DVB tags private.",
       "candidate": "The opening catalogue uses version 0 at byte 188, with opaque PID 257 and, in the default programme, opaque PID 258. Version 1 at byte 940 signals type 0x11 on PID 257 for subsequent data.",
       "reference": "Labels PID 257 AC-3 from the earlier DVB descriptor and, in the default programme, labels PID 258 DVB subtitles with language eng and configuration 0001000214. Packet and terminal folds agree.",
-      "compat": "A consumer using a native demux probe catalogue across PMT changes would use compat::pes::probe_catalogue.",
+      "compat": "No built policy keeps a native probe catalogue across PMT changes.",
       "cases": [
         "ts-program-program-pmt-retype",
         "source-program-pmt-retype"
@@ -545,7 +545,7 @@
       "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.8.8 define the media extent and trun sample size",
       "candidate": "Emits both complete video packets and reports data refusal. The first AAC sample starts at byte 3189 and declares 176 bytes. The file ends at byte 3240.",
       "reference": "Emits both video packets and the 51 available bytes of the AAC sample as a corrupt packet, then reports end.",
-      "compat": "compat::mov::deliver_truncated_sample",
+      "compat": "The MOV demux view (Mp4Open::new_recovery with compat::mov::index) delivers the available prefix as a short packet.",
       "cases": [
         "mp4-forward-progressive-fragment-aac-short"
       ]
@@ -555,7 +555,7 @@
       "clause": "RFC 9559 sections 5.1.4.1.13 and 11.1 define DefaultDuration and timestamp units",
       "candidate": "Keeps 41666666 ns durations, with the same selected packets, payloads, flags, PTS and DTS presence.",
       "reference": "Reports 41000000 ns durations in the stream's integer demux clock.",
-      "compat": "compat::matroska::demux_tick_durations",
+      "compat": "triergon_matroska::compat::clock::packet_timing gives the reference's whole-tick duration.",
       "cases": [
         "matroska-startup-seek-startup-avc-high-b",
         "matroska-startup-seek-startup-avc-high-b0",
@@ -568,7 +568,7 @@
       "clause": "RFC 9559 sections 5.1.3.5.2 and 11.2 specify the Block timestamp as presentation time",
       "candidate": "Keeps DTS absent and zero duration in the fold when no duration is present; payloads, flags and PTS match.",
       "reference": "Publishes a derived DTS for each HEVC packet.",
-      "compat": "compat::matroska::inferred_decode_timestamps",
+      "compat": "No built policy fills a DTS from the Block PTS; the source DTS stays absent.",
       "cases": [
         "matroska-startup-seek-startup-hevc-no-default-duration",
         "matroska-startup-seek-startup-hevc-vps-timed-no-default",
@@ -580,7 +580,7 @@
       "clause": "RFC 9559 sections 5.1.4.1.13 and 11.1\u20132 define DefaultDuration and Block presentation timestamps",
       "candidate": "Keeps 41666666 ns durations and leaves DTS absent. Payloads, flags and PTS match in order.",
       "reference": "Reports 41000000 ns video durations and uses derived DTS for the HEVC packets or the PGS packet.",
-      "compat": "compat::matroska::demux_packet_clocks",
+      "compat": "triergon_matroska::compat::clock::packet_timing gives the reference's whole-tick duration; no built policy fills the DTS.",
       "cases": [
         "matroska-startup-seek-startup-avc-pgs-early-canvas",
         "matroska-startup-seek-startup-hevc-b0",
@@ -596,7 +596,7 @@
       "clause": "RFC 9559 sections 5.1.4.1.13, 5.1.4.1.25 and 11.1\u20132 define exact duration and subtract CodecDelay from each Block presentation timestamp",
       "candidate": "Keeps delay-adjusted PTS, exact duration and absent DTS. Every track, payload and packet flag matches in order.",
       "reference": "Uses a millisecond demux clock, quantizes presentation or duration where needed and also derives DTS.",
-      "compat": "compat::matroska::demux_packet_clocks",
+      "compat": "triergon_matroska::compat::clock::packet_timing gives the reference's tick-rounded CodecDelay timestamp.",
       "cases": [
         "matroska-startup-seek-startup-avc-mixed",
         "matroska-startup-seek-startup-hevc-mixed"
@@ -627,7 +627,7 @@
       "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6\u20137 and Table 2-21 require marker_bit to equal 1",
       "candidate": "Rejects the malformed header, publishes no PES, and reaches clean EOF.",
       "reference": "Returns the 27 payload bytes and reports PTS 90000 despite the zero PTS marker.",
-      "compat": "A repair-oriented PES reader that accepts malformed timestamp markers would use compat::mpegts::pes_timestamp_marker_recovery.",
+      "compat": "No built policy accepts malformed PES timestamp markers.",
       "cases": [
         "source-pes-timestamp-marker"
       ]
@@ -637,7 +637,7 @@
       "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.6\u20137 define PES_packet_length as the bytes following the length field",
       "candidate": "Publishes no PES for the first entity when it is finalized alone. The contiguous remainder is covered separately.",
       "reference": "Returns the available 170 payload bytes at EOF although the PES length field declares 520 bytes following the field.",
-      "compat": "A salvage consumer that needs the available part of an incomplete PES would use compat::mpegts::partial_pes_payload_at_eof.",
+      "compat": "No built policy delivers the available part of an incomplete PES at the definitive end.",
       "cases": [
         "source-hls-contiguous-part-a"
       ]
@@ -647,7 +647,7 @@
       "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.7 restricts zero PES_packet_length to video elementary streams in transport packets",
       "candidate": "Delivers the valid AVC packets and omits the AAC PES whose length is zero.",
       "reference": "Also delivers 27 bytes from the zero-length AAC PES.",
-      "compat": "A demux consumer that accepts legacy audio without a bounded PES length would use compat::mpegts::zero_length_audio_pes.",
+      "compat": "No built policy admits an audio PES without a bounded length.",
       "cases": [
         "ts-program-program-eof-avc-aac",
         "source-program-eof-avc-aac"
