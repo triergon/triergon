@@ -273,21 +273,83 @@ pub enum Status {
     Ended,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Phase {
+/// What the decoder is doing.
+// The packet is stepped in place; boxing it would allocate outside the pool.
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+enum State {
+    /// No packet is active.
     Idle,
+    /// A packet was pushed and its output is not yet taken.
+    Packet(Packet),
+    /// The input has ended; `polled` once the end is paid for.
+    End { polled: bool },
+    /// An error other than pool pressure, returned until reset.
+    Failed(Error),
+}
+
+impl State {
+    /// The decoded packet, leaving the decoder idle; `None`, changing
+    /// nothing, unless a packet is decoded.
+    fn take_ready(&mut self) -> Option<Packet> {
+        if !matches!(
+            self,
+            State::Packet(Packet {
+                step: Step::Ready,
+                ..
+            })
+        ) {
+            return None;
+        }
+        match std::mem::replace(self, State::Idle) {
+            State::Packet(packet) => Some(packet),
+            state => {
+                *self = state;
+                None
+            }
+        }
+    }
+}
+
+/// The active packet and how far its decoding got.
+#[derive(Debug)]
+struct Packet {
+    raw: Bytes,
+    clock: PacketClock,
+    /// Where the next segment starts.
+    at: usize,
+    /// The PTS of the subtitle this packet returns, as the reference fills it:
+    /// the packet's own, then the presentation PTS of the display it shows,
+    /// or zero once a display failed.
+    subtitle_pts: Option<i64>,
+    refusal: Option<Refusal>,
+    step: Step,
+    display: Display,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Step {
+    /// The segment at `at`.
     Segment,
-    /// After an END segment: the receiver builds its display.
+    /// After an END segment: the packet's display, as far as it got.
     Display,
-    /// The display's next rectangle.
-    Rectangle,
-    /// Decoding the rectangle's object.
-    Raster,
-    StoreEvent,
+    /// Every segment the receiver reads is read.
     Finish,
+    /// The packet is decoded.
     Ready,
-    Eof,
-    Ended,
+}
+
+/// The first display of a packet, which the reference returns.
+#[derive(Debug)]
+enum Display {
+    /// No END has been displayed.
+    Pending,
+    /// The packet's subtitle, which an END started; `drawing` while its
+    /// rectangles are placed.
+    Shown {
+        subtitle: Subtitle,
+        drawing: Option<Drawing>,
+    },
 }
 
 /// A rectangle's pixels: a decoded object, or nothing with the row width the
@@ -317,13 +379,24 @@ enum Placement {
     Missing,
 }
 
-/// A display being built from an END segment.
+/// What placing a display's rectangles needs besides the rectangles.
 #[derive(Debug)]
-struct Draft {
-    pts: Option<i64>,
-    rectangles: BudgetVec<Rect>,
-    palette: Option<ReceiverPalette>,
+struct Drawing {
+    /// The words of the palette the composition selects, which every
+    /// rectangle takes that forced-only output does not hide.
+    palette: ReceiverPalette,
+    /// The pixels the display has decoded.
     pixels: usize,
+    /// The rectangle whose object is decoded next, once its reference is
+    /// placed.
+    raster: Option<Raster>,
+}
+
+/// A reference whose object has data, and where the object is in the cache.
+#[derive(Clone, Copy, Debug)]
+struct Raster {
+    reference: Reference,
+    object: usize,
 }
 
 /// Plane storage. A display writes the last display's buffer again in place
@@ -342,6 +415,20 @@ enum Planes {
     Fresh(Bytes),
 }
 
+/// What the decoder keeps from packet to packet: its bounds, the stream state
+/// its segments build and the work paid.
+#[derive(Debug)]
+struct Core {
+    budget: Budget,
+    limits: Limits,
+    options: Options,
+    receiver: Receiver,
+    /// Work paid towards the current step; cleared when a step is done.
+    credit: usize,
+    spent: usize,
+    planes: Planes,
+}
+
 /// FFmpeg's PGS decoder over one stream's packets.
 ///
 /// One packet is active at a time. Accepted inputs, caches and outputs stay
@@ -349,30 +436,8 @@ enum Planes {
 /// operation receives caller cancellation.
 #[derive(Debug)]
 pub struct ReceiverDecoder {
-    budget: Budget,
-    limits: Limits,
-    options: Options,
-    /// The packet's subtitle, once its first END is displayed.
-    event: Option<Subtitle>,
-    receiver: Receiver,
-    phase: Phase,
-    credit: usize,
-    spent: usize,
-    failed: Option<Error>,
-    final_input: bool,
-    output: Option<ReceiverPacket>,
-    // The active packet.
-    packet: Option<Bytes>,
-    clock: Option<PacketClock>,
-    at: usize,
-    /// The PTS of the subtitle this packet returns, as the reference fills it:
-    /// the packet's own, then a display's presentation PTS, or zero once a
-    /// display failed.
-    subtitle_pts: Option<i64>,
-    displayed: bool,
-    refusal: Option<Refusal>,
-    draft: Option<Draft>,
-    planes: Planes,
+    core: Core,
+    state: State,
 }
 
 impl ReceiverDecoder {
@@ -385,25 +450,16 @@ impl ReceiverDecoder {
     pub fn new(budget: &Budget, limits: Limits, options: Options) -> Result<Self> {
         limits.validate()?;
         Ok(Self {
-            budget: budget.clone(),
-            limits,
-            options,
-            event: None,
-            receiver: Receiver::new(budget),
-            phase: Phase::Idle,
-            credit: 0,
-            spent: 0,
-            failed: None,
-            final_input: false,
-            output: None,
-            packet: None,
-            clock: None,
-            at: 0,
-            subtitle_pts: None,
-            displayed: false,
-            refusal: None,
-            draft: None,
-            planes: Planes::None,
+            core: Core {
+                budget: budget.clone(),
+                limits,
+                options,
+                receiver: Receiver::new(budget),
+                credit: 0,
+                spent: 0,
+                planes: Planes::None,
+            },
+            state: State::Idle,
         })
     }
 
@@ -425,78 +481,45 @@ impl ReceiverDecoder {
         clock: PacketClock,
         cancel: &AtomicBool,
     ) -> Result<()> {
-        if let Some(error) = self.failed {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
             return Err(self.poison(Error::Cancelled));
         }
-        if self.phase != Phase::Idle || self.final_input {
+        if !matches!(self.state, State::Idle) {
             return Err(Error::Invalid(
                 "PGS packet pushed while one is active or after the end of input",
             ));
         }
-        let packet = raw.as_ref().ok_or(Error::Invalid("PGS packet absent"))?;
-        if !packet.belongs_to(&self.budget) {
-            return Err(Error::ForeignPool);
+        let packet = raw.take().ok_or(Error::Invalid("PGS packet absent"))?;
+        if let Err(error) = self.core.admit(&packet) {
+            *raw = Some(packet);
+            return Err(error);
         }
-        if packet.is_empty() {
-            return Err(Error::Invalid("empty PGS packet"));
-        }
-        if packet.len() > self.limits.max_packet_bytes {
-            return Err(Error::Limit {
-                requested: packet.len(),
-                maximum: self.limits.max_packet_bytes,
-            });
-        }
-        self.packet = raw.take();
-        self.clock = Some(clock);
-        self.at = 0;
-        self.subtitle_pts = state::microseconds(clock);
-        self.displayed = false;
-        self.refusal = None;
-        // `finish`, `poison` and `reset` leave no event behind; release
-        // builds clear it anyway, out of line.
-        debug_assert!(self.event.is_none());
-        if self.event.is_some() {
-            self.discard_event();
-        }
-        self.done(Phase::Segment);
+        self.state = State::Packet(Packet {
+            raw: packet,
+            clock,
+            at: 0,
+            subtitle_pts: state::microseconds(clock),
+            refusal: None,
+            step: Step::Segment,
+            display: Display::Pending,
+        });
+        self.core.credit = 0;
         Ok(())
-    }
-
-    #[cold]
-    fn discard_event(&mut self) {
-        self.event = None;
     }
 
     /// Work units spent since the decoder was made or last reset.
     pub fn work_spent(&self) -> usize {
-        self.spent
+        self.core.spent
     }
 
     fn poison(&mut self, error: Error) -> Error {
-        self.packet = None;
-        self.event = None;
-        self.output = None;
-        self.receiver = Receiver::new(&self.budget);
-        self.draft = None;
-        self.planes = Planes::None;
-        self.failed = Some(error);
+        self.core.receiver = Receiver::new(&self.core.budget);
+        self.core.planes = Planes::None;
+        self.state = State::Failed(error);
         error
-    }
-    fn done(&mut self, phase: Phase) {
-        self.phase = phase;
-        self.credit = 0;
-    }
-    fn pay(&mut self, work: &mut WorkBudget, cancel: &AtomicBool, cost: usize) -> Result<bool> {
-        Work {
-            caller: work,
-            spent: &mut self.spent,
-            maximum: self.limits.max_work,
-            cancel,
-        }
-        .pay(&mut self.credit, cost)
     }
 
     /// Decodes the active packet, or the end of input, as far as `work`
@@ -510,16 +533,18 @@ impl ReceiverDecoder {
     /// included, fails the decoder: every call returns it until
     /// [`reset`](Self::reset).
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
-        if let Some(error) = self.failed {
+        if let State::Failed(error) = self.state {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
             return Err(self.poison(Error::Cancelled));
         }
-        match self.phase {
-            Phase::Ready => return Ok(Status::OutputReady),
-            Phase::Idle => return Ok(Status::NeedPacket),
-            Phase::Ended => return Ok(Status::Ended),
+        match &self.state {
+            State::Packet(Packet {
+                step: Step::Ready, ..
+            }) => return Ok(Status::OutputReady),
+            State::Idle => return Ok(Status::NeedPacket),
+            State::End { polled: true } => return Ok(Status::Ended),
             _ if work.remaining() == 0 => return Ok(Status::Yield),
             _ => {}
         }
@@ -530,9 +555,10 @@ impl ReceiverDecoder {
         }
     }
 
-    /// The decode loop: every phase of a packet, until it is ready or the
+    /// The decode loop: every step of a packet, until it is ready or the
     /// caller's work runs out.
     fn run(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
+        let Self { core, state } = self;
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -540,145 +566,319 @@ impl ReceiverDecoder {
             if work.remaining() == 0 {
                 return Ok(Status::Yield);
             }
-            let phase = self.phase;
-            let next = match phase {
-                Phase::Segment => self.segment(work, cancel)?,
-                Phase::Display => self.display(work, cancel)?,
-                Phase::Rectangle => self.rectangle(work, cancel)?,
-                Phase::Raster => self.raster(work, cancel)?,
-                Phase::StoreEvent => self.store_event(work, cancel)?,
-                Phase::Finish => self.finish(work, cancel)?,
-                Phase::Eof => self.end_of_stream(work, cancel)?,
-                Phase::Idle => return Ok(Status::NeedPacket),
-                Phase::Ready => return Ok(Status::OutputReady),
-                Phase::Ended => return Ok(Status::Ended),
+            let done = match state {
+                State::Packet(packet) => match packet.step {
+                    Step::Segment => core.segment(packet, work, cancel)?,
+                    Step::Display => core.display(packet, work, cancel)?,
+                    Step::Finish => {
+                        let done = core.pay(work, cancel, 1)?;
+                        if done {
+                            packet.step = Step::Ready;
+                        }
+                        done
+                    }
+                    Step::Ready => return Ok(Status::OutputReady),
+                },
+                // The receiver holds no delayed subtitle: the end outputs nothing.
+                State::End { polled: true } => return Ok(Status::Ended),
+                State::End { polled } => {
+                    let done = core.pay(work, cancel, 1)?;
+                    if done {
+                        *polled = true;
+                    }
+                    done
+                }
+                State::Idle => return Ok(Status::NeedPacket),
+                State::Failed(error) => return Err(*error),
             };
-            match next {
-                Some(next) => self.done(next),
-                None => return Ok(Status::Yield),
+            if !done {
+                return Ok(Status::Yield);
             }
+            core.credit = 0;
         }
     }
 
-    fn packet(&self) -> Result<&Bytes> {
-        self.packet
-            .as_ref()
-            .ok_or(Error::Invalid("PGS packet absent"))
+    /// The decoded packet, once [`poll`](Self::poll) has returned
+    /// `OutputReady`; the decoder then needs the next packet.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` before the output is ready; `Error::Cancelled` when
+    /// `cancel` is set, which fails the decoder; a failed decoder returns its
+    /// failure.
+    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<ReceiverPacket> {
+        if let State::Failed(error) = self.state {
+            return Err(error);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(self.poison(Error::Cancelled));
+        }
+        let Some(packet) = self.state.take_ready() else {
+            return Err(Error::Invalid("PGS output not ready"));
+        };
+        self.core.credit = 0;
+        Ok(ReceiverPacket {
+            raw: packet.raw,
+            clock: packet.clock,
+            event: match packet.display {
+                Display::Shown { subtitle, .. } => Some(subtitle),
+                Display::Pending => None,
+            },
+            refusal: packet.refusal,
+            canvas: self.core.receiver.canvas,
+        })
+    }
+
+    /// Ends the input; [`poll`](Self::poll) then reaches `Ended`.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` while a packet is active or its output not taken, and
+    /// once input has ended; `Error::Cancelled` when `cancel` is set, which
+    /// fails the decoder; a failed decoder returns its failure.
+    pub fn finish_input(&mut self, cancel: &AtomicBool) -> Result<()> {
+        if let State::Failed(error) = self.state {
+            return Err(error);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(self.poison(Error::Cancelled));
+        }
+        if !matches!(self.state, State::Idle) {
+            return Err(Error::Invalid("PGS input ended while a packet is active"));
+        }
+        self.state = State::End { polled: false };
+        self.core.credit = 0;
+        Ok(())
+    }
+
+    /// Discards the stream state (caches, canvas, failure, work spent and the
+    /// end of input), keeping the limits and configuration. Outputs already
+    /// taken keep their own charged storage.
+    ///
+    /// # Errors
+    ///
+    /// `Error::Invalid` unless the decoder has failed, needs a packet or has
+    /// ended; `Error::Cancelled` when `cancel` is set, which fails the
+    /// decoder.
+    pub fn reset(&mut self, cancel: &AtomicBool) -> Result<()> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(self.poison(Error::Cancelled));
+        }
+        if !matches!(
+            self.state,
+            State::Failed(_) | State::Idle | State::End { polled: true }
+        ) {
+            return Err(Error::Invalid("PGS decoder reset while a packet is active"));
+        }
+        let core = &mut self.core;
+        core.planes = Planes::None;
+        core.receiver = Receiver::new(&core.budget);
+        core.spent = 0;
+        core.credit = 0;
+        self.state = State::Idle;
+        Ok(())
+    }
+}
+
+impl Core {
+    /// Checks a packet before it is taken.
+    fn admit(&self, packet: &Bytes) -> Result<()> {
+        if !packet.belongs_to(&self.budget) {
+            return Err(Error::ForeignPool);
+        }
+        if packet.is_empty() {
+            return Err(Error::Invalid("empty PGS packet"));
+        }
+        if packet.len() > self.limits.max_packet_bytes {
+            return Err(Error::Limit {
+                requested: packet.len(),
+                maximum: self.limits.max_packet_bytes,
+            });
+        }
+        Ok(())
+    }
+
+    fn pay(&mut self, work: &mut WorkBudget, cancel: &AtomicBool, cost: usize) -> Result<bool> {
+        Work {
+            caller: work,
+            spent: &mut self.spent,
+            maximum: self.limits.max_work,
+            cancel,
+        }
+        .pay(&mut self.credit, cost)
     }
 
     /// The segment at `at`: its header (the length read past the packet end as
     /// zero), then its effect on the receiver. A segment running past the
     /// packet ends the packet, except END, which has no body to read.
-    fn segment(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
-        let length = self.packet()?.len();
+    fn segment(
+        &mut self,
+        packet: &mut Packet,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let length = packet.raw.len();
         if length < 3 {
-            self.refusal = Some(Refusal::ShortPacket);
-            return Ok(Some(Phase::Finish));
+            packet.refusal = Some(Refusal::ShortPacket);
+            packet.step = Step::Finish;
+            return Ok(true);
         }
-        if self.at >= length {
-            return Ok(Some(Phase::Finish));
+        if packet.at >= length {
+            packet.step = Step::Finish;
+            return Ok(true);
         }
-        let raw = self.packet()?;
+        let raw = &packet.raw;
+        let at = packet.at;
         let byte = |at: usize| raw.get(at).copied().unwrap_or(0);
-        let kind = byte(self.at);
-        let body = self.at + 3
-            ..self.at + 3 + usize::from(u16::from_be_bytes([byte(self.at + 1), byte(self.at + 2)]));
+        let kind = byte(at);
+        let body = at + 3..at + 3 + usize::from(u16::from_be_bytes([byte(at + 1), byte(at + 2)]));
         if body.end > length && kind != END {
-            return Ok(Some(Phase::Finish));
+            packet.step = Step::Finish;
+            return Ok(true);
         }
         // Fixed when first computed, so a retry after pressure pays nothing
         // twice; the cache lookups a segment makes are bounded by the limits.
-        let cost = body.end.min(length) - self.at + 1;
+        let cost = body.end.min(length) - at + 1;
         if !self.pay(work, cancel, cost)? {
-            return Ok(None);
+            return Ok(false);
         }
-        let raw = self
-            .packet
-            .as_ref()
-            .ok_or(Error::Invalid("PGS packet absent"))?;
         let (receiver, limits) = (&mut self.receiver, &self.limits);
         match kind {
-            COMPOSITION => receiver.composition(raw, body.clone(), self.subtitle_pts, limits)?,
+            COMPOSITION => receiver.composition(raw, body.clone(), packet.subtitle_pts, limits)?,
             PALETTE => receiver.palette_definition(raw, body.clone(), limits, &self.budget)?,
             OBJECT => {
-                self.refusal =
+                packet.refusal =
                     receiver.object_fragment(&raw[body.clone()], limits, &self.budget)?;
             }
             _ => {}
         }
-        self.at = body.end;
-        Ok(Some(match kind {
-            _ if self.refusal.is_some() => Phase::Finish,
-            END => Phase::Display,
-            _ => Phase::Segment,
-        }))
+        packet.at = body.end;
+        if packet.refusal.is_some() {
+            packet.step = Step::Finish;
+        } else if kind == END {
+            packet.step = Step::Display;
+        }
+        Ok(true)
     }
 
     /// END: the reference returns the first display of a packet and ignores
-    /// later ones. A display that needs the composition's palette and lacks
-    /// it returns nothing and zeroes the packet's PTS.
-    fn display(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
-        if self.displayed {
-            return Ok(self.pay(work, cancel, 1)?.then_some(Phase::Segment));
+    /// later ones; the display is drawn one rectangle at a time.
+    fn display(
+        &mut self,
+        packet: &mut Packet,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let Display::Shown { subtitle, drawing } = &mut packet.display else {
+            return self.start_display(packet, work, cancel);
+        };
+        let Some(draw) = drawing else {
+            let done = self.pay(work, cancel, 1)?;
+            if done {
+                packet.step = Step::Segment;
+            }
+            return Ok(done);
+        };
+        if let Some(raster) = draw.raster {
+            return self.raster(&packet.raw, subtitle, draw, raster, work, cancel);
         }
+        let index = subtitle.rectangles.len();
+        let Some(reference) = self.receiver.references.get(index).copied().flatten() else {
+            // Every reference is placed: the rectangles' pixels are sliced
+            // from the planes buffer.
+            if !self.pay(work, cancel, 1)? {
+                return Ok(false);
+            }
+            self.store(subtitle)?;
+            *drawing = None;
+            packet.step = Step::Segment;
+            return Ok(true);
+        };
+        self.rectangle(&packet.raw, subtitle, draw, reference, work, cancel)
+    }
+
+    /// The subtitle an END starts, with room for a rectangle per reference. A
+    /// display that needs the composition's palette and lacks it returns
+    /// nothing and zeroes the packet's PTS; a later END tries again.
+    fn start_display(
+        &mut self,
+        packet: &mut Packet,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         if !self.pay(work, cancel, self.receiver.cache_entries() + 1)? {
-            return Ok(None);
+            return Ok(false);
         }
         let references = self.receiver.references().count();
-        if references != 0 && self.receiver.palette().is_none() {
+        let palette = if references == 0 {
+            ReceiverPalette::Hidden
+        } else if let Some(words) = self.receiver.palette() {
+            ReceiverPalette::Owned(Arc::clone(words))
+        } else {
             self.receiver.presentation = None;
-            self.subtitle_pts = Some(0);
-            return Ok(Some(Phase::Segment));
-        }
+            packet.subtitle_pts = Some(0);
+            packet.step = Step::Segment;
+            return Ok(true);
+        };
         let mut rectangles = BudgetVec::new(&self.budget);
         rectangles.try_reserve_exact(references)?;
-        let pts = self.receiver.presentation.or(self.subtitle_pts);
-        self.subtitle_pts = pts;
+        let pts = self.receiver.presentation.or(packet.subtitle_pts);
+        packet.subtitle_pts = pts;
         self.receiver.presentation = None;
-        self.displayed = true;
-        self.draft = Some(Draft {
-            pts,
-            rectangles,
-            palette: None,
-            pixels: 0,
-        });
-        Ok(Some(Phase::Rectangle))
+        packet.display = Display::Shown {
+            subtitle: Subtitle {
+                pts_microseconds: pts,
+                rectangles,
+            },
+            drawing: Some(Drawing {
+                palette,
+                pixels: 0,
+                raster: None,
+            }),
+        };
+        Ok(true)
     }
 
-    fn draft(&mut self) -> Result<&mut Draft> {
-        self.draft
-            .as_mut()
-            .ok_or(Error::Invalid("PGS receiver display absent"))
-    }
-
-    /// The next reference: a missing object is an empty rectangle at the
+    /// Places `reference`: a missing object is an empty rectangle at the
     /// origin, an object without data an empty one at its position with no
     /// row width; an object with data is decoded next, within the pixel
     /// limits for one object and for the display.
-    fn rectangle(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
-        let index = self.draft()?.rectangles.len();
-        let Some(reference) = self.receiver.references.get(index).copied().flatten() else {
-            return Ok(Some(Phase::StoreEvent));
-        };
+    fn rectangle(
+        &mut self,
+        raw: &Bytes,
+        subtitle: &mut Subtitle,
+        draw: &mut Drawing,
+        reference: Reference,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
         if !self.pay(work, cancel, self.receiver.objects.len() + 1)? {
-            return Ok(None);
+            return Ok(false);
         }
-        let Some(object) = self.receiver.object(reference.object.id) else {
-            let empty = self.packet()?.slice(0..0)?;
-            self.push_rect(reference, Placement::Missing, Bitmap::empty(0, empty))?;
-            return Ok(Some(Phase::Rectangle));
+        let Some((object, found)) = self.receiver.object(reference.object.id) else {
+            let empty = raw.slice(0..0)?;
+            self.push_rect(
+                subtitle,
+                draw,
+                reference,
+                Placement::Missing,
+                Bitmap::empty(0, empty),
+            )?;
+            return Ok(true);
         };
-        if !object.has_data() {
-            let empty = self.packet()?.slice(0..0)?;
-            self.push_rect(reference, Placement::Object, Bitmap::empty(0, empty))?;
-            return Ok(Some(Phase::Rectangle));
+        if !found.has_data() {
+            let empty = raw.slice(0..0)?;
+            self.push_rect(
+                subtitle,
+                draw,
+                reference,
+                Placement::Object,
+                Bitmap::empty(0, empty),
+            )?;
+            return Ok(true);
         }
-        let area = usize::from(object.width) * usize::from(object.height);
-        let total = self
-            .draft()?
-            .pixels
-            .checked_add(area)
-            .ok_or(Error::Overflow)?;
+        let area = usize::from(found.width) * usize::from(found.height);
+        let total = draw.pixels.checked_add(area).ok_or(Error::Overflow)?;
         for (requested, maximum) in [
             (area, self.limits.max_object_pixels),
             (total, self.limits.max_display_pixels),
@@ -687,33 +887,37 @@ impl ReceiverDecoder {
                 return Err(Error::Limit { requested, maximum });
             }
         }
-        Ok(Some(Phase::Raster))
+        draw.raster = Some(Raster { reference, object });
+        Ok(true)
     }
 
-    /// Decodes the current reference's object.
-    fn raster(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
-        let index = self.draft()?.rectangles.len();
-        let reference = self.receiver.references[index]
-            .ok_or(Error::Invalid("PGS receiver reference absent"))?;
-        let object = self
-            .receiver
-            .object(reference.object.id)
-            .ok_or(Error::Invalid("PGS receiver object absent"))?;
+    /// Decodes the object of the rectangle being placed.
+    fn raster(
+        &mut self,
+        raw: &Bytes,
+        subtitle: &mut Subtitle,
+        draw: &mut Drawing,
+        Raster { reference, object }: Raster,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        // No segment is read while a display is drawn: the object stays where
+        // the rectangle found it.
+        let object = &self.receiver.objects[object];
         let (width, height) = (object.width, object.height);
         let area = usize::from(width) * usize::from(height);
-        if !self.pay(work, cancel, object.encoded.len() + area)? {
-            return Ok(None);
+        let paid = Work {
+            caller: work,
+            spent: &mut self.spent,
+            maximum: self.limits.max_work,
+            cancel,
         }
-        let object = self
-            .receiver
-            .object(reference.object.id)
-            .ok_or(Error::Invalid("PGS receiver object absent"))?;
+        .pay(&mut self.credit, object.encoded.len() + area)?;
+        if !paid {
+            return Ok(false);
+        }
         // A rectangle without its own pixels views none of the packet.
-        let packet = self
-            .packet
-            .as_ref()
-            .ok_or(Error::Invalid("PGS packet absent"))?;
-        let empty = || packet.slice(0..0);
+        let empty = || raw.slice(0..0);
         if let Planes::Kept(_) = self.planes
             && let Planes::Kept(kept) = std::mem::replace(&mut self.planes, Planes::None)
             && let Ok(planes) = kept.try_into_writer()
@@ -754,16 +958,19 @@ impl ReceiverDecoder {
                 Bitmap::empty(width, empty()?)
             }
         };
-        self.draft()?.pixels += area;
-        self.push_rect(reference, Placement::Object, bitmap)?;
-        Ok(Some(Phase::Rectangle))
+        draw.pixels += area;
+        draw.raster = None;
+        self.push_rect(subtitle, draw, reference, Placement::Object, bitmap)?;
+        Ok(true)
     }
 
     /// Appends a rectangle. One for a missing object sits at the origin and
     /// carries no forced flag; forced-only output still selects its palette
     /// by the reference's flag.
     fn push_rect(
-        &mut self,
+        &self,
+        subtitle: &mut Subtitle,
+        draw: &Drawing,
         reference: Reference,
         placement: Placement,
         bitmap: Bitmap,
@@ -775,9 +982,9 @@ impl ReceiverDecoder {
         let palette = if self.options.forced_only && !reference.object.forced() {
             ReceiverPalette::Hidden
         } else {
-            self.composition_palette()?
+            draw.palette.clone()
         };
-        self.draft()?
+        subtitle
             .rectangles
             .try_push(Rect {
                 reference: reference.object,
@@ -793,38 +1000,16 @@ impl ReceiverDecoder {
             .map_err(|e| e.error)
     }
 
-    /// The composition palette for this display, chosen once.
-    fn composition_palette(&mut self) -> Result<ReceiverPalette> {
-        if let Some(palette) = &self.draft()?.palette {
-            return Ok(palette.clone());
-        }
-        let words = self
-            .receiver
-            .palette()
-            .ok_or(Error::Invalid("PGS receiver palette absent"))?;
-        let palette = ReceiverPalette::Owned(Arc::clone(words));
-        self.draft()?.palette = Some(palette.clone());
-        Ok(palette)
-    }
-
-    fn store_event(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
-        if !self.pay(work, cancel, 1)? {
-            return Ok(None);
-        }
-        let mut draft = self
-            .draft
-            .take()
-            .ok_or(Error::Invalid("PGS receiver display absent"))?;
-        if self.event.is_some() {
-            return Err(Error::Invalid("PGS subtitle already stored"));
-        }
+    /// Slices the decoded rectangles' pixels from the planes buffer they
+    /// were written to.
+    fn store(&mut self, subtitle: &mut Subtitle) -> Result<()> {
         match std::mem::replace(&mut self.planes, Planes::None) {
             Planes::Writing(planes, _) => {
                 // Each decoded rectangle takes the next width * height bytes of
                 // the buffer; the others have no pixels.
                 let planes = planes.finish();
                 let mut at = 0;
-                for rect in draft.rectangles.as_mut_slice() {
+                for rect in subtitle.rectangles.as_mut_slice() {
                     let area = usize::from(rect.width) * usize::from(rect.height);
                     if area != 0 {
                         rect.pixels = planes.slice(at..at + area)?;
@@ -836,121 +1021,6 @@ impl ReceiverDecoder {
             Planes::Kept(planes) | Planes::Fresh(planes) => self.planes = Planes::Kept(planes),
             Planes::None => {}
         }
-        self.event = Some(Subtitle {
-            pts_microseconds: draft.pts,
-            rectangles: draft.rectangles,
-        });
-        Ok(Some(Phase::Segment))
-    }
-
-    fn finish(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Phase>> {
-        if !self.pay(work, cancel, 1)? {
-            return Ok(None);
-        }
-        let raw = self
-            .packet
-            .take()
-            .ok_or(Error::Invalid("PGS packet absent"))?;
-        let clock = self.clock.ok_or(Error::Invalid("PGS clock absent"))?;
-        self.output = Some(ReceiverPacket {
-            raw,
-            clock,
-            event: self.event.take(),
-            refusal: self.refusal,
-            canvas: self.receiver.canvas,
-        });
-        Ok(Some(Phase::Ready))
-    }
-
-    fn end_of_stream(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<Phase>> {
-        let mut credit = 0;
-        let paid = Work {
-            caller: work,
-            spent: &mut self.spent,
-            maximum: self.limits.max_work,
-            cancel,
-        }
-        .pay(&mut credit, 1)?;
-        // The receiver holds no delayed subtitle: the end outputs nothing.
-        Ok(paid.then_some(Phase::Ended))
-    }
-
-    /// The decoded packet, once [`poll`](Self::poll) has returned
-    /// `OutputReady`; the decoder then needs the next packet.
-    ///
-    /// # Errors
-    ///
-    /// `Error::Invalid` before the output is ready; `Error::Cancelled` when
-    /// `cancel` is set, which fails the decoder; a failed decoder returns its
-    /// failure.
-    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<ReceiverPacket> {
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        if cancel.load(Ordering::Relaxed) {
-            return Err(self.poison(Error::Cancelled));
-        }
-        if self.phase != Phase::Ready {
-            return Err(Error::Invalid("PGS output not ready"));
-        }
-        let result = self
-            .output
-            .take()
-            .ok_or(Error::Invalid("PGS output absent"))?;
-        self.done(Phase::Idle);
-        Ok(result)
-    }
-
-    /// Ends the input; [`poll`](Self::poll) then reaches `Ended`.
-    ///
-    /// # Errors
-    ///
-    /// `Error::Invalid` while a packet is active or its output not taken, and
-    /// once input has ended; `Error::Cancelled` when `cancel` is set, which
-    /// fails the decoder; a failed decoder returns its failure.
-    pub fn finish_input(&mut self, cancel: &AtomicBool) -> Result<()> {
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        if cancel.load(Ordering::Relaxed) {
-            return Err(self.poison(Error::Cancelled));
-        }
-        if self.phase != Phase::Idle {
-            return Err(Error::Invalid("PGS input ended while a packet is active"));
-        }
-        self.final_input = true;
-        self.done(Phase::Eof);
-        Ok(())
-    }
-
-    /// Discards the stream state (caches, canvas, failure, work spent and the
-    /// end of input), keeping the limits and configuration. Outputs already
-    /// taken keep their own charged storage.
-    ///
-    /// # Errors
-    ///
-    /// `Error::Invalid` unless the decoder has failed, needs a packet or has
-    /// ended; `Error::Cancelled` when `cancel` is set, which fails the
-    /// decoder.
-    pub fn reset(&mut self, cancel: &AtomicBool) -> Result<()> {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(self.poison(Error::Cancelled));
-        }
-        if self.failed.is_none() && self.phase != Phase::Idle && self.phase != Phase::Ended {
-            return Err(Error::Invalid("PGS decoder reset while a packet is active"));
-        }
-        self.event = None;
-        self.planes = Planes::None;
-        self.receiver = Receiver::new(&self.budget);
-        self.failed = None;
-        self.spent = 0;
-        self.credit = 0;
-        self.final_input = false;
-        self.done(Phase::Idle);
         Ok(())
     }
 }

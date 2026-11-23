@@ -147,18 +147,19 @@ fn an_object_fragment_refused_under_pressure_leaves_the_receiver_as_before() {
     // A first fragment that would replace object 7 with a 4x1 bitmap.
     let replacement = [0, 7, 0, 0xc0, 0, 0, 8, 0, 4, 0, 1, 3, 3, 3, 3];
     let hold = b.reserve(b.available()).unwrap();
-    let result = refused
+    let core = &mut refused.core;
+    let result = core
         .receiver
-        .object_fragment(&replacement, &refused.limits, &refused.budget);
+        .object_fragment(&replacement, &core.limits, &core.budget);
     assert!(matches!(result, Err(Error::Backpressure { .. })));
     drop(hold);
     let expected = presented(&decode(&mut untouched, &b, &redisplay()));
     assert_eq!(expected, [(3, 0, 2, 1, 2, vec![1, 2])]);
     assert_eq!(presented(&decode(&mut refused, &b, &redisplay())), expected);
     // Without pressure the same fragment does replace the object.
-    refused
-        .receiver
-        .object_fragment(&replacement, &refused.limits, &refused.budget)
+    let core = &mut refused.core;
+    core.receiver
+        .object_fragment(&replacement, &core.limits, &core.budget)
         .unwrap();
     assert_eq!(
         presented(&decode(&mut refused, &b, &redisplay())),

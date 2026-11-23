@@ -299,8 +299,13 @@ impl Receiver {
         self.references.iter().map_while(|r| *r)
     }
 
-    pub(super) fn object(&self, id: u16) -> Option<&Object> {
-        self.objects.as_slice().iter().find(|o| o.id == id)
+    /// The object with `id` and its place in the cache.
+    pub(super) fn object(&self, id: u16) -> Option<(usize, &Object)> {
+        self.objects
+            .as_slice()
+            .iter()
+            .enumerate()
+            .find(|(_, o)| o.id == id)
     }
 
     /// The words of the palette the composition selects.
