@@ -496,28 +496,61 @@ impl RecoveryObserver {
         self.pending_timeline = None;
         Ok(())
     }
-    /// Each unit validates one fixed <=6-byte field or commits one charged span
-    /// action. Pressure retry never repeats the completed syntax phases.
+    /// Polls the pending selected carrier `p`, which stays pending until its packet is out.
     pub(super) fn poll_selected(
         &mut self,
+        mut p: SelectedPending,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<DemuxObservation>> {
+        let step = match p.advance(&self.inner, work, cancel) {
+            Ok(Selected::Packet { header, position }) => {
+                return self.finish_selected(p, header, position);
+            }
+            Ok(Selected::Yield) => Ok(AssemblyStep::Yield),
+            Ok(Selected::NeedDiagnostic) => Ok(AssemblyStep::NeedPayload),
+            Err(error) => Err(error),
+        };
+        self.pending = Some(RecoveryPending::Selected(p));
+        step
+    }
+}
+
+/// How far a step of the selected carrier got.
+enum Selected {
+    /// The work grant ran out.
+    Yield,
+    /// The carrier waits for its source diagnostic.
+    NeedDiagnostic,
+    /// Every check passed; the packet's header and demuxer position.
+    Packet {
+        header: DiagnosticHeader,
+        position: i64,
+    },
+}
+
+impl SelectedPending {
+    /// Each unit validates one fixed <=6-byte field or commits one charged span
+    /// action. Pressure retry never repeats the completed syntax phases.
+    fn advance(
+        &mut self,
+        inner: &DemuxObserver,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Selected> {
+        let p = self;
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if work.remaining() == 0 {
-                return Ok(AssemblyStep::Yield);
+                return Ok(Selected::Yield);
             }
-            let Some(RecoveryPending::Selected(p)) = self.pending.as_mut() else {
-                return Err(Error::Invalid("selected pending owner missing"));
-            };
             if p.diagnostic.is_none() {
-                return Ok(AssemblyStep::NeedPayload);
+                return Ok(Selected::NeedDiagnostic);
             }
             if !work.try_charge(1) {
-                return Ok(AssemblyStep::Yield);
+                return Ok(Selected::Yield);
             }
             let raw = p.carrier.backing_bytes().as_ref();
             let body = raw
@@ -525,7 +558,7 @@ impl RecoveryObserver {
                 .ok_or(Error::Invalid("selected diagnostic payload offset"))?;
             match p.phase {
                 0 => {
-                    let s = self.inner.scope();
+                    let s = inner.scope();
                     if raw[0] != 0x47
                         || raw[1] & 0x40 == 0
                         || (u16::from(raw[1] & 31) << 8) | u16::from(raw[2]) != s.pid
@@ -538,8 +571,7 @@ impl RecoveryObserver {
                             "selected diagnostic raw envelope unobserved",
                         ));
                     }
-                    if self
-                        .inner
+                    if inner
                         .recovery_counter()
                         .is_some_and(|cc| ((cc + 1) & 15) != (raw[3] & 15))
                     {
@@ -575,8 +607,8 @@ impl RecoveryObserver {
                             "selected incomplete/unbounded finite PES unobserved",
                         ));
                     }
-                    if body.len() > self.inner.limits().pes_bytes {
-                        return Err(crate::limit(body.len(), self.inner.limits().pes_bytes));
+                    if body.len() > inner.limits().pes_bytes {
+                        return Err(crate::limit(body.len(), inner.limits().pes_bytes));
                     }
                 }
                 3 => {
@@ -615,7 +647,7 @@ impl RecoveryObserver {
                 6 => {
                     p.header_ranges
                         .try_push(SourceRange {
-                            entity: self.inner.scope().entity,
+                            entity: inner.scope().entity,
                             offset: p.carrier.source_offset() + p.start as u64,
                             bytes: p.header_len,
                         })
@@ -630,12 +662,12 @@ impl RecoveryObserver {
                                 .backing_bytes()
                                 .slice(p.start + p.header_len..188)?,
                             source: SourceRange {
-                                entity: self.inner.scope().entity,
+                                entity: inner.scope().entity,
                                 offset: p.carrier.source_offset() + (p.start + p.header_len) as u64,
                                 bytes: body.len() - p.header_len,
                             },
                             transport: SourceRange {
-                                entity: self.inner.scope().entity,
+                                entity: inner.scope().entity,
                                 offset: p.carrier.source_offset(),
                                 bytes: 188,
                             },
@@ -653,46 +685,55 @@ impl RecoveryObserver {
                         markers_valid: p.pts.is_some() && p.kind != SelectedFault::TimestampMarkers,
                         time_flags: body[7] >> 6,
                     };
-                    let offset = p.carrier.source_offset();
-                    let counter = p.counter();
-                    let position = self.inner.media_position(offset)?;
-                    let Some(RecoveryPending::Selected(p)) = self.pending.take() else {
-                        unreachable!()
-                    };
-                    let (fault, diagnostic) = p
-                        .diagnostic
-                        .ok_or(Error::Invalid("selected source diagnostic missing"))?;
-                    self.inner
-                        .note_recovered(counter, offset, diagnostic.source_event_ordinal);
-                    let scope = self.inner.scope();
-                    return Ok(AssemblyStep::Output(
-                        DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket {
-                            program: scope.program,
-                            pid: scope.pid,
-                            source_origin: SourceLocation {
-                                source: scope.entity,
-                                offset,
-                            },
-                            source_epochs: p.input.epochs,
-                            position,
-                            flags: 0,
-                            duration90_raw: 0,
-                            stream_id: stream_id::VIDEO_FIRST,
-                            selected_fault: p.kind,
-                            source_fault: fault,
-                            carrier: p.carrier,
-                            input_context: p.input,
-                            diagnostic_context: diagnostic,
-                            encoded_header: header,
-                            payload_len: p.spans.as_slice()[0].as_ref().len(),
-                            header_source_ranges: p.header_ranges,
-                            spans: p.spans,
-                        }),
-                    ));
+                    let position = inner.media_position(p.carrier.source_offset())?;
+                    return Ok(Selected::Packet { header, position });
                 }
                 _ => return Err(Error::Invalid("selected diagnostic phase")),
             }
             p.phase += 1;
         }
+    }
+}
+
+impl RecoveryObserver {
+    /// The packet of the selected carrier `p`, whose checks have all passed.
+    fn finish_selected(
+        &mut self,
+        p: SelectedPending,
+        header: DiagnosticHeader,
+        position: i64,
+    ) -> Result<AssemblyStep<DemuxObservation>> {
+        let offset = p.carrier.source_offset();
+        let counter = p.counter();
+        let (fault, diagnostic) = p
+            .diagnostic
+            .ok_or(Error::Invalid("selected source diagnostic missing"))?;
+        self.inner
+            .note_recovered(counter, offset, diagnostic.source_event_ordinal);
+        let scope = self.inner.scope();
+        Ok(AssemblyStep::Output(
+            DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket {
+                program: scope.program,
+                pid: scope.pid,
+                source_origin: SourceLocation {
+                    source: scope.entity,
+                    offset,
+                },
+                source_epochs: p.input.epochs,
+                position,
+                flags: 0,
+                duration90_raw: 0,
+                stream_id: stream_id::VIDEO_FIRST,
+                selected_fault: p.kind,
+                source_fault: fault,
+                carrier: p.carrier,
+                input_context: p.input,
+                diagnostic_context: diagnostic,
+                encoded_header: header,
+                payload_len: p.spans.as_slice()[0].as_ref().len(),
+                header_source_ranges: p.header_ranges,
+                spans: p.spans,
+            }),
+        ))
     }
 }

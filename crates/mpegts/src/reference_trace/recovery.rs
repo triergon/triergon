@@ -506,38 +506,51 @@ impl RecoveryObserver {
         }
         result
     }
+    /// Polls the pending transport fault `job`, which stays pending until it has output.
+    fn poll_transport_fault(
+        &mut self,
+        mut job: TransportFaultJob,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<DemuxObservation>> {
+        let step = match job.poll(&self.inner, work, cancel) {
+            Ok(AssemblyStep::Output(())) => {
+                let packet = job.finish(&mut self.inner)?;
+                return Ok(AssemblyStep::Output(
+                    DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket::from(packet)),
+                ));
+            }
+            Ok(AssemblyStep::Yield) => Ok(AssemblyStep::Yield),
+            Ok(AssemblyStep::NeedPayload) => Ok(AssemblyStep::NeedPayload),
+            Ok(AssemblyStep::Finished) => {
+                Err(Error::Invalid("transport fault ended before output"))
+            }
+            Err(error) => Err(error),
+        };
+        self.pending = Some(RecoveryPending::TransportFault(job));
+        step
+    }
+
     fn poll_inner(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         input: Option<&triergon_core::InputCursor>,
     ) -> Result<AssemblyStep<DemuxObservation>> {
-        if self.pending.is_none() {
-            return self
-                .inner
-                .poll_bound(work, cancel, input)
-                .map(|step| step.map(DemuxObservation::Accepted));
-        }
-        if matches!(self.pending, Some(RecoveryPending::Selected(_))) {
-            return self.poll_selected(work, cancel);
-        }
-        if let Some(RecoveryPending::TransportFault(job)) = self.pending.as_mut() {
-            return Ok(match job.poll(&self.inner, work, cancel)? {
-                AssemblyStep::Output(()) => {
-                    let Some(RecoveryPending::TransportFault(job)) = self.pending.take() else {
-                        unreachable!()
-                    };
-                    let packet = job.finish(&mut self.inner)?;
-                    AssemblyStep::Output(DemuxObservation::FromSelectedDiagnostic(
-                        DiagnosticPacket::from(packet),
-                    ))
-                }
-                AssemblyStep::Yield => AssemblyStep::Yield,
-                AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
-                AssemblyStep::Finished => {
-                    return Err(Error::Invalid("transport fault ended before output"));
-                }
-            });
+        match self.pending.take() {
+            None => {
+                return self
+                    .inner
+                    .poll_bound(work, cancel, input)
+                    .map(|step| step.map(DemuxObservation::Accepted));
+            }
+            Some(RecoveryPending::Selected(pending)) => {
+                return self.poll_selected(pending, work, cancel);
+            }
+            Some(RecoveryPending::TransportFault(job)) => {
+                return self.poll_transport_fault(job, work, cancel);
+            }
+            opcr => self.pending = opcr,
         }
         loop {
             if cancel.load(Ordering::Relaxed) {
