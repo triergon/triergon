@@ -326,6 +326,18 @@ impl<'a> Slot<'a> {
         }
     }
 
+    /// How far the demuxer lowers a seek query of an unedited track before it
+    /// searches the index: by the largest amount a composition time it took into
+    /// account precedes its decode time, the `ctts` rows that lower a regular track's
+    /// decode times and every fragment sample. Zero without such a sample, and for an
+    /// edited track, whose query moves by its edit alone.
+    fn composition_shift(&self) -> i64 {
+        if self.track.edits.is_some() {
+            return 0;
+        }
+        -self.shift.min(self.fragment_cto_minimum)
+    }
+
     fn source(&self) -> Result<SourceTrack<'a>> {
         SourceTrack::new(
             self.track.track_id,
@@ -777,6 +789,15 @@ fn count(value: u64, maximum: u64) -> Result<()> {
 impl<'a> PacketCursor<'a> {
     pub(crate) fn index_edit_offset(&self) -> i64 {
         self.slots.as_slice().first().map_or(0, Slot::seek_offset)
+    }
+
+    /// The first track's [composition shift](Slot::composition_shift), known once the
+    /// cursor is prepared.
+    pub(crate) fn index_composition_shift(&self) -> i64 {
+        self.slots
+            .as_slice()
+            .first()
+            .map_or(0, Slot::composition_shift)
     }
 
     /// A cursor over `tracks`, whose samples must lie in `media`: the absolute file

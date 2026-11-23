@@ -295,10 +295,12 @@ Limits of the reader:
   a plan. A sync sample is a container fact, not proof of decoder recovery. `sidx`
   and `tfra` entries are hints, not verified against the media. The
   FFmpeg-compatible `SeekJob` lands on the last key entry at or before the target
-  in index order, also where repeated edits put earlier times after later ones. It
-  searches the target as given, without a per-track composition shift, and refuses
-  an index with a decode time at or above 2^63 (a version-1 `tfdt` is unsigned),
-  which its signed index timestamps cannot carry.
+  in index order, also where repeated edits put earlier times after later ones. As
+  the demuxer does, it first lowers the target of an unedited track by the track's
+  composition shift, the largest amount by which a composition time the demuxer took
+  into account precedes its decode time. It refuses an index with a decode time at
+  or above 2^63 (a version-1 `tfdt` is unsigned), which its signed index timestamps
+  cannot carry.
 - **Refusals.** Unknown box versions, unknown flags, unselected `stz2` widths,
   non-unit edits and unobserved FFmpeg-compatible profiles return
   `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.

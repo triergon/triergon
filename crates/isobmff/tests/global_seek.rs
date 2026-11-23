@@ -347,3 +347,64 @@ fn repeated_edit_seek_lands_on_the_last_key_at_or_before_the_target_in_index_ord
         );
     }
 }
+
+#[test]
+fn seek_lowers_the_target_by_the_composition_shift() {
+    // The demuxer lowers a query by the largest amount a composition time it took into
+    // account precedes its decode time (ISO/IEC 14496-12 section 8.6.1.3). A regular
+    // track's index times are lowered by the same amount, so the key at decode time
+    // 3000 is the landing from 3000 on: with a smallest offset of -1000, and of -100
+    // where the -700 of a `ctts` table's last two rows is not taken into account. A
+    // fragmented track's index keeps its decode times, so its key at 3000 is the
+    // landing only from 4000 on.
+    type Landing = (i64, u64, i64, i64);
+    let cases: [(&[u8], [Landing; 2]); 3] = [
+        (
+            include_bytes!("fixtures/r-ctts-v1.mov"),
+            [(2999, 0, -1000, 731), (3000, 3, 2000, 767)],
+        ),
+        (
+            include_bytes!("fixtures/native-followup/follow-clock-later-minimum-four.mov"),
+            [(2999, 0, -100, 28), (3000, 3, 2900, 64)],
+        ),
+        (
+            include_bytes!("fixtures/f-ctts-v1.mp4"),
+            [(3999, 0, 0, 771), (4000, 3, 3000, 975)],
+        ),
+    ];
+    for (bytes, landings) in cases {
+        let pool = Budget::new(4 * 1024 * 1024).unwrap();
+        let movie = support::parse(&pool, bytes);
+        let tracks = movie.demux();
+        for (target, entry, timestamp, position) in landings {
+            // One work unit a poll takes the entry-by-entry seek, a large budget the
+            // seek that reads the tables.
+            for work in [1, 4096] {
+                let mut job = SeekJob::new_complete_source(
+                    &pool,
+                    tracks[0],
+                    &movie.media,
+                    target,
+                    SeekLimits::default(),
+                    DemuxProfile::NoParseNoFillin,
+                )
+                .unwrap();
+                let ready = (0..8192).any(|_| {
+                    job.poll(&mut WorkBudget::new(work), &AtomicBool::new(false))
+                        .unwrap()
+                        == BuildStatus::Ready
+                });
+                assert!(
+                    ready,
+                    "target {target} did not finish within the work bound"
+                );
+                let landing = job.finish().unwrap().landing().selected.clone();
+                assert_eq!(
+                    (landing.ordinal, landing.timestamp, landing.position),
+                    (entry, timestamp, position),
+                    "target {target}, work {work}"
+                );
+            }
+        }
+    }
+}

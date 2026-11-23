@@ -472,9 +472,11 @@ impl<'a> IndexCursor<'a> {
                 allow_initial_nonkey: self.allow_initial_nonkey,
                 allow_initial_prefix,
                 max_entries: self.max_entries,
-                // As the first entry does, take a fragment edit's media start
-                // from the query.
-                target: query - i128::from(self.cursor.index_edit_offset()),
+                // As the first entry does, take a fragment edit's media start and
+                // the composition shift from the query.
+                target: query
+                    - i128::from(self.cursor.index_edit_offset())
+                    - i128::from(self.cursor.index_composition_shift()),
             }))
         }))
     }
@@ -539,6 +541,15 @@ type EncodedEdits<'a> = &'a [Option<crate::compat::mov::encoded_edits::EncodedEd
 /// index and selects the last key entry whose timestamp is at or before the target,
 /// or the first key entry when there is none. The target is in ticks of the track's
 /// demux time base, as the demuxer's seek takes it, and is not rounded.
+///
+/// The demuxer first lowers the target by the track's composition shift: the largest
+/// amount by which a composition time it took into account precedes its decode time
+/// (ISO/IEC 14496-12 section 8.6.1.3), from every `ctts` row but the last two and from
+/// every fragment sample. A regular track's index times lie that far below its decode
+/// times, so the seek lands on the last key whose decode time is at or before the
+/// target; a fragmented track's index keeps the decode times, so there the key's decode
+/// time lies at least the shift before the target. The standard's presentation mapping
+/// (sections 8.6.6 and 8.6.1.3) would compare composition times instead.
 #[derive(Debug)]
 pub struct SeekJob<'a> {
     context: Context<'a>,
@@ -704,8 +715,12 @@ impl<'a> SeekJob<'a> {
                             || self.context.encoded_edits.is_some());
                     if self.scanned == 0 {
                         // Convert the query to the packet index clock before
-                        // searching. Packet and presentation clocks can differ.
-                        self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
+                        // searching. Packet and presentation clocks can differ: the
+                        // demuxer lowers the query by an edit's offset and by its
+                        // composition shift.
+                        let cursor = &self.index.cursor;
+                        self.index_timestamp -= i128::from(cursor.index_edit_offset())
+                            + i128::from(cursor.index_composition_shift());
                     }
                     self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
                     let first = nonkey_first || (key && self.first.is_none());

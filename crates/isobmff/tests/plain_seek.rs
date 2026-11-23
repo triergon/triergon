@@ -149,20 +149,44 @@ fn global_seek<'a>(
     }
 }
 
+/// How far the demuxer lowers a query of an unedited track before it searches,
+/// restated from the entries: the amount by which the index lowered a regular
+/// track's decode times, or the largest amount by which a fragment sample's
+/// composition time precedes its decode time.
+fn composition_shift(entries: &[IndexEntry]) -> i128 {
+    entries
+        .iter()
+        .map(|entry| {
+            let source = &entry.occurrence.source;
+            if source.fragment_flags.is_none() {
+                source.dts_ticks.unwrap() - entry.occurrence.demux.dts_field.exact_ticks
+            } else {
+                -source
+                    .composition_offset
+                    .map_or(0, triergon_isobmff::CompositionOffset::ticks)
+            }
+        })
+        .max()
+        .unwrap_or(0)
+        .max(0)
+}
+
 /// The entry a backward seek to `target` selects, restated from the seek's
-/// rule over every entry in index order: the last key at or before the target,
-/// also where repeated edits put earlier times after later ones, or else the
-/// first key, or a fragment track's first entry where `prefix` admits it. The
-/// seek refuses an entry with the null timestamp and an index without a key to
-/// fall back to.
+/// rule over every entry in index order: the last key at or before the target
+/// lowered by `shift`, also where repeated edits put earlier times after later
+/// ones, or else the first key, or a fragment track's first entry where `prefix`
+/// admits it. The seek refuses an entry with the null timestamp and an index
+/// without a key to fall back to.
 fn select(
     entries: &[IndexEntry],
     target: i64,
+    shift: i128,
     fragments: bool,
     prefix: bool,
 ) -> Result<usize, Error> {
     let mut first = None;
     let mut best = None;
+    let target = i128::from(target) - shift;
     for (at, entry) in entries.iter().enumerate() {
         if entry.timestamp == i64::MIN {
             return Err(Error::Unsupported("seek over a null index clock"));
@@ -173,7 +197,7 @@ fn select(
         }
         if key {
             first = first.or(Some(at));
-            if entry.timestamp <= target {
+            if i128::from(entry.timestamp) <= target {
                 best = Some(at);
             }
         }
@@ -280,7 +304,12 @@ fn compare(name: &str, pool: &Budget, movie: &support::Movie) -> Compared {
             let landing = outcomes[1].as_ref();
             // Fragment edits move the query; the scan below does not.
             if !(fragments && track.edits.is_some()) {
-                let expected = select(entries, target, fragments, false);
+                let shift = if track.edits.is_none() {
+                    composition_shift(entries)
+                } else {
+                    0
+                };
+                let expected = select(entries, target, shift, fragments, false);
                 assert_eq!(
                     landing
                         .map(|landing| landing.selected.ordinal)
