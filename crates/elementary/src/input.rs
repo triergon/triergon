@@ -27,7 +27,7 @@ impl Wait {
             Step::NeedInput(request) => Some(Wait::Step(Step::NeedInput(request))),
             Step::Yield => Some(Wait::Step(Step::Yield)),
             Step::End(_) => Some(Wait::End),
-            Step::Backpressure(_) => Some(Wait::Step(Step::Yield)),
+            Step::Backpressure(never) => match never {},
         }
     }
 }

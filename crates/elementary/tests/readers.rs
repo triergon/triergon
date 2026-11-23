@@ -685,3 +685,23 @@ fn first_frame_headers_and_lame_tag_remain_available_after_opening() {
     assert!(a52.next_packet(&cancel).unwrap().is_some());
     assert_eq!(a52.reader().format().header().unwrap().blocks, 6);
 }
+
+#[test]
+fn reset_forgets_the_last_seek() {
+    let file = mp3_stream(100);
+    let pool = Budget::new(64 << 20).unwrap();
+    let mut reader = open::<MpegAudio>(&pool, &file, true);
+    read(&mut reader, &pool, &file, 1 << 20, 4096).unwrap();
+    let request = reader
+        .request_seek(SeekRequest {
+            track: triergon_elementary::TRACK,
+            target: Time::new(1, 1).unwrap(),
+            policy: SeekPolicy::PreviousRandomAccess,
+        })
+        .unwrap();
+    supply(&mut reader, &pool, &file, &request, 4096);
+    read(&mut reader, &pool, &file, 1 << 20, 4096).unwrap();
+    assert!(reader.last_seek().is_some());
+    reader.reset().unwrap();
+    assert!(reader.last_seek().is_none());
+}

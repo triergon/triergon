@@ -18,8 +18,8 @@ pub struct Adts {
 
 impl Adts {
     /// The first frame's header.
-    pub fn header(&self) -> Option<AacAdtsHeader> {
-        self.first
+    pub fn header(&self) -> Option<&AacAdtsHeader> {
+        self.first.as_ref()
     }
 }
 

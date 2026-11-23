@@ -1175,6 +1175,7 @@ impl<F: Format> ContainerReader for Reader<F> {
         self.audio_start = None;
         self.audio_end = None;
         self.seeking = None;
+        self.last_seek = None;
         self.format.reset();
         self.input.reset(0)
     }
