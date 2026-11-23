@@ -33,7 +33,8 @@ pub struct Packet<I> {
 }
 
 impl Work {
-    pub(crate) fn location(&mut self, offset: u64, clock: TimeBase) {
+    /// Fold the source offset and clock a packet row of the views worker reports.
+    pub fn location(&mut self, offset: u64, clock: TimeBase) {
         fold(&mut self.digest, offset);
         fold(&mut self.digest, clock.numerator());
         fold(&mut self.digest, clock.denominator());
@@ -46,7 +47,8 @@ impl Work {
         }
     }
 
-    pub(crate) fn skip_samples(&mut self, bytes: Option<[u8; 10]>) {
+    /// Fold a packet's skip-samples side data, or its absence.
+    pub fn skip_samples(&mut self, bytes: Option<[u8; 10]>) {
         fold(&mut self.digest, u64::from(bytes.is_some()));
         let Some(bytes) = bytes else {
             if self.trace {
