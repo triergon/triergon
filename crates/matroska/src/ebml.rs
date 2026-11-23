@@ -121,6 +121,15 @@ pub(crate) fn header(data: &[u8]) -> Result<Header> {
 }
 
 /// A big-endian unsigned integer of zero to eight bytes (RFC 8794 §7.2).
+/// Whether this is the first occurrence of the child that owns `bit`. A child that
+/// may occur once is read at its first occurrence and passed over after it
+/// (RFC 8794 §12).
+#[inline(always)]
+pub(crate) fn once(seen: &mut u16, bit: u16) -> bool {
+    let first = *seen & (1 << bit) == 0;
+    *seen |= 1 << bit;
+    first
+}
 pub(crate) fn uint(data: &[u8]) -> Result<u64> {
     if data.len() > 8 {
         return Err(Error::Invalid("integer width"));

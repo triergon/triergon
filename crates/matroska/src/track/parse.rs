@@ -4,7 +4,7 @@ use super::{Track, static_metadata_text};
 use crate::colour::parse::ColourJob;
 use crate::configuration::{Configuration, ConfigurationJob};
 use crate::content_encoding::{Encodings, parse::EncodingsJob};
-use crate::ebml::ChildCursor;
+use crate::ebml::{ChildCursor, once};
 use crate::step::check;
 use crate::zlib::restore::{RestoreJob, RestorePlan};
 use crate::{
@@ -101,15 +101,6 @@ impl TrackSide {
             _ => None,
         }
     }
-}
-/// Whether this is the first occurrence of the child that owns `bit`. A child that
-/// may occur once is read at its first occurrence and passed over after it
-/// (RFC 8794 §12).
-#[inline(always)]
-fn once(seen: &mut u16, bit: u16) -> bool {
-    let first = *seen & (1 << bit) == 0;
-    *seen |= 1 << bit;
-    first
 }
 /// A track as TrackJob starts it: every field at its default.
 fn new_track(source_metadata: SharedBytes) -> Track {

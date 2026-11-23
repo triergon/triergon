@@ -195,16 +195,16 @@ RFC 8794 tells a reader to refuse a value outside its range. What blocks depend 
 fails the input: a BlockAddID above the track's MaxBlockAdditionID and malformed EBML.
 
 **Repeated children.** A child a schema allows once is read at its first occurrence and
-passed over after it (RFC 8794 §12): in a TrackEntry (its scalar fields, flags, languages,
-Video, Audio, Colour and ContentEncodings), a BlockAdditionMapping, MaxBlockAdditionID, a
-ContentEncoding's ContentCompression, a BlockGroup (Block, BlockDuration, DiscardPadding,
-CodecState, BlockAdditions, and a BlockMore's BlockAddID and BlockAdditional), a CuePoint
-and its CueTrackPositions, and a Seek entry. Three rules are of another kind and still
-fail the input: two tracks with one TrackNumber or TrackUID, two additions with one
-BlockAddID in a BlockGroup, and two ContentEncodings with one ContentEncodingOrder. A
-repeated single-occurrence child inside an Info, Chapters, Tags or Attachments document
-also still fails it (`duplicate metadata field`), as does a second Cues or Attachments
-element.
+passed over after it (RFC 8794 §12): in the EBML header (DocType and the read-version and
+width fields), a TrackEntry (its scalar fields, flags, languages, Video, Audio, Colour and
+ContentEncodings), a BlockAdditionMapping, MaxBlockAdditionID, a ContentEncoding's
+ContentCompression, a BlockGroup (Block, BlockDuration, DiscardPadding, CodecState,
+BlockAdditions, and a BlockMore's BlockAddID and BlockAdditional), a CuePoint and its
+CueTrackPositions, and a Seek entry. Three rules are of another kind and still fail the
+input: two tracks with one TrackNumber or TrackUID, two additions with one BlockAddID in a
+BlockGroup, and two ContentEncodings with one ContentEncodingOrder. A repeated
+single-occurrence child inside an Info, Chapters, Tags or Attachments document also still
+fails it (`duplicate metadata field`), as does a second Cues or Attachments element.
 
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and

@@ -161,6 +161,25 @@ fn cyclic_seek_heads_are_bounded_and_cannot_fabricate_missing_tracks() {
 }
 
 #[test]
+fn a_repeated_ebml_header_child_keeps_its_first_occurrence() {
+    let header = element(
+        0x1a45dfa3,
+        &[
+            element(0x4282, b"matroska"),
+            element(0x4282, b"other"),
+            uint(0x42f7, 1),
+            uint(0x42f7, 9),
+        ]
+        .concat(),
+    );
+    let bytes = fixture(cluster(0, block(0, true)), false);
+    let plain = element(0x1a45dfa3, &element(0x4282, b"matroska"));
+    let bytes = [header, bytes[plain.len()..].to_vec()].concat();
+    let packets = collect(&bytes, Limits::default()).unwrap();
+    assert_eq!(packets.len(), 1);
+}
+
+#[test]
 fn header_restore_handles_each_lace_and_rejects_duplicate_encoding_orders() {
     let encode = |order: u64, header: &[u8]| {
         element(

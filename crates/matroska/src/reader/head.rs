@@ -1,6 +1,6 @@
 //! Bounded EBML document and SeekHead syntax. No blocking parser calls.
 use crate::compat::block_additions::BlockAdditionContainer;
-use crate::ebml::{self, ChildCursor};
+use crate::ebml::{self, ChildCursor, once};
 use crate::step::{ParseStep, Required, check};
 use crate::storage::{SharedBytes, copy_vec::CopyVec};
 use crate::{Error, Result};
@@ -11,7 +11,8 @@ pub(crate) struct EbmlJob {
     source: SharedBytes,
     cursor: ChildCursor,
     doctype: Option<BlockAdditionContainer>,
-    done: bool,
+    // The single-occurrence children read so far, one bit each (`once`).
+    seen: u16,
 }
 impl EbmlJob {
     /// The EBML header element's data.
@@ -24,7 +25,7 @@ impl EbmlJob {
             source,
             cursor: ChildCursor::new(0..end),
             doctype: None,
-            done: false,
+            seen: 0,
         }
     }
     pub(crate) fn step(
@@ -32,41 +33,47 @@ impl EbmlJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<BlockAdditionContainer>> {
+        // The occurrence bits stay in a register while the children are read.
+        let mut seen = self.seen;
+        let result = self.read(&mut seen, work, cancel);
+        self.seen = seen;
+        result
+    }
+    fn read(
+        &mut self,
+        seen: &mut u16,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<BlockAdditionContainer>> {
         loop {
             check(cancel)?;
-            if self.done {
-                return Ok(ParseStep::Event(
-                    self.doctype.ok_or(Error::Unsupported("document type"))?,
-                ));
-            }
             match self.cursor.step(&self.source, work, cancel)? {
                 ParseStep::Yield => return Ok(ParseStep::Yield),
                 ParseStep::Event(None) => {
-                    if self.doctype.is_none() {
-                        return Err(Error::Unsupported("document type"));
-                    }
-                    self.done = true;
+                    return Ok(ParseStep::Event(
+                        self.doctype.ok_or(Error::Unsupported("document type"))?,
+                    ));
                 }
                 ParseStep::Event(Some(child)) => {
                     let bytes = &self.source[child.payload];
                     match child.id {
-                        0x4282 => {
+                        0x4282 if once(seen, 0) => {
                             self.doctype = match bytes {
                                 b"matroska" => Some(BlockAdditionContainer::Matroska),
                                 b"webm" => Some(BlockAdditionContainer::WebM),
                                 _ => None,
                             };
                         }
-                        0x4285 if ebml::uint(bytes)? > 4 => {
+                        0x4285 if once(seen, 1) && ebml::uint(bytes)? > 4 => {
                             return Err(Error::Unsupported("DocTypeReadVersion"));
                         }
-                        0x42f7 if ebml::uint(bytes)? > 1 => {
+                        0x42f7 if once(seen, 2) && ebml::uint(bytes)? > 1 => {
                             return Err(Error::Unsupported("EBMLReadVersion"));
                         }
-                        0x42f2 if ebml::uint(bytes)? > 4 => {
+                        0x42f2 if once(seen, 3) && ebml::uint(bytes)? > 4 => {
                             return Err(Error::Unsupported("EBML ID width"));
                         }
-                        0x42f3 if ebml::uint(bytes)? > 8 => {
+                        0x42f3 if once(seen, 4) && ebml::uint(bytes)? > 8 => {
                             return Err(Error::Unsupported("EBML size width"));
                         }
                         _ => (),
