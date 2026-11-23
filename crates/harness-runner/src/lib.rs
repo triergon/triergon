@@ -471,7 +471,10 @@ fn measure_outcome_dyn(
 /// operation when they refuse alike; otherwise the first refusal ends the loop.
 /// `unsupported` is what the line reports as met and unsupported once the loop is
 /// done.
-// The refusal policy is a constant so that the loop of `measure` stays as it is.
+// The refusal policy is a constant so that the loop of `measure` stays as it is, and
+// the loop stays out of line as it was measured: inlined into the PGS capsule worker's
+// one caller it cost about 70 instructions an operation.
+#[inline(never)]
 fn measure_dyn<const REPEAT: bool>(
     mode: Mode,
     iterations: u64,
