@@ -148,6 +148,9 @@ impl<'a> PlainScan<'a> {
         }
     }
 
+    // Out of line, entered once per poll of the seek: the walks keep their own
+    // registers, so their loops do not change with the seek's entry loop.
+    #[inline(never)]
     pub(super) fn poll(&mut self, work: &mut WorkBudget) -> PlainStep<'a> {
         let state = &mut self.state;
         match &mut self.walk {
@@ -180,6 +183,9 @@ impl<'a> PlainScan<'a> {
 }
 
 impl<'a> State<'a> {
+    // Compiled by itself: beside the other walks a table with composition offsets
+    // takes 0.07% more instructions per seek.
+    #[inline(never)]
     fn poll_regular(
         &mut self,
         work: &mut WorkBudget,
