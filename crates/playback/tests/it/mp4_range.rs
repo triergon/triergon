@@ -1229,16 +1229,17 @@ fn range_player_keeps_seek_checkpoints_for_unedited_fragments() {
 }
 
 #[test]
-fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
+fn range_player_keeps_the_active_seek_while_planning_opus_recovery() {
     let seed =
         include_bytes!("../../../isobmff/tests/fixtures/range-encoded-edits/avc-opus-edit.mp4");
     let mut ended = seed.to_vec();
     for at in [1420, 1508] {
         ended[at..at + 4].copy_from_slice(&1500_u32.to_be_bytes());
     }
-    let mut incomplete = seed.to_vec();
-    assert_eq!(&incomplete[2902..2906], &157_u32.to_be_bytes());
-    incomplete[2902..2906].copy_from_slice(&156_u32.to_be_bytes());
+    // ISO/IEC 14496-12 §8.9.2.3 permits a mapping that leaves samples uncovered.
+    let mut partially_grouped = seed.to_vec();
+    assert_eq!(&partially_grouped[2902..2906], &157_u32.to_be_bytes());
+    partially_grouped[2902..2906].copy_from_slice(&156_u32.to_be_bytes());
 
     let mut fragmented = include_bytes!("../fixtures/mp4/fragmented-avc-aac.mp4").to_vec();
     // The fragment packet bytes stay opaque. Use the regular Opus sample
@@ -1251,10 +1252,10 @@ fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
     fragmented[1053..1057].copy_from_slice(b"free");
     fragmented[1057..1084].fill(0);
 
-    for (raw, is_fragmented, timestamp) in [
-        (ended.as_slice(), false, 32_000),
-        (incomplete.as_slice(), false, 32_000),
-        (fragmented.as_slice(), true, 12_800),
+    for (raw, is_fragmented, timestamp, recovers) in [
+        (ended.as_slice(), false, 32_000, false),
+        (partially_grouped.as_slice(), false, 32_000, true),
+        (fragmented.as_slice(), true, 12_800, false),
     ] {
         for checkpoints in [true, false] {
             let (opened, plans) = if is_fragmented {
@@ -1287,21 +1288,31 @@ fn range_player_keeps_the_active_seek_after_refusing_opus_recovery() {
                 timestamp,
                 limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
             };
-            let error = match player.prepare_seek_with_opus_recovery(request, audio) {
-                Err(error) => error,
-                Ok(mut job) => (0..1000)
-                    .find_map(|_| match job.poll(&mut WorkBudget::new(64), &cancel) {
-                        Err(error) => Some(error),
-                        Ok(false) => None,
-                        Ok(true) => panic!("invalid Opus recovery completed"),
-                    })
-                    .expect("Opus recovery refusal"),
-            };
-            assert!(matches!(error, C::Unsupported(_)), "{error:?}");
+            let recovery = (|| {
+                let mut job = player.prepare_seek_with_opus_recovery(request, audio)?;
+                for _ in 0..1000 {
+                    if job.poll(&mut WorkBudget::new(64), &cancel)? {
+                        return job.finish();
+                    }
+                }
+                panic!("Opus recovery did not finish");
+            })();
             assert!(player.current(&first));
-            let mut ordinary = player.prepare_seek(request).unwrap();
-            assert!((0..1000).any(|_| ordinary.poll(&mut WorkBudget::new(64), &cancel).unwrap()));
-            let mut command = ordinary.finish().unwrap();
+            let mut command = if recovers {
+                let command = recovery.unwrap();
+                let landing = command.receipt().opus_recovery.unwrap();
+                assert_eq!(landing.track_id, audio);
+                assert!(landing.first_sample < landing.sync_sample);
+                assert!(landing.preroll >= triergon_core::Time::new(2, 25).unwrap());
+                command
+            } else {
+                assert!(matches!(recovery, Err(C::Unsupported(_))), "{recovery:?}");
+                let mut ordinary = player.prepare_seek(request).unwrap();
+                assert!(
+                    (0..1000).any(|_| ordinary.poll(&mut WorkBudget::new(64), &cancel).unwrap())
+                );
+                ordinary.finish().unwrap()
+            };
             assert!(
                 player
                     .apply_seek(&mut command, &mut WorkBudget::new(4096), &cancel)
