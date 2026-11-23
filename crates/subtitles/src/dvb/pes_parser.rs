@@ -219,19 +219,13 @@ impl PesParser {
         let Some(Pending { pes, pts, scan }) = self.input.take() else {
             return Ok(PesProgress::NeedPacket);
         };
-        let mut scan = match scan {
-            _ if work.remaining() == 0 => {
-                self.input = Some(Pending { pes, pts, scan });
-                return Ok(PesProgress::Yield);
-            }
-            Some(scan) => scan,
-            None => match self.open(&pes, pts) {
-                Some(scan) => scan,
-                None => {
-                    work.take(1);
-                    return Ok(self.passthrough(pes, pts));
-                }
-            },
+        if work.remaining() == 0 {
+            self.input = Some(Pending { pes, pts, scan });
+            return Ok(PesProgress::Yield);
+        }
+        let Some(mut scan) = scan.or_else(|| self.open(&pes, pts)) else {
+            work.take(1);
+            return Ok(self.passthrough(pes, pts));
         };
         match scan.cut(&pes, work, cancel) {
             Ok(Cut::Done { end, joined }) => self.complete(pes, pts, scan, end, joined),
