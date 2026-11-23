@@ -144,7 +144,8 @@ pub(super) fn ogg_tracks(
     work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
-    let Ok(reader) = ogg::BlockingReader::open_seekable(Cursor::new(input), ogg::Limits::default()) else {
+    let Ok(reader) = ogg::BlockingReader::open_seekable(Cursor::new(input), ogg::Limits::default())
+    else {
         return record(work, trace, 8, &[], &[]);
     };
     if reader.tracks().is_empty() {
