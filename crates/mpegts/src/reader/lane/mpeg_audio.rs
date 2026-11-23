@@ -257,10 +257,8 @@ impl FreeFormat {
                 0
             };
             if extra != 0 {
-                match input.read_append(&mut self.buffer, extra, work, cancel)? {
-                    Step::Ready(_) => (),
-                    _ => unreachable!("buffered lookahead within the work grant"),
-                }
+                // Whatever this reads, the search below covers the bytes buffered.
+                input.read_append(&mut self.buffer, extra, work, cancel)?;
             }
             let last = (self.buffer.len() - HEADER).min(maximum);
             let search =
