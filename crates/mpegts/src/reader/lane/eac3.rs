@@ -20,7 +20,7 @@ const MAX_DEPENDENTS: usize = 8;
 // The 11-bit frame size gives the number of 16-bit words minus one.
 const MAX_SYNCFRAME_BYTES: usize = 2 * (1 << 11);
 
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "the resumable parser stays inline without a separate allocation"
 )]

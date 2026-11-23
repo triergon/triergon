@@ -199,7 +199,7 @@ impl TransportFaultRecovery {
         Ok(true)
     }
 
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original charged carrier inline"
     )]

@@ -628,7 +628,7 @@ impl Catalogue {
             .ok_or(Error::Overflow)?;
         u64::try_from(units).map_err(|_| Error::Overflow)
     }
-    #[allow(
+    #[expect(
         clippy::too_many_arguments,
         reason = "keeps source status, wire header and demux observation context distinct"
     )]

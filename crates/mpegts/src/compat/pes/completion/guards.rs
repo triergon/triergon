@@ -15,7 +15,7 @@ const INACTIVE: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/tests/data/psi-pending-not-current.ts"
 ));
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "test recorder retains the original inline owned source event; no extra boxed allocation"
 )]

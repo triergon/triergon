@@ -175,7 +175,7 @@ impl Scan {
 }
 
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "one original event or observation stays inline"
 )]

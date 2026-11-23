@@ -15,7 +15,7 @@ use triergon_core::container::{Event, ReaderStep, TrackId};
 use triergon_core::{BudgetVec, Error, Result, SourceLocation, Step, WorkBudget};
 
 /// A transport event on its way to the caller.
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "an unshared event stays inline until it is shared or returned"
 )]
@@ -89,7 +89,7 @@ pub(super) enum LaneWork {
 }
 
 /// What the step loop does next.
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "returned by value in place, as an `Option<ReaderStep>` would be"
 )]
@@ -101,7 +101,7 @@ enum Flow {
 }
 
 /// The outcome of one admission call.
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "returned by value in place, as an `Option<ReaderStep>` would be"
 )]
@@ -113,7 +113,7 @@ enum Admitted {
 }
 
 /// What one lane step produced.
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "returned by value in place, as an `Option<ReaderStep>` would be"
 )]

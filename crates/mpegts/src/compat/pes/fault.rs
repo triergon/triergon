@@ -85,10 +85,6 @@ impl PesFaultKind {
 
 /// The unchanged accepted or rejected carrier. No accepted packet is forged.
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "charged source storage stays inline"
-)]
 pub enum PesFaultCarrier {
     /// An accepted transport packet.
     Transport(TransportPacket),
@@ -286,10 +282,6 @@ impl TransportFaultPacket {
 
 /// Accepted assembly and faulted extraction remain distinct results.
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "charged inputs and outputs stay inline"
-)]
 pub enum RecoveredPes {
     /// A packet of ordinary input, from the wrapped observer.
     Accepted(DemuxPacket),
@@ -320,7 +312,7 @@ pub struct TransportFaultRecovery {
 impl TransportFaultRecovery {
     /// Wrap a drained, unbound observer. No storage is allocated.
     /// Rejection returns the original observer with its pending state intact.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original observer inline"
     )]
@@ -329,7 +321,7 @@ impl TransportFaultRecovery {
     }
     /// Enable explicit recovery policies for finite AVC in TS188. An input-bound
     /// or undrained observer is refused and returned intact.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original observer inline"
     )]
@@ -372,7 +364,7 @@ impl TransportFaultRecovery {
     ///
     /// Refuses the carrier intact while a pushed carrier is not drained, after a terminal boundary,
     /// or once the recovery has failed.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original charged carrier inline"
     )]
@@ -438,7 +430,7 @@ impl TransportFaultRecovery {
     /// Stage an opaque carrier whose sole transport rejection is its PCR or OPCR field.
     /// The policy must enable this case, and the preceding carrier must be drained.
     /// A refusal returns the original diagnostic intact.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original charged diagnostic inline"
     )]
@@ -556,7 +548,7 @@ pub(crate) struct TransportFaultJob {
     spans: BudgetVec<DemuxSpan>,
 }
 impl TransportFaultJob {
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover original charged input without allocating"
     )]
@@ -583,7 +575,7 @@ impl TransportFaultJob {
                         || body[11] & 1 == 0
                         || body[13] & 1 == 0)))
     }
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original charged transport inline"
     )]
@@ -594,7 +586,7 @@ impl TransportFaultJob {
     ) -> std::result::Result<Self, Refused<TransportPacket>> {
         Self::from_transport(packet, input, inner, None, true)
     }
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original charged transport inline"
     )]
@@ -674,7 +666,7 @@ impl TransportFaultJob {
             spans,
         })
     }
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original charged diagnostic inline"
     )]

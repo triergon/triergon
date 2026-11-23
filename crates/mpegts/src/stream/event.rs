@@ -61,10 +61,6 @@ pub enum CarrierObservation<'a> {
 /// One result at a time. Every dynamic member owns shared charged storage; there
 /// is no uncharged boxed variant or internal unbounded event queue.
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one inline owned source event; heap storage inside variants is already charged"
-)]
 pub enum TraceEvent {
     /// An accepted transport packet, published before its continuity and payload are
     /// processed.
@@ -144,7 +140,7 @@ impl TraceEvent {
 /// Opt-in source view. A run expands to one transport event per carrier,
 /// in physical order, with no intervening continuity or clock events.
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "keep one owned source event inline"
 )]

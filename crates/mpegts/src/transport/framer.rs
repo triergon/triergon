@@ -80,7 +80,7 @@ fn plain_null(ts: &[u8]) -> bool {
 
 /// The outcome of one [`TransportFramer::push`].
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "one bounded inline packet per poll; boxing would introduce another allocation and budget owner"
 )]
@@ -105,10 +105,6 @@ pub struct FrameStep {
 }
 
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "keep the literal carrier inline for allocation-free fallback"
-)]
 pub(crate) enum FramedCarrier {
     Packet(TransportPacket),
     Plain(PlainContinuation),

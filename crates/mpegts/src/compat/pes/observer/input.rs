@@ -22,7 +22,7 @@ impl DemuxObserver {
 
     /// As [`Self::push`], using the cursor that owns the bound input. A mismatched
     /// source, current request or byte pool returns the original carrier intact.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover the original charged inline carrier"
     )]
@@ -35,7 +35,7 @@ impl DemuxObserver {
         self.push_input_boundary(packet, context, false, input)
     }
 
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover the original charged inline carrier"
     )]
@@ -125,7 +125,7 @@ impl DemuxObserver {
     /// Admit one carrier on the selected PID in source order. A foreign pool, mismatched
     /// scope or active pending carrier is refused. The returned refusal owns the original
     /// charged packet, so it can be retried after draining the observer.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover original inline charged transport input; no uncharged Box allocation"
     )]
@@ -158,7 +158,7 @@ impl DemuxObserver {
         Ok(())
     }
 
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return original charged transport input inline"
     )]
@@ -266,7 +266,7 @@ impl DemuxObserver {
         Ok(&self.budget)
     }
 
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return original charged transport input inline"
     )]

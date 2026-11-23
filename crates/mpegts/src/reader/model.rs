@@ -769,7 +769,7 @@ impl UnframedAudio {
 
 /// A reader output other than a complete access unit.
 #[derive(Clone, Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "a carrier owns charged bytes and moves through without a separate allocation"
 )]

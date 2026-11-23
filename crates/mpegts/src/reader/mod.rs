@@ -59,7 +59,7 @@ enum PacketTracks {
 }
 
 /// The input and transport state the reader reads from.
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "the open transport is the common case and stays inline"
 )]
@@ -71,7 +71,7 @@ enum Transport {
 }
 
 /// The transport stream of a reader that is reading.
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "the open transport is the common case and stays inline"
 )]

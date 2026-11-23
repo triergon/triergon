@@ -40,7 +40,7 @@ impl MalformedInputKind {
 
 /// The carrier a reported discard is about.
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "the accepted carrier stays inline, as in the option this replaces"
 )]
@@ -97,7 +97,7 @@ impl MalformedInputFact {
 /// Apply to the original event: forward it unchanged, await its real diagnostic,
 /// or deliver a reported discard. This never represents a codec/PES packet.
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "original charged carriers remain inline"
 )]

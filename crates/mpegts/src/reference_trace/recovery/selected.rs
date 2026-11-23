@@ -39,10 +39,6 @@ impl SelectedFault {
 }
 /// The carrier a [`DiagnosticPacket`] was assembled from.
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one charged original input inline; no uncharged Box"
-)]
 pub enum DiagnosticCarrier {
     /// A carrier the transport inspector accepted.
     Transport(TransportPacket),
@@ -279,7 +275,7 @@ impl RecoveryObserver {
         }
         Ok(())
     }
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "original full charged carrier returned inline"
     )]
@@ -365,7 +361,7 @@ impl RecoveryObserver {
     /// checking that the PCR encoding is its sole transport failure. The source
     /// scope and ordinal must match, and pending input must be drained. A refusal
     /// returns the diagnostic and charged carrier intact.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover the original charged source diagnostic inline"
     )]

@@ -916,7 +916,7 @@ mod tests {
 
     #[test]
     fn compact_accounting_keeps_the_charged_observer_layout() {
-        #[allow(
+        #[expect(
             dead_code,
             reason = "field layout fixes the ordinary observer's charged inline footprint"
         )]

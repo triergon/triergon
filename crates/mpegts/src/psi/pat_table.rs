@@ -92,7 +92,7 @@ impl PatCollector {
     /// Queue a validated PAT section for the current version’s coverage check.
     /// An active assembly job or foreign byte pool is refused with the charged
     /// section intact.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "return the original charged PAT and source spans without allocating on rejection"
     )]

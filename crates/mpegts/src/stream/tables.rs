@@ -13,10 +13,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Result, WorkBudget};
 
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one bounded in-progress source table parser; no extra boxed allocator outside Budget"
-)]
 pub(super) enum Job {
     Pat(PatReader),
     Pmt(PmtReader),
@@ -39,10 +35,6 @@ pub(super) enum PsiTable {
 /// The one piece of table work between carriers. While it is a section, a table
 /// or a map, no carrier is read and the carrier in hand does not advance.
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one bounded in-progress table parser inline; boxing would allocate outside Budget"
-)]
 pub(super) enum PsiWork {
     Idle,
     /// A diagnostic to publish before anything else.

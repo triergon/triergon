@@ -361,10 +361,6 @@ impl RejectedTransport {
 
 /// The outcome of inspecting one transport carrier.
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one inline owned carrier; all backing storage is already charged"
-)]
 pub enum TransportInspection {
     /// The carrier is well formed.
     Accepted(TransportPacket),

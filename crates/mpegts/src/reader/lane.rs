@@ -49,8 +49,10 @@ use triergon_framing::{
     nal::{Codec, RawAnnexBReader},
 };
 
-// Keep concrete readers inline; their containing BudgetVec charges the whole state.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "readers stay inline: the lane table that holds them charges the whole state"
+)]
 enum Framer {
     Video(RawAnnexBReader),
     MpegVideo(mpeg_video::Reader),

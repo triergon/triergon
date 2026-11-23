@@ -100,7 +100,7 @@ impl RecoveredPacket {
 }
 /// One packet of a [`RecoveryObserver`].
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "one owned inline observation; dynamic storage is charged, no Box"
 )]
@@ -136,10 +136,6 @@ struct Pending {
 }
 
 #[derive(Debug)]
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one bounded original charged input mailbox, no heap Box"
-)]
 enum RecoveryPending {
     Opcr(Pending),
     Selected(selected::SelectedPending),
@@ -281,7 +277,7 @@ impl RecoveryObserver {
     /// Refuses the carrier intact while a pushed input is not drained, out of source order, before
     /// a pending PMT binding resolves, once the observer has failed, or when it is bound to an
     /// input.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover original charged carrier without allocating a Box"
     )]
@@ -295,7 +291,7 @@ impl RecoveryObserver {
     /// Admit an accepted carrier against the bound source cursor. A mismatch in
     /// entity, request or byte pool returns the original carrier intact. Other
     /// admission rules follow [`Self::push_accepted`].
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover original charged inline carrier"
     )]
@@ -307,7 +303,7 @@ impl RecoveryObserver {
     ) -> std::result::Result<(), Refused<TransportPacket>> {
         self.push_accepted_bound(packet, context, Some(input))
     }
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover original charged inline carrier"
     )]
@@ -375,7 +371,7 @@ impl RecoveryObserver {
     /// Refuses the rejection intact with `Unsupported` outside the policy's carrier shape, with
     /// `Invalid` while input is not drained or out of source order, and with `ForeignPool` for
     /// another byte pool.
-    #[allow(
+    #[expect(
         clippy::result_large_err,
         reason = "recover original charged rejection, error and full storage inline"
     )]
