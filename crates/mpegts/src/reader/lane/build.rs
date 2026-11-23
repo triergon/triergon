@@ -15,14 +15,6 @@ impl BuildUnit {
     }
 }
 
-/// A build published before the table of its PES sources was reserved.
-const UNPREPARED_SOURCES: &str = "MPEG-TS access unit sources not reserved";
-
-pub(super) enum BuildOrigins {
-    ReserveTable(usize),
-    Ready(PayloadSources),
-}
-
 /// The piece of a NAL unit the coalescing copy is writing.
 #[derive(Clone, Copy)]
 pub(super) enum Part {
@@ -39,7 +31,7 @@ pub(super) struct Build {
     pub(super) nal: usize,
     pub(super) part: Part,
     pub(super) copied: usize,
-    pub(super) origins: BuildOrigins,
+    pub(super) origins: PayloadSources,
     pub(super) origin: usize,
     pub(super) clock: Option<PacketClock>,
     pub(super) picture_origin: Option<(SourceEpochs, u64, u64)>,
@@ -75,7 +67,7 @@ impl Build {
             nal: 0,
             part: Part::LeadingZeros,
             copied: 0,
-            origins: BuildOrigins::Ready(origins),
+            origins,
             origin: 0,
             clock: None,
             picture_origin: None,
@@ -303,20 +295,10 @@ impl Lane {
                 cancel,
             );
         }
-        if let BuildOrigins::ReserveTable(count) = build.origins {
-            if !work.try_charge(1) {
-                return Ok(LaneStep::Yield);
-            }
-            let mut origins = BudgetVec::new(&self.pool);
-            origins.try_reserve_exact(count)?;
-            build.origins = BuildOrigins::Ready(PayloadSources::Table(origins));
-        }
         if !build.copy(work, cancel)? {
             return Ok(LaneStep::Yield);
         }
-        let BuildOrigins::Ready(origins) = &mut build.origins else {
-            return crate::refuse(Error::Invalid(UNPREPARED_SOURCES));
-        };
+        let origins = &mut build.origins;
         let consumed_end = match &build.unit {
             BuildUnit::Packet(AccessUnit::DvbSubtitle(unit)) => unit.pes_end,
             _ => range.end,
@@ -438,9 +420,7 @@ impl Lane {
                 )
             });
         let track = self.track.clone();
-        let BuildOrigins::Ready(origins) = build.origins else {
-            return crate::refuse(Error::Invalid(UNPREPARED_SOURCES));
-        };
+        let origins = build.origins;
         match build.unit {
             BuildUnit::Packet(unit) => Ok(LaneStep::Packet(Packet(Shared::new(
                 PacketData {

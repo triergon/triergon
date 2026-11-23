@@ -65,7 +65,10 @@ fn checkpoint(reader: &Reader) -> Option<usize> {
             if !copy.prepared && copy.piece == lane.pieces.len() {
                 return Some(0);
             }
-            if copy.prepared && copy.piece == lane.pieces.len() && copy.bytes.is_none() {
+            if copy.bytes.is_some() {
+                return Some(2);
+            }
+            if copy.prepared && copy.piece == lane.pieces.len() {
                 return Some(1);
             }
         }
@@ -75,9 +78,6 @@ fn checkpoint(reader: &Reader) -> Option<usize> {
             BuildUnit::Packet(AccessUnit::IncompleteAudio { .. })
         ) {
             return None;
-        }
-        if matches!(build.origins, BuildOrigins::ReserveTable(_)) {
-            return Some(2);
         }
         (build.origin == lane.pieces.len()).then_some(3)
     })

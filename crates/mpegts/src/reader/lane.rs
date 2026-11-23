@@ -28,7 +28,7 @@ use crate::pes::stream_id;
 use crate::psi::{CodecIdentification, DescriptorNamespace, stream_type};
 use crate::stream::{StorageItem, TransportStorageCursor};
 use crate::{SourceEpochs, table_storage};
-use build::{Build, BuildOrigins, BuildUnit};
+use build::{Build, BuildUnit};
 use fragment::{
     FragmentKind, Incomplete, LEADING_VIDEO_BYTES, ResidueScan, UnframedKind, VideoResidueScan,
 };
@@ -345,6 +345,7 @@ impl Framer {
             }),
             Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
             Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                // A borrowed byte-framer enum measured +0.451% on byte-split PES headers.
                 return crate::refuse(Error::Invalid(WHOLE_PES));
             }
         })
@@ -362,6 +363,7 @@ impl Framer {
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
             Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                // A borrowed byte-framer enum measured +0.451% on byte-split PES headers.
                 crate::refuse(Error::Invalid(WHOLE_PES))
             }
         }
@@ -379,6 +381,7 @@ impl Framer {
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
             Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
+                // A borrowed byte-framer enum measured +0.451% on byte-split PES headers.
                 crate::refuse(Error::Invalid(WHOLE_PES))
             }
         }
@@ -386,9 +389,6 @@ impl Framer {
 }
 
 /// A byte-stream call on a framer that takes whole PES, which [`Lane::step`] serves first.
-// The byte-stream framers in an enum of their own measured +0.95% with the tag in a niche (each
-// framer copied through `memcpy` when built) and +0.28% built in place (the ADTS carrier reader
-// and `finish` leave the step).
 const WHOLE_PES: &str = "MPEG-TS framer takes whole PES";
 
 struct Piece {
@@ -600,6 +600,7 @@ impl Lane {
             self.incomplete,
             Some(Incomplete {
                 reader_storage: Some(0),
+                bytes: None,
                 ..
             })
         )
@@ -805,27 +806,10 @@ impl Lane {
                 if !incomplete.copy(self.pieces.as_slice(), work, cancel)? {
                     return Ok(LaneStep::Yield);
                 }
-                let incomplete = self.incomplete.take().expect("finished fragment copy");
-                let bytes = incomplete.bytes.expect("copied fragment bytes");
-                let mut build = match incomplete.kind {
-                    FragmentKind::Audio => Build::new(
-                        AccessUnit::IncompleteAudio {
-                            range: incomplete.range,
-                            bytes,
-                            reason: Error::Truncated,
-                        },
-                        &self.pool,
-                        self.last_anchor,
-                    ),
-                    FragmentKind::Unframed(kind) => Build::with_unit(
-                        BuildUnit::Unframed(kind, incomplete.range),
-                        Some(bytes),
-                        &self.pool,
-                        self.last_anchor,
-                    ),
-                };
-                build.origins = BuildOrigins::ReserveTable(incomplete.origins);
-                self.build = Some(build);
+                let count = incomplete.origins;
+                if !self.finish_fragment(count, work, cancel)? {
+                    return Ok(LaneStep::Yield);
+                }
                 continue;
             }
             // A single framing state added at least 0.478% to split PES-header reads.
@@ -1082,6 +1066,50 @@ impl Lane {
             }
         }
     }
+    // Keep the fragment's allocation and packet construction out of the byte-framing loop.
+    #[inline(never)]
+    #[expect(
+        clippy::expect_used,
+        reason = "called after the fragment bytes have been copied"
+    )]
+    fn finish_fragment(
+        &mut self,
+        count: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if !work.try_charge(1) {
+            return Ok(false);
+        }
+        let mut origins = BudgetVec::new(&self.pool);
+        origins.try_reserve_exact(count)?;
+        let incomplete = self.incomplete.take().expect("finished fragment copy");
+        let bytes = incomplete.bytes.expect("copied fragment bytes");
+        let mut build = match incomplete.kind {
+            FragmentKind::Audio => Build::new(
+                AccessUnit::IncompleteAudio {
+                    range: incomplete.range,
+                    bytes,
+                    reason: Error::Truncated,
+                },
+                &self.pool,
+                self.last_anchor,
+            ),
+            FragmentKind::Unframed(kind) => Build::with_unit(
+                BuildUnit::Unframed(kind, incomplete.range),
+                Some(bytes),
+                &self.pool,
+                self.last_anchor,
+            ),
+        };
+        build.origins = PayloadSources::Table(origins);
+        self.build = Some(build);
+        Ok(true)
+    }
+
     fn check_output_limit(&self) -> Result<()> {
         if self.completed == self.limits.maximum_access_units {
             return Err(Error::Limit {

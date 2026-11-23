@@ -193,6 +193,10 @@ impl StorageCursor {
                     let live = reader.stream().is_some();
                     if lane.input.is_some()
                         || lane.build.is_some()
+                        || lane
+                            .incomplete
+                            .as_ref()
+                            .is_some_and(|copy| copy.bytes.is_some())
                         || (!live && (lane.framer.is_some() || lane.residue.is_some()))
                         || reader
                             .map
