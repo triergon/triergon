@@ -1,6 +1,5 @@
-#[path = "common/transport_cases.rs"]
-mod cases;
 use crate::common;
+use crate::common::transport_cases as cases;
 use common::{child, roots};
 use std::{
     ops::Range,

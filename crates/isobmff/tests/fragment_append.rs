@@ -1,7 +1,6 @@
 //! Literal demux index tuples and independent source facts.
 
-#[path = "common/demux.rs"]
-mod support;
+use crate::common::demux as support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{

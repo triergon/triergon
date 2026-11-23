@@ -10,12 +10,15 @@ use triergon_isobmff::{
     },
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-dependency/dep-unreferenced.mp4");
-#[path = "common/encoded_track.rs"]
-mod encoded_track;
+use crate::common::encoded_track;
 use encoded_track::{Source, finish, rows};
 
 impl Source {
-    fn job<'a>(&'a self, configs: &'a [EncodedStream], i: &InputCursor) -> EncodedEditJob<'a> {
+    fn dependency_job<'a>(
+        &'a self,
+        configs: &'a [EncodedStream],
+        i: &InputCursor,
+    ) -> EncodedEditJob<'a> {
         EncodedEditJob::new_with_dependency_table(
             self.context(&configs[0]),
             configs,
@@ -24,16 +27,16 @@ impl Source {
         )
         .unwrap()
     }
-    fn plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
+    fn dependency_plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
         let mut i = self.input();
         let configs = self.configs(&mut i);
-        finish(&mut self.job(&configs, &i), &mut i, q)
+        finish(&mut self.dependency_job(&configs, &i), &mut i, q)
     }
 }
 #[test]
 fn disposable_flag_is_separate_from_raw_dependency_stss_and_source_clock() {
     let s = Source::new(BASE);
-    let rows = rows(&s, s.plan(1).unwrap());
+    let rows = rows(&s, s.dependency_plan(1).unwrap());
     assert_eq!(rows.len(), 2);
     assert_eq!(
         rows.iter().map(|r| r.demux.flags).collect::<Vec<_>>(),
@@ -52,7 +55,7 @@ fn leading_byte_bits_remain_uninterpreted_source_facts() {
     let s = Source::new(include_bytes!(
         "fixtures/encoded-dependency/dep-leading-raw-preserved.mp4"
     ));
-    let rows = rows(&s, s.plan(1).unwrap());
+    let rows = rows(&s, s.dependency_plan(1).unwrap());
     assert_eq!(rows.len(), 2);
     assert_eq!(rows[0].source.dependency, Some(0xa6));
     assert_eq!(rows[1].source.dependency, Some(0x96));
@@ -66,7 +69,7 @@ fn stss_is_not_overridden_by_a_conflicting_dependency_hint() {
     let s = Source::new(include_bytes!(
         "fixtures/encoded-dependency/dep-STSS-conflict-preserved.mp4"
     ));
-    let rows = rows(&s, s.plan(1).unwrap());
+    let rows = rows(&s, s.dependency_plan(1).unwrap());
     assert_eq!(
         rows.iter().map(|r| r.demux.flags).collect::<Vec<_>>(),
         [1, 0]
@@ -82,7 +85,7 @@ fn unknown_dependency_zero_does_not_invent_a_disposable_fact() {
         "fixtures/encoded-dependency/dep-no-hint.mp4"
     ));
     assert_eq!(
-        rows(&s, s.plan(1).unwrap())
+        rows(&s, s.dependency_plan(1).unwrap())
             .iter()
             .map(|r| r.demux.flags)
             .collect::<Vec<_>>(),
@@ -97,8 +100,8 @@ fn absent_groups_and_explicit_unassociated_groups_both_keep_source_ranges() {
     let b = Source::new(include_bytes!(
         "fixtures/encoded-dependency/dep-referenced.mp4"
     ));
-    let aa = rows(&a, a.plan(1).unwrap());
-    let bb = rows(&b, b.plan(1).unwrap());
+    let aa = rows(&a, a.dependency_plan(1).unwrap());
+    let bb = rows(&b, b.dependency_plan(1).unwrap());
     assert_eq!(aa.len(), 2);
     assert_eq!(bb.len(), 2);
     for (a, b) in aa.iter().zip(&bb) {
@@ -119,7 +122,7 @@ fn dependency_flags_are_independent_of_roll_membership() {
     let s = Source::new(include_bytes!(
         "fixtures/encoded-dependency/dep-real-roll-unadmitted.mp4"
     ));
-    let occurrences = rows(&s, s.plan(1).unwrap());
+    let occurrences = rows(&s, s.dependency_plan(1).unwrap());
     assert_eq!(occurrences.len(), 2);
     assert_eq!(
         (occurrences[0].demux.flags, occurrences[1].demux.flags),
@@ -137,7 +140,7 @@ fn reserved_depended_on_field_is_not_a_false_or_true_repair() {
         "fixtures/encoded-dependency/dep-reserved-referenced-field.mp4"
     ));
     assert_eq!(
-        s.plan(1).unwrap_err(),
+        s.dependency_plan(1).unwrap_err(),
         Error::Unsupported("encoded dependency view reserved depended-on value")
     );
     let mut c = s.table.cursor();
@@ -169,7 +172,7 @@ fn group_work_zero_has_no_source_or_charge_progress() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.dependency_job(&configs, &i);
     let used = s.pool.used();
     let pos = i.position();
     let mut w = WorkBudget::new(0);
@@ -188,8 +191,8 @@ fn group_work_zero_has_no_source_or_charge_progress() {
 #[test]
 fn work_one_and_bulk_validate_identical_group_and_sample_facts() {
     let s = Source::new(BASE);
-    let a = rows(&s, s.plan(1).unwrap());
-    let b = rows(&s, s.plan(4096).unwrap());
+    let a = rows(&s, s.dependency_plan(1).unwrap());
+    let b = rows(&s, s.dependency_plan(4096).unwrap());
     assert_eq!(a.len(), b.len());
     for (a, b) in a.iter().zip(&b) {
         assert_eq!(a.source, b.source);
@@ -201,7 +204,7 @@ fn cancel_precedes_group_work_and_is_sticky() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.dependency_job(&configs, &i);
     assert_eq!(
         j.poll(&mut i, &mut WorkBudget::new(0), &AtomicBool::new(true))
             .unwrap_err(),
@@ -218,7 +221,7 @@ fn transport_failure_precedes_zero_group_work() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.dependency_job(&configs, &i);
     i.fail(i.source(), i.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(
@@ -232,7 +235,7 @@ fn reset_generation_is_rejected_during_group_scan() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.dependency_job(&configs, &i);
     assert_eq!(
         j.poll(&mut i, &mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap(),
@@ -247,7 +250,7 @@ fn reset_generation_is_rejected_during_group_scan() {
 #[test]
 fn charged_packet_pressure_retries_without_changing_the_validated_plan() {
     let s = Source::new(BASE);
-    let plans = [Some(s.plan(1).unwrap())];
+    let plans = [Some(s.dependency_plan(1).unwrap())];
     let hold = s.pool.reserve(s.pool.limit() - s.pool.used()).unwrap();
     assert!(matches!(
         PacketCursor::new_encoded_regular(
@@ -265,7 +268,7 @@ fn charged_packet_pressure_retries_without_changing_the_validated_plan() {
 #[test]
 fn index_and_packet_receiver_share_the_same_source_derived_flags() {
     let s = Source::new(BASE);
-    let plan = s.plan(1).unwrap();
+    let plan = s.dependency_plan(1).unwrap();
     let plans = [Some(plan.clone())];
     let mut c = IndexCursor::new_encoded_regular(
         &s.pool,

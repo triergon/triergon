@@ -13,12 +13,15 @@ use triergon_isobmff::{
     sample_groups::{RecoveryKind, RecoveryLimits, RecoveryLookup},
 };
 const BASE: &[u8] = include_bytes!("fixtures/encoded-recovery/roll-negative-v0.mp4");
-#[path = "common/encoded_track.rs"]
-mod encoded_track;
+use crate::common::encoded_track;
 use encoded_track::{Source, finish, rows};
 
 impl Source {
-    fn job<'a>(&'a self, configs: &'a [EncodedStream], i: &InputCursor) -> EncodedEditJob<'a> {
+    fn recovery_job<'a>(
+        &'a self,
+        configs: &'a [EncodedStream],
+        i: &InputCursor,
+    ) -> EncodedEditJob<'a> {
         EncodedEditJob::new_with_recovery_groups(
             self.context(&configs[0]),
             configs,
@@ -27,10 +30,10 @@ impl Source {
         )
         .unwrap()
     }
-    fn plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
+    fn recovery_plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
         let mut i = self.input();
         let configs = self.configs(&mut i);
-        finish(&mut self.job(&configs, &i), &mut i, q)
+        finish(&mut self.recovery_job(&configs, &i), &mut i, q)
     }
 }
 fn fixture(name: &str) -> &'static [u8] {
@@ -105,7 +108,7 @@ fn selection(
 #[test]
 fn actual_roll_keeps_signed_source_range_and_literal_packet_clocks() {
     let s = Source::new(BASE);
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     let source = selection(&plan, RecoveryKind::Roll, 2);
     assert_eq!(source.raw_mapping_index, Some(1));
     let d = source.description.unwrap();
@@ -143,7 +146,7 @@ fn actual_roll_keeps_signed_source_range_and_literal_packet_clocks() {
 #[test]
 fn reserved_dependency_stays_reserved_while_receiver_adds_no_hint() {
     let s = Source::new(fixture("reserved-source-retained"));
-    let result = rows(&s, s.plan(1).unwrap());
+    let result = rows(&s, s.recovery_plan(1).unwrap());
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].source.dependency, Some(0x2e));
     assert_eq!((result[0].demux.flags, result[1].demux.flags), (1, 16));
@@ -151,7 +154,7 @@ fn reserved_dependency_stays_reserved_while_receiver_adds_no_hint() {
 #[test]
 fn prol_and_roll_have_separate_owned_namespaces() {
     let s = Source::new(fixture("roll-prol-independent"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 2)
             .description
@@ -171,7 +174,7 @@ fn prol_and_roll_have_separate_owned_namespaces() {
 #[test]
 fn mapping_before_description_resolves_against_real_later_box() {
     let s = Source::new(fixture("mapping-before-description"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 2)
             .description
@@ -184,7 +187,7 @@ fn mapping_before_description_resolves_against_real_later_box() {
 #[test]
 fn positive_roll_stays_positive_without_invented_decoder_preroll() {
     let s = Source::new(fixture("roll-positive-v1"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     let source = selection(&plan, RecoveryKind::Roll, 1);
     assert_eq!(source.description.as_ref().unwrap().distance, 1);
     assert_eq!(
@@ -198,7 +201,7 @@ fn positive_roll_stays_positive_without_invented_decoder_preroll() {
 #[test]
 fn zero_mapping_is_absent_not_description_one() {
     let s = Source::new(fixture("roll-zero-association"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 1).raw_mapping_index,
         Some(0)
@@ -219,7 +222,7 @@ fn zero_mapping_is_absent_not_description_one() {
 #[test]
 fn multiple_descriptions_are_read_in_source_order() {
     let s = Source::new(fixture("roll-multiple-descriptions"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 1)
             .description
@@ -238,7 +241,7 @@ fn multiple_descriptions_are_read_in_source_order() {
 #[test]
 fn description_without_map_is_retained_but_unassociated() {
     let s = Source::new(fixture("description-without-map"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         plan.recovery_facts()
             .unwrap()
@@ -258,27 +261,29 @@ fn description_without_map_is_retained_but_unassociated() {
 fn dangling_index_is_rejected_before_any_packet() {
     let s = Source::new(fixture("dangling-description"));
     assert_eq!(
-        s.plan(1).unwrap_err(),
+        s.recovery_plan(1).unwrap_err(),
         Error::Invalid("encoded unresolved recovery description")
     );
 }
 #[test]
 fn zero_count_run_leaves_packet_coverage_unchanged() {
     let source = Source::new(fixture("empty-run"));
-    let plan = source.plan(1).unwrap();
+    let plan = source.recovery_plan(1).unwrap();
     assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn too_many_source_samples_in_map_is_rejected() {
     assert_eq!(
-        Source::new(fixture("coverage-over")).plan(1).unwrap_err(),
+        Source::new(fixture("coverage-over"))
+            .recovery_plan(1)
+            .unwrap_err(),
         Error::Invalid("encoded recovery exceeds samples")
     );
 }
 #[test]
 fn samples_after_the_last_group_run_have_no_association() {
     let s = Source::new(fixture("coverage-under"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     let tail = selection(&plan, RecoveryKind::Roll, 2);
     assert_eq!(tail.raw_mapping_index, None);
     assert!(tail.description.is_none());
@@ -288,7 +293,7 @@ fn samples_after_the_last_group_run_have_no_association() {
 fn fragment_namespace_cannot_resolve_as_regular_track_description() {
     assert_eq!(
         Source::new(fixture("fragment-namespace"))
-            .plan(1)
+            .recovery_plan(1)
             .unwrap_err(),
         Error::Unsupported("encoded fragment recovery namespace")
     );
@@ -296,7 +301,7 @@ fn fragment_namespace_cannot_resolve_as_regular_track_description() {
 #[test]
 fn version_one_grouping_parameter_is_kept_with_its_mapping() {
     let source = Source::new(fixture("grouping-parameter"));
-    let plan = source.plan(1).unwrap();
+    let plan = source.recovery_plan(1).unwrap();
     let facts = plan.recovery_facts().unwrap();
     let mappings = facts.source_scope(RecoveryKind::Roll).mappings.unwrap();
     assert_eq!(mappings.grouping_parameter(), Some(7));
@@ -305,7 +310,7 @@ fn version_one_grouping_parameter_is_kept_with_its_mapping() {
 #[test]
 fn variable_lengths_do_not_trigger_repeated_prefix_parsing() {
     let source = Source::new(fixture("variable-length-unadmitted"));
-    let plan = source.plan(1).unwrap();
+    let plan = source.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 2)
             .description
@@ -319,7 +324,7 @@ fn variable_lengths_do_not_trigger_repeated_prefix_parsing() {
 fn duplicate_context_does_not_silently_replace_prior_backing() {
     assert_eq!(
         Source::new(fixture("duplicate-description"))
-            .plan(1)
+            .recovery_plan(1)
             .unwrap_err(),
         Error::Invalid("encoded duplicate recovery context")
     );
@@ -327,7 +332,7 @@ fn duplicate_context_does_not_silently_replace_prior_backing() {
 #[test]
 fn unknown_group_semantics_do_not_get_roll_fallback() {
     let source = Source::new(fixture("unknown-group-unadmitted"));
-    let plan = source.plan(1).unwrap();
+    let plan = source.recovery_plan(1).unwrap();
     assert!(
         selection(&plan, RecoveryKind::Roll, 2)
             .description
@@ -360,7 +365,7 @@ fn dependency_view_retains_the_roll_description() {
 fn source_group_backing_survives_producer_and_pool_handles() {
     let (pool, plan, before) = {
         let s = Source::new(BASE);
-        let plan = s.plan(1).unwrap();
+        let plan = s.recovery_plan(1).unwrap();
         let before = s.pool.used();
         (s.pool.clone(), plan, before)
     };
@@ -387,7 +392,7 @@ fn zero_work_does_not_charge_allocate_or_read_group_bytes() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut job = s.job(&configs, &i);
+    let mut job = s.recovery_job(&configs, &i);
     let used = s.pool.used();
     let position = i.position();
     let mut w = WorkBudget::new(0);
@@ -403,8 +408,8 @@ fn zero_work_does_not_charge_allocate_or_read_group_bytes() {
 #[test]
 fn work_one_and_bulk_preserve_all_source_fields_and_receiver_rows() {
     let s = Source::new(fixture("roll-prol-independent"));
-    let a = rows(&s, s.plan(1).unwrap());
-    let b = rows(&s, s.plan(4096).unwrap());
+    let a = rows(&s, s.recovery_plan(1).unwrap());
+    let b = rows(&s, s.recovery_plan(4096).unwrap());
     assert_eq!(a.len(), b.len());
     for (a, b) in a.iter().zip(&b) {
         assert_eq!(a.source, b.source);
@@ -416,7 +421,7 @@ fn cancel_during_group_scan_is_sticky_and_publishes_nothing() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     assert_eq!(
         j.poll(&mut i, &mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap(),
@@ -442,7 +447,7 @@ fn failed_transport_precedes_zero_group_work() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     i.fail(i.source(), i.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(
@@ -456,7 +461,7 @@ fn reset_invalidates_group_scan_and_ready_backing() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     assert_eq!(
         j.poll(&mut i, &mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap(),
@@ -475,7 +480,7 @@ fn foreign_pool_is_rejected_before_group_work() {
     let mut other = Source::new(BASE).input();
     let mut owned = s.input();
     let configs = s.configs(&mut owned);
-    let mut job = s.job(&configs, &i);
+    let mut job = s.recovery_job(&configs, &i);
     assert_eq!(
         job.poll(&mut other, &mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap_err(),
@@ -485,7 +490,7 @@ fn foreign_pool_is_rejected_before_group_work() {
 #[test]
 fn validated_source_plan_survives_output_pressure_without_extra_group_allocation() {
     let s = Source::new(BASE);
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     let group_backing = plan
         .recovery_facts()
         .unwrap()
@@ -514,7 +519,7 @@ fn validated_source_plan_survives_output_pressure_without_extra_group_allocation
 #[test]
 fn packet_hint_does_not_become_public_index_key() {
     let s = Source::new(fixture("reserved-source-retained"));
-    let plans = [Some(s.plan(1).unwrap())];
+    let plans = [Some(s.recovery_plan(1).unwrap())];
     let mut c = IndexCursor::new_encoded_regular(
         &s.pool,
         s.track(),
@@ -551,7 +556,7 @@ fn original_reserved_without_membership_keeps_raw_and_packet_hint_absent() {
     let s = Source::new(include_bytes!(
         "fixtures/encoded-dependency/dep-reserved-referenced-field.mp4"
     ));
-    let result = rows(&s, s.plan(1).unwrap());
+    let result = rows(&s, s.recovery_plan(1).unwrap());
     assert_eq!(result.len(), 2);
     assert_eq!(
         (result[0].source.dependency, result[1].source.dependency),
@@ -564,7 +569,7 @@ fn same_pool_other_source_is_rejected_before_inspection() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     let mut other = InputCursor::new(
         &s.pool,
         SourceId(1998),

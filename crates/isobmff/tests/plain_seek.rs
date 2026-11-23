@@ -3,8 +3,7 @@
 //! refuse where that scan refuses, with the same error, and continue as a
 //! replay of every track from its beginning continues.
 
-#[path = "common/demux.rs"]
-mod support;
+use crate::common::demux as support;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{

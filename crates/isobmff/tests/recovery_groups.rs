@@ -1,5 +1,4 @@
-#[path = "common/recovery.rs"]
-mod wire;
+use crate::common::recovery as wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{

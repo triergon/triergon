@@ -1,5 +1,11 @@
 #![allow(dead_code)]
+pub(crate) mod demux;
+pub(crate) mod encoded_track;
 pub mod fixtures;
+pub(crate) mod movie;
+pub(crate) mod recovery;
+#[cfg(feature = "reference-trace")]
+pub(crate) mod transport_cases;
 
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
 use triergon_isobmff::{

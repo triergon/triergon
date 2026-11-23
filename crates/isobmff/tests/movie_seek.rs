@@ -1,8 +1,6 @@
 use crate::common;
-#[path = "common/movie.rs"]
-mod fixture;
-#[path = "common/recovery.rs"]
-mod wire;
+use crate::common::movie as fixture;
+use crate::common::recovery as wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
