@@ -123,8 +123,10 @@ Translated from libass 0.17.5, stage by stage:
   tables of the WHATWG Encoding Standard's indexes, with their notices in
   [crates/subtitles/LICENSE](../crates/subtitles/LICENSE). The strict Big5 and GBK
   profiles' tables (`src/text/charset/mapping-data/big5.bin`, `big5_plane2.bin`,
-  `gbk.bin`, `gb18030_ranges.bin`) hold `index-big5.txt`, `index-gb18030.txt` and
-  `index-gb18030-ranges.txt` of https://encoding.spec.whatwg.org/; the strict Shift_JIS
+  `gbk.bin`, `gb18030_ranges.bin`) are the records of `index-big5.txt`,
+  `index-gb18030.txt` and `index-gb18030-ranges.txt` of
+  https://encoding.spec.whatwg.org/, as `cargo xtask subtitle-views charset-tables`
+  writes them from those files; the strict Shift_JIS
   and EUC-KR profiles decode the code page 932 and 949 tables, whose records beyond
   ASCII `index-jis0208.txt` and `index-euc-kr.txt` give. The indexes are of the edition
   dated 2024-09-18 (identifiers `8dfc7710…`, `cbaa91f3…`, `1d97134c…`, `ff1c9a92…`

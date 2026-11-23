@@ -120,19 +120,6 @@
         "TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT"
       ]
     },
-    "INDEX-BIG5.TXT": {
-      "represents": "https://encoding.spec.whatwg.org/index-big5.txt",
-      "sha256": "804ec2688abb23dec196c9b3df4b3a2fa3282f4f9cbf4c170435dda28c7e5719",
-      "bytes": 262498,
-      "head": [
-        "# Big5 as the Encoding Standard decodes it: index-big5 of https://encoding.spec.whatwg.org/,",
-        "# as carried by the tables encoding_rs 0.8.35 generates from it (BIG5_LOW_BITS, BIG5_ASTRALNESS).",
-        "# Each line is a two-byte code and its code point. A pointer of the index is",
-        "# (lead - 0x81) * 157 + (trail - 0x40, or trail - 0x62 from 0xA1). The codes 8862, 8864, 88A3 and",
-        "# 88A5 decode to two code points and are listed last, as comments."
-      ],
-      "written_from": "the tables encoding_rs 0.8.35 generates from the index; its records equal index-big5.txt (identifier 8dfc7710..., 2024-09-18), which the generator checks; the sha256 is this file's"
-    },
     "index-big5.txt": {
       "url": "https://encoding.spec.whatwg.org/index-big5.txt",
       "sha256": "08e24270c8e95d998c994c03f907e972480dc01f58743e078654cc466203c8ff",
@@ -140,7 +127,7 @@
       "identifier": "8dfc771062e7be0810919082c2c06baa2236147909e0ecc235b1cb9ad782ac82",
       "date": "2024-09-18",
       "in_repository": false,
-      "use": "`cargo xtask subtitle-views charset-tables` reads it from a path and compares the tables with it, or with --write writes them from it"
+      "use": "`cargo xtask subtitle-views charset-tables big5` reads it from a path and compares big5.bin and big5_plane2.bin with it, or with --write writes them from it"
     },
     "index-jis0208.txt": {
       "url": "https://encoding.spec.whatwg.org/index-jis0208.txt",
@@ -192,9 +179,9 @@
       "binary": "receiver_gbk.bin"
     },
     "big5": {
-      "source": "INDEX-BIG5.TXT",
-      "source_sha256": "804ec2688abb23dec196c9b3df4b3a2fa3282f4f9cbf4c170435dda28c7e5719",
-      "original_records": 18594,
+      "source": "index-big5.txt",
+      "source_sha256": "08e24270c8e95d998c994c03f907e972480dc01f58743e078654cc466203c8ff",
+      "original_records": 18590,
       "profile_records": 16877,
       "added_identity_controls": [],
       "explicit_unmapped": [],

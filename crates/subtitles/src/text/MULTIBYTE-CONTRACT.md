@@ -56,8 +56,8 @@ and `gb18030_ranges.bin`, the four-byte ranges below U+10000 as `(u16 pointer, u
 scalar)` records. `ShiftJis` and `EucKr` decode `windows932.bin` and `windows949.bin`:
 `cargo xtask subtitle-views charset-tables shift_jis INDEX` and `... euc-kr INDEX`
 check that `index-jis0208.txt` and `index-euc-kr.txt` give those tables' records
-beyond ASCII, with Shift_JIS's 0x80, which the decoder gives as itself. The tests read Big5's text form,
-`tests/multibyte-mapping-data/INDEX-BIG5.TXT`, whose records equal `index-big5.txt`.
+beyond ASCII, with Shift_JIS's 0x80, which the decoder gives as itself. The tests decode every one- and
+two-byte input of the Big5 tables and check hand-picked pointers of `index-big5.txt` with their code points.
 The receiver tables are `receiver_gbk.bin`, `receiver_shift_jis.bin` and
 `receiver_euc_kr.bin` from the Microsoft and Unicode tables above, and the GNU Big5
 charmap, with its free-distribution notice, `charset/mapping-data/RECEIVER-BIG5-DATA.txt`

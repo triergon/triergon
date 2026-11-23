@@ -97,16 +97,11 @@ fn old_resolver_refusals_are_preserved_and_new_aliases_are_explicit() {
     ));
 }
 
-const PROFILES: [(M, &str, usize); 8] = [
+const PROFILES: [(M, &str, usize); 7] = [
     (
         M::ReceiverGbk,
         include_str!("multibyte-mapping-data/CP936.TXT"),
         21920,
-    ),
-    (
-        M::Big5,
-        include_str!("multibyte-mapping-data/INDEX-BIG5.TXT"),
-        18718,
     ),
     (
         M::ReceiverShiftJis,
@@ -208,7 +203,7 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
         // CP949.TXT 2.01 predates A2E8, which KS X 1001:2002 assigns.
         assert!(map.insert(0xa2e8, '\u{327e}').is_none());
     }
-    if matches!(profile, M::Big5 | M::ReceiverEucKrC1) {
+    if profile == M::ReceiverEucKrC1 {
         for byte in 0..128 {
             assert!(
                 map.insert(byte, char::from_u32(u32::from(byte)).unwrap())
@@ -321,6 +316,8 @@ fn packed(records: &[u8]) -> std::collections::BTreeMap<u16, char> {
 }
 
 const GBK: &[u8] = include_bytes!("../src/text/charset/mapping-data/gbk.bin");
+const BIG5: &[u8] = include_bytes!("../src/text/charset/mapping-data/big5.bin");
+const BIG5_PLANE2: &[u8] = include_bytes!("../src/text/charset/mapping-data/big5_plane2.bin");
 const WINDOWS932: &[u8] = include_bytes!("../src/text/charset/mapping-data/windows932.bin");
 const WINDOWS949: &[u8] = include_bytes!("../src/text/charset/mapping-data/windows949.bin");
 
@@ -329,6 +326,15 @@ const WINDOWS949: &[u8] = include_bytes!("../src/text/charset/mapping-data/windo
 // path, with every one- and two-byte table result.
 #[test]
 fn every_one_and_two_byte_input_of_the_packed_tables() {
+    // Big5's plane 2 table holds the low 16 bits of its code points.
+    let mut big5 = packed(BIG5);
+    for &[a, b, c, d] in BIG5_PLANE2.as_chunks::<4>().0 {
+        let scalar = char::from_u32(0x20000 | u32::from(u16::from_be_bytes([c, d]))).unwrap();
+        assert_eq!(big5.insert(u16::from_be_bytes([a, b]), scalar), None);
+    }
+    // The index's 18,590 codes, ASCII, and none of the four of two characters.
+    assert_eq!(big5.len(), 18_590 + 128);
+    check_short_inputs(M::Big5, &big5);
     for (profile, records) in [
         (
             M::ReceiverBig5,
@@ -424,32 +430,31 @@ table_tests!(
     every_receiver_gbk_one_and_two_byte_input,
     0
 );
-table_tests!(whole_big5_mapping, every_big5_one_and_two_byte_input, 1);
 table_tests!(
     whole_receiver_shift_jis_mapping,
     every_receiver_shift_jis_one_and_two_byte_input,
-    2
+    1
 );
-table_tests!(whole_euc_kr_mapping, every_euc_kr_one_and_two_byte_input, 3);
+table_tests!(whole_euc_kr_mapping, every_euc_kr_one_and_two_byte_input, 2);
 table_tests!(
     whole_windows932_mapping,
     every_windows932_one_and_two_byte_input,
-    4
+    3
 );
 table_tests!(
     whole_windows949_mapping,
     every_windows949_one_and_two_byte_input,
-    5
+    4
 );
 table_tests!(
     whole_windows950_mapping,
     every_windows950_one_and_two_byte_input,
-    6
+    5
 );
 table_tests!(
     whole_shift_jis_mapping,
     every_shift_jis_one_and_two_byte_input,
-    7
+    6
 );
 
 #[test]
@@ -583,19 +588,29 @@ fn invalid_trail_never_replays_as_ascii_or_publishes_replacement() {
 
 #[test]
 fn big5_is_the_encoding_standards_index() {
-    // Where Unicode's historical BIG5.TXT differs or has no mapping, the
-    // supplement before A1 40, a plane 2 character and the last code.
-    for (code, scalar) in [
-        ([0xa1, 0x45], '\u{2027}'),
-        ([0xa1, 0x5a], '\u{2574}'),
-        ([0xa1, 0xc3], '\u{ffe3}'),
-        ([0xa2, 0xcc], '\u{5341}'),
-        ([0xc6, 0xa1], '\u{2460}'),
-        ([0xf9, 0xfe], '\u{ffed}'),
-        ([0x87, 0x40], '\u{43f0}'),
-        ([0x9c, 0x71], '\u{20021}'),
-        ([0xfe, 0xfe], '\u{79d4}'),
+    // Pointers of index-big5.txt (identifier 8dfc7710..., 2024-09-18) and
+    // their code points as the index lists them: its first and last pointers,
+    // plane 2 characters, the neighbours of the two-character codes, and codes
+    // where Unicode's historical BIG5.TXT differs or has no mapping.
+    for (pointer, code, scalar) in [
+        (942, [0x87, 0x40], '\u{43f0}'),
+        (947, [0x87, 0x45], '\u{27267}'),
+        (1132, [0x88, 0x61], '\u{d2}'),
+        (1136, [0x88, 0x65], '\u{1ec0}'),
+        (4288, [0x9c, 0x71], '\u{20021}'),
+        (5029, [0xa1, 0x45], '\u{2027}'),
+        (5050, [0xa1, 0x5a], '\u{2574}'),
+        (5121, [0xa1, 0xc3], '\u{ffe3}'),
+        (5287, [0xa2, 0xcc], '\u{5341}'),
+        (10896, [0xc6, 0xa1], '\u{2460}'),
+        (18996, [0xf9, 0xfe], '\u{ffed}'),
+        (19781, [0xfe, 0xfe], '\u{79d4}'),
     ] {
+        // The decoder's pointer: (lead - 0x81) * 157 + (trail - 0x40, or
+        // trail - 0x62 from 0xA1).
+        let [lead, trail] = code.map(u32::from);
+        let offset = if trail < 0x7f { 0x40 } else { 0x62 };
+        assert_eq!((lead - 0x81) * 157 + trail - offset, pointer);
         assert_eq!(
             decode(&code, M::Big5, 1).unwrap(),
             scalar.to_string().as_bytes(),
