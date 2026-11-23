@@ -381,8 +381,18 @@ pub enum TransportInspection {
     Rejected(RejectedTransport),
 }
 
+/// What the inspector does with its next work unit.
 #[derive(Clone, Copy, Debug)]
 enum Phase {
+    /// Check one fixed field of the carrier.
+    Check(Field),
+    /// Every field is checked or one has failed: deliver the packet or the rejection.
+    Finish,
+}
+
+/// The fields of a carrier, in the order they are checked.
+#[derive(Clone, Copy, Debug)]
+enum Field {
     Header,
     Length,
     Flags,
@@ -392,7 +402,6 @@ enum Phase {
     Private,
     Extension,
     Stuffing,
-    Finish,
 }
 
 /// One <=192-byte input. Fixed header/clock actions inspect at most six bytes;
@@ -457,7 +466,7 @@ impl TransportInspector {
             format,
             offset,
             entity,
-            phase: Phase::Header,
+            phase: Phase::Check(Field::Header),
             pcr_policy: crate::compat::pes::PcrPolicy::Strict,
             position: 0,
             fields: Envelope {
@@ -525,7 +534,9 @@ impl TransportInspector {
             if self.bytes.is_none() {
                 return Ok(AssemblyStep::Finished);
             }
-            if matches!(self.phase, Phase::Stuffing) && self.position < self.fields.adaptation_end {
+            if matches!(self.phase, Phase::Check(Field::Stuffing))
+                && self.position < self.fields.adaptation_end
+            {
                 // The carrier stays owned by the inspector. Inspect only the
                 // funded bytes and stop charging at the first syntax error.
                 let available = (self.fields.adaptation_end - self.position).min(64) as u64;
@@ -556,9 +567,9 @@ impl TransportInspector {
             if !work.try_charge(1) {
                 return Ok(AssemblyStep::Yield);
             }
-            if matches!(self.phase, Phase::Finish) {
+            let Phase::Check(field) = self.phase else {
                 return self.finish().map(AssemblyStep::Output);
-            }
+            };
             // The following borrow is confined to one fixed field.
             let source = self
                 .bytes
@@ -566,8 +577,8 @@ impl TransportInspector {
                 .ok_or(Error::Invalid("carrier owner missing"))?;
             let data = &source.as_ref()[self.format.prefix_bytes()..];
             let action: Result<()> = (|| {
-                match self.phase {
-                    Phase::Header => {
+                match field {
+                    Field::Header => {
                         let header = CarrierHeader::parse(data)?;
                         self.fields.pid = header.pid;
                         self.fields.pusi = header.pusi;
@@ -583,10 +594,10 @@ impl TransportInspector {
                             self.complete_check = true;
                             self.phase = Phase::Finish;
                         } else {
-                            self.phase = Phase::Length;
+                            self.phase = Phase::Check(Field::Length);
                         }
                     }
-                    Phase::Length => {
+                    Field::Length => {
                         let length = usize::from(data[4]);
                         if (self.fields.afc == 2 && length != 183)
                             || (self.fields.afc == 3 && length > 182)
@@ -597,12 +608,12 @@ impl TransportInspector {
                         self.fields.payload_start = 5 + length;
                         self.position = if length == 0 { 5 } else { 6 };
                         self.phase = if length == 0 {
-                            Phase::Stuffing
+                            Phase::Check(Field::Stuffing)
                         } else {
-                            Phase::Flags
+                            Phase::Check(Field::Flags)
                         };
                     }
-                    Phase::Flags => {
+                    Field::Flags => {
                         self.fields.flags = data[5];
                         // Continue the remaining real checks so this first semantic
                         // fault cannot conceal a second envelope/clock fault.
@@ -610,12 +621,12 @@ impl TransportInspector {
                             self.error = Some(Error::Invalid(OPCR_WITHOUT_PCR));
                         }
                         self.phase = if self.fields.flags & 31 == 0 && work.try_charge(5) {
-                            Phase::Stuffing
+                            Phase::Check(Field::Stuffing)
                         } else {
-                            Phase::Pcr
+                            Phase::Check(Field::Pcr)
                         };
                     }
-                    Phase::Pcr => {
+                    Field::Pcr => {
                         if self.fields.flags & 0x10 != 0 {
                             let next =
                                 Self::field_end(self.position, self.fields.adaptation_end, 6)?;
@@ -640,12 +651,12 @@ impl TransportInspector {
                             self.position = next;
                         }
                         self.phase = if self.fields.flags & 15 == 0 && work.try_charge(4) {
-                            Phase::Stuffing
+                            Phase::Check(Field::Stuffing)
                         } else {
-                            Phase::Opcr
+                            Phase::Check(Field::Opcr)
                         };
                     }
-                    Phase::Opcr => {
+                    Field::Opcr => {
                         if self.fields.flags & 8 != 0 {
                             let next =
                                 Self::field_end(self.position, self.fields.adaptation_end, 6)?;
@@ -653,19 +664,19 @@ impl TransportInspector {
                                 Some(crate::transport::packet::pcr(&data[self.position..next])?);
                             self.position = next;
                         }
-                        self.phase = Phase::Splice;
+                        self.phase = Phase::Check(Field::Splice);
                     }
-                    Phase::Splice => {
+                    Field::Splice => {
                         if self.fields.flags & 4 != 0 {
                             let next =
                                 Self::field_end(self.position, self.fields.adaptation_end, 1)?;
                             self.fields.splice = Some(data[self.position] as i8);
                             self.position = next;
                         }
-                        self.phase = Phase::Private;
+                        self.phase = Phase::Check(Field::Private);
                     }
-                    Phase::Private | Phase::Extension => {
-                        let private = matches!(self.phase, Phase::Private);
+                    Field::Private | Field::Extension => {
+                        let private = matches!(field, Field::Private);
                         let flag = if private { 2 } else { 1 };
                         if self.fields.flags & flag != 0 {
                             Self::field_end(self.position, self.fields.adaptation_end, 1)?;
@@ -683,16 +694,15 @@ impl TransportInspector {
                             self.position = next;
                         }
                         self.phase = if private {
-                            Phase::Extension
+                            Phase::Check(Field::Extension)
                         } else {
-                            Phase::Stuffing
+                            Phase::Check(Field::Stuffing)
                         };
                     }
-                    Phase::Stuffing => {
+                    Field::Stuffing => {
                         self.complete_check = true;
                         self.phase = Phase::Finish;
                     }
-                    Phase::Finish => unreachable!(),
                 }
                 Ok(())
             })();
