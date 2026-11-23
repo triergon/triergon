@@ -65,11 +65,11 @@ Further independent programs are skipped.
   frame and reports `Feature::EnhancedCoupling` in `FrameInfo::concealed`; FFmpeg does
   the same.
 - Concealment (A/52 7.10 block repeat): a damaged block repeats the previous block for
-  the rest of the frame; a truncated AC-3 frame outputs six copies of the last block; a
-  truncated E-AC-3 frame outputs nothing.
-- `CrcPolicy::Reject` refuses complete syncframes whose CRC fails with
-  `DecodeError::CrcMismatch`; `CrcPolicy::Report`, the default, decodes them and reports
-  the failure.
+  the rest of the frame; under `CrcPolicy::Report` a truncated AC-3 frame outputs six
+  copies of the last block; a truncated E-AC-3 frame outputs nothing.
+- `CrcPolicy::Reject` refuses syncframes whose CRC fails with `DecodeError::CrcMismatch`,
+  and a truncated AC-3 frame, whose CRC words are missing, with `DecodeError::Truncated`;
+  `CrcPolicy::Report`, the default, decodes them and reports the failure.
 - Not applied, as in FFmpeg: dialnorm, compr, transient pre-noise processing (parsed).
 - `FrameInfo::downmix` mirrors FFmpeg's downmix side data: exported only for programs
   with more than two channels, taken from the last syncframe of the access unit.
@@ -113,8 +113,8 @@ rewritten stream and exact AC-3 PCM; it declares observed binary32 and truncatio
 diagnostic differences, and one E-AC-3 diagnostic for bytes before the first syncframe.
 The `ac3-crc-reject` and `eac3-crc-reject` lanes of the
 [CRC comparison](../../harness/codecs/crc-damage.json) compare frame counts and PCM
-under `CrcPolicy::Reject` with FFmpeg under `crccheck`, including short AC-3 tails the
-decoder conceals and FFmpeg drops. Results are in [docs/status.md](../../docs/status.md).
+under `CrcPolicy::Reject` with FFmpeg under `crccheck+explode`. Results are in
+[docs/status.md](../../docs/status.md).
 
 - Not compared with FFmpeg: dual mono, 2/3-block E-AC-3 frames, `blkswe`, AHT on
   coupling and LFE channels, dependents without channel map, and E-AC-3 reduced sample

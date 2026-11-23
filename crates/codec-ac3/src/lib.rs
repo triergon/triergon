@@ -53,7 +53,9 @@ pub enum CrcPolicy {
     /// Decode anyway and report `crc_ok = false` (FFmpeg 9.0.2's default behaviour).
     #[default]
     Report,
-    /// Refuse the access unit with [`DecodeError::CrcMismatch`].
+    /// Refuse an access unit whose CRC fails with [`DecodeError::CrcMismatch`], and an
+    /// AC-3 syncframe cut short, whose CRC words are missing, with
+    /// [`DecodeError::Truncated`].
     Reject,
 }
 
@@ -314,7 +316,9 @@ impl Decoder {
                 needed: first.frame_bytes,
                 available: au.len(),
             };
-            if first.syntax == Syntax::Eac3 {
+            // The CRC words of a frame cut short are missing, so under `Reject` the frame
+            // is refused as unverifiable rather than concealed.
+            if first.syntax == Syntax::Eac3 || self.opts.crc == CrcPolicy::Reject {
                 return Err(truncated);
             }
             let dialnorm = header::ac3_dialnorm([au[6], au[7]], first.acmod);

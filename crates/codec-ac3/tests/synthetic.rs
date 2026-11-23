@@ -271,6 +271,25 @@ fn truncated_ac3_frame_repeats_last_block() {
 }
 
 #[test]
+fn a_rejecting_decoder_refuses_a_truncated_frame_it_cannot_check() {
+    let mut dec = Decoder::new().with_options(DecoderOptions {
+        crc: CrcPolicy::Reject,
+        ..Default::default()
+    });
+    let mut out = AudioFrame::default();
+    dec.decode(&mono_frame(0), &mut out).unwrap();
+    out.clear();
+    assert_eq!(
+        dec.decode(&mono_frame(0)[..100], &mut out).err(),
+        Some(DecodeError::Truncated {
+            needed: 128,
+            available: 100
+        })
+    );
+    assert_eq!(out.samples_per_channel, 0);
+}
+
+#[test]
 fn invalid_block_data_is_concealed() {
     let mut out = AudioFrame::default();
     let info = Decoder::new().decode(&mono_frame(61), &mut out).unwrap();

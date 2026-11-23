@@ -1,18 +1,7 @@
 {
   "schema": "triergon.codecs.correctness-manifest.v1",
   "note": "Faulty and crafted FLAC inputs retain their corpus pins. Each derived input flips one seeded bit after the first eight bytes of every probed input frame. The three lanes compare decoders that refuse a frame whose embedded CRC fails: the candidate runs with its rejecting policy (--crc reject, --reject-crc) and the reference with -err_detect crccheck+explode, which its help documents as verify embedded CRCs and abort decoding on minor error detection. A vector passes when both sides return the same frames and PCM, or both return none.",
-  "open_cases": [
-    "flip-monsters_inc_2.0_192_small.ac3",
-    "flip-monsters_inc_5.1_448_small.ac3",
-    "flip-mp3ac325_a0.ac3",
-    "flip-mp3ac325_a1.ac3"
-  ],
-  "open_case_readings": {
-    "flip-monsters_inc_2.0_192_small.ac3": "Under CrcPolicy::Reject the AC-3 decoder refuses every complete syncframe whose CRC fails and then emits one concealed 1536-sample frame for the short terminal syncframe, which it cannot verify; the reference emits nothing. A decoder asked to reject must not publish synthesised audio for a frame it could not check (crates/codec-ac3, Decoder::decode under CrcPolicy::Reject).",
-    "flip-monsters_inc_5.1_448_small.ac3": "Under CrcPolicy::Reject the AC-3 decoder refuses every complete syncframe whose CRC fails and then emits one concealed 1536-sample frame for the short terminal syncframe, which it cannot verify; the reference emits nothing. A decoder asked to reject must not publish synthesised audio for a frame it could not check (crates/codec-ac3, Decoder::decode under CrcPolicy::Reject).",
-    "flip-mp3ac325_a0.ac3": "Under CrcPolicy::Reject the AC-3 decoder refuses every complete syncframe whose CRC fails and then emits one concealed 1536-sample frame for the short terminal syncframe, which it cannot verify; the reference emits nothing. A decoder asked to reject must not publish synthesised audio for a frame it could not check (crates/codec-ac3, Decoder::decode under CrcPolicy::Reject).",
-    "flip-mp3ac325_a1.ac3": "Under CrcPolicy::Reject the AC-3 decoder refuses every complete syncframe whose CRC fails and then emits one concealed 1536-sample frame for the short terminal syncframe, which it cannot verify; the reference emits nothing. A decoder asked to reject must not publish synthesised audio for a frame it could not check (crates/codec-ac3, Decoder::decode under CrcPolicy::Reject)."
-  },
+  "open_cases": [],
   "vectors": [
     {
       "lane": "flac-crc-reject",
