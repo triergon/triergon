@@ -1581,15 +1581,15 @@
       "cases": [
         "dvb-source-separate-descriptors-service-0"
       ]
-    }
-  ],
-  "pending_module_requirements": [
-    "DvbTsBridge reports a DVB subtitle PES whose PES_packet_length is 0 as Error::Invalid instead of dropping it with neither output nor error: ITU-T H.222.0 (08/2023) section 2.4.3.7 allows length 0 only for video in a transport stream."
-  ],
-  "open_cases": [
+    },
     {
-      "id": "dvb-pes-unbounded-ts",
-      "requirement": "DvbTsBridge reports a DVB subtitle PES whose PES_packet_length is 0 as Error::Invalid instead of dropping it with neither output nor error: ITU-T H.222.0 (08/2023) section 2.4.3.7 allows length 0 only for video in a transport stream."
+      "reading": "Triergon's strict PES reader discards a DVB subtitle PES whose PES_packet_length is 0, and DvbTsBridge reports it as DvbStep::Discarded (recovery policy)",
+      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.7: a PES_packet_length of 0 is allowed only in PES packets whose payload is a video elementary stream carried in transport stream packets.",
+      "candidate": "Reports each of the two PES as discarded with Error::Invalid and publishes nothing (9 0).",
+      "reference": "Ends each PES at the next unit start and decodes pictures at 1000000 and 2000000 us.",
+      "cases": [
+        "dvb-pes-unbounded-ts"
+      ]
     }
   ],
   "open_refusals": [

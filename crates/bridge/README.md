@@ -63,7 +63,10 @@ video sample that cannot extend the decode clock.
 
 **Subtitles.** The TS bridges bind to one PID of one active PMT and take its
 strict private-stream PES; a new generation, PMT epoch or clock epoch needs a
-new bridge. Their times are the PES times on the player's timeline; teletext
+new bridge. A PES the player discards, an unbounded one for example, reaches a
+TS bridge as the fault the player reports in its place, and the bridge returns
+it as `Discarded`; a packet the DVB decoder refuses as malformed is `Refused`.
+Neither presents anything, and the bridge goes on with the next. Their times are the PES times on the player's timeline; teletext
 times are bounded by the program clock as FFmpeg's demuxer bounds them, read
 from the transport packets offered to `TeletextTsBridge::observe`.
 `PgsTsTrack` hands each PES to `PgsBridge`. `Mp4DvdSetup` reads the colour

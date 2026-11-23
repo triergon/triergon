@@ -5,7 +5,7 @@
 //! [`PgsBridge`](crate::bitmap::PgsBridge) as a [`BitmapInput`], on
 //! the player's 90 kHz timeline.
 use crate::bitmap::{BitmapInput, BitmapScope};
-use crate::ts::{PesBinding, PesData, TakenPes};
+use crate::ts::{PesBinding, PesData, Taken, TakenPes};
 use triergon_core::{Error, Result, TimeBase, WorkBudget};
 use triergon_mpegts::clock::SourceTimestamp;
 use triergon_playback::Output;
@@ -36,6 +36,22 @@ pub enum PgsTsStep {
     Yield,
     /// The pushed PES, ready for the PGS bridge.
     Packet(BitmapInput<TsPesFacts>),
+    /// The player discarded a PES of the PID and reported this fault in its
+    /// place. Push the next.
+    Discarded(Error),
+}
+
+/// What a pushed output left for the next poll.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one pending PES per bridge, stepped in place; a box would be an allocation the pool does not charge"
+)]
+#[derive(Debug)]
+enum Pending {
+    /// A PES being gathered, with its source facts.
+    Pes(PesData, TsPesFacts),
+    /// The fault the player reported for a PES it discarded.
+    Discarded(Error),
 }
 
 /// One PGS stream of one active PMT. A new playback generation, PMT epoch or
@@ -45,7 +61,7 @@ pub struct PgsTsTrack {
     binding: PesBinding,
     scope: BitmapScope,
     sequence: u64,
-    pending: Option<(PesData, TsPesFacts)>,
+    pending: Option<Pending>,
 }
 
 impl PgsTsTrack {
@@ -74,29 +90,40 @@ impl PgsTsTrack {
         self.scope
     }
 
-    /// Move a PES of this stream out of `mailbox`. A busy track returns
-    /// `false`; a refused output stays in the mailbox.
+    /// Moves the next PES of this stream out of `mailbox`, or the fault the
+    /// player reported for the PID in place of one, which the next poll returns
+    /// as [`PgsTsStep::Discarded`]. A busy track returns `false`; a refused
+    /// output stays in the mailbox.
     pub fn push(&mut self, mailbox: &mut Option<Output>) -> Result<bool> {
         if self.pending.is_some() {
             return Ok(false);
         }
-        let Some(TakenPes { pes, pts, dts }) = self.binding.take(mailbox)? else {
-            return Ok(false);
+        self.pending = match self.binding.take(mailbox)? {
+            None => return Ok(false),
+            Some(Taken::Discarded(error)) => Some(Pending::Discarded(error)),
+            Some(Taken::Pes(TakenPes { pes, pts, dts })) => {
+                let facts = TsPesFacts {
+                    pid: pes.pid,
+                    elementary_offset: pes.elementary_offset,
+                    pts,
+                    dts,
+                };
+                Some(Pending::Pes(PesData::new(pes, self.binding.pool()), facts))
+            }
         };
-        let facts = TsPesFacts {
-            pid: pes.pid,
-            elementary_offset: pes.elementary_offset,
-            pts,
-            dts,
-        };
-        self.pending = Some((PesData::new(pes, self.binding.pool()), facts));
         Ok(true)
     }
 
     /// Gather the pushed PES into one packet under `work`.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<PgsTsStep> {
-        let Some((data, facts)) = &mut self.pending else {
-            return Ok(PgsTsStep::NeedPacket);
+        let (data, facts) = match &mut self.pending {
+            None => return Ok(PgsTsStep::NeedPacket),
+            Some(Pending::Discarded(error)) => {
+                let error = *error;
+                self.pending = None;
+                return Ok(PgsTsStep::Discarded(error));
+            }
+            Some(Pending::Pes(data, facts)) => (data, facts),
         };
         let Some(raw) = data.poll(self.binding.pool(), work)? else {
             return Ok(PgsTsStep::Yield);

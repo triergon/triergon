@@ -2,7 +2,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_bridge::ts::dvb::{DvbQueueAction, DvbServiceSelection, DvbStep, DvbTsBridge};
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, PsiCrc32};
-use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::stream::{FaultKind, TraceEvent, TraceFault};
 use triergon_mpegts::{PacketFormat, ParseLimits, clock::SourceTimePolicy};
 use triergon_playback::{
     ByteSource, Engine, Event, Output, Player, PlayerPolicy, Progress, Selection, SourceOwner,
@@ -12,7 +12,8 @@ use triergon_subtitles::dvb::Size;
 
 const PACKET_LIMIT: usize = 1 << 20;
 
-/// A player over `source` and its outputs: the active PMT and the PES packets.
+/// A player over `source` and its outputs: the active PMT, and the PES packets
+/// and the PES faults it reported in their place.
 fn play(
     budget: &Budget,
     source: &[u8],
@@ -59,7 +60,12 @@ fn play(
                     ..
                 }) => map = Some(output),
                 Event::Ts(TsEvent {
-                    source: TraceEvent::Pes(_),
+                    source:
+                        TraceEvent::Pes(_)
+                        | TraceEvent::Diagnostic(TraceFault {
+                            kind: FaultKind::Pes,
+                            ..
+                        }),
                     ..
                 }) => pes.push(output),
                 _ => {}
@@ -81,6 +87,8 @@ enum Seen {
     },
     Clear(i64),
     Nothing,
+    Refused(triergon_core::Error),
+    Discarded(triergon_core::Error),
 }
 
 fn decode(bridge: &mut DvbTsBridge, pes: Output) -> Seen {
@@ -90,6 +98,8 @@ fn decode(bridge: &mut DvbTsBridge, pes: Output) -> Seen {
         match bridge.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
             DvbStep::Yield => {}
             DvbStep::NeedPacket => return Seen::Nothing,
+            DvbStep::Refused(error) => return Seen::Refused(error),
+            DvbStep::Discarded(error) => return Seen::Discarded(error),
             DvbStep::Action(DvbQueueAction::Clear { at_ns }) => return Seen::Clear(at_ns),
             DvbStep::Action(DvbQueueAction::Show(picture)) => {
                 let pixels = picture.rectangles().next().unwrap().pixels.to_vec();
@@ -192,7 +202,7 @@ fn selected_ts_service_reaches_the_bitmap_queue() {
                 assert!(!show);
                 assert_eq!(at_ns, 1_000_000_000);
             }
-            Seen::Nothing => panic!("no subtitle"),
+            Seen::Nothing | Seen::Refused(_) | Seen::Discarded(_) => panic!("no subtitle"),
         }
         bridge.finish_input();
         assert!(matches!(
@@ -320,8 +330,9 @@ fn ts_bridge_accepts_a_continuation_after_a_refused_or_partial_pes() {
                     assert_eq!(pixels, indices);
                     shown += 1;
                 }
+                Seen::Refused(error) => assert!(matches!(error, triergon_core::Error::Invalid(_))),
                 Seen::Nothing => {}
-                Seen::Clear(_) => panic!("unexpected clear"),
+                Seen::Clear(_) | Seen::Discarded(_) => panic!("unexpected clear or discard"),
             }
         }
         assert_eq!(shown, 1);
@@ -331,6 +342,34 @@ fn ts_bridge_accepts_a_continuation_after_a_refused_or_partial_pes() {
             DvbStep::Finished
         ));
     }
+}
+
+/// A PES the player discards, an unbounded one here (H.222.0 2.4.3.7 allows a
+/// PES_packet_length of 0 for video only), reaches the bridge as the fault the
+/// player reported in its place, and the bridge takes the next PES.
+#[test]
+fn ts_bridge_reports_a_pes_the_player_discarded() {
+    const TS: usize = 188;
+    let mut source = *include_bytes!("../../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
+    let start = 2 * TS
+        + source[2 * TS..3 * TS]
+            .windows(4)
+            .position(|w| w == [0, 0, 1, 0xbd])
+            .unwrap();
+    source[start + 4..start + 6].fill(0);
+    let cancel = AtomicBool::new(false);
+    let pool = Budget::new(16 * 1024 * 1024).unwrap();
+    let (_player, map, mut inputs) = play(&pool, &source, 37, SourceTimePolicy::RelativeEpochZero);
+    let mut bridge = DvbTsBridge::new(&map.unwrap(), 256, PACKET_LIMIT, &cancel).unwrap();
+    assert_eq!(inputs.len(), 1);
+    assert!(matches!(
+        decode(&mut bridge, inputs.remove(0)),
+        Seen::Discarded(triergon_core::Error::Invalid(_))
+    ));
+    assert!(matches!(
+        bridge.poll(&mut WorkBudget::new(1), &cancel).unwrap(),
+        DvbStep::NeedPacket
+    ));
 }
 
 /// A PES the pool cannot hold, at whatever point it runs short, waits in the

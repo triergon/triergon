@@ -223,6 +223,7 @@ fn ts_pgs_reaches_the_pgs_bridge() {
                 PgsTsStep::Yield => {}
                 PgsTsStep::Packet(input) => break input,
                 PgsTsStep::NeedPacket => panic!("pushed PES lost"),
+                PgsTsStep::Discarded(error) => panic!("{error:?}"),
             }
         };
         pgs.provide(input)
@@ -285,6 +286,7 @@ fn teletext_ts_reaches_the_text_bridge() {
                 }
             }
             TeletextStep::Refused(refusal) => panic!("{refusal:?}"),
+            TeletextStep::Discarded(error) => panic!("{error:?}"),
         }
     };
     for output in outputs {

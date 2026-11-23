@@ -12,7 +12,7 @@
 //! bridge reads the PCR from the transport packets the player delivers
 //! ([`TeletextTsBridge::observe`]).
 use crate::text::{AssIdentity, TextSource, receiver_timing};
-use crate::ts::{PesBinding, PesData, TakenPes};
+use crate::ts::{PesBinding, PesData, Taken, TakenPes};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Bytes, Error, Result, Rounding, Time, TimeBase, WorkBudget, container::CodecId,
@@ -50,6 +50,9 @@ pub enum TeletextStep {
     },
     /// The decoder refused the packet; decoding continues with the next.
     Refused(Refusal),
+    /// The player discarded a PES of the PID and reported this fault in its
+    /// place. Push the next.
+    Discarded(Error),
     /// Input finished and the decoder drained.
     Finished,
 }
@@ -62,8 +65,7 @@ pub struct TeletextTsBridge {
     clock: ProgramClock,
     decoder: Decoder,
     header: Bytes,
-    /// The pushed PES and its time in microseconds.
-    pending: Option<(PesData, Option<i64>)>,
+    pending: Option<Pending>,
     sequence: u64,
     eof: bool,
     drains: usize,
@@ -126,8 +128,10 @@ impl TeletextTsBridge {
         Ok(())
     }
 
-    /// Move a PES of this stream out of `mailbox`. A busy bridge returns
-    /// `false`; a refused output stays in the mailbox.
+    /// Moves the next PES of this stream out of `mailbox`, or the fault the
+    /// player reported for the PID in place of one, which the next poll returns
+    /// as [`TeletextStep::Discarded`]. A busy bridge returns `false`; a refused
+    /// output stays in the mailbox.
     pub fn push(&mut self, mailbox: &mut Option<Output>) -> Result<bool> {
         if mailbox.is_some() && self.eof {
             return Err(Error::Invalid("teletext bridge input after EOF"));
@@ -135,8 +139,13 @@ impl TeletextTsBridge {
         if self.pending.is_some() {
             return Ok(false);
         }
-        let Some(TakenPes { pes, pts, .. }) = self.binding.take(mailbox)? else {
-            return Ok(false);
+        let (pes, pts) = match self.binding.take(mailbox)? {
+            None => return Ok(false),
+            Some(Taken::Discarded(error)) => {
+                self.pending = Some(Pending::Discarded(error));
+                return Ok(true);
+            }
+            Some(Taken::Pes(TakenPes { pes, pts, .. })) => (pes, pts),
         };
         let pts = self
             .clock
@@ -150,7 +159,7 @@ impl TeletextTsBridge {
                 )
             })
             .transpose()?;
-        self.pending = Some((PesData::new(pes, self.binding.pool()), pts));
+        self.pending = Some(Pending::Pes(PesData::new(pes, self.binding.pool()), pts));
         Ok(true)
     }
 
@@ -170,7 +179,10 @@ impl TeletextTsBridge {
             self.drains = MAX_DRAIN;
             return Err(Error::Cancelled);
         }
-        let decoded = if let Some((data, pts)) = &mut self.pending {
+        let decoded = if let Some(Pending::Discarded(error)) = self.pending {
+            self.pending = None;
+            return Ok(TeletextStep::Discarded(error));
+        } else if let Some(Pending::Pes(data, pts)) = &mut self.pending {
             let Some(raw) = data.poll(self.binding.pool(), work)? else {
                 return Ok(TeletextStep::Yield);
             };
@@ -229,6 +241,19 @@ impl TeletextTsBridge {
         self.sequence += 1;
         Ok(TeletextStep::Cue(cue))
     }
+}
+
+/// What a pushed output left for the next poll.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one pending PES per bridge, stepped in place; a box would be an allocation the pool does not charge"
+)]
+#[derive(Debug)]
+enum Pending {
+    /// A PES being gathered, and its time in microseconds.
+    Pes(PesData, Option<i64>),
+    /// The fault the player reported for a PES it discarded.
+    Discarded(Error),
 }
 
 /// The program clock at the stream's unit starts, kept until their PES arrive.

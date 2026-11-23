@@ -5,7 +5,7 @@
 //! PMT, cuts each into the codec packet FFmpeg's demuxer hands its decoder
 //! ([`PesParser`]) and decodes it. Matroska tracks feed the same decoder
 //! through [`MatroskaDvbPacket`](crate::matroska::MatroskaDvbPacket).
-use crate::ts::{PesBinding, PesData, TakenPes};
+use crate::ts::{PesBinding, PesData, Taken, TakenPes};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, Rounding, TimeBase, WorkBudget};
 use triergon_mpegts::psi::{CodecIdentification, ElementaryStream, descriptor_tag};
@@ -33,9 +33,22 @@ pub struct DvbTsBridge {
     eof: bool,
 }
 
+/// What a pushed output left for the next poll.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one pending PES per bridge, stepped in place; a box would be an allocation the pool does not charge"
+)]
+#[derive(Debug)]
+enum Pending {
+    /// An accepted PES on its way to the decoder.
+    Pes(PesWork),
+    /// The fault the player reported for a PES it discarded.
+    Discarded(Error),
+}
+
 /// An accepted PES on its way to the decoder.
 #[derive(Debug)]
-struct Pending {
+struct PesWork {
     data: PesData,
     /// The PES time in 90 kHz ticks, on the player's timeline when it has
     /// one, else as coded: the parser groups segments by it.
@@ -115,6 +128,13 @@ pub enum DvbStep<'a> {
     Yield,
     /// A subtitle came out of the packet.
     Action(DvbQueueAction<'a>),
+    /// The decoder refused the PES as malformed; it presents nothing. Push the
+    /// next.
+    Refused(Error),
+    /// The player discarded a PES of the PID and reported this fault in its
+    /// place (`Error::Invalid` for an unbounded PES, for example). Push the
+    /// next.
+    Discarded(Error),
     /// Input finished and everything was decoded.
     Finished,
 }
@@ -197,8 +217,10 @@ impl DvbTsBridge {
         &self.configuration
     }
 
-    /// Move a selected strict PES only on acceptance. A busy bridge returns
-    /// `false` and validation errors leave the caller's output intact.
+    /// Moves the next strict PES of the PID out of `mailbox`, or the fault the
+    /// player reported for the PID in place of one, which the next poll returns
+    /// as [`DvbStep::Discarded`]. A busy bridge returns `false`, and validation
+    /// errors leave the caller's output intact.
     pub fn push(&mut self, mailbox: &mut Option<Output>) -> Result<bool> {
         if mailbox.is_some() && self.eof {
             return Err(Error::Invalid("DVB bridge input after EOF"));
@@ -206,25 +228,29 @@ impl DvbTsBridge {
         if self.pending.is_some() {
             return Ok(false);
         }
-        let Some(TakenPes {
-            pes,
-            pts: source_pts,
-            ..
-        }) = self.binding.take(mailbox)?
-        else {
-            return Ok(false);
+        self.pending = match self.binding.take(mailbox)? {
+            None => return Ok(false),
+            Some(Taken::Discarded(error)) => Some(Pending::Discarded(error)),
+            Some(Taken::Pes(TakenPes {
+                pes,
+                pts: source_pts,
+                ..
+            })) => {
+                if let Some(timestamp) =
+                    source_pts.filter(|t| t.raw33.is_some() || t.ticks90.is_some())
+                {
+                    self.anchored = timestamp.ticks90.is_some();
+                }
+                Some(Pending::Pes(PesWork {
+                    data: PesData::new(pes, self.binding.pool()),
+                    pts: source_pts.and_then(|timestamp| {
+                        timestamp.ticks90.or(timestamp.raw33.map(i128::from))
+                    }),
+                    parser_input: false,
+                    codec: None,
+                }))
+            }
         };
-        if let Some(timestamp) = source_pts.filter(|t| t.raw33.is_some() || t.ticks90.is_some()) {
-            self.anchored = timestamp.ticks90.is_some();
-        }
-        let pts =
-            source_pts.and_then(|timestamp| timestamp.ticks90.or(timestamp.raw33.map(i128::from)));
-        self.pending = Some(Pending {
-            data: PesData::new(pes, self.binding.pool()),
-            pts,
-            parser_input: false,
-            codec: None,
-        });
         Ok(true)
     }
 
@@ -233,8 +259,11 @@ impl DvbTsBridge {
         self.eof = true;
     }
 
-    /// Collect, cut and decode the pending PES under `work`. A packet the
-    /// decoder refuses, or one that presents nothing, asks for the next.
+    /// Gathers, cuts and decodes the pending PES under `work`. A PES that
+    /// presents nothing asks for the next, as does one the decoder refuses as
+    /// malformed, after [`DvbStep::Refused`]. A PES too large for the pool
+    /// (`Limit`) is dropped with its error; one refused for memory
+    /// (`Backpressure`) stays pending.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<DvbStep<'_>> {
         if cancel.load(Ordering::Relaxed) {
             self.decoder.abandon();
@@ -243,12 +272,20 @@ impl DvbTsBridge {
             self.eof = true;
             return Err(Error::Cancelled);
         }
-        let Some(pending) = &mut self.pending else {
-            return Ok(if self.eof {
-                DvbStep::Finished
-            } else {
-                DvbStep::NeedPacket
-            });
+        let pending = match &mut self.pending {
+            None => {
+                return Ok(if self.eof {
+                    DvbStep::Finished
+                } else {
+                    DvbStep::NeedPacket
+                });
+            }
+            Some(Pending::Discarded(error)) => {
+                let error = *error;
+                self.pending = None;
+                return Ok(DvbStep::Discarded(error));
+            }
+            Some(Pending::Pes(pending)) => pending,
         };
         if !pending.cut(&mut self.parser, self.binding.pool(), work, cancel)?
             || work.remaining() == 0
@@ -278,9 +315,13 @@ impl DvbTsBridge {
                 Ok(DvbStep::Action(DvbQueueAction::from_subtitle(subtitle)))
             }
             Ok(Status::Yield) => Ok(DvbStep::Yield),
-            Ok(Status::Nothing) | Err(Error::Invalid(_)) => {
+            Ok(Status::Nothing) => {
                 self.pending = None;
                 Ok(DvbStep::NeedPacket)
+            }
+            Err(error @ Error::Invalid(_)) => {
+                self.pending = None;
+                Ok(DvbStep::Refused(error))
             }
             // The decoder keeps the packet, or refused all of it for want of
             // memory: either way the next poll tries it again. A cancelled
@@ -338,7 +379,7 @@ fn subtitling_descriptor(
     }
 }
 
-impl Pending {
+impl PesWork {
     /// Gather the PES data field and cut it into its codec packet; `false`
     /// to yield.
     fn cut(

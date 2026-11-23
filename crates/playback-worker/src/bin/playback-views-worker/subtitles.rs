@@ -451,7 +451,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
     };
     // One run: its totals and, with `--report-refusal`, the unsupported feature that
     // ended it.
-    let mut operation = || -> Result<Outcome> {
+    let operation = || -> Result<Outcome> {
         let mut records = Records {
             totals: Totals {
                 packets: 0,

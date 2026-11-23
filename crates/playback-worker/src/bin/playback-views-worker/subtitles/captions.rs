@@ -64,6 +64,11 @@ pub(super) fn teletext(
                         println!("# teletext decoder refused {error:?}");
                     }
                 }
+                TeletextStep::Discarded(error) => {
+                    if records.trace {
+                        println!("# teletext PES discarded: {error}");
+                    }
+                }
                 TeletextStep::Yield => {}
                 TeletextStep::NeedPacket | TeletextStep::Finished => return Ok(()),
             }

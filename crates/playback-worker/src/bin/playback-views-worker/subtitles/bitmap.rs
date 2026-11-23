@@ -14,8 +14,8 @@ use triergon_bridge::{
 };
 use triergon_core::{Budget, Error, Rounding, TimeBase, WorkBudget, container::CodecId};
 use triergon_isobmff::config::ConfigurationLimits;
-use triergon_mpegts::stream::TraceEvent;
-use triergon_playback::{ByteSource, Event, Output, Player, TrackKey, mp4::Mp4Event};
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
+use triergon_playback::{ByteSource, Event, Output, Player, TrackKey, TsEvent, mp4::Mp4Event};
 use triergon_subtitles::{
     compat::{dvb::ReceiverDecoder, dvd::Limits as DvdLimits},
     pgs::{DisplayConfig, DisplayLimits, PacketClock},
@@ -382,6 +382,12 @@ fn mkv_dvb(
                 return Ok(());
             }
             MatroskaDvbStep::Decoded => return Ok(()),
+            MatroskaDvbStep::Refused(error) => {
+                if records.trace {
+                    println!("# DVB decoder refused {error:?}");
+                }
+                return Ok(());
+            }
         }
     }
 }
@@ -630,9 +636,19 @@ pub(super) fn ts_map(
     Err("selected TS stream absent".into())
 }
 
+/// Whether `output` is for the TS bridge of `pid`: a PES of the stream, or the fault the
+/// player reported for a PES of it that it discarded.
 pub(super) fn ts_payload(output: &Output, program: u16, pid: u16) -> bool {
-    output.event().track() == Some(TrackKey::Ts { program, pid })
-        && matches!(output.event(), Event::Ts(event) if matches!(event.source, TraceEvent::Pes(_)))
+    match output.event() {
+        Event::Ts(event) if matches!(event.source, TraceEvent::Pes(_)) => {
+            output.event().track() == Some(TrackKey::Ts { program, pid })
+        }
+        Event::Ts(TsEvent {
+            source: TraceEvent::Diagnostic(fault),
+            ..
+        }) => fault.kind == FaultKind::Pes && fault.pid == Some(pid),
+        _ => false,
+    }
 }
 
 #[inline(never)]
@@ -658,6 +674,18 @@ fn ts_dvb(case: &Case<'_>, player: &mut Player<ByteSource>, records: &mut Record
                 match receiver.poll(&mut WorkBudget::new(GRANT), &CANCEL)? {
                     DvbStep::Yield => {}
                     DvbStep::Action(action) => dvb(records, action),
+                    DvbStep::Refused(error) => {
+                        if records.trace {
+                            println!("# DVB decoder refused {error:?}");
+                        }
+                        break;
+                    }
+                    DvbStep::Discarded(error) => {
+                        if records.trace {
+                            println!("# DVB PES discarded: {error}");
+                        }
+                        break;
+                    }
                     DvbStep::NeedPacket | DvbStep::Finished => break,
                 }
             }
@@ -693,6 +721,12 @@ fn ts_pgs(
                             check_pgs_reset(case, pool, &input)?;
                         }
                         pgs(&mut receiver, input, records)?;
+                        break;
+                    }
+                    PgsTsStep::Discarded(error) => {
+                        if records.trace {
+                            println!("# PGS PES discarded: {error}");
+                        }
                         break;
                     }
                     PgsTsStep::NeedPacket => {

@@ -7,13 +7,10 @@ pub mod teletext;
 
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
 use triergon_mpegts::clock::SourceTimestamp;
-use triergon_mpegts::pes::Pes;
+use triergon_mpegts::pes::{Pes, stream_id};
 use triergon_mpegts::psi::ElementaryStream;
-use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_playback::{Delivery, Event, Output, TrackKey, TsEvent};
-
-/// `stream_id` of PES private data: DVB subtitles, teletext and HDMV PGS.
-const PRIVATE_STREAM_1: u8 = 0xbd;
 
 /// A PES taken from the player with its timestamps.
 #[derive(Debug)]
@@ -23,14 +20,28 @@ pub(crate) struct TakenPes {
     pub dts: Option<SourceTimestamp>,
 }
 
+/// What the player delivered for the bound stream.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the PES moves from the player's output to the bridge by value, once per PES"
+)]
+#[derive(Debug)]
+pub(crate) enum Taken {
+    /// The next PES.
+    Pes(TakenPes),
+    /// The fault the player reported for the stream in place of a PES it discarded.
+    Discarded(Error),
+}
+
 /// One elementary stream of one active PMT. A new playback generation, PMT
 /// epoch or TS clock epoch needs a new binding.
 #[derive(Debug)]
 pub(crate) struct PesBinding {
     pool: Budget,
     source: SourceId,
-    pub(crate) track: TrackKey,
-    /// The program's PCR PID, as the PMT names it (0x1fff for none).
+    program: u16,
+    pub(crate) pid: u16,
+    /// The program's PCR PID, as the PMT names it (`pid::NULL` for none).
     pub(crate) pcr_pid: u16,
     generation: u64,
     pub(crate) configuration_epoch: u64,
@@ -66,10 +77,8 @@ impl PesBinding {
         let binding = Self {
             pool: output.pool().clone(),
             source: output.source_id(),
-            track: TrackKey::Ts {
-                program: map.header.extension,
-                pid,
-            },
+            program: map.header.extension,
+            pid,
             pcr_pid: map.pcr_pid,
             generation: output.generation(),
             configuration_epoch: *configuration_epoch,
@@ -91,9 +100,30 @@ impl PesBinding {
         self.generation
     }
 
-    /// Move the next PES of the bound stream out of `mailbox`. An empty
-    /// mailbox gives `None`; a refused output stays in the mailbox.
-    pub(crate) fn take(&mut self, mailbox: &mut Option<Output>) -> Result<Option<TakenPes>> {
+    /// The fault in `mailbox` the player reported for a PES of the stream it
+    /// discarded, moved out of it; any other output is refused and stays there.
+    #[cold]
+    #[inline(never)]
+    fn discarded(&self, mailbox: &mut Option<Output>) -> Result<Option<Taken>> {
+        let Some(Event::Ts(TsEvent {
+            source: TraceEvent::Diagnostic(fault),
+            ..
+        })) = mailbox.as_ref().map(Output::event)
+        else {
+            return Err(Error::Invalid("TS bridge requires strict TS PES"));
+        };
+        if fault.kind != FaultKind::Pes || fault.pid != Some(self.pid) {
+            return Err(Error::Invalid("TS bridge requires strict TS PES"));
+        }
+        let error = fault.error;
+        *mailbox = None;
+        Ok(Some(Taken::Discarded(error)))
+    }
+
+    /// Move the next PES of the bound stream out of `mailbox`, or the fault the
+    /// player reported for the stream in place of one. An empty mailbox gives
+    /// `None`; a refused output stays in the mailbox.
+    pub(crate) fn take(&mut self, mailbox: &mut Option<Output>) -> Result<Option<Taken>> {
         let Some(output) = mailbox.as_ref() else {
             return Ok(None);
         };
@@ -116,11 +146,15 @@ impl PesBinding {
             ..
         }) = output.event()
         else {
-            return Err(Error::Invalid("TS bridge requires strict TS PES"));
+            return self.discarded(mailbox);
+        };
+        let track = TrackKey::Ts {
+            program: self.program,
+            pid: self.pid,
         };
         if output.delivery() == Delivery::Unselected
-            || output.event().track() != Some(self.track)
-            || pes.header.stream_id != PRIVATE_STREAM_1
+            || output.event().track() != Some(track)
+            || pes.header.stream_id != stream_id::PRIVATE_STREAM_1
             || pes.epochs.configuration != self.configuration_epoch
         {
             return Err(Error::Invalid("TS bridge track or configuration changed"));
@@ -149,7 +183,7 @@ impl PesBinding {
             unreachable!("validated PES event")
         };
         self.clock_epoch = Some(pes.epochs.clock);
-        Ok(Some(TakenPes { pes, pts, dts }))
+        Ok(Some(Taken::Pes(TakenPes { pes, pts, dts })))
     }
 }
 

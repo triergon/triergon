@@ -45,11 +45,11 @@ pub struct MatroskaDvbPacket {
 impl MatroskaDvbPacket {
     /// Decode the packet with the track's receiver
     /// ([`MatroskaBitmapTrack::dvb_decoder`]) and project its subtitle onto
-    /// the bitmap queue. A packet the decoder refuses or that presents
-    /// nothing, and a preroll or unselected one, has no action. A packet
-    /// refused for memory returns the error: `Error::Backpressure` may be
-    /// offered again once the pool has room, `Error::Limit` never fits the
-    /// pool and is dropped.
+    /// the bitmap queue. A packet that presents nothing, and a preroll or
+    /// unselected one, has no action; one the decoder refuses as malformed is
+    /// [`MatroskaDvbStep::Refused`]. A packet refused for memory returns the
+    /// error: `Error::Backpressure` may be offered again once the pool has
+    /// room, `Error::Limit` never fits the pool and is dropped.
     pub fn decode<'d>(
         &self,
         decoder: &'d mut ReceiverDecoder,
@@ -73,7 +73,8 @@ impl MatroskaDvbPacket {
         let subtitle = match status {
             Ok(Status::Subtitle(subtitle)) => subtitle,
             Ok(Status::Yield) => return Ok(MatroskaDvbStep::Yield),
-            Ok(Status::Nothing) | Err(Error::Invalid(_)) => return Ok(MatroskaDvbStep::Decoded),
+            Ok(Status::Nothing) => return Ok(MatroskaDvbStep::Decoded),
+            Err(error @ Error::Invalid(_)) => return Ok(MatroskaDvbStep::Refused(error)),
             Ok(Status::Stalled(error)) | Err(error) => return Err(error),
         };
         if matches!(
@@ -95,6 +96,8 @@ pub enum MatroskaDvbStep<'a> {
     Action(DvbQueueAction<'a>),
     /// The packet is decoded with no action.
     Decoded,
+    /// The decoder refused the packet as malformed; it presents nothing.
+    Refused(Error),
     /// The work budget ran out. The decoder keeps the packet: decode the same
     /// packet again to resume it, or drop it with
     /// [`ReceiverDecoder::abandon`]. A memory refusal after the packet was
