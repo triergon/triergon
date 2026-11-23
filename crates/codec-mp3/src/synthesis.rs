@@ -211,9 +211,7 @@ impl Synthesis {
         self.history[self.newest + 16] = folded;
         // An even age reads the first half of its vector, an odd age the second. Each
         // sum runs over the ages in order.
-        let (ages, []) = self.history[self.newest..][..16].as_chunks::<2>() else {
-            unreachable!("16 ages are 8 pairs");
-        };
+        let ages = self.history[self.newest..][..16].as_chunks::<2>().0;
         let (low, high) = pcm.split_at_mut(16);
         for (group, taps) in TAPS.iter().enumerate() {
             let base = group * LANES;
