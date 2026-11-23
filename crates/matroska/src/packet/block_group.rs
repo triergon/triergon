@@ -1,7 +1,7 @@
 //! RFC9559 §§5.1.3.5.1–6, 16; RFC8794 §§6.1,7.2,11.3.1.
 //! Raw group metadata, never an inferred codec/native side-data interpretation.
 use crate::ebml::{self, Child, ChildCursor};
-use crate::step::{ParseStep, Required, check};
+use crate::step::{ParseStep, check};
 use crate::storage::{SharedBytes, copy_vec::CopyVec};
 use crate::{Error, Limits, Result};
 use std::{
@@ -339,7 +339,9 @@ enum Scope {
     Additions,
     More(usize),
 }
-#[derive(Debug)]
+/// A master being read: the BlockGroup, its BlockAdditions or a BlockMore, with its
+/// CRC-32 child once read and whether that CRC has been checked.
+#[derive(Clone, Copy, Debug)]
 struct Frame {
     scope: Scope,
     span: Span,
@@ -360,16 +362,41 @@ enum Pending {
     Extension(Extension),
     Reference(i64),
 }
-#[derive(Debug)]
+/// Where the reading of a BlockGroup stands. From the end of the BlockGroup on, the
+/// phases carry the Block's span; the ID check carries its sort.
+#[derive(Clone, Copy, Debug)]
 enum Phase {
+    /// The children of the innermost frame.
     Parse,
-    Flush,
-    Crc,
-    IdReserve,
-    IdFill,
-    IdSort,
-    IdCheck,
-    Seal,
+    /// Adding a descriptor to its arena; `queued` once the push is requested.
+    Flush {
+        pending: Pending,
+        queued: bool,
+    },
+    /// Checking the innermost frame's CRC-32: `expected`, over its payload but
+    /// the CRC element `skip`, from byte `at` of the job on.
+    Crc {
+        skip: Span,
+        expected: u32,
+    },
+    /// Reserving, filling, sorting and comparing the effective BlockAddIDs.
+    IdReserve {
+        block: Span,
+    },
+    IdFill {
+        block: Span,
+    },
+    IdSort {
+        block: Span,
+        heap: crate::metadata::build::Heap,
+    },
+    IdCheck {
+        block: Span,
+    },
+    /// Building the group source.
+    Seal {
+        block: Span,
+    },
     Done,
 }
 #[derive(Debug)]
@@ -380,9 +407,10 @@ pub(crate) struct GroupJob {
     maximum: u64,
     highest: u64,
     location: Option<GroupLocation>,
-    frames: [Option<Frame>; 3],
+    frames: [Frame; 3],
     depth: usize,
-    more: Option<More>,
+    // The BlockMore being read while the innermost frame is one.
+    more: More,
     block: Option<Span>,
     duration: Option<(Span, u64)>,
     discard: Option<(Span, i64)>,
@@ -392,14 +420,10 @@ pub(crate) struct GroupJob {
     additions: CopyVec<Addition>,
     extensions: CopyVec<Extension>,
     references: CopyVec<i64>,
-    pending: Option<Pending>,
-    queued: bool,
     ids: BudgetVec<u64>,
-    heap: Option<crate::metadata::build::Heap>,
     at: usize,
     crc: Crc32Ieee,
     phase: Phase,
-    result: Option<BlockGroupSource>,
     failed: bool,
 }
 impl GroupJob {
@@ -424,14 +448,13 @@ impl GroupJob {
             data: 0,
             end: raw.len(),
         };
-        let mut frames = std::array::from_fn(|_| None);
-        frames[0] = Some(Frame {
+        let group = Frame {
             scope: Scope::Group,
             span,
             cursor: ChildCursor::new(span.payload()),
             crc: None,
             checked: false,
-        });
+        };
         Ok(Self {
             raw,
             pool: pool.clone(),
@@ -439,9 +462,14 @@ impl GroupJob {
             maximum,
             highest: 0,
             location,
-            frames,
+            frames: [group; 3],
             depth: 1,
-            more: None,
+            more: More {
+                span,
+                id: 1,
+                id_field: None,
+                data: None,
+            },
             block: None,
             duration: None,
             discard: None,
@@ -451,14 +479,10 @@ impl GroupJob {
             additions: CopyVec::new(pool),
             extensions: CopyVec::new(pool),
             references: CopyVec::new(pool),
-            pending: None,
-            queued: false,
             ids: BudgetVec::new(pool),
-            heap: None,
             at: 0,
             crc: Crc32Ieee::default(),
             phase: Phase::Parse,
-            result: None,
             failed: false,
         })
     }
@@ -472,30 +496,29 @@ impl GroupJob {
         if count >= self.limit {
             return Err(Error::Policy("packet source descriptors"));
         }
-        self.pending = Some(pending);
-        self.queued = false;
-        self.phase = Phase::Flush;
+        self.phase = Phase::Flush {
+            pending,
+            queued: false,
+        };
         Ok(())
     }
     fn push_frame(&mut self, scope: Scope, span: Span) -> Result<()> {
         if self.depth == self.frames.len() {
             return Err(Error::Policy("packet source nesting"));
         }
-        self.frames[self.depth] = Some(Frame {
+        self.frames[self.depth] = Frame {
             scope,
             span,
             cursor: ChildCursor::new(span.payload()),
             crc: None,
             checked: false,
-        });
+        };
         self.depth += 1;
         Ok(())
     }
     fn child(&mut self, child: Child) -> Result<()> {
         let span = Span::from_child(&child);
-        let frame = self.frames[self.depth - 1]
-            .as_mut()
-            .required("missing group frame")?;
+        let frame = &mut self.frames[self.depth - 1];
         let scope = frame.scope;
         if child.id == crate::element::CRC32 {
             if frame.crc.is_some() || child.header != frame.span.data || child.payload.len() != 4 {
@@ -540,16 +563,16 @@ impl GroupJob {
                 }
             }
             (Scope::Additions, 0xa6) => {
-                self.more = Some(More {
+                self.more = More {
                     span,
                     id: 1,
                     id_field: None,
                     data: None,
-                });
+                };
                 self.push_frame(Scope::More(self.additions.len()), span)?;
             }
             (Scope::More(_), 0xee) => {
-                let more = self.more.as_mut().required("missing BlockMore")?;
+                let more = &mut self.more;
                 if more.id_field.is_none() {
                     more.id_field = Some(span);
                     more.id = if span.data == span.end {
@@ -563,11 +586,7 @@ impl GroupJob {
                 }
             }
             (Scope::More(_), 0xa5) => {
-                self.more
-                    .as_mut()
-                    .required("missing BlockMore")?
-                    .data
-                    .get_or_insert(span);
+                self.more.data.get_or_insert(span);
             }
             _ => {
                 let scope = match scope {
@@ -585,14 +604,13 @@ impl GroupJob {
         Ok(())
     }
     fn close(&mut self) -> Result<()> {
-        let frame = self.frames[self.depth - 1]
-            .take()
-            .required("missing group frame")?;
         self.depth -= 1;
-        match frame.scope {
+        match self.frames[self.depth].scope {
             Scope::More(_) => {
-                let more = self.more.take().required("missing BlockMore")?;
-                let data = more.data.required("BlockMore without BlockAdditional")?;
+                let more = self.more;
+                let Some(data) = more.data else {
+                    return Err(Error::Invalid("BlockMore without BlockAdditional"));
+                };
                 if more.id > self.maximum {
                     return Err(Error::Invalid("BlockAddID exceeds track maximum"));
                 }
@@ -609,11 +627,13 @@ impl GroupJob {
             }
             Scope::Additions => (),
             Scope::Group => {
-                self.block.required("BlockGroup without Block")?;
+                let Some(block) = self.block else {
+                    return Err(Error::Invalid("BlockGroup without Block"));
+                };
                 if self.zero_reference && self.references.len() != 1 {
                     return Err(Error::Invalid("zero ReferenceBlock with other references"));
                 }
-                self.phase = Phase::IdReserve;
+                self.phase = Phase::IdReserve { block };
             }
         }
         Ok(())
@@ -648,24 +668,22 @@ impl GroupJob {
     ) -> Result<ParseStep<BlockGroupSource>> {
         loop {
             check(cancel)?;
-            match self.phase {
+            match &mut self.phase {
                 Phase::Parse => {
                     let step = self.frames[self.depth - 1]
-                        .as_mut()
-                        .required("missing group frame")?
                         .cursor
                         .step(&self.raw, work, cancel)?;
                     match step {
                         ParseStep::Yield => return Ok(ParseStep::Yield),
                         ParseStep::Event(Some(child)) => self.child(child)?,
                         ParseStep::Event(None) => {
-                            let frame = self.frames[self.depth - 1]
-                                .as_ref()
-                                .required("missing group frame")?;
-                            if frame.crc.is_some() && !frame.checked {
+                            let frame = &self.frames[self.depth - 1];
+                            if let Some((skip, expected)) = frame.crc
+                                && !frame.checked
+                            {
                                 self.at = frame.span.data;
                                 self.crc = Crc32Ieee::default();
-                                self.phase = Phase::Crc;
+                                self.phase = Phase::Crc { skip, expected };
                             } else {
                                 if !work.try_charge(1) {
                                     return Ok(ParseStep::Yield);
@@ -676,15 +694,15 @@ impl GroupJob {
                         _ => return Err(Error::Invalid("group parse transition")),
                     }
                 }
-                Phase::Flush => {
-                    let pending = self.pending.required("missing group descriptor")?;
-                    if !self.queued {
+                Phase::Flush { pending, queued } => {
+                    let pending = *pending;
+                    if !*queued {
                         match pending {
                             Pending::Addition(v) => self.additions.push(v)?,
                             Pending::Extension(v) => self.extensions.push(v)?,
                             Pending::Reference(v) => self.references.push(v)?,
                         }
-                        self.queued = true;
+                        *queued = true;
                     }
                     let step = match pending {
                         Pending::Addition(_) => self.additions.step(work, cancel)?,
@@ -692,27 +710,18 @@ impl GroupJob {
                         Pending::Reference(_) => self.references.step(work, cancel)?,
                     };
                     match step {
-                        ParseStep::Event(()) => {
-                            self.pending = None;
-                            self.queued = false;
-                            self.phase = Phase::Parse;
-                        }
+                        ParseStep::Event(()) => self.phase = Phase::Parse,
                         other => return crate::step::pending(other),
                     }
                 }
-                Phase::Crc => {
-                    let frame = self.frames[self.depth - 1]
-                        .as_ref()
-                        .required("missing CRC frame")?;
-                    let (skip, expected) = frame.crc.required("missing packet CRC")?;
+                Phase::Crc { skip, expected } => {
+                    let (skip, expected) = (*skip, *expected);
+                    let frame = &mut self.frames[self.depth - 1];
                     if self.at == frame.span.end {
                         if self.crc.finish() != expected {
                             return Err(Error::Invalid("packet source CRC mismatch"));
                         }
-                        self.frames[self.depth - 1]
-                            .as_mut()
-                            .required("missing CRC frame")?
-                            .checked = true;
+                        frame.checked = true;
                         self.phase = Phase::Parse;
                         continue;
                     }
@@ -732,18 +741,21 @@ impl GroupJob {
                     self.crc.update(&self.raw[self.at..self.at + count]);
                     self.at += count;
                 }
-                Phase::IdReserve => {
+                Phase::IdReserve { block } => {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
+                    let block = *block;
                     self.ids.try_reserve_exact(self.additions.len())?;
                     self.at = 0;
-                    self.phase = Phase::IdFill;
+                    self.phase = Phase::IdFill { block };
                 }
-                Phase::IdFill => {
+                Phase::IdFill { block } => {
                     if self.at == self.additions.len() {
-                        self.heap = Some(crate::metadata::build::Heap::new(self.ids.len()));
-                        self.phase = Phase::IdSort;
+                        self.phase = Phase::IdSort {
+                            block: *block,
+                            heap: crate::metadata::build::Heap::new(self.ids.len()),
+                        };
                         continue;
                     }
                     if !work.try_charge(1) {
@@ -754,23 +766,17 @@ impl GroupJob {
                         .map_err(|e| e.error)?;
                     self.at += 1;
                 }
-                Phase::IdSort => {
-                    if !self
-                        .heap
-                        .as_mut()
-                        .required("missing addition-ID sort")?
-                        .step(self.ids.as_mut_slice(), work, cancel)?
-                    {
+                Phase::IdSort { block, heap } => {
+                    if !heap.step(self.ids.as_mut_slice(), work, cancel)? {
                         return Ok(ParseStep::Yield);
                     }
                     self.at = 0;
-                    self.phase = Phase::IdCheck;
+                    self.phase = Phase::IdCheck { block: *block };
                 }
-                Phase::IdCheck => {
+                Phase::IdCheck { block } => {
                     if self.at + 1 >= self.ids.len() {
                         self.ids = BudgetVec::new(&self.pool);
-                        self.heap = None;
-                        self.phase = Phase::Seal;
+                        self.phase = Phase::Seal { block: *block };
                         continue;
                     }
                     if !work.try_charge(1) {
@@ -781,28 +787,24 @@ impl GroupJob {
                     }
                     self.at += 1;
                 }
-                Phase::Seal => {
+                Phase::Seal { block } => {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
+                    let block = *block;
                     let charge = self
                         .pool
                         .reserve(size_of::<Data>() + 2 * size_of::<usize>())?;
-                    let additions =
-                        std::mem::replace(&mut self.additions, CopyVec::new(&self.pool))
-                            .finish()?;
-                    let extensions =
-                        std::mem::replace(&mut self.extensions, CopyVec::new(&self.pool))
-                            .finish()?;
-                    let references =
-                        std::mem::replace(&mut self.references, CopyVec::new(&self.pool))
-                            .finish()?;
-                    self.result = Some(BlockGroupSource(Arc::new(Data {
+                    let additions = self.additions.take()?;
+                    let extensions = self.extensions.take()?;
+                    let references = self.references.take()?;
+                    self.phase = Phase::Done;
+                    return Ok(ParseStep::Event(BlockGroupSource(Arc::new(Data {
                         raw: self.raw.clone(),
                         additions,
                         extensions,
                         references,
-                        block: self.block.required("BlockGroup without Block")?,
+                        block,
                         duration: self.duration,
                         discard: self.discard,
                         state: self.state,
@@ -810,17 +812,9 @@ impl GroupJob {
                         location: self.location,
                         pool: self.pool.clone(),
                         charge,
-                    })));
-                    self.phase = Phase::Done;
+                    }))));
                 }
-                Phase::Done => {
-                    return Ok(ParseStep::Event(
-                        self.result
-                            .as_ref()
-                            .required("missing source group")?
-                            .clone(),
-                    ));
-                }
+                Phase::Done => return Ok(ParseStep::Finished),
             }
         }
     }
@@ -843,8 +837,7 @@ crate::storage::usage::storage!(GroupJob, |s| [
     s.additions,
     s.extensions,
     s.references,
-    s.ids,
-    s.result
+    s.ids
 ]);
 
 #[cfg(test)]

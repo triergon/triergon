@@ -883,7 +883,7 @@ enum HeapPhase {
     Extract,
     Done,
 }
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct Heap {
     build: usize,
     end: usize,
