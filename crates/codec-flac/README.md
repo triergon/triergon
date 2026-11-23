@@ -83,8 +83,8 @@ RFC 9639. Test vectors (outside git): the IETF CELLAR decoder testbench (`subset
 `uncommon`, `faulty`; CC0) and the streams `harness/codecs/flac/flac_vectors.py generate`
 makes with FFmpeg's and the reference `flac` encoder, compared with FFmpeg's decoder in
 [harness/codecs](../../harness/codecs/STATUS.md). The `flac-crc-reject` lane compares the
-retained frame counts and PCM under `crccheck`, including cases where only FFmpeg returns
-samples from damaged input. The
+retained frame counts and PCM with FFmpeg under `crccheck+explode`, both refusing a frame
+whose CRC fails. The
 [integer PCM comparison](../../harness/features/flac-integer/contract.json) checks every
 sample against the encoder's STREAMINFO checksum, including the low bits of 32-bit
 samples, an unconfigured decoder's rate and layout change, and a clean frame, the same
