@@ -135,7 +135,8 @@ fn decode(
                 .filter_map(|index| reader.track(index))
                 .find(|track| track.kind() == MediaKind::Audio)
                 .ok_or("no audio track")?;
-            let raw_aac = matches!(reader, AnyReader::Isobmff(_)) && track.codec() == CodecId::Aac;
+            let check_description =
+                matches!(reader, AnyReader::Isobmff(_)) && track.codec() == CodecId::Aac;
             let selected = if options.reject_crc {
                 if track.codec() != CodecId::Flac {
                     return Err("CRC rejection requires a FLAC track".into());
@@ -152,23 +153,22 @@ fn decode(
                         .map_err(|error| format!("{error:?}"))?
                         .with_crc_policy(triergon_codec_flac::CrcPolicy::Reject),
                 ))
-            } else if raw_aac {
-                TrackDecoder::aac_access_units_in(track.configuration(), &pool)
-                    .map(Decoder::Track)
-                    .map_err(|error| format!("{error:?}"))?
             } else if triergon_session::audio_codec(track.codec()).is_none() {
                 return Err(match track.codec() {
                     CodecId::Other => format!("unsupported codec Other({:?})", track.codec_tag()),
                     codec => format!("unsupported codec {codec:?}"),
                 });
             } else {
-                TrackDecoder::new(track)
-                    .map(Decoder::Track)
-                    .map_err(|error| format!("{error:?}"))?
+                let decoder = if check_description {
+                    TrackDecoder::new_in(track, &pool)
+                } else {
+                    TrackDecoder::new(track)
+                };
+                Decoder::Track(decoder.map_err(|error| format!("{error:?}"))?)
             };
-            decoder = Some((track.id(), selected, raw_aac));
+            decoder = Some((track.id(), selected, check_description));
         }
-        let Some((track, decoder, raw_aac)) = decoder.as_mut() else {
+        let Some((track, decoder, check_description)) = decoder.as_mut() else {
             continue;
         };
         if packet.track() != *track {
@@ -176,7 +176,7 @@ fn decode(
         }
         // The neutral track publishes the first description. The example
         // cannot decode another description with those configuration bytes.
-        if *raw_aac
+        if *check_description
             && !matches!(&packet, AnyPacket::Isobmff(p) if p.sample().description_index == 1)
         {
             return Err("AAC sample description changed".into());

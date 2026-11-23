@@ -35,8 +35,9 @@ impl TrackDecoder {
     /// chooses from.
     pub const DEFAULT_STORAGE_BYTES: usize = 32 << 20;
 
-    /// The decoder for `track`; refused when this crate does not decode its codec or its
-    /// configuration is invalid.
+    /// The decoder for `track`. AAC uses raw LC packets when the track supplies an
+    /// AudioSpecificConfig, and ADTS otherwise. Unsupported codecs and invalid or
+    /// unsupported configurations are refused.
     pub fn new(track: &dyn TrackInfo) -> Result<TrackDecoder, Error> {
         Self::new_in(track, &Budget::new(Self::DEFAULT_STORAGE_BYTES)?)
     }
@@ -44,8 +45,12 @@ impl TrackDecoder {
     /// [`TrackDecoder::new`] charging the configuration and the decoder to `budget`.
     pub fn new_in(track: &dyn TrackInfo, budget: &Budget) -> Result<TrackDecoder, Error> {
         let codec = audio_codec(track.codec()).ok_or(Error::Unsupported("track codec"))?;
+        let source = track.configuration();
+        if codec == AudioCodec::Aac && !source.is_empty() {
+            return Self::aac_access_units_in(source, budget);
+        }
         let mut configuration = BudgetVec::new(budget);
-        audio_configuration(codec, track.configuration(), &mut configuration)?;
+        audio_configuration(codec, source, &mut configuration)?;
         let decoder = audio_decoder_in(codec, &configuration, budget)?;
         Ok(TrackDecoder {
             codec,
@@ -55,8 +60,8 @@ impl TrackDecoder {
     }
 
     /// Decode raw AAC-LC from the selected sample description's AudioSpecificConfig.
-    /// The caller must use a decoder configured for each packet's description.
-    /// Use [`Self::new_in`] for ADTS-framed packets.
+    /// Use this when the packet's sample description differs from the track's
+    /// default configuration. Use [`Self::new_in`] for ADTS packets.
     pub fn aac_access_units_in(configuration: &[u8], budget: &Budget) -> Result<Self, Error> {
         Self::aac_access_units_with_layout_in(configuration, Policy::Specification, budget)
     }

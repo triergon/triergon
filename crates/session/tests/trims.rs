@@ -95,7 +95,7 @@ fn a_track_decoder_charges_its_configuration_to_the_callers_pool() {
 }
 
 #[test]
-fn a_quicktime_aac_track_preserves_eight_speakers() {
+fn a_quicktime_aac_track_decodes_raw_packets_and_preserves_eight_speakers() {
     use Speaker::{
         BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency, SideLeft, SideRight,
     };
@@ -109,7 +109,7 @@ fn a_quicktime_aac_track_preserves_eight_speakers() {
         .find(|track| track.kind() == MediaKind::Audio)
         .unwrap();
     let id = track.id();
-    let mut decoder = TrackDecoder::aac_access_units_in(track.configuration(), &budget).unwrap();
+    let mut decoder = TrackDecoder::new(track).unwrap();
     let mut frame = AudioFrame::default();
     let mut count = 0;
     while let Some(current) = packet {
