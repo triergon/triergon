@@ -4,6 +4,10 @@ use crate::{SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
+/// A continuation carrier while no PES is being cut.
+pub(super) const CONTINUATION_WITHOUT_PACKET: Error =
+    Error::Unsupported("PES continuation without an active packet");
+
 impl DemuxObserver {
     pub(super) fn poll_start(&mut self, work: &mut WorkBudget) -> Result<bool> {
         let pending = self
@@ -55,9 +59,7 @@ impl DemuxObserver {
             }
             self.begin_pes()?;
         } else if !self.active {
-            return Err(Error::Unsupported(
-                "PES continuation without an active packet",
-            ));
+            return Err(CONTINUATION_WITHOUT_PACKET);
         }
         self.pending
             .as_mut()

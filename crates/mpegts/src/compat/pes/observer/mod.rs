@@ -400,6 +400,17 @@ struct Emission {
     continue_without_header: bool,
 }
 
+/// How the observer admits the carriers after the current one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Follow {
+    /// Every carrier in the scope's entity and epochs.
+    Admit,
+    /// A PES header failed its start code or length syntax: its continuations are
+    /// dropped until the next payload unit start, as the demuxer drops a packet it
+    /// cannot parse.
+    SkipToStart,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PayloadFormat {
     Owned,
@@ -425,39 +436,43 @@ const _: () = assert!(size_of::<PayloadFormat>() == size_of::<bool>());
 
 /// Opt-in, charged, one-transport-input mailbox. Caller keeps the strict source
 /// operation and causal events; this observer cannot replace or suppress them.
+// `repr(C)` keeps the field offsets the compiler chose for the hot assembly paths;
+// `follow` takes a byte of the trailing padding.
 #[derive(Debug)]
+#[repr(C)]
 pub struct DemuxObserver {
-    scope: DemuxScope,
-    // No source storage or auxiliary queue; only selects a bounded demux view.
-    private_audio: Option<PrivateAudioCarriage>,
-    demux_input: Option<crate::compat::input::InputBinding>,
-    payload_format: PayloadFormat,
-    budget: Budget,
-    limits: ParseLimits,
-    pending: Option<Pending>,
-    ended: bool,
     last_input: Option<(u64, u64)>,
-    entity_first: bool,
-    media_position_base: u64,
-    previous_counter: Option<u8>,
-    active: bool,
     origin: Option<SourceLocation>,
+    declared_total: Option<usize>,
+    body_limit: Option<usize>,
+    pending: Option<Pending>,
+    header: Option<PesHeader>,
+    demux_input: Option<crate::compat::input::InputBinding>,
+    header_ranges: BudgetVec<SourceRange>,
+    spans: PesList<DemuxSpan>,
+    output_header: PesList<SourceRange>,
+    emission: Option<Emission>,
+    growth: Option<Growth>,
+    fault: Option<Error>,
+    budget: Budget,
+    scope: DemuxScope,
+    limits: ParseLimits,
+    media_position_base: u64,
     position: i64,
     raw_header: [u8; HEADER_MAX],
     header_used: usize,
     header_target: usize,
-    header: Option<PesHeader>,
-    declared_total: Option<usize>,
-    body_limit: Option<usize>,
+    payload_extent: PayloadExtent,
+    previous_counter: Option<u8>,
+    ended: bool,
+    entity_first: bool,
+    active: bool,
     time_header_applies: bool,
     corrupt: bool,
-    payload_extent: PayloadExtent,
-    header_ranges: BudgetVec<SourceRange>,
-    spans: PesList<DemuxSpan>,
-    output_header: PesList<SourceRange>,
-    growth: Option<Growth>,
-    emission: Option<Emission>,
-    fault: Option<Error>,
+    payload_format: PayloadFormat,
+    // Only selects a bounded demux view; no source storage or auxiliary queue.
+    private_audio: Option<PrivateAudioCarriage>,
+    follow: Follow,
 }
 impl DemuxObserver {
     fn payload_len(&self) -> usize {
@@ -576,6 +591,7 @@ impl DemuxObserver {
             media_position_base: 0,
             previous_counter: None,
             active: false,
+            follow: Follow::Admit,
             origin: None,
             position: 0,
             raw_header: [0; HEADER_MAX],
@@ -788,7 +804,7 @@ impl DemuxObserver {
         }
         let result = self.poll_inner(work, cancel);
         if let Err(error) = &result {
-            self.keep_fault(*error);
+            return self.poll_failed(*error);
         }
         result
     }
@@ -910,6 +926,7 @@ mod tests {
             media_position_base: u64,
             previous_counter: Option<u8>,
             active: bool,
+            follow: Follow,
             origin: Option<SourceLocation>,
             position: i64,
             raw_header: [u8; HEADER_MAX],

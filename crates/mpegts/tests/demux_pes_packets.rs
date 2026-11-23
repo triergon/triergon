@@ -506,6 +506,29 @@ fn demux_headerless_time_is_unknown_and_does_not_seed_a_clock() {
 }
 
 #[test]
+fn a_pes_whose_header_fails_its_syntax_is_dropped_and_the_observer_continues() {
+    for data in [
+        include_bytes!("data/pes-optional-header-overrun.ts").as_slice(),
+        include_bytes!("data/pes-start-prefix-invalid.ts").as_slice(),
+    ] {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut observer = observer(&budget);
+        let mut output = Vec::new();
+        for (ordinal, packet) in input(data, PacketFormat::Ts188, &budget)
+            .into_iter()
+            .enumerate()
+            .filter(|(_, packet)| packet.pid == 256)
+        {
+            observer.push(packet, context(ordinal)).unwrap();
+            output.extend(drain(&mut observer, false));
+        }
+        observer.end_of_source().unwrap();
+        output.extend(drain(&mut observer, true));
+        assert!(output.is_empty());
+    }
+}
+
+#[test]
 fn observer_zero_work_and_cancel_preserve_pending_original_input() {
     let budget = Budget::new(16384).unwrap();
     let packets = input(

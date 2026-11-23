@@ -186,6 +186,7 @@ impl DemuxObserver {
         self.scope = scope;
         self.header = None;
         self.origin = None;
+        self.follow = super::Follow::Admit;
     }
 
     pub(crate) fn recovery_counter(&self) -> Option<u8> {

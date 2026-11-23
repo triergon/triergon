@@ -9,12 +9,21 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, SourceLocation, WorkBudget};
 
 impl DemuxObserver {
-    /// Keeps a failure that ends the observer, so that every later poll reports it.
+    /// The result of a poll that failed with `error`. A PES whose header fails its start
+    /// code or length syntax is dropped with its continuations, up to the next payload unit
+    /// start, as the demuxer drops a packet it cannot parse; the observer then asks for the
+    /// next carrier. Any other failure that is not retryable ends the observer, so that
+    /// every later poll reports it.
     #[cold]
-    pub(super) fn keep_fault(&mut self, error: Error) {
+    pub(super) fn poll_failed<T>(&mut self, error: Error) -> Result<AssemblyStep<T>> {
+        if self.drops_unparsed(error) {
+            self.pending = None;
+            return Ok(AssemblyStep::NeedPayload);
+        }
         if !crate::retryable(error) {
             self.fault = Some(error);
         }
+        Err(error)
     }
 
     /// Prepay allocation/move work across small polls, then reserve before any

@@ -1,9 +1,15 @@
 //! The PES header of the packet being cut.
-use super::{Arena, DemuxObserver};
+use super::body::CONTINUATION_WITHOUT_PACKET;
+use super::{Arena, DemuxObserver, Follow};
 use crate::pes::{HEADER_MAX, parse_header, parse_timed_header};
 use crate::{SourceRange, commit_range, limit, prepare_range};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
+
+/// A PES that does not begin with the start code prefix.
+const START_CODE: Error = Error::Invalid("PES start code");
+/// A PES whose optional header runs past its declared length.
+const EXCEEDS_LENGTH: Error = Error::Invalid("PES header exceeds length");
 
 impl DemuxObserver {
     fn finish_header(&mut self) -> Result<()> {
@@ -15,14 +21,33 @@ impl DemuxObserver {
         }
         self.body_limit = self
             .declared_total
-            .map(|total| {
-                total
-                    .checked_sub(self.header_used)
-                    .ok_or(Error::Invalid("PES header exceeds length"))
-            })
+            .map(|total| total.checked_sub(self.header_used).ok_or(EXCEEDS_LENGTH))
             .transpose()?;
         self.header = Some(header);
         Ok(())
+    }
+
+    /// Whether `error` drops the PES being cut, or the carrier that continues one dropped
+    /// before; when it does, the PES state is cleared to wait for the next payload unit
+    /// start. A dropped PES leaves no origin until the next one begins.
+    pub(super) fn drops_unparsed(&mut self, error: Error) -> bool {
+        if error == CONTINUATION_WITHOUT_PACKET {
+            return self.follow == Follow::SkipToStart && self.origin.is_none();
+        }
+        if !(error == START_CODE || error == EXCEEDS_LENGTH)
+            || !self.active
+            || self.header.is_some()
+        {
+            return false;
+        }
+        self.active = false;
+        self.follow = Follow::SkipToStart;
+        self.origin = None;
+        self.header_used = 0;
+        self.header_target = 6;
+        self.declared_total = None;
+        self.header_ranges.clear();
+        true
     }
 
     /// Read a timestamp-only header from one carrier when its whole validation
@@ -105,7 +130,7 @@ impl DemuxObserver {
             match self.header_used {
                 6 => {
                     if self.raw_header[..3] != [0, 0, 1] {
-                        return Err(Error::Invalid("PES start code"));
+                        return Err(START_CODE);
                     }
                     if self.raw_header[3] != self.scope.stream_id {
                         return Err(Error::Unsupported(
@@ -141,7 +166,7 @@ impl DemuxObserver {
                         .declared_total
                         .is_some_and(|total| self.header_target > total)
                     {
-                        return Err(Error::Invalid("PES header exceeds length"));
+                        return Err(EXCEEDS_LENGTH);
                     }
                     if self.header_target == 9 {
                         self.finish_header()?;
