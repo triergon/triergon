@@ -33,7 +33,7 @@ fn decode(raw: &[u8], profile: M, quantum: u64) -> Result<Vec<u8>, Error> {
 fn multibyte_missing_api_and_four_selected_scripts() {
     for (profile, raw, text) in [
         (M::GbkCp936, &[0xd6, 0xd0, 0xce, 0xc4][..], "中文"),
-        (M::Big5Unicode, &[0xa4, 0xa4, 0xa4, 0xe5][..], "中文"),
+        (M::Big5, &[0xa4, 0xa4, 0xa4, 0xe5][..], "中文"),
         (M::ShiftJisUnicode, &[0x93, 0xfa, 0x96, 0x7b][..], "日本"),
         (M::EucKr, &[0xc7, 0xd1, 0xb1, 0xdb][..], "한글"),
     ] {
@@ -52,10 +52,7 @@ fn windows_variants_are_observably_distinct() {
         decode(&[0x81, 0x60], M::Windows932, 1).unwrap(),
         "～".as_bytes()
     );
-    assert_eq!(
-        decode(&[0xa1, 0x45], M::Big5Unicode, 1).unwrap(),
-        "•".as_bytes()
-    );
+    assert_eq!(decode(&[0xa1, 0x45], M::Big5, 1).unwrap(), "‧".as_bytes());
     assert_eq!(
         decode(&[0xa1, 0x45], M::Windows950, 1).unwrap(),
         "‧".as_bytes()
@@ -107,9 +104,9 @@ const PROFILES: [(M, &str, usize); 7] = [
         21920,
     ),
     (
-        M::Big5Unicode,
-        include_str!("multibyte-mapping-data/BIG5.TXT"),
-        13831,
+        M::Big5,
+        include_str!("multibyte-mapping-data/INDEX-BIG5.TXT"),
+        18718,
     ),
     (
         M::ShiftJisUnicode,
@@ -150,9 +147,6 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
         };
         let code = u16::from_str_radix(code.strip_prefix("0x").unwrap(), 16).unwrap();
         let value = char::from_u32(u32::from_str_radix(value, 16).unwrap()).unwrap();
-        if profile == M::Big5Unicode && value == '\u{fffd}' {
-            continue;
-        }
         if profile == M::EucKr && !(0xa1..=0xfe).contains(&(code >> 8)) {
             continue;
         }
@@ -204,7 +198,7 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
         // CP949.TXT 2.01 predates A2E8, which KS X 1001:2002 assigns.
         assert!(map.insert(0xa2e8, '\u{327e}').is_none());
     }
-    if matches!(profile, M::Big5Unicode | M::EucKr) {
+    if matches!(profile, M::Big5 | M::EucKr) {
         for byte in 0..128 {
             assert!(
                 map.insert(byte, char::from_u32(u32::from(byte)).unwrap())
@@ -267,6 +261,9 @@ fn all_short_inputs(index: usize) {
 }
 
 fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>) {
+    // The Big5 codes that are two characters have a test of their own.
+    let two_characters =
+        |raw: [u8; 2]| profile == M::Big5 && matches!(raw, [0x88, 0x62 | 0x64 | 0xa3 | 0xa5]);
     for first in 0u16..256 {
         match table.get(&first) {
             Some(value) => assert_eq!(
@@ -277,6 +274,9 @@ fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>)
         }
         for second in 0u16..256 {
             let raw = [first as u8, second as u8];
+            if two_characters(raw) {
+                continue;
+            }
             let expected = if let Some(a) = table.get(&first) {
                 table.get(&second).map(|b| format!("{a}{b}"))
             } else {
@@ -401,7 +401,7 @@ fn every_physical_partition_retains_lead_and_exact_ranges() {
     let cancel = AtomicBool::new(false);
     for (profile, raw) in [
         (M::GbkCp936, &[0, 0xd6, 0xd0, 0x41, 0xce, 0xc4][..]),
-        (M::Big5Unicode, &[0, 0xa4, 0xa4, 0x41, 0xa4, 0xe5][..]),
+        (M::Big5, &[0, 0xa4, 0xa4, 0x41, 0xa4, 0xe5][..]),
         (M::ShiftJisUnicode, &[0, 0x93, 0xfa, 0x41, 0x96, 0x7b][..]),
         (M::EucKr, &[0, 0xc7, 0xd1, 0x41, 0xb1, 0xdb][..]),
     ] {
@@ -437,7 +437,7 @@ fn lead_starvation_is_not_eof_and_finish_is_sticky_truncation() {
     let cancel = AtomicBool::new(false);
     for profile in [
         M::GbkCp936,
-        M::Big5Unicode,
+        M::Big5,
         M::ShiftJisUnicode,
         M::EucKr,
         M::Windows932,
@@ -523,20 +523,83 @@ fn invalid_trail_never_replays_as_ascii_or_publishes_replacement() {
 }
 
 #[test]
-fn big5_seven_unmapped_records_are_all_required_refusals() {
-    for code in [0xa15au16, 0xa1c3, 0xa1c5, 0xa1fe, 0xa240, 0xa2cc, 0xa2ce] {
+fn big5_is_the_encoding_standards_index() {
+    // Where Unicode's historical BIG5.TXT differs or has no mapping, the
+    // supplement before A1 40, a plane 2 character and the last code.
+    for (code, scalar) in [
+        ([0xa1, 0x45], '\u{2027}'),
+        ([0xa1, 0x5a], '\u{2574}'),
+        ([0xa1, 0xc3], '\u{ffe3}'),
+        ([0xa2, 0xcc], '\u{5341}'),
+        ([0xc6, 0xa1], '\u{2460}'),
+        ([0xf9, 0xfe], '\u{ffed}'),
+        ([0x87, 0x40], '\u{43f0}'),
+        ([0x9c, 0x71], '\u{20021}'),
+        ([0xfe, 0xfe], '\u{79d4}'),
+    ] {
+        assert_eq!(
+            decode(&code, M::Big5, 1).unwrap(),
+            scalar.to_string().as_bytes(),
+            "{code:02x?}"
+        );
+    }
+    // No pointer below 942, and no single byte beyond ASCII.
+    for refused in [&[0x81, 0x40][..], &[0x86, 0xfe], &[0x80], &[0xff]] {
         assert!(matches!(
-            decode(&code.to_be_bytes(), M::Big5Unicode, 1),
+            decode(refused, M::Big5, 1),
             Err(Error::Invalid(_))
         ));
-        assert!(decode(&code.to_be_bytes(), M::Windows950, 1).is_ok());
     }
 }
 
 #[test]
-fn gbk_has_no_gb18030_four_byte_codes_and_big5_no_supplement() {
+fn big5_codes_of_two_characters_give_a_letter_and_its_mark() {
+    let cancel = AtomicBool::new(false);
+    for (code, text) in [
+        ([0x88, 0x62], "\u{ca}\u{304}"),
+        ([0x88, 0x64], "\u{ca}\u{30c}"),
+        ([0x88, 0xa3], "\u{ea}\u{304}"),
+        ([0x88, 0xa5], "\u{ea}\u{30c}"),
+    ] {
+        let raw = [b'A', code[0], code[1], b'B'];
+        for quantum in [1, 7, 4096] {
+            assert_eq!(
+                decode(&raw, M::Big5, quantum).unwrap(),
+                format!("A{text}B").as_bytes()
+            );
+        }
+        // The decoder gives the letter for the lead byte and the mark for the
+        // trail byte, which it takes on its second push.
+        let mut decoder = MultibyteDecoder::new(M::Big5);
+        let mut scalars = Vec::new();
+        while decoder.position() < raw.len() {
+            let byte = raw[decoder.position()];
+            if let DecodeStep::Scalar(scalar) = decoder
+                .push(byte, &mut WorkBudget::new(1), &cancel)
+                .unwrap()
+            {
+                scalars.push((scalar.value, scalar.range));
+            }
+        }
+        decoder.finish(&cancel).unwrap();
+        let mut characters = text.chars();
+        assert_eq!(
+            scalars,
+            [
+                ('A', 0..1),
+                (characters.next().unwrap(), 1..2),
+                (characters.next().unwrap(), 2..3),
+                ('B', 3..4),
+            ]
+        );
+        // Without its trail byte the code is truncated.
+        assert_eq!(decode(&raw[..2], M::Big5, 1), Err(Error::Truncated));
+    }
+}
+
+#[test]
+fn gbk_has_no_gb18030_four_byte_codes() {
     assert!(decode(&[0x81, 0x30, 0x81, 0x30], M::GbkCp936, 1).is_err());
-    assert!(decode(&[0x87, 0x40], M::Big5Unicode, 1).is_err());
 }
 
 #[test]
@@ -595,7 +658,7 @@ fn byte_origin_overflow_is_checked_before_source_progress() {
 #[test]
 fn finished_decoder_rejects_more_bytes_and_empty_input_is_real_empty_text() {
     let cancel = AtomicBool::new(false);
-    let mut decoder = MultibyteDecoder::new(M::Big5Unicode);
+    let mut decoder = MultibyteDecoder::new(M::Big5);
     decoder.finish(&cancel).unwrap();
     decoder.finish(&cancel).unwrap();
     assert!(matches!(

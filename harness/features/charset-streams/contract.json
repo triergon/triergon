@@ -357,10 +357,10 @@
   ],
   "open_deviations": [
     {
-      "reading": "The strict big5 profile follows Unicode's historical BIG5.TXT (a profile choice; no normative Big5 mapping exists)",
-      "clause": "Big5 has no normative Unicode mapping: Unicode's BIG5.TXT, which the strict profile follows, is marked obsolete; glibc, Microsoft CP950, HKSCS and the WHATWG Encoding Standard differ among themselves. The WHATWG decoder, like the strict profile, refuses byte 80, and its index maps A145 to U+2027 as glibc does.",
-      "candidate": "Refuses byte 80 and pairs BIG5.TXT leaves unmapped such as A15A; maps A145 to U+2022 and C6A1 to U+30FE.",
-      "reference": "glibc 2.39 iconv decodes 80 as U+0080 and A15A as U+2574, and maps A145 to U+2027 and C6A1 to U+F6B1.",
+      "reading": "The strict big5 profile decodes Big5 as the Encoding Standard does (a profile choice: the reference's C library converts with its own Big5 charmap)",
+      "clause": "WHATWG Encoding Standard, Big5 decoder and index-big5: lead bytes 81 to FE, the Hong Kong supplement with its plane 2 characters, the codes 8862, 8864, 88A3 and 88A5 as two code points each, and no single byte beyond ASCII.",
+      "candidate": "Refuses byte 80; maps 8740 to U+43F0, 8862 to U+00CA U+0304, C6A1 to U+2460 and F9FE to U+FFED.",
+      "reference": "glibc 2.39 iconv decodes 80 as U+0080, refuses 8740 and 8862, and maps C6A1 to U+F6B1 and F9FE to U+2593.",
       "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "big5-bytes",

@@ -3,7 +3,7 @@
 //! the declared label are kept beside the result.
 use super::{
     Encoding, Limits,
-    unicode::{Cursor, Poll, Probe, cancelled},
+    unicode::{Cursor, Outside, Poll, Probe, cancelled},
 };
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -246,7 +246,18 @@ impl CharsetJob {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        let value = self.inner(work, cancel);
+        let mut value = self.inner(work, cancel);
+        // Only Big5 decodes anything its table refuses.
+        while value.is_err() && self.charset == Charset::Multibyte(MultibyteCharset::Big5) {
+            match self.outside_table() {
+                Ok(true) => value = self.inner(work, cancel),
+                Ok(false) => break,
+                Err(error) => {
+                    value = Err(error);
+                    break;
+                }
+            }
+        }
         if let Err(error) = value
             && !matches!(error, Error::Backpressure { .. } | Error::Cancelled)
         {
@@ -259,6 +270,29 @@ impl CharsetJob {
     // `poll`: inlined into a decoder's larger step they cost about a tenth more
     // instructions for each conversion.
     #[inline(never)]
+    /// After `inner` failed: takes what the reader's profile decodes although
+    /// its table refused it, as `inner` takes a character; `false` when the
+    /// refusal stands. `inner` reads through the cursor's bare step, so this
+    /// is the one place a conversion calls for it.
+    #[cold]
+    fn outside_table(&mut self) -> Result<bool> {
+        let Reader::Scalars(cursor) = &mut self.reader else {
+            return Ok(false);
+        };
+        match cursor.outside_table(self.source.as_ref()) {
+            Outside::Refused => return Ok(false),
+            Outside::Lead => {}
+            Outside::Scalar(scalar) => match self.phase {
+                Phase::Count => self.length = counted(self.length, scalar.value, &self.limits)?,
+                Phase::Encode => {
+                    self.pending_len = scalar.value.encode_utf8(&mut self.pending).len();
+                    self.pending_at = 0;
+                }
+                _ => {}
+            },
+        }
+        Ok(true)
+    }
     fn inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CharsetStatus> {
         loop {
             cancelled(cancel)?;
@@ -298,7 +332,7 @@ impl CharsetJob {
                         self.range = range;
                     }
                     Reader::Scalars(cursor) => {
-                        match cursor.poll(self.source.as_ref(), work, cancel)? {
+                        match cursor.step(self.source.as_ref(), work, cancel)? {
                             Poll::Yield => return Ok(CharsetStatus::Pending),
                             Poll::Ready(scalar) => {
                                 self.length = counted(self.length, scalar.value, &self.limits)?;
@@ -374,7 +408,7 @@ impl CharsetJob {
                             continue;
                         }
                         Reader::Scalars(cursor) => {
-                            match cursor.poll(self.source.as_ref(), work, cancel)? {
+                            match cursor.step(self.source.as_ref(), work, cancel)? {
                                 Poll::Yield => return Ok(CharsetStatus::Pending),
                                 Poll::Ready(scalar) => scalar.value,
                                 Poll::End => {

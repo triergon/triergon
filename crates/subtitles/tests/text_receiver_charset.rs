@@ -47,7 +47,7 @@ fn decode(p: &Budget, raw: &[u8], profile: M) -> Result<Vec<u8>, Error> {
     panic!("nonterminal")
 }
 #[test]
-fn big5_seven_undefined_and_punctuation_are_receiver_only() {
+fn the_receiver_big5_maps_the_codes_the_historical_table_leaves_out() {
     let p = Budget::new(1 << 20).unwrap();
     for (raw, text) in [
         (&[0xa1, 0x5a][..], "╴"),
@@ -61,7 +61,12 @@ fn big5_seven_undefined_and_punctuation_are_receiver_only() {
     ] {
         assert_eq!(decode(&p, raw, M::ReceiverBig5).unwrap(), text.as_bytes());
     }
-    assert!(decode(&p, &[0xa1, 0x5a], M::Big5Unicode).is_err());
+    // The Encoding Standard's Big5 maps A1 5A as the receiver does, and A1 4E
+    // and A1 C2 too; neither is the reference's table.
+    assert_eq!(
+        decode(&p, &[0xa1, 0x5a, 0xa1, 0x4e, 0xa1, 0xc2], M::Big5).unwrap(),
+        "╴﹑¯".as_bytes()
+    );
 }
 #[test]
 fn euc_c1_controls_are_explicit_not_cp949_alias() {

@@ -2,8 +2,11 @@
 //! decoder that reads them a byte at a time. No charset is detected.
 //!
 //! The mapping data and licences are described in `MULTIBYTE-CONTRACT.md`.
-//! The profiles keep historical Unicode, Windows and restricted EUC
-//! repertoires apart; a label that names one does not name the others.
+//! A profile follows the current definition of its charset: the Encoding
+//! Standard's decoder, a Windows code page as Windows converts it, or a
+//! national standard. The `Receiver` profiles follow the C library of the
+//! reference build instead, for
+//! [`receiver_charset`](crate::compat::charset::receiver_charset).
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -15,8 +18,10 @@ use super::super::unicode::cancelled;
 pub enum MultibyteCharset {
     /// Microsoft CP936 table 2.01, including its single-byte euro mapping.
     GbkCp936,
-    /// Unicode historical Big5 table 2.0, with its seven NO MAPPING entries refused.
-    Big5Unicode,
+    /// Big5 as the Encoding Standard decodes it: its index, with the Hong Kong
+    /// supplement and its plane 2 characters. The codes 88 62, 88 64, 88 A3
+    /// and 88 A5 are each two characters, a letter and a combining mark.
+    Big5,
     /// Unicode historical Shift-JIS table 2.0, which decodes 0x5C as yen and
     /// 0x7E as overline, with 81 5F, JIS X 0208's reverse solidus, as
     /// U+FF3C as JIS0208.TXT maps it.
@@ -61,8 +66,8 @@ impl MultibyteCharset {
             ("gbk", Self::GbkCp936),
             ("cp936", Self::GbkCp936),
             ("windows-936", Self::GbkCp936),
-            ("big5", Self::Big5Unicode),
-            ("big-5", Self::Big5Unicode),
+            ("big5", Self::Big5),
+            ("big-5", Self::Big5),
             ("shift_jis", Self::ShiftJisUnicode),
             ("shift-jis", Self::ShiftJisUnicode),
             ("sjis", Self::ShiftJisUnicode),
@@ -87,7 +92,7 @@ impl MultibyteCharset {
     fn lookup(self, code: u16) -> Option<char> {
         let data: &[u8] = match self {
             Self::GbkCp936 => include_bytes!("mapping-data/gbk.bin"),
-            Self::Big5Unicode => include_bytes!("mapping-data/big5.bin"),
+            Self::Big5 => include_bytes!("mapping-data/big5.bin"),
             Self::ShiftJisUnicode => include_bytes!("mapping-data/shift_jis.bin"),
             Self::EucKr | Self::ReceiverEucKrC1 => {
                 if let Ok(byte) = u8::try_from(code) {
@@ -124,13 +129,28 @@ impl MultibyteCharset {
         None
     }
 
+    /// The character of a [`Big5`](Self::Big5) code in plane 2.
+    fn big5_plane2(code: u16) -> Option<char> {
+        let (records, _) = include_bytes!("mapping-data/big5_plane2.bin").as_chunks::<4>();
+        let at = records
+            .binary_search_by_key(&code, |&[lead, trail, ..]| {
+                u16::from_be_bytes([lead, trail])
+            })
+            .ok()?;
+        let [_, _, high, low] = records[at];
+        char::from_u32(0x2_0000 | u32::from(u16::from_be_bytes([high, low])))
+    }
+
+    // Big5's lead bytes here are those of its standard part; the decoder takes
+    // the supplement's, 0x81 to 0xA0 and 0xFA to 0xFE, with what else lies
+    // outside its table.
     fn lead(self, byte: u8) -> bool {
         match self {
             Self::ShiftJisUnicode => matches!(byte, 0x81..=0x9f | 0xe0..=0xef),
             Self::Windows932 => {
                 matches!(byte, 0x81..=0x9f | 0xe0..=0xfc)
             }
-            Self::Big5Unicode | Self::ReceiverBig5 => matches!(byte, 0xa1..=0xf9),
+            Self::Big5 | Self::ReceiverBig5 => matches!(byte, 0xa1..=0xf9),
             Self::EucKr | Self::ReceiverEucKrC1 => {
                 matches!(byte, 0xa1..=0xfe)
             }
@@ -144,7 +164,7 @@ impl MultibyteCharset {
                 matches!(byte, 0x40..=0x7e | 0x80..=0xfc)
             }
             Self::GbkCp936 => matches!(byte, 0x40..=0x7e | 0x80..=0xfe),
-            Self::Big5Unicode | Self::Windows950 | Self::ReceiverBig5 => {
+            Self::Big5 | Self::Windows950 | Self::ReceiverBig5 => {
                 matches!(byte, 0x40..=0x7e | 0xa1..=0xfe)
             }
             Self::EucKr | Self::ReceiverEucKrC1 => {
@@ -154,6 +174,12 @@ impl MultibyteCharset {
         }
     }
 }
+
+/// Lead bytes that stand for a combining mark still to give, the second
+/// character of a [`MultibyteCharset::Big5`] code that is two: a macron and a
+/// caron. Neither is a Big5 lead byte.
+const MACRON_DUE: u8 = 0x80;
+const CARON_DUE: u8 = 0xff;
 
 /// A decoded character and the bytes it was decoded from.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -218,11 +244,30 @@ impl MultibyteDecoder {
         self.position
     }
 
-    /// Decodes `byte`. `Error::Invalid` for input after
+    /// Decodes `byte`, the byte at [`position`](Self::position). The trail
+    /// byte of a [`MultibyteCharset::Big5`] code that is two characters gives
+    /// the letter and stays the next byte to push; pushed again it gives the
+    /// combining mark. `Error::Invalid` for input after
     /// [`finish`](Self::finish), a trail byte the profile refuses, or a byte
     /// or pair its table does not map; `Error::Overflow` when the position
     /// does not fit `usize`.
     pub fn push(
+        &mut self,
+        byte: u8,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<DecodeStep> {
+        let step = self.push_table(byte, work, cancel);
+        match step {
+            Err(error) => self.outside_table(byte).ok_or(error),
+            step => step,
+        }
+    }
+
+    /// [`push`](Self::push) for what the profile's table and lead bytes hold;
+    /// what else [`MultibyteCharset::Big5`] decodes is refused here and taken
+    /// by [`outside_table`](Self::outside_table).
+    pub(crate) fn push_table(
         &mut self,
         byte: u8,
         work: &mut WorkBudget,
@@ -288,6 +333,51 @@ impl MultibyteDecoder {
             return Ok(DecodeStep::NeedInput);
         }
         Err(Error::Invalid("unmapped multibyte byte"))
+    }
+
+    /// The step for `byte`, which [`push_table`](Self::push_table) has just
+    /// refused, where [`MultibyteCharset::Big5`] decodes it all the same: a
+    /// lead byte of the supplement, a plane 2 character, or one of the codes
+    /// that are two characters. `None` leaves the refusal standing.
+    #[cold]
+    pub(crate) fn outside_table(&mut self, byte: u8) -> Option<DecodeStep> {
+        if self.profile != MultibyteCharset::Big5 || self.finished {
+            return None;
+        }
+        self.failed?;
+        let next = self.position.checked_add(1)?;
+        let Some(lead) = self.lead else {
+            if !matches!(byte, 0x81..=0xa0 | 0xfa..=0xfe) {
+                return None;
+            }
+            self.failed = None;
+            self.lead = Some(byte);
+            self.position = next;
+            return Some(DecodeStep::NeedInput);
+        };
+        if !self.profile.trail(byte) {
+            return None;
+        }
+        let start = self.position.checked_sub(1)?;
+        let (value, range, lead) = match [lead, byte] {
+            // The mark of a letter already given: the trail byte's second turn.
+            [MACRON_DUE, _] => ('\u{304}', self.position..next, None),
+            [CARON_DUE, _] => ('\u{30c}', self.position..next, None),
+            // The letter, with the trail byte left for its mark.
+            [0x88, 0x62] => ('\u{ca}', start..self.position, Some(MACRON_DUE)),
+            [0x88, 0x64] => ('\u{ca}', start..self.position, Some(CARON_DUE)),
+            [0x88, 0xa3] => ('\u{ea}', start..self.position, Some(MACRON_DUE)),
+            [0x88, 0xa5] => ('\u{ea}', start..self.position, Some(CARON_DUE)),
+            code => (
+                MultibyteCharset::big5_plane2(u16::from_be_bytes(code))?,
+                start..next,
+                None,
+            ),
+        };
+        self.failed = None;
+        self.lead = lead;
+        self.position = range.end;
+        Some(DecodeStep::Scalar(DecodedScalar { value, range }))
     }
 
     /// Ends the input. A pending lead byte is a sticky `Error::Truncated`;

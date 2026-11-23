@@ -25,6 +25,17 @@ pub(crate) fn cancelled(cancel: &AtomicBool) -> Result<()> {
     }
 }
 
+/// What a multibyte profile makes of a byte its table refused.
+#[derive(Debug)]
+pub(crate) enum Outside {
+    /// The refusal stands.
+    Refused,
+    /// A lead byte: the cursor has taken it.
+    Lead,
+    /// A character.
+    Scalar(Scalar),
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Scalar {
     pub value: char,
@@ -111,7 +122,7 @@ impl Cursor {
             let byte = *bytes
                 .get(self.at)
                 .ok_or(Error::Invalid("multibyte source range"))?;
-            match decoder.push(byte, work, cancel)? {
+            match decoder.push_table(byte, work, cancel)? {
                 DecodeStep::Yield => return Ok(Poll::Yield),
                 DecodeStep::NeedInput => self.at = decoder.position(),
                 DecodeStep::Scalar(scalar) => {
@@ -123,7 +134,68 @@ impl Cursor {
         }
     }
 
+    /// The next scalar. What a multibyte profile decodes outside its table
+    /// ([`outside_table`](Self::outside_table)) is resolved here.
+    #[inline(always)]
     pub(super) fn poll(
+        &mut self,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Poll<Scalar>> {
+        let step = self.step(bytes, work, cancel);
+        if step.is_err() {
+            return self.resolve(bytes, work, cancel, step);
+        }
+        step
+    }
+
+    #[cold]
+    fn resolve(
+        &mut self,
+        bytes: &[u8],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        mut step: Result<Poll<Scalar>>,
+    ) -> Result<Poll<Scalar>> {
+        while step.is_err() {
+            match self.outside_table(bytes) {
+                Outside::Refused => break,
+                Outside::Lead => step = self.step(bytes, work, cancel),
+                Outside::Scalar(scalar) => return Ok(Poll::Ready(scalar)),
+            }
+        }
+        step
+    }
+
+    /// After [`step`](Self::step) failed: what the multibyte profile makes of
+    /// the byte at the cursor although its table refused it.
+    #[cold]
+    pub(super) fn outside_table(&mut self, bytes: &[u8]) -> Outside {
+        let step = match (&mut self.multibyte, bytes.get(self.at)) {
+            (Some(decoder), Some(&byte)) if self.at < self.end => decoder.outside_table(byte),
+            _ => None,
+        };
+        match step {
+            Some(DecodeStep::Scalar(scalar)) => {
+                self.at = scalar.range.end;
+                self.scalar_start = scalar.range.start;
+                self.scalar(u32::from(scalar.value))
+                    .map_or(Outside::Refused, Outside::Scalar)
+            }
+            Some(DecodeStep::NeedInput) => {
+                self.at += 1;
+                Outside::Lead
+            }
+            Some(DecodeStep::Yield) | None => Outside::Refused,
+        }
+    }
+
+    /// The next scalar of what the encoding's own tables hold: a step that
+    /// calls nothing, as a call in it, even one never made, costs every
+    /// character.
+    #[inline(never)]
+    pub(super) fn step(
         &mut self,
         bytes: &[u8],
         work: &mut WorkBudget,
