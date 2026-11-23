@@ -1033,10 +1033,14 @@ pub(crate) struct SegmentState {
     values: Option<usize>,
 }
 
+impl SegmentState {
+    const NO_CODE: u32 = u32::MAX;
+}
+
 impl Default for SegmentState {
     fn default() -> Self {
         Self {
-            charcode: u32::MAX,
+            charcode: Self::NO_CODE,
             gindex: 0,
             range: 0,
             start: 0,
@@ -1445,7 +1449,7 @@ impl<'a> SegmentDelta<'a> {
                 charcode = state.start;
             }
         }
-        (state.charcode, state.gindex) = (u32::MAX, 0);
+        (state.charcode, state.gindex) = (SegmentState::NO_CODE, 0);
     }
 }
 
