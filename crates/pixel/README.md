@@ -8,6 +8,11 @@ scale/pad chain does, and the Y'CbCr → RGB of subtitle palette entries. It is 
 layer below the codec crates and depends only on `std`. It does no other scaling and no
 colour management.
 
+The conversions are reproductions: the letterbox, the RGBA → YUV filters and the palette
+rounding give FFmpeg's results bit for bit, because no specification defines a scaler's
+taps or rounding. With no specification form to keep apart from them, they live at the
+crate root rather than in a `compat` module.
+
 ## Usage
 
 RGBA in, coded YUV 4:2:0 out (the encoder input of
