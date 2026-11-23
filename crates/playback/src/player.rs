@@ -843,7 +843,7 @@ impl<S: Source> Player<S> {
             selection,
             epoch,
             queue,
-            cancel: cancel,
+            cancel,
             seek: None,
         }))
     }
