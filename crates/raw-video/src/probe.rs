@@ -130,9 +130,9 @@ pub enum PlaybackProbeStep {
 }
 
 /// The selected input. It replays the probed prefix, then reads on from the source.
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "one inline selected reader avoids a separate uncharged allocation"
+    reason = "the selected reader is held inline: boxing it adds an uncharged allocation"
 )]
 #[derive(Debug)]
 pub enum PlaybackInput<S: Source> {

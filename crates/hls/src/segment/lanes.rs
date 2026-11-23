@@ -182,9 +182,9 @@ impl VideoPicture for HlsMediaVideoUnit {
     }
 }
 
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "retain the selected video assembler inline in the bounded session"
+    reason = "the HEVC assembler is held inline: a segment reader owns one and boxing it adds an uncharged allocation"
 )]
 pub(super) enum VideoAssembler {
     Avc(AvcTsReader),
@@ -275,10 +275,6 @@ impl From<HlsAacFrame> for HlsMediaAudioUnit {
     }
 }
 
-#[allow(
-    clippy::large_enum_variant,
-    reason = "retain the selected audio assembler inline in the bounded session"
-)]
 pub(super) enum AudioAssembler {
     Aac(HlsAac),
     Dolby(HlsDolby),

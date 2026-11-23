@@ -31,9 +31,9 @@ pub use probe::{
     RawVideoProbeLimits, RawVideoProbeStep,
 };
 
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "one inline raw parser avoids an uncharged allocation for the active source"
+    reason = "the active raw reader is held inline: boxing it adds an uncharged allocation"
 )]
 #[derive(Debug)]
 enum State<S: Source> {

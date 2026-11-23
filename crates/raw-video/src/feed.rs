@@ -64,9 +64,9 @@ struct Active<S: Source> {
     clock: Option<SubmissionClock>,
 }
 
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "one inline decoder configuration tracker avoids an uncharged allocation"
+    reason = "the configuration tracker is held inline: boxing it adds an uncharged allocation"
 )]
 #[derive(Debug)]
 enum State<S: Source> {
