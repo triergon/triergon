@@ -2,10 +2,11 @@
 
 Bounded, incremental reader for ISO base media files: MP4, QuickTime MOV and
 fragmented MP4. It is a format-layer crate built on `triergon-core` (input
-cursor, budgets, exact time) and uses `triergon-framing` only for AC-3/E-AC-3
-configuration in encoded edit plans. It parses boxes, sample tables, fragments,
-edit lists and seek indexes, and reads sample payloads by byte range. It does no
-I/O of its own, decodes no codec, and does not apply edits to presentation.
+cursor, budgets, exact time) and uses `triergon-framing` for the AAC, AC-3 and
+Opus configuration parsers its FFmpeg-compatible encoded views read. It parses
+boxes, sample tables, fragments, edit lists and seek indexes, and reads sample
+payloads by byte range. It does no I/O of its own, decodes no codec, and does not
+apply edits to presentation.
 
 `Reader` implements the core `ContainerReader` over the source view, so the crate
 works in generic code and inside `triergon::AnyReader`. The parts below stay
@@ -303,9 +304,9 @@ Limits of the reader:
   into account precedes its decode time. Its index times are the demuxer's signed
   64-bit field: a decode time from 2^63 on (a version-1 `tfdt` is unsigned) reads
   there as a negative time and is compared as one.
-- **Refusals.** Unknown box versions, unknown flags, unselected `stz2` widths,
-  non-unit edits and unobserved FFmpeg-compatible profiles return
-  `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.
+- **Refusals.** Unknown box versions, unknown flags, `stz2` widths other than 4, 8
+  and 16, non-unit edits and inputs the FFmpeg-compatible views do not reproduce
+  return `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.
   Readers keep a failure sticky; build a new reader to continue.
 - **Not handled.** External data references (`dref` URLs), encryption,
   metadata (`udta`/`meta`) interpretation, decoder recovery and muxing.
