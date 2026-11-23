@@ -110,7 +110,10 @@ pub enum Selection {
 }
 
 /// Selects the container `prefix` starts under `policy`, testing in this order: an
-/// EBML header, an accepted opening box, an Ogg page, transport sync bytes.
+/// EBML header, an accepted opening box, an Ogg page, transport sync bytes. An opening
+/// box is one whose size can hold its header (ISO/IEC 14496-12 4.2): 0 (to the end of
+/// the file), at least 8, or 1 with a 64-bit size of at least 16, for which the prefix
+/// must reach byte 16.
 // Inline, so that a caller's constant policy compiles to its own tests: a probe
 // calls this for every window it reads.
 #[inline]
@@ -119,7 +122,20 @@ pub fn select(prefix: &[u8], policy: &Policy) -> Selection {
         return Selection::Container(Container::Matroska);
     }
     if opening_box(prefix).is_some_and(|kind| policy.opening_boxes.contains(kind)) {
-        return Selection::Container(Container::Isobmff);
+        match u32::from_be_bytes([prefix[0], prefix[1], prefix[2], prefix[3]]) {
+            0 | 8.. => return Selection::Container(Container::Isobmff),
+            1 => match prefix
+                .get(8..16)
+                .and_then(|large| <[u8; 8]>::try_from(large).ok())
+            {
+                None => return Selection::Need(16),
+                Some(large) if u64::from_be_bytes(large) >= 16 => {
+                    return Selection::Container(Container::Isobmff);
+                }
+                Some(_) => {}
+            },
+            _ => {}
+        }
     }
     if policy.ogg && ogg(prefix) {
         return Selection::Container(Container::Ogg);
@@ -235,6 +251,20 @@ mod tests {
         assert_eq!(select(&both, &REFUSING), Selection::Unrecognised);
         both[188] = 0x47;
         assert_eq!(select(&both, &REFUSING), ts188);
+    }
+
+    #[test]
+    fn an_opening_box_too_small_for_its_header_is_not_one() {
+        let isobmff = Selection::Container(Container::Isobmff);
+        assert_eq!(select(b"\0\0\0\x07ftyp", &FIRST), Selection::Unrecognised);
+        assert_eq!(select(b"\0\0\0\x08ftyp", &FIRST), isobmff);
+        assert_eq!(select(b"\0\0\0\0ftyp", &FIRST), isobmff);
+        let mut large = *b"\0\0\0\x01ftyp\0\0\0\0\0\0\0\x10";
+        assert_eq!(select(&large[..15], &FIRST), Selection::Need(16));
+        assert_eq!(select(&large, &FIRST), isobmff);
+        large[15] = 8;
+        assert_eq!(select(&large, &FIRST), Selection::Unrecognised);
+        assert_eq!(select_whole(&large, &FIRST), Selection::Unrecognised);
     }
 
     #[test]
