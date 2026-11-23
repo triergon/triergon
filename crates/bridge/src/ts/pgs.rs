@@ -7,20 +7,22 @@
 use crate::bitmap::{BitmapInput, BitmapScope};
 use crate::ts::{PesBinding, PesData, Taken, TakenPes};
 use triergon_core::{Error, Result, TimeBase, WorkBudget};
-use triergon_mpegts::clock::SourceTimestamp;
+use triergon_mpegts::{clock::SourceTimestamp, psi::stream_type};
 use triergon_playback::Output;
 use triergon_subtitles::pgs::PacketClock;
 
-/// The BD-ROM stream type of presentation graphics.
-const STREAM_TYPE_PGS: u8 = 0x90;
-
-/// Source provenance carried with an assembled PGS packet through the bitmap bridge.
+/// Where a PGS packet came from in the transport stream, kept as its
+/// [`BitmapInput`] metadata.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TsPesFacts {
-    pid: u16,
-    elementary_offset: u64,
-    pts: Option<SourceTimestamp>,
-    dts: Option<SourceTimestamp>,
+    /// The PID of the stream.
+    pub pid: u16,
+    /// The offset of the PES data field's first byte in the PID's elementary stream.
+    pub elementary_offset: u64,
+    /// The PES presentation time as coded and on the player's timeline.
+    pub pts: Option<SourceTimestamp>,
+    /// The PES decode time as coded and on the player's timeline.
+    pub dts: Option<SourceTimestamp>,
 }
 
 /// What a poll did.
@@ -68,7 +70,7 @@ impl PgsTsTrack {
     /// Bind to `pid` of the active PMT `output`; it must be a PGS stream.
     pub fn new(output: &Output, pid: u16, packet_limit: usize) -> Result<Self> {
         let (binding, stream) = PesBinding::new(output, pid, packet_limit)?;
-        if stream.stream_type != STREAM_TYPE_PGS {
+        if stream.stream_type != stream_type::HDMV_PGS {
             return Err(Error::Unsupported("PGS track requires stream type 0x90"));
         }
         let scope = BitmapScope {

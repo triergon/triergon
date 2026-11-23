@@ -175,10 +175,12 @@ pub(super) fn avc_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<(u8,
         }
         match NalHeader::parse(Codec::Avc, nal)? {
             NalHeader::Avc {
-                nal_unit_type: 7, ..
+                nal_unit_type: avc::SPS,
+                ..
             } if sps.is_none() => sps = Some(avc::read_sps_reorder(&nal[1..])?),
             NalHeader::Avc {
-                nal_unit_type: 8, ..
+                nal_unit_type: avc::PPS,
+                ..
             } if pps.is_none() => pps = Some(avc::read_pps_ids(&nal[1..])?),
             _ => return Err(Error::Unsupported("AVC clock parameter-set chain")),
         }
@@ -191,6 +193,9 @@ pub(super) fn avc_chain<'a>(nals: impl Iterator<Item = &'a [u8]>) -> Result<(u8,
     Ok((pps, reorder))
 }
 
+/// The AVC NAL unit type of filler data (H.264 Table 7-1).
+const FILLER_DATA: u8 = 12;
+
 pub(super) fn picture_nal(
     codec: Codec,
     nal: &[u8],
@@ -198,17 +203,17 @@ pub(super) fn picture_nal(
 ) -> Result<Option<(bool, bool, u8)>> {
     match NalHeader::parse(codec, nal)? {
         NalHeader::Avc {
-            nal_unit_type: kind @ (1 | 5),
+            nal_unit_type: kind @ (avc::SLICE | avc::IDR),
             ..
         } => {
             let (address, slice_type, pps) = avc::read_slice_prefix(&nal[1..])?;
             if !(matches!(slice_type, 0 | 2) || reorders && slice_type == 1) {
                 return Err(Error::Unsupported("AVC clock slice type"));
             }
-            Ok(Some((address == 0, kind == 5, pps)))
+            Ok(Some((address == 0, kind == avc::IDR, pps)))
         }
         NalHeader::Avc {
-            nal_unit_type: 6 | 9 | 12,
+            nal_unit_type: avc::SEI | avc::AUD | FILLER_DATA,
             ..
         } => Ok(None),
         header @ NalHeader::Hevc { .. } => match hevc::startup_nal(nal, header)? {

@@ -422,7 +422,8 @@ pub struct AccessUnit<'a, P> {
 }
 
 impl<P> AccessUnit<'_, P> {
-    /// Borrow from the packet when framing produces no new bytes.
+    /// The bytes framing made, or `None` when the unit is the packet's own payload,
+    /// borrowed.
     pub fn framed(&self) -> Option<&Bytes> {
         match &self.bytes {
             Unit::Framed(bytes) => Some(bytes),

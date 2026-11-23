@@ -14,7 +14,10 @@ use triergon_bridge::{
 };
 use triergon_core::{Budget, Error, Rounding, TimeBase, WorkBudget, container::CodecId};
 use triergon_isobmff::config::ConfigurationLimits;
-use triergon_mpegts::stream::{FaultKind, TraceEvent};
+use triergon_mpegts::{
+    psi::stream_type,
+    stream::{FaultKind, TraceEvent},
+};
 use triergon_playback::{ByteSource, Event, Output, Player, TrackKey, TsEvent, mp4::Mp4Event};
 use triergon_subtitles::{
     compat::{dvb::ReceiverDecoder, dvd::Limits as DvdLimits},
@@ -622,7 +625,7 @@ pub(super) fn ts_map(
                 .iter()
                 .filter(|stream| {
                     if codec == CodecId::Pgs {
-                        stream.stream_type == 0x90
+                        stream.stream_type == stream_type::HDMV_PGS
                     } else {
                         stream.codec() == Some(codec)
                     }

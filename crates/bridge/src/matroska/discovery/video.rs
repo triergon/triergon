@@ -6,7 +6,8 @@ use triergon_framing::{
     BuildStep,
     avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource},
     hevc::{
-        HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration, check_parameter_sets,
+        self as hevc_nal, HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration,
+        check_parameter_sets,
     },
     nal::{Codec, LengthSize},
 };
@@ -255,9 +256,9 @@ fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
     for nal in view.nals() {
         nal.check_parameter_set_declaration()?;
         let kind = nal.header().nal_unit_type();
-        if (32..=34).contains(&kind) {
+        if (hevc_nal::VPS..=hevc_nal::PPS).contains(&kind) {
             let offset = nal.source_range().start - nal.length_field_bytes().len();
-            hevc_parameter_sets[usize::from(kind - 32)] =
+            hevc_parameter_sets[usize::from(kind - hevc_nal::VPS)] =
                 u16::try_from(offset).map_err(|_| Error::Overflow)?;
         }
     }
