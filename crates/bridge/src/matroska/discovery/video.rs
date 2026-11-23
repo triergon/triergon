@@ -51,7 +51,6 @@ struct Sample {
     hevc_repeats_checked: bool,
 }
 
-#[allow(clippy::large_enum_variant, reason = "one bounded setup at a time")]
 #[derive(Debug)]
 enum Setup {
     Avc(AvcConfigParser),

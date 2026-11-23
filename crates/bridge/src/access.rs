@@ -54,9 +54,9 @@ impl Default for AccessUnitLimits {
     }
 }
 
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "one session per track, kept inline in its framing"
+    reason = "each packet reads its framing in place; a box would add an indirection per packet and an allocation the pool does not charge"
 )]
 #[derive(Debug)]
 enum Framing {
@@ -88,9 +88,9 @@ pub struct AccessUnits {
     framing: Framing,
 }
 
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "one setup per track, polled in place"
+    reason = "one setup per track, stepped in place; a box would be an allocation the pool does not charge"
 )]
 #[derive(Debug)]
 enum Setup {

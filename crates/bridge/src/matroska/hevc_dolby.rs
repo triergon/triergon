@@ -55,9 +55,9 @@ impl DolbyCodec {
     }
 }
 
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "the bounded inline parser avoids a separate uncharged setup allocation"
+    reason = "one setup per track, stepped in place; a box would be an allocation the pool does not charge"
 )]
 #[derive(Debug)]
 enum SetupCodec {
@@ -185,8 +185,10 @@ impl MatroskaHevcDolbySetup {
     }
 }
 
-// Keep the bounded HEVC configuration inline to avoid another feed allocation.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "each packet reads its configuration in place; a box would add an indirection per packet and an allocation the pool does not charge"
+)]
 #[derive(Debug)]
 enum FeedCodec {
     Hevc(HevcAnnexBConfig),
