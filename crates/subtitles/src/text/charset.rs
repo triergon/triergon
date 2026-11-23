@@ -70,27 +70,54 @@ impl Charset {
         }
         Err(Error::Unsupported("declared charset conversion"))
     }
-    fn cursor_encoding(self) -> Option<Encoding> {
-        match self {
-            Self::Utf8 => Some(Encoding::Utf8),
-            Self::Utf16Bom => Some(Encoding::Utf16Bom),
-            Self::Utf16Be => Some(Encoding::Utf16Be),
-            Self::Utf16Le => Some(Encoding::Utf16Le),
-            Self::Multibyte(profile) => Some(Encoding::Multibyte(profile)),
-            _ => None,
-        }
+    /// The reader of `range` in this charset, before any of it is read.
+    fn reader(self, range: Range<usize>) -> Reader {
+        let encoding = match self {
+            Self::Utf8 => Encoding::Utf8,
+            Self::Utf16Bom => Encoding::Utf16Bom,
+            Self::Utf16Be => Encoding::Utf16Be,
+            Self::Utf16Le => Encoding::Utf16Le,
+            Self::Multibyte(profile) => Encoding::Multibyte(profile),
+            Self::Ascii => return Reader::Table(Table::Ascii, range.start),
+            Self::Latin1 => return Reader::Table(Table::Latin1, range.start),
+            Self::Windows1251 => return Reader::Table(Table::Windows1251, range.start),
+            Self::Windows1252 => return Reader::Table(Table::Windows1252, range.start),
+        };
+        Reader::Probe(Probe::new(range, encoding))
     }
-    pub(super) fn scalar(self, byte: u8) -> Result<char> {
+}
+
+/// A single-byte charset: every byte is one character.
+#[derive(Clone, Copy, Debug)]
+enum Table {
+    Ascii,
+    Latin1,
+    Windows1251,
+    Windows1252,
+}
+impl Table {
+    fn scalar(self, byte: u8) -> Result<char> {
         let value = match self {
             Self::Ascii if byte >= 128 => return Err(Error::Invalid("non-ASCII byte")),
             Self::Ascii | Self::Latin1 => u32::from(byte),
             Self::Windows1251 if byte >= 128 => tables::CP1251[usize::from(byte - 128)],
             Self::Windows1252 if byte >= 128 => tables::CP1252[usize::from(byte - 128)],
             Self::Windows1251 | Self::Windows1252 => u32::from(byte),
-            _ => return Err(Error::Invalid("charset scalar dispatch")),
         };
         char::from_u32(value).ok_or(Error::Invalid("undefined charset byte"))
     }
+}
+
+/// Where the source's characters come from.
+#[derive(Debug)]
+enum Reader {
+    /// A single-byte charset and the offset of its next byte.
+    Table(Table, usize),
+    /// A Unicode or multibyte charset whose leading bytes have not chosen
+    /// its encoding yet.
+    Probe(Probe),
+    /// The scalar decoder of the chosen encoding.
+    Scalars(Cursor),
 }
 /// What [`CharsetJob::poll`] reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -117,14 +144,22 @@ pub struct ConvertedText {
 /// The most source bytes of a single-byte charset converted in one step.
 const SINGLE_BYTE_RUN: usize = 4096;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug)]
 enum Phase {
-    Probe,
+    /// Validating the source and counting the output.
     Count,
-    Allocate,
+    /// Reserving the output; whether the reservation's unit is paid.
+    Allocate {
+        paid: bool,
+    },
+    /// Writing the output.
     Encode,
-    Freeze,
-    Ready,
+    /// Freezing the output; whether the freeze's unit is paid.
+    Freeze {
+        paid: bool,
+    },
+    /// The conversion, ready to take.
+    Ready(Bytes),
     Taken,
 }
 
@@ -140,18 +175,18 @@ pub struct CharsetJob {
     charset: Charset,
     budget: Budget,
     limits: Limits,
+    /// The source bytes that are text: all of them, or those after a
+    /// byte-order mark.
     range: Range<usize>,
-    probe: Option<Probe>,
-    cursor: Option<Cursor>,
-    effective: Option<Encoding>,
-    offset: usize,
+    reader: Reader,
+    /// The output's length, counted.
     length: usize,
     output: BudgetVec<u8>,
-    result: Option<Bytes>,
+    /// A character read but not yet written whole: its UTF-8 bytes and how
+    /// many are written.
     pending: [u8; 4],
     pending_len: usize,
     pending_at: usize,
-    paid: bool,
     phase: Phase,
     failed: Option<Error>,
 }
@@ -191,90 +226,16 @@ impl CharsetJob {
             charset,
             budget: budget.clone(),
             limits,
-            range: range.clone(),
-            probe: charset.cursor_encoding().map(|e| Probe::new(range, e)),
-            cursor: None,
-            effective: None,
-            offset: 0,
+            reader: charset.reader(range.clone()),
+            range,
             length: 0,
             output: BudgetVec::new(budget),
-            result: None,
             pending: [0; 4],
             pending_len: 0,
             pending_at: 0,
-            paid: false,
-            phase: if charset.cursor_encoding().is_some() {
-                Phase::Probe
-            } else {
-                Phase::Count
-            },
+            phase: Phase::Count,
             failed: None,
         })
-    }
-    fn next(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Poll<char>> {
-        if let Some(cursor) = self.cursor.as_mut() {
-            return Ok(match cursor.poll(self.source.as_ref(), work, cancel)? {
-                Poll::Ready(s) => Poll::Ready(s.value),
-                Poll::End => Poll::End,
-                Poll::Yield => Poll::Yield,
-            });
-        }
-        if self.offset == self.range.end {
-            return Ok(Poll::End);
-        }
-        if !work.try_charge(1) {
-            return Ok(Poll::Yield);
-        }
-        let value = self.charset.scalar(self.source.as_ref()[self.offset])?;
-        self.offset += 1;
-        Ok(Poll::Ready(value))
-    }
-    /// Counts or encodes the next source bytes of a single-byte charset, up
-    /// to [`SINGLE_BYTE_RUN`] of them, charging what converting them one at a
-    /// time charges: a unit per source byte and, when encoding, one per output
-    /// byte. It stops before a character the budget does not cover in full.
-    fn single_byte_run(&mut self, work: &mut WorkBudget) -> Result<()> {
-        let end = self
-            .range
-            .end
-            .min(self.offset.saturating_add(SINGLE_BYTE_RUN));
-        let source = &self.source.as_ref()[self.offset..end];
-        match self.phase {
-            Phase::Count => {
-                for &byte in source {
-                    if !work.try_charge(1) {
-                        break;
-                    }
-                    let value = self.charset.scalar(byte)?;
-                    self.offset += 1;
-                    self.length = self
-                        .length
-                        .checked_add(value.len_utf8())
-                        .ok_or(Error::Overflow)?;
-                    if self.length > self.limits.max_decoded_bytes {
-                        return Err(Error::Limit {
-                            requested: self.length,
-                            maximum: self.limits.max_decoded_bytes,
-                        });
-                    }
-                }
-            }
-            Phase::Encode => {
-                let mut utf8 = [0; 4];
-                for &byte in source {
-                    // The count validated every byte.
-                    let value = self.charset.scalar(byte)?;
-                    let encoded = value.encode_utf8(&mut utf8).as_bytes();
-                    if !work.try_charge(1 + encoded.len() as u64) {
-                        break;
-                    }
-                    self.output.try_extend_from_slice(encoded)?;
-                    self.offset += 1;
-                }
-            }
-            _ => {}
-        }
-        Ok(())
     }
     /// Advances the conversion, spending a unit per source byte in each pass
     /// and one per output byte written. `Error::Invalid` or
@@ -290,120 +251,152 @@ impl CharsetJob {
             && !matches!(error, Error::Backpressure { .. } | Error::Cancelled)
         {
             self.output = BudgetVec::new(&self.budget);
-            self.result = None;
             self.failed = Some(error);
         }
         value
     }
+    // Out of line, so the conversion loops compile the same whatever calls
+    // `poll`: inlined into a decoder's larger step they cost about a tenth more
+    // instructions for each conversion.
+    #[inline(never)]
     fn inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CharsetStatus> {
         loop {
             cancelled(cancel)?;
-            if self.phase == Phase::Ready {
-                return Ok(CharsetStatus::Ready);
-            }
-            if self.phase == Phase::Taken {
-                return Err(Error::Invalid("charset output already taken"));
+            match self.phase {
+                Phase::Ready(_) => return Ok(CharsetStatus::Ready),
+                Phase::Taken => return Err(Error::Invalid("charset output already taken")),
+                _ => {}
             }
             if work.remaining() == 0 {
                 return Ok(CharsetStatus::Pending);
             }
-            if self.charset.cursor_encoding().is_none()
-                && matches!(self.phase, Phase::Count | Phase::Encode)
-                && self.pending_at == self.pending_len
-            {
-                let from = self.offset;
-                self.single_byte_run(work)?;
-                if self.offset != from {
-                    continue;
-                }
-            }
             match self.phase {
-                Phase::Probe => match self
-                    .probe
-                    .as_mut()
-                    .ok_or(Error::Invalid("charset probe absent"))?
-                    .poll(self.source.as_ref(), work, cancel)?
-                {
-                    None => return Ok(CharsetStatus::Pending),
-                    Some((encoding, range)) => {
-                        self.cursor = Some(Cursor::new(range.clone(), encoding));
+                Phase::Count => match &mut self.reader {
+                    // A run of single-byte characters, a unit each; it stops
+                    // where the budget does.
+                    Reader::Table(table, offset) => {
+                        if *offset == self.range.end {
+                            self.phase = Phase::Allocate { paid: false };
+                            continue;
+                        }
+                        for &byte in run(&self.source, *offset..self.range.end) {
+                            if !work.try_charge(1) {
+                                break;
+                            }
+                            let value = table.scalar(byte)?;
+                            *offset += 1;
+                            self.length = counted(self.length, value, &self.limits)?;
+                        }
+                    }
+                    Reader::Probe(probe) => {
+                        let Some((encoding, range)) =
+                            probe.poll(self.source.as_ref(), work, cancel)?
+                        else {
+                            return Ok(CharsetStatus::Pending);
+                        };
+                        self.reader = Reader::Scalars(Cursor::new(range.clone(), encoding));
                         self.range = range;
-                        self.effective = Some(encoding);
-                        self.phase = Phase::Count;
                     }
-                },
-                Phase::Count => match self.next(work, cancel)? {
-                    Poll::Yield => return Ok(CharsetStatus::Pending),
-                    Poll::Ready(c) => {
-                        self.length = self
-                            .length
-                            .checked_add(c.len_utf8())
-                            .ok_or(Error::Overflow)?;
-                        if self.length > self.limits.max_decoded_bytes {
-                            return Err(Error::Limit {
-                                requested: self.length,
-                                maximum: self.limits.max_decoded_bytes,
-                            });
-                        }
-                    }
-                    Poll::End => {
-                        if self.charset == Charset::Utf8 {
-                            self.result = Some(self.source.slice(self.range.clone())?);
-                            self.phase = Phase::Ready;
-                        } else {
-                            self.phase = Phase::Allocate;
+                    Reader::Scalars(cursor) => {
+                        match cursor.poll(self.source.as_ref(), work, cancel)? {
+                            Poll::Yield => return Ok(CharsetStatus::Pending),
+                            Poll::Ready(scalar) => {
+                                self.length = counted(self.length, scalar.value, &self.limits)?;
+                            }
+                            Poll::End if self.charset == Charset::Utf8 => {
+                                self.phase = Phase::Ready(self.source.slice(self.range.clone())?);
+                            }
+                            Poll::End => self.phase = Phase::Allocate { paid: false },
                         }
                     }
                 },
-                Phase::Allocate => {
-                    if !self.paid {
+                Phase::Allocate { paid } => {
+                    if !paid {
                         if !work.try_charge(1) {
                             return Ok(CharsetStatus::Pending);
                         }
-                        self.paid = true;
+                        self.phase = Phase::Allocate { paid: true };
                     }
                     self.output.try_reserve_exact(self.length)?;
-                    self.cursor = self.effective.map(|e| Cursor::new(self.range.clone(), e));
-                    self.offset = self.range.start;
-                    self.paid = false;
+                    // The second pass reads the text again from its start.
+                    match &mut self.reader {
+                        Reader::Table(_, offset) => *offset = self.range.start,
+                        Reader::Scalars(cursor) => {
+                            *cursor = Cursor::new(self.range.clone(), cursor.encoding());
+                        }
+                        Reader::Probe(_) => {}
+                    }
                     self.phase = Phase::Encode;
                 }
-                Phase::Encode => {
-                    if self.pending_at < self.pending_len {
-                        if !work.try_charge(1) {
-                            return Ok(CharsetStatus::Pending);
-                        }
-                        self.output
-                            .try_push(self.pending[self.pending_at])
-                            .map_err(|e| e.error)?;
-                        self.pending_at += 1;
-                    } else {
-                        match self.next(work, cancel)? {
-                            Poll::Yield => return Ok(CharsetStatus::Pending),
-                            Poll::Ready(c) => {
-                                self.pending_len = c.encode_utf8(&mut self.pending).len();
-                                self.pending_at = 0;
-                            }
-                            Poll::End => {
-                                self.phase = Phase::Freeze;
-                                self.paid = false;
-                            }
-                        }
+                Phase::Encode if self.pending_at < self.pending_len => {
+                    if !work.try_charge(1) {
+                        return Ok(CharsetStatus::Pending);
                     }
+                    self.output
+                        .try_push(self.pending[self.pending_at])
+                        .map_err(|e| e.error)?;
+                    self.pending_at += 1;
                 }
-                Phase::Freeze => {
-                    if !self.paid {
+                Phase::Encode => {
+                    let value = match &mut self.reader {
+                        // A run of single-byte characters, a unit each and one
+                        // per output byte; it stops before a character the
+                        // budget does not cover whole, which is then read and
+                        // written a byte at a time.
+                        Reader::Table(table, offset) => {
+                            if *offset == self.range.end {
+                                self.phase = Phase::Freeze { paid: false };
+                                continue;
+                            }
+                            let from = *offset;
+                            let mut utf8 = [0; 4];
+                            for &byte in run(&self.source, from..self.range.end) {
+                                // The count validated every byte.
+                                let encoded = table.scalar(byte)?.encode_utf8(&mut utf8).as_bytes();
+                                if !work.try_charge(1 + encoded.len() as u64) {
+                                    break;
+                                }
+                                self.output.try_extend_from_slice(encoded)?;
+                                *offset += 1;
+                            }
+                            if *offset != from {
+                                continue;
+                            }
+                            if !work.try_charge(1) {
+                                return Ok(CharsetStatus::Pending);
+                            }
+                            let value = table.scalar(self.source.as_ref()[from])?;
+                            *offset += 1;
+                            value
+                        }
+                        Reader::Probe(_) => {
+                            self.phase = Phase::Count;
+                            continue;
+                        }
+                        Reader::Scalars(cursor) => {
+                            match cursor.poll(self.source.as_ref(), work, cancel)? {
+                                Poll::Yield => return Ok(CharsetStatus::Pending),
+                                Poll::Ready(scalar) => scalar.value,
+                                Poll::End => {
+                                    self.phase = Phase::Freeze { paid: false };
+                                    continue;
+                                }
+                            }
+                        }
+                    };
+                    self.pending_len = value.encode_utf8(&mut self.pending).len();
+                    self.pending_at = 0;
+                }
+                Phase::Freeze { paid } => {
+                    if !paid {
                         if !work.try_charge(1) {
                             return Ok(CharsetStatus::Pending);
                         }
-                        self.paid = true;
+                        self.phase = Phase::Freeze { paid: true };
                     }
                     match std::mem::replace(&mut self.output, BudgetVec::new(&self.budget)).freeze()
                     {
-                        Ok(bytes) => {
-                            self.result = Some(bytes);
-                            self.phase = Phase::Ready;
-                        }
+                        Ok(bytes) => self.phase = Phase::Ready(bytes),
                         Err(e) => {
                             self.output = e.value;
                             return Err(e.error);
@@ -412,7 +405,7 @@ impl CharsetJob {
                 }
                 // The loop's head returns in these phases; returning here as well,
                 // not looping, keeps the per-character dispatch short.
-                Phase::Ready => return Ok(CharsetStatus::Ready),
+                Phase::Ready(_) => return Ok(CharsetStatus::Ready),
                 Phase::Taken => return Err(Error::Invalid("charset output already taken")),
             }
         }
@@ -424,14 +417,13 @@ impl CharsetJob {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        if self.phase != Phase::Ready {
-            return Err(Error::Invalid("charset output not ready"));
-        }
-        let utf8 = self
-            .result
-            .take()
-            .ok_or(Error::Invalid("charset output absent"))?;
-        self.phase = Phase::Taken;
+        let utf8 = match std::mem::replace(&mut self.phase, Phase::Taken) {
+            Phase::Ready(utf8) => utf8,
+            phase => {
+                self.phase = phase;
+                return Err(Error::Invalid("charset output not ready"));
+            }
+        };
         Ok(ConvertedText {
             source: self.source.clone(),
             declared_label: self.label.clone(),
@@ -439,4 +431,26 @@ impl CharsetJob {
             utf8,
         })
     }
+}
+
+/// The source bytes of a single-byte charset one step converts: `text`, or its
+/// first [`SINGLE_BYTE_RUN`] bytes.
+fn run(source: &Bytes, text: Range<usize>) -> &[u8] {
+    let end = text.end.min(text.start.saturating_add(SINGLE_BYTE_RUN));
+    &source.as_ref()[text.start..end]
+}
+
+/// The counted output length `length` with `character` added; `Error::Limit`
+/// beyond `limits.max_decoded_bytes`.
+fn counted(length: usize, character: char, limits: &Limits) -> Result<usize> {
+    let length = length
+        .checked_add(character.len_utf8())
+        .ok_or(Error::Overflow)?;
+    if length > limits.max_decoded_bytes {
+        return Err(Error::Limit {
+            requested: length,
+            maximum: limits.max_decoded_bytes,
+        });
+    }
+    Ok(length)
 }

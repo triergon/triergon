@@ -74,6 +74,10 @@ impl Cursor {
         self.decoded
     }
 
+    pub(super) fn encoding(&self) -> Encoding {
+        self.encoding
+    }
+
     fn scalar(&mut self, value: u32) -> Result<Scalar> {
         let value = char::from_u32(value).ok_or(Error::Invalid("invalid Unicode scalar"))?;
         self.decoded = self
