@@ -213,6 +213,11 @@ fn directory(root: &Path, contract: &Value, listing: &Value) -> Option<PathBuf> 
         .or_else(|| report::recorded_corpus(root, listing))
 }
 
+/// Records each case's reference fold as `expected` and, for every case the contract
+/// lists as open on this target (`open_cases` and `open_deviations`), the
+/// candidate's fold as `candidate_expected`, so that a listed case pins both outputs
+/// of its difference and not only that one exists. A case that is not listed keeps
+/// no candidate pin.
 fn reference_pins(
     root: &Path,
     contract_path: &Path,
@@ -229,46 +234,39 @@ fn reference_pins(
         report::PrefixFeature::load(root, contract_path, manifest_path, directory.as_deref())?;
     let identity = json::read(&root.join("target/harness/identity.json"))?;
     let reference = feature.reference_worker(root, &identity)?;
+    let open = report::open_cases(contract, listing, &report::gate_target()?)?;
+    let candidate = if open.is_empty() {
+        None
+    } else {
+        Some(crate::harness::validation::candidate_worker(
+            root,
+            &identity,
+            &feature.candidate,
+        )?)
+    };
     let operation = contract
         .get("operation")
         .and_then(Value::as_str)
         .ok_or("no operation")?;
     let timeout = worker::contract_parity_timeout(contract)?;
-    let mut cases = Vec::new();
-    let mut pending: std::collections::BTreeSet<_> = selected.iter().map(String::as_str).collect();
-    for mut case in feature.cases.clone() {
-        if !selected.is_empty()
-            && !case
-                .get("id")
-                .and_then(Value::as_str)
-                .is_some_and(|id| pending.remove(id))
-        {
-            cases.push(case);
-            continue;
-        }
-        let input = feature.verified_input(&case)?;
+    let fold = |worker: &Path, prefix: &str, case: &Value| -> Result<Value, String> {
+        let input = feature.verified_input(case)?;
         let mut command = vec![
-            reference.as_os_str().to_owned(),
-            format!(
-                "{}fold",
-                feature
-                    .reference_prefix
-                    .as_deref()
-                    .unwrap_or(&feature.prefix)
-            )
-            .into(),
+            worker.as_os_str().to_owned(),
+            format!("{prefix}fold").into(),
             input.into(),
         ];
         command.extend(report::resolved_case_arguments(
             &feature.corpus,
-            &case,
-            report::case_arguments(&case),
+            case,
+            report::case_arguments(case),
         )?);
-        let result =
-            worker::run_in(&command, &[], Some(root), timeout)?.ok_or("reference timed out")?;
+        let result = worker::run_in(&command, &[], Some(root), timeout)?
+            .ok_or_else(|| format!("{} timed out", worker.display()))?;
         if result.code != 0 {
             return Err(format!(
-                "{}: {}",
+                "{} {}: {}",
+                worker.display(),
                 command[2].to_string_lossy(),
                 String::from_utf8_lossy(&result.stderr)
             ));
@@ -281,10 +279,43 @@ fn reference_pins(
             || observed.get("eof") != Some(&Value::Bool(true))
             || observed.get("iterations") != Some(&Value::int(1))
         {
-            return Err("incomplete or incorrect reference operation".into());
+            return Err(format!(
+                "{}: incomplete or incorrect operation",
+                worker.display()
+            ));
         }
-        let summary = crate::harness::comparison::work_summary(&observed, &feature.work_fields)?;
-        crate::harness::validation::put(&mut case, "expected", summary)?;
+        crate::harness::comparison::work_summary(&observed, &feature.work_fields)
+    };
+    let reference_prefix = feature
+        .reference_prefix
+        .as_deref()
+        .unwrap_or(&feature.prefix);
+    let mut cases = Vec::new();
+    let mut pending: std::collections::BTreeSet<_> = selected.iter().map(String::as_str).collect();
+    for mut case in feature.cases.clone() {
+        let id = case.get("id").and_then(Value::as_str).unwrap_or_default();
+        if !selected.is_empty() && !pending.remove(id) {
+            cases.push(case);
+            continue;
+        }
+        let listed = open.iter().any(|open| open == id);
+        let expected = fold(reference.as_path(), reference_prefix, &case)?;
+        let observed = match (&candidate, listed) {
+            (Some(candidate), true) => Some(fold(candidate.as_path(), &feature.prefix, &case)?),
+            _ => None,
+        };
+        if observed.as_ref() == Some(&expected) {
+            return Err(format!(
+                "{id}: listed as open, but the candidate's fold equals the reference's"
+            ));
+        }
+        crate::harness::validation::put(&mut case, "expected", expected)?;
+        if let Value::Object(fields) = &mut case {
+            fields.retain(|(key, _)| key != "candidate_expected");
+        }
+        if let Some(observed) = observed {
+            crate::harness::validation::put(&mut case, "candidate_expected", observed)?;
+        }
         cases.push(case);
     }
     if !pending.is_empty() {
