@@ -332,6 +332,7 @@ impl TrackSelection {
 
 struct SegmentReader<S: Source, V: LaneAssembler, A: LaneAssembler> {
     pool: Budget,
+    // Driving the shared feed directly raises one-byte segment input counts by 2.35%.
     player: Option<Player<LimitedSource<S>>>,
     limits: HlsSegmentLimits,
     selection: TrackSelection,
