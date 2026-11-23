@@ -542,6 +542,7 @@ impl NalReader {
         })
     }
 
+    // One loop over every phase: the transport and playback workers' per-byte path.
     fn step_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<NalUnit>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
@@ -551,6 +552,7 @@ impl NalReader {
                 Phase::Length => {
                     let width = match self.framing {
                         Framing::LengthPrefixed(width) => width.bytes(),
+                        // Reached by no Annex B reader: the per-framing split costs as above.
                         Framing::AnnexB => return Err(Error::Invalid("NAL reader phase")),
                     };
                     if self.length_used == 0 {
@@ -761,7 +763,9 @@ impl NalReader {
                     }
                     let codec = self.codec;
                     let header = NalHeader::parse(codec, self.buffer.as_slice())?;
-                    // Keeping the prefix in the phase costs 0.18% more instructions on repeated preroll.
+                    // The prefix in the phase measured +0.18 to +2.2% on the transport worker; one
+                    // reader per framing with a plain prefix field, +0.24 to +0.33% where its lanes
+                    // are rebuilt.
                     let framing = self.current.ok_or(Error::Invalid("missing NAL framing"))?;
                     let payload_offset = framing.payload_offset()?;
                     let bytes = freeze_whole(&mut self.buffer)?;

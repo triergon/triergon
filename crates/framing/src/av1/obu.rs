@@ -456,6 +456,7 @@ impl Av1ObuReader {
         started(&mut self.output, self.cursor.budget())
     }
 
+    // One loop over every phase, as the NAL and AC-3 readers keep theirs.
     fn step_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<Av1Obu>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
