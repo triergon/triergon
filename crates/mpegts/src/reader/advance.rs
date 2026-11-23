@@ -1,5 +1,5 @@
 //! The reader's step loop: polling the transport and admitting each source event to the lanes.
-use super::lane::{Lane, LaneStep, PesRun, StorageScan};
+use super::lane::{Lane, LaneStep, NoCause, PesRun, StorageScan};
 use super::model::{ClockContext, Shared};
 use super::{
     AccessUnit, EntityTransition, IncompleteVideo, Packet, Reader, ReaderEvent, SourceEvent,
@@ -887,6 +887,10 @@ impl Reader {
 
     /// Runs lane `index` as at the end of the source until its unframed run is copied and
     /// returned, with `cause` as what ended it. The event stays in flight meanwhile.
+    ///
+    /// The copy starts without a storage audit. When the pool refuses it, the audit of
+    /// everything the reader owns decides the class: `Limit` when the run can never fit
+    /// beside it, `Backpressure` when output the caller holds is in the way.
     #[cold]
     #[inline(never)]
     fn publish_unframed_run(
@@ -896,30 +900,64 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Admitted> {
-        Ok(Admitted::Kept(
-            match self.lane_step(index, true, work, cancel)? {
-                LaneOutput::Ready(mut step) => {
-                    if let Step::Ready(Event::Other(
-                        ReaderEvent::IncompleteVideo(IncompleteVideo { ended_by, .. })
-                        | ReaderEvent::UnframedAudio(UnframedAudio { ended_by, .. }),
-                    )) = &mut step
-                    {
-                        *ended_by = Some(cause.clone());
-                    }
-                    Flow::Return(step)
+        let step = match self.lane_step(index, true, work, cancel) {
+            Err(error @ Error::Backpressure(_))
+                if self.lanes.as_slice()[index].copies_unaudited() =>
+            {
+                return self.audit_unframed_run(index, cause, error, work, cancel);
+            }
+            step => step?,
+        };
+        Ok(Admitted::Kept(match step {
+            LaneOutput::Ready(mut step) => {
+                if let Step::Ready(Event::Other(
+                    ReaderEvent::IncompleteVideo(IncompleteVideo { ended_by, .. })
+                    | ReaderEvent::UnframedAudio(UnframedAudio { ended_by, .. }),
+                )) = &mut step
+                {
+                    *ended_by = Some(cause.clone());
                 }
-                LaneOutput::Deferred => {
-                    self.lanes.as_mut_slice()[index].copy_fragment_unaudited();
-                    Flow::Continue
-                }
-                // The lane has nothing to return for the run: leave what it holds to the
-                // restart, which reports it as interrupted.
-                LaneOutput::Done => {
-                    self.lanes.as_mut_slice()[index].abandon_unframed_run();
-                    Flow::Continue
-                }
-            },
-        ))
+                Flow::Return(step)
+            }
+            LaneOutput::Deferred => {
+                self.lanes.as_mut_slice()[index].copy_fragment_unaudited();
+                Flow::Continue
+            }
+            // The lane has nothing to return for the run: leave what it holds to the
+            // restart, which reports it as interrupted.
+            LaneOutput::Done => {
+                self.lanes.as_mut_slice()[index].abandon_unframed_run();
+                Flow::Continue
+            }
+        }))
+    }
+
+    /// Audits what the reader owns inside the stream for the run of lane `index` that the
+    /// pool refused, so that the next copy attempt sees the run's whole peak. A stream that
+    /// holds table work in progress returns the refusal, `pressure`, as it is.
+    #[cold]
+    #[inline(never)]
+    fn audit_unframed_run(
+        &mut self,
+        index: usize,
+        cause: &SourceEvent,
+        pressure: Error,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Admitted> {
+        let scan = match self.storage.take() {
+            Some(scan) if scan.is_in_stream() => Some(scan),
+            _ => StorageScan::in_stream(self, cause)?,
+        };
+        let Some(mut scan) = scan else {
+            return Err(pressure);
+        };
+        if !scan.step(self, cause, work, cancel)? {
+            self.storage = Some(scan);
+            return Ok(Admitted::Kept(Flow::Return(Step::Yield)));
+        }
+        self.lanes.as_mut_slice()[index].set_reader_storage(scan.bytes())?;
+        Ok(Admitted::Kept(Flow::Continue))
     }
 
     /// Audits the storage the unfinished tail of lane `index` may use; `false` when the audit
@@ -936,7 +974,7 @@ impl Reader {
             Some(storage) => storage,
             None => StorageScan::new(self, finished)?,
         };
-        if !storage.step(self, work, cancel)? {
+        if !storage.step(self, NoCause, work, cancel)? {
             self.storage = Some(storage);
             return Ok(false);
         }
@@ -1142,7 +1180,7 @@ impl Reader {
             Some(scan) => scan,
             None => StorageScan::pes_growth(self, floor)?,
         };
-        if !scan.step(self, work, cancel)? {
+        if !scan.step(self, NoCause, work, cancel)? {
             self.storage = Some(scan);
             return Ok(Step::Yield);
         }

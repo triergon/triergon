@@ -36,7 +36,7 @@ use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
-pub(super) use storage::StorageScan;
+pub(super) use storage::{NoCause, StorageScan};
 use triergon_core::container::CodecId;
 use triergon_core::{
     Budget, BudgetVec, Bytes, Charged, Error, InputRequest, InputWindow, Refused, Result,
@@ -583,14 +583,23 @@ impl Lane {
         self.incomplete = None;
         self.build = None;
     }
-    /// Lets the fragment of a run that ends inside the stream be copied without an audit.
-    /// The open transport's storage cannot be counted as a released one's is at the end of
-    /// the source, so only a pool that cannot hold the fragment itself is `Limit`; other
-    /// pressure is `Backpressure`, as for every access unit published inside a stream.
+    /// Lets the fragment of a run that ends inside the stream be copied before its storage
+    /// is audited: the audit runs only if the pool refuses the copy.
     pub(super) fn copy_fragment_unaudited(&mut self) {
         if let Some(incomplete) = &mut self.incomplete {
             incomplete.reader_storage = Some(0);
         }
+    }
+    /// Whether the fragment is being copied without an audit (an audit always counts the
+    /// pool's own control storage, so it is never zero).
+    pub(super) fn copies_unaudited(&self) -> bool {
+        matches!(
+            self.incomplete,
+            Some(Incomplete {
+                reader_storage: Some(0),
+                ..
+            })
+        )
     }
     /// Admits the PES of `source`: `Ok(None)` once admitted or ignored, `Ok(Some(source))` when
     /// the work grant is spent; a refusal returns the source with the error.

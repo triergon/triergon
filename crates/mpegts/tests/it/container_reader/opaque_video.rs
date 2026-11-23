@@ -414,16 +414,7 @@ impl<'a> Tight<'a> {
 
 #[test]
 fn a_run_refused_for_pressure_at_a_fault_is_reported_after_the_caller_releases() {
-    const RUN_BYTES: usize = 16 * 4096;
-    // Sixteen opaque PES, then a position without a sync byte.
-    let mut transport = Transport::new();
-    transport.tables(&[(0x1b, PID, &[])], 0);
-    for _ in 0..16 {
-        transport.pes(PID, 0xe0, &[0xaa; 4096], None, None);
-    }
-    let fault = transport.bytes.len() as u64;
-    transport.bytes.extend_from_slice(&[0; 188]);
-    let raw = transport.bytes;
+    let (raw, fault) = run_then_sync_loss();
     let mut tight = Tight::new(&raw, 1 << 20);
     let Stop::Paused(request) = tight.read(Some(fault)).unwrap() else {
         panic!("no request for the faulted carrier");
@@ -438,4 +429,38 @@ fn a_run_refused_for_pressure_at_a_fault_is_reported_after_the_caller_releases()
         panic!("no run after the caller released its reservation");
     };
     assert_eq!(bytes, vec![0xaa; RUN_BYTES]);
+}
+
+#[test]
+fn a_run_that_cannot_fit_beside_what_the_reader_holds_at_a_fault_is_a_limit() {
+    let (raw, fault) = run_then_sync_loss();
+    // What the reader holds when the faulted carrier is due; the caller holds nothing.
+    let mut probe = Tight::new(&raw, 1 << 20);
+    assert!(matches!(probe.read(Some(fault)).unwrap(), Stop::Paused(_)));
+    let held = probe.pool.used();
+    // Room beside it for the diagnostic, but not for a copy of the run: releasing output
+    // cannot help, so the reader reports a limit and never backpressure.
+    let mut tight = Tight::new(&raw, held + RUN_BYTES / 2);
+    let Stop::Paused(request) = tight.read(Some(fault)).unwrap() else {
+        panic!("no request for the faulted carrier");
+    };
+    tight.supply(request).unwrap();
+    assert!(matches!(
+        tight.read(None),
+        Err(Error::Limit { requested, maximum }) if requested > maximum
+    ));
+}
+
+const RUN_BYTES: usize = 16 * 4096;
+
+/// Sixteen opaque PES, then a position without a sync byte, and that position.
+fn run_then_sync_loss() -> (Vec<u8>, u64) {
+    let mut transport = Transport::new();
+    transport.tables(&[(0x1b, PID, &[])], 0);
+    for _ in 0..16 {
+        transport.pes(PID, 0xe0, &[0xaa; 4096], None, None);
+    }
+    let fault = transport.bytes.len() as u64;
+    transport.bytes.extend_from_slice(&[0; 188]);
+    (transport.bytes, fault)
 }

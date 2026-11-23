@@ -426,9 +426,10 @@ epoch, a table change, or the first PES of another byte run. Only what the
 source view delivered as complete PES is in it; the faulted carrier and a
 partial PES are not. A discontinuity the caller declares
 (`EntityTransition::Discontinuity`) is a flush: it reports what the reader held
-as `Interrupted`. A run that ends inside the stream is copied without the
-storage audit made at the end of the source, so a full pool is `Backpressure`
-and the run follows once the caller has released storage.
+as `Interrupted`. A run that ends inside the stream is copied at once; when
+the pool refuses the copy, the reader counts what it holds itself, the open
+stream included, and reports `Limit` when the run can never fit beside that and
+`Backpressure` when output the caller holds is in the way.
 
 The FFmpeg-compatible `DemuxObserver` cuts what the demuxer cuts and refuses what
 its profile does not cover: a carrier with a transport error or scrambling returns

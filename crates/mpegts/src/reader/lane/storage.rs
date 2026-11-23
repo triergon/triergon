@@ -6,7 +6,11 @@ const CHANGED: Error = Error::Invalid("MPEG-TS storage audit changed during scan
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StorageCursor {
+    /// The stream around the PES route whose growth was refused.
     Transport(TransportStorageCursor),
+    /// The whole open stream, then the event the reader is admitting.
+    OpenTransport(TransportStorageCursor),
+    Cause(usize),
     Map,
     MapSource,
     MapProgram,
@@ -30,22 +34,71 @@ enum StorageCursor {
 }
 
 impl StorageCursor {
+    /// The edges only an audit inside the open stream walks: the stream, then `cause`.
+    // Out of line, so the walk of the PES growth audit, which some workloads run per
+    // carrier, keeps its code.
+    #[cold]
+    #[inline(never)]
+    fn step_in_stream<'a>(
+        &mut self,
+        reader: &'a crate::reader::Reader,
+        cause: Option<&'a SourceEvent>,
+    ) -> Result<Option<StorageItem<'a>>> {
+        Ok(match *self {
+            Self::OpenTransport(cursor) => {
+                let mut next = cursor;
+                let Some(stream) = reader.stream() else {
+                    return Err(CHANGED);
+                };
+                let item = next.step(stream, None)?;
+                *self = if next == TransportStorageCursor::End {
+                    Self::Cause(0)
+                } else {
+                    Self::OpenTransport(next)
+                };
+                item
+            }
+            Self::Cause(index) => {
+                let backing = cause
+                    .ok_or(CHANGED)
+                    .map(|cause| event_backing(cause.event(), index))?;
+                *self = if backing.is_some() {
+                    Self::Cause(index + 1)
+                } else {
+                    Self::Map
+                };
+                backing.map(StorageItem::Bytes)
+            }
+            _ => return Err(CHANGED),
+        })
+    }
+
     // One structural edge per call, including empty tables. Checking earlier
     // entries for shared backing also consumes cooperative work.
-    fn step<'a>(&mut self, reader: &'a crate::reader::Reader) -> Result<Option<StorageItem<'a>>> {
+    fn step<'a, C: Cause<'a>>(
+        &mut self,
+        reader: &'a crate::reader::Reader,
+        cause: C,
+    ) -> Result<Option<StorageItem<'a>>> {
         let item = match *self {
             Self::Transport(cursor) => {
                 let mut next = cursor;
                 let Some(stream) = reader.stream() else {
                     return Err(CHANGED);
                 };
-                let item = next.step(stream)?;
+                let blocked = stream
+                    .assembling_route()
+                    .ok_or(Error::Invalid("PES storage audit outside drain"))?;
+                let item = next.step(stream, Some(blocked))?;
                 *self = if next == TransportStorageCursor::End {
                     Self::Map
                 } else {
                     Self::Transport(next)
                 };
                 item
+            }
+            Self::OpenTransport(_) | Self::Cause(_) => {
+                return self.step_in_stream(reader, cause.event());
             }
             Self::Map => {
                 *self = Self::MapSource;
@@ -228,6 +281,77 @@ impl StorageCursor {
     }
 }
 
+/// The `index`th shared backing an event that ends a byte run owns: a rejected carrier, the
+/// spans of a PES or the section bytes of a table.
+fn event_backing(event: &crate::stream::TraceEvent, index: usize) -> Option<&Bytes> {
+    use crate::stream::TraceEvent;
+    match event {
+        TraceEvent::Diagnostic(fault) => fault
+            .rejected
+            .as_ref()
+            .filter(|_| index == 0)
+            .map(crate::transport::RejectedTransport::backing_bytes),
+        TraceEvent::Pes(pes)
+        | TraceEvent::UnboundedAdtsPes(crate::compat::adts::UnboundedPes(pes)) => pes
+            .spans()
+            .get(index)
+            .map(crate::pes::PesSpan::backing_bytes),
+        TraceEvent::ProgramMap { map, .. } => match index {
+            0 => Some(&map.source),
+            1 => Some(&map.program_descriptors),
+            stream => map
+                .streams
+                .as_slice()
+                .get(stream - 2)
+                .map(|stream| &stream.descriptor_bytes),
+        },
+        TraceEvent::Pat(table) => table.source_sections.as_slice().get(index),
+        _ => None,
+    }
+}
+
+/// The tables an event owns besides its shared backings.
+fn event_tables(event: &crate::stream::TraceEvent) -> Result<usize> {
+    use crate::stream::TraceEvent;
+    match event {
+        TraceEvent::Pes(pes)
+        | TraceEvent::UnboundedAdtsPes(crate::compat::adts::UnboundedPes(pes)) => {
+            pes.table_storage()
+        }
+        TraceEvent::ProgramMap { map, .. } => table_storage(&map.streams)?
+            .checked_add(table_storage(&map.source_ranges)?)
+            .ok_or(Error::Overflow),
+        TraceEvent::Pat(table) => table_storage(&table.programs)?
+            .checked_add(table_storage(&table.source_sections)?)
+            .and_then(|n| n.checked_add(table_storage(&table.source_ranges).ok()?))
+            .ok_or(Error::Overflow),
+        _ => Ok(0),
+    }
+}
+
+/// The source event an audit inside the stream counts beside the reader's state.
+// A type rather than an `Option`, so the other audits' walk, which the PES growth audit
+// runs per refused carrier, takes no extra argument.
+pub(in crate::reader) trait Cause<'a>: Copy {
+    fn event(self) -> Option<&'a SourceEvent>;
+}
+
+/// The cause of an audit that counts no event in flight.
+#[derive(Clone, Copy)]
+pub(in crate::reader) struct NoCause;
+
+impl<'a> Cause<'a> for NoCause {
+    fn event(self) -> Option<&'a SourceEvent> {
+        None
+    }
+}
+
+impl<'a> Cause<'a> for &'a SourceEvent {
+    fn event(self) -> Option<&'a SourceEvent> {
+        Some(self)
+    }
+}
+
 // No allocation is needed to decide whether allocation is possible. Comparing
 // earlier owners may take several steps; cursors survive yields and cancellation.
 // Caller-only reservations and output owners are never part of this graph.
@@ -268,6 +392,42 @@ impl StorageScan {
         )
     }
 
+    /// The audit of everything the reader owns while it admits `cause` inside the open
+    /// stream: the stream itself, `cause`, and the state the end-of-source audit counts.
+    /// Step it with the same `cause`. `None` while the stream holds table work in
+    /// progress, which it does not walk.
+    pub(in crate::reader) fn in_stream(
+        reader: &crate::reader::Reader,
+        cause: &SourceEvent,
+    ) -> Result<Option<Self>> {
+        let Some(stream) = reader.stream() else {
+            return Err(Error::Invalid(
+                "MPEG-TS stream audit after the stream ended",
+            ));
+        };
+        let Some(transport) = stream.open_storage()? else {
+            return Ok(None);
+        };
+        let total = Budget::control_storage_bytes()
+            .checked_add(transport)
+            .and_then(|n| {
+                n.checked_add(Shared::<crate::stream::TraceEvent>::allocation_bytes().ok()?)
+            })
+            .and_then(|n| n.checked_add(event_tables(cause.event()).ok()?))
+            .ok_or(Error::Overflow)?;
+        Self::start(
+            reader,
+            StorageCursor::OpenTransport(TransportStorageCursor::OPEN),
+            total,
+        )
+        .map(Some)
+    }
+
+    /// Whether this is an audit inside the open stream.
+    pub(in crate::reader) fn is_in_stream(&self) -> bool {
+        matches!(self.start, StorageCursor::OpenTransport(_))
+    }
+
     fn start(reader: &crate::reader::Reader, start: StorageCursor, total: usize) -> Result<Self> {
         let selection = match &reader.packet_tracks {
             crate::reader::PacketTracks::Selected(tracks) => table_storage(tracks)?,
@@ -299,9 +459,12 @@ impl StorageScan {
     pub(in crate::reader) fn bytes(&self) -> usize {
         self.total
     }
-    pub(in crate::reader) fn step(
+    /// Advances the audit within `work`; `true` once every owner is counted. `cause` is the
+    /// event an audit [`in_stream`](Self::in_stream) was started for, [`NoCause`] otherwise.
+    pub(in crate::reader) fn step<'a, C: Cause<'a>>(
         &mut self,
-        reader: &crate::reader::Reader,
+        reader: &'a crate::reader::Reader,
+        cause: C,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<bool> {
@@ -318,7 +481,7 @@ impl StorageScan {
             if let Some(at) = self.candidate {
                 // Reborrow the backing so a suspended scan cannot keep input charged.
                 let mut candidate = at;
-                let Some(StorageItem::Bytes(bytes)) = candidate.step(reader)? else {
+                let Some(StorageItem::Bytes(bytes)) = candidate.step(reader, cause)? else {
                     return Err(CHANGED);
                 };
                 if self.prior == at {
@@ -329,7 +492,7 @@ impl StorageScan {
                     self.candidate = None;
                 } else if self
                     .prior
-                    .step(reader)?
+                    .step(reader, cause)?
                     .and_then(StorageItem::backing)
                     .is_some_and(|prior| prior.shares_storage_with(bytes))
                 {
@@ -337,7 +500,7 @@ impl StorageScan {
                 }
             } else {
                 let at = self.cursor;
-                match self.cursor.step(reader)? {
+                match self.cursor.step(reader, cause)? {
                     Some(StorageItem::Fixed(bytes)) => {
                         self.total = self.total.checked_add(bytes).ok_or(Error::Overflow)?;
                     }
