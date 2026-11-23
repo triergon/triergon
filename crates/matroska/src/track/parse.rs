@@ -15,6 +15,8 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, WorkBudget};
 
+pub(crate) const VIDEO: u64 = 0xe0;
+
 /// Where the reading of one TrackEntry stands. A phase owns no storage, so a
 /// phase change never drops one; the jobs it starts run in `TrackJob::side`.
 #[derive(Clone, Copy, Debug)]
@@ -409,14 +411,14 @@ impl TrackJob {
                                     )?);
                                     continue 'entry;
                                 }
-                                0xe0 | 0xe1
+                                VIDEO | 0xe1
                                     if once(
                                         &mut self.seen,
-                                        if child.id == 0xe0 { 10 } else { 11 },
+                                        if child.id == VIDEO { 10 } else { 11 },
                                     ) =>
                                 {
                                     let cursor = ChildCursor::new(child.payload);
-                                    self.phase = if child.id == 0xe0 {
+                                    self.phase = if child.id == VIDEO {
                                         TrackPhase::Video(cursor)
                                     } else {
                                         t.audio_settings_present = true;
@@ -446,7 +448,7 @@ impl TrackJob {
                                             t.height = ebml::uint(bytes)?;
                                         }
                                         // A repeated Colour is ignored (RFC 8794 §12).
-                                        0x55b0 if t.colour.is_none() => {
+                                        crate::colour::COLOUR if t.colour.is_none() => {
                                             self.side = TrackSide::Colour(ColourJob::new(
                                                 self.source.clone(),
                                                 child.payload,

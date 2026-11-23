@@ -5,6 +5,8 @@ use crate::{Error, Result};
 
 pub(crate) mod parse;
 
+pub(crate) const COLOUR: u64 = 0x55b0;
+
 /// All ten source floats as written, without rational quantization or filling absent
 /// fields. Values outside the schema's ranges (chromaticity 0 to 1, luminance at least
 /// 0) are reported, not refused.

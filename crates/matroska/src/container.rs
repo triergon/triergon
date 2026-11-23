@@ -3,11 +3,17 @@
 //! Packet times are nanoseconds (Matroska's TimestampScale is already applied),
 //! DTS stays `None` because Matroska carries none, and random access follows
 //! the Block keyframe rule. Nothing here copies a packet.
-use crate::colour::Colour;
+use crate::colour::{
+    COLOUR, Colour,
+    parse::{
+        CHROMA_SITING_HORZ, MATRIX_COEFFICIENTS, MAX_FALL, PRIMARIES, RANGE,
+        TRANSFER_CHARACTERISTICS,
+    },
+};
 use crate::packet::batch::TypedPacket as Packet;
 use crate::reader::{Event, Reader};
 use crate::seek::SeekReceipt as MatroskaSeek;
-use crate::track::{LegacyAacProfile, Track};
+use crate::track::{LegacyAacProfile, Track, parse::VIDEO};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     CodecId, ColourDescription, ColourRange, ContainerReader, ContentLight, Event as Neutral,
@@ -71,10 +77,10 @@ impl TrackInfo for Track {
     }
     fn kind(&self) -> MediaKind {
         match self.kind {
-            1 => MediaKind::Video,
-            2 => MediaKind::Audio,
-            17 => MediaKind::Subtitle,
-            3 | 16 | 18 | 32 => MediaKind::Data,
+            Self::VIDEO => MediaKind::Video,
+            Self::AUDIO => MediaKind::Audio,
+            Self::SUBTITLE => MediaKind::Subtitle,
+            Self::COMPLEX | Self::LOGO | Self::BUTTONS | Self::CONTROL => MediaKind::Data,
             _ => MediaKind::Unknown,
         }
     }
@@ -152,11 +158,11 @@ fn colour_presence(entry: &[u8]) -> u16 {
         }
         None
     }
-    let Some(colour) = child(entry, 0xe0).and_then(|video| child(video, 0x55b0)) else {
+    let Some(colour) = child(entry, VIDEO).and_then(|video| child(video, COLOUR)) else {
         return 0;
     };
-    (0x55b1..=0x55bd).fold(0, |present, id| {
-        present | (u16::from(child(colour, id).is_some()) << (id - 0x55b1))
+    (MATRIX_COEFFICIENTS..=MAX_FALL).fold(0, |present, id| {
+        present | (u16::from(child(colour, id).is_some()) << (id - MATRIX_COEFFICIENTS))
     })
 }
 
@@ -165,8 +171,8 @@ impl Colour {
     /// each Colour child the source carried; omitted fields carry the Matroska
     /// schema default with [`Origin::SpecificationDefault`].
     pub fn description(&self, present: u16) -> ColourDescription {
-        let origin = |id: u16| {
-            if present & (1 << (id - 0x55b1)) != 0 {
+        let origin = |id: u64| {
+            if present & (1 << (id - MATRIX_COEFFICIENTS)) != 0 {
                 Origin::Container
             } else {
                 Origin::SpecificationDefault
@@ -177,7 +183,7 @@ impl Colour {
             2 => ColourRange::Full,
             _ => ColourRange::Unspecified,
         };
-        let siting = present & (0b11 << (0x55b7 - 0x55b1)) != 0;
+        let siting = present & (0b11 << (CHROMA_SITING_HORZ - MATRIX_COEFFICIENTS)) != 0;
         let mastering = self.mastering.and_then(|m| {
             let [rx, ry, gx, gy, bx, by, wx, wy] = m.chromaticity;
             Some(MasteringDisplay {
@@ -188,10 +194,13 @@ impl Colour {
             })
         });
         ColourDescription {
-            primaries: Sourced::new(self.primaries, origin(0x55bb)),
-            transfer: Sourced::new(self.transfer_characteristics, origin(0x55ba)),
-            matrix: Sourced::new(self.matrix_coefficients, origin(0x55b1)),
-            range: Sourced::new(range, origin(0x55b9)),
+            primaries: Sourced::new(self.primaries, origin(PRIMARIES)),
+            transfer: Sourced::new(
+                self.transfer_characteristics,
+                origin(TRANSFER_CHARACTERISTICS),
+            ),
+            matrix: Sourced::new(self.matrix_coefficients, origin(MATRIX_COEFFICIENTS)),
+            range: Sourced::new(range, origin(RANGE)),
             chroma_siting: siting.then_some(self.chroma_siting),
             mastering,
             content_light: self

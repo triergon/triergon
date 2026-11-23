@@ -105,6 +105,10 @@ impl Track {
     pub(crate) const AUDIO: u64 = 2;
     /// The TrackType of a subtitle track.
     pub(crate) const SUBTITLE: u64 = 17;
+    pub(crate) const COMPLEX: u64 = 3;
+    pub(crate) const LOGO: u64 = 16;
+    pub(crate) const BUTTONS: u64 = 18;
+    pub(crate) const CONTROL: u64 = 32;
 
     /// LanguageBCP47 when present, otherwise the Language element (`eng` when absent).
     pub fn effective_language(&self) -> &str {

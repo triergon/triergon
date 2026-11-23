@@ -10,6 +10,21 @@ use crate::{
 };
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::WorkBudget;
+
+pub(crate) const MATRIX_COEFFICIENTS: u64 = 0x55b1;
+pub(crate) const BITS_PER_CHANNEL: u64 = 0x55b2;
+pub(crate) const CHROMA_SUBSAMPLING_HORZ: u64 = 0x55b3;
+pub(crate) const CHROMA_SUBSAMPLING_VERT: u64 = 0x55b4;
+pub(crate) const CB_SUBSAMPLING_HORZ: u64 = 0x55b5;
+pub(crate) const CB_SUBSAMPLING_VERT: u64 = 0x55b6;
+pub(crate) const CHROMA_SITING_HORZ: u64 = 0x55b7;
+pub(crate) const CHROMA_SITING_VERT: u64 = 0x55b8;
+pub(crate) const RANGE: u64 = 0x55b9;
+pub(crate) const TRANSFER_CHARACTERISTICS: u64 = 0x55ba;
+pub(crate) const PRIMARIES: u64 = 0x55bb;
+pub(crate) const MAX_CLL: u64 = 0x55bc;
+pub(crate) const MAX_FALL: u64 = 0x55bd;
+
 #[derive(Debug)]
 pub(crate) struct ColourJob {
     source: SharedBytes,
@@ -122,32 +137,40 @@ impl ColourJob {
                         self.mastering = Some(ChildCursor::new(child.payload));
                         continue;
                     }
-                    if !(0x55b1..=0x55bd).contains(&child.id) {
+                    if !(MATRIX_COEFFICIENTS..=MAX_FALL).contains(&child.id) {
                         continue;
                     }
-                    if !Self::first(&mut self.seen, (child.id - 0x55b1) as u32) {
+                    if !Self::first(&mut self.seen, (child.id - MATRIX_COEFFICIENTS) as u32) {
                         continue;
                     }
                     let bytes = &self.source[child.payload];
-                    let v = if bytes.is_empty() && matches!(child.id, 0x55b1 | 0x55ba | 0x55bb) {
+                    let v = if bytes.is_empty()
+                        && matches!(
+                            child.id,
+                            MATRIX_COEFFICIENTS | TRANSFER_CHARACTERISTICS | PRIMARIES
+                        ) {
                         2
                     } else {
                         ebml::uint(bytes)?
                     };
                     match child.id {
-                        0x55b1 => self.out.matrix_coefficients = v,
-                        0x55b2 => self.out.bits_per_channel = v,
-                        0x55b3..=0x55b4 => {
-                            self.out.chroma_subsampling[(child.id - 0x55b3) as usize] = Some(v);
+                        MATRIX_COEFFICIENTS => self.out.matrix_coefficients = v,
+                        BITS_PER_CHANNEL => self.out.bits_per_channel = v,
+                        CHROMA_SUBSAMPLING_HORZ..=CHROMA_SUBSAMPLING_VERT => {
+                            self.out.chroma_subsampling
+                                [(child.id - CHROMA_SUBSAMPLING_HORZ) as usize] = Some(v);
                         }
-                        0x55b5..=0x55b6 => {
-                            self.out.cb_subsampling[(child.id - 0x55b5) as usize] = Some(v);
+                        CB_SUBSAMPLING_HORZ..=CB_SUBSAMPLING_VERT => {
+                            self.out.cb_subsampling[(child.id - CB_SUBSAMPLING_HORZ) as usize] =
+                                Some(v);
                         }
-                        0x55b7..=0x55b8 => self.out.chroma_siting[(child.id - 0x55b7) as usize] = v,
-                        0x55b9 => self.out.range = v,
-                        0x55ba => self.out.transfer_characteristics = v,
-                        0x55bb => self.out.primaries = v,
-                        0x55bc => self.out.max_cll = Some(v),
+                        CHROMA_SITING_HORZ..=CHROMA_SITING_VERT => {
+                            self.out.chroma_siting[(child.id - CHROMA_SITING_HORZ) as usize] = v
+                        }
+                        RANGE => self.out.range = v,
+                        TRANSFER_CHARACTERISTICS => self.out.transfer_characteristics = v,
+                        PRIMARIES => self.out.primaries = v,
+                        MAX_CLL => self.out.max_cll = Some(v),
                         _ => self.out.max_fall = Some(v),
                     }
                 }
