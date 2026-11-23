@@ -287,15 +287,12 @@ impl DvbTsBridge {
             }
             Some(Pending::Pes(pending)) => pending,
         };
-        if !pending.cut(&mut self.parser, self.binding.pool(), work, cancel)?
-            || work.remaining() == 0
-        {
+        let Some(codec) = pending.cut(&mut self.parser, self.binding.pool(), work, cancel)? else {
+            return Ok(DvbStep::Yield);
+        };
+        if work.remaining() == 0 {
             return Ok(DvbStep::Yield);
         }
-        let codec = pending
-            .codec
-            .as_ref()
-            .ok_or(Error::Invalid("DVB codec packet absent"))?;
         let anchored = self.anchored;
         let pts = codec
             .codec_pts()
@@ -380,31 +377,28 @@ fn subtitling_descriptor(
 }
 
 impl PesWork {
-    /// Gather the PES data field and cut it into its codec packet; `false`
-    /// to yield.
+    /// Gather the PES data field and cut it into its codec packet; `None` to
+    /// yield.
     fn cut(
         &mut self,
         parser: &mut PesParser,
         pool: &Budget,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<bool> {
+    ) -> Result<Option<&PesPacket>> {
         if self.codec.is_some() {
-            return Ok(true);
+            return Ok(self.codec.as_ref());
         }
         if !self.parser_input {
             let Some(raw) = self.data.poll(pool, work)? else {
-                return Ok(false);
+                return Ok(None);
             };
             parser.provide(raw, self.pts)?;
             self.parser_input = true;
         }
         match parser.step(work, cancel)? {
-            PesProgress::Yield => Ok(false),
-            PesProgress::Packet(packet) => {
-                self.codec = Some(packet);
-                Ok(true)
-            }
+            PesProgress::Yield => Ok(None),
+            PesProgress::Packet(packet) => Ok(Some(self.codec.insert(packet))),
             PesProgress::NeedPacket => Err(Error::Invalid("DVB parser input disappeared")),
         }
     }
