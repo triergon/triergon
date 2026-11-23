@@ -227,6 +227,28 @@ struct ActivePic {
     sh: SliceHeader,
 }
 
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+struct PendingField {
+    id: PictureId,
+    structure: Structure,
+    frame_num: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Dimensions {
+    mb_width: u32,
+    mb_height: u32,
+}
+
+#[derive(Debug)]
+#[repr(C)]
+struct PictureScratch {
+    mbs: BudgetVec<MbInfo>,
+    slices: BudgetVec<SliceDbk>,
+    dbk: deblock::Progress,
+}
+
 /// H.264 decoder.
 #[derive(Debug)]
 pub struct Decoder {
@@ -248,12 +270,12 @@ pub struct Decoder {
     rbsp: BudgetVec<u8>,
     /// The last decoded first field, held from output while it waits for its second
     /// field: its stored picture, field and frame_num.
-    pending_field: Option<(PictureId, Structure, u32)>,
+    pending_field: Option<PendingField>,
     /// Dimensions of the active SPS (to flush on change).
-    cur_dims: Option<(u32, u32)>,
+    cur_dims: Option<Dimensions>,
     pending_pts: Option<i64>,
     /// Macroblock, slice and deblocking arrays of the last picture, reused by the next.
-    pic_scratch: Option<(BudgetVec<MbInfo>, BudgetVec<SliceDbk>, deblock::Progress)>,
+    pic_scratch: Option<PictureScratch>,
     /// The pool every buffer sized from the stream is charged to.
     budget: Budget,
     /// Samples of no picture, for references whose store has none.
@@ -339,7 +361,7 @@ fn keep_decoded(
     reference: bool,
     compact: bool,
     spare_motion: &mut Vec<Motion>,
-) -> (BudgetVec<MbInfo>, BudgetVec<SliceDbk>, deblock::Progress) {
+) -> PictureScratch {
     let slot = usize::from(structure == Structure::Bottom);
     fs.buf = Some(Arc::new(pic.buf));
     let spare = if reference && !(compact && fs.motion[slot].compact_from(&pic.motion).is_ok()) {
@@ -355,7 +377,11 @@ fn keep_decoded(
     } else {
         structure as u8
     };
-    (pic.mbs, pic.slices, pic.dbk)
+    PictureScratch {
+        mbs: pic.mbs,
+        slices: pic.slices,
+        dbk: pic.dbk,
+    }
 }
 
 /// A sample buffer of the given size: a spare one no output picture shares any more, or a new one.
@@ -637,7 +663,10 @@ impl Decoder {
 
     /// Begin decoding a new picture: frame_num gap handling, POC, frame store allocation.
     fn start_picture(&mut self, sps: &Arc<Sps>, sh: &SliceHeader) -> Result<(), DecodeError> {
-        let dims = (sps.pic_width_in_mbs, sps.frame_height_in_mbs());
+        let dims = Dimensions {
+            mb_width: sps.pic_width_in_mbs,
+            mb_height: sps.frame_height_in_mbs(),
+        };
         if self.cur_dims.is_some() && self.cur_dims != Some(dims) {
             // Resolution change: output everything and drop the DPB.
             self.close_pending_field();
@@ -653,13 +682,19 @@ impl Decoder {
         // second field of an IDR frame may be IDR too.
         let first = self
             .pending_field
-            .filter(|&(id, par, frame_num)| {
-                structure.is_field()
-                    && structure != par
-                    && frame_num == sh.frame_num
-                    && (!sh.idr || self.dpb.entries().any(|e| e.id() == id && e.picture().idr))
-            })
-            .map(|(id, _, _)| id);
+            .filter(
+                |&PendingField {
+                     id,
+                     structure: parity,
+                     frame_num,
+                 }| {
+                    structure.is_field()
+                        && structure != parity
+                        && frame_num == sh.frame_num
+                        && (!sh.idr || self.dpb.entries().any(|e| e.id() == id && e.picture().idr))
+                },
+            )
+            .map(|first| first.id);
         if first.is_none() {
             self.close_pending_field();
         }
@@ -711,13 +746,17 @@ impl Decoder {
         } else {
             fh / 2
         };
-        let (mut mbs, mut slices, mut dbk) = self.pic_scratch.take().unwrap_or_else(|| {
+        let PictureScratch {
+            mut mbs,
+            mut slices,
+            mut dbk,
+        } = self.pic_scratch.take().unwrap_or_else(|| {
             let budget = &self.budget;
-            (
-                BudgetVec::new(budget),
-                BudgetVec::new(budget),
-                deblock::Progress::new(budget),
-            )
+            PictureScratch {
+                mbs: BudgetVec::new(budget),
+                slices: BudgetVec::new(budget),
+                dbk: deblock::Progress::new(budget),
+            }
         });
         mbs.clear();
         mbs.try_resize(w * h, MbInfo::default())?;
@@ -944,7 +983,7 @@ impl Decoder {
     /// The pending first field gets no second field: it is output on its own, as a frame
     /// with one decoded field.
     fn close_pending_field(&mut self) {
-        if let Some((id, _, _)) = self.pending_field.take()
+        if let Some(PendingField { id, .. }) = self.pending_field.take()
             && let Some(mut first) = self.dpb.entry(id)
         {
             first.release();
@@ -1233,7 +1272,11 @@ impl Decoder {
                 match self.dpb.store(stored, fs) {
                     Ok(id) => {
                         if field.is_some() {
-                            self.pending_field = Some((id, structure, sh.frame_num));
+                            self.pending_field = Some(PendingField {
+                                id,
+                                structure,
+                                frame_num: sh.frame_num,
+                            });
                         }
                     }
                     Err(refused) => self.free.push(refused.picture),
