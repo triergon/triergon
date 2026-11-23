@@ -79,6 +79,11 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
   (implicit SBR/PS, a new PCE). A frame yields 1024 samples per raw data block, 2048 with
   SBR. A malformed SBR payload in a bounded fill element is skipped without replacing
   the last accepted SBR header or time grid. The core audio remains available.
+  A Parametric Stereo mode change needs new frequency-differential parameters
+  (ISO/IEC 14496-26:2024 7.18.1.2.1). On a malformed time-differential mode change
+  the decoder uses the last coded envelope and zeroes missing indices. To reproduce
+  the reference's differential history, select `compat::ffmpeg::extensions::Policy::Reference` with
+  `Decoder::with_extension_policy`.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
   `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.

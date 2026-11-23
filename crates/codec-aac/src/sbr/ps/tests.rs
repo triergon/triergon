@@ -151,6 +151,29 @@ fn an_error_frame_resets_the_phases_and_keeps_them_enabled() {
 }
 
 #[test]
+fn a_time_differential_mode_change_uses_only_the_last_coded_parameters() {
+    let frame = |mode, dt, first| {
+        let header = Header {
+            iid: Some(mode),
+            ..Header::default()
+        };
+        let mut raw = frame_with(Some(header), 1, None);
+        raw.iid[0].0 = dt;
+        raw.iid[0].1[0] = first;
+        raw
+    };
+    for (policy, uncoded) in [(Policy::Conceal, 0), (Policy::Reference, 3)] {
+        let mut ps = Ps::new();
+        ps.policy = policy;
+        assert!(ps.apply_raw(&frame(1, false, 3), false));
+        assert!(ps.apply_raw(&frame(0, false, -1), false));
+        assert!(ps.apply_raw(&frame(1, true, 0), false));
+        assert_eq!(ps.frame.iid[0][..10], [-1; 10]);
+        assert_eq!(ps.frame.iid[0][10..20], [uncoded; 10]);
+    }
+}
+
+#[test]
 fn a_time_differential_envelope_reads_the_values_of_its_envelope_index() {
     // probes o41 and o43: a 4-envelope 20-band frame, a 1-envelope 10-band frame, then a
     // 20-band envelope coded time-differentially with steps of 0: above band 10 it reads
@@ -166,6 +189,7 @@ fn a_time_differential_envelope_reads_the_values_of_its_envelope_index() {
         (dt, steps)
     };
     let mut ps = Ps::new();
+    ps.policy = Policy::Reference;
     let mut four = frame_with(Some(header(1)), 4, None);
     for (e, envelope) in four.iid.iter_mut().enumerate() {
         *envelope = coded(false, e as i8);

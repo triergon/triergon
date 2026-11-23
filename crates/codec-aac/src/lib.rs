@@ -99,6 +99,18 @@ impl Decoder {
         self
     }
 
+    /// Selects recovery for damaged SBR and Parametric Stereo extensions.
+    #[must_use]
+    pub fn with_extension_policy(mut self, policy: compat::ffmpeg::extensions::Policy) -> Self {
+        self.core.extension_policy = policy;
+        for element in &mut self.core.elements {
+            if let Some(sbr) = &mut element.sbr {
+                sbr.ps.policy = policy;
+            }
+        }
+        self
+    }
+
     /// Decodes one ADTS frame including its header, yielding 1024 samples per raw data
     /// block or 2048 with spectral band replication.
     /// Replaces `out`, leaving `samples_per_channel == 0` on refusal.

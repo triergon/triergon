@@ -1,7 +1,7 @@
 //! raw_data_block() decoding: element parsing, channel mapping, per-channel state and
 //! output assembly.
 
-use crate::compat::ffmpeg::layout::Policy;
+use crate::compat::ffmpeg::{extensions::Policy as ExtensionPolicy, layout::Policy};
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
 use crate::ics::*;
@@ -95,8 +95,14 @@ impl ChannelState {
 }
 
 /// SBR state for an element of `kind` at core sampling-frequency index `sf_index`.
-fn new_sbr(budget: &Budget, sf_index: usize, kind: ElementId) -> Result<Charged<Box<sbr::Sbr>>> {
-    let s = sbr::Sbr::new(SAMPLE_RATES[sf_index], kind == ElementId::Cpe, budget)?;
+fn new_sbr(
+    budget: &Budget,
+    sf_index: usize,
+    kind: ElementId,
+    policy: ExtensionPolicy,
+) -> Result<Charged<Box<sbr::Sbr>>> {
+    let mut s = sbr::Sbr::new(SAMPLE_RATES[sf_index], kind == ElementId::Cpe, budget)?;
+    s.ps.policy = policy;
     Ok(Charged::boxed(budget, s)?)
 }
 
@@ -215,6 +221,7 @@ pub(crate) struct Core {
     output_charge: Reservation,
     /// Output samples (per channel) still to be dropped (FFmpeg skip_samples behaviour).
     pub skip_samples: usize,
+    pub extension_policy: ExtensionPolicy,
     pub priming_policy: crate::compat::ffmpeg::priming::Policy,
     /// Frames output since the last (re)configuration.
     pub frames_out: u64,
@@ -242,6 +249,7 @@ impl Core {
             budget: budget.clone(),
             output_charge: Reservation::empty(budget),
             skip_samples: 0,
+            extension_policy: ExtensionPolicy::default(),
             priming_policy: crate::compat::ffmpeg::priming::Policy::default(),
             frames_out: 0,
         }
@@ -386,7 +394,12 @@ impl Core {
             }
             let mut e = ElementState::new(&self.budget, aot, s.kind, s.tag)?;
             if sbr {
-                e.sbr = Some(new_sbr(&self.budget, self.sf_index, s.kind)?);
+                e.sbr = Some(new_sbr(
+                    &self.budget,
+                    self.sf_index,
+                    s.kind,
+                    self.extension_policy,
+                )?);
             }
             elements.push(Charged::boxed(&self.budget, e)?);
         }
@@ -821,7 +834,12 @@ impl Core {
             let mut sbr = Vec::with_capacity(self.elements.len());
             for e in &self.elements {
                 sbr.push(match e.sbr {
-                    None => Some(new_sbr(&self.budget, self.sf_index, e.kind)?),
+                    None => Some(new_sbr(
+                        &self.budget,
+                        self.sf_index,
+                        e.kind,
+                        self.extension_policy,
+                    )?),
                     Some(_) => None,
                 });
             }
@@ -839,7 +857,12 @@ impl Core {
         // Every element has its SBR state once SBR runs.
         let sbr = match e.sbr {
             Some(ref mut sbr) => sbr,
-            None => e.sbr.insert(new_sbr(&self.budget, self.sf_index, e.kind)?),
+            None => e.sbr.insert(new_sbr(
+                &self.budget,
+                self.sf_index,
+                e.kind,
+                self.extension_policy,
+            )?),
         };
         let start = br.position();
         match sbr.parse(br, crc, bits, is_cpe) {
@@ -1427,7 +1450,7 @@ pub(crate) mod tests {
             for kind in [ElementId::Sce, ElementId::Cpe] {
                 let fresh = || {
                     let mut e = ElementState::new(&budget, aot, kind, 3).unwrap();
-                    e.sbr = Some(new_sbr(&budget, 4, kind).unwrap());
+                    e.sbr = Some(new_sbr(&budget, 4, kind, ExtensionPolicy::default()).unwrap());
                     e
                 };
                 let mut e = fresh();

@@ -76,6 +76,7 @@ mod tests;
 
 use self::synth::{MAX_PAR, SLOTS, Synth, layouts};
 use self::tables as t;
+use crate::compat::ffmpeg::extensions::Policy;
 use crate::error::Result;
 use crate::fft::Cpx;
 use crate::huffman::books;
@@ -356,6 +357,7 @@ pub(crate) struct Ps {
     start_re: [[f32; 4]; MAX_PAR],
     start_im: [[f32; 4]; MAX_PAR],
     status: Status,
+    pub(crate) policy: Policy,
 }
 
 /// What a single channel element holds to output Parametric Stereo: the stereo synthesis
@@ -415,6 +417,7 @@ impl Ps {
             start_re: [[0.0; 4]; MAX_PAR],
             start_im: [[0.0; 4]; MAX_PAR],
             status: Status::Absent,
+            policy: Policy::default(),
         }
     }
 
@@ -672,18 +675,24 @@ impl Ps {
     /// Keep the values of the `coded` (at least one) envelopes read: the first entries of
     /// the frame's band counts in each envelope's array.
     fn keep(&mut self, h: Header, iid: &Values, icc: &Values, coded: usize) {
-        for (kept, values, mode) in [
-            (&mut self.kept_iid, iid, h.iid),
-            (&mut self.kept_icc, icc, h.icc),
-        ] {
-            if let Some(m) = mode {
-                let n = band_count(m);
-                for (kept, values) in kept.iter_mut().zip(values).take(coded) {
-                    kept[..n].copy_from_slice(&values[..n]);
+        if self.policy == Policy::Reference {
+            for (kept, values, mode) in [
+                (&mut self.kept_iid, iid, h.iid),
+                (&mut self.kept_icc, icc, h.icc),
+            ] {
+                if let Some(m) = mode {
+                    let n = band_count(m);
+                    for (kept, values) in kept.iter_mut().zip(values).take(coded) {
+                        kept[..n].copy_from_slice(&values[..n]);
+                    }
                 }
             }
+            self.kept_env = coded - 1;
+        } else {
+            self.kept_iid[0] = iid[coded - 1];
+            self.kept_icc[0] = icc[coded - 1];
+            self.kept_env = 0;
         }
-        self.kept_env = coded - 1;
     }
 
     /// An error frame: mono output, values reset (IPD/OPD to index 0 with their enable bit

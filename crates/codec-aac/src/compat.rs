@@ -15,6 +15,20 @@ pub mod ffmpeg {
         }
     }
 
+    /// Recovery choices for damaged spectral band replication and Parametric Stereo.
+    pub mod extensions {
+        /// How to handle damaged extension data while keeping the core audio.
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+        #[repr(u8)]
+        pub enum Policy {
+            /// Uses the last coded envelope and fills missing differential references with zero.
+            #[default]
+            Conceal,
+            /// Reproduces the reference decoder's recovery of damaged extensions.
+            Reference,
+        }
+    }
+
     /// Channel mappings for fixed AAC-LC access units.
     ///
     /// `ConventionalSurround` uses the reference speaker mapping for packets with an

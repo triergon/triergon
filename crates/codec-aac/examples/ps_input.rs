@@ -2,6 +2,7 @@
 
 use std::io::{BufWriter, Write};
 
+use triergon_codec_aac::compat::ffmpeg::extensions::Policy;
 use triergon_codec_aac::{AudioFrame, Decoder, adts, reference_trace};
 
 fn main() -> std::io::Result<()> {
@@ -9,7 +10,7 @@ fn main() -> std::io::Result<()> {
     let output = std::env::var_os("AAC_PS_OUTPUT").expect("output path");
     let data = std::fs::read(input)?;
     let mut out = BufWriter::new(std::fs::File::create(output)?);
-    let mut decoder = Decoder::new();
+    let mut decoder = Decoder::new().with_extension_policy(Policy::Reference);
     let mut frame = AudioFrame::default();
     let mut pos = 0;
     let empty = vec![0f32; 38 * 64 * 2];
