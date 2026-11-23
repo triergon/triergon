@@ -517,14 +517,7 @@ impl RecoveryObserver {
             return self
                 .inner
                 .poll_bound(work, cancel, input)
-                .map(|step| match step {
-                    AssemblyStep::Output(packet) => {
-                        AssemblyStep::Output(DemuxObservation::Accepted(packet))
-                    }
-                    AssemblyStep::Yield => AssemblyStep::Yield,
-                    AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
-                    AssemblyStep::Finished => AssemblyStep::Finished,
-                });
+                .map(|step| step.map(DemuxObservation::Accepted));
         }
         if matches!(self.pending, Some(RecoveryPending::Selected(_))) {
             return self.poll_selected(work, cancel);

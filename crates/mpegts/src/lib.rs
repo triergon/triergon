@@ -124,6 +124,19 @@ pub enum AssemblyStep<T> {
     Finished,
 }
 
+impl<T> AssemblyStep<T> {
+    /// The same step, with a completed object converted by `f`.
+    #[inline]
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> AssemblyStep<U> {
+        match self {
+            Self::Output(output) => AssemblyStep::Output(f(output)),
+            Self::NeedPayload => AssemblyStep::NeedPayload,
+            Self::Yield => AssemblyStep::Yield,
+            Self::Finished => AssemblyStep::Finished,
+        }
+    }
+}
+
 pub(crate) fn checked_pid(pid: u16) -> Result<()> {
     if pid >= transport::pid::NULL {
         Err(Error::Invalid("assembly PID"))

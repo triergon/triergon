@@ -496,14 +496,10 @@ impl TransportFaultRecovery {
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<RecoveredPes>> {
         let Some(job) = self.pending.as_mut() else {
-            return self.inner.poll(work, cancel).map(|step| match step {
-                AssemblyStep::Output(packet) => {
-                    AssemblyStep::Output(RecoveredPes::Accepted(packet))
-                }
-                AssemblyStep::Yield => AssemblyStep::Yield,
-                AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
-                AssemblyStep::Finished => AssemblyStep::Finished,
-            });
+            return self
+                .inner
+                .poll(work, cancel)
+                .map(|step| step.map(RecoveredPes::Accepted));
         };
         Ok(match job.poll(&self.inner, work, cancel)? {
             AssemblyStep::Output(()) => {
