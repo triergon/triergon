@@ -33,13 +33,17 @@
   "timeout_seconds": 120,
   "open_deviations": [
     {
-      "reading": "Composite allocation failure is distinguishable from an empty render",
-      "clause": "ISO C section 7.22.3 allows an allocation to fail. The raster API returns Error::Allocation to its caller",
+      "reading": "A composite that cannot be allocated is an error, not an empty render (an API choice of ours)",
+      "clause": "ISO C section 7.22.3: an allocation may fail; the raster API returns Error::Allocation to its caller. On 32-bit ARM the multi-gigabyte composite of these cases cannot be allocated.",
       "candidate": "Returns the allocation error for each composite.",
-      "reference": "The pinned ARMv7 build silently omits each composite.",
-      "compat": "compat::raster::omit_on_allocation_failure",
-      "cases": ["outlines-71", "outlines-83"],
-      "targets": ["thumbv7neon-unknown-linux-gnueabihf"]
+      "reference": "The 32-bit ARM build silently draws nothing for each composite.",
+      "cases": [
+        "outlines-71",
+        "outlines-83"
+      ],
+      "targets": [
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ]
     }
   ]
 }
