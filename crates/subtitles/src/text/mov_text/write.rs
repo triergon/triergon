@@ -44,7 +44,6 @@ impl<const N: usize> fmt::Write for Fixed<N> {
 #[derive(Debug)]
 pub(super) struct Writer<const N: usize> {
     pub pending: Fixed<N>,
-    at: usize,
     data: BudgetVec<u8>,
     pub frozen: Option<Bytes>,
 }
@@ -52,7 +51,6 @@ impl<const N: usize> Writer<N> {
     pub(super) fn new(pool: &Budget) -> Self {
         Self {
             pending: Fixed::new(),
-            at: 0,
             data: BudgetVec::new(pool),
             frozen: None,
         }
@@ -65,7 +63,7 @@ impl<const N: usize> Writer<N> {
         funding: &mut Funding,
         caller: &mut WorkBudget,
     ) -> Result<bool> {
-        let pending = &self.pending.bytes[self.at..self.pending.length];
+        let pending = self.pending.as_bytes();
         if pending.is_empty() {
             return Ok(true);
         }
@@ -81,7 +79,6 @@ impl<const N: usize> Writer<N> {
         self.data.try_reserve(pending.len())?;
         self.data.try_extend_from_slice(pending)?;
         funding.commit();
-        self.at = 0;
         self.pending.clear();
         Ok(true)
     }
