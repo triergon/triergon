@@ -16,14 +16,23 @@ fn maximal_single_packet_sdt_is_complete_and_has_valid_crc() {
     assert_eq!(PsiCrc32::of(s), 0);
 }
 #[test]
-fn one_byte_excess_is_rejected_without_emission() {
-    assert!(matches!(
+fn names_one_byte_beyond_the_service_descriptor_are_rejected() {
+    // "Service01" leaves 243 of the descriptor's 252 name bytes to the provider.
+    assert!(
         Muxer::new(&MuxConfig {
-            provider_name: "p".repeat(150),
+            provider_name: "p".repeat(243),
             ..MuxConfig::default()
-        }),
-        Err(Error::Unsupported(_))
-    ));
+        })
+        .is_ok()
+    );
+    assert_eq!(
+        Muxer::new(&MuxConfig {
+            provider_name: "p".repeat(244),
+            ..MuxConfig::default()
+        })
+        .unwrap_err(),
+        Error::Unsupported("service descriptor length")
+    );
 }
 #[test]
 fn oversized_encoded_lengths_are_rejected() {
@@ -46,7 +55,7 @@ fn oversized_encoded_lengths_are_rejected() {
 }
 #[test]
 fn unsupported_name_encoding_is_rejected() {
-    for n in ["é", "line\n", "nul\0"] {
+    for n in ["line\n", "nul\0", "tab\tstop"] {
         assert!(
             Muxer::new(&MuxConfig {
                 provider_name: n.into(),
