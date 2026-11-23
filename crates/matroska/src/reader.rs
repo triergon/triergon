@@ -179,37 +179,39 @@ enum State {
 
 /// Retained format jobs on the envelope's one InputCursor. Every lace
 /// and checksum in a packet batch validates before its first packet is emitted.
+// The fields are declared in address order. The demux and seek steps were measured
+// with this layout (`reader_fields_keep_their_measured_offsets` records it).
 #[derive(Debug)]
+#[repr(C)]
 pub struct Reader {
-    envelope: ElementReader,
-    pool: Budget,
-    limits: Limits,
-    state: State,
-    failed: bool,
-    first_cluster: Option<ClusterCheckpoint>,
-    configuration: Option<Configuration>,
-    catalogue: Catalogue,
-    cues: Option<BudgetVec<crate::seek::Cue>>,
-    scale: u64,
     cluster_time: Option<u64>,
-    last_location: Option<ReplayLocation>,
-    segment_data: u64,
     segment_end: Option<u64>,
-    revision: u64,
-    metadata_used: usize,
+    scan_remaining: Option<u64>,
+    first_cluster: Option<ClusterCheckpoint>,
+    last_location: Option<ReplayLocation>,
     loaded: CopyVec<(u64, u64)>,
     seek_targets: CopyVec<(u64, u64)>,
-    opening: Option<Opening>,
-    resolver: Option<Resolver>,
-    pending_seek: Option<SeekRequest>,
-    recovery_audio: RecoveryAudio,
-    seek_stage: SeekStage,
     subtitle_recovery: Option<SubtitleRecovery>,
     replay_prefix: Option<ReplayPrefix>,
-    demux_read_bytes: u64,
-    scan_remaining: Option<u64>,
-    seek_metadata_bytes: u64,
+    seek_stage: SeekStage,
+    state: State,
+    configuration: Option<Configuration>,
+    envelope: ElementReader,
+    resolver: Option<Resolver>,
+    epoch_reference: Option<EpochReference>,
     pressure: Option<crate::storage::usage::Pressure>,
+    catalogue: Catalogue,
+    cues: Option<BudgetVec<crate::seek::Cue>>,
+    opening: Option<Opening>,
+    pending_seek: Option<SeekRequest>,
+    pool: Budget,
+    limits: Limits,
+    scale: u64,
+    segment_data: u64,
+    revision: u64,
+    metadata_used: usize,
+    demux_read_bytes: u64,
+    seek_metadata_bytes: u64,
     adapter_storage: usize,
     // An allocation-free negative proof: normal sequential parsing has validated
     // every group through this offset. Range jumps never extend this prefix.
@@ -218,10 +220,11 @@ pub struct Reader {
     // poll and never retained across polls.
     owned_root: Option<triergon_core::Bytes>,
     seek_index: Option<Box<seek_index::ImmutableSeekIndex>>,
+    failed: bool,
+    recovery_audio: RecoveryAudio,
     state_coverage_contiguous: bool,
     state_seen: bool,
     webm_vp9_t35: bool,
-    epoch_reference: Option<EpochReference>,
 }
 
 /// A [`Reader`] that also admits WebM VP9's implicit ITU-T T.35 addition

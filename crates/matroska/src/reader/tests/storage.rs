@@ -220,6 +220,78 @@ fn inline_transaction_workspace_stays_within_the_observed_host_ceiling() {
         "the observed transaction workspace ceiling must not grow"
     );
 }
+/// The reader's fields in address order with their offsets. The demux and seek
+/// steps were measured with this layout: a field that moves is a change to
+/// measure again, on 64-bit and on 32-bit hosts.
+#[test]
+fn reader_fields_keep_their_measured_offsets() {
+    macro_rules! layout {
+        ($($field:ident),* $(,)?) => {
+            [$((stringify!($field), std::mem::offset_of!(Reader, $field))),*]
+        };
+    }
+    let fields = layout![
+        cluster_time,
+        segment_end,
+        scan_remaining,
+        first_cluster,
+        last_location,
+        loaded,
+        seek_targets,
+        subtitle_recovery,
+        replay_prefix,
+        seek_stage,
+        state,
+        configuration,
+        envelope,
+        resolver,
+        epoch_reference,
+        pressure,
+        catalogue,
+        cues,
+        opening,
+        pending_seek,
+        pool,
+        limits,
+        scale,
+        segment_data,
+        revision,
+        metadata_used,
+        demux_read_bytes,
+        seek_metadata_bytes,
+        adapter_storage,
+        state_coverage_end,
+        owned_root,
+        seek_index,
+        failed,
+        recovery_audio,
+        state_coverage_contiguous,
+        state_seen,
+        webm_vp9_t35,
+    ];
+    let offsets = fields.map(|(_, offset)| offset);
+    println!(
+        "READER_LAYOUT|size={}|align={}|{}",
+        size_of::<Reader>(),
+        align_of::<Reader>(),
+        fields
+            .map(|(name, offset)| format!("{name}={offset}"))
+            .join("|")
+    );
+    #[cfg(target_pointer_width = "64")]
+    assert_eq!(
+        (offsets, size_of::<Reader>()),
+        (
+            [
+                0, 16, 32, 48, 112, 240, 352, 464, 528, 576, 1040, 7792, 7824, 8392, 8912, 8952,
+                9024, 9096, 9136, 9160, 9184, 9192, 9296, 9304, 9312, 9320, 9328, 9336, 9344, 9352,
+                9360, 9384, 9392, 9393, 9394, 9395, 9396,
+            ],
+            9408
+        )
+    );
+    assert!(offsets.is_sorted());
+}
 #[cfg(target_pointer_width = "64")]
 #[test]
 fn performance_lace_workspace_keeps_one_descriptor_arena() {
