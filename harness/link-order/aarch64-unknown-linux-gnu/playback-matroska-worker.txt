@@ -21,7 +21,7 @@ __rustc::__rust_alloc
 alloc::io::read::default_read_to_end::small_probe_read::<std::fs::File>
 <triergon_core::bytes::Bytes>::copy_from_slice
 __aarch64_ldadd8_relax
-triergon_harness_runner::measure_dyn
+triergon_harness_runner::measure_dyn::<false>
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
 __aarch64_cas4_acq
 __aarch64_swp4_rel
@@ -29,19 +29,19 @@ __aarch64_swp4_rel
 <std::sys::stdio::unix::Stdout as core::io::write::Write>::write_all
 <alloc::io::buffered::bufwriter::BufWriter<std::io::stdio::StdoutRaw>>::flush_buf
 playback_worker::matroska_video::run::{closure#0}
-<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_playback::source::ByteSource>>::new
-<triergon_bridge::matroska::discovery::MatroskaDiscovery<triergon_playback::source::ByteSource>>::poll
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::read_output_inner
+<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_core::source::ByteSource>>::new
+<triergon_bridge::matroska::discovery::MatroskaDiscovery<triergon_core::source::ByteSource>>::poll
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::read_output_inner
 <triergon_playback::engine::matroska::MkvEngine>::step
-<triergon_matroska::reader::Reader>::step_demux_after_health_check::<triergon_matroska::reader::projection::TypedProjection>
+<triergon_matroska::reader::Stream>::step_demux_after_health_check::<triergon_matroska::reader::projection::TypedProjection>
 <triergon_matroska::element::ElementReader>::step_typed_compact_after_input_health
 <triergon_matroska::element::ElementReader>::take_buffered_header
 core::ptr::drop_glue::<triergon_matroska::element::Phase>
 <triergon_matroska::element::ElementReader>::bounded_header_refill
 <triergon_matroska::element::ElementReader>::expanded_refill
-<triergon_playback::source::SourceOwner<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::poll
-<triergon_playback::source::ByteSource as triergon_playback::source::Source>::poll
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::provide
+<triergon_core::source::SourceOwner<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::poll
+<triergon_core::source::ByteSource as triergon_core::source::Source>::poll
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::provide
 <triergon_core::input::InputCursor>::provide
 __aarch64_ldadd8_rel
 <triergon_matroska::element::ElementReader>::begin::<triergon_matroska::element::control::CompactDelivery>
@@ -49,13 +49,13 @@ __aarch64_ldadd8_rel
 <triergon_core::input::InputCursor>::read_discard
 <triergon_matroska::element::control::CompactDelivery as triergon_matroska::element::EnvelopeDelivery>::leaf
 core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::seek::Cue>>>
-<triergon_matroska::reader::Reader>::start_leaf_projected::<triergon_matroska::reader::projection::TypedProjection>
+<triergon_matroska::reader::Stream>::start_leaf_projected::<triergon_matroska::reader::projection::TypedProjection>
 core::ptr::drop_glue::<triergon_matroska::reader::State>
 <triergon_matroska::reader::head::EbmlJob>::step
 <triergon_matroska::ebml::ChildCursor>::step
 <triergon_matroska::storage::SharedBytes as core::ops::deref::Deref>::deref
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::accept_event::<true>
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::admit
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::accept_event::<true>
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::admit
 <triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>::reallocate
 triergon_core::bytes::charge_replacement
@@ -67,46 +67,46 @@ triergon_core::bytes::settle_replacement
 <triergon_core::bytes::BudgetVec<(u64, u64)>>::reallocate
 <triergon_matroska::element::ElementReader>::admit_typed_leaf
 <triergon_matroska::reader::head::SeekHeadJob>::step
-<triergon_matroska::reader::Reader>::commit_metadata
+<triergon_matroska::reader::Stream>::commit_metadata
 <triergon_core::input::InputCursor>::check_cancel
 <triergon_matroska::metadata::build::CataloguePrepareJob>::step
 <triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>::reallocate
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_matroska::metadata::SharedDocument>>
-core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>>
 <triergon_matroska::metadata::build::CatalogueJob>::step
 <triergon_matroska::metadata::build::CatalogueJob>::start_document
 <triergon_core::bytes::Bytes as core::convert::AsRef<[u8]>>::as_ref
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::metadata::build::DocumentJob>>
-<triergon_core::budget::Budget>::reserve
+<triergon_core::budget::Reservation>::resize_to
 <triergon_core::bytes::BudgetVec<triergon_matroska::metadata::Node>>::reallocate
 <triergon_matroska::storage::text::TextCheck>::step
 triergon_matroska::metadata::build::bit
+alloc::boxed::box_new_uninit
 <triergon_matroska::storage::StorageVec<triergon_matroska::metadata::SharedDocument>>::push
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>
 <triergon_matroska::track::parse::TracksJob>::step
 <triergon_core::bytes::BudgetVec<triergon_matroska::track::Track>>::reallocate
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::track::parse::TrackJob>>
+core::ptr::drop_glue::<triergon_matroska::track::parse::TracksSide>
 <triergon_matroska::track::parse::TrackJob>::advance
+core::ptr::drop_glue::<triergon_matroska::track::parse::TrackSide>
 <triergon_matroska::storage::SharedBytes>::slice
 <triergon_matroska::track::extensions::TrackExtensionsJob>::new
-<triergon_matroska::track::extensions::TrackExtensionsJob>::step
+<triergon_matroska::track::extensions::TrackExtensionsJob>::step_job
 core::ptr::drop_glue::<triergon_matroska::track::extensions::TrackExtensionsJob>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::track::extensions::Mapping>>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::track::extensions::Unknown>>
 <alloc::sync::Arc<triergon_matroska::track::extensions::Data>>::drop_slow
 core::ptr::drop_glue::<triergon_matroska::track::extensions::Data>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::content_encoding::parse::EncodingsJob>>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::zlib::restore::RestoreJob>>
-alloc::boxed::box_new_uninit
+core::ptr::drop_glue::<triergon_matroska::track::Track>
+<triergon_core::budget::Budget>::reserve
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::configuration::Configuration>>
-core::ptr::drop_glue::<triergon_matroska::configuration::ConfigurationJob>
 <triergon_matroska::track::parse::TracksJob>::metadata_bytes
-core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::track::Track>>>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::configuration::ConfigurationJob>>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_matroska::track::Track>>
 <triergon_playback::player::Selection>::validate
 <triergon_bridge::matroska::discovery::Readiness>::new
 <triergon_matroska::storage::SharedText>::as_str
 core::ptr::drop_glue::<core::option::Option<triergon_bridge::matroska::discovery::Readiness>>
-<triergon_matroska::element::ElementReader>::cluster_checkpoint
+<triergon_matroska::reader::Reader>::enter_clusters
+triergon_matroska::reader::step_activity
 <alloc::sync::Arc<triergon_core::bytes::Storage>>::drop_slow
 <triergon_core::input::InputCursor>::read_span
 <triergon_core::bytes::BudgetVec<u8>>::reallocate
@@ -115,7 +115,6 @@ core::ptr::drop_glue::<core::option::Option<triergon_bridge::matroska::discovery
 <triergon_matroska::reader::projection::TypedProjection as triergon_matroska::reader::projection::PacketProjection>::simple
 <triergon_matroska::packet::batch::simple::SimplePacketJob>::step_compact_borrowing
 <triergon_matroska::storage::SharedBytes>::into_slice
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::SharedBytes>>
 <triergon_matroska::packet::batch::FrameParameters>::fields
 <triergon_matroska::reader::projection::TypedProjection as triergon_matroska::reader::projection::PacketProjection>::take_simple
 <triergon_matroska::reader::seek_index::ImmutableSeekIndex>::observe
@@ -149,7 +148,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_framing::aac::config::AacAs
 <triergon_framing::aac::config::AacAscParser>::step
 <triergon_framing::aac::config::Bits>::object_type
 core::ptr::drop_glue::<triergon_framing::aac::config::State>
-<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_playback::source::ByteSource>>::finish
+<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_core::source::ByteSource>>::finish
 <triergon_bridge::matroska::MatroskaFeedSetup>::new
 <triergon_bridge::matroska::MatroskaFeedSetup>::step
 core::ptr::drop_glue::<triergon_bridge::matroska::MatroskaFeedSetup>
@@ -162,12 +161,12 @@ core::ptr::drop_glue::<triergon_matroska::reader::Event>
 <triergon_matroska::timing::ExactTime>::rounded_duration_ns
 <triergon_bridge::matroska::video_clock::DecodeClock>::push_pts
 core::ptr::drop_glue::<core::iter::adapters::map::Map<triergon_core::bytes::BudgetVecIntoIter<triergon_playback::player::MatroskaReplayOutput>, <triergon_playback::player::MatroskaReplayOutput>::into_output>>
-<triergon_matroska::reader::Reader>::start_group_batch
+<triergon_matroska::reader::Stream>::start_group_batch
 <triergon_matroska::packet::block_group::GroupJob>::new
 <triergon_matroska::packet::batch::PacketBatchJob>::step_ready
 <triergon_matroska::packet::block_group::GroupJob>::step
 <triergon_matroska::metadata::build::Heap>::step
-core::ptr::drop_glue::<triergon_matroska::packet::batch::BatchWork>
+core::ptr::drop_glue::<triergon_matroska::packet::batch::SideJob>
 core::ptr::drop_glue::<triergon_matroska::packet::block_group::GroupJob>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::packet::block_group::Addition>>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<i64>>
@@ -182,22 +181,18 @@ core::ptr::drop_glue::<triergon_matroska::packet::batch::Staged>
 <triergon_core::bytes::BudgetVec<triergon_matroska::seek::cues::Position>>::reallocate
 <triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::Cue>>::step
 <triergon_core::bytes::BudgetVec<triergon_matroska::seek::Cue>>::reallocate
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::Cue>>>
+core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::Cue>>
 core::ptr::drop_glue::<triergon_bridge::matroska::MatroskaTrackFeed>
-core::ptr::drop_glue::<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::shutdown
+core::ptr::drop_glue::<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::shutdown
 core::ptr::drop_glue::<triergon_playback::engine::Engine>
+core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<(u64, u64)>>
 <alloc::sync::Arc<triergon_matroska::configuration::Data>>::drop_slow
 core::ptr::drop_glue::<triergon_matroska::configuration::Data>
-core::ptr::drop_glue::<triergon_matroska::track::Track>
-core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>
 <alloc::sync::Arc<triergon_matroska::metadata::Document>>::drop_slow
 core::ptr::drop_glue::<triergon_matroska::metadata::Document>
-core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<(u64, u64)>>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::reader::resolving::Resolver>>
-core::ptr::drop_glue::<triergon_matroska::reader::seeking::SeekStage>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::usage::Pressure>>
 core::ptr::drop_glue::<core::option::Option<alloc::boxed::Box<triergon_matroska::reader::seek_index::ImmutableSeekIndex>>>
+core::ptr::drop_glue::<triergon_matroska::reader::Activity>
 core::ptr::drop_glue::<alloc::vec::Vec<core::option::Option<triergon_playback::player::Output>>>
 alloc::fmt::format::format_inner
 core::fmt::write
@@ -226,13 +221,14 @@ core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_playback::player
 <triergon_matroska::reader::seek_index::ImmutableSeekIndex>::discard
 <triergon_playback::player::Output>::event_budget
 core::ptr::drop_glue::<core::option::Option<triergon_playback::player::Output>>
+<triergon_matroska::reader::seeking::Seek>::step
+<triergon_matroska::reader::resolving::Resolver>::step
+core::ptr::drop_glue::<triergon_matroska::reader::resolving::Phase>
 <triergon_core::bytes::BudgetVec<i64>>::reallocate
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::reader::range::RangeLeafJob>>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::cues::Position>>
-<triergon_matroska::reader::Reader>::start_seek_plan
-<triergon_matroska::reader::Reader>::seek_plan_job
+<triergon_matroska::reader::seeking::Operation>::plan_job
+core::ptr::drop_glue::<triergon_matroska::reader::seeking::SeekStage>
 core::ptr::drop_glue::<triergon_matroska::reader::resolving::Resolver>
-<triergon_matroska::reader::Reader>::step_seeking
 <triergon_core::time::Time>::combine
 <triergon_matroska::element::ElementReader>::begin_internal_cluster_range
 <triergon_core::input::InputCursor>::request_range
@@ -240,23 +236,21 @@ core::ptr::drop_glue::<triergon_matroska::reader::resolving::Resolver>
 <triergon_matroska::element::ElementReader>::begin::<triergon_matroska::element::PublicDelivery>
 <triergon_matroska::seek::cue_validation::CueValidationJob>::step_batch
 core::ptr::drop_glue::<triergon_matroska::packet::batch::TypedPacket>
-core::ptr::drop_glue::<triergon_matroska::step::ParseStep>
+core::ptr::drop_glue::<triergon_matroska::step::ParseStep<triergon_matroska::element::ElementEvent>>
 <triergon_matroska::seek::cue_validation::ValidatedCue as core::clone::Clone>::clone
-<triergon_matroska::reader::Reader>::finish_seek
+<triergon_matroska::reader::seeking::Operation>::finish
 <triergon_matroska::packet::batch::FrameParameters>::scan_fields
 <triergon_matroska::reader::seeking::ScanSimple>::context_matches
 <triergon_matroska::element::ElementReader>::finish_scanned_leaf
-core::ptr::drop_glue::<triergon_matroska::step::ParseStep<triergon_matroska::reader::Event>>
-<triergon_matroska::reader::Reader>::complete_scan
+<core::option::Option<triergon_matroska::reader::seeking::ScanBoundary> as core::clone::Clone>::clone_from
 <triergon_matroska::seek::epoch::EpochRestoreJob>::step
-core::ptr::drop_glue::<triergon_matroska::reader::seeking::ScanState>
+core::ptr::drop_glue::<triergon_matroska::seek::epoch::Phase>
 core::ptr::drop_glue::<triergon_matroska::step::ParseStep<triergon_matroska::seek::epoch::RestoredEpoch>>
-<triergon_matroska::seek::epoch::EpochRestoreJob>::start_copy
-<triergon_matroska::seek::epoch::EpochRestoreJob>::after_group
-<triergon_matroska::seek::epoch::RestoredEpoch as core::clone::Clone>::clone
+<triergon_matroska::seek::epoch::EpochRestoreJob>::after_block
 core::ptr::drop_glue::<triergon_matroska::configuration::Configuration>
 triergon_matroska::packet::batch::keep_recovery_packet
 <triergon_bridge::matroska::video_seek::MatroskaVideoSeekGate>::admits
+<triergon_matroska::storage::text::TextJob>::new
 <triergon_matroska::storage::text::TextJob>::step
 <triergon_framing::hevc::config::HvcConfigParser>::new
 <triergon_framing::hevc::config::HvcConfigParser>::step

@@ -13,9 +13,11 @@ std::env::args
 core::str::converts::from_utf8
 playback_worker::progressive::run
 <triergon_harness_runner::Invocation>::parse
-triergon_harness_runner::measure_dyn
+triergon_harness_runner::measure_dyn::<false>
 <std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>
+<std::sys::sync::once::futex::Once>::call
 __aarch64_cas4_acq
+<std::sync::once::Once>::call_once_force::<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::initialize<<std::sync::once_lock::OnceLock<std::sync::reentrant_lock::ReentrantLock<core::cell::RefCell<alloc::io::buffered::linewriter::LineWriter<std::io::stdio::StdoutRaw>>>>>::get_or_init<std::io::stdio::stdout::{closure#0}>::{closure#0}, !>::{closure#0}>::{closure#0}
 __aarch64_swp4_rel
 __aarch64_cas8_relax
 <std::io::stdio::StdoutLock as core::io::write::Write>::write_all
@@ -27,14 +29,14 @@ playback_worker::progressive::operation
 <std::sys::fs::unix::File>::open_c
 std::sys::fs::unix::try_statx
 __aarch64_ldadd8_relax
-<triergon_playback::engine::ts::TsEngine>::segment
+<triergon_playback::engine::ts::TsEngine>::progressive
 <triergon_mpegts::stream::TransportStream>::new_with_program
 __aarch64_ldadd8_rel
 <triergon_hls::progressive::Transport<playback_worker::progressive::Forward>>::poll
 <triergon_mpegts::stream::TransportStream>::poll_feed_inner::<true, true, &mut <triergon_playback::engine::ts::TsEngine>::poll_feed_stream::{closure#0}>
 <triergon_mpegts::transport::framer::TransportFramer>::release_unused_windows
 <triergon_hls::progressive::Transport<playback_worker::progressive::Forward>>::provide
-<triergon_playback::source::SourceReply>::provide_to
+<triergon_core::source::SourceReply>::provide_to::<triergon_core::input::InputCursor>
 <std::fs::File as alloc::io::read::Read>::read
 <triergon_core::bytes::Bytes>::copy_from_slice
 <triergon_core::input::InputCursor>::provide
@@ -182,7 +184,7 @@ core::ptr::drop_glue::<triergon_mpegts::stream::tables::PsiWork>
 core::ptr::drop_glue::<triergon_playback::engine::ts::tracks::PesTracks>
 core::ptr::drop_glue::<triergon_playback::engine::ts::tracks::PesTrack>
 core::ptr::drop_glue::<triergon_hls::avc::AvcTsReader>
-core::ptr::drop_glue::<triergon_playback::engine::ts::feed::SpentLists>
+core::ptr::drop_glue::<triergon_mpegts::compat::pes::feed::SpentLists>
 <triergon_hls::progressive::TsProgressiveReader<playback_worker::progressive::Forward>>::end_audio
 core::ptr::drop_glue::<triergon_hls::aac::HlsAac>
 core::ptr::drop_glue::<triergon_hls::progressive::TsProgressiveReader<playback_worker::progressive::Forward>>
@@ -215,12 +217,13 @@ alloc::io::read::default_read_to_end::small_probe_read::<std::fs::File>
 playback_worker::mp4_range::run::{closure#1}
 playback_worker::mp4_range::open
 <triergon_isobmff::open::MovieOpen>::new_inner
-<triergon_playback::mp4::open::Mp4Open<triergon_playback::source::ByteSource>>::advance
+<triergon_playback::mp4::open::Mp4Open<triergon_core::source::ByteSource>>::advance
 <triergon_core::input::InputCursor>::buffered
-<triergon_playback::source::ByteSource as triergon_playback::source::Source>::poll
+<triergon_core::source::ByteSource as triergon_core::source::Source>::poll
 <triergon_isobmff::boxes::BoxHeader>::parse
 <triergon_isobmff::boxes::reader::BoxReader>::read_metadata
 <triergon_isobmff::boxes::BoxView>::new
+<triergon_isobmff::boxes::BoxView>::payload
 <triergon_core::bytes::BudgetVec<triergon_isobmff::boxes::BoxView>>::reallocate
 triergon_isobmff::open::push::<triergon_isobmff::boxes::BoxView>
 triergon_isobmff::open::push::<core::ops::range::Range<u64>>
@@ -241,7 +244,6 @@ triergon_isobmff::open::push::<triergon_isobmff::open::Frame>
 <triergon_core::bytes::BudgetVec<triergon_isobmff::open::Parts>>::reallocate
 <triergon_isobmff::open::Walk>::descend
 <triergon_isobmff::table::SampleTableBuilder>::with_policy
-<triergon_isobmff::boxes::BoxView>::payload
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::open::TrackBuild>>
 triergon_isobmff::open::push::<bool>
 <triergon_core::bytes::BudgetVec<bool>>::grow_for_push
@@ -258,14 +260,14 @@ core::ptr::drop_glue::<triergon_isobmff::table::Stage>
 <triergon_core::bytes::BudgetVec<triergon_isobmff::open::MovieTrack>>::reallocate
 <triergon_isobmff::table::SampleTableBuilder>::finish
 triergon_isobmff::open::push::<triergon_isobmff::open::MovieTrack>
-<triergon_playback::mp4::open::Mp4Open<triergon_playback::source::ByteSource>>::finish
+<triergon_playback::mp4::open::Mp4Open<triergon_core::source::ByteSource>>::finish
 core::ptr::drop_glue::<triergon_isobmff::open::Parts>
-core::ptr::drop_glue::<triergon_playback::mp4::open::Mp4Open<triergon_playback::source::ByteSource>>
+core::ptr::drop_glue::<triergon_playback::mp4::open::Mp4Open<triergon_core::source::ByteSource>>
 core::ptr::drop_glue::<triergon_isobmff::open::MovieOpen>
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_isobmff::open::MovieTrack>>
 playback_worker::mp4_range::prepare_tracks
 <triergon_core::bytes::BudgetVec<core::option::Option<triergon_isobmff::compat::mov::encoded_edits::EncodedEditPlan>>>::reallocate
-<triergon_isobmff::compat::mov::encoded_stream::EncodedStreamJob>::new_range_playback
+<triergon_isobmff::compat::mov::encoded_stream::EncodedStreamJob>::new_description_inner
 <triergon_isobmff::movie::SampleDescription>::extensions
 <triergon_isobmff::compat::mov::encoded_stream::EncodedStreamJob>::poll
 <triergon_isobmff::compat::mov::encoded_stream::EncodedStreamJob>::accept_configuration
@@ -280,7 +282,6 @@ core::ptr::drop_glue::<core::option::Option<triergon_isobmff::compat::mov::encod
 <triergon_isobmff::movie::EditList>::entry
 <triergon_isobmff::boxes::BoxHeader as core::cmp::PartialEq>::eq
 <triergon_isobmff::compat::mov::encoded_edits::EncodedEditJob>::poll
-<triergon_isobmff::compat::mov::encoded_recovery::RecoveryWalk>::poll
 core::ptr::drop_glue::<triergon_isobmff::compat::mov::encoded_recovery_context::RecoveryContextReceiver>
 core::ptr::drop_glue::<triergon_isobmff::compat::mov::encoded_recovery::RecoveryWalk>
 core::ptr::drop_glue::<triergon_isobmff::compat::mov::encoded_recovery::RecoveryFacts>
@@ -301,6 +302,7 @@ core::ptr::drop_glue::<triergon_isobmff::compat::mov::encoded_stream::EncodedStr
 <triergon_isobmff::config::EsdsWalk>::with_profile
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::config::EsdsWalk>>
 <triergon_isobmff::config::EsdsWalk>::poll
+<triergon_isobmff::compat::mov::encoded_recovery::RecoveryWalk>::poll
 <triergon_isobmff::sample_groups::RecoveryDescriptions>::parse
 <triergon_isobmff::sample_groups::RecoveryDescriptionLookup>::poll
 <triergon_isobmff::sample_groups::RecoveryMappings>::parse
@@ -314,7 +316,9 @@ triergon_isobmff::reader::media_kind
 <triergon_core::bytes::BudgetVec<triergon_isobmff::compat::mov::cursor::Slot>>::reallocate
 <triergon_isobmff::compat::mov::cursor::PacketCursor>::bind_encoded_edits
 <triergon_core::bytes::BudgetVec<core::option::Option<triergon_isobmff::compat::mov::encoded_edits::EncodedEditPlan>>>::try_reserve_exact
+<triergon_isobmff::compat::mov::encoded_edits::EncodedEditPlan as core::clone::Clone>::clone
 core::array::try_from_fn::<core::ops::try_trait::NeverShortCircuit<triergon_isobmff::compat::mov::encoded_recovery::RecoveryGroup>, 2, <core::ops::try_trait::NeverShortCircuit<triergon_isobmff::compat::mov::encoded_recovery::RecoveryGroup>>::wrap_mut_1<usize, <triergon_isobmff::compat::mov::encoded_recovery::RecoveryGroup as core::array::SpecArrayClone>::clone<2>::{closure#0}>::{closure#0}>
+triergon_playback::mp4::plan::push::<core::option::Option<triergon_isobmff::compat::mov::encoded_edits::EncodedEditPlan>>
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<core::ops::range::Range<u64>>>
 <triergon_playback::mp4::plan::Mp4IndexJob>::poll
 <triergon_playback::mp4::plan::Mp4IndexJob>::index_tracks
@@ -348,24 +352,24 @@ __aarch64_cas8_acq
 <triergon_playback::mp4::plan::Mp4IndexJob>::read_fragment_trim
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::compat::mov::encoded_edits::fragment_aac::FragmentAacTrimJob>>
 <triergon_playback::mp4::plan::Mp4IndexJob>::project_front_tracks
-<triergon_playback::player::mp4_range::Mp4RangeOpen>::finish::<triergon_playback::source::ByteSource>
+<triergon_playback::player::mp4_range::Mp4RangeOpen>::finish::<triergon_core::source::ByteSource>
 core::ptr::drop_glue::<triergon_playback::mp4::plan::Mp4IndexJob>
 <triergon_playback::engine::mp4::Mp4Engine>::new
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::with_queue
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::with_queue
 <triergon_playback::player::Selection>::validate
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::read_output_inner
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::read_output_inner
 <triergon_playback::engine::mp4::Mp4Engine>::poll
 <triergon_playback::engine::mp4::Mp4Engine>::publish_configuration
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::accept_event::<true>
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::admit
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::accept_event::<true>
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::admit
 core::ptr::drop_glue::<triergon_playback::event::Event>
 <triergon_isobmff::payload::SampleReader>::new_with_shared_window
 <triergon_isobmff::payload::SampleReader>::new_checked
 core::ptr::drop_glue::<core::option::Option<(usize, triergon_isobmff::payload::SampleReader)>>
 <triergon_playback::engine::mp4::Mp4Engine>::poll_packet
 <triergon_isobmff::payload::SampleReader>::poll_inner
-<triergon_playback::source::SourceOwner<triergon_playback::source::ByteSource>>::poll
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::provide
+<triergon_core::source::SourceOwner<triergon_core::source::ByteSource>>::poll
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::provide
 <triergon_playback::engine::Engine>::provide
 core::ptr::drop_glue::<triergon_isobmff::payload::SampleBuffer>
 <triergon_isobmff::payload::SampleReader>::freeze_buffer
@@ -373,18 +377,18 @@ core::ptr::drop_glue::<triergon_isobmff::payload::SampleBuffer>
 <triergon_playback::engine::mp4::Mp4Engine>::emit_packet
 <triergon_playback::engine::mp4::Mp4Engine>::skip_samples
 <triergon_playback::player::Selection>::includes
-core::ptr::drop_glue::<triergon_playback::player::mp4_range::Mp4RangePlayer<triergon_playback::source::ByteSource>>
+core::ptr::drop_glue::<triergon_playback::player::mp4_range::Mp4RangePlayer<triergon_core::source::ByteSource>>
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_isobmff::compat::mov::cursor::Slot>>
 <alloc::sync::Arc<triergon_isobmff::compat::mov::cursor::range_seek::Checkpoints>>::drop_slow
 core::ptr::drop_glue::<triergon_isobmff::compat::mov::cursor::range_seek::Checkpoints>
-core::ptr::drop_glue::<triergon_playback::player::Player<triergon_playback::source::ByteSource>>
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::shutdown
+core::ptr::drop_glue::<triergon_playback::player::Player<triergon_core::source::ByteSource>>
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::shutdown
 core::ptr::drop_glue::<triergon_playback::engine::Engine>
 core::ptr::drop_glue::<triergon_playback::mp4::plan::PreparedMp4>
 core::ptr::drop_glue::<triergon_playback::mp4::plan::PlanTrack>
 <alloc::sync::Arc<triergon_playback::mp4::plan::TrackMetadata>>::drop_slow
 core::ptr::drop_glue::<triergon_playback::mp4::plan::TrackMetadata>
-core::ptr::drop_glue::<core::option::Option<triergon_core::budget::Charged<alloc::boxed::Box<triergon_isobmff::config::entry::EntryConfiguration>>>>
+core::ptr::drop_glue::<core::option::Option<alloc::boxed::Box<triergon_core::budget::Charged<triergon_isobmff::config::entry::EntryConfiguration>>>>
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<core::option::Option<triergon_isobmff::compat::mov::encoded_edits::EncodedEditPlan>>>
 core::ptr::drop_glue::<core::option::Option<triergon_playback::engine::mp4::progressive::ProgressiveState>>
 core::ptr::drop_glue::<alloc::vec::Vec<core::option::Option<triergon_playback::player::Output>>>
@@ -392,8 +396,9 @@ core::ptr::drop_glue::<triergon_isobmff::open::Movie>
 core::ptr::drop_glue::<triergon_isobmff::open::MovieTrack>
 core::ptr::drop_glue::<triergon_isobmff::table::SampleTable>
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::FragmentIndex>>
+core::ptr::drop_glue::<std::sync::once_lock::OnceLock<alloc::boxed::Box<triergon_isobmff::compat::mov::demux_edits::DemuxEdits>>>
 playback_worker::mp4_range::seek_to
-<triergon_playback::player::mp4_range::Mp4RangePlayer<triergon_playback::source::ByteSource>>::prepare_range_seek
+<triergon_playback::player::mp4_range::Mp4RangePlayer<triergon_core::source::ByteSource>>::prepare_range_seek
 <triergon_isobmff::compat::mov::clocks::MediaClock>::from_source
 <triergon_isobmff::compat::mov::cursor::PacketCursor>::prepare_checked_range_seek
 <triergon_playback::player::mp4_range::Mp4RangeSeekJob>::poll
@@ -408,11 +413,11 @@ core::ptr::drop_glue::<triergon_isobmff::compat::mov::cursor::range_seek::TrackS
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::compat::mov::cursor::range_seek::TrackSearch>>
 <triergon_playback::player::mp4_range::Mp4RangeSeekJob>::finish
 core::ptr::drop_glue::<core::option::Option<triergon_isobmff::compat::mov::index::GlobalSeekJob>>
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::apply_seek
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::apply_seek
 <triergon_playback::engine::Engine>::begin_seek
 <triergon_core::input::InputCursor>::reset
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::drain
-<triergon_playback::player::Player<triergon_playback::source::ByteSource>>::stage_seek
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::drain
+<triergon_playback::player::Player<triergon_core::source::ByteSource>>::stage_seek
 core::ptr::drop_glue::<triergon_isobmff::compat::mov::cursor::PacketCursor>
 core::ptr::drop_glue::<triergon_playback::player::mp4_range::Mp4RangeSeek>
 core::ptr::drop_glue::<core::option::Option<triergon_playback::player::Output>>
@@ -423,6 +428,7 @@ triergon_isobmff::open::push::<triergon_isobmff::fragment::Trex>
 <triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::Trex>>::reallocate
 <triergon_isobmff::open::MovieOpen>::fragment
 core::ptr::drop_glue::<triergon_isobmff::open::TrafStage>
+<triergon_isobmff::open::MovieTrack>::decode_end
 <triergon_isobmff::fragment::FragmentBuilder>::new_with_inherited_decode_end
 <triergon_isobmff::fragment::FragmentBuilder>::poll
 <triergon_core::bytes::BudgetVec<triergon_isobmff::fragment::IndexedRun>>::reallocate
@@ -483,6 +489,7 @@ playback_worker::ts_program::run
 playback_worker::packet_fold::drive::<playback_worker::ts_program::operate>::{closure#1}
 <alloc::raw_vec::RawVec<triergon_playback::compat::pes::PidSelection>>::grow_one
 triergon_playback::compat::pes::open
+<triergon_playback::engine::ts::TsEngine>::with_selections
 <triergon_playback::engine::ts::TsEngine>::program
 <[triergon_playback::engine::ts::tracks::PesTrack]>::sort_unstable_by_key::<u16, <triergon_playback::engine::ts::tracks::PesTrack>::pid>
 <core::slice::iter::Windows<triergon_playback::engine::ts::tracks::PesTrack> as core::iter::traits::iterator::Iterator>::try_fold::<(), core::iter::traits::iterator::Iterator::any::check<&[triergon_playback::engine::ts::tracks::PesTrack], <triergon_playback::engine::ts::TsEngine>::with_selections::{closure#2}>::{closure#0}, core::ops::control_flow::ControlFlow<()>>
@@ -515,39 +522,36 @@ playback_worker::hls::run
 <triergon_core::budget::Budget>::new
 <triergon_core::bytes::Bytes>::try_from_vec
 playback_worker::hls::run::{closure#1}
-<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>::with_queue
-<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>::read_output_inner
+playback_worker::hls::open_segment
+<triergon_playback::engine::ts::TsEngine>::segment
+<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>::with_queue
+<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>::read_output_inner
 <triergon_mpegts::stream::TransportStream>::poll_feed_inner::<false, false, &mut <triergon_playback::engine::ts::TsEngine>::poll_feed_stream::{closure#0}>
-<triergon_playback::source::SourceOwner<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>::poll
-<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>::provide
+<triergon_core::source::SourceOwner<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>::poll
+<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>::provide
 <triergon_mpegts::transport::framer::TransportFramer>::share_buffered_owner
 <triergon_playback::engine::ts::TsEngine>::deliver_feed_event::<triergon_playback::event::EngineStep>
-<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>::accept_event::<true>
-<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>::admit
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::on_event
+<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>::accept_event::<true>
+<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>::admit
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::on_event
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::bind_program
 triergon_hls::segment::select_tracks
-<triergon_hls::avc::AvcTsReader as triergon_hls::segment::lanes::LaneAssembler>::bind
-<triergon_hls::aac::HlsAac as triergon_hls::segment::lanes::LaneAssembler>::bind
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::configure
 <triergon_mpegts::transport::continuity::Continuity>::record_continuation
 <triergon_hls::avc::AvcTsReader>::push
 triergon_hls::pes::clock_describes
 <triergon_hls::avc::AvcTsReader as triergon_hls::segment::lanes::LaneAssembler>::poll
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::reuse_pes_lists::<<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::step::{closure#0}>
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::reuse_pes_lists
 core::ptr::drop_glue::<core::option::Option<triergon_hls::segment::Unit<triergon_hls::avc::AvcTsAccessUnit, triergon_hls::aac::HlsAacFrame>>>
 <triergon_hls::avc::AvcTsReader as triergon_hls::segment::lanes::LaneAssembler>::unit_bytes
 triergon_hls::segment::reserve_one::<triergon_hls::segment::Lane>
 <triergon_core::bytes::BudgetVec<triergon_hls::segment::Lane>>::reallocate
 <triergon_core::bytes::BudgetVec<triergon_hls::avc::AvcTsAccessUnit>>::reallocate
-<triergon_core::bytes::BudgetVec<triergon_hls::avc::AvcTsAccessUnit>>::try_push
-<triergon_core::bytes::BudgetVec<triergon_hls::segment::Lane>>::try_push
 <triergon_hls::aac::HlsAac>::push
 <triergon_core::bytes::BudgetVec<triergon_hls::aac::HlsAacFrame>>::reallocate
-<triergon_core::bytes::BudgetVec<triergon_hls::aac::HlsAacFrame>>::try_push
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::reuse_pes_lists::<<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::step::{closure#1}>
-core::ptr::drop_glue::<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>
-<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_playback::source::ByteSource>>>::shutdown
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::take_with::<triergon_hls::clock::HlsAudioClockNs, <triergon_hls::segment::HlsSegmentReader<triergon_playback::source::ByteSource>>::take_with_ns_clocks::{closure#0}>
-<triergon_core::time::Time>::to_nanoseconds
+core::ptr::drop_glue::<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>
+<triergon_playback::player::Player<triergon_hls::segment::LimitedSource<triergon_core::source::ByteSource>>>::shutdown
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::avc::AvcTsReader, triergon_hls::aac::HlsAac>>::take_with::<triergon_hls::clock::HlsAudioClockNs, <triergon_hls::segment::HlsSegmentReader<triergon_core::source::ByteSource>>::take_with_ns_clocks::{closure#0}>
 <triergon_core::bytes::BudgetVec<triergon_hls::clock::HlsAudioClockNs>>::reallocate
 core::ptr::drop_glue::<playback_worker::hls::Reader>
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_hls::avc::AvcTsAccessUnit>>
@@ -556,12 +560,13 @@ core::ptr::drop_glue::<triergon_hls::segment::HlsSegment<triergon_hls::clock::Hl
 <triergon_mpegts::compat::pes::observer::audio::PrivateAudioCarriage>::from_pmt
 <triergon_mpegts::compat::pes::observer::DemuxObserver>::new_hls_private_audio
 <triergon_mpegts::compat::pes::observer::DemuxObserver>::admitted
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::on_event
-<triergon_hls::segment::lanes::VideoAssembler as triergon_hls::segment::lanes::LaneAssembler>::bind
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::on_event
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::bind_program
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::configure
 <triergon_framing::nal::raw_annex_b::RawAnnexBReader>::new
 core::ptr::drop_glue::<core::option::Option<triergon_hls::segment::lanes::VideoAssembler>>
-<triergon_hls::segment::lanes::AudioAssembler as triergon_hls::segment::lanes::LaneAssembler>::bind
 core::ptr::drop_glue::<core::option::Option<triergon_hls::segment::lanes::AudioAssembler>>
+<triergon_hls::segment::lanes::VideoAssembler as triergon_hls::segment::lanes::LaneAssembler>::push
 <triergon_hls::hevc::Active>::push::{closure#4}
 <triergon_hls::segment::lanes::VideoAssembler as triergon_hls::segment::lanes::LaneAssembler>::poll
 <triergon_hls::hevc::Active>::poll
@@ -569,13 +574,12 @@ core::ptr::drop_glue::<core::option::Option<triergon_hls::segment::lanes::AudioA
 <triergon_core::bytes::BudgetVec<triergon_hls::hevc::PesAnchor>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_hls::hevc::PesAnchor>>::reallocate
 <triergon_core::input::InputCursor>::provide_owned
-<triergon_framing::nal::reader::NalReader>::reserve_compact_payload
+<triergon_framing::nal::reader::annex_b::AnnexBNalReader>::reserve_compact_payload
 triergon_framing::freeze_whole
-<triergon_core::bytes::BudgetVec<triergon_framing::nal::reader::NalUnit>>::grow_for_push
-<triergon_core::bytes::BudgetVec<triergon_framing::nal::reader::NalUnit>>::reallocate
+<triergon_core::bytes::BudgetVec<triergon_framing::nal::reader::NalUnit<triergon_framing::nal::reader::AnnexBPrefix>>>::grow_for_push
+<triergon_core::bytes::BudgetVec<triergon_framing::nal::reader::NalUnit<triergon_framing::nal::reader::AnnexBPrefix>>>::reallocate
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVecIntoIter<triergon_mpegts::compat::pes::observer::DemuxSpan>>
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::reuse_pes_lists::<<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::step::{closure#0}>
-triergon_hls::hevc::picture_entry
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::reuse_pes_lists
 <triergon_raw_video::config::RawVideoConfigTracker>::observe
 triergon_framing::hevc::prefix::read_vps_id
 <triergon_core::bytes::BudgetVec<triergon_raw_video::config::Update>>::grow_for_push
@@ -592,7 +596,6 @@ core::ptr::drop_glue::<core::option::Option<triergon_hls::segment::Unit<triergon
 <triergon_hls::segment::lanes::VideoAssembler as triergon_hls::segment::lanes::LaneAssembler>::unit_bytes
 <triergon_core::bytes::BudgetVec<triergon_hls::segment::lanes::HlsMediaVideoUnit>>::reallocate
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_hls::segment::lanes::HlsMediaVideoUnit>>
-<triergon_core::bytes::BudgetVec<triergon_hls::segment::lanes::HlsMediaVideoUnit>>::try_push
 <triergon_hls::segment::lanes::AudioAssembler as triergon_hls::segment::lanes::LaneAssembler>::push
 <triergon_hls::dolby::HlsDolby>::push::{closure#2}
 <triergon_hls::segment::lanes::AudioAssembler as triergon_hls::segment::lanes::LaneAssembler>::poll
@@ -601,16 +604,15 @@ triergon_framing::ac3::frame::probe_with_layout
 <triergon_framing::ac3::frame::PrefixBits>::small
 <triergon_framing::ac3::frame::PrefixBits>::compression
 <triergon_framing::ac3::frame::Ac3FrameHeader>::sample_span
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::reuse_pes_lists::<<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::step::{closure#1}>
 core::ptr::drop_glue::<core::option::Option<triergon_hls::hevc::Active>>
 core::ptr::drop_glue::<triergon_framing::nal::raw_annex_b::RawAnnexBReader>
 core::ptr::drop_glue::<triergon_raw_video::config::RawVideoConfigTracker>
-<triergon_hls::segment::SegmentReader<triergon_playback::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::take_with::<triergon_hls::clock::HlsAudioClockNs, <triergon_hls::segment::HlsMediaSegmentReader<triergon_playback::source::ByteSource>>::take::{closure#0}>
-<triergon_hls::segment::lanes::HlsMediaVideoUnit>::contiguous_feed
+<triergon_hls::segment::SegmentReader<triergon_core::source::ByteSource, triergon_hls::segment::lanes::VideoAssembler, triergon_hls::segment::lanes::AudioAssembler>>::take_with::<triergon_hls::clock::HlsAudioClockNs, <triergon_hls::segment::HlsMediaSegmentReader<triergon_core::source::ByteSource>>::take::{closure#0}>
+<triergon_core::time::Time>::to_nanoseconds
 core::ptr::drop_glue::<triergon_hls::segment::HlsSegment<triergon_hls::clock::HlsAudioClockNs, triergon_hls::segment::lanes::HlsMediaVideoUnit, triergon_hls::segment::lanes::HlsMediaAudioUnit>>
 playback_worker::raw_video::run
 playback_worker::packet_fold::drive::<playback_worker::raw_video::operate>::{closure#1}
-<triergon_raw_video::RawVideoSource<triergon_raw_video::probe::ProbeReplay<triergon_playback::source::ByteSource>>>::into_feed
+<triergon_raw_video::RawVideoSource<triergon_raw_video::probe::ProbeReplay<triergon_core::source::ByteSource>>>::into_feed
 <triergon_framing::nal::raw_annex_b::RawAnnexBReader>::provide
 <triergon_framing::avc::picture::Rbsp>::unsigned
 <triergon_framing::avc::picture::Rbsp>::flag
@@ -622,14 +624,13 @@ triergon_framing::avc::prefix::read_sps_timing
 triergon_framing::avc::prefix::vui_timing
 triergon_framing::nal::syntax::skip_vui_to_timing::<triergon_bitstream::rbsp::Rbsp>
 <triergon_bitstream::rbsp::Rbsp as triergon_bitstream::checked::BitSource>::flag
-<triergon_raw_video::config::RawVideoConfiguration as core::clone::Clone>::clone
-core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_framing::nal::reader::NalUnit>>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_framing::nal::reader::NalUnit<triergon_framing::nal::reader::AnnexBPrefix>>>
 <triergon_raw_video::config::RawVideoConfiguration as core::cmp::PartialEq>::eq
 <triergon_framing::nal::raw_annex_b::RawAnnexBReader>::finish
 <triergon_core::input::InputCursor>::finish
-core::ptr::drop_glue::<triergon_playback::source::SourceOwner<triergon_raw_video::probe::ProbeReplay<triergon_playback::source::ByteSource>>>
-core::ptr::drop_glue::<triergon_raw_video::feed::State<triergon_raw_video::probe::ProbeReplay<triergon_playback::source::ByteSource>>>
-core::ptr::drop_glue::<triergon_raw_video::probe::RawVideoProbe<triergon_playback::source::ByteSource>>
+core::ptr::drop_glue::<triergon_core::source::SourceOwner<triergon_raw_video::probe::ProbeReplay<triergon_core::source::ByteSource>>>
+core::ptr::drop_glue::<triergon_raw_video::feed::State<triergon_raw_video::probe::ProbeReplay<triergon_core::source::ByteSource>>>
+core::ptr::drop_glue::<triergon_raw_video::probe::RawVideoProbe<triergon_core::source::ByteSource>>
 <triergon_raw_video::config::RawVideoConfiguration>::hevc_timing
 triergon_framing::hevc::prefix::read_sps_timing
 <triergon_framing::hevc::prefix::Rbsp>::flag
@@ -640,29 +641,29 @@ triergon_framing::hevc::prefix::skip_short_term_sets
 <triergon_bitstream::rbsp::Rbsp as triergon_bitstream::checked::BitSource>::read
 playback_worker::matroska_video::run
 playback_worker::matroska_video::run::{closure#0}
-<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_playback::source::ByteSource>>::new
-<triergon_bridge::matroska::discovery::MatroskaDiscovery<triergon_playback::source::ByteSource>>::poll
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::read_output_inner
+<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_core::source::ByteSource>>::new
+<triergon_bridge::matroska::discovery::MatroskaDiscovery<triergon_core::source::ByteSource>>::poll
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::read_output_inner
 <triergon_playback::engine::matroska::MkvEngine>::step
-<triergon_matroska::reader::Reader>::step_demux_after_health_check::<triergon_matroska::reader::projection::TypedProjection>
+<triergon_matroska::reader::Stream>::step_demux_after_health_check::<triergon_matroska::reader::projection::TypedProjection>
 <triergon_matroska::element::ElementReader>::step_typed_compact_after_input_health
 <triergon_matroska::element::ElementReader>::take_buffered_header
 core::ptr::drop_glue::<triergon_matroska::element::Phase>
 <triergon_matroska::element::ElementReader>::bounded_header_refill
 <triergon_matroska::element::ElementReader>::expanded_refill
-<triergon_playback::source::SourceOwner<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::poll
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::provide
+<triergon_core::source::SourceOwner<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::poll
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::provide
 <triergon_matroska::element::ElementReader>::begin::<triergon_matroska::element::control::CompactDelivery>
 <triergon_core::input::InputCursor>::read_discard
 <triergon_matroska::element::control::CompactDelivery as triergon_matroska::element::EnvelopeDelivery>::leaf
 core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::seek::Cue>>>
-<triergon_matroska::reader::Reader>::start_leaf_projected::<triergon_matroska::reader::projection::TypedProjection>
+<triergon_matroska::reader::Stream>::start_leaf_projected::<triergon_matroska::reader::projection::TypedProjection>
 core::ptr::drop_glue::<triergon_matroska::reader::State>
 <triergon_matroska::reader::head::EbmlJob>::step
 <triergon_matroska::ebml::ChildCursor>::step
 <triergon_matroska::storage::SharedBytes as core::ops::deref::Deref>::deref
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::accept_event::<true>
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::admit
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::accept_event::<true>
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::admit
 <triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>::grow_for_push
 <triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>::reallocate
 <triergon_matroska::element::ElementReader>::check_input_cancel
@@ -670,46 +671,45 @@ core::ptr::drop_glue::<triergon_matroska::reader::State>
 <triergon_core::bytes::BudgetVec<(u64, u64)>>::reallocate
 <triergon_matroska::element::ElementReader>::admit_typed_leaf
 <triergon_matroska::reader::head::SeekHeadJob>::step
-<triergon_matroska::reader::Reader>::commit_metadata
+<triergon_matroska::reader::Stream>::commit_metadata
 <triergon_matroska::metadata::build::CataloguePrepareJob>::step
 <triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>::reallocate
 core::ptr::drop_glue::<alloc::vec::Vec<triergon_matroska::metadata::SharedDocument>>
-core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>>
 <triergon_matroska::metadata::build::CatalogueJob>::step
 <triergon_matroska::metadata::build::CatalogueJob>::start_document
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::metadata::build::DocumentJob>>
-<triergon_core::budget::Budget>::reserve
+<triergon_core::budget::Reservation>::resize_to
 <triergon_core::bytes::BudgetVec<triergon_matroska::metadata::Node>>::reallocate
 <triergon_matroska::storage::text::TextCheck>::step
 triergon_matroska::metadata::build::bit
 <triergon_matroska::storage::StorageVec<triergon_matroska::metadata::SharedDocument>>::push
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>
 <triergon_matroska::track::parse::TracksJob>::step
 <triergon_core::bytes::BudgetVec<triergon_matroska::track::Track>>::reallocate
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::track::parse::TrackJob>>
+core::ptr::drop_glue::<triergon_matroska::track::parse::TracksSide>
 <triergon_matroska::track::parse::TrackJob>::advance
+core::ptr::drop_glue::<triergon_matroska::track::parse::TrackSide>
 <triergon_matroska::storage::SharedBytes>::slice
 <triergon_matroska::track::extensions::TrackExtensionsJob>::new
-<triergon_matroska::track::extensions::TrackExtensionsJob>::step
+<triergon_matroska::track::extensions::TrackExtensionsJob>::step_job
 core::ptr::drop_glue::<triergon_matroska::track::extensions::TrackExtensionsJob>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::track::extensions::Mapping>>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::track::extensions::Unknown>>
 <alloc::sync::Arc<triergon_matroska::track::extensions::Data>>::drop_slow
 core::ptr::drop_glue::<triergon_matroska::track::extensions::Data>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::content_encoding::parse::EncodingsJob>>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::zlib::restore::RestoreJob>>
+core::ptr::drop_glue::<triergon_matroska::track::Track>
+<triergon_core::budget::Budget>::reserve
 core::ptr::drop_glue::<core::option::Option<triergon_matroska::configuration::Configuration>>
-core::ptr::drop_glue::<triergon_matroska::configuration::ConfigurationJob>
 <triergon_matroska::track::parse::TracksJob>::metadata_bytes
-core::ptr::drop_glue::<core::option::Option<triergon_core::bytes::BudgetVec<triergon_matroska::track::Track>>>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::configuration::ConfigurationJob>>
+core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_matroska::track::Track>>
 <triergon_bridge::matroska::discovery::Readiness>::new
 <triergon_matroska::storage::SharedText>::as_str
 core::ptr::drop_glue::<core::option::Option<triergon_bridge::matroska::discovery::Readiness>>
-<triergon_matroska::element::ElementReader>::cluster_checkpoint
+<triergon_matroska::reader::Reader>::enter_clusters
+triergon_matroska::reader::step_activity
 <triergon_matroska::reader::projection::TypedProjection as triergon_matroska::reader::projection::PacketProjection>::simple
 <triergon_matroska::packet::batch::simple::SimplePacketJob>::step_compact_borrowing
 <triergon_matroska::storage::SharedBytes>::into_slice
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::SharedBytes>>
 <triergon_matroska::packet::batch::FrameParameters>::fields
 <triergon_matroska::reader::projection::TypedProjection as triergon_matroska::reader::projection::PacketProjection>::take_simple
 <triergon_matroska::reader::seek_index::ImmutableSeekIndex>::observe
@@ -735,7 +735,7 @@ core::ptr::drop_glue::<core::option::Option<triergon_framing::aac::config::AacAs
 <triergon_framing::aac::config::AacAscParser>::step
 <triergon_framing::aac::config::Bits>::object_type
 core::ptr::drop_glue::<triergon_framing::aac::config::State>
-<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_playback::source::ByteSource>>::finish
+<triergon_bridge::matroska::discovery::MatroskaCompactDiscovery<triergon_core::source::ByteSource>>::finish
 <triergon_bridge::matroska::MatroskaFeedSetup>::new
 <triergon_bridge::matroska::MatroskaFeedSetup>::step
 core::ptr::drop_glue::<triergon_bridge::matroska::MatroskaFeedSetup>
@@ -747,12 +747,12 @@ core::ptr::drop_glue::<triergon_matroska::reader::Event>
 <triergon_matroska::timing::ExactTime>::rounded_duration_ns
 <triergon_bridge::matroska::video_clock::DecodeClock>::push_pts
 core::ptr::drop_glue::<core::iter::adapters::map::Map<triergon_core::bytes::BudgetVecIntoIter<triergon_playback::player::MatroskaReplayOutput>, <triergon_playback::player::MatroskaReplayOutput>::into_output>>
-<triergon_matroska::reader::Reader>::start_group_batch
+<triergon_matroska::reader::Stream>::start_group_batch
 <triergon_matroska::packet::block_group::GroupJob>::new
 <triergon_matroska::packet::batch::PacketBatchJob>::step_ready
 <triergon_matroska::packet::block_group::GroupJob>::step
 <triergon_matroska::metadata::build::Heap>::step
-core::ptr::drop_glue::<triergon_matroska::packet::batch::BatchWork>
+core::ptr::drop_glue::<triergon_matroska::packet::batch::SideJob>
 core::ptr::drop_glue::<triergon_matroska::packet::block_group::GroupJob>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::packet::block_group::Addition>>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<i64>>
@@ -766,33 +766,30 @@ core::ptr::drop_glue::<triergon_matroska::packet::batch::Staged>
 <triergon_core::bytes::BudgetVec<triergon_matroska::seek::cues::Position>>::reallocate
 <triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::Cue>>::step
 <triergon_core::bytes::BudgetVec<triergon_matroska::seek::Cue>>::reallocate
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::Cue>>>
+core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::Cue>>
 core::ptr::drop_glue::<triergon_bridge::matroska::MatroskaTrackFeed>
-core::ptr::drop_glue::<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>
-<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_playback::source::ByteSource>>>::shutdown
+core::ptr::drop_glue::<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>
+<triergon_playback::player::Player<triergon_bridge::matroska::discovery::MatroskaStartupSource<triergon_core::source::ByteSource>>>::shutdown
+core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<(u64, u64)>>
 <alloc::sync::Arc<triergon_matroska::configuration::Data>>::drop_slow
 core::ptr::drop_glue::<triergon_matroska::configuration::Data>
-core::ptr::drop_glue::<triergon_matroska::track::Track>
-core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_matroska::metadata::SharedDocument>>
 <alloc::sync::Arc<triergon_matroska::metadata::Document>>::drop_slow
 core::ptr::drop_glue::<triergon_matroska::metadata::Document>
-core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<(u64, u64)>>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::reader::resolving::Resolver>>
-core::ptr::drop_glue::<triergon_matroska::reader::seeking::SeekStage>
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::storage::usage::Pressure>>
 core::ptr::drop_glue::<core::option::Option<alloc::boxed::Box<triergon_matroska::reader::seek_index::ImmutableSeekIndex>>>
+core::ptr::drop_glue::<triergon_matroska::reader::Activity>
 core::ptr::drop_glue::<triergon_core::bytes::BudgetVec<triergon_playback::player::MatroskaReplayOutput>>
 <triergon_playback::engine::Engine>::facts
 <triergon_core::bytes::BudgetVec<triergon_playback::engine::TrackFact>>::grow_for_push
 <triergon_matroska::reader::Reader>::seek_for_playback
 <triergon_matroska::reader::seek_index::ImmutableSeekIndex>::discard
+<triergon_matroska::reader::seeking::Seek>::step
+<triergon_matroska::reader::resolving::Resolver>::step
+core::ptr::drop_glue::<triergon_matroska::reader::resolving::Phase>
 <triergon_core::bytes::BudgetVec<i64>>::reallocate
-core::ptr::drop_glue::<core::option::Option<triergon_matroska::reader::range::RangeLeafJob>>
 core::ptr::drop_glue::<triergon_matroska::storage::copy_vec::CopyVec<triergon_matroska::seek::cues::Position>>
-<triergon_matroska::reader::Reader>::start_seek_plan
-<triergon_matroska::reader::Reader>::seek_plan_job
+<triergon_matroska::reader::seeking::Operation>::plan_job
+core::ptr::drop_glue::<triergon_matroska::reader::seeking::SeekStage>
 core::ptr::drop_glue::<triergon_matroska::reader::resolving::Resolver>
-<triergon_matroska::reader::Reader>::step_seeking
 <triergon_core::time::Time>::combine
 <triergon_matroska::element::ElementReader>::begin_internal_cluster_range
 <triergon_core::input::InputCursor>::request_range
@@ -800,23 +797,21 @@ core::ptr::drop_glue::<triergon_matroska::reader::resolving::Resolver>
 <triergon_matroska::element::ElementReader>::begin::<triergon_matroska::element::PublicDelivery>
 <triergon_matroska::seek::cue_validation::CueValidationJob>::step_batch
 core::ptr::drop_glue::<triergon_matroska::packet::batch::TypedPacket>
-core::ptr::drop_glue::<triergon_matroska::step::ParseStep>
+core::ptr::drop_glue::<triergon_matroska::step::ParseStep<triergon_matroska::element::ElementEvent>>
 <triergon_matroska::seek::cue_validation::ValidatedCue as core::clone::Clone>::clone
-<triergon_matroska::reader::Reader>::finish_seek
+<triergon_matroska::reader::seeking::Operation>::finish
 <triergon_matroska::packet::batch::FrameParameters>::scan_fields
 <triergon_matroska::reader::seeking::ScanSimple>::context_matches
 <triergon_matroska::element::ElementReader>::finish_scanned_leaf
-core::ptr::drop_glue::<triergon_matroska::step::ParseStep<triergon_matroska::reader::Event>>
-<triergon_matroska::reader::Reader>::complete_scan
+<core::option::Option<triergon_matroska::reader::seeking::ScanBoundary> as core::clone::Clone>::clone_from
 <triergon_matroska::seek::epoch::EpochRestoreJob>::step
-core::ptr::drop_glue::<triergon_matroska::reader::seeking::ScanState>
+core::ptr::drop_glue::<triergon_matroska::seek::epoch::Phase>
 core::ptr::drop_glue::<triergon_matroska::step::ParseStep<triergon_matroska::seek::epoch::RestoredEpoch>>
-<triergon_matroska::seek::epoch::EpochRestoreJob>::start_copy
-<triergon_matroska::seek::epoch::EpochRestoreJob>::after_group
-<triergon_matroska::seek::epoch::RestoredEpoch as core::clone::Clone>::clone
+<triergon_matroska::seek::epoch::EpochRestoreJob>::after_block
 core::ptr::drop_glue::<triergon_matroska::configuration::Configuration>
 triergon_matroska::packet::batch::keep_recovery_packet
 <triergon_bridge::matroska::video_seek::MatroskaVideoSeekGate>::admits
+<triergon_matroska::storage::text::TextJob>::new
 <triergon_matroska::storage::text::TextJob>::step
 <triergon_framing::hevc::config::HvcConfigParser>::new
 <triergon_framing::hevc::config::HvcConfigParser>::step
