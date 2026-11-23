@@ -266,17 +266,6 @@
       ]
     },
     {
-      "reading": "Wave policy the format leaves open: a repeated esds or frma atom",
-      "clause": "Apple QuickTime File Format 'siDecompressionParam atom (wave)' lists one format and one decoder atom and says nothing of a second copy; the metadata profile refuses duplicates",
-      "candidate": "refuses the second atom (Unsupported: encoded duplicate configuration box; Invalid: encoded duplicate wave format)",
-      "reference": "opens the entry as AAC and reads 458 packet payload bytes",
-      "compat": "compat::mov::encoded::EncodedStreamJob::new_description_with_contexts",
-      "cases": [
-        "qt-v1-duplicate-esds",
-        "qt-v1-duplicate-frma"
-      ]
-    },
-    {
       "reading": "Compressed sound without the framed table mode required by the view",
       "clause": "Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ ‘Redefined sample tables’ explains compression ID -2 and sample tables whose units are compressed frames",
       "candidate": "refuses the entry: compression ID 0 for MPEG-4 audio (Unsupported: encoded sound-v1 frame-table compression ID)",
@@ -298,16 +287,6 @@
       ]
     },
     {
-      "reading": "Group policy the standard leaves to the reader: a sample-to-group map longer than the track",
-      "clause": "ISO/IEC 14496-12:2015 8.9.2.3: a total above sample_count is an error and reader behaviour is then undefined",
-      "candidate": "refuses the overlong map (Invalid: encoded recovery exceeds samples)",
-      "reference": "opens and reads 4379 packet payload bytes",
-      "compat": "compat::mov::edits (EncodedEditJob::new_with_recovery_contexts)",
-      "cases": [
-        "coverage-over"
-      ]
-    },
-    {
       "reading": "Two group description boxes for one grouping type",
       "clause": "ISO/IEC 14496-12:2015 §§8.9.2.1–.3 and 8.9.3.1–.3: at most one sgpd per grouping_type in a sample table",
       "candidate": "refuses the second sgpd (Invalid: encoded duplicate recovery context)",
@@ -324,6 +303,31 @@
       "reference": "opens and reads 4379 packet payload bytes",
       "cases": [
         "dep-reserved-referenced-field"
+      ]
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "Wave policy the format leaves open: a repeated esds or frma atom",
+      "undecided": "Apple QuickTime File Format 'siDecompressionParam atom (wave)' lists one format and one decoder atom and says nothing of a second copy; the metadata profile refuses duplicates",
+      "rule": "refuses the second atom (Unsupported: encoded duplicate configuration box; Invalid: encoded duplicate wave format)",
+      "documented": "triergon_isobmff::compat::mov::encoded::EncodedStreamJob",
+      "reference_rule": "opens the entry as AAC and reads 458 packet payload bytes",
+      "compat": "compat::mov::encoded::EncodedStreamJob::new_description_with_contexts",
+      "cases": [
+        "qt-v1-duplicate-esds",
+        "qt-v1-duplicate-frma"
+      ]
+    },
+    {
+      "policy": "Group policy the standard leaves to the reader: a sample-to-group map longer than the track",
+      "undecided": "ISO/IEC 14496-12:2015 8.9.2.3: a total above sample_count is an error and reader behaviour is then undefined",
+      "rule": "refuses the overlong map (Invalid: encoded recovery exceeds samples)",
+      "documented": "triergon_isobmff::compat::mov::encoded::EncodedStreamJob",
+      "reference_rule": "opens and reads 4379 packet payload bytes",
+      "compat": "compat::mov::edits (EncodedEditJob::new_with_recovery_contexts)",
+      "cases": [
+        "coverage-over"
       ]
     }
   ]

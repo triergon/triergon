@@ -31,7 +31,7 @@
       "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord lengthSizeMinusOne, as documented by HvcConfigFields and HvcConfigParser",
       "candidate": "refuses the record before writing parameter sets",
       "reference": "initializes it and writes VPS, SPS and PPS",
-      "compat": "triergon_framing::compat::nal::ReceiverHevcConfigParser",
+      "compat": "triergon_framing::compat::nal::HevcRecordParser",
       "cases": [
         "hvcc-hevc-width3-all",
         "hvcc-hevc-width3-decoder"

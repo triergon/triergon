@@ -115,7 +115,7 @@ with the specification; every other listed case withholds its comparison's accep
 | [`mkv-metadata-fields`](../harness/features/mkv-metadata-fields/contract.json) | 3 |  |  |  |  | 3 | 52 |
 | [`mkv-side-data`](../harness/features/mkv-side-data/contract.json) |  | 3 |  |  |  | 3 | 27 |
 | [`mkv-track-extensions`](../harness/features/mkv-track-extensions/contract.json) |  | 1 |  |  |  | 1 | 12 |
-| [`mov-encoded-views`](../harness/features/mov-encoded-views/contract.json) | 12 |  |  |  | 7 | 19 | 53 |
+| [`mov-encoded-views`](../harness/features/mov-encoded-views/contract.json) | 9 | 3 |  |  | 7 | 19 | 53 |
 | [`mov-pcm-packets`](../harness/features/mov-pcm-packets/contract.json) | 12 |  |  |  | 2 | 14 | 22 |
 | [`mov-run-recovery`](../harness/features/mov-run-recovery/contract.json) | 18 | 2 |  |  |  | 20 | 144 |
 | [`mov-track-seek`](../harness/features/mov-track-seek/contract.json) | 30 | 64 |  |  |  | 94 | 2944 |
@@ -147,7 +147,7 @@ with the specification; every other listed case withholds its comparison's accep
 | [`tx3g-configuration`](../harness/features/tx3g-configuration/contract.json) | 56 |  |  |  |  | 56 | 84 |
 | [`video-nal-input`](../harness/features/video-nal-input/contract.json) | 2 |  | 52 |  |  | 54 | 597 |
 | [`vobsub-index`](../harness/features/vobsub-index/contract.json) | 3 |  |  |  |  | 3 | 210 |
-| **Total** | 2269 / 2250 | 2319 / 2311 | 191 | 39 | 10 | 4708 / 4681 | 44382 |
+| **Total** | 2266 / 2247 | 2322 / 2314 | 191 | 39 | 10 | 4708 / 4681 | 44382 |
 
 ## Linux AArch64
 
