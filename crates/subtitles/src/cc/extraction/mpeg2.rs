@@ -10,8 +10,8 @@ use super::captions::{Gathered, Mark};
 use super::queue::FrameQueue;
 use crate::cc::text::Text;
 use crate::cc::video::mpeg2::{
-    self, EXTENSION, FrameRate, GROUP, PICTURE, PictureCoding, PictureHeader, PictureStructure,
-    PictureType, SEQUENCE_HEADER, SequenceExtension, StartCode,
+    self, EXTENSION, FrameRate, GROUP, PICTURE, PictureCoding, PictureStructure, PictureType,
+    SEQUENCE_HEADER, SequenceExtension, StartCode,
 };
 use triergon_core::{Budget, BudgetVec, Result};
 
@@ -259,7 +259,7 @@ impl Decoding {
         let pts = stamps[..taken].last().and_then(|stamp| stamp.pts);
         self.progress.stamp_head += taken;
         let mut units = mpeg2::start_codes(picture);
-        let Some(header) = units.next().and_then(|u| PictureHeader::parse(u.data)) else {
+        let Some(picture_type) = units.next().and_then(|u| PictureType::of_header(u.data)) else {
             return Ok(());
         };
         let mut coding = PictureCoding::default();
@@ -294,11 +294,11 @@ impl Decoding {
         let duration = progress.duration(time_base, fields);
         let decoded_at = progress.decode_time;
         progress.decode_time = progress.decode_time.saturating_add(duration.unwrap_or(0));
-        if header.picture_type == PictureType::Bidirectional && progress.references < 2 {
+        if picture_type == PictureType::Bidirectional && progress.references < 2 {
             return Ok(());
         }
         let bytes = self.captions.bytes.as_bytes();
-        if header.picture_type.is_reference() {
+        if picture_type.is_reference() {
             progress.references = progress.references.saturating_add(1);
             let frame = Held {
                 pts,

@@ -87,7 +87,8 @@ pub(crate) const fn is_slice(code: u8) -> bool {
     matches!(code, 0x01..=0xaf)
 }
 
-/// `picture_coding_type`.
+/// `picture_coding_type`, the field of a picture header (§6.2.3) that orders
+/// pictures for output.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum PictureType {
     Intra,
@@ -100,6 +101,19 @@ pub(crate) enum PictureType {
 }
 
 impl PictureType {
+    /// Reads a picture header's data, `None` when cut short.
+    #[must_use]
+    pub(crate) fn of_header(data: &[u8]) -> Option<Self> {
+        let &[_, b, ..] = data else { return None };
+        Some(match (b >> 3) & 7 {
+            1 => Self::Intra,
+            2 => Self::Predictive,
+            3 => Self::Bidirectional,
+            4 => Self::DcIntra,
+            other => Self::Reserved(other),
+        })
+    }
+
     #[must_use]
     pub(crate) const fn is_reference(self) -> bool {
         matches!(self, Self::Intra | Self::Predictive)
@@ -113,31 +127,6 @@ pub(crate) enum PictureStructure {
     BottomField,
     #[default]
     Frame,
-}
-
-/// The fields of a picture header (§6.2.3).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct PictureHeader {
-    pub temporal_reference: u16,
-    pub picture_type: PictureType,
-}
-
-impl PictureHeader {
-    /// Reads a picture header's data, `None` when cut short.
-    #[must_use]
-    pub(crate) fn parse(data: &[u8]) -> Option<Self> {
-        let &[a, b, ..] = data else { return None };
-        Some(Self {
-            temporal_reference: (u16::from(a) << 2) | u16::from(b >> 6),
-            picture_type: match (b >> 3) & 7 {
-                1 => PictureType::Intra,
-                2 => PictureType::Predictive,
-                3 => PictureType::Bidirectional,
-                4 => PictureType::DcIntra,
-                other => PictureType::Reserved(other),
-            },
-        })
-    }
 }
 
 /// The fields of a picture coding extension (§6.2.3.1) that place a picture in
@@ -260,7 +249,7 @@ mod tests {
     #[test]
     fn scans_start_codes_and_headers() {
         let es = [
-            0, 0, 1, 0x00, 0x00, 0x8f, 0xff, // picture: temporal reference 2, I
+            0, 0, 1, 0x00, 0x00, 0x8f, 0xff, // picture: I
             0, 0, 1, 0xb5, 0x8f, 0xff, 0xf3, 0x41, 0x80, // coding extension
             0, 0, 1, 0xb2, b'G', b'A', b'9', b'4', // user data
             0, 0, 1, 0x01, 0x12, // slice
@@ -268,9 +257,10 @@ mod tests {
         let codes: Vec<_> = start_codes(&es).map(|u| u.code).collect();
         assert_eq!(codes, [0x00, 0xb5, 0xb2, 0x01]);
         let picture = start_codes(&es).next().expect("picture");
-        let header = PictureHeader::parse(picture.data).expect("header");
-        assert_eq!(header.temporal_reference, 2);
-        assert_eq!(header.picture_type, PictureType::Intra);
+        assert_eq!(
+            PictureType::of_header(picture.data),
+            Some(PictureType::Intra)
+        );
         let coding = PictureCoding::parse(&[0x8f, 0xff, 0xf3, 0x41, 0x80]).expect("coding");
         assert_eq!(coding.structure, PictureStructure::Frame);
         assert!(coding.progressive_frame && !coding.repeat_first_field);
