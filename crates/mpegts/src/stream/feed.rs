@@ -23,7 +23,8 @@ pub enum FeedContinuation {
     Yield,
 }
 
-/// A validated continuation offered to a feed's native observer.
+/// A validated continuation of a selected PES, offered to the feed callback for a
+/// `compat::pes::DemuxObserver`.
 #[derive(Debug)]
 pub struct FeedCarrier<'a>(pub(super) &'a mut FramedCarrier);
 
@@ -63,7 +64,7 @@ pub enum FeedItem<'a> {
     PayloadRun(FeedPayloadRun<'a>),
 }
 
-// Per carrier: input, header inspection, source PES, native append and event.
+// Per carrier: input, header inspection, source PES, observer append and event.
 pub(super) const PAYLOAD_RUN_WORK: u64 =
     TS188_BYTES as u64 + 2 + (PLAIN_PAYLOAD_BYTES as u64 + 1) + 2 + 1;
 
@@ -74,7 +75,7 @@ fn matches_payload_header(ts: &[u8], pid: u16, counter: u8) -> bool {
         .is_some_and(|header| u32::from_be_bytes(*header) & !0x0020_0000 == expected)
 }
 
-/// A same-PID continuation prefix that may be appended to a native observer.
+/// A run of same-PID continuation carriers that a `compat::pes::DemuxObserver` may append.
 #[derive(Debug)]
 pub struct FeedPayloadRun<'a> {
     input: &'a mut InputCursor,

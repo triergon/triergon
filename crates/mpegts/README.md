@@ -23,7 +23,7 @@ The crate exposes two views:
   rewrites source facts.
 
 The non-default `reference-trace` feature adds `reference_trace`: comparison-only
-projections (`recovery`, `catalogue`, `packet_completion`, `dvb`, `input`).
+projections (`recovery`, `catalogue`, `dvb`, `input`).
 
 ## Usage
 
@@ -278,7 +278,7 @@ checks each owned and borrowed span against its input carrier and checks the
 source context and ordering returned by the compact cursor.
 The [catalogue comparison](../../harness/features/ts-catalogue/contract.json)
 checks retained section and carrier bytes and the source evidence for each
-PSI compatibility policy alongside the native program and stream rows.
+PSI compatibility policy alongside the strict program and stream rows.
 `DemuxClock` places timestamps in the demuxer's 33-bit interval beside the raw
 values. Contexts outside the observed profile return `Error::Unsupported`.
 The [recovery comparison](../../harness/features/ts-recovery-trace/contract.json)
@@ -357,7 +357,7 @@ assert_eq!(out.len() % 188, 0);
 
 The [mux read-back comparison](../../harness/features/ts-mux-readback/contract.json)
 checks the table cadence, continuity, PCR and PES headers, stuffing and coded
-picture bytes on the original transport stream before native demux.
+picture bytes on the original transport stream before the reference demuxes it.
 
 | Item | FFmpeg 9.0.2 | `mux` | Reason |
 |---|---|---|---|
