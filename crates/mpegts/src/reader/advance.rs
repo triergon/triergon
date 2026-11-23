@@ -239,6 +239,8 @@ impl Reader {
         )
     }
     /// The reader event of an event [`Self::is_inline_source`] accepted.
+    // An `InFlight` variant holding only these two events measured +0.78% (AC-3 carriage): the
+    // event's moves in `share_raw` and the step loop are copied inline instead of by `memcpy`.
     fn inline_source(event: TraceEvent) -> Result<ReaderStep<Self>> {
         let event = match event {
             TraceEvent::Transport(packet) => ReaderEvent::Transport(packet),
