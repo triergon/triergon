@@ -1183,7 +1183,10 @@ mod tests {
                 &mut WorkBudget::new(4096),
                 &AtomicBool::new(false)
             ),
-            Err(Error::Policy("playback event count"))
+            Err(Error::Limit {
+                requested: 2,
+                maximum: 1
+            })
         ));
         assert!(slot.is_none());
     }
