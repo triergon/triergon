@@ -7,12 +7,6 @@ use triergon_core::{
     BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
 };
 
-/// Opt-in token for physical reads, passed to [`PhysicalRead::from_event`],
-/// [`PhysicalReader::new`] and the physical cursors of
-/// [`DescriptionRecoveryTable`](crate::compat::mov::recovery::DescriptionRecoveryTable).
-#[derive(Clone, Copy, Debug)]
-pub struct PhysicalReadProfile;
-
 /// A plan to read the bytes of one [`DescriptionEvent`]'s packet that lie before the
 /// physical end of the file. Whether bytes exist is a fact about the file; treating the
 /// packet as short there is how FFmpeg reads it, not something the read confirms.
@@ -40,7 +34,6 @@ impl PhysicalRead {
         input: &InputCursor,
         declared_media: Range<u64>,
         maximum_packet: usize,
-        _profile: PhysicalReadProfile,
     ) -> Result<Self> {
         let physical_length = input.capabilities().length.ok_or(Error::Unsupported(
             "physical read needs a known source length",
@@ -123,7 +116,7 @@ impl PhysicalRead {
     /// [`UnavailablePhysicalStart`](DescriptionRead::UnavailablePhysicalStart) packet of 1
     /// byte to 16 MiB that starts exactly where this one ends. Any other `next`, such as a
     /// later chunk inside the file, gives false; it is neither dropped nor treated as a seek.
-    pub fn following_eof(&self, next: &DescriptionEvent, _profile: PhysicalReadProfile) -> bool {
+    pub fn following_eof(&self, next: &DescriptionEvent) -> bool {
         if !self.short_at_physical_end || next.read != DescriptionRead::UnavailablePhysicalStart {
             return false;
         }
@@ -184,7 +177,6 @@ impl PhysicalReader {
         event: DescriptionEvent,
         plan: PhysicalRead,
         maximum_packet: usize,
-        _profile: PhysicalReadProfile,
     ) -> Result<Self> {
         if !input.budget().same_pool(&plan.origin_pool) {
             return Err(Error::ForeignPool);

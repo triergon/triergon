@@ -6,11 +6,8 @@ use triergon_core::{
 use triergon_isobmff::{
     CursorStatus,
     compat::mov::{
-        edits::{EncodedEditJob, EncodedEditLimits, EncodedEditPlan, EncodedEditProfile},
-        encoded::{
-            DependedOn, DependencyCause, DependencyObservation, EncodedMetadataProfile,
-            EncodedRecoveryProfile, EncodedStream,
-        },
+        edits::{EncodedEditJob, EncodedEditLimits, EncodedEditPlan},
+        encoded::{DependedOn, DependencyCause, DependencyObservation, EncodedStream},
         packets::{PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
@@ -28,7 +25,6 @@ impl Source {
             configs,
             i,
             EncodedEditLimits::default(),
-            EncodedRecoveryProfile,
         )
         .unwrap()
     }
@@ -152,7 +148,7 @@ fn reserved_dependency_stays_reserved_while_receiver_adds_no_hint() {
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].source.dependency, Some(0x2e));
     assert_eq!((result[0].demux.flags, result[1].demux.flags), (1, 16));
-    let observation = DependencyObservation::from_source(0x2e, EncodedRecoveryProfile);
+    let observation = DependencyObservation::from_source(0x2e);
     assert_eq!(observation.source.raw, 0x2e);
     assert_eq!(observation.source.depended_on, DependedOn::Reserved);
     assert_eq!(
@@ -351,7 +347,6 @@ fn old_actual_membership_refusal_is_unchanged() {
         &configs,
         &i,
         EncodedEditLimits::default(),
-        EncodedMetadataProfile,
     )
     .unwrap();
     assert_eq!(
@@ -506,8 +501,7 @@ fn validated_source_plan_survives_output_pressure_without_extra_group_allocation
             &[s.track()],
             &s.media,
             PacketLimits::default(),
-            &plans,
-            EncodedEditProfile
+            &plans
         ),
         Err(Error::Backpressure { .. })
     ));
@@ -525,7 +519,6 @@ fn packet_hint_does_not_become_public_index_key() {
         &s.media,
         IndexLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut flags = Vec::new();
@@ -596,7 +589,6 @@ fn configured_sample_limit_still_bounds_source_scan() {
         &configs,
         &i,
         EncodedEditLimits { max_samples: 1 },
-        EncodedRecoveryProfile,
     )
     .unwrap();
     assert_eq!(

@@ -10,7 +10,7 @@ use triergon_isobmff::{
     compat::mov::{
         clock::ClockField,
         packets::PacketView,
-        pcm::{PcmCursor, PcmLimits, PcmPacket, PcmProfile, PcmReader, PcmStream},
+        pcm::{PcmCursor, PcmLimits, PcmPacket, PcmReader, PcmStream},
     },
     config::{ConfigurationLimits, check_dts_core_description},
     open::{Movie, MovieOpen, OpenLimits, OpenStep},
@@ -491,19 +491,13 @@ fn pcm_packets(
         .ok_or(Error::Invalid("no PCM media"))?;
     let mut tracks = Vec::new();
     for track in movie.tracks() {
-        PcmStream::new(
-            track.header(),
-            track.table(),
-            movie.major_brand(),
-            PcmProfile,
-        )?;
+        PcmStream::new(track.header(), track.table(), movie.major_brand())?;
         let mut cursor = PcmCursor::new(
             track.header(),
             track.table(),
             input,
             media.clone(),
             PcmLimits::default(),
-            PcmProfile,
         )?;
         let head = pcm_head(source, &mut cursor, input, cancel)?;
         tracks.push((cursor, head, track.header().time_base()?));

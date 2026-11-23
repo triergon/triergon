@@ -29,11 +29,7 @@ fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
 #[doc(hidden)]
 pub fn box_reader(input: &InputCursor, metadata_bytes: usize, recovery: bool) -> Result<BoxReader> {
     if recovery {
-        BoxReader::new_recovery(
-            input,
-            metadata_bytes,
-            crate::table::recovery::RunRecoveryProfile,
-        )
+        BoxReader::new_recovery(input, metadata_bytes)
     } else {
         BoxReader::new(input, metadata_bytes)
     }
@@ -977,13 +973,8 @@ impl MovieOpen {
         let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
         let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
         let header = if self.recovery {
-            crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(
-                tkhd,
-                mdhd,
-                hdlr,
-                crate::table::recovery::RunRecoveryProfile,
-            )?
-            .into_source()
+            crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(tkhd, mdhd, hdlr)?
+                .into_source()
         } else {
             TrackHeader::parse(tkhd, mdhd, hdlr)?
         };

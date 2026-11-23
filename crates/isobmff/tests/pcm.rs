@@ -7,7 +7,7 @@ use triergon_core::{
 };
 use triergon_isobmff::{
     CursorStatus,
-    compat::mov::pcm::{PcmCursor, PcmLimits, PcmPacket, PcmProfile, PcmReader, PcmStream},
+    compat::mov::pcm::{PcmCursor, PcmLimits, PcmPacket, PcmReader, PcmStream},
     movie::TrackHeader,
     table::SampleTable,
 };
@@ -76,7 +76,6 @@ impl Parsed {
             input,
             self.media.clone(),
             PcmLimits::default(),
-            PcmProfile,
         )
         .unwrap()
     }
@@ -245,7 +244,7 @@ fn initial_demux_catalogue_retains_exact_source_entry() {
         (twos.as_slice(), "pcm_s8"),
     ] {
         let p = Parsed::new(raw);
-        let s = PcmStream::new(&p.header, &p.table, Some(*b"qt  "), PcmProfile).unwrap();
+        let s = PcmStream::new(&p.header, &p.table, Some(*b"qt  ")).unwrap();
         assert_eq!(s.demux().codec, codec);
         assert_eq!(s.demux().media_type, 1);
         assert!(s.demux().extradata.is_empty());
@@ -311,8 +310,7 @@ fn wrong_pool_is_rejected_before_plan_or_read() {
             &p.table,
             &input,
             p.media.clone(),
-            PcmLimits::default(),
-            PcmProfile
+            PcmLimits::default()
         ),
         Err(Error::ForeignPool)
     ));
@@ -394,14 +392,7 @@ fn source_sample_limit_is_checked_before_metadata_walk() {
         ..PcmLimits::default()
     };
     assert!(matches!(
-        PcmCursor::new(
-            &p.header,
-            &p.table,
-            &input,
-            p.media.clone(),
-            limits,
-            PcmProfile
-        ),
+        PcmCursor::new(&p.header, &p.table, &input, p.media.clone(), limits),
         Err(Error::Limit {
             requested: 2049,
             maximum: 2048
@@ -448,7 +439,7 @@ fn public_header_mutation_does_not_change_demux_catalogue() {
     let mut p = Parsed::new(MONO);
     p.header.timescale = 1;
     assert!(matches!(
-        PcmStream::new(&p.header, &p.table, Some(*b"qt  "), PcmProfile),
+        PcmStream::new(&p.header, &p.table, Some(*b"qt  ")),
         Err(Error::Invalid(_))
     ));
 }
@@ -456,7 +447,7 @@ fn public_header_mutation_does_not_change_demux_catalogue() {
 fn unsupported_brand_does_not_rewrite_source_pcm() {
     let p = Parsed::new(MONO);
     assert!(matches!(
-        PcmStream::new(&p.header, &p.table, Some(*b"isom"), PcmProfile),
+        PcmStream::new(&p.header, &p.table, Some(*b"isom")),
         Err(Error::Unsupported(_))
     ));
     assert_eq!(p.table.descriptions()[0].format, *b"raw ");
@@ -580,15 +571,7 @@ fn packet_policy_limit_preserves_source_and_poisoned_cursor() {
         max_packet_bytes: 3,
         ..PcmLimits::default()
     };
-    let mut c = PcmCursor::new(
-        &p.header,
-        &p.table,
-        &input,
-        p.media.clone(),
-        limits,
-        PcmProfile,
-    )
-    .unwrap();
+    let mut c = PcmCursor::new(&p.header, &p.table, &input, p.media.clone(), limits).unwrap();
     assert_eq!(
         next(&mut c, &mut input, 1).unwrap_err(),
         Error::Limit {

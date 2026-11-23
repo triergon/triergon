@@ -1014,7 +1014,7 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         compat::mov::{
             edits::{EncodedEditContext, EncodedEditJob},
             encoded::{
-                EncodedConfigProfile, EncodedConfigSequence, EncodedContextProfile, EncodedInitial,
+                EncodedConfigSequence, EncodedInitial,
                 EncodedSelection, EncodedStreamJob,
             },
         },
@@ -1055,7 +1055,6 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                         description,
                         limits: triergon_isobmff::config::ConfigurationLimits::default(),
                     },
-                    EncodedContextProfile,
                 ),
                 Err(C::Unsupported("encoded catalogue namespace/handler"))
             ));
@@ -1067,13 +1066,13 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
         };
         let refusal = Some(C::Unsupported("encoded codec requires range playback"));
         assert_eq!(
-            EncodedInitial::new(table, &configs, &first, &opened.input, EncodedConfigProfile,)
+            EncodedInitial::new(table, &configs, &first, &opened.input, )
                 .err(),
             refusal,
             "initial catalogue"
         );
         assert_eq!(
-            EncodedConfigSequence::new(table, &configs, &opened.input, EncodedConfigProfile,).err(),
+            EncodedConfigSequence::new(table, &configs, &opened.input, ).err(),
             refusal,
             "configuration sequence"
         );
@@ -1089,7 +1088,6 @@ fn native_range_cursor_keeps_edited_av1_and_vp9_description_transitions() {
                 &configs,
                 &opened.input,
                 triergon_isobmff::compat::mov::edits::EncodedEditLimits::default(),
-                EncodedContextProfile,
             )
             .err(),
             refusal,

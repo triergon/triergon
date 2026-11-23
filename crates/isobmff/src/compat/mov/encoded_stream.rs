@@ -20,11 +20,6 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 use triergon_framing::opus::{self, OpusHead};
 
-/// Opt-in token for [`EncodedStreamJob::new`]: admit the first description of a track
-/// in an ISO-branded file.
-#[derive(Clone, Copy, Debug)]
-pub struct EncodedStreamProfile;
-
 /// The codec of an admitted sample entry, by entry format and configuration box.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EncodedEntryKind {
@@ -183,7 +178,6 @@ impl<'a> EncodedStreamJob<'a> {
         input: &InputCursor,
         major: Option<[u8; 4]>,
         limits: ConfigurationLimits,
-        _profile: EncodedStreamProfile,
     ) -> Result<Self> {
         Self::new_description_inner(
             header,
@@ -206,7 +200,6 @@ impl<'a> EncodedStreamJob<'a> {
         major: Option<[u8; 4]>,
         limits: ConfigurationLimits,
         description: u32,
-        _profile: crate::compat::mov::encoded_configs::EncodedConfigProfile,
     ) -> Result<Self> {
         Self::new_description_inner(
             header,
@@ -230,7 +223,6 @@ impl<'a> EncodedStreamJob<'a> {
         table: &SampleTable,
         input: &InputCursor,
         selection: crate::compat::mov::encoded_metadata::EncodedSelection,
-        _profile: crate::compat::mov::encoded_metadata::EncodedMetadataProfile,
     ) -> Result<Self> {
         Self::new_description_inner(header, table, input, selection, DescriptionView::Metadata)
     }
@@ -244,7 +236,6 @@ impl<'a> EncodedStreamJob<'a> {
         table: &SampleTable,
         input: &InputCursor,
         selection: crate::compat::mov::encoded_metadata::EncodedSelection,
-        _profile: crate::compat::mov::encoded_contexts::EncodedContextProfile,
     ) -> Result<Self> {
         Self::new_description_inner(header, table, input, selection, DescriptionView::Contexts)
     }

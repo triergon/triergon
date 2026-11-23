@@ -4,8 +4,8 @@ use triergon_core::{Error, InputCursor, SourceFailure, WorkBudget};
 use triergon_isobmff::{
     CursorStatus, Next,
     compat::mov::{
-        edits::{EncodedEditJob, EncodedEditLimits, EncodedEditPlan, EncodedEditProfile},
-        encoded::{EncodedConfigProfile, EncodedMetadataProfile, EncodedStream},
+        edits::{EncodedEditJob, EncodedEditLimits, EncodedEditPlan},
+        encoded::EncodedStream,
         packets::{PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
@@ -22,7 +22,6 @@ impl Source {
             configs,
             i,
             EncodedEditLimits::default(),
-            EncodedMetadataProfile,
         )
         .unwrap()
     }
@@ -150,7 +149,6 @@ fn old_source_profile_remains_explicitly_unsupported() {
         &configs,
         &i,
         EncodedEditLimits::default(),
-        EncodedConfigProfile,
     )
     .unwrap();
     assert_eq!(
@@ -249,8 +247,7 @@ fn charged_packet_pressure_retries_without_changing_the_validated_plan() {
             &[s.track()],
             &s.media,
             PacketLimits::default(),
-            &plans,
-            EncodedEditProfile
+            &plans
         ),
         Err(Error::Backpressure { .. })
     ));
@@ -268,7 +265,6 @@ fn index_and_packet_receiver_share_the_same_source_derived_flags() {
         &s.media,
         IndexLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut flags = Vec::new();

@@ -12,8 +12,7 @@ use triergon_isobmff::{
         packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
         recovery::{
             DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, DescriptionRecoveryTable, RecoveryTrackHeader,
-            RunRecoveryProfile,
+            DescriptionRecoveryTable, RecoveryTrackHeader,
         },
     },
     index::{SegmentIndex, TrackFragmentRandomAccess},
@@ -337,12 +336,8 @@ impl RawMovie {
         let cancel = AtomicBool::new(false);
         let limits = Limits::default();
         if matches!(model, Model::Initial(_) | Model::Transport(_)) {
-            let mut job = DescriptionRecoveryBuilder::new(
-                self.table.clone(),
-                self.pool.clone(),
-                limits,
-                DescriptionRecoveryProfile,
-            )?;
+            let mut job =
+                DescriptionRecoveryBuilder::new(self.table.clone(), self.pool.clone(), limits)?;
             while job.poll(&mut WorkBudget::new(quantum), &cancel)? == BuildStatus::Yield {}
             let table = job.finish()?;
             let transport = self.transport(&table, window, quantum, &cancel, model)?;
@@ -470,7 +465,6 @@ impl RawMovie {
             &child(&self.trak, b"tkhd", quantum)?,
             &child(&self.mdia, b"mdhd", quantum)?,
             &child(&self.mdia, b"hdlr", quantum)?,
-            RunRecoveryProfile,
         )?;
         let mut input = input_cursor(&self.pool, self.size, window)?;
         let limits = PacketLimits::default();

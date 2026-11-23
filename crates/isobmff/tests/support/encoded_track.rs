@@ -8,8 +8,8 @@ use triergon_core::{
 use triergon_isobmff::{
     CursorStatus, Limits,
     compat::mov::{
-        edits::{EncodedEditContext, EncodedEditJob, EncodedEditPlan, EncodedEditProfile},
-        encoded::{EncodedMetadataProfile, EncodedSelection, EncodedStream, EncodedStreamJob},
+        edits::{EncodedEditContext, EncodedEditJob, EncodedEditPlan},
+        encoded::{EncodedSelection, EncodedStream, EncodedStreamJob},
         packets::{DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence},
     },
     config::ConfigurationLimits,
@@ -89,7 +89,6 @@ impl Source {
                 description: 1,
                 limits: ConfigurationLimits::default(),
             },
-            EncodedMetadataProfile,
         )
         .unwrap();
         for _ in 0..20000 {
@@ -144,7 +143,6 @@ pub(crate) fn rows(s: &Source, plan: EncodedEditPlan) -> Vec<PacketOccurrence> {
         &s.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut rows = Vec::new();

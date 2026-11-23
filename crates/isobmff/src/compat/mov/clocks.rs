@@ -65,7 +65,7 @@ pub struct MediaClock {
 impl MediaClock {
     /// The 1/1 s clock of a track whose `mdhd` timescale is zero, under the run
     /// recovery profile.
-    pub fn for_zero_scale(_profile: crate::table::recovery::RunRecoveryProfile) -> Result<Self> {
+    pub fn for_zero_scale() -> Result<Self> {
         Ok(Self {
             source_base: SourceTimeBase::UNAVAILABLE,
             demux_base: TimeBase::new(1, 1)?,

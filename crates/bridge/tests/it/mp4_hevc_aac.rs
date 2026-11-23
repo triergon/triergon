@@ -80,7 +80,6 @@ fn aac_fixture_player() -> (Player<ByteSource>, Budget, Bytes, u64) {
         &opened.input,
         Some(raw[8..12].try_into().unwrap()),
         ConfigurationLimits::default(),
-        EncodedStreamProfile,
     )
     .unwrap();
     while job

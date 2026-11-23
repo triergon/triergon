@@ -14,11 +14,6 @@ use crate::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 
-/// Opt-in token for tracks with several descriptions: `EncodedStreamJob::new_description`,
-/// [`EncodedInitial`], [`EncodedConfigSequence`], `EncodedEditJob::new_with_configs` and
-/// [`EncodedCreation`].
-#[derive(Clone, Copy, Debug)]
-pub struct EncodedConfigProfile;
 /// The `mdhd` creation time and the `creation_time` tag FFmpeg's MOV demuxer derives
 /// from it, for creation times from 1970.
 #[derive(Clone, Debug)]
@@ -31,7 +26,7 @@ impl EncodedCreation {
     /// Reads the creation time of `header`'s `mdhd` box; the `mvhd` and `tkhd` times are
     /// not used. `Error::Unsupported` for nonzero flags, a version above 1, a time before
     /// 1970 or a year past 9999.
-    pub fn from_source(header: &TrackHeader, _profile: EncodedConfigProfile) -> Result<Self> {
+    pub fn from_source(header: &TrackHeader) -> Result<Self> {
         let raw = header.raw_mdhd.clone();
         let (version, flags) = fields::full(raw.payload())?;
         if flags != 0 {
@@ -216,7 +211,6 @@ impl EncodedInitial {
         configs: &[EncodedStream],
         first: &Sample,
         input: &InputCursor,
-        _profile: EncodedConfigProfile,
     ) -> Result<Self> {
         validate_configs(table, configs, input.budget())?;
         if first.ordinal != 1 {
@@ -283,7 +277,6 @@ impl<'a> EncodedConfigSequence<'a> {
         table: &SampleTable,
         configs: &'a [EncodedStream],
         input: &InputCursor,
-        _profile: EncodedConfigProfile,
     ) -> Result<Self> {
         validate_configs(table, configs, input.budget())?;
         Ok(Self {

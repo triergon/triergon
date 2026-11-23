@@ -5,7 +5,6 @@ use crate::{
     Sample,
     boxes::BoxHeader,
     compat::mov::field_recovery::{RecoverySampleExtent, RecoverySampleRead, ShortSample},
-    table::recovery::RunRecoveryProfile,
 };
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
@@ -146,7 +145,6 @@ impl SampleReader {
         sample: Sample,
         media: RecoverySampleExtent,
         maximum_packet: usize,
-        _profile: RunRecoveryProfile,
     ) -> Result<Self> {
         match media {
             RecoverySampleExtent::Finite(extent) => sample.require_within(extent)?,
@@ -226,7 +224,6 @@ impl SampleReader {
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        _profile: RunRecoveryProfile,
     ) -> Result<Step<RecoverySampleRead>> {
         if let Some(error) = self.failed {
             return Err(error);

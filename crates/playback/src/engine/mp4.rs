@@ -20,7 +20,7 @@ use triergon_isobmff::{
     compat::mov::{
         front::FrontReadBoundary,
         packets::{PacketCursor, PacketOccurrence},
-        recovery::{RecoverySampleExtent, RecoverySampleRead, RunRecoveryProfile},
+        recovery::{RecoverySampleExtent, RecoverySampleRead},
     },
     payload::{SampleReader, SourcePacket},
 };
@@ -368,7 +368,7 @@ impl Mp4Engine {
             .ok_or(Error::Invalid("pending sample missing"))?;
         let at_track = *at_track;
         let step = if self.plan.demux_recovery && self.plan.demux_row(self.row).is_some() {
-            reader.poll_recovery(&mut self.input, w, c, RunRecoveryProfile)?
+            reader.poll_recovery(&mut self.input, w, c)?
         } else {
             match reader.poll(&mut self.input, w, c)? {
                 Step::Ready(packet) => Step::Ready(RecoverySampleRead::Complete(packet)),
@@ -627,7 +627,6 @@ impl Mp4Engine {
                 row.sample,
                 media,
                 self.maximum_packet,
-                RunRecoveryProfile,
             )?
         } else {
             match media {

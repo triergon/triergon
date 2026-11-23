@@ -14,11 +14,8 @@ use triergon_isobmff::{
     CursorStatus, Limits, Next,
     boxes::BoxView,
     compat::mov::{
-        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditProfile},
-        encoded::{
-            EncodedConfigProfile, EncodedInitial, EncodedMetadataProfile, EncodedSelection,
-            EncodedStreamJob,
-        },
+        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits},
+        encoded::{EncodedInitial, EncodedSelection, EncodedStreamJob},
         packets::{DemuxTrack, PacketCursor, PacketLimits},
     },
     config::ConfigurationLimits,
@@ -116,7 +113,6 @@ impl Source {
                 description: 1,
                 limits: ConfigurationLimits::default(),
             },
-            EncodedMetadataProfile,
         )
         .unwrap();
         for _ in 0..10000 {
@@ -206,13 +202,7 @@ fn same_bytes_relocated_encoded_description_is_rejected() {
         config.source_description().raw().header().start,
         s.table.descriptions()[0].raw().header().start
     );
-    let result = EncodedInitial::new(
-        &s.table,
-        &[config],
-        &first(&s.table),
-        &input,
-        EncodedConfigProfile,
-    );
+    let result = EncodedInitial::new(&s.table, &[config], &first(&s.table), &input);
     assert!(
         matches!(
             result,
@@ -237,7 +227,6 @@ fn direct_edit_constructor_rejects_relocated_configuration() {
         },
         &input,
         EncodedEditLimits::default(),
-        EncodedEditProfile,
     );
     assert!(
         matches!(
@@ -265,7 +254,6 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
         &configs,
         &input,
         EncodedEditLimits::default(),
-        EncodedMetadataProfile,
     )
     .unwrap();
     while job
@@ -288,7 +276,6 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
         &s.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     );
     assert!(
         matches!(
@@ -322,14 +309,5 @@ fn encoded_same_allocation_same_physical_start_stays_valid() {
     let reconstructed = s.shifted(0);
     let mut input = s.input();
     let config = s.encoded(&reconstructed, &mut input);
-    assert!(
-        EncodedInitial::new(
-            &s.table,
-            &[config],
-            &first(&s.table),
-            &input,
-            EncodedConfigProfile
-        )
-        .is_ok()
-    );
+    assert!(EncodedInitial::new(&s.table, &[config], &first(&s.table), &input).is_ok());
 }

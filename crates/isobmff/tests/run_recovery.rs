@@ -5,7 +5,7 @@ use triergon_core::{Budget, Error, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
     BuildStatus, Limits, Next,
     boxes::BoxView,
-    compat::mov::recovery::{RunKind, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable},
+    compat::mov::recovery::{RunKind, RunRecoveryBuilder, RunRecoveryTable},
     interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
     seek::{SourceCompositionLookup, SourceSeekLimits, SourceSeekPlanner, SourceSeekRequest},
     table::{SampleTableBuilder, TimingRunPolicy, TimingRunSurplus},
@@ -26,12 +26,7 @@ fn stbl(bytes: &[u8], pool: &Budget) -> BoxView {
     .unwrap()
 }
 fn build(bytes: &[u8], pool: &Budget, quantum: u64) -> Result<RunRecoveryTable, Error> {
-    let mut builder = RunRecoveryBuilder::new(
-        stbl(bytes, pool),
-        pool.clone(),
-        Limits::default(),
-        RunRecoveryProfile,
-    )?;
+    let mut builder = RunRecoveryBuilder::new(stbl(bytes, pool), pool.clone(), Limits::default())?;
     for _ in 0..100_000 {
         if builder.poll(&mut WorkBudget::new(quantum), &AtomicBool::new(false))?
             == BuildStatus::Ready
@@ -323,13 +318,7 @@ fn unrelated_description_and_zero_sync_values_stay_errors() {
 #[test]
 fn zero_work_yields_and_cancellation_is_sticky() {
     let p = Budget::new(1 << 20).unwrap();
-    let mut b = RunRecoveryBuilder::new(
-        stbl(STTS, &p),
-        p.clone(),
-        Limits::default(),
-        RunRecoveryProfile,
-    )
-    .unwrap();
+    let mut b = RunRecoveryBuilder::new(stbl(STTS, &p), p.clone(), Limits::default()).unwrap();
     let c = AtomicBool::new(false);
     assert_eq!(
         b.poll(&mut WorkBudget::new(0), &c).unwrap(),
@@ -361,10 +350,7 @@ fn raw_backing_survives_input_drop_and_releases_to_initial_pool_control() {
 fn wrong_pool_and_record_limit_remain_enforced() {
     let p = Budget::new(1 << 20).unwrap();
     let other = Budget::new(1 << 20).unwrap();
-    assert!(
-        RunRecoveryBuilder::new(stbl(STTS, &p), other, Limits::default(), RunRecoveryProfile)
-            .is_err()
-    );
+    assert!(RunRecoveryBuilder::new(stbl(STTS, &p), other, Limits::default()).is_err());
     let mut b = RunRecoveryBuilder::new(
         stbl(STTS, &p),
         p.clone(),
@@ -372,7 +358,6 @@ fn wrong_pool_and_record_limit_remain_enforced() {
             max_records: 0,
             ..Limits::default()
         },
-        RunRecoveryProfile,
     )
     .unwrap();
     assert!(
@@ -385,8 +370,7 @@ fn budget_backpressure_retains_builder_and_recovers_without_rewriting() {
     let p = Budget::new(1 << 20).unwrap();
     let raw = stbl(STTS, &p);
     let held = p.reserve(p.available()).unwrap();
-    let mut b =
-        RunRecoveryBuilder::new(raw, p.clone(), Limits::default(), RunRecoveryProfile).unwrap();
+    let mut b = RunRecoveryBuilder::new(raw, p.clone(), Limits::default()).unwrap();
     assert!(matches!(
         b.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Backpressure { .. })

@@ -11,8 +11,8 @@ use triergon_isobmff::{
     compat::mov::{
         packets::PacketLimits,
         recovery::{
-            DirectAssociation, DirectContext, DirectRead, DirectRecoveryProfile,
-            RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable,
+            DirectAssociation, DirectContext, DirectRead, RecoveryTrackHeader, RunRecoveryBuilder,
+            RunRecoveryTable,
         },
         seek::IndexLimits,
     },
@@ -28,7 +28,6 @@ fn parts(bytes: &[u8], pool: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Rang
         &child(&track, b"tkhd").unwrap(),
         &child(&mdia, b"mdhd").unwrap(),
         &child(&mdia, b"hdlr").unwrap(),
-        RunRecoveryProfile,
     )
     .unwrap();
     (
@@ -41,8 +40,7 @@ fn parts(bytes: &[u8], pool: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Rang
     )
 }
 fn build(raw: BoxView, p: &Budget) -> Result<RunRecoveryTable, Error> {
-    let mut b =
-        RunRecoveryBuilder::new_direct(raw, p.clone(), Limits::default(), DirectRecoveryProfile)?;
+    let mut b = RunRecoveryBuilder::new_direct(raw, p.clone(), Limits::default())?;
     for _ in 0..100_000 {
         if b.poll(&mut WorkBudget::new(1), &AtomicBool::new(false))? == BuildStatus::Ready {
             return b.finish();
@@ -64,7 +62,6 @@ fn positions(bytes: &[u8]) -> Vec<(u64, u64, i64)> {
                 physical_length: bytes.len() as u64,
                 read_position: m[0].start,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let mut rows = Vec::new();
@@ -95,7 +92,7 @@ fn strict_and_run_description_zero_rejections_are_unchanged() {
         common::table(raw.clone(), &p, 1).unwrap_err(),
         Error::Invalid("stsc order/count/description")
     );
-    let mut b = RunRecoveryBuilder::new(raw, p, Limits::default(), RunRecoveryProfile).unwrap();
+    let mut b = RunRecoveryBuilder::new(raw, p, Limits::default()).unwrap();
     assert_eq!(
         b.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Invalid("stsc order/count/description"))
@@ -145,7 +142,6 @@ fn raw_description_counts_ranges_and_configuration_are_not_repaired() {
                 physical_length: 747,
                 read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let mut n = 0;
@@ -282,7 +278,6 @@ fn outside_source_is_invalid_source_but_observed_forward_eof() {
                 physical_length: 747,
                 read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     loop {
@@ -315,7 +310,6 @@ fn invalid_index_positions_are_not_clipped_sorted_or_removed() {
                 physical_length: 747,
                 read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let mut out = Vec::new();
@@ -365,7 +359,6 @@ fn far_seek_never_invents_clean_eof() {
                 physical_length: 747,
                 read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     loop {
@@ -397,7 +390,6 @@ fn first_read(bytes: &[u8], read_position: u64) -> DirectRead {
                 physical_length: bytes.len() as u64,
                 read_position,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     while c
@@ -461,7 +453,6 @@ fn zero_work_yields_cancel_is_sticky_even_ready() {
                 physical_length: 747,
                 read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let cancel = AtomicBool::new(false);
@@ -502,8 +493,7 @@ fn source_limits_and_index_limits_are_not_waived() {
                 max_source_samples: 5,
                 ..PacketLimits::default()
             },
-            ctx,
-            DirectRecoveryProfile
+            ctx
         ),
         Err(Error::Limit { .. })
     ));
@@ -517,7 +507,6 @@ fn source_limits_and_index_limits_are_not_waived() {
                 ..IndexLimits::default()
             },
             ctx,
-            DirectRecoveryProfile,
         )
         .unwrap();
     loop {
@@ -561,7 +550,6 @@ fn direct_iteration_does_not_allocate_and_raw_backing_survives_close() {
                     physical_length: 747,
                     read_position: 675,
                 },
-                DirectRecoveryProfile,
             )
             .unwrap();
         loop {

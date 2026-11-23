@@ -206,7 +206,7 @@
     }
   ],
   "pending_module_requirements": [
-    "EncodedMetadataProfile refuses a version-1 mp4a wave without frma (Unsupported: encoded incomplete mp4a wave context). Apple QuickTime File Format 'Sound sample data' only recommends frma and has unknown atoms ignored; the entry's esds is present and the reference reads 458 bytes.",
+    "The metadata view (EncodedStreamJob::new_description_with_metadata) refuses a version-1 mp4a wave without frma (Unsupported: encoded incomplete mp4a wave context). Apple QuickTime File Format 'Sound sample data' only recommends frma and has unknown atoms ignored; the entry's esds is present and the reference reads 458 bytes.",
     "The encoded recovery profile refuses a sample-to-group map that leaves samples without an explicit association (Unsupported: encoded incomplete recovery coverage); ISO/IEC 14496-12:2015 8.9.2.3 assigns them to the default group, or none.",
     "The encoded recovery profile refuses an sbgp run with sample_count 0 (Invalid: encoded empty recovery run); no clause of ISO/IEC 14496-12:2015 8.9.2 forbids an empty run.",
     "The encoded recovery profile refuses valid ISO/IEC 14496-12:2015 8.9 group syntax it does not implement: a version-1 sbgp grouping_type_parameter, a grouping type it does not know (4.2: skip what is not recognised) and sgpd version 1 with default_length 0.",
@@ -215,7 +215,7 @@
   "open_cases": [
     {
       "id": "qt-v1-missing-frma",
-      "requirement": "EncodedMetadataProfile refuses a version-1 mp4a wave without frma (Unsupported: encoded incomplete mp4a wave context). Apple QuickTime File Format 'Sound sample data' only recommends frma and has unknown atoms ignored; the entry's esds is present and the reference reads 458 bytes."
+      "requirement": "The metadata view (EncodedStreamJob::new_description_with_metadata) refuses a version-1 mp4a wave without frma (Unsupported: encoded incomplete mp4a wave context). Apple QuickTime File Format 'Sound sample data' only recommends frma and has unknown atoms ignored; the entry's esds is present and the reference reads 458 bytes."
     },
     {
       "id": "coverage-under",
@@ -248,7 +248,7 @@
       "clause": "Apple QuickTime File Format ‘Sound sample description extensions’, ‘siDecompressionParam atom (wave)’ and ‘Terminator atom’: a terminator marks the end and contains no payload; the strict wave profile requires it",
       "candidate": "refuses the three wave layouts (Invalid: encoded wave child after terminator; Invalid: encoded wave terminator data; Unsupported: encoded incomplete mp4a wave context)",
       "reference": "opens and reads 458 packet payload bytes in each case",
-      "compat": "compat::mov::encoded::EncodedContextProfile",
+      "compat": "compat::mov::encoded::EncodedStreamJob::new_description_with_contexts",
       "cases": [
         "qt-v1-after-terminator",
         "qt-v1-missing-terminator",
@@ -260,7 +260,7 @@
       "clause": "Apple QuickTime File Format 'Format atom (frma)': frma names the format of the data the entry describes; here it names ac-3 inside an mp4a entry",
       "candidate": "refuses the entry (Unsupported: encoded wave format conflicts with entry)",
       "reference": "opens the entry as AAC and reads 458 packet payload bytes",
-      "compat": "compat::mov::encoded::EncodedContextProfile",
+      "compat": "compat::mov::encoded::EncodedStreamJob::new_description_with_contexts",
       "cases": [
         "qt-v1-wrong-frma"
       ]
@@ -270,7 +270,7 @@
       "clause": "Apple QuickTime File Format 'siDecompressionParam atom (wave)' lists one format and one decoder atom and says nothing of a second copy; the metadata profile refuses duplicates",
       "candidate": "refuses the second atom (Unsupported: encoded duplicate configuration box; Invalid: encoded duplicate wave format)",
       "reference": "opens the entry as AAC and reads 458 packet payload bytes",
-      "compat": "compat::mov::encoded::EncodedContextProfile",
+      "compat": "compat::mov::encoded::EncodedStreamJob::new_description_with_contexts",
       "cases": [
         "qt-v1-duplicate-esds",
         "qt-v1-duplicate-frma"
@@ -281,7 +281,7 @@
       "clause": "Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ ‘Redefined sample tables’ explains compression ID -2 and sample tables whose units are compressed frames",
       "candidate": "refuses the entry: compression ID 0 for MPEG-4 audio (Unsupported: encoded sound-v1 frame-table compression ID)",
       "reference": "opens the entry as AAC and reads 458 packet payload bytes",
-      "compat": "compat::mov::encoded::EncodedContextProfile",
+      "compat": "compat::mov::encoded::EncodedStreamJob::new_description_with_contexts",
       "cases": [
         "qt-v1-unframed-compression"
       ]
@@ -291,7 +291,7 @@
       "clause": "ISO/IEC 14496-12:2015 8.9.2.3 and 8.9.4: group_description_index is 0 or 1 to the sgpd entry_count, and indices above 0x10000 name fragment-local descriptions, which stbl cannot hold",
       "candidate": "refuses the dangling index and the fragment-local index in stbl (Invalid: encoded unresolved recovery description; Unsupported: encoded fragment recovery namespace)",
       "reference": "opens and reads 4379 packet payload bytes in each case",
-      "compat": "compat::mov::encoded::EncodedContextProfile",
+      "compat": "compat::mov::edits (EncodedEditJob::new_with_recovery_contexts)",
       "cases": [
         "dangling-description",
         "fragment-namespace"
@@ -302,7 +302,7 @@
       "clause": "ISO/IEC 14496-12:2015 8.9.2.3: a total above sample_count is an error and reader behaviour is then undefined",
       "candidate": "refuses the overlong map (Invalid: encoded recovery exceeds samples)",
       "reference": "opens and reads 4379 packet payload bytes",
-      "compat": "compat::mov::encoded::EncodedContextProfile",
+      "compat": "compat::mov::edits (EncodedEditJob::new_with_recovery_contexts)",
       "cases": [
         "coverage-over"
       ]
@@ -312,7 +312,7 @@
       "clause": "ISO/IEC 14496-12:2015 §§8.9.2.1–.3 and 8.9.3.1–.3: at most one sgpd per grouping_type in a sample table",
       "candidate": "refuses the second sgpd (Invalid: encoded duplicate recovery context)",
       "reference": "opens and reads 4379 packet payload bytes",
-      "compat": "compat::mov::encoded::EncodedContextProfile",
+      "compat": "compat::mov::edits (EncodedEditJob::new_with_recovery_contexts)",
       "cases": [
         "duplicate-description"
       ]

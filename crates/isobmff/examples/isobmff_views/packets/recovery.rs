@@ -8,9 +8,8 @@ use triergon_isobmff::{
         packets::{PacketLimits, PacketView},
         recovery::{
             DescriptionAssociation, DescriptionContext, DescriptionEmission, DescriptionEvent,
-            DescriptionRead, DescriptionRecoveryBuilder, DescriptionRecoveryProfile, DirectContext,
-            DirectRead, DirectRecoveryProfile, PhysicalRead, PhysicalReadProfile, PhysicalReader,
-            RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile,
+            DescriptionRead, DescriptionRecoveryBuilder, DirectContext, DirectRead, PhysicalRead,
+            PhysicalReader, RecoveryTrackHeader, RunRecoveryBuilder,
         },
     },
     open,
@@ -83,7 +82,6 @@ pub(super) fn run(
         &child(&track, b"tkhd", q)?,
         &child(&mdia, b"mdhd", q)?,
         &child(&mdia, b"hdlr", q)?,
-        RunRecoveryProfile,
     )?;
     let raw = child(&child(&mdia, b"minf", q)?, b"stbl", q)?;
     let pool = input.budget().clone();
@@ -92,9 +90,9 @@ pub(super) fn run(
     }
     let direct = matches!(profile, Profile::Direct);
     let mut builder = if direct {
-        RunRecoveryBuilder::new_direct(raw, pool.clone(), Limits::default(), DirectRecoveryProfile)?
+        RunRecoveryBuilder::new_direct(raw, pool.clone(), Limits::default())?
     } else {
-        RunRecoveryBuilder::new(raw, pool.clone(), Limits::default(), RunRecoveryProfile)?
+        RunRecoveryBuilder::new(raw, pool.clone(), Limits::default())?
     };
     while builder.poll(&mut WorkBudget::new(q), cancel)? == BuildStatus::Yield {}
     let table = builder.finish()?;
@@ -127,7 +125,6 @@ pub(super) fn run(
                 physical_length: length,
                 read_position,
             },
-            DirectRecoveryProfile,
         )?;
         loop {
             match cursor.poll(&mut WorkBudget::new(q), cancel)? {
@@ -181,12 +178,7 @@ fn physical(
 ) -> Result<()> {
     let q = source.quantum;
     let pool = input.budget().clone();
-    let mut builder = DescriptionRecoveryBuilder::new(
-        raw,
-        pool.clone(),
-        Limits::default(),
-        DescriptionRecoveryProfile,
-    )?;
+    let mut builder = DescriptionRecoveryBuilder::new(raw, pool.clone(), Limits::default())?;
     while builder.poll(&mut WorkBudget::new(q), cancel)? == BuildStatus::Yield {}
     let table = builder.finish()?;
     let length = source.bytes.len() as u64;
@@ -206,7 +198,6 @@ fn physical(
             physical_length: length,
             custom_read_maximum: source.window,
         },
-        PhysicalReadProfile,
     )?;
     let mut reader = RecoveryPayload {
         source,
@@ -293,7 +284,7 @@ impl RecoveryPayload<'_, '_> {
     fn event(&mut self, event: DescriptionEvent, out: &mut Output<'_, '_>) -> Result<bool> {
         if event.read != DescriptionRead::Available {
             if self.previous.as_ref().is_some_and(|previous| {
-                previous.following_eof(&event, PhysicalReadProfile)
+                previous.following_eof(&event)
                     || (event.read == DescriptionRead::UnavailablePhysicalStart
                         && previous.requested().end == previous.physical_length()
                         && event.packet.as_ref().is_some_and(|packet| {
@@ -314,10 +305,8 @@ impl RecoveryPayload<'_, '_> {
             self.input,
             extent.start..extent.end.min(length),
             MAX_PACKET,
-            PhysicalReadProfile,
         )?;
-        let mut reader =
-            PhysicalReader::new(self.input, event, plan, MAX_PACKET, PhysicalReadProfile)?;
+        let mut reader = PhysicalReader::new(self.input, event, plan, MAX_PACKET)?;
         let result = self.source.read(self.input, |input, work| {
             reader.poll(input, work, self.cancel)
         })?;

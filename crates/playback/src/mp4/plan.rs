@@ -639,7 +639,7 @@ impl<'a> Mp4IndexJob<'a> {
                     ));
                 }
                 let clock =
-                    MediaClock::for_zero_scale(iso::compat::mov::recovery::RunRecoveryProfile)?;
+                    MediaClock::for_zero_scale()?;
                 zero_scale_clock = Some(clock);
                 clock.demux_base
             } else {
@@ -753,7 +753,6 @@ impl<'a> Mp4IndexJob<'a> {
                     movie.media(),
                     packet_limits,
                     plans,
-                    iso::compat::mov::edits::EncodedEditProfile,
                 )?
             } else if let Some(bounds) = forward_regular {
                 PacketCursor::new_front_regular(
@@ -944,7 +943,6 @@ impl<'a> Mp4IndexJob<'a> {
                 movie.media(),
                 self.limits.packet_limits(),
                 plans,
-                iso::compat::mov::edits::EncodedEditProfile,
             )?);
             p.encoded_edits = Some(retained);
         }
@@ -967,7 +965,6 @@ impl<'a> Mp4IndexJob<'a> {
                             h,
                             t.table(),
                             self.movie.major_brand(),
-                            iso::compat::mov::recovery::RunRecoveryProfile,
                         ),
                     )
                 } else {

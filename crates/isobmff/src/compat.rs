@@ -59,7 +59,7 @@ pub mod mov {
         pub use super::edit_list::{DurationBasis, EditCursor, EditLimits, EditOccurrence};
         pub use super::encoded_edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
-            EncodedEditProfile, fragment_aac::FragmentAacTrimJob,
+            fragment_aac::FragmentAacTrimJob,
         };
         pub use super::view::ProjectedEdit;
     }
@@ -90,42 +90,35 @@ pub mod mov {
         //!
         //! [`EncodedStreamJob`] reads one sample entry and returns an [`EncodedStream`]:
         //! the demuxer's stream view, the source description and the metadata it reads
-        //! from the movie. Its constructors select what it admits:
-        //! [`EncodedStreamProfile`] one description, [`EncodedConfigProfile`] one of
-        //! several, [`EncodedMetadataProfile`] QuickTime sound entries and legacy
-        //! metadata, [`EncodedContextProfile`] the receiver's reading of a `wave` box.
-        //! [`EncodedRecoveryProfile`] adds the `roll` and `prol` groups of the table.
+        //! from the movie. Its constructors select what it admits: `new` the first
+        //! description, `new_description` one of several, `new_description_with_metadata`
+        //! QuickTime sound entries and legacy metadata, `new_description_with_contexts`
+        //! the receiver's reading of a `wave` box. An
+        //! [`EncodedEditJob`](super::edits::EncodedEditJob) from
+        //! `new_with_recovery_groups` adds the `roll` and `prol` groups of the table.
         //!
         //! [`EncodedInitial`] and [`EncodedConfigSequence`] follow the configuration of a
         //! track with more than one description.
         pub use super::encoded_configs::{
-            EncodedConfigProfile, EncodedConfigSequence, EncodedConfigStep, EncodedCreation,
-            EncodedInitial,
+            EncodedConfigSequence, EncodedConfigStep, EncodedCreation, EncodedInitial,
         };
-        pub use super::encoded_contexts::{
-            EncodedContextProfile, SourceProfileFault, WaveObservation,
-        };
+        pub use super::encoded_contexts::{SourceProfileFault, WaveObservation};
         pub use super::encoded_metadata::{
-            DependedOn, DependencyView, EncodedCreationSource, EncodedMetadataProfile,
-            EncodedSelection, EncodedSource, HandlerSource, LanguageCause, LanguageSource,
-            SoundV1Source,
+            DependedOn, DependencyView, EncodedCreationSource, EncodedSelection, EncodedSource,
+            HandlerSource, LanguageCause, LanguageSource, SoundV1Source,
         };
         pub use super::encoded_recovery::{
-            DependencyCause, DependencyObservation, EncodedRecoveryProfile, RecoveryFacts,
-            RecoveryGroup,
+            DependencyCause, DependencyObservation, RecoveryFacts, RecoveryGroup,
         };
         pub use super::encoded_recovery_context::RecoveryObservation;
-        pub use super::encoded_stream::{
-            EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile,
-        };
+        pub use super::encoded_stream::{EncodedEntryKind, EncodedStream, EncodedStreamJob};
     }
 
     pub mod recovery {
         //! Malformed-MOV recovery.
         //!
         //! Strict parsing refuses these files; the types here read what the demuxer
-        //! reads from them and keep the strict error beside the result. Their entry
-        //! points take an explicit profile token.
+        //! reads from them and keep the strict error beside the result.
         //!
         //! - Field recovery. [`RecoveryTrackHeader`] accepts a zero timescale and
         //!   [`PartialSampleReader`] or
@@ -148,19 +141,16 @@ pub mod mov {
             PartialSampleReader, PayloadBounds, RecoveredPayload, RecoverySampleExtent,
             RecoverySampleRead, RecoveryTrackHeader, ShortSample,
         };
-        pub use super::physical_read::{
-            PhysicalPayload, PhysicalRead, PhysicalReadProfile, PhysicalReader,
-        };
+        pub use super::physical_read::{PhysicalPayload, PhysicalRead, PhysicalReader};
         pub use crate::table::recovery::{
             DescriptionAssociation, DescriptionContext, DescriptionEmission, DescriptionEvent,
             DescriptionIndexCursor, DescriptionIndexEntry, DescriptionIndexEvent,
             DescriptionPacketCursor, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, DescriptionRecoveryTable, DescriptionRowDiagnostic,
-            DirectAssociation, DirectContext, DirectIndexCursor, DirectIndexEntry,
-            DirectOccurrence, DirectPacketCursor, DirectRead, DirectRecoveryProfile,
+            DescriptionRecoveryTable, DescriptionRowDiagnostic, DirectAssociation, DirectContext,
+            DirectIndexCursor, DirectIndexEntry, DirectOccurrence, DirectPacketCursor, DirectRead,
             InitialDescriptionDiagnostic, RecoveryIndexCursor, RecoveryIndexEntry,
             RecoveryOccurrence, RecoveryPacketCursor, RecoverySourceCursor, RunCoverage, RunKind,
-            RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable, SyncDiagnostic,
+            RunRecoveryBuilder, RunRecoveryTable, SyncDiagnostic,
         };
     }
 
@@ -168,7 +158,7 @@ pub mod mov {
         //! [`PcmCursor`] groups QuickTime version 0 PCM samples into demux packets.
         //! [`PcmReader`] reads the grouped payloads.
         pub use super::pcm_packets::{
-            PcmCursor, PcmLimits, PcmPacket, PcmPayload, PcmProfile, PcmReader, PcmStream,
+            PcmCursor, PcmLimits, PcmPacket, PcmPayload, PcmReader, PcmStream,
         };
     }
 }

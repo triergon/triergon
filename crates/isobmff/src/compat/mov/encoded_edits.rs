@@ -31,10 +31,6 @@ pub(crate) mod fragment_aac;
 // ETSI TS 102 366 Annex F.2: an AC-3 or E-AC-3 ISO media sample covers six blocks.
 const DOLBY_SAMPLE_TICKS: u32 = 1536;
 
-/// Opt-in token for encoded edit plans, taken by [`EncodedEditJob::new`] and
-/// [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular).
-#[derive(Clone, Copy, Debug)]
-pub struct EncodedEditProfile;
 /// Bounds of an encoded edit scan; exceeding one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedEditLimits {
@@ -330,7 +326,6 @@ impl EncodedEditPlan {
                     if self.dependency_recovery {
                         crate::compat::mov::encoded_recovery::DependencyObservation::from_source(
                             raw,
-                            crate::compat::mov::encoded_recovery::EncodedRecoveryProfile,
                         )
                         .demux_disposable_hint()
                     } else {
@@ -498,7 +493,6 @@ impl<'a> EncodedEditJob<'a> {
         context: EncodedEditContext<'a>,
         input: &InputCursor,
         limits: EncodedEditLimits,
-        _profile: EncodedEditProfile,
     ) -> Result<Self> {
         context.stream.kind().require_regular_codec()?;
         Self::new_description_bound(context, input, limits, 1, false, false)
@@ -512,7 +506,6 @@ impl<'a> EncodedEditJob<'a> {
         configs: &[EncodedStream],
         input: &InputCursor,
         limits: EncodedEditLimits,
-        _profile: crate::compat::mov::encoded_configs::EncodedConfigProfile,
     ) -> Result<Self> {
         crate::compat::mov::encoded_configs::validate_configs(
             context.table,
@@ -531,7 +524,6 @@ impl<'a> EncodedEditJob<'a> {
         configs: &[EncodedStream],
         input: &InputCursor,
         limits: EncodedEditLimits,
-        _profile: crate::compat::mov::encoded_metadata::EncodedMetadataProfile,
     ) -> Result<Self> {
         crate::compat::mov::encoded_configs::validate_configs(
             context.table,
@@ -555,7 +547,6 @@ impl<'a> EncodedEditJob<'a> {
         configs: &[EncodedStream],
         input: &InputCursor,
         limits: EncodedEditLimits,
-        _profile: crate::compat::mov::encoded_recovery::EncodedRecoveryProfile,
     ) -> Result<Self> {
         crate::compat::mov::encoded_configs::validate_configs(
             context.table,
@@ -584,7 +575,6 @@ impl<'a> EncodedEditJob<'a> {
         configs: &[EncodedStream],
         input: &InputCursor,
         limits: EncodedEditLimits,
-        _profile: crate::compat::mov::encoded_contexts::EncodedContextProfile,
     ) -> Result<Self> {
         crate::compat::mov::encoded_configs::validate_configs(
             context.table,

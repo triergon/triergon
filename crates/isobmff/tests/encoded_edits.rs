@@ -10,12 +10,11 @@ use triergon_isobmff::{
     compat::mov::{
         edits::{
             EditCursor, EditLimits, EncodedEditContext, EncodedEditJob, EncodedEditLimits,
-            EncodedEditPlan, EncodedEditProfile,
+            EncodedEditPlan,
         },
         encoded::{
-            EncodedConfigProfile, EncodedConfigSequence, EncodedContextProfile, EncodedEntryKind,
-            EncodedMetadataProfile, EncodedRecoveryProfile, EncodedSelection, EncodedStream,
-            EncodedStreamJob, EncodedStreamProfile,
+            EncodedConfigSequence, EncodedEntryKind, EncodedSelection, EncodedStream,
+            EncodedStreamJob,
         },
         packets::{DemuxTrack, PacketCursor, PacketLimits},
         seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
@@ -115,7 +114,6 @@ impl Source {
             i,
             Some(*b"isom"),
             ConfigurationLimits::default(),
-            EncodedStreamProfile,
         )
         .unwrap();
         for _ in 0..100000 {
@@ -146,7 +144,6 @@ impl Source {
             EncodedEditLimits {
                 max_samples: maximum,
             },
-            EncodedEditProfile,
         )
     }
     fn plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
@@ -193,7 +190,6 @@ fn rows(
         &p.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut out = Vec::new();
@@ -339,7 +335,6 @@ fn range_playback_keeps_the_leading_video_gap_and_uses_the_edited_seek_clock() {
         &source.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -444,7 +439,6 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
         &source.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -935,7 +929,6 @@ fn opus_decoder_recovery_agrees_with_and_without_range_checkpoints() {
         &video.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -1219,7 +1212,6 @@ fn encoded_views_refuse_caller_supplied_dts_range_configurations() {
         &input,
         Some(*b"isom"),
         limits,
-        EncodedStreamProfile,
     )
     .unwrap();
     let cancel = AtomicBool::new(false);
@@ -1241,29 +1233,11 @@ fn encoded_views_refuse_caller_supplied_dts_range_configurations() {
     let limits = EncodedEditLimits::default();
     #[allow(clippy::large_stack_arrays)] // A handful of jobs in a test.
     for admission in [
-        EncodedEditJob::new(context(), &input, limits, EncodedEditProfile),
-        EncodedEditJob::new_with_configs(context(), &configs, &input, limits, EncodedConfigProfile),
-        EncodedEditJob::new_with_dependency_table(
-            context(),
-            &configs,
-            &input,
-            limits,
-            EncodedMetadataProfile,
-        ),
-        EncodedEditJob::new_with_recovery_groups(
-            context(),
-            &configs,
-            &input,
-            limits,
-            EncodedRecoveryProfile,
-        ),
-        EncodedEditJob::new_with_recovery_contexts(
-            context(),
-            &configs,
-            &input,
-            limits,
-            EncodedContextProfile,
-        ),
+        EncodedEditJob::new(context(), &input, limits),
+        EncodedEditJob::new_with_configs(context(), &configs, &input, limits),
+        EncodedEditJob::new_with_dependency_table(context(), &configs, &input, limits),
+        EncodedEditJob::new_with_recovery_groups(context(), &configs, &input, limits),
+        EncodedEditJob::new_with_recovery_contexts(context(), &configs, &input, limits),
     ] {
         assert!(matches!(
             admission,
@@ -1271,7 +1245,7 @@ fn encoded_views_refuse_caller_supplied_dts_range_configurations() {
         ));
     }
     assert!(matches!(
-        EncodedConfigSequence::new(&source.table, &configs, &input, EncodedConfigProfile),
+        EncodedConfigSequence::new(&source.table, &configs, &input),
         Err(Error::Unsupported("encoded codec requires range playback"))
     ));
 }
@@ -1320,7 +1294,6 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
         &source.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -1506,7 +1479,6 @@ fn encoded_cursor_rejects_plan_with_wrong_movie_timebase() {
         },
         &input,
         EncodedEditLimits::default(),
-        EncodedEditProfile,
     )
     .unwrap();
     let plans = [Some(complete(&mut job, &mut input, 1).unwrap())];
@@ -1516,7 +1488,6 @@ fn encoded_cursor_rejects_plan_with_wrong_movie_timebase() {
         &p.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .map(|_| ());
     assert_eq!(
@@ -1703,8 +1674,7 @@ fn source_association_cannot_rebind_equal_bytes_from_different_backing() {
             &[other.track()],
             &other.media,
             PacketLimits::default(),
-            &plans,
-            EncodedEditProfile
+            &plans
         ),
         Err(Error::Invalid(_))
     ));
@@ -1755,7 +1725,6 @@ fn new_index_uses_same_real_source_positions_and_decode_ticks() {
         &p.media,
         IndexLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut count = 0;
@@ -1795,8 +1764,7 @@ fn charged_cursor_pressure_preserves_plan_for_bounded_retry() {
             &[p.track()],
             &p.media,
             PacketLimits::default(),
-            &plans,
-            EncodedEditProfile
+            &plans
         ),
         Err(Error::Backpressure { .. })
     ));
@@ -1807,7 +1775,6 @@ fn charged_cursor_pressure_preserves_plan_for_bounded_retry() {
         &p.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     for _ in 0..100000 {
@@ -1898,7 +1865,6 @@ fn without_sdtp_keeps_existing_aac_roll_observation() {
         &configs,
         &input,
         EncodedEditLimits::default(),
-        EncodedMetadataProfile,
     )
     .unwrap();
     let actual = rows(&p, complete(&mut job, &mut input, 1).unwrap());

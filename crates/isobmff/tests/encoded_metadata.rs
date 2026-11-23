@@ -7,8 +7,7 @@ use triergon_core::{
 use triergon_isobmff::{
     CursorStatus,
     compat::mov::encoded::{
-        EncodedCreationSource, EncodedMetadataProfile, EncodedSelection, EncodedStream,
-        EncodedStreamJob,
+        EncodedCreationSource, EncodedSelection, EncodedStream, EncodedStreamJob,
     },
     config::ConfigurationLimits,
     movie::TrackHeader,
@@ -74,7 +73,6 @@ impl Source {
                 description: 1,
                 limits: ConfigurationLimits::default(),
             },
-            EncodedMetadataProfile,
         )
     }
 }
@@ -270,7 +268,6 @@ fn outer_and_nested_extensions_share_one_total_limit() {
                 ..ConfigurationLimits::default()
             },
         },
-        EncodedMetadataProfile,
     )
     .unwrap();
     assert_eq!(
@@ -297,7 +294,6 @@ fn empty_iso_handler_is_source_owned_but_receiver_tag_is_absent() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        EncodedMetadataProfile,
     )
     .unwrap();
     let r = finish(&mut j, &mut i, 1).unwrap();
@@ -369,7 +365,7 @@ macro_rules! date {
                 $file,
                 ".mov"
             )));
-            let c = EncodedCreationSource::from_source(&s.header, EncodedMetadataProfile).unwrap();
+            let c = EncodedCreationSource::from_source(&s.header).unwrap();
             assert_eq!(c.source_seconds(), $word);
             assert_eq!(c.demux().map(|x| x.as_slice()), $expected);
             assert_eq!(c.raw().bytes().as_ref(), s.header.raw_mdhd.bytes().as_ref());

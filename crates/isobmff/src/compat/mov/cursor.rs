@@ -1076,7 +1076,6 @@ impl<'a> PacketCursor<'a> {
         media: &'a [Range<u64>],
         limits: PacketLimits,
         plans: &'a [Option<crate::compat::mov::encoded_edits::EncodedEditPlan>],
-        _profile: crate::compat::mov::encoded_edits::EncodedEditProfile,
     ) -> Result<Self> {
         if plans.len() != tracks.len() {
             return Err(Error::Invalid("encoded edit track coverage"));

@@ -9,12 +9,6 @@ use crate::{
 };
 use triergon_core::{Bytes, Error, Result};
 
-/// Opt-in token for the metadata view: the legacy QuickTime forms of
-/// `EncodedStreamJob::new_description_with_metadata`, the creation tag of
-/// [`EncodedCreationSource`] and the `sdtp` disposable flag of
-/// `EncodedEditJob::new_with_dependency_table`.
-#[derive(Clone, Copy, Debug)]
-pub struct EncodedMetadataProfile;
 /// Which description of a track to admit, under which major brand and limits.
 #[derive(Clone, Copy, Debug)]
 pub struct EncodedSelection {
@@ -60,7 +54,7 @@ pub struct EncodedCreationSource {
 impl EncodedCreationSource {
     /// Reads the creation time of `header`'s `mdhd` box. `Error::Unsupported` for
     /// nonzero flags, a version above 1 or a year past 9999.
-    pub fn from_source(header: &TrackHeader, _profile: EncodedMetadataProfile) -> Result<Self> {
+    pub fn from_source(header: &TrackHeader) -> Result<Self> {
         let raw = header.raw_mdhd.clone();
         if raw.header().kind != *b"mdhd" {
             return Err(Error::Invalid("creation source is not mdhd"));

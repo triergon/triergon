@@ -7,9 +7,7 @@ use triergon_core::{
 use triergon_isobmff::{
     CursorStatus,
     boxes::BoxView,
-    compat::mov::encoded::{
-        EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile,
-    },
+    compat::mov::encoded::{EncodedEntryKind, EncodedStream, EncodedStreamJob},
     config::ConfigurationLimits,
     movie::TrackHeader,
     table::SampleTable,
@@ -74,7 +72,6 @@ impl Source {
             input,
             Some(*b"isom"),
             ConfigurationLimits::default(),
-            EncodedStreamProfile,
         )
         .unwrap()
     }
@@ -289,8 +286,7 @@ fn foreign_pool_is_rejected_before_config_scanning() {
             &p.table,
             &i,
             Some(*b"isom"),
-            ConfigurationLimits::default(),
-            EncodedStreamProfile
+            ConfigurationLimits::default()
         ),
         Err(Error::ForeignPool)
     ));
@@ -303,15 +299,7 @@ fn config_limit_is_a_resource_error_with_literal_source_untouched() {
         max_config_bytes: 1,
         ..ConfigurationLimits::default()
     };
-    let mut j = EncodedStreamJob::new(
-        &p.header,
-        &p.table,
-        &i,
-        Some(*b"isom"),
-        limits,
-        EncodedStreamProfile,
-    )
-    .unwrap();
+    let mut j = EncodedStreamJob::new(&p.header, &p.table, &i, Some(*b"isom"), limits).unwrap();
     assert!(matches!(
         complete(&mut j, &mut i, 1),
         Err(Error::Limit { maximum: 1, .. })
@@ -326,15 +314,7 @@ fn descriptor_limit_bounds_actual_nested_records() {
         max_descriptors: 1,
         ..ConfigurationLimits::default()
     };
-    let mut j = EncodedStreamJob::new(
-        &p.header,
-        &p.table,
-        &i,
-        Some(*b"isom"),
-        limits,
-        EncodedStreamProfile,
-    )
-    .unwrap();
+    let mut j = EncodedStreamJob::new(&p.header, &p.table, &i, Some(*b"isom"), limits).unwrap();
     assert_eq!(
         complete(&mut j, &mut i, 1).unwrap_err(),
         Error::Limit {
@@ -377,8 +357,7 @@ fn unproven_brand_remains_refused_without_source_rewrite() {
             &p.table,
             &i,
             Some(*b"qt  "),
-            ConfigurationLimits::default(),
-            EncodedStreamProfile
+            ConfigurationLimits::default()
         ),
         Err(Error::Unsupported(_))
     ));

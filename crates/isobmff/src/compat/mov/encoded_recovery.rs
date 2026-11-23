@@ -17,11 +17,6 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
-/// Opt-in token for the recovery view: the checked `roll` and `prol` groups of
-/// `EncodedEditJob::new_with_recovery_groups` and the `sdtp` reading of
-/// [`DependencyObservation`].
-#[derive(Clone, Copy, Debug)]
-pub struct EncodedRecoveryProfile;
 /// The `sample_is_depended_on` field of an `sdtp` byte as the recovery view reads it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DependencyCause {
@@ -46,7 +41,7 @@ pub struct DependencyObservation {
 }
 impl DependencyObservation {
     /// Reads one `sdtp` byte.
-    pub fn from_source(raw: u8, _profile: EncodedRecoveryProfile) -> Self {
+    pub fn from_source(raw: u8) -> Self {
         let cause = match raw & 0x0c {
             0 => DependencyCause::SourceUnspecified,
             4 => DependencyCause::SourceReferenced,

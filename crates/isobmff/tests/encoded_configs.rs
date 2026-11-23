@@ -7,8 +7,8 @@ use triergon_core::{
 use triergon_isobmff::{
     CursorStatus, Next, Sample,
     compat::mov::encoded::{
-        EncodedConfigProfile, EncodedConfigSequence, EncodedConfigStep, EncodedCreation,
-        EncodedInitial, EncodedStream, EncodedStreamJob,
+        EncodedConfigSequence, EncodedConfigStep, EncodedCreation, EncodedInitial, EncodedStream,
+        EncodedStreamJob,
     },
     config::ConfigurationLimits,
     movie::TrackHeader,
@@ -80,7 +80,6 @@ impl Source {
                     Some(*b"isom"),
                     ConfigurationLimits::default(),
                     n as u32,
-                    EncodedConfigProfile,
                 )
                 .unwrap();
                 for _ in 0..100000 {
@@ -125,7 +124,7 @@ fn observed(
 #[test]
 fn creation_uses_media_header_not_distinct_movie_or_track_fields() {
     let p = Source::new(CREATED);
-    let c = EncodedCreation::from_source(&p.header, EncodedConfigProfile).unwrap();
+    let c = EncodedCreation::from_source(&p.header).unwrap();
     assert_eq!(c.source_seconds(), 2082844803);
     assert_eq!(c.demux().unwrap(), b"1970-01-01T00:00:03.000000Z");
     assert_eq!(c.raw().bytes().as_ref(), p.header.raw_mdhd.bytes().as_ref());
@@ -133,7 +132,7 @@ fn creation_uses_media_header_not_distinct_movie_or_track_fields() {
 #[test]
 fn track_only_creation_does_not_fill_absent_media_creation() {
     let p = Source::new(TRACK_ONLY);
-    let c = EncodedCreation::from_source(&p.header, EncodedConfigProfile).unwrap();
+    let c = EncodedCreation::from_source(&p.header).unwrap();
     assert_eq!(c.source_seconds(), 0);
     assert!(c.demux().is_none());
 }
@@ -147,7 +146,7 @@ fn calendar_handles_gregorian_leap_day_from_source_seconds() {
     b[at..at + 4].copy_from_slice(&seconds.to_be_bytes());
     let p = Source::new(&b);
     assert_eq!(
-        EncodedCreation::from_source(&p.header, EncodedConfigProfile)
+        EncodedCreation::from_source(&p.header)
             .unwrap()
             .demux()
             .unwrap(),
@@ -163,7 +162,7 @@ fn ambiguous_old_epoch_is_refused_without_raw_rewrite() {
     b[at..at + 4].copy_from_slice(&1u32.to_be_bytes());
     let p = Source::new(&b);
     assert!(matches!(
-        EncodedCreation::from_source(&p.header, EncodedConfigProfile),
+        EncodedCreation::from_source(&p.header),
         Err(Error::Unsupported(_))
     ));
     assert_eq!(&p.header.raw_mdhd.payload()[4..8], &1u32.to_be_bytes());
@@ -193,7 +192,7 @@ fn initial_extradata_uses_first_used_description_but_metadata_stays_first_declar
     let c = p.configs(&mut i);
     let samples = p.samples();
     assert_eq!(samples[0].description_index, 2);
-    let view = EncodedInitial::new(&p.table, &c, &samples[0], &i, EncodedConfigProfile).unwrap();
+    let view = EncodedInitial::new(&p.table, &c, &samples[0], &i).unwrap();
     assert_eq!(view.source_initial_description(), 2);
     assert_eq!(
         view.demux().extradata.as_ref(),
@@ -212,7 +211,7 @@ fn different121_emits_real_second_and_return_configuration_once_each() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     assert!(observed(&mut seq, &s[0], &mut i).is_none());
     assert_eq!(
         observed(&mut seq, &s[1], &mut i).unwrap().as_ref(),
@@ -237,7 +236,7 @@ fn equal_byte_descriptions_still_retain_two_distinct_source_transition_events() 
         c[0].demux().extradata.as_ref(),
         c[1].demux().extradata.as_ref()
     );
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     assert!(observed(&mut seq, &s[0], &mut i).is_none());
     assert!(observed(&mut seq, &s[1], &mut i).is_some());
     assert!(observed(&mut seq, &s[2], &mut i).is_some());
@@ -248,7 +247,7 @@ fn zero_work_cannot_consume_source_event_or_allocate() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     let used = p.pool.used();
     let position = i.position();
     let mut w = WorkBudget::new(0);
@@ -268,7 +267,7 @@ fn cancelled_config_event_stays_failed() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     assert_eq!(
         seq.observe(
             &s[0],
@@ -296,7 +295,7 @@ fn source_reset_rejects_config_even_at_zero_work() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     i.reset(0).unwrap();
     assert!(matches!(
         seq.observe(
@@ -314,7 +313,7 @@ fn transport_failure_precedes_zero_work_config_event() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     i.fail(i.source(), i.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(
@@ -334,7 +333,7 @@ fn range_request_keeps_same_source_configuration_history() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     i.request_range(4).unwrap();
     assert!(observed(&mut seq, &s[0], &mut i).is_none());
     assert_eq!(i.position(), 4);
@@ -345,7 +344,7 @@ fn duplicate_source_ordinal_is_an_error_not_an_extra_packet() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     assert!(observed(&mut seq, &s[0], &mut i).is_none());
     assert!(matches!(
         seq.observe(
@@ -383,7 +382,7 @@ fn foreign_pool_does_not_admit_owned_source_configurations() {
     )
     .unwrap();
     assert!(matches!(
-        EncodedConfigSequence::new(&p.table, &c, &foreign, EncodedConfigProfile),
+        EncodedConfigSequence::new(&p.table, &c, &foreign),
         Err(Error::ForeignPool)
     ));
 }
@@ -394,7 +393,7 @@ fn equal_bytes_from_another_source_backing_do_not_rebind_configuration() {
     let c = p.configs(&mut i);
     let other = Source::in_pool(BASE, p.pool.clone());
     assert!(matches!(
-        EncodedConfigSequence::new(&other.table, &c, &i, EncodedConfigProfile),
+        EncodedConfigSequence::new(&other.table, &c, &i),
         Err(Error::Invalid(_))
     ));
 }
@@ -405,7 +404,7 @@ fn emitted_span_keeps_full_backing_charge_after_jobs_and_tables_drop() {
     let c = p.configs(&mut i);
     let s = p.samples();
     let span = {
-        let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+        let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
         assert!(observed(&mut seq, &s[0], &mut i).is_none());
         observed(&mut seq, &s[1], &mut i).unwrap()
     };
@@ -424,7 +423,7 @@ fn source_transition_borrows_under_full_pool_without_new_allocation() {
     let mut i = p.input();
     let c = p.configs(&mut i);
     let s = p.samples();
-    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i, EncodedConfigProfile).unwrap();
+    let mut seq = EncodedConfigSequence::new(&p.table, &c, &i).unwrap();
     assert!(observed(&mut seq, &s[0], &mut i).is_none());
     let hold = p.pool.reserve(p.pool.limit() - p.pool.used()).unwrap();
     let before = p.pool.used();

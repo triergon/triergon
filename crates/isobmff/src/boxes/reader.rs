@@ -94,11 +94,7 @@ impl BoxReader {
     }
     /// A [`MediaDataPolicy::PreserveTerminalDeclaration`] reader for the recovery view.
     /// Metadata boxes must still be complete.
-    pub(crate) fn new_recovery(
-        input: &InputCursor,
-        metadata_limit: usize,
-        _profile: crate::table::recovery::RunRecoveryProfile,
-    ) -> Result<Self> {
+    pub(crate) fn new_recovery(input: &InputCursor, metadata_limit: usize) -> Result<Self> {
         Self::with_media_data_policy(
             input,
             metadata_limit,

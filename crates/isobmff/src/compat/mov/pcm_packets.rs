@@ -20,11 +20,6 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget,
 };
 
-/// Token that selects FFmpeg's QuickTime PCM packets for [`PcmStream`] and
-/// [`PcmCursor`].
-#[derive(Clone, Copy, Debug)]
-pub struct PcmProfile;
-
 /// Limits of a [`PcmCursor`]; passing one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct PcmLimits {
@@ -93,7 +88,6 @@ impl PcmStream {
         header: &TrackHeader,
         table: &SampleTable,
         major_brand: Option<[u8; 4]>,
-        _profile: PcmProfile,
     ) -> Result<Self> {
         header_binding(header)?;
         if major_brand != Some(*b"qt  ") {
@@ -356,7 +350,6 @@ impl<'a> PcmCursor<'a> {
         input: &InputCursor,
         media: Range<u64>,
         limits: PcmLimits,
-        _profile: PcmProfile,
     ) -> Result<Self> {
         if !table.raw().bytes().belongs_to(input.budget())
             || [&header.raw_tkhd, &header.raw_mdhd, &header.raw_hdlr]

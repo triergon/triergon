@@ -100,7 +100,6 @@ impl StreamView {
         header: &TrackHeader,
         table: &SampleTable,
         major_brand: Option<[u8; 4]>,
-        profile: crate::table::recovery::RunRecoveryProfile,
     ) -> Result<Self> {
         let [entry] = table.descriptions() else {
             return Err(Error::Unsupported(
@@ -114,7 +113,7 @@ impl StreamView {
         {
             return Err(Error::Unsupported("zero-timescale raw-video catalogue"));
         }
-        let clock = MediaClock::for_zero_scale(profile)?;
+        let clock = MediaClock::for_zero_scale()?;
         let mut view = Self::with_projection_base(header, entry, clock.demux_base)?;
         view.clock = clock;
         view.with_major_brand(major_brand)

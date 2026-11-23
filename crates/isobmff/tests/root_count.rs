@@ -7,9 +7,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
     BuildStatus, Limits,
-    compat::mov::recovery::{
-        DescriptionContext, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
-    },
+    compat::mov::recovery::{DescriptionContext, DescriptionRecoveryBuilder},
     reference_trace::mov::transport::{RootWalkTransportBuilder, RootWalkTransportProfile},
 };
 
@@ -25,13 +23,7 @@ fn excess_root_count_refuses_before_metadata_discovery_with_explicit_limit() {
     let trak = child(movie, b"trak").unwrap();
     let mdia = child(&trak, b"mdia").unwrap();
     let stbl = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-    let mut table = DescriptionRecoveryBuilder::new(
-        stbl,
-        pool.clone(),
-        Limits::default(),
-        DescriptionRecoveryProfile,
-    )
-    .unwrap();
+    let mut table = DescriptionRecoveryBuilder::new(stbl, pool.clone(), Limits::default()).unwrap();
     while table
         .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()

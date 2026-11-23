@@ -6,7 +6,6 @@ use crate::{
     boxes::BoxView,
     movie::TrackHeader,
     payload::{SampleReader, SourcePacket, TerminalMdat},
-    table::recovery::RunRecoveryProfile,
 };
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
@@ -25,12 +24,7 @@ pub struct RecoveryTrackHeader {
 impl RecoveryTrackHeader {
     /// Parses as [`TrackHeader::parse`] does, except that a zero `mdhd` timescale is
     /// accepted.
-    pub fn parse(
-        tkhd: &BoxView,
-        mdhd: &BoxView,
-        hdlr: &BoxView,
-        _profile: RunRecoveryProfile,
-    ) -> Result<Self> {
+    pub fn parse(tkhd: &BoxView, mdhd: &BoxView, hdlr: &BoxView) -> Result<Self> {
         Ok(Self {
             source: TrackHeader::parse_inner(tkhd, mdhd, hdlr, true)?,
         })
@@ -115,7 +109,6 @@ impl PayloadBounds {
         declared_media: Range<u64>,
         known_length: u64,
         maximum_packet: usize,
-        _profile: RunRecoveryProfile,
     ) -> Result<Self> {
         sample.require_within(declared_media)?;
         // The limit is on the original declaration, before any physical bound.
@@ -176,18 +169,12 @@ impl PartialSampleReader {
         sample: Sample,
         declared_media: Range<u64>,
         maximum_packet: usize,
-        profile: RunRecoveryProfile,
     ) -> Result<Self> {
         let known_length = input.capabilities().length.ok_or(Error::Unsupported(
             "partial MOV payload requires known physical length",
         ))?;
-        let bounds = PayloadBounds::from_source(
-            &sample,
-            declared_media,
-            known_length,
-            maximum_packet,
-            profile,
-        )?;
+        let bounds =
+            PayloadBounds::from_source(&sample, declared_media, known_length, maximum_packet)?;
         let available = bounds
             .available
             .clone()

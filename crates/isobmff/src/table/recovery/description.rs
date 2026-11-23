@@ -14,11 +14,6 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-/// Opt-in token for description recovery, passed to [`DescriptionRecoveryBuilder::new`] and
-/// the description cursors of [`DescriptionRecoveryTable`].
-#[derive(Clone, Copy, Debug)]
-pub struct DescriptionRecoveryProfile;
-
 /// What the caller knows about the source for description recovery.
 #[derive(Clone, Copy, Debug)]
 pub struct DescriptionContext {
@@ -160,16 +155,11 @@ impl DescriptionRecoveryBuilder {
     /// Starts description recovery of `raw`, charging storage to `budget`. Fails with
     /// `Error::ForeignPool` when `raw`'s bytes are not charged to `budget`, and with
     /// `Error::Invalid` when it is not an `stbl` box.
-    pub fn new(
-        raw: BoxView,
-        budget: Budget,
-        limits: Limits,
-        _profile: DescriptionRecoveryProfile,
-    ) -> Result<Self> {
+    pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
         if !raw.bytes().belongs_to(&budget) {
             return Err(Error::ForeignPool);
         }
-        let mut inner = RunRecoveryBuilder::new(raw, budget, limits, RunRecoveryProfile)?;
+        let mut inner = RunRecoveryBuilder::new(raw, budget, limits)?;
         inner.inner.acceptance = Acceptance::RunsAndDescriptions;
         Ok(Self {
             inner,
@@ -352,7 +342,6 @@ impl DescriptionRecoveryTable {
         media: &'a [Range<u64>],
         limits: PacketLimits,
         context: DescriptionContext,
-        _profile: DescriptionRecoveryProfile,
     ) -> Result<DescriptionPacketCursor<'a>> {
         if !self.raw().bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
@@ -370,7 +359,6 @@ impl DescriptionRecoveryTable {
                     physical_length: context.physical_length,
                     read_position: context.physical_length,
                 },
-                DirectRecoveryProfile,
             )?;
             return Ok(DescriptionPacketCursor {
                 legacy: Some(legacy),
@@ -446,11 +434,7 @@ impl DescriptionRecoveryTable {
     /// Whether the first sample's declared range starts before `length` and ends after it,
     /// so that only a prefix of it exists in a file of `length` bytes. False for a table
     /// with invalid rows or without samples.
-    pub fn first_sample_physical_prefix(
-        &self,
-        length: u64,
-        _profile: crate::compat::mov::physical_read::PhysicalReadProfile,
-    ) -> Result<bool> {
+    pub fn first_sample_physical_prefix(&self, length: u64) -> Result<bool> {
         let raw = &self.base.storage;
         if self.invalid != 0 || raw.sample_count() == 0 {
             return Ok(false);
@@ -474,7 +458,6 @@ impl DescriptionRecoveryTable {
         media: &'a [Range<u64>],
         limits: PacketLimits,
         context: DescriptionContext,
-        _profile: crate::compat::mov::physical_read::PhysicalReadProfile,
     ) -> Result<DescriptionPacketCursor<'a>> {
         if !self.raw().bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
@@ -505,10 +488,8 @@ impl DescriptionRecoveryTable {
         media: &'a [Range<u64>],
         limits: IndexLimits,
         context: DescriptionContext,
-        profile: crate::compat::mov::physical_read::PhysicalReadProfile,
     ) -> Result<DescriptionIndexCursor<'a>> {
-        let inner =
-            self.physical_packet_cursor(pool, header, media, limits.packets, context, profile)?;
+        let inner = self.physical_packet_cursor(pool, header, media, limits.packets, context)?;
         Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
     /// [`physical_packet_cursor`](Self::physical_packet_cursor) in the context of a
@@ -528,14 +509,7 @@ impl DescriptionRecoveryTable {
     ) -> Result<DescriptionPacketCursor<'a>> {
         let context = model.context();
         model.require_binding(self.raw(), pool, context, media)?;
-        let mut cursor = self.physical_packet_cursor(
-            pool,
-            header,
-            media,
-            limits,
-            context,
-            crate::compat::mov::physical_read::PhysicalReadProfile,
-        )?;
+        let mut cursor = self.physical_packet_cursor(pool, header, media, limits, context)?;
         if let Some(direct) = &mut cursor.direct {
             direct.root_walk_transport_model = Some(model);
         }
@@ -570,12 +544,10 @@ impl DescriptionRecoveryTable {
         media: &'a [Range<u64>],
         limits: PacketLimits,
         model: &'a crate::reference_trace::mov::raw_video_transport::RawVideoTransportModel,
-        profile: DescriptionRecoveryProfile,
     ) -> Result<DescriptionPacketCursor<'a>> {
         let context = model.context();
         model.require_binding(self.raw(), pool, context, media)?;
-        let mut cursor =
-            self.description_packet_cursor(pool, header, media, limits, context, profile)?;
+        let mut cursor = self.description_packet_cursor(pool, header, media, limits, context)?;
         if let Some(direct) = &mut cursor.direct {
             direct.transport = Some(model);
         }
@@ -591,7 +563,6 @@ impl DescriptionRecoveryTable {
         media: &'a [Range<u64>],
         limits: IndexLimits,
         model: &'a crate::reference_trace::mov::raw_video_transport::RawVideoTransportModel,
-        profile: DescriptionRecoveryProfile,
     ) -> Result<DescriptionIndexCursor<'a>> {
         let inner = self.description_packet_cursor_with_transport(
             pool,
@@ -599,7 +570,6 @@ impl DescriptionRecoveryTable {
             media,
             limits.packets,
             model,
-            profile,
         )?;
         Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
@@ -613,10 +583,8 @@ impl DescriptionRecoveryTable {
         media: &'a [Range<u64>],
         limits: IndexLimits,
         context: DescriptionContext,
-        profile: DescriptionRecoveryProfile,
     ) -> Result<DescriptionIndexCursor<'a>> {
-        let inner =
-            self.description_packet_cursor(pool, header, media, limits.packets, context, profile)?;
+        let inner = self.description_packet_cursor(pool, header, media, limits.packets, context)?;
         Ok(DescriptionIndexCursor::new(inner, limits.max_entries))
     }
 }

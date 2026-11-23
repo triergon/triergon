@@ -14,8 +14,7 @@ use triergon_isobmff::{
         packets::PacketLimits,
         recovery::{
             DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, DescriptionRecoveryTable, RecoveryTrackHeader,
-            RunRecoveryProfile,
+            DescriptionRecoveryTable, RecoveryTrackHeader,
         },
         seek::IndexLimits,
     },
@@ -57,17 +56,11 @@ impl Source {
             &child(&trak, b"tkhd").unwrap(),
             &child(&mdia, b"mdhd").unwrap(),
             &child(&mdia, b"hdlr").unwrap(),
-            RunRecoveryProfile,
         )
         .unwrap();
         let raw = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-        let mut build = DescriptionRecoveryBuilder::new(
-            raw,
-            pool.clone(),
-            Limits::default(),
-            DescriptionRecoveryProfile,
-        )
-        .unwrap();
+        let mut build =
+            DescriptionRecoveryBuilder::new(raw, pool.clone(), Limits::default()).unwrap();
         while build
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()

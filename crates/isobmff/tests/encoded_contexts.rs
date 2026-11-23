@@ -7,14 +7,8 @@ use triergon_core::{
 use triergon_isobmff::{
     CursorStatus, Limits,
     compat::mov::{
-        edits::{
-            EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
-            EncodedEditProfile,
-        },
-        encoded::{
-            EncodedMetadataProfile, EncodedRecoveryProfile, EncodedSelection, EncodedStream,
-            EncodedStreamJob,
-        },
+        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan},
+        encoded::{EncodedSelection, EncodedStream, EncodedStreamJob},
         packets::{DemuxTrack, PacketCursor, PacketLimits},
     },
     config::ConfigurationLimits,
@@ -99,7 +93,6 @@ impl Source {
                 description: 1,
                 limits: ConfigurationLimits::default(),
             },
-            triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
         )
         .unwrap();
         for _ in 0..20000 {
@@ -127,7 +120,6 @@ impl Source {
             configs,
             i,
             EncodedEditLimits::default(),
-            triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
         )
         .unwrap()
     }
@@ -175,7 +167,6 @@ fn rows(
         &s.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut rows = Vec::new();
@@ -202,7 +193,6 @@ fn strict_config(s: &Source) -> Result<EncodedStream, Error> {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        EncodedMetadataProfile,
     )?;
     finish_config(job, &mut i)
 }
@@ -241,7 +231,6 @@ fn strict_plan(s: &Source) -> Result<EncodedEditPlan, Error> {
         &configs,
         &i,
         EncodedEditLimits::default(),
-        EncodedRecoveryProfile,
     )?;
     finish(&mut j, &mut i, 1)
 }
@@ -406,7 +395,6 @@ fn wave_work_zero_cancel_and_request_generation_stay_checked() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     let used = s.pool.used();
@@ -431,7 +419,6 @@ fn wave_work_zero_cancel_and_request_generation_stay_checked() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     i.reset(0).unwrap();
@@ -463,8 +450,7 @@ fn foreign_pool_is_not_recovery_or_wave_policy() {
                 major_brand: Some(s.brand),
                 description: 1,
                 limits: ConfigurationLimits::default()
-            },
-            triergon_isobmff::compat::mov::encoded::EncodedContextProfile
+            }
         ),
         Err(Error::ForeignPool)
     ));
@@ -485,7 +471,6 @@ fn later_real_esds_fault_is_not_hidden_by_earlier_allowed_wave_fault() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     let mut error = None;
@@ -521,7 +506,6 @@ fn configuration_and_group_limits_are_never_converted_to_demux_context() {
             description: 1,
             limits,
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     let mut rejected = false;
@@ -546,7 +530,6 @@ fn configuration_and_group_limits_are_never_converted_to_demux_context() {
         &configs,
         &i,
         EncodedEditLimits { max_samples: 1 },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     assert!(matches!(

@@ -17,11 +17,6 @@ pub struct SourceProfileFault {
     /// position, 0 for a fault in the sample entry; `None` for a sample group fault.
     pub ordinal: Option<u32>,
 }
-/// Opt-in token for the context view, which reports source faults instead of failing:
-/// in a `wave` box with `EncodedStreamJob::new_description_with_contexts`, in sample
-/// groups with `EncodedEditJob::new_with_recovery_contexts`.
-#[derive(Clone, Copy, Debug)]
-pub struct EncodedContextProfile;
 /// A QuickTime sound entry's `wave` box as the context view read it, with the faults
 /// the metadata view refuses.
 #[derive(Clone, Debug)]

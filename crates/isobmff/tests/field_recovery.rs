@@ -7,7 +7,7 @@ use triergon_isobmff::{
     boxes::BoxView,
     compat::mov::{
         packets::PacketLimits,
-        recovery::{RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable},
+        recovery::{RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryTable},
         seek::IndexLimits,
     },
     movie::TrackHeader,
@@ -21,7 +21,6 @@ fn source(input: &[u8], pool: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Ran
         &child(&track, b"tkhd").unwrap(),
         &child(&mdia, b"mdhd").unwrap(),
         &child(&mdia, b"hdlr").unwrap(),
-        RunRecoveryProfile,
     )
     .unwrap();
     let stbl = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
@@ -33,8 +32,7 @@ fn source(input: &[u8], pool: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Ran
     (stbl, h, media)
 }
 fn table(stbl: BoxView, p: &Budget) -> RunRecoveryTable {
-    let mut b =
-        RunRecoveryBuilder::new(stbl, p.clone(), Limits::default(), RunRecoveryProfile).unwrap();
+    let mut b = RunRecoveryBuilder::new(stbl, p.clone(), Limits::default()).unwrap();
     while b
         .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
@@ -127,8 +125,7 @@ fn unknown_media_header_version_is_not_a_zero_scale_recovery() {
         RecoveryTrackHeader::parse(
             &child(&track, b"tkhd").unwrap(),
             &child(&mdia, b"mdhd").unwrap(),
-            &child(&mdia, b"hdlr").unwrap(),
-            RunRecoveryProfile
+            &child(&mdia, b"hdlr").unwrap()
         ),
         Err(Error::Unsupported("clock header version"))
     ));

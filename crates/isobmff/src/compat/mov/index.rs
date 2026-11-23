@@ -232,16 +232,9 @@ impl<'a> IndexCursor<'a> {
         media: &'a [Range<u64>],
         limits: IndexLimits,
         plans: &'a [Option<crate::compat::mov::encoded_edits::EncodedEditPlan>],
-        profile: crate::compat::mov::encoded_edits::EncodedEditProfile,
     ) -> Result<Self> {
-        let cursor = PacketCursor::new_encoded_regular(
-            pool,
-            &[track],
-            media,
-            limits.packets,
-            plans,
-            profile,
-        )?;
+        let cursor =
+            PacketCursor::new_encoded_regular(pool, &[track], media, limits.packets, plans)?;
         Ok(Self::from_cursor(
             cursor,
             limits.max_entries,
@@ -649,7 +642,6 @@ impl<'a> SeekJob<'a> {
                 context.media,
                 context.limits.index,
                 plans,
-                crate::compat::mov::encoded_edits::EncodedEditProfile,
             )?
         } else {
             IndexCursor::new_complete_source(
@@ -903,7 +895,6 @@ impl<'a> SeekPlan<'a> {
                 c.media,
                 c.limits.index.packets,
                 plans,
-                crate::compat::mov::encoded_edits::EncodedEditProfile,
             )?
         } else {
             PacketCursor::new_complete_source(
@@ -1505,7 +1496,6 @@ impl<'a> GlobalSeekPlan<'a> {
                 self.setup.media,
                 self.setup.limits.index.packets,
                 plans,
-                crate::compat::mov::encoded_edits::EncodedEditProfile,
             )?
         } else {
             PacketCursor::new_complete_source(

@@ -12,12 +12,6 @@ mod direct;
 pub use description::*;
 pub use direct::*;
 
-/// Opt-in token for field and run recovery. The constructors that read a malformed MOV file
-/// as FFmpeg's MOV demuxer does take it, so that recovery is always chosen explicitly. It
-/// changes no source fact, packet order or codec configuration, and strict parsing
-/// elsewhere is unaffected.
-#[derive(Clone, Copy, Debug)]
-pub struct RunRecoveryProfile;
 /// The timing table a [`RunCoverage`] describes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunKind {
@@ -62,12 +56,7 @@ impl RunRecoveryBuilder {
     /// Starts run recovery of `raw`, charging storage to `budget`. Fails with
     /// `Error::Invalid` when `raw` is not an `stbl` box or its bytes are not charged to
     /// `budget`.
-    pub fn new(
-        raw: BoxView,
-        budget: Budget,
-        limits: Limits,
-        _profile: RunRecoveryProfile,
-    ) -> Result<Self> {
+    pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
         let mut inner = SampleTableBuilder::with_timing_policy(
             raw,
             budget,

@@ -19,16 +19,10 @@ use std::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
-/// Opt-in token for direct recovery, passed to [`RunRecoveryBuilder::new_direct`] and the
-/// direct cursors of [`RunRecoveryTable`].
-#[derive(Clone, Copy, Debug)]
-pub struct DirectRecoveryProfile;
-impl DirectRecoveryProfile {
-    /// How far past the position its input has reached FFmpeg reads forward instead of
-    /// seeking. Observed on the pinned release with reads of one byte to the whole
-    /// file; it is not an ISO rule.
-    pub(crate) const OBSERVED_FORWARD_READ_CAPACITY: u64 = 32768;
-}
+/// How far past the position its input has reached FFmpeg reads forward instead of
+/// seeking. Observed on the pinned release with reads of one byte to the whole file; it
+/// is not an ISO rule.
+const OBSERVED_FORWARD_READ_CAPACITY: u64 = 32768;
 /// The zero description index in the first `stsc` row that direct recovery accepts, and how
 /// FFmpeg reads the first chunk instead.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -104,13 +98,8 @@ impl RunRecoveryBuilder {
     /// `sample_description_index` in the first `stsc` row, when the table has one sample
     /// description and the second row starts at chunk 2 with index 1. The table then
     /// reports an [`InitialDescriptionDiagnostic`]. Fails as [`new`](Self::new) does.
-    pub fn new_direct(
-        raw: BoxView,
-        budget: Budget,
-        limits: Limits,
-        _profile: DirectRecoveryProfile,
-    ) -> Result<Self> {
-        let mut b = Self::new(raw, budget, limits, RunRecoveryProfile)?;
+    pub fn new_direct(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
+        let mut b = Self::new(raw, budget, limits)?;
         b.inner.acceptance = Acceptance::RunsAndInitialDescription;
         Ok(b)
     }
@@ -135,7 +124,6 @@ impl RunRecoveryTable {
         media: &'a [Range<u64>],
         limits: PacketLimits,
         context: DirectContext,
-        _profile: DirectRecoveryProfile,
     ) -> Result<DirectPacketCursor<'a>> {
         if !self.raw().bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
@@ -197,7 +185,6 @@ impl RunRecoveryTable {
         media: &'a [Range<u64>],
         limits: IndexLimits,
         context: DirectContext,
-        profile: DirectRecoveryProfile,
     ) -> Result<DirectIndexCursor<'a>> {
         let direct = self.initial_description.is_some()
             || (self.storage.sample_count() != 0
@@ -212,7 +199,6 @@ impl RunRecoveryTable {
                 media,
                 limits.packets,
                 context,
-                profile,
             )?),
             next: 0,
             distance: 0,
@@ -370,7 +356,7 @@ impl DirectCursor<'_> {
             let ceiling = self
                 .context
                 .read_position
-                .checked_add(DirectRecoveryProfile::OBSERVED_FORWARD_READ_CAPACITY)
+                .checked_add(OBSERVED_FORWARD_READ_CAPACITY)
                 .ok_or(Error::Overflow)?;
             if projected.range.start <= ceiling {
                 DirectRead::ObservedForwardEof

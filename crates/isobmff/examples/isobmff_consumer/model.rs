@@ -20,9 +20,8 @@ use triergon_isobmff::{
     compat::mov::{
         packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, StreamView},
         recovery::{
-            DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, PartialSampleReader, PayloadBounds, RecoveryTrackHeader,
-            RunRecoveryProfile,
+            DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder, PartialSampleReader,
+            PayloadBounds, RecoveryTrackHeader,
         },
         seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
     },
@@ -780,16 +779,13 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             &child(track, b"tkhd")?,
             &child(&mdia, b"mdhd")?,
             &child(&mdia, b"hdlr")?,
-            RunRecoveryProfile,
         )?;
         let minf = child(&mdia, b"minf")?;
         let refs = data_references(&minf, &self.budget)?;
-        let profile = DescriptionRecoveryProfile;
         let mut builder = DescriptionRecoveryBuilder::new(
             child(&minf, b"stbl")?,
             self.budget.clone(),
             Limits::default(),
-            profile,
         )?;
         while builder.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? != BuildStatus::Ready
         {
@@ -817,7 +813,6 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
             media,
             PacketLimits::default(),
             context,
-            profile,
         )?;
         loop {
             match cursor.poll(&mut WorkBudget::new(self.quantum), &self.cancel)? {
@@ -884,7 +879,6 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                 media,
                 IndexLimits::default(),
                 context,
-                profile,
             )?;
             protocol::fold(&mut stats.digest, 0x49);
             protocol::fold(&mut stats.digest, 1);
@@ -921,14 +915,8 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
 
     #[cold]
     fn terminal_payload(&mut self, sample: Sample, declared: &Range<u64>) -> Result<Bytes> {
-        let profile = RunRecoveryProfile;
-        let mut reader = PartialSampleReader::new(
-            &mut self.input,
-            sample,
-            declared.clone(),
-            MAX_SAMPLE_BYTES,
-            profile,
-        )?;
+        let mut reader =
+            PartialSampleReader::new(&mut self.input, sample, declared.clone(), MAX_SAMPLE_BYTES)?;
         loop {
             match reader.poll(
                 &mut self.input,
@@ -1170,7 +1158,6 @@ impl<'a, T: Read + Seek> Driver<'a, T> {
                         declared.clone(),
                         self.length,
                         MAX_SAMPLE_BYTES,
-                        RunRecoveryProfile,
                     )?;
                     return Ok((reads, true));
                 }

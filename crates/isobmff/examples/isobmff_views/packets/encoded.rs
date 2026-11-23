@@ -4,11 +4,8 @@ use triergon_core::{Error, InputCursor, Result, WorkBudget};
 use triergon_isobmff::{
     CursorStatus,
     compat::mov::{
-        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditProfile},
-        encoded::{
-            EncodedCreationSource, EncodedMetadataProfile, EncodedRecoveryProfile,
-            EncodedSelection, EncodedStreamJob,
-        },
+        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits},
+        encoded::{EncodedCreationSource, EncodedSelection, EncodedStreamJob},
         packets::{DemuxTrack, PacketCursor, PacketLimits},
     },
     config::ConfigurationLimits,
@@ -57,7 +54,6 @@ pub(super) fn run(
             track.table(),
             input,
             selection,
-            EncodedMetadataProfile,
         )?;
         while job.poll(input, &mut WorkBudget::new(q), cancel)? == CursorStatus::Yield {}
         let config = job.take(input, cancel)?;
@@ -73,23 +69,13 @@ pub(super) fn run(
             let configs = std::slice::from_ref(&config);
             let limits = EncodedEditLimits::default();
             let mut job = match profile {
-                Profile::Metadata => {
-                    EncodedEditJob::new(context, input, limits, EncodedEditProfile)?
+                Profile::Metadata => EncodedEditJob::new(context, input, limits)?,
+                Profile::Recovery => {
+                    EncodedEditJob::new_with_recovery_groups(context, configs, input, limits)?
                 }
-                Profile::Recovery => EncodedEditJob::new_with_recovery_groups(
-                    context,
-                    configs,
-                    input,
-                    limits,
-                    EncodedRecoveryProfile,
-                )?,
-                Profile::Dependency => EncodedEditJob::new_with_dependency_table(
-                    context,
-                    configs,
-                    input,
-                    limits,
-                    EncodedMetadataProfile,
-                )?,
+                Profile::Dependency => {
+                    EncodedEditJob::new_with_dependency_table(context, configs, input, limits)?
+                }
             };
             while job.poll(input, &mut WorkBudget::new(q), cancel)? == CursorStatus::Yield {}
             Some(job.take(input, cancel)?)
@@ -112,7 +98,6 @@ pub(super) fn run(
         movie.media(),
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )?;
     out.row(2, &[tracks.len() as u64], &[])?;
     for (index, (track, config)) in movie.tracks().iter().zip(&configs).enumerate() {
@@ -142,7 +127,7 @@ pub(super) fn run(
         out.string(4, stream.handler_name.as_ref())?;
         let vendor = stream.vendor_id.map(vendor_text);
         out.string(5, vendor.as_ref().map_or(&[], String::as_bytes))?;
-        let creation = EncodedCreationSource::from_source(track.header(), EncodedMetadataProfile)?;
+        let creation = EncodedCreationSource::from_source(track.header())?;
         out.string(6, creation.demux().map_or(&[], |bytes| &bytes[..]))?;
         // This profile publishes no stream-level skip-samples data.
         out.string(7, &[])?;
