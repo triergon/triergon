@@ -61,62 +61,98 @@ fn every_vector_matches_its_streaminfo_md5() {
 }
 
 fn check_md5(max_bytes: u64) {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.research");
+    let vectors = include_str!("data/md5-vectors.txt");
     let mut checked = 0;
     for dir in [
         "flac-test-files/subset",
         "flac-test-files/uncommon",
         "flac-generated",
     ] {
-        for path in research(dir) {
-            if std::fs::metadata(&path).map_or(true, |m| m.len() > max_bytes) {
-                continue;
-            }
-            let Some((configuration, frames)) = read(&path) else {
-                continue;
-            };
-            let Ok(info) = flac::stream_info(&configuration) else {
-                continue;
-            };
-            let mut decoder = Decoder::new(&configuration).unwrap();
-            let (mut integer, mut float) = (decoder.integer_frame(), AudioFrame::default());
-            let mut pcm = Vec::new();
-            let mut uniform = true;
-            for au in &frames {
-                let Ok(frame) = decoder.decode_integer(au, &mut integer) else {
-                    uniform = false;
-                    continue;
-                };
-                uniform &= frame.layout.channels() == usize::from(info.channels)
-                    && frame.sample_rate == info.sample_rate;
-                decoder.decode(au, &mut float).unwrap();
-                let width = usize::from(info.bits_per_sample).div_ceil(8);
-                let scale = |x: i32| {
-                    let bits = u32::from(info.bits_per_sample);
-                    if bits <= 16 {
-                        f32::from((x << (16 - bits)) as i16) / 32768.0
-                    } else {
-                        (x << (32 - bits)) as f32 / 2_147_483_648.0
-                    }
-                };
-                for i in 0..integer.samples_per_channel {
-                    for (plane, floats) in integer.planes().zip(&float.planes) {
-                        assert_eq!(floats[i], scale(plane[i]), "{}", path.display());
-                        pcm.extend_from_slice(&plane[i].to_le_bytes()[..width]);
-                    }
-                }
-            }
-            if uniform && info.md5 != [0; 16] {
-                assert_eq!(md5::digest(&pcm), info.md5, "{}", path.display());
-                checked += 1;
+        let files = research(dir);
+        if files.is_empty() && !root.join(dir).is_dir() {
+            skipped(format_args!("the FLAC MD5 input directory {dir}: absent"));
+            continue;
+        }
+        let mut expected: Vec<_> = vectors
+            .lines()
+            .map(|line| line.split_once('\t').expect("expectation and path"))
+            .filter(|&(_, relative)| Path::new(relative).parent() == Some(Path::new(dir)))
+            .map(|(expectation, relative)| (root.join(relative), expectation))
+            .collect();
+        expected.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        assert!(
+            files.iter().eq(expected.iter().map(|(path, _)| path)),
+            "unexpected files in {dir}: found {}, expected {}",
+            files.len(),
+            expected.len()
+        );
+        for (path, expectation) in expected {
+            let bytes = std::fs::metadata(&path).unwrap().len();
+            if bytes <= max_bytes {
+                checked += usize::from(check_vector(&path, expectation));
             }
         }
     }
-    if checked == 0 {
-        skipped(format_args!(
-            "the FLAC MD5 check: no stream in .research/flac-test-files or .research/flac-generated"
-        ));
-    }
     eprintln!("{checked} streams match their MD5");
+}
+
+fn check_vector(path: &Path, expectation: &str) -> bool {
+    let (configuration, frames) =
+        read(path).unwrap_or_else(|| panic!("{} did not open as FLAC", path.display()));
+    let info = flac::stream_info(&configuration);
+    if expectation == "no-streaminfo" {
+        // These streams start at a frame header or with junk before a frame header.
+        assert!(info.is_err(), "{} has STREAMINFO", path.display());
+        return false;
+    }
+    let info = info.unwrap_or_else(|error| panic!("{}: {error:?}", path.display()));
+    let mut decoder = Decoder::new(&configuration).unwrap();
+    let (mut integer, mut float) = (decoder.integer_frame(), AudioFrame::default());
+    let mut pcm = Vec::new();
+    let mut uniform = true;
+    for au in &frames {
+        let Ok(frame) = decoder.decode_integer(au, &mut integer) else {
+            uniform = false;
+            continue;
+        };
+        uniform &= frame.layout.channels() == usize::from(info.channels)
+            && frame.sample_rate == info.sample_rate;
+        decoder.decode(au, &mut float).unwrap();
+        let width = usize::from(info.bits_per_sample).div_ceil(8);
+        let scale = |x: i32| {
+            let bits = u32::from(info.bits_per_sample);
+            if bits <= 16 {
+                f32::from((x << (16 - bits)) as i16) / 32768.0
+            } else {
+                (x << (32 - bits)) as f32 / 2_147_483_648.0
+            }
+        };
+        for i in 0..integer.samples_per_channel {
+            for (plane, floats) in integer.planes().zip(&float.planes) {
+                assert_eq!(floats[i], scale(plane[i]), "{}", path.display());
+                pcm.extend_from_slice(&plane[i].to_le_bytes()[..width]);
+            }
+        }
+    }
+    match expectation {
+        "md5" => {
+            assert!(
+                uniform,
+                "{} did not decode at a uniform format",
+                path.display()
+            );
+            assert_ne!(info.md5, [0; 16], "{} has no recorded MD5", path.display());
+            assert_eq!(md5::digest(&pcm), info.md5, "{}", path.display());
+            true
+        }
+        "variable-format" => {
+            assert_eq!(info.md5, [0; 16], "{}", path.display());
+            assert!(!pcm.is_empty(), "{} decoded no samples", path.display());
+            false
+        }
+        _ => panic!("invalid vector expectation {expectation}"),
+    }
 }
 
 #[test]
