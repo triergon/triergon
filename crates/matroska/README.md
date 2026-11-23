@@ -100,7 +100,7 @@ generic code and inside `triergon::AnyReader`:
 | `PacketInfo` | `TypedPacket`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
 | `TrackInfo` | `Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `codec` from an exact CodecID match with any other CodecID as `CodecId::Other`, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
 | `Event::Seek` | `MatroskaSeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
-| `Event::Other` | the other `Event`s (Envelope, Configuration, Document) |
+| `Event::Other` | `ReaderEvent`: Envelope, Configuration or Document |
 
 `request_seek` maps the `TrackId` to a track index (`Error::Invalid` when absent),
 floors the target to nanoseconds and calls `seek_previous` for

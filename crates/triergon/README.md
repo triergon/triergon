@@ -192,7 +192,8 @@ The meaning of each type is documented in
   `AnyPacket::Isobmff(p)`, `AnyPacket::MpegTs(p)`, `AnyPacket::Ogg(p)` or `AnyPacket::Elementary(p)` for the
   format's own packet type.
 - **Other events.** `Event::Other` carries an `AnyOther`; match
-  `AnyOther::Matroska(event)` for Matroska configuration, documents and structure,
+  `AnyOther::Matroska(event)` for a Matroska `ReaderEvent` carrying configuration,
+  a validated document or envelope structure,
   or `AnyOther::Isobmff(event)` for root boxes and the end of opening. ISO BMFF has
   no tracks until `ReaderEvent::Movie`.
   `AnyOther::MpegTs(event)` retains source transport/PES events, header-only

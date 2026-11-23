@@ -88,7 +88,7 @@ pub enum AnyPacket {
 pub enum AnyOther {
     /// Matroska structure, track configuration or a validated document.
     #[cfg(feature = "matroska")]
-    Matroska(triergon_matroska::Event),
+    Matroska(triergon_matroska::ReaderEvent),
     /// An ISO BMFF root box or notification that the movie index is ready.
     #[cfg(feature = "isobmff")]
     Isobmff(triergon_isobmff::ReaderEvent),

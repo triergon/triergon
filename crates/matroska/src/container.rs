@@ -16,6 +16,7 @@ use crate::reader::{Event, Reader};
 use crate::seek::SeekReceipt as MatroskaSeek;
 use crate::step::ParseStep;
 use crate::track::{LegacyAacProfile, Track, parse::VIDEO};
+use crate::{Configuration, ElementEvent, metadata::SharedDocument};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     CodecId, ColourDescription, ColourRange, ContainerReader, ContentLight, Event as Neutral,
@@ -244,11 +245,22 @@ impl MatroskaSeek {
     }
 }
 
+/// Non-packet events in the neutral Matroska reader.
+#[derive(Clone, Debug)]
+pub enum ReaderEvent {
+    /// Source structure or syntax.
+    Envelope(ElementEvent),
+    /// The track configuration published before any packet that uses it.
+    Configuration(Configuration),
+    /// A validated Info, Chapters, Tags or Attachments document.
+    Document(SharedDocument),
+}
+
 impl ContainerReader for Reader {
     type Packet = Packet;
     type Track = Track;
     /// Configuration, documents and envelope structure.
-    type Other = Event;
+    type Other = ReaderEvent;
 
     fn provide(&mut self, window: &InputWindow) -> Result<()> {
         Reader::provide(self, window)
@@ -267,7 +279,15 @@ impl ContainerReader for Reader {
         Ok(match Reader::step(self, work, cancel)? {
             Step::Ready(Event::Packet(packet)) => Step::Ready(Neutral::Packet(packet)),
             Step::Ready(Event::Seek(receipt)) => Step::Ready(Neutral::Seek(receipt.neutral()?)),
-            Step::Ready(other) => Step::Ready(Neutral::Other(other)),
+            Step::Ready(Event::Envelope(event)) => {
+                Step::Ready(Neutral::Other(ReaderEvent::Envelope(event)))
+            }
+            Step::Ready(Event::Configuration(configuration)) => {
+                Step::Ready(Neutral::Other(ReaderEvent::Configuration(configuration)))
+            }
+            Step::Ready(Event::Document(document)) => {
+                Step::Ready(Neutral::Other(ReaderEvent::Document(document)))
+            }
             Step::NeedInput(request) => Step::NeedInput(request),
             Step::Yield => Step::Yield,
             Step::Backpressure(pressure) => Step::Backpressure(pressure),

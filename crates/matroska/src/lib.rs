@@ -30,6 +30,7 @@ mod track;
 mod zlib;
 
 pub use configuration::{CodecState, Configuration, Initialization, InitializationOrigin};
+pub use container::ReaderEvent;
 pub use element::{ElementEvent, ElementHeader};
 pub use hdr10_plus::{
     Hdr10Plus, Hdr10PlusGeometry, Hdr10PlusPeakGrid, Hdr10PlusPercentile, Hdr10PlusToneCurve,
