@@ -80,6 +80,14 @@ impl<T: Copy> CopyVec<T> {
         }
         Ok(self.data)
     }
+    /// The completed elements; the arena is left empty, on the same pool.
+    pub(crate) fn take(&mut self) -> Result<BudgetVec<T>> {
+        if self.operation.is_some() || self.growth.is_some() {
+            return Err(Error::Invalid("copy arena is incomplete"));
+        }
+        let empty = BudgetVec::new(self.data.budget());
+        Ok(std::mem::replace(&mut self.data, empty))
+    }
     pub(crate) fn step(
         &mut self,
         work: &mut WorkBudget,

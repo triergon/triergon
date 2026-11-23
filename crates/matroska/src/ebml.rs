@@ -149,7 +149,7 @@ pub(crate) struct Child {
 }
 /// Walks the children of one master element whose bytes are in memory, one
 /// child and one work unit per step. A child of unknown size is refused.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct ChildCursor {
     at: usize,
     end: usize,
