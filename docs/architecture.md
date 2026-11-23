@@ -10,8 +10,9 @@ timing over convenience.
 
 The table lists the layers from the bottom up. A crate depends only on crates in its own
 row or in rows above it; `triergon-core` depends on no format. Formats, subtitles and
-decoders take codec headers, configuration records and NAL unit splitting from
-`triergon-framing`, so each wire structure has one parser.
+decoders use `triergon-framing` for packet boundaries, header metadata, configuration
+records and NAL unit splitting. The AAC, AC-3 and DTS decoders read the complete
+syntax with their decoder state, including bit positions, CRC coverage and refusals.
 
 | Layer | Crates | Role |
 |---|---|---|
