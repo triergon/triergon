@@ -443,6 +443,7 @@ fn mkv_dvb_clock(
     Ok(())
 }
 
+#[inline(never)]
 fn mp4_dvd(
     case: &Case<'_>,
     pool: &Budget,
@@ -496,6 +497,7 @@ fn mp4_dvd(
     Err("MP4 DVD track absent".into())
 }
 
+#[inline(never)]
 fn matroska(
     case: &Case<'_>,
     pool: &Budget,
@@ -633,6 +635,7 @@ pub(super) fn ts_payload(output: &Output, program: u16, pid: u16) -> bool {
         && matches!(output.event(), Event::Ts(event) if matches!(event.source, TraceEvent::Pes(_)))
 }
 
+#[inline(never)]
 fn ts_dvb(case: &Case<'_>, player: &mut Player<ByteSource>, records: &mut Records) -> Result<()> {
     let (map, pid) = ts_map(player, case.ordinal, CodecId::DvbSubtitle)?;
     let mut receiver = if let Some(service) = case.option("dvb_substream") {
@@ -670,6 +673,7 @@ fn ts_dvb(case: &Case<'_>, player: &mut Player<ByteSource>, records: &mut Record
     Ok(())
 }
 
+#[inline(never)]
 fn ts_pgs(
     case: &Case<'_>,
     pool: &Budget,
@@ -702,6 +706,8 @@ fn ts_pgs(
     drain_pgs(&mut receiver, records)
 }
 
+/// Plays one case. Each path is compiled on its own (`inline(never)`), so a change
+/// to one bridge does not move another path's code.
 pub(super) fn play(
     case: &Case<'_>,
     pool: &Budget,
