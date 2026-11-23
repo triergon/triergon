@@ -10,7 +10,7 @@ use crate::{
     config::{
         ConfigurationLimits, DtsCoreDescription, EsdsProfile, EsdsWalk, check_configuration_size,
         check_dts_sample_entry, check_mp4a_dts, dts_entry_children, dts_object_type,
-        quicktime_aac_extensions,
+        quicktime_sound_extensions,
     },
     fields,
     movie::{EntryLayout, SampleDescription, TrackHeader},
@@ -350,7 +350,9 @@ impl<'a> EncodedStreamJob<'a> {
         };
         let wave_offset = match sound_version {
             1 => Some(44),
-            2 if view == DescriptionView::RangePlayback => Some(quicktime_aac_extensions(&entry)?),
+            2 if view == DescriptionView::RangePlayback => {
+                Some(quicktime_sound_extensions(&entry)?)
+            }
             _ => None,
         };
         let quicktime_visual =

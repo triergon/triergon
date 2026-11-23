@@ -407,7 +407,7 @@ impl AacConfigurationJob {
     }
 }
 
-pub(crate) fn quicktime_aac_extensions(entry: &SampleDescription) -> Result<usize> {
+pub(crate) fn quicktime_sound_extensions(entry: &SampleDescription) -> Result<usize> {
     let raw = entry.raw();
     let body = raw.payload();
     fields::slice(body, 0, 64)?;
@@ -483,7 +483,7 @@ impl EsdsDescriptionWalk {
                 2 => (
                     entry
                         .raw()
-                        .children(quicktime_aac_extensions(entry)?, child_limits)?,
+                        .children(quicktime_sound_extensions(entry)?, child_limits)?,
                     true,
                 ),
                 _ => (entry.extensions(EntryLayout::AudioV0, child_limits)?, false),

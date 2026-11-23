@@ -24,6 +24,13 @@ fn version_one_sound_description_preserves_pcm_frames() {
     ));
 }
 
+#[test]
+fn version_two_sound_description_uses_its_lpcm_layout() {
+    assert_extended_pcm(include_bytes!(
+        "../../../harness/features/quicktime-pcm-samples/variants/sound-v2.mov"
+    ));
+}
+
 fn assert_extended_pcm(raw: &[u8]) {
     let parsed = Parsed::new(raw);
     let stream = PcmStream::new(&parsed.header, &parsed.table, Some(*b"qt  ")).unwrap();
