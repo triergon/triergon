@@ -170,7 +170,7 @@ impl StorageCursor {
                     .framer
                     .as_ref()
                     .expect("live framer");
-                Some(StorageItem::Fixed(framer.input_wait_storage()?))
+                Some(StorageItem::Fixed(framer.retained_storage()?))
             }
             Self::FramerBacking(lane, index) => {
                 let framer = reader.lanes.as_slice()[lane]

@@ -39,7 +39,7 @@ use std::{
 pub(super) use storage::StorageScan;
 use triergon_core::container::CodecId;
 use triergon_core::{
-    Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Refused, Result,
+    Budget, BudgetVec, Bytes, Charged, Error, InputRequest, InputWindow, Refused, Result,
     SourceCapabilities, SourceId, SourceLocation, Step, Time, WorkBudget,
 };
 use triergon_framing::{
@@ -49,12 +49,19 @@ use triergon_framing::{
     nal::{Codec, RawAnnexBReader},
 };
 
+/// The access-unit reader of a lane's track.
+///
+/// The video reader, six times the size of the next, is boxed and charged on its own, so a
+/// lane moves and rebuilds without copying it. The explicit tag byte keeps each dispatch a
+/// byte load; without it the enum takes a niche in the largest audio reader and decodes the
+/// tag on every step.
 #[expect(
     clippy::large_enum_variant,
-    reason = "readers stay inline: the lane table that holds them charges the whole state"
+    reason = "the audio and subtitle readers stay inline in the charged lane table"
 )]
+#[repr(u8)]
 enum Framer {
-    Video(RawAnnexBReader),
+    Video(Charged<Box<RawAnnexBReader>>),
     MpegVideo(mpeg_video::Reader),
     Adts(AacAdtsStreamReader),
     AdtsFragments(AacAdtsCarrierReader),
@@ -70,9 +77,14 @@ enum Framer {
 }
 
 impl Framer {
-    fn input_wait_storage(&self) -> Result<usize> {
+    /// Storage the reader retains between inputs, its own box included.
+    fn retained_storage(&self) -> Result<usize> {
         Ok(match self {
-            Self::Video(reader) => reader.input_wait_storage()?.0,
+            // The boxed reader's own charge, then the units it holds between inputs.
+            Self::Video(reader) => reader
+                .charged_bytes()
+                .checked_add(reader.input_wait_storage()?.0)
+                .ok_or(Error::Overflow)?,
             Self::Adts(reader) => reader.input_wait_buffer_capacity(),
             Self::AdtsFragments(reader) => reader.input_wait_buffer_capacity(),
             Self::Loas(reader) => reader.input_wait_buffer_capacity(),
@@ -125,8 +137,9 @@ impl Framer {
             stream_type::MPEG1_VIDEO | stream_type::MPEG2_VIDEO => {
                 Ok(Self::MpegVideo(mpeg_video::Reader::default()))
             }
-            kind @ (stream_type::H264 | stream_type::HEVC) => {
-                Ok(Self::Video(RawAnnexBReader::new(
+            kind @ (stream_type::H264 | stream_type::HEVC) => Ok(Self::Video(Charged::boxed(
+                pool,
+                RawAnnexBReader::new(
                     pool,
                     if kind == stream_type::H264 {
                         Codec::Avc
@@ -136,8 +149,8 @@ impl Framer {
                     source,
                     caps,
                     limits.video,
-                )?))
-            }
+                )?,
+            )?)),
             stream_type::AAC_ADTS if limits.adts_packet_policy == PacketPolicy::ReportFragments => {
                 Ok(Self::AdtsFragments(
                     AacAdtsCarrierReader::for_parser_packets(
@@ -437,7 +450,7 @@ pub(super) struct Lane {
     probe: Option<dts_probe::Probe>,
 }
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<Lane>() == 7920 && align_of::<Lane>() == 16);
+const _: () = assert!(size_of::<Lane>() == 2272 && align_of::<Lane>() == 16);
 
 impl Lane {
     pub(super) fn is_probing_dts(&self) -> bool {
