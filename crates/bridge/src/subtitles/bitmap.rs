@@ -40,7 +40,7 @@ pub struct BitmapInput<M> {
 }
 #[derive(Debug)]
 struct Data<M> {
-    // An unconditional input raises PGS transport reads by 0.30–1.08%.
+    // Unconditional input with out-of-line queue checks raises PGS view counts by 0.12%.
     input: Option<BitmapInput<M>>,
     /// Keeps the owner's allocation charged to the pool while it lives.
     _charge: Reservation,
