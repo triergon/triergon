@@ -151,7 +151,7 @@ fn decode(
                 Decoder::Flac(Box::new(
                     triergon_codec_flac::Decoder::new_in(&configuration, &pool)
                         .map_err(|error| format!("{error:?}"))?
-                        .with_crc_policy(triergon_codec_flac::CrcPolicy::Reject),
+                        .with_crc_policy(triergon_codec_flac::compat::ffmpeg::CrcPolicy::Reject),
                 ))
             } else if triergon_session::audio_codec(track.codec()).is_none() {
                 return Err(match track.codec() {

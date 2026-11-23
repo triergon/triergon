@@ -3,7 +3,8 @@
 mod common;
 
 use common::{configuration, frame, rice_residual, subframe_header, verbatim};
-use triergon_codec_flac::{AudioFrame, Budget, CrcPolicy, DecodeError, Decoder, Limits};
+use triergon_codec_flac::compat::ffmpeg::CrcPolicy;
+use triergon_codec_flac::{AudioFrame, Budget, DecodeError, Decoder, Limits};
 
 fn decoder(channels: u8, bits: u8) -> Decoder {
     Decoder::new(&configuration(44100, channels, bits, 4096, &[])).unwrap()

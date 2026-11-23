@@ -12,7 +12,8 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo};
-use triergon_codec_flac::{AudioFrame, ChannelLayout, CrcPolicy, Decoder};
+use triergon_codec_flac::compat::ffmpeg::CrcPolicy;
+use triergon_codec_flac::{AudioFrame, ChannelLayout, Decoder};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();

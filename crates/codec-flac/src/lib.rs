@@ -10,6 +10,7 @@
     clippy::expect_used
 )]
 
+pub mod compat;
 mod error;
 mod frame;
 mod layout;
@@ -26,6 +27,7 @@ pub use error::DecodeError;
 pub use output::IntegerFrame;
 pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
+use compat::ffmpeg::CrcPolicy;
 use frame::FrameDecoder;
 use output::{FloatOutput, IntegerOutput};
 use stream::Stream;
@@ -47,16 +49,6 @@ impl Default for Limits {
             live_storage_bytes: 7 << 20,
         }
     }
-}
-
-/// What to do with the CRC-16 that ends every frame.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum CrcPolicy {
-    /// Do not compute it; a damaged frame decodes to whatever it holds. FFmpeg's default.
-    #[default]
-    Ignore,
-    /// Refuse a frame whose CRC-16 does not match with [`DecodeError::CrcMismatch`].
-    Reject,
 }
 
 /// The format of one decoded frame.
@@ -115,8 +107,13 @@ impl Decoder {
         self
     }
 
-    /// Replaces `out` with the frame `au` holds as planar `f32`, scaled as FFmpeg's FLAC
-    /// decoder output converts to `f32`. On failure `out` is left empty.
+    /// Decodes the frame as planar `f32` scaled to full scale for its sample size.
+    /// Replaces `out`, leaving `samples_per_channel == 0` on refusal.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed or unsupported frames, CRC mismatches under the rejecting
+    /// policy and storage charges the pool cannot cover.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<FrameInfo, DecodeError> {
         let mut output = FloatOutput::new(out, &mut self.output_charge);
         self.frames.decode(au, &mut output)

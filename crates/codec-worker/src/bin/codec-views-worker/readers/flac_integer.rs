@@ -2,7 +2,7 @@ use std::{io::Write, sync::atomic::AtomicBool};
 
 use triergon::{
     Budget, PacketInfo, TrackInfo,
-    codec::flac::{CrcPolicy, DecodeError, Decoder, IntegerFrame},
+    codec::flac::{DecodeError, Decoder, IntegerFrame, compat::ffmpeg::CrcPolicy},
     elementary::Flac,
 };
 use triergon_harness_protocol::md5;

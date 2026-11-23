@@ -1,10 +1,11 @@
 //! One frame (RFC 9639 section 9): header, subframes, padding and CRC-16.
+use crate::compat::ffmpeg::CrcPolicy;
 use crate::output::Output;
 use crate::predict::Restore;
 use crate::scratch::Scratch;
 use crate::stereo::Stereo;
 use crate::stream::Stream;
-use crate::{CrcPolicy, DecodeError, FrameInfo, subframe};
+use crate::{DecodeError, FrameInfo, subframe};
 use triergon_bitstream::CachedBitReader;
 use triergon_bitstream::crc::crc16_a52;
 use triergon_codec::{Budget, Error};

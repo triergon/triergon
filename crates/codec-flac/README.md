@@ -52,7 +52,7 @@ channel counts that change between frames.
   (sample bits + coefficient precision + log2 order <= 32) allows it, else in 64 bits;
   fixed predictors always use 32-bit arithmetic, which is exact modulo 2^32.
 - Following FFmpeg 9.0.2's decoder: the frame CRC-16 is not checked by default
-  (`CrcPolicy::Ignore`; `with_crc_policy(CrcPolicy::Reject)` refuses mismatches with
+  (`compat::ffmpeg::CrcPolicy::Ignore`; `with_crc_policy(CrcPolicy::Reject)` refuses mismatches with
   `CrcMismatch`); a frame whose sample size differs from STREAMINFO's (or, without one,
   from the first frame's) is refused as `Unsupported`; so are negative LPC shifts. A
   STREAMINFO maximum block size below 16, a block above it, a predictor order above the
