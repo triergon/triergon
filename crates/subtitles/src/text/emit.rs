@@ -43,7 +43,7 @@ pub(crate) struct TextSpan {
     pub text: Range<usize>,
     pub decode: Range<usize>,
     pub encoding: Encoding,
-    /// Counted during actual validation/framing; no allocation-size guess.
+    /// The UTF-8 length the validation counted.
     pub decoded_len: usize,
 }
 

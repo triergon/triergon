@@ -33,7 +33,7 @@ pub struct Header {
     pub language: Option<Bytes>,
     /// The LanguageBCP47 element.
     pub language_bcp47: Option<Bytes>,
-    /// A caller-supplied hint; this does not invent a Matroska charset element.
+    /// The charset label the caller supplies; Matroska has no charset element.
     pub charset_hint: Option<Bytes>,
     /// Where the header was read.
     pub position: Option<SourceLocation>,

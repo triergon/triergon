@@ -915,9 +915,8 @@ impl Conflicts {
             self.at += 1;
             return Ok(Scan::Stepped);
         };
-        // Every record has already passed source range/time ordering checks.
-        // An empty time interval never applies a cross-kind effect; retain the
-        // record and advance the charged scan without inventing a clock.
+        // An entry with an empty time interval never highlights: it is kept,
+        // and the scan passes it.
         if event.start_tick == event.end_tick {
             self.event += 1;
             return Ok(Scan::Stepped);

@@ -254,7 +254,7 @@ impl ConfigJob {
             font_id: Self::u16(b, 22),
             face_flags: b[24],
             font_size: b[25],
-            rgba: b[26..30].try_into().map_err(|_| Error::Truncated)?,
+            rgba: [b[26], b[27], b[28], b[29]],
         };
         if style.start != 0 || style.end != 0 {
             return Err(Error::Invalid("tx3g default character range"));
@@ -266,10 +266,10 @@ impl ConfigJob {
         }
         Ok(Defaults {
             data_reference_index: (offset == 8).then(|| Self::u16(fixed, 6)),
-            display_flags: u32::from_be_bytes(b[..4].try_into().map_err(|_| Error::Truncated)?),
+            display_flags: u32::from_be_bytes([b[0], b[1], b[2], b[3]]),
             horizontal,
             vertical,
-            background: b[6..10].try_into().map_err(|_| Error::Truncated)?,
+            background: [b[6], b[7], b[8], b[9]],
             text_box: [
                 Self::u16(b, 10) as i16,
                 Self::u16(b, 12) as i16,
