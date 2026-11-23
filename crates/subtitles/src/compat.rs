@@ -40,7 +40,7 @@ pub mod pgs {
     //! decodes the next packet.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::pgs::receiver::{ReceiverDecoder, ReceiverEof, ReceiverPacket, Refusal};
+    pub use crate::pgs::receiver::{ReceiverDecoder, ReceiverPacket, Refusal};
 }
 pub mod dvd {
     //! FFmpeg's DVD subtitle receiver and the packets its demuxers deliver.

@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverEof, ReceiverPacket};
+use triergon_subtitles::compat::pgs::{ReceiverDecoder, ReceiverPacket};
 use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
@@ -415,7 +415,6 @@ fn end_of_input_presents_nothing_pending() {
     assert_eq!(d.poll(&mut zero, &c).unwrap(), RecoveryStatus::Ended);
     assert_eq!(zero.spent(), 0);
     assert_eq!(d.work_spent(), before + 1);
-    assert_eq!(d.eof_report(), Some(ReceiverEof::NoDelayedSubtitle));
     assert!(d.take_output(&c).is_err());
     let mut next = Some(Bytes::copy_from_slice(&b, &picture()).unwrap());
     let held = next.as_ref().unwrap().clone();

@@ -259,15 +259,6 @@ impl ReceiverPacket {
     }
 }
 
-/// What the receiver reports at the end of input
-/// ([`ReceiverDecoder::eof_report`]).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReceiverEof {
-    /// The receiver holds no delayed subtitle, so draining it outputs
-    /// nothing.
-    NoDelayedSubtitle,
-}
-
 /// What [`ReceiverDecoder::poll`] reached.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RecoveryStatus {
@@ -369,7 +360,6 @@ pub struct ReceiverDecoder {
     spent: usize,
     failed: Option<Error>,
     final_input: bool,
-    eof: Option<ReceiverEof>,
     output: Option<ReceiverPacket>,
     // The active packet.
     packet: Option<Bytes>,
@@ -405,7 +395,6 @@ impl ReceiverDecoder {
             spent: 0,
             failed: None,
             final_input: false,
-            eof: None,
             output: None,
             packet: None,
             clock: None,
@@ -886,10 +875,8 @@ impl ReceiverDecoder {
             cancel,
         }
         .pay(&mut credit, 1)?;
-        Ok(paid.then(|| {
-            self.eof = Some(ReceiverEof::NoDelayedSubtitle);
-            Phase::Ended
-        }))
+        // The receiver holds no delayed subtitle: the end outputs nothing.
+        Ok(paid.then_some(Phase::Ended))
     }
 
     /// The decoded packet, once [`poll`](Self::poll) has returned
@@ -940,12 +927,6 @@ impl ReceiverDecoder {
         Ok(())
     }
 
-    /// What the receiver reported at the end of input, once
-    /// [`poll`](Self::poll) has reached `Ended`; `None` before.
-    pub fn eof_report(&self) -> Option<ReceiverEof> {
-        self.eof
-    }
-
     /// Discards the stream state (caches, canvas, failure, work spent and the
     /// end of input), keeping the limits and configuration. Outputs already
     /// taken keep their own charged storage.
@@ -969,7 +950,6 @@ impl ReceiverDecoder {
         self.spent = 0;
         self.credit = 0;
         self.final_input = false;
-        self.eof = None;
         self.done(Phase::Idle);
         Ok(())
     }
