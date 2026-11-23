@@ -190,9 +190,8 @@ Glyph positions and advances use signed 32-bit coordinates in font units or
 26.6 metrics use 64 bits to cover large sizes at small units per em. The
 linear vertical advance also uses 64-bit storage for its sign-extended result.
 The translated hinters carry 32-bit values in integers and apply wrapping at
-the arithmetic boundaries. Fixed-point types belong in an independent
-implementation of those hinters, where each value's unit and rounding can be
-specified together.
+the arithmetic boundaries. Retyping that arithmetic requires checking each
+intermediate wrap and rounding against the full outline and metric corpus.
 
 Known differences from FreeType: a face without a usable `glyf` or CFF table is
 `Error::Invalid`, where FreeType opens it and fails each glyph; a CFF2 face whose

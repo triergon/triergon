@@ -414,6 +414,7 @@ impl<'f> SizedFont<'f> {
         // control value program once per size, and keeps the state they
         // leave for the size's glyphs.
         let tables = || {
+            // An absent table supplies no bytes to the interpreter.
             let table = |tag| font.table(tag).unwrap_or_default();
             Tables {
                 programs,

@@ -147,6 +147,7 @@ pub(super) fn digits_have_same_width(face: &Face<'_>) -> bool {
         let Some(glyph) = face.glyph(digit) else {
             continue;
         };
+        // A mapped digit without readable metrics contributes a zero advance.
         let advance = face.font.advance(glyph).unwrap_or_default();
         match first {
             Some(first) if first != advance => return false,

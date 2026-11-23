@@ -506,6 +506,7 @@ pub(crate) fn parse(
             continue;
         }
         let mut steps = 0;
+        // An offset outside the table is validated as an empty subtable.
         *kept = Kept::of(bytes.get(*offset..).unwrap_or_default(), &mut steps);
         last = Some((*offset, *kept));
         charge(work, steps)?;
@@ -578,6 +579,7 @@ pub(crate) fn unicode_charmap<'f>(
 
 impl Subtable {
     fn table<'a>(&self, data: &'a [u8]) -> &'a [u8] {
+        // A missing validated span has no entries to look up.
         data.get(self.offset..self.end).unwrap_or_default()
     }
 

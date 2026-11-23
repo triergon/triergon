@@ -264,6 +264,7 @@ fn extremum(points: &[OutlinePoint], ends: &[u32], horizontal: bool, top: bool) 
     let mut best: Option<i64> = None;
     let mut first = 0;
     for &end in ends {
+        // A contour without a valid point range contributes no extremum.
         let contour = points.get(first..end as usize).unwrap_or_default();
         first = end as usize;
         // Single points are never drawn; in some fonts they are mark

@@ -32,7 +32,7 @@ pub(crate) struct Table {
 
 impl Table {
     pub(crate) fn bytes(self, data: &[u8]) -> &[u8] {
-        // Directory parsing keeps every range inside the data.
+        // The directory validates these ranges. A missing range supplies no table bytes.
         data.get(self.offset..self.offset + self.len)
             .unwrap_or_default()
     }
