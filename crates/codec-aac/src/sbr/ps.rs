@@ -70,6 +70,7 @@
 //!   there (o00, o31, o32; only kx = 32 is probed).
 
 mod synth;
+#[rustfmt::skip] // Laid out by the table generator.
 mod tables;
 #[cfg(test)]
 mod tests;

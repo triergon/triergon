@@ -18,6 +18,7 @@ mod error;
 mod fft;
 mod filterbank;
 mod huffman;
+#[rustfmt::skip] // Laid out by the table generator.
 mod huffman_probed;
 mod huffman_tables;
 mod ics;
