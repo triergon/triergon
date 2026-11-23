@@ -392,6 +392,8 @@ enum Transform {
     Inflate(InflateSlot),
 }
 impl Transform {
+    // Compiled into the restore loop, which stays one call from the packet batch.
+    #[inline(always)]
     fn step(
         &mut self,
         work: &mut WorkBudget,

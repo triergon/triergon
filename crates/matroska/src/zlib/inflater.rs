@@ -352,29 +352,94 @@ const DIST: [usize; 30] = [
     2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577,
 ];
 
+// The explicit tag byte keeps the variants out of `Resume`'s niche: the niche-encoded
+// tag measured up to +1% on the zlib workloads.
 #[derive(Clone, Copy, Debug)]
+#[repr(u8)]
 enum Phase {
     Header,
     Block,
     StoredHeader,
-    StoredReserve { remaining: usize },
-    Stored { remaining: usize },
+    StoredReserve {
+        remaining: usize,
+    },
+    Stored {
+        remaining: usize,
+    },
     DynamicHeader,
-    CodeLengths { at: usize },
+    CodeLengths {
+        at: usize,
+    },
     BuildCodes,
     Lengths,
-    Repeat { value: u8, remaining: usize },
+    Repeat {
+        value: u8,
+        remaining: usize,
+    },
     BuildLiterals,
     BuildDistances,
     Symbol,
     Literal(u8),
-    Distance { length: usize },
-    Match { distance: usize, remaining: usize },
+    Distance {
+        length: usize,
+    },
+    Match {
+        distance: usize,
+        remaining: usize,
+    },
     Finish,
-    Checksum { at: usize },
+    Checksum {
+        at: usize,
+    },
     Freeze,
-    Grow,
+    /// Copying the output into its larger replacement; the output phase resumes after.
+    Grow(Resume),
     Done,
+}
+/// A phase that appends output, as it resumes once the output has grown.
+#[derive(Clone, Copy, Debug)]
+enum Resume {
+    StoredReserve { remaining: usize },
+    Stored { remaining: usize },
+    Literal(u8),
+    Match { distance: usize, remaining: usize },
+}
+impl From<Resume> for Phase {
+    fn from(resume: Resume) -> Self {
+        match resume {
+            Resume::StoredReserve { remaining } => Self::StoredReserve { remaining },
+            Resume::Stored { remaining } => Self::Stored { remaining },
+            Resume::Literal(value) => Self::Literal(value),
+            Resume::Match {
+                distance,
+                remaining,
+            } => Self::Match {
+                distance,
+                remaining,
+            },
+        }
+    }
+}
+/// The Huffman codes of one dynamic block (RFC 1951 §3.2.7), each built in place
+/// by `build`: the code-length code, then the literal/length and distance codes.
+#[derive(Debug)]
+struct DynamicCodes {
+    build: Build,
+    code_tree: CodeTree,
+    literal_tree: Tree,
+    distance_tree: DistanceTree,
+}
+impl DynamicCodes {
+    #[cold]
+    #[inline(never)]
+    fn new() -> Self {
+        Self {
+            build: Build::new(true),
+            code_tree: CodeTree::empty(),
+            literal_tree: Tree::empty(),
+            distance_tree: DistanceTree::empty(),
+        }
+    }
 }
 /// Output and bit/block/tree/copy/checksum state survive both work yields and
 /// retained-output backpressure. No partial decoded packet is returned.
@@ -384,24 +449,18 @@ pub(crate) struct Inflater {
     state: State,
 }
 #[derive(Debug)]
-struct Growth {
-    buffer: BudgetVec<u8>,
-    at: usize,
-    resume: Phase,
-}
-#[derive(Debug)]
 struct State {
     phase: Phase,
     position: Position,
-    output: Option<BudgetVec<u8>>,
-    growth: Option<Growth>,
-    pool: Budget,
-    result: Option<SharedBytes>,
+    output: BudgetVec<u8>,
+    /// The larger buffer the output is copied into while the phase is `Grow`.
+    grown: BudgetVec<u8>,
+    /// The whole output once the phase is `Done`.
+    result: SharedBytes,
     limit: usize,
     initial: usize,
     policy_left: u64,
     last: bool,
-    fixed: bool,
     window: usize,
     lengths: [u8; 320],
     code_lengths: [u8; 19],
@@ -409,10 +468,8 @@ struct State {
     distances: usize,
     codes: usize,
     at: usize,
-    builder: Option<Build>,
-    code_tree: Option<CodeTree>,
-    literal_tree: Option<Tree>,
-    distance_tree: Option<DistanceTree>,
+    /// The current block's own codes; `None` while it uses the fixed codes.
+    dynamic: Option<DynamicCodes>,
     a: u32,
     b: u32,
     failed: bool,
@@ -435,15 +492,13 @@ impl Inflater {
             state: State {
                 phase: Phase::Header,
                 position: Position::new(),
-                output: Some(BudgetVec::new(pool)),
-                growth: None,
-                pool: pool.clone(),
-                result: None,
+                output: BudgetVec::new(pool),
+                grown: BudgetVec::new(pool),
+                result: SharedBytes::default(),
                 limit,
                 initial,
                 policy_left: limits.work,
                 last: false,
-                fixed: false,
                 window: 0,
                 lengths: [0; 320],
                 code_lengths: [0; 19],
@@ -451,10 +506,7 @@ impl Inflater {
                 distances: 0,
                 codes: 0,
                 at: 0,
-                builder: None,
-                code_tree: None,
-                literal_tree: None,
-                distance_tree: None,
+                dynamic: None,
                 a: 1,
                 b: 0,
                 failed: false,
@@ -464,7 +516,11 @@ impl Inflater {
     /// Bytes decoded so far; the whole output length once decoding has finished.
     #[cfg(test)]
     fn output_len(&self) -> usize {
-        self.state.output_len()
+        if matches!(self.state.phase, Phase::Done) {
+            self.state.result.len()
+        } else {
+            self.state.output.len()
+        }
     }
     /// Decodes within `work`: [`ParseStep::Yield`] when the budget runs out,
     /// [`ParseStep::Backpressure`] when the pool cannot hold more output, then
@@ -482,13 +538,6 @@ impl Inflater {
 }
 impl State {
     #[inline(always)]
-    fn output_len(&self) -> usize {
-        self.output.as_ref().map_or_else(
-            || self.result.as_ref().map_or(0, |r| r.len()),
-            BudgetVec::len,
-        )
-    }
-    #[inline(always)]
     fn policy(&mut self, units: u64) -> Result<()> {
         let Some(left) = self.policy_left.checked_sub(units) else {
             return Err(Error::Policy("inflate work"));
@@ -496,41 +545,42 @@ impl State {
         self.policy_left = left;
         Ok(())
     }
+    /// Room for `extra` more output bytes: `false` when the output must first grow,
+    /// in which case the phase is `Grow` and `resume` follows it.
     #[inline(always)]
-    fn reserve_output(&mut self, extra: usize) -> Result<bool> {
-        let Some(output) = self.output.as_ref() else {
-            return Err(Error::Invalid("missing inflate output"));
-        };
-        let Some(needed) = output.len().checked_add(extra) else {
+    fn reserve_output(&mut self, extra: usize, resume: Resume) -> Result<bool> {
+        let Some(needed) = self.output.len().checked_add(extra) else {
             return Err(Error::Overflow);
         };
         if needed > self.limit {
             return Err(Error::Policy("inflated output bytes or expansion ratio"));
         }
-        if needed > output.capacity() {
-            return self.grow_output(needed);
+        if needed > self.output.capacity() {
+            return self.grow_output(needed, resume);
         }
         Ok(true)
     }
     #[cold]
     #[inline(never)]
-    fn grow_output(&mut self, needed: usize) -> Result<bool> {
-        let output = self
-            .output
-            .as_ref()
-            .ok_or(Error::Invalid("missing inflate output"))?;
-        let initial = if output.capacity() == 0 {
+    fn grow_output(&mut self, needed: usize, resume: Resume) -> Result<bool> {
+        let initial = if self.output.capacity() == 0 {
             self.initial
         } else {
             0
         };
         let target = needed
-            .max(output.capacity().saturating_mul(2))
+            .max(self.output.capacity().saturating_mul(2))
             .max(initial)
             .min(self.limit);
-        // The replacement starts empty. Core reserves the same geometric target
-        // and minimal fallback as before, without hiding a copy of the live prefix.
-        let mut buffer = BudgetVec::new(&self.pool);
+        // An empty output is reallocated in place. Otherwise the replacement starts
+        // empty and the live prefix is copied in bounded units, never hidden in one
+        // reallocation.
+        let empty = self.output.is_empty();
+        let buffer = if empty {
+            &mut self.output
+        } else {
+            &mut self.grown
+        };
         buffer.try_reserve_exact(target).or_else(|error| {
             if target > needed
                 && matches!(
@@ -543,54 +593,33 @@ impl State {
                 Err(error)
             }
         })?;
-        if output.is_empty() {
-            self.output = Some(buffer);
+        if empty {
             return Ok(true);
         }
-        self.growth = Some(Growth {
-            buffer,
-            at: 0,
-            resume: self.phase,
-        });
-        self.phase = Phase::Grow;
+        self.phase = Phase::Grow(resume);
         Ok(false)
     }
-    fn copy_growth(&mut self) -> Result<()> {
-        let growth = self
-            .growth
-            .as_mut()
-            .ok_or(Error::Invalid("missing inflate growth"))?;
-        let output = self
-            .output
-            .as_ref()
-            .ok_or(Error::Invalid("missing inflate output"))?;
+    fn copy_growth(&mut self, resume: Resume) -> Result<()> {
         // A growth unit is at most 2 KiB of already validated bytes, separate
         // from semantic DEFLATE/output work. Both allocations remain charged and
         // cancellation is checked before every unit. No decoded byte is appended.
-        let count = (output.len() - growth.at).min(2048);
-        growth
-            .buffer
-            .try_extend_from_slice(&output.as_slice()[growth.at..growth.at + count])?;
-        growth.at += count;
-        if growth.at == output.len() {
-            let growth = self
-                .growth
-                .take()
-                .ok_or(Error::Invalid("missing inflate growth"))?;
-            self.output = Some(growth.buffer);
-            self.phase = growth.resume;
+        let at = self.grown.len();
+        let count = (self.output.len() - at).min(2048);
+        self.grown
+            .try_extend_from_slice(&self.output.as_slice()[at..at + count])?;
+        if self.grown.len() == self.output.len() {
+            std::mem::swap(&mut self.output, &mut self.grown);
+            self.grown = BudgetVec::new(self.output.budget());
+            self.phase = resume.into();
         }
         Ok(())
     }
     #[inline(always)]
     fn append(&mut self, value: u8) -> Result<bool> {
-        if !self.reserve_output(1)? {
+        if !self.reserve_output(1, Resume::Literal(value))? {
             return Ok(false);
         }
-        let Some(output) = self.output.as_mut() else {
-            return Err(Error::Invalid("missing inflate output"));
-        };
-        output.try_push(value).map_err(|error| error.error)?;
+        self.output.try_push(value).map_err(|error| error.error)?;
         Ok(true)
     }
     // A fused successor consumes exactly the unit its dispatched phase would
@@ -611,14 +640,17 @@ impl State {
         work: &mut WorkBudget,
     ) -> Result<()> {
         let count = Self::batch_count(remaining, 8192, work);
-        if !self.reserve_output(count)? {
+        if !self.reserve_output(
+            count,
+            Resume::Match {
+                distance,
+                remaining,
+            },
+        )? {
             return Ok(());
         }
         Self::charge_batch(count, work)?;
-        let Some(output) = self.output.as_mut() else {
-            return Err(Error::Invalid("missing inflate output"));
-        };
-        output.try_extend_from_history(distance, count)?;
+        self.output.try_extend_from_history(distance, count)?;
         self.phase = if count == remaining {
             Phase::Symbol
         } else {
@@ -653,13 +685,9 @@ impl State {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<()> {
-        let tree = if self.fixed {
-            &FIXED_DISTANCE
-        } else {
-            let Some(tree) = self.distance_tree.as_ref() else {
-                return Err(Error::Invalid("missing distance tree"));
-            };
-            tree
+        let tree = match &self.dynamic {
+            Some(codes) => &codes.distance_tree,
+            None => &FIXED_DISTANCE,
         };
         let code = tree.symbol(bits)?;
         if code >= 30 {
@@ -667,7 +695,7 @@ impl State {
         }
         let extra = if code < 4 { 0 } else { code / 2 - 1 };
         let distance = DIST[code] + bits.take(extra)? as usize;
-        if distance > self.output_len() || distance > self.window {
+        if distance > self.output.len() || distance > self.window {
             return Err(Error::Invalid("DEFLATE distance outside window"));
         }
         self.policy(length as u64)?;
@@ -688,13 +716,9 @@ impl State {
         cancel: &AtomicBool,
     ) -> Result<()> {
         self.policy(1)?;
-        let tree = if self.fixed {
-            &FIXED_LITERAL
-        } else {
-            let Some(tree) = self.literal_tree.as_ref() else {
-                return Err(Error::Invalid("missing literal tree"));
-            };
-            tree
+        let tree = match &self.dynamic {
+            Some(codes) => &codes.literal_tree,
+            None => &FIXED_LITERAL,
         };
         let symbol = tree.symbol(bits)?;
         match symbol {
@@ -790,12 +814,7 @@ impl State {
                 return Err(Error::Cancelled);
             }
             if matches!(self.phase, Phase::Done) {
-                return Ok(ParseStep::Event(
-                    self.result
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing inflated result"))?
-                        .clone(),
-                ));
+                return Ok(ParseStep::Event(self.result.clone()));
             }
             // Builder itself charges each alphabet entry and table row.
             if matches!(
@@ -807,48 +826,33 @@ impl State {
                     Phase::BuildLiterals => &self.lengths[..self.literals],
                     _ => &self.lengths[self.literals..self.literals + self.distances],
                 };
-                let builder = self
-                    .builder
-                    .as_mut()
-                    .ok_or(Error::Invalid("missing Huffman builder"))?;
+                // The codes exist from the end of the code lengths on.
+                let codes = self.dynamic.get_or_insert_with(DynamicCodes::new);
                 let ready = match self.phase {
-                    Phase::BuildCodes => builder.advance(
-                        self.code_tree
-                            .as_mut()
-                            .ok_or(Error::Invalid("missing code-length destination"))?,
-                        lengths,
-                        work,
-                        cancel,
-                    )?,
-                    Phase::BuildLiterals => builder.advance(
-                        self.literal_tree
-                            .as_mut()
-                            .ok_or(Error::Invalid("missing literal destination"))?,
-                        lengths,
-                        work,
-                        cancel,
-                    )?,
-                    _ => builder.advance(
-                        self.distance_tree
-                            .as_mut()
-                            .ok_or(Error::Invalid("missing distance destination"))?,
-                        lengths,
-                        work,
-                        cancel,
-                    )?,
+                    Phase::BuildCodes => {
+                        codes
+                            .build
+                            .advance(&mut codes.code_tree, lengths, work, cancel)?
+                    }
+                    Phase::BuildLiterals => {
+                        codes
+                            .build
+                            .advance(&mut codes.literal_tree, lengths, work, cancel)?
+                    }
+                    _ => codes
+                        .build
+                        .advance(&mut codes.distance_tree, lengths, work, cancel)?,
                 };
                 if !ready {
                     return Ok(ParseStep::Yield);
                 }
-                self.builder = None;
                 match self.phase {
                     Phase::BuildCodes => {
                         self.at = 0;
                         self.phase = Phase::Lengths;
                     }
                     Phase::BuildLiterals => {
-                        self.distance_tree = Some(DistanceTree::empty());
-                        self.builder = Some(Build::new(false));
+                        codes.build = Build::new(false);
                         self.phase = Phase::BuildDistances;
                     }
                     _ => self.phase = Phase::Symbol,
@@ -870,13 +874,10 @@ impl State {
                     self.phase = match kind {
                         0 => Phase::StoredHeader,
                         1 => {
-                            self.fixed = true;
+                            self.dynamic = None;
                             Phase::Symbol
                         }
-                        2 => {
-                            self.fixed = false;
-                            Phase::DynamicHeader
-                        }
+                        2 => Phase::DynamicHeader,
                         _ => return Err(Error::Invalid("reserved DEFLATE block type")),
                     };
                 }
@@ -892,7 +893,7 @@ impl State {
                 Phase::StoredReserve { remaining } => {
                     // LEN is known. Reserve once for its complete destination,
                     // while copying and checksum work still resume in batches.
-                    if !self.reserve_output(remaining)? {
+                    if !self.reserve_output(remaining, Resume::StoredReserve { remaining })? {
                         continue;
                     }
                     self.phase = if remaining != 0 {
@@ -912,14 +913,11 @@ impl State {
                     if end > bits.data.len() {
                         return Err(Error::Truncated);
                     }
-                    if !self.reserve_output(count)? {
+                    if !self.reserve_output(count, Resume::Stored { remaining })? {
                         continue;
                     }
                     Self::charge_batch(count, work)?;
-                    self.output
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing inflate output"))?
-                        .try_extend_from_slice(&bits.data[start..end])?;
+                    self.output.try_extend_from_slice(&bits.data[start..end])?;
                     bits.skip_bytes(count)?;
                     self.phase = if count != remaining {
                         Phase::Stored {
@@ -950,8 +948,7 @@ impl State {
                         self.code_lengths[ORDER[at]] = value;
                         self.phase = Phase::CodeLengths { at: at + 1 };
                     } else {
-                        self.code_tree = Some(CodeTree::empty());
-                        self.builder = Some(Build::new(true));
+                        self.dynamic = Some(DynamicCodes::new());
                         self.phase = Phase::BuildCodes;
                     }
                 }
@@ -960,15 +957,16 @@ impl State {
                         if self.lengths[256] == 0 {
                             return Err(Error::Invalid("missing end-of-block code"));
                         }
-                        self.literal_tree = Some(Tree::empty());
-                        self.builder = Some(Build::new(false));
+                        self.dynamic.get_or_insert_with(DynamicCodes::new).build =
+                            Build::new(false);
                         self.phase = Phase::BuildLiterals;
                         continue;
                     }
-                    let Some(tree) = self.code_tree.as_ref() else {
-                        return Err(Error::Invalid("missing code-length tree"));
-                    };
-                    let code = tree.symbol(bits)?;
+                    let code = self
+                        .dynamic
+                        .get_or_insert_with(DynamicCodes::new)
+                        .code_tree
+                        .symbol(bits)?;
                     let (value, count) = match code {
                         0..=15 => (code as u8, 1),
                         16 if self.at != 0 => {
@@ -1003,7 +1001,7 @@ impl State {
                     distance,
                     remaining,
                 } => self.copy_match(distance, remaining, work)?,
-                Phase::Grow => self.copy_growth()?,
+                Phase::Grow(resume) => self.copy_growth(resume)?,
                 Phase::Finish => {
                     bits.align()?;
                     if bits.position() != bits.data.len() {
@@ -1012,10 +1010,7 @@ impl State {
                     self.phase = Phase::Checksum { at: 0 };
                 }
                 Phase::Checksum { at } => {
-                    let output = self
-                        .output
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing inflate output"))?;
+                    let output = &self.output;
                     if at == output.len() {
                         let expected = u32::from_be_bytes(
                             source[source.len() - 4..]
@@ -1040,22 +1035,19 @@ impl State {
                     self.phase = Phase::Checksum { at: at + count };
                 }
                 Phase::Freeze => {
-                    let output = self
-                        .output
-                        .take()
-                        .ok_or(Error::Invalid("missing inflate output"))?;
+                    let empty = BudgetVec::new(self.output.budget());
+                    let output = std::mem::replace(&mut self.output, empty);
                     if output.is_empty() {
-                        self.result = Some(SharedBytes::default());
                         self.phase = Phase::Done;
                         continue;
                     }
                     match output.freeze() {
                         Ok(bytes) => {
-                            self.result = Some(SharedBytes::from_core(bytes));
+                            self.result = SharedBytes::from_core(bytes);
                             self.phase = Phase::Done;
                         }
                         Err(error) => {
-                            self.output = Some(error.value);
+                            self.output = error.value;
                             return Err(error.error);
                         }
                     }
@@ -1071,9 +1063,11 @@ mod stream_tests;
 #[cfg(test)]
 mod tests;
 
+// The output until it is frozen, the result once it is, the replacement while
+// the output grows.
 crate::storage::usage::storage!(Inflater, |s| [
     s.source,
-    s.state.output,
-    s.state.result,
-    s.state.growth.as_ref().map(|growth| &growth.buffer)
+    (!matches!(s.state.phase, Phase::Done)).then_some(&s.state.output),
+    matches!(s.state.phase, Phase::Done).then_some(&s.state.result),
+    matches!(s.state.phase, Phase::Grow(_)).then_some(&s.state.grown)
 ]);
