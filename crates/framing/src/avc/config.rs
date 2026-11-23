@@ -233,8 +233,8 @@ impl Scan {
                 )
             }
             ScanPhase::Extension => {
-                // This explicitly selects the acquired2010 edition, whose
-                // branch list includes144. No newer profile list is guessed.
+                // ISO/IEC 14496-15:2010: the extension follows for profile_idc 100,
+                // 110, 122 and 144. No later profile list is assumed.
                 if !profile_extension_required(raw[1]) {
                     self.phase = ScanPhase::End;
                     return Ok(Event::End(self.position));
@@ -595,7 +595,7 @@ impl AvcConfigParser {
                             *slot = ArrayDescriptor {
                                 kind,
                                 range: start..start,
-                                // At most31+255+255 NALs in this grammar.
+                                // At most 31 + 255 + 255 NAL units in this grammar.
                                 first_nal: self.total as u16,
                                 nal_count: 0,
                             };
@@ -607,7 +607,7 @@ impl AvcConfigParser {
                         Event::GroupEnd(end) if counting => {
                             let slot = &mut self.arrays[self.array_count - 1];
                             slot.range.end = u32::try_from(end).map_err(|_| Error::Overflow)?;
-                            // Each group consumed its literal count (at most255).
+                            // Each group consumed its literal count (at most 255).
                             slot.nal_count = (self.total - usize::from(slot.first_nal)) as u8;
                         }
                         Event::Nal {
@@ -713,9 +713,9 @@ const INLINE_NALS: usize = 4;
 
 type AvcNalStorage = InlineStorage<AvcNalDescriptor, INLINE_NALS>;
 
-/// Complete AVC configuration facts with one raw record handle and charged
-/// heap descriptors beyond four inline slots. Borrowed inspection creates no
-/// per-NAL owning byte aliases.
+/// A checked avcC record: its fields, parameter-set arrays and NAL units, read from
+/// the record's bytes, which it keeps. Up to four NAL descriptors are held inline,
+/// more in storage charged to the record's pool; NAL views borrow the record.
 #[derive(Debug)]
 pub struct AvcConfiguration {
     raw: Bytes,
@@ -851,8 +851,9 @@ impl AvcConfiguration {
             .checked_mul(size_of::<AvcNalDescriptor>())
             .ok_or(Error::Overflow)
     }
-    /// Full hidden raw backing plus actual descriptor heap capacities. Fails when the
-    /// sum in bytes overflows `usize`.
+    /// Bytes the record keeps charged: the whole allocation behind
+    /// [`Self::source_bytes`] and [`Self::descriptor_storage_bytes`]. Fails when the
+    /// sum overflows `usize`.
     pub fn retained_storage_bytes(&self) -> Result<usize> {
         self.descriptor_storage_bytes()?
             .checked_add(self.raw.retained_storage_bytes())

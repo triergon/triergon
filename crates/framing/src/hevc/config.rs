@@ -570,9 +570,8 @@ impl HvcConfigParser {
                         Event::End(end) => {
                             if !filling {
                                 self.understood_end = end;
-                                // Detect an intrinsically impossible live-set without
-                                // blaming caller retention. Capacity is charged by
-                                // BudgetVec, including any allocator over-allocation.
+                                // Refuse a record whose descriptors cannot fit the pool
+                                // even when nothing else is charged to it.
                                 let array_bytes =
                                     DescriptorStorage::<HvcArrayDescriptor>::required_heap_bytes(
                                         usize::from(self.scan.array_count),
@@ -731,9 +730,9 @@ impl HvcNalDescriptor {
         self.payload_start - 2
     }
 }
-/// Complete hvcC facts with one raw record handle. Arrays and NALs independently
-/// keep up to four descriptors inline; larger tables have charged heap capacity.
-/// Array headers and NAL spans are borrowed inspections.
+/// A checked hvcC record: its fields, arrays and NAL units, read from the record's
+/// bytes, which it keeps. Arrays and NAL units each keep up to four descriptors
+/// inline, more in storage charged to the record's pool; views borrow the record.
 #[derive(Debug)]
 pub struct HvcConfiguration {
     raw: Bytes,
