@@ -351,10 +351,7 @@ fn raw_probe_refuses_mixed_evidence_and_uses_explicit_scan_bounds() {
                 maximum_bytes: 65536,
                 maximum_nals: 1,
             },
-            Error::Limit {
-                requested: 2,
-                maximum: 1,
-            },
+            Error::Policy("raw video probe NAL count"),
         ),
         (
             &[0, 0, 1, 0x09, 0x10][..],

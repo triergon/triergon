@@ -21,7 +21,7 @@ pub struct RawVideoProbeLimits {
     /// The most prefix bytes read and retained (64 KiB by default); nonzero, and for a
     /// [`PlaybackProbe`] at least `CONTAINER_SIGNATURE_BYTES`.
     pub maximum_bytes: usize,
-    /// The most NAL units scanned before the probe fails with `Limit` (64 by default);
+    /// The most NAL units scanned before the probe fails with `Policy` (64 by default);
     /// nonzero.
     pub maximum_nals: usize,
 }
@@ -81,7 +81,7 @@ impl<S: Source> RawVideoProbe<S> {
 
     /// Reads and scans the prefix within `work`. Fails with `Unsupported` when no AVC
     /// or HEVC signature appears within `maximum_bytes` or before the source ends, and
-    /// with `Limit` after `maximum_nals` NAL units. A failure other than backpressure or
+    /// with `Policy` after `maximum_nals` NAL units. A failure other than backpressure or
     /// allocation closes the probe.
     pub fn advance(
         &mut self,
@@ -593,10 +593,7 @@ impl Signatures {
             }
             self.count = self.count.checked_add(1).ok_or(Error::Overflow)?;
             if self.count > maximum_nals {
-                return Err(Error::Limit {
-                    requested: self.count,
-                    maximum: maximum_nals,
-                });
+                return Err(Error::Policy("raw video probe NAL count"));
             }
             self.head = Some(Head::default());
             return Ok(None);

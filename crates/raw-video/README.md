@@ -55,6 +55,7 @@ fn read_annex_b(
 `PlaybackProbe` shares the [container signatures](../playback/README.md) and
 replays the read prefix. The raw Annex B probe selects AVC or HEVC at the
 first slice after its parameter sets, charging one work unit per scanned byte.
+The NAL count bound fails with `Error::Policy`.
 The packet carries its active SPS timing. An optional submission clock uses
 the caller's cadence. Borrow the NAL slices in order with
 `RawAccessUnit::segments`.
