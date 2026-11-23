@@ -9,8 +9,9 @@ use crate::Discard;
 use crate::SessionState;
 use crate::lane::{OnRefusal, Phase, Refusals};
 use crate::mix::Downmix;
-use crate::queue::{FeedError, QueueLimits, UnitQueue};
+use crate::queue::{FeedError, QueueLimits, UnitQueue, packet_pts};
 use triergon_codec::{AudioFrame, ChannelLayout, DownmixLevels, DynAudioDecoder, Error};
+use triergon_core::container::PacketInfo;
 
 /// One block of output at one sample rate, its samples in the lane's [`PcmForm`]: by
 /// default interleaved stereo s16.
@@ -197,6 +198,13 @@ impl<F: PcmForm> AudioSession<F> {
     /// keep the unit and retry).
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
         self.feed_discarding(au, pts, Discard::default())
+    }
+    /// Queue a decoder-ready packet and apply its container trim to the decoded
+    /// samples. Its PTS is rounded down to nanoseconds, with no timestamp queued
+    /// when none is supplied. A PTS outside `i64` nanoseconds is [`FeedError::Invalid`].
+    /// Other refusals follow [`Self::feed`].
+    pub fn feed_packet(&mut self, packet: &impl PacketInfo) -> Result<(), FeedError> {
+        self.feed_discarding(packet.payload(), packet_pts(packet)?, Discard::of(packet))
     }
     /// [`feed`](Self::feed) a container packet's payload, whose decoded output then drops
     /// the samples its container marks for discarding ([`Discard::of`]).

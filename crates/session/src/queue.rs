@@ -2,6 +2,20 @@
 //! feeder keeps it (backpressure).
 use crate::Discard;
 use std::collections::VecDeque;
+use triergon_core::container::PacketInfo;
+use triergon_core::{Rounding, TimeBase};
+
+pub(crate) fn packet_pts(packet: &impl PacketInfo) -> Result<Option<i64>, FeedError> {
+    packet
+        .pts()
+        .map(|pts| {
+            packet
+                .time_base()
+                .rescale(pts, TimeBase::NANOSECONDS, Rounding::Floor)
+        })
+        .transpose()
+        .map_err(|_| FeedError::Invalid)
+}
 
 /// Capacity of one lane's pending input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -34,7 +48,8 @@ impl QueueLimits {
 pub enum FeedError {
     /// The queue is full; retry the same access unit after output progresses.
     Backpressure,
-    /// The access unit exceeds the per-unit limit or is empty.
+    /// The lane has ended, the access unit is empty or oversized, or its timestamp
+    /// does not fit the session clock.
     Invalid,
     /// No session accepts input (nothing loaded or the lane has no codec).
     Idle,

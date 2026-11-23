@@ -6,9 +6,10 @@
 //! the clock and publishes it once the clock reaches its PTS.
 use crate::SessionState;
 use crate::lane::{OnRefusal, Phase, Refusals};
-use crate::queue::{FeedError, QueueLimits, UnitQueue};
+use crate::queue::{FeedError, QueueLimits, UnitQueue, packet_pts};
 use std::sync::Arc;
 use triergon_codec::{DynVideoDecoder, Error};
+use triergon_core::container::PacketInfo;
 use triergon_pixel::letterbox::{Canvas, Scaler};
 
 /// The current picture for the compositor. `sequence` increases for every
@@ -126,6 +127,12 @@ impl VideoSession {
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
         self.phase.admit(self.decoder.is_some())?;
         self.queue.push(au, pts)
+    }
+    /// Queue an Annex B packet, rounding its PTS down to nanoseconds and preserving
+    /// an absent PTS. A PTS outside `i64` nanoseconds is [`FeedError::Invalid`].
+    /// Other refusals follow [`Self::feed`].
+    pub fn feed_packet(&mut self, packet: &impl PacketInfo) -> Result<(), FeedError> {
+        self.feed(packet.payload(), packet_pts(packet)?)
     }
     /// No more input for this generation: the decoder drains and the lane
     /// reports `Ended` once every picture has been published.

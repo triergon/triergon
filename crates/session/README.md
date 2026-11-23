@@ -80,15 +80,18 @@ one directly.
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
-configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). The
-generic AAC track decoder takes ADTS; raw packets use `aac_access_units_in` above.
+configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). For AAC,
+a track with an AudioSpecificConfig takes raw LC packets. An AAC track without
+configuration takes ADTS packets. Use `aac_access_units_in` when the packet's sample
+description supplies a different configuration.
 `TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
 pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a
 start trim carrying into the next packet when it is longer than one.
-`Discard::of(packet)` with `AudioSession::feed_discarding` does the same for a
-clock-paced session. `examples/decode_audio.rs` decodes the first audio track of any
-file `triergon::open_blocking` opens.
+`AudioSession::feed_packet` does the same for a clock-paced session. Both sessions'
+`feed_packet` methods accept decoder-ready packets and round their presentation
+times down to nanoseconds. `examples/decode_audio.rs` decodes the first audio track
+of any file `triergon::open_blocking` opens.
 
 The `mix` module holds the stereo downmix and the s16 conversion.
 

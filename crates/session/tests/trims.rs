@@ -3,7 +3,6 @@
 use triergon::ogg::page::{BEGIN_OF_STREAM, END_OF_STREAM, write_page};
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
 use triergon_codec::{AudioFrame, Speaker};
-use triergon_core::{Rounding, TimeBase};
 use triergon_session::{AudioSession, Discard, Error, PcmBlock, QueueLimits, TrackDecoder};
 
 /// Ogg Opus: five 20 ms CELT packets, the supplied pre-skip, and a final granule (which
@@ -63,16 +62,13 @@ fn opus_session(pre_skip: u16, clocked: bool) -> (PcmBlock, usize) {
             session.load(Some(TrackDecoder::new(track).unwrap().into_decoder()));
             loaded = true;
         }
-        let payload = packet.payload().to_vec();
-        let pts = packet.pts().filter(|_| clocked).map(|pts| {
-            packet
-                .time_base()
-                .rescale(pts, TimeBase::NANOSECONDS, Rounding::NearestAway)
-                .unwrap()
-        });
-        session
-            .feed_discarding(&payload, pts, Discard::of(&packet))
-            .unwrap();
+        if clocked {
+            session.feed_packet(&packet).unwrap();
+        } else {
+            session
+                .feed_discarding(packet.payload(), None, Discard::of(&packet))
+                .unwrap();
+        }
     }
     session.end_of_stream();
     let mut block = PcmBlock::default();
