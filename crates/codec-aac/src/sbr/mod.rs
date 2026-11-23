@@ -182,6 +182,7 @@ pub(crate) struct Chan {
     m_prev: usize,
     /// Scratch: the prediction coefficients of this frame's source bands, by band.
     alpha: [(Cpx, Cpx); 32],
+    // An Option<u8> envelope and a boolean border add 0.097% instructions on HE-AAC stereo.
     /// transient envelope index l_A (-1 = none)
     l_a: i32,
     bw_prev: [f32; 5],
