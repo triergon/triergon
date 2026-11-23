@@ -462,7 +462,6 @@ pub struct EncodedEditJob<'a> {
     dolby_config: Option<Ac3ConfigParser>,
     descriptions: u32,
     dependency_table: bool,
-    empty_recovery: Option<crate::compat::mov::encoded_dependency::EmptyRecoveryWalk>,
     dependency_recovery: bool,
     recovery_walk: Option<crate::compat::mov::encoded_recovery::RecoveryWalk>,
     recovery_contexts:
@@ -517,8 +516,8 @@ impl<'a> EncodedEditJob<'a> {
     }
     /// Like [`new_with_configs`](Self::new_with_configs), and when the table has an
     /// `sdtp` box, marks a packet disposable when no other sample depends on it, as
-    /// FFmpeg's MOV demuxer does. Its `roll` and `prol` groups must then be absent or
-    /// empty; other groups and the reserved `sdtp` value are `Error::Unsupported`.
+    /// FFmpeg's MOV demuxer does. Roll groups are checked independently of the
+    /// dependency flags. The reserved `sdtp` value is `Error::Unsupported`.
     pub fn new_with_dependency_table(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
@@ -531,11 +530,13 @@ impl<'a> EncodedEditJob<'a> {
             input.budget(),
         )?;
         let count = u32::try_from(configs.len()).map_err(|_| Error::Overflow)?;
-        // This extension is SDTP admission. A table without SDTP keeps the
-        // already established edit/roll observation, with its raw groups
-        // retained unchanged; no new recovery capability is inferred here.
         let dependency_table = context.table.has_dependency_table();
-        Self::new_description_bound(context, input, limits, count, dependency_table, false)
+        let mut job =
+            Self::new_description_bound(context, input, limits, count, dependency_table, false)?;
+        if dependency_table {
+            job.read_recovery_groups()?;
+        }
+        Ok(job)
     }
     /// Like [`new_with_dependency_table`](Self::new_with_dependency_table), but accepts
     /// `roll` and `prol` groups and the reserved `sdtp` value. The groups are checked and
@@ -555,17 +556,20 @@ impl<'a> EncodedEditJob<'a> {
         )?;
         let count = u32::try_from(configs.len()).map_err(|_| Error::Overflow)?;
         let dependency = context.table.has_dependency_table();
-        let recovery = crate::compat::mov::encoded_recovery::RecoveryWalk::new(
-            context.table,
-            limits.max_samples,
-        )?;
         let mut job =
             Self::new_description_bound(context, input, limits, count, dependency, false)?;
-        job.empty_recovery = None;
+        job.read_recovery_groups()?;
         job.dependency_recovery = true;
-        job.recovery_walk = Some(recovery);
         Ok(job)
     }
+    fn read_recovery_groups(&mut self) -> Result<()> {
+        self.recovery_walk = Some(crate::compat::mov::encoded_recovery::RecoveryWalk::new(
+            self.context.table,
+            self.limits.max_samples,
+        )?);
+        Ok(())
+    }
+
     /// Like [`new_with_recovery_groups`](Self::new_with_recovery_groups), but reads the
     /// sample groups as the context view does: a fault in them is kept in
     /// [`EncodedEditPlan::recovery_observation`] instead of failing the job. `sync`
@@ -598,8 +602,6 @@ impl<'a> EncodedEditJob<'a> {
         )?;
         let mut out =
             Self::new_description_bound(context, input, limits, count, dependency, range_playback)?;
-        out.empty_recovery = None;
-        out.recovery_walk = None;
         out.dependency_recovery = true;
         out.recovery_contexts = Some(recovery);
         Ok(out)
@@ -779,16 +781,6 @@ impl<'a> EncodedEditJob<'a> {
             (None, 0, None)
         };
         let cursor = context.table.cursor();
-        let empty_recovery = if dependency_table {
-            Some(
-                crate::compat::mov::encoded_dependency::EmptyRecoveryWalk::new(
-                    context.table,
-                    limits.max_samples,
-                )?,
-            )
-        } else {
-            None
-        };
         Ok(Self {
             context,
             cursor,
@@ -833,7 +825,6 @@ impl<'a> EncodedEditJob<'a> {
             dolby_config: None,
             descriptions,
             dependency_table,
-            empty_recovery,
             dependency_recovery: false,
             recovery_walk: None,
             recovery_contexts: None,
@@ -1112,12 +1103,6 @@ impl<'a> EncodedEditJob<'a> {
             };
             self.recovery_facts = Some(facts);
             self.recovery_walk = None;
-        }
-        if let Some(recovery) = &mut self.empty_recovery {
-            if !recovery.poll(work)? {
-                return Ok(false);
-            }
-            self.empty_recovery = None;
         }
         if let Some(parser) = &mut self.aac_program {
             let config = match parser.step(work, cancel)? {

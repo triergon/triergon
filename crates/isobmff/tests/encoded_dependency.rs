@@ -116,12 +116,21 @@ fn absent_groups_and_explicit_unassociated_groups_both_keep_source_ranges() {
     }
 }
 #[test]
-fn actual_roll_membership_stays_unadmitted_not_ignored() {
+fn dependency_flags_are_independent_of_roll_membership() {
     let s = Source::new(include_bytes!(
         "fixtures/encoded-dependency/dep-real-roll-unadmitted.mp4"
     ));
-    assert!(matches!(s.plan(1), Err(Error::Unsupported(_))));
-    assert_eq!(s.table.sample_count(), 2);
+    let occurrences = rows(&s, s.plan(1).unwrap());
+    assert_eq!(occurrences.len(), 2);
+    assert_eq!(
+        (occurrences[0].demux.flags, occurrences[1].demux.flags),
+        (1, 0)
+    );
+    assert!(
+        occurrences
+            .iter()
+            .all(|row| row.source.dependency.is_some())
+    );
 }
 #[test]
 fn reserved_depended_on_field_is_not_a_false_or_true_repair() {

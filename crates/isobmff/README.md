@@ -283,7 +283,8 @@ Empty `sbgp` runs associate no samples. Samples beyond the last run use the grou
 default when present. The recovery view retains the version-1 grouping type
 parameter with its mapping. It skips unknown grouping types and refuses groups
 that can change the demux view's key-frame flags. A version-1 `sgpd` can state
-the length of each recovery description individually.
+the length of each recovery description individually. The dependency view can report
+`sdtp` flags for tracks with their own roll groups.
 
 ## Behaviour and limits
 

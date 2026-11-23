@@ -345,7 +345,7 @@ fn unknown_group_semantics_do_not_get_roll_fallback() {
     assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
-fn old_actual_membership_refusal_is_unchanged() {
+fn dependency_view_retains_the_roll_description() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
@@ -356,9 +356,13 @@ fn old_actual_membership_refusal_is_unchanged() {
         EncodedEditLimits::default(),
     )
     .unwrap();
+    let plan = finish(&mut old, &mut i, 1).unwrap();
     assert_eq!(
-        finish(&mut old, &mut i, 1).unwrap_err(),
-        Error::Unsupported("encoded dependency view nonempty recovery descriptions")
+        selection(&plan, RecoveryKind::Roll, 2)
+            .description
+            .unwrap()
+            .distance,
+        -1,
     );
 }
 #[test]

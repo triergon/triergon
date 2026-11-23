@@ -15,7 +15,6 @@ pub mod mov {
     pub(crate) mod edit_list;
     pub(crate) mod encoded_configs;
     pub(crate) mod encoded_contexts;
-    pub(crate) mod encoded_dependency;
     pub(crate) mod encoded_edits;
     pub(crate) mod encoded_metadata;
     pub(crate) mod encoded_recovery;
