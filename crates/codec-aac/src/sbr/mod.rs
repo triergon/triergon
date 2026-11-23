@@ -701,76 +701,17 @@ impl Sbr {
                 ch.kx_prev = 32;
                 ch.m_prev = 0;
             }
-            // QMF analysis of the core output (float scale -> 16-bit domain)
-            let mut bands = [Cpx::default(); 32];
-            for (t, input) in buf[..1024].as_chunks::<32>().0.iter().enumerate() {
-                ch.analysis.run(qmf, input, 32768.0, &mut bands);
-                for (xl, band) in ch.xl.iter_mut().zip(bands) {
-                    xl[T_HFGEN + t] = band;
-                }
-            }
             let (kx, m) = if ready {
                 (self.ft.kx, self.ft.m)
             } else {
                 (32, 0)
             };
-            // low band buffer: history (previous frame, k < kx_prev) + current (k < kx)
-            for (k, xl) in ch.xl.iter_mut().enumerate() {
-                if k >= ch.kx_prev {
-                    xl[..T_HFGEN].fill(Cpx::default());
-                }
-                if k >= kx {
-                    xl[T_HFGEN..T_HFGEN + 32].fill(Cpx::default());
-                }
-            }
+            analyse_core(ch, buf, kx, qmf);
             if ready {
                 hf_generate(ch, &self.ft);
                 hf_adjust(ch, &self.ft, &self.hdr, reset);
             }
-            // assemble the synthesis input X(k, i), i < 32
-            let i_temp = (2 * ch.prev_t_env_last).saturating_sub(32).min(8);
-            for i in 0..32 {
-                let row = &mut self.x[i];
-                let (kxi, mi) = if i < i_temp {
-                    (ch.kx_prev, ch.m_prev)
-                } else {
-                    (kx, m)
-                };
-                let low = kxi.min(32);
-                for (r, xl) in row.iter_mut().zip(&ch.xl[..low]) {
-                    *r = xl[i + T_HFADJ];
-                }
-                let hf = kxi.min(64)..(kxi + mi).min(64);
-                row[low..hf.start].fill(Cpx::default());
-                // Early slots take the previous high band only when this frame has SBR data.
-                if ready {
-                    let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
-                    row[hf.clone()].copy_from_slice(&high[hf.clone()]);
-                } else {
-                    row[hf.clone()].fill(Cpx::default());
-                }
-                row[hf.end..].fill(Cpx::default());
-            }
-            // keep state for the next frame
-            for xl in ch.xl.iter_mut() {
-                xl.copy_within(32..32 + T_HFGEN, 0);
-            }
-            if ready {
-                let last = ch.t_env[ch.num_env];
-                for i in 0..8 {
-                    ch.y_prev[i] = if 32 + i < 2 * last {
-                        ch.y[32 + i]
-                    } else {
-                        [Cpx::default(); 64]
-                    };
-                }
-                ch.prev_t_env_last = last;
-                ch.kx_prev = kx;
-                ch.m_prev = m;
-            } else {
-                // The reference policy retains the previous border and band limits with a zero high band.
-                ch.y_prev[..i_temp].fill([Cpx::default(); 64]);
-            }
+            prepare_synthesis(ch, &mut self.x, (kx, m), ready);
             if let (0, true, Some(stereo)) = (c, ps, &mut self.stereo) {
                 // look-ahead slots (low band only) for the PS hybrid filters
                 for i in 32..38 {
@@ -822,6 +763,77 @@ impl Sbr {
             self.reset = false;
         }
         self.data_ok = false;
+    }
+}
+
+/// Analyzes the core PCM into the QMF low bands and bounds the available history.
+#[inline]
+fn analyse_core(ch: &mut Chan, input: &[f32], kx: usize, qmf: &mut Modulation) {
+    // QMF analysis of the core output (float scale -> 16-bit domain)
+    let mut bands = [Cpx::default(); 32];
+    for (t, input) in input[..1024].as_chunks::<32>().0.iter().enumerate() {
+        ch.analysis.run(qmf, input, 32768.0, &mut bands);
+        for (xl, band) in ch.xl.iter_mut().zip(bands) {
+            xl[T_HFGEN + t] = band;
+        }
+    }
+    // low band buffer: history (previous frame, k < kx_prev) + current (k < kx)
+    for (k, xl) in ch.xl.iter_mut().enumerate() {
+        if k >= ch.kx_prev {
+            xl[..T_HFGEN].fill(Cpx::default());
+        }
+        if k >= kx {
+            xl[T_HFGEN..T_HFGEN + 32].fill(Cpx::default());
+        }
+    }
+}
+
+/// Assembles the synthesis input and advances its low- and high-band carry.
+#[inline]
+fn prepare_synthesis(ch: &mut Chan, x: &mut [[Cpx; 64]], (kx, m): (usize, usize), ready: bool) {
+    // assemble the synthesis input X(k, i), i < 32
+    let i_temp = (2 * ch.prev_t_env_last).saturating_sub(32).min(8);
+    for i in 0..32 {
+        let row = &mut x[i];
+        let (kxi, mi) = if i < i_temp {
+            (ch.kx_prev, ch.m_prev)
+        } else {
+            (kx, m)
+        };
+        let low = kxi.min(32);
+        for (r, xl) in row.iter_mut().zip(&ch.xl[..low]) {
+            *r = xl[i + T_HFADJ];
+        }
+        let hf = kxi.min(64)..(kxi + mi).min(64);
+        row[low..hf.start].fill(Cpx::default());
+        // Early slots take the previous high band only when this frame has SBR data.
+        if ready {
+            let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
+            row[hf.clone()].copy_from_slice(&high[hf.clone()]);
+        } else {
+            row[hf.clone()].fill(Cpx::default());
+        }
+        row[hf.end..].fill(Cpx::default());
+    }
+    // keep state for the next frame
+    for xl in ch.xl.iter_mut() {
+        xl.copy_within(32..32 + T_HFGEN, 0);
+    }
+    if ready {
+        let last = ch.t_env[ch.num_env];
+        for i in 0..8 {
+            ch.y_prev[i] = if 32 + i < 2 * last {
+                ch.y[32 + i]
+            } else {
+                [Cpx::default(); 64]
+            };
+        }
+        ch.prev_t_env_last = last;
+        ch.kx_prev = kx;
+        ch.m_prev = m;
+    } else {
+        // The reference policy retains the previous border and band limits with a zero high band.
+        ch.y_prev[..i_temp].fill([Cpx::default(); 64]);
     }
 }
 
