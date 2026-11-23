@@ -167,11 +167,11 @@ impl<S: Source, T: Sink> Pump<S, T> {
             run: Run::Running,
         })
     }
-    /// The player.
+    /// The player the pump drives.
     pub fn player(&self) -> Option<&Player<S>> {
         self.player.as_ref()
     }
-    /// The sink.
+    /// The sink the pump feeds.
     pub fn sink(&self) -> Option<&T> {
         self.sink.as_ref()
     }

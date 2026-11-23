@@ -408,78 +408,6 @@ fn widening_product(a: u64, b: u64) -> u128 {
     (u128::from(a_high * b_high) << 64) + (middle << 32) + u128::from(a_low * b_low)
 }
 
-#[test]
-fn mp4_seek_tick_comparison_keeps_exact_order() {
-    let audio = TimeBase::new(1, 48_000).unwrap();
-    let wide = TimeBase::new(u64::MAX, u64::MAX - 1).unwrap();
-    for (ticks, base, target) in [
-        (-1024, audio, Time::new(-1, 48).unwrap()),
-        (1000, audio, Time::new(1, 48).unwrap()),
-        (i64::MIN, wide, Time::new(i128::MIN + 1, u128::MAX).unwrap()),
-        (i64::MAX, wide, Time::new(i128::MAX, u128::MAX).unwrap()),
-    ] {
-        let pts = Time::from_ticks(i128::from(ticks), base).unwrap();
-        assert_eq!(mp4_tick_before(ticks, base, target).unwrap(), pts < target);
-    }
-    let bases = [
-        (1, 48_000),
-        (1, 90_000),
-        (1001, 30_000),
-        (1, 1),
-        (u64::MAX, 3),
-        (7, u64::MAX),
-    ]
-    .map(|(n, d)| TimeBase::new(n, d).unwrap());
-    let targets = [
-        (0, 1),
-        (3072, 125),
-        (-3072, 125),
-        (60, 1),
-        (1, 3),
-        (-1, 90_000),
-        (i128::from(i64::MAX), 1),
-        (i128::from(i64::MIN), 1),
-        (i128::from(i64::MAX) + 1, 7),
-        (5, u128::from(u64::MAX) + 2),
-    ]
-    .map(|(n, d)| Time::new(n, d).unwrap());
-    let ticks = [
-        0,
-        1,
-        -1,
-        2,
-        -2,
-        1023,
-        -1023,
-        48_000,
-        -90_000,
-        i64::MAX,
-        i64::MIN,
-        1 << 40,
-    ];
-    for base in bases {
-        for target in targets {
-            for ticks in ticks {
-                let pts = Time::from_ticks(i128::from(ticks), base).unwrap();
-                assert_eq!(
-                    mp4_tick_before(ticks, base, target).unwrap(),
-                    pts < target,
-                    "{ticks} in {base:?} before {target:?}"
-                );
-            }
-        }
-    }
-    for (a, b) in [
-        (0, 0),
-        (u64::MAX, u64::MAX),
-        (u64::MAX, 1),
-        (1 << 32, 1 << 32),
-        (0x1234_5678_9abc_def0, 0x0fed_cba9_8765_4321),
-    ] {
-        assert_eq!(widening_product(a, b), u128::from(a) * u128::from(b));
-    }
-}
-
 #[derive(Debug)]
 #[repr(C)]
 struct PendingEvent {
@@ -1595,5 +1523,82 @@ impl<S: Source> Player<S> {
 impl<S: Source> Drop for Player<S> {
     fn drop(&mut self) {
         self.shutdown(State::Stopped);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mp4_seek_tick_comparison_keeps_exact_order() {
+        let audio = TimeBase::new(1, 48_000).unwrap();
+        let wide = TimeBase::new(u64::MAX, u64::MAX - 1).unwrap();
+        for (ticks, base, target) in [
+            (-1024, audio, Time::new(-1, 48).unwrap()),
+            (1000, audio, Time::new(1, 48).unwrap()),
+            (i64::MIN, wide, Time::new(i128::MIN + 1, u128::MAX).unwrap()),
+            (i64::MAX, wide, Time::new(i128::MAX, u128::MAX).unwrap()),
+        ] {
+            let pts = Time::from_ticks(i128::from(ticks), base).unwrap();
+            assert_eq!(mp4_tick_before(ticks, base, target).unwrap(), pts < target);
+        }
+        let bases = [
+            (1, 48_000),
+            (1, 90_000),
+            (1001, 30_000),
+            (1, 1),
+            (u64::MAX, 3),
+            (7, u64::MAX),
+        ]
+        .map(|(n, d)| TimeBase::new(n, d).unwrap());
+        let targets = [
+            (0, 1),
+            (3072, 125),
+            (-3072, 125),
+            (60, 1),
+            (1, 3),
+            (-1, 90_000),
+            (i128::from(i64::MAX), 1),
+            (i128::from(i64::MIN), 1),
+            (i128::from(i64::MAX) + 1, 7),
+            (5, u128::from(u64::MAX) + 2),
+        ]
+        .map(|(n, d)| Time::new(n, d).unwrap());
+        let ticks = [
+            0,
+            1,
+            -1,
+            2,
+            -2,
+            1023,
+            -1023,
+            48_000,
+            -90_000,
+            i64::MAX,
+            i64::MIN,
+            1 << 40,
+        ];
+        for base in bases {
+            for target in targets {
+                for ticks in ticks {
+                    let pts = Time::from_ticks(i128::from(ticks), base).unwrap();
+                    assert_eq!(
+                        mp4_tick_before(ticks, base, target).unwrap(),
+                        pts < target,
+                        "{ticks} in {base:?} before {target:?}"
+                    );
+                }
+            }
+        }
+        for (a, b) in [
+            (0, 0),
+            (u64::MAX, u64::MAX),
+            (u64::MAX, 1),
+            (1 << 32, 1 << 32),
+            (0x1234_5678_9abc_def0, 0x0fed_cba9_8765_4321),
+        ] {
+            assert_eq!(widening_product(a, b), u128::from(a) * u128::from(b));
+        }
     }
 }
