@@ -23,14 +23,15 @@ struct Payload {
     offset: u64,
 }
 
+/// A payload slot read after its last span took the bytes.
+const CONSUMED_PAYLOAD: &str = "PES payload consumed";
+
 impl Payload {
-    // Returning a checked payload view measured +0.197001% on one transport workload.
-    #[expect(
-        clippy::expect_used,
-        reason = "an error return here and in the body loop measured +0.09% (pes/cc-wrap +0.13%)"
-    )]
-    fn bytes(&self) -> &Bytes {
-        self.bytes.as_ref().expect("PES payload not consumed")
+    fn bytes(&self) -> Result<&Bytes> {
+        match &self.bytes {
+            Some(bytes) => Ok(bytes),
+            None => crate::refuse(Error::Invalid(CONSUMED_PAYLOAD)),
+        }
     }
 
     fn remaining(&self) -> usize {
@@ -526,7 +527,7 @@ impl PesAssembler {
             .payload
             .as_ref()
             .ok_or(Error::Invalid("PES payload missing"))?;
-        let bytes = &pending.bytes().as_ref()[pending.position..];
+        let bytes = &pending.bytes()?.as_ref()[pending.position..];
         let Some((header, total)) = parse_timed_header(bytes, self.limits.pes_bytes, work) else {
             return Ok(false);
         };
@@ -662,7 +663,7 @@ impl PesAssembler {
                     .payload
                     .as_ref()
                     .ok_or(Error::Invalid("PES payload missing"))?;
-                if !audit.step(self.spans.as_slice(), pending.bytes(), work, cancel)? {
+                if !audit.step(self.spans.as_slice(), pending.bytes()?, work, cancel)? {
                     return Ok(false);
                 }
                 if cancel.load(Ordering::Relaxed) {
@@ -900,7 +901,7 @@ impl PesAssembler {
                     .payload
                     .as_mut()
                     .ok_or(Error::Invalid("PES payload missing"))?;
-                let bytes = &pending.bytes().as_ref()[pending.position..pending.position + count];
+                let bytes = &pending.bytes()?.as_ref()[pending.position..pending.position + count];
                 self.raw_header[self.header_used..self.header_used + count].copy_from_slice(bytes);
                 self.header_used += count;
                 self.seen += count;
@@ -962,7 +963,7 @@ impl PesAssembler {
                 let bytes = if count == available {
                     pending.bytes.take().expect("pending PES span")
                 } else {
-                    pending.bytes().clone()
+                    pending.bytes()?.clone()
                 };
                 // The charged table amortises ordinary growth. A rejected
                 // append keeps the input position and byte grant for retry.
