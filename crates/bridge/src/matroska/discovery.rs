@@ -226,7 +226,7 @@ pub struct MatroskaDiscovery<S: Source> {
     cutoff: Option<MatroskaDiscoveryCutoff>,
 }
 
-// Separate generic buffers raise Matroska bitmap discovery reads by 0.08–0.09%.
+// Generic buffers raise bitmap discovery by 0.08–0.09%, and borrowed buffers raise discovery by up to 0.88%.
 #[derive(Debug)]
 enum ReplayBuffer {
     Full(BudgetVec<Output>),
