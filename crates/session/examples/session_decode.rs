@@ -327,7 +327,14 @@ fn audio<F: OutputForm>(
                 .transpose()?;
             run.feed(packet.payload(), pts, Discard::of(&packet))?;
         }
-        next = source.next_packet()?;
+        next = match source.next_packet() {
+            Ok(next) => next,
+            Err(error) => {
+                // The packets before a source refusal decode as a stream that ends there.
+                run.finish()?;
+                return Err(error.into());
+            }
+        };
     }
     run.finish()
 }

@@ -829,11 +829,11 @@
       "decoder.ours_layout": "stereo",
       "decoder.ours_pcm_bytes": 3538944,
       "decoder.ours_rate": 44100,
-      "decoder.ours_rc": 0,
+      "decoder.ours_rc": 1,
       "decoder.ours_samples": 442368,
       "decoder.timeline.ours_at_difference": null,
       "decoder.timeline.ours_blocks": 432,
-      "output.ours_rc": 0,
+      "output.ours_rc": 1,
       "output.samples_ours": 442368
      },
      "reference": {

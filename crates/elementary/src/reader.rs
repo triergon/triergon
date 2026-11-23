@@ -240,6 +240,9 @@ pub struct Reader<F: Format> {
     audio_end: Option<u64>,
     seeking: Option<Seeking>,
     last_seek: Option<SeekDetail>,
+    /// A new sequence ([`Syntax::NEW_SEQUENCE`]) follows the last unit: the reader
+    /// refuses it where the stream would end.
+    new_sequence: bool,
 }
 
 impl<F: Format> Reader<F> {
@@ -275,6 +278,7 @@ impl<F: Format> Reader<F> {
             audio_end: None,
             seeking: None,
             last_seek: None,
+            new_sequence: false,
         })
     }
 
@@ -343,6 +347,11 @@ impl<F: Format> Reader<F> {
                 Phase::Frame(cut) => self.frame(cut, work, cancel)?,
                 Phase::Trailing => self.trailing(work, cancel)?,
                 Phase::End => {
+                    if let Some(detail) = F::NEW_SEQUENCE
+                        && self.new_sequence
+                    {
+                        return Err(Error::Unsupported(detail));
+                    }
                     return Ok(Step::End(SourceLocation {
                         source: self.input.cursor().source(),
                         offset: self.input.position(),
@@ -893,6 +902,23 @@ impl<F: Format> Reader<F> {
                     after: After::Frame { lead: 0 },
                 })));
             }
+            if F::NEW_SEQUENCE.is_some()
+                && let Probe::Header(next) = self.format.probe(&self.input.view()[end..])
+            {
+                match self.confirmed_sequence(end, &next, work, cancel)? {
+                    Flow::Wait(wait) => return Ok(Flow::Wait(wait)),
+                    Flow::Ready(true) => {
+                        self.new_sequence = true;
+                        return Ok(Flow::Ready(Some(Unit {
+                            len: end,
+                            header: unit,
+                            complete: true,
+                            after: After::End,
+                        })));
+                    }
+                    Flow::Ready(false) => {}
+                }
+            }
             let found = match self.resync(cut, end, work, cancel)? {
                 Flow::Wait(wait) => return Ok(Flow::Wait(wait)),
                 Flow::Ready(found) => found,
@@ -918,6 +944,35 @@ impl<F: Format> Reader<F> {
                 after,
             })));
         }
+    }
+
+    /// Whether `next`, the header after the frame ending at `end`, which does not
+    /// continue the stream, starts a new sequence ([`Syntax::NEW_SEQUENCE`]): the frame
+    /// after it continues it, or the source ends with it. Otherwise it is a false sync
+    /// to search past.
+    #[cold]
+    fn confirmed_sequence(
+        &mut self,
+        end: usize,
+        next: &F::Header,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Flow<bool>> {
+        let Length::Known(len) = self.format.length(next) else {
+            return Ok(Flow::Ready(false));
+        };
+        let after = end + len;
+        let at_end = match self.need(after + F::PROBE, work, cancel)? {
+            Flow::Wait(wait) => return Ok(Flow::Wait(wait)),
+            Flow::Ready(_) => self.input.ended(),
+        };
+        let view = self.input.view();
+        Ok(Flow::Ready(
+            match view.get(after..).map(|rest| self.format.probe(rest)) {
+                Some(Probe::Header(following)) => self.format.continues(next, &following),
+                _ => at_end && after == view.len(),
+            },
+        ))
     }
 
     /// Search for the end of a frame whose header gives no length: the next header of
@@ -1178,6 +1233,7 @@ impl<F: Format> ContainerReader for Reader<F> {
     /// Keeps nothing: the stream is found again from the source start.
     fn reset(&mut self) -> Result<InputRequest> {
         self.phase = Phase::Leading;
+        self.new_sequence = false;
         self.opened = None;
         self.last = None;
         self.tags.clear();

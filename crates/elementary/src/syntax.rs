@@ -116,6 +116,10 @@ pub(crate) mod sealed {
         const CONFIRM: u8;
         /// Frames delivered before a seek target for decoder warm-up.
         const PREROLL: u32;
+        /// The refusal detail for a confirmed frame sequence whose headers do not continue
+        /// the stream, where the format lets a stream change to a new sequence the reader
+        /// does not read; `None` where such headers are false syncs to search past.
+        const NEW_SEQUENCE: Option<&'static str> = None;
 
         /// A format with no stream adopted; `budget` charges what it retains.
         fn new(budget: &Budget, limits: &Limits) -> Self;

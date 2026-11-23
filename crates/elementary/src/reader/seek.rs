@@ -183,6 +183,8 @@ impl<F: Format> Reader<F> {
             .map(Track::time_base)
             .ok_or(Error::Invalid("seek before the stream is open"))?;
         let context = self.seek_context()?;
+        // A seek reads the first sequence again.
+        self.new_sequence = false;
         let target = request
             .target
             .to_i64_ticks(time_base, Rounding::Floor)?

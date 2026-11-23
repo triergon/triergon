@@ -44,6 +44,9 @@ is a random-access point. Tags are kept as bounded opaque bytes (`Reader::tags`)
 
 A frame cut short by the end of the input is delivered with `Packet::is_complete`
 false, and so are MPEG audio bytes after the last frame, as FFmpeg 9.0.2 delivers them.
+An ADTS stream that goes on with another sampling frequency or ID, a new sequence
+(ISO/IEC 13818-7 section 6.2.1), is read up to its last frame before the change and
+then refused with `Unsupported`: the reader reads one sequence.
 
 FLAC metadata blocks are kept up to the retention limit (PADDING by length only), and
 SEEKTABLE and STREAMINFO are read; a stream whose first block is not STREAMINFO is

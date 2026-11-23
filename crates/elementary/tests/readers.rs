@@ -3,7 +3,7 @@ mod common;
 use common::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
-    CodecId, ContainerReader, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
+    CodecId, ContainerReader, Event, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
 };
 use triergon_core::{Budget, Error, Step, Time, WorkBudget};
 use triergon_elementary::{
@@ -224,6 +224,41 @@ fn adts_frames_drop_junk_and_keep_a_truncated_tail() {
     assert_eq!(lens, [200, 201, 202, 203, 204, 205, 206, 207, 120]);
     assert_eq!(reading.packets[4].offset, 14 + 200 + 201 + 202 + 203 + 50);
     assert_eq!(reading.packets[8].pts, 8 * 1024);
+}
+
+#[test]
+fn an_adts_stream_that_changes_its_sampling_frequency_is_refused_there() {
+    let mut file = Vec::new();
+    for i in 0..4 {
+        file.extend(adts_frame(i, 200));
+    }
+    for i in 4..8 {
+        // Sampling frequency index 7 (22050 Hz) after index 4 (44100 Hz).
+        let mut frame = adts_frame(i, 180);
+        frame[2] = (frame[2] & !0x3c) | (7 << 2);
+        file.extend(frame);
+    }
+    for (work, most) in [(1 << 30, usize::MAX), (64, 3)] {
+        let pool = Budget::new(16 << 20).unwrap();
+        let mut reader = open::<Adts>(&pool, &file, true);
+        let cancel = AtomicBool::new(false);
+        let mut lens = Vec::new();
+        let error = loop {
+            match reader.step(&mut WorkBudget::new(work), &cancel) {
+                Ok(Step::Ready(Event::Packet(packet))) => lens.push(Seen::of(&packet).len),
+                Ok(Step::Ready(_) | Step::Yield) => {}
+                Ok(Step::NeedInput(request)) => supply(&mut reader, &pool, &file, &request, most),
+                Ok(Step::End(_)) => panic!("the frames after the change were dropped"),
+                Ok(Step::Backpressure(pressure)) => panic!("{pressure:?}"),
+                Err(error) => break error,
+            }
+        };
+        assert_eq!(lens, [200; 4]);
+        assert_eq!(
+            error,
+            Error::Unsupported("ADTS sequence with another sampling frequency or ID")
+        );
+    }
 }
 
 #[test]

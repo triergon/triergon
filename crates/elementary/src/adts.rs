@@ -31,6 +31,10 @@ impl Syntax for Adts {
     const CONFIRM: u8 = 1;
     /// The first frame of a decode overlaps with nothing.
     const PREROLL: u32 = 1;
+    /// The fixed header holds over a sequence (ISO/IEC 13818-7 section 6.2.1); a stream
+    /// that goes on with another sampling frequency or ID is a new one.
+    const NEW_SEQUENCE: Option<&'static str> =
+        Some("ADTS sequence with another sampling frequency or ID");
 
     fn new(_budget: &Budget, _limits: &Limits) -> Adts {
         Adts { first: None }
