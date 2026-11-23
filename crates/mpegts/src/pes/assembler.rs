@@ -330,10 +330,11 @@ impl PesAssembler {
     }
 
     /// Commit a carrier after the complete span and work grant were checked.
-    // Returning refused spans measured +1.088607% on one transport workload.
+    // A refused span returned measured +0.24% (seek split-PES +0.72%), a cold refusal through
+    // `Result` +0.39% (DTS-HD) and +0.19% on playback: `try_push` stops inlining.
     #[expect(
         clippy::expect_used,
-        reason = "handing a refused span back to the caller measured +0.24% (seek split-PES +0.72%): try_push no longer inlines"
+        reason = "returning the refusal +0.24 to +0.72%; core has no push into reserved capacity"
     )]
     pub(crate) fn append_body_carrier(
         &mut self,
@@ -364,7 +365,8 @@ impl PesAssembler {
         if self.total != Some(self.seen) {
             return Ok(None);
         }
-        // `emit` returning the PES itself measured +0.85% on the access-unit workloads.
+        // `emit` returning the PES itself measured +0.85%; a cold refusal or `None` for the other
+        // steps +0.32% on M2TS split seeks (callers of a callee that cannot unwind lay out anew).
         let AssemblyStep::Output(pes) = self.emit::<true>()? else {
             unreachable!("complete finite PES");
         };
@@ -698,10 +700,10 @@ impl PesAssembler {
         }
     }
 
-    // Borrowing the body payload once measured +0.062095% on one playback workload.
+    // Cold refusals in the body loop measured +0.179% on progressive TS188 playback.
     #[expect(
         clippy::expect_used,
-        reason = "error returns in the body loop measured +0.09% (pes/cc-wrap +0.13%)"
+        reason = "error returns in the body loop +0.09 to +0.13%, cold refusals +0.179%"
     )]
     fn poll_inner<const RETAIN: bool>(
         &mut self,

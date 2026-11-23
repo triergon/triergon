@@ -163,6 +163,7 @@ pub mod latm {
         }
 
         /// The complete validated LATM PES, with its wire header and source ranges.
+        // Typed only with the PES shared apart from `TraceEvent::Pes`, as `SourceEvent::pes`.
         pub fn pes(&self) -> &Pes {
             let TraceEvent::Pes(pes) = self.source.event() else {
                 unreachable!("LATM packet owns its source PES");

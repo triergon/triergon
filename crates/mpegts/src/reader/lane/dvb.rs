@@ -22,11 +22,11 @@ impl Reader {
         }
     }
 
-    // Borrowing the envelope through publication measured +0.076651% on one transport workload.
-    // Staging it, the storage and the buffer through `Option::insert` measured +0.056% on six.
+    // `get_or_insert_with` and field reads with one cold refusal measured +0.59%: the MPEG video
+    // reader's `materialize` then inlines into `Lane::step`.
     #[expect(
         clippy::expect_used,
-        reason = "error returns here measured +0.12 to +0.14% on DVB subtitle workloads"
+        reason = "error returns +0.12 to +0.14%; typed staging +0.056 to +0.59%"
     )]
     pub(super) fn step(
         &mut self,
@@ -221,10 +221,11 @@ impl Envelope {
         }
     }
 
-    // Borrowing the subtitle buffer across the copy loop measured +0.162746% on one transport workload.
+    // Cold refusals here and in `step` measured +0.19% (the MPEG video `materialize` inlines into
+    // `Lane::step`, 5,368 -> 5,898 instructions).
     #[expect(
         clippy::expect_used,
-        reason = "error returns here measured +0.12 to +0.14% on DVB subtitle workloads"
+        reason = "error returns +0.12 to +0.14%; cold refusals +0.19%"
     )]
     fn materialize(
         &mut self,

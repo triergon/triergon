@@ -757,10 +757,11 @@ impl Lane {
         }
         Ok(())
     }
-    // Borrowing the copied fragment through publication measured +0.063684% on one transport workload.
+    // Cold refusals here measured +0.207% on MPEG-2 video (+162 adds an iteration in this step:
+    // its registers are allocated around the inlined picture scan), the piece reads alone +0.069%.
     #[expect(
         clippy::expect_used,
-        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions"
+        reason = "typed fragment copy +0.04 to +0.26%, cold refusals +0.069 to +0.21%"
     )]
     pub(super) fn step(
         &mut self,

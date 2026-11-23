@@ -169,10 +169,11 @@ impl Incomplete {
         Ok(true)
     }
 
-    // Matching the audit and buffer together measured +0.155353% on one transport workload.
+    // Cold refusals here and in `copy` measured +0.215% on MPEG-2 video: both inline into
+    // `Lane::step`.
     #[expect(
         clippy::expect_used,
-        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions"
+        reason = "typing the fragment copy +0.04 to +0.26%, cold refusals +0.215%"
     )]
     fn prepare(
         &mut self,
@@ -217,10 +218,10 @@ impl Incomplete {
         Ok(true)
     }
 
-    // Keeping audit cursors and the buffer live across copying measured +0.137280% on one transport workload.
+    // Keeping the cursors and buffer live across the copy measured +0.137%, cold refusals +0.215%.
     #[expect(
         clippy::expect_used,
-        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions"
+        reason = "typing the fragment copy +0.04 to +0.26%, cold refusals +0.215%"
     )]
     pub(super) fn copy(
         &mut self,

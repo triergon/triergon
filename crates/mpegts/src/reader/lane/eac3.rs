@@ -174,10 +174,11 @@ impl Reader {
         self.framer.finish(request.source, request.token)
     }
 
-    // Borrowing the staged syncframe beside its group measured +0.065969% on one transport workload.
+    // Cold refusals here and in `Group::append` measured +0.226% on ATSC E-AC-3 (this step,
+    // inlined into `Framer::step`, grows by 182 instructions).
     #[expect(
         clippy::expect_used,
-        reason = "error returns here measured +0.12 to +0.14% on E-AC-3 workloads"
+        reason = "error returns +0.12 to +0.14%, cold refusals +0.226%"
     )]
     pub(super) fn step(
         &mut self,
@@ -392,10 +393,10 @@ impl Group {
             })
     }
 
-    // Cloning the dependent into a reserved slot measured +0.161008% on one transport workload.
+    // Cloning the dependent into a reserved slot measured +0.161%, a cold refusal +0.226%.
     #[expect(
         clippy::expect_used,
-        reason = "error returns here measured +0.12 to +0.14% on E-AC-3 workloads"
+        reason = "error returns +0.12 to +0.14%, cold refusals +0.226%"
     )]
     fn append(
         &mut self,

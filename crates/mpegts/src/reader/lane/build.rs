@@ -85,10 +85,10 @@ impl Build {
             recovered_adts_bytes: false,
         }
     }
-    // Moving the copy buffer only on freeze measured +0.090117% on one transport workload.
+    // Cold refusals here and in `finish_build` measured +0.80% on DTS-HD grouped reads.
     #[expect(
         clippy::expect_used,
-        reason = "a typed coalescing state measured +0.17 to +0.25% more instructions"
+        reason = "a typed coalescing state +0.17 to +0.25%, cold refusals +0.80%"
     )]
     pub(super) fn copy(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if self.bytes.is_some() {
@@ -163,10 +163,10 @@ impl Lane {
         Ok(())
     }
 
-    // Returning the finished build as an option measured +0.051575% on one transport workload.
+    // Returning the build as a checked result measured +0.80% with `Build::copy`'s refusals.
     #[expect(
         clippy::expect_used,
-        reason = "moving the build out of its slot to publish measured +0.35 to +0.72% more instructions"
+        reason = "moving the build out to publish +0.35 to +0.72%, a checked result +0.80%"
     )]
     fn finish_build(&mut self, consumed_end: u64) -> Build {
         let build = self.build.take().expect("prepared publication");
