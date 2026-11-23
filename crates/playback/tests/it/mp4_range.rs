@@ -1303,7 +1303,7 @@ fn range_player_keeps_the_active_seek_while_planning_opus_recovery() {
                 let landing = command.receipt().opus_recovery.unwrap();
                 assert_eq!(landing.track_id, audio);
                 assert!(landing.first_sample < landing.sync_sample);
-                assert!(landing.preroll >= triergon_core::Time::new(2, 25).unwrap());
+                assert!(landing.preroll >= Time::new(2, 25).unwrap());
                 command
             } else {
                 assert!(matches!(recovery, Err(C::Unsupported(_))), "{recovery:?}");
