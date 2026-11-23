@@ -7,8 +7,8 @@ use triergon_core::{
 use triergon_isobmff::{
     CursorStatus, Next, Sample,
     compat::mov::encoded::{
-        EncodedConfigSequence, EncodedConfigStep, EncodedCreation, EncodedInitial, EncodedStream,
-        EncodedStreamJob,
+        EncodedConfigSequence, EncodedConfigStep, EncodedCreationSource, EncodedInitial,
+        EncodedStream, EncodedStreamJob,
     },
     config::ConfigurationLimits,
     movie::TrackHeader,
@@ -124,7 +124,7 @@ fn observed(
 #[test]
 fn creation_uses_media_header_not_distinct_movie_or_track_fields() {
     let p = Source::new(CREATED);
-    let c = EncodedCreation::from_source(&p.header).unwrap();
+    let c = EncodedCreationSource::from_source(&p.header).unwrap();
     assert_eq!(c.source_seconds(), 2082844803);
     assert_eq!(c.demux().unwrap(), b"1970-01-01T00:00:03.000000Z");
     assert_eq!(c.raw().bytes().as_ref(), p.header.raw_mdhd.bytes().as_ref());
@@ -132,7 +132,7 @@ fn creation_uses_media_header_not_distinct_movie_or_track_fields() {
 #[test]
 fn track_only_creation_does_not_fill_absent_media_creation() {
     let p = Source::new(TRACK_ONLY);
-    let c = EncodedCreation::from_source(&p.header).unwrap();
+    let c = EncodedCreationSource::from_source(&p.header).unwrap();
     assert_eq!(c.source_seconds(), 0);
     assert!(c.demux().is_none());
 }
@@ -146,7 +146,7 @@ fn calendar_handles_gregorian_leap_day_from_source_seconds() {
     b[at..at + 4].copy_from_slice(&seconds.to_be_bytes());
     let p = Source::new(&b);
     assert_eq!(
-        EncodedCreation::from_source(&p.header)
+        EncodedCreationSource::from_source(&p.header)
             .unwrap()
             .demux()
             .unwrap(),
@@ -154,17 +154,16 @@ fn calendar_handles_gregorian_leap_day_from_source_seconds() {
     );
 }
 #[test]
-fn ambiguous_old_epoch_is_refused_without_raw_rewrite() {
+fn legacy_unix_epoch_keeps_the_original_source_word() {
     let mut b = CREATED.to_vec();
     let p = Source::new(&b);
     let at = p.header.raw_mdhd.header().start as usize + 12;
     drop(p);
     b[at..at + 4].copy_from_slice(&1u32.to_be_bytes());
     let p = Source::new(&b);
-    assert!(matches!(
-        EncodedCreation::from_source(&p.header),
-        Err(Error::Unsupported(_))
-    ));
+    let creation = EncodedCreationSource::from_source(&p.header).unwrap();
+    assert_eq!(creation.source_seconds(), 1);
+    assert_eq!(creation.demux().unwrap(), b"1970-01-01T00:00:01.000000Z");
     assert_eq!(&p.header.raw_mdhd.payload()[4..8], &1u32.to_be_bytes());
 }
 #[test]

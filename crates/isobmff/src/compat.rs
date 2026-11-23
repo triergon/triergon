@@ -99,7 +99,7 @@ pub mod mov {
         //! [`EncodedInitial`] and [`EncodedConfigSequence`] follow the configuration of a
         //! track with more than one description.
         pub use super::encoded_configs::{
-            EncodedConfigSequence, EncodedConfigStep, EncodedCreation, EncodedInitial,
+            EncodedConfigSequence, EncodedConfigStep, EncodedInitial,
         };
         pub use super::encoded_contexts::{SourceProfileFault, WaveObservation};
         pub use super::encoded_metadata::{

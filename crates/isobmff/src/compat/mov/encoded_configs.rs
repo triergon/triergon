@@ -1,78 +1,17 @@
 //! Encoded tracks with several sample descriptions, as FFmpeg's MOV demuxer reports
 //! them: [`EncodedInitial`] is the stream view with the first sample's extradata and
 //! [`EncodedConfigSequence`] gives the new extradata at each change of description.
-//! [`EncodedCreation`] reads the `mdhd` creation tag. No sample or configuration bytes
-//! are rebuilt.
+//! Configuration bytes are shared with the source entry.
 use crate::{
     Sample,
     boxes::BoxView,
     compat::mov::{encoded_stream::EncodedStream, view::StreamView},
-    fields,
-    movie::TrackHeader,
     table::SampleTable,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, InputToken, Result, SourceId, WorkBudget};
 
-/// The `mdhd` creation time and the `creation_time` tag FFmpeg's MOV demuxer derives
-/// from it, for creation times from 1970.
-#[derive(Clone, Debug)]
-pub struct EncodedCreation {
-    raw: BoxView,
-    source_seconds: u64,
-    demux: Option<[u8; 27]>,
-}
-impl EncodedCreation {
-    /// Reads the creation time of `header`'s `mdhd` box; the `mvhd` and `tkhd` times are
-    /// not used. `Error::Unsupported` for nonzero flags, a version above 1, a time before
-    /// 1970 or a year past 9999.
-    pub fn from_source(header: &TrackHeader) -> Result<Self> {
-        let raw = header.raw_mdhd.clone();
-        let (version, flags) = fields::full(raw.payload())?;
-        if flags != 0 {
-            return Err(Error::Unsupported("encoded creation header flags"));
-        }
-        let seconds = match version {
-            0 => u64::from(fields::u32_at(raw.payload(), 4)?),
-            1 => fields::u64_at(raw.payload(), 4)?,
-            _ => return Err(Error::Unsupported("encoded creation header version")),
-        };
-        let demux = if seconds == 0 {
-            None
-        } else {
-            Some(calendar(seconds)?)
-        };
-        Ok(Self {
-            raw,
-            source_seconds: seconds,
-            demux,
-        })
-    }
-    /// The `mdhd` box.
-    pub fn raw(&self) -> &BoxView {
-        &self.raw
-    }
-    /// The creation time as stored, in seconds since 1904-01-01 UTC.
-    pub fn source_seconds(&self) -> u64 {
-        self.source_seconds
-    }
-    /// The tag text, `YYYY-MM-DDTHH:MM:SS.000000Z` in UTC; `None` for a zero time.
-    pub fn demux(&self) -> Option<&[u8; 27]> {
-        self.demux.as_ref()
-    }
-}
-fn calendar(seconds: u64) -> Result<[u8; 27]> {
-    if seconds < 2_082_844_800 {
-        return Err(Error::Unsupported(
-            "encoded creation ambiguous pre-Unix epoch profile",
-        ));
-    }
-    calendar_bounded(seconds, 1970)
-}
 pub(crate) fn calendar_qt_seconds(seconds: u64) -> Result<[u8; 27]> {
-    calendar_bounded(seconds, 1904)
-}
-fn calendar_bounded(seconds: u64, minimum_year: u64) -> Result<[u8; 27]> {
     let days = seconds / 86400;
     let prior = |year: u64| {
         let y = year - 1;
@@ -84,7 +23,7 @@ fn calendar_bounded(seconds: u64, minimum_year: u64) -> Result<[u8; 27]> {
             "encoded creation four-digit year profile",
         ));
     }
-    let (mut lo, mut hi) = (minimum_year, 10000u64);
+    let (mut lo, mut hi) = (1904, 10000u64);
     while lo + 1 < hi {
         let mid = lo + (hi - lo) / 2;
         if prior(mid) - origin <= days {
