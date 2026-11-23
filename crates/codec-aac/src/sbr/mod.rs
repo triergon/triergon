@@ -26,9 +26,26 @@ use tables::NOISE;
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{Budget, BudgetVec};
 
-const FIXFIX: u8 = 0;
-const FIXVAR: u8 = 1;
-const VARFIX: u8 = 2;
+/// SBR envelope border classes (Table 4.69).
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum FrameClass {
+    FixFix = 0,
+    FixVar = 1,
+    VarFix = 2,
+    VarVar = 3,
+}
+
+impl FrameClass {
+    fn read(br: &mut CachedBitReader<'_>) -> Self {
+        match br.read(2) {
+            0 => Self::FixFix,
+            1 => Self::FixVar,
+            2 => Self::VarFix,
+            _ => Self::VarVar,
+        }
+    }
+}
 
 const NUM_TIME_SLOTS: usize = 16;
 /// t_HFAdj (4.6.18.2): offset of the HF signals in QMF subsamples.
@@ -141,7 +158,6 @@ pub(crate) struct Chan {
     env_prev_res: bool,
     add_harmonic_flag: bool,
     add_harmonic: [bool; 49],
-    frame_class: u8,
     invf: [u8; 5],
     invf_prev: [u8; 5],
 }
@@ -152,7 +168,6 @@ impl Chan {
     fn new(budget: &Budget, analysed: bool) -> Result<Chan> {
         let rows = |n: usize| if analysed { n } else { 0 };
         Ok(Chan {
-            frame_class: 0,
             num_env: 0,
             t_env: [0; 6],
             freq_res: [false; 6],
@@ -216,7 +231,6 @@ impl Chan {
     fn renew(&mut self) {
         self.reset_signal();
         let Chan {
-            frame_class,
             num_env,
             t_env,
             freq_res,
@@ -254,7 +268,6 @@ impl Chan {
             y,
             alpha: _,
         } = self; // the fields set to `_` are reset_signal's, and scratch
-        *frame_class = 0;
         *num_env = 0;
         *t_env = [0; 6];
         *freq_res = [false; 6];
@@ -722,7 +735,6 @@ fn copy_grid(a: &Chan, b: &mut Chan) {
     } else {
         -1
     };
-    b.frame_class = a.frame_class;
     b.num_env = a.num_env;
     b.t_env = a.t_env;
     b.freq_res = a.freq_res;
@@ -740,7 +752,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
     } else {
         -1
     };
-    let class = br.read(2) as u8;
+    let class = FrameClass::read(br);
     let mut rel0 = [0usize; 4];
     let mut rel1 = [0usize; 4];
     let (mut nrel0, mut nrel1) = (0usize, 0usize);
@@ -748,7 +760,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
     let mut pointer = 0usize;
     let num_env;
     match class {
-        FIXFIX => {
+        FrameClass::FixFix => {
             let tmp = br.read(2);
             num_env = 1usize << tmp;
             if num_env > 4 {
@@ -764,7 +776,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                 *r = rel;
             }
         }
-        FIXVAR => {
+        FrameClass::FixVar => {
             abs1 = br.read(2) as usize + NUM_TIME_SLOTS;
             nrel1 = br.read(2) as usize;
             num_env = nrel1 + 1;
@@ -777,7 +789,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
             }
             abs0 = 0;
         }
-        VARFIX => {
+        FrameClass::VarFix => {
             abs0 = br.read(2) as usize;
             nrel0 = br.read(2) as usize;
             num_env = nrel0 + 1;
@@ -790,8 +802,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
             }
             abs1 = NUM_TIME_SLOTS;
         }
-        _ => {
-            // VARVAR
+        FrameClass::VarVar => {
             abs0 = br.read(2) as usize;
             abs1 = br.read(2) as usize + NUM_TIME_SLOTS;
             nrel0 = br.read(2) as usize;
@@ -815,7 +826,6 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
     if pointer > num_env {
         return Err(DecodeError::Invalid("SBR bs_pointer"));
     }
-    c.frame_class = class;
     c.num_env = num_env;
     c.t_env[0] = abs0;
     c.t_env[num_env] = abs1;
@@ -841,8 +851,8 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
         c.t_q[1] = c.t_env[1];
     } else {
         let mid = match class {
-            FIXFIX => num_env / 2,
-            VARFIX => {
+            FrameClass::FixFix => num_env / 2,
+            FrameClass::VarFix => {
                 if pointer == 0 {
                     1
                 } else if pointer == 1 {
@@ -851,7 +861,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                     pointer - 1
                 }
             }
-            _ => {
+            FrameClass::FixVar | FrameClass::VarVar => {
                 if pointer > 1 {
                     num_env + 1 - pointer
                 } else {
@@ -863,15 +873,15 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
         c.t_q[2] = c.t_env[num_env];
     }
     c.l_a = match class {
-        FIXFIX => -1,
-        VARFIX => {
+        FrameClass::FixFix => -1,
+        FrameClass::VarFix => {
             if pointer > 1 {
                 pointer as i32 - 1
             } else {
                 -1
             }
         }
-        _ => {
+        FrameClass::FixVar | FrameClass::VarVar => {
             if pointer > 0 {
                 num_env as i32 + 1 - pointer as i32
             } else {
@@ -880,7 +890,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
         }
     };
     // FIXFIX with a single envelope uses 1.5 dB resolution regardless of bs_amp_res
-    c.amp_res = !(class == FIXFIX && num_env == 1);
+    c.amp_res = !(class == FrameClass::FixFix && num_env == 1);
     Ok(())
 }
 
