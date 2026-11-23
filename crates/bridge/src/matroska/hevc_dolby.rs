@@ -63,6 +63,8 @@ impl DolbyCodec {
 enum SetupCodec {
     Hevc(HvcConfigParser),
     Dolby(DolbyCodec),
+    /// The feed was delivered, or the setup failed.
+    Done,
 }
 
 /// Bind one selected HEVC, AC-3 or E-AC-3 track to its current configuration.
@@ -70,7 +72,7 @@ enum SetupCodec {
 /// source configuration for the consumer.
 #[derive(Debug)]
 pub struct MatroskaHevcDolbySetup {
-    association: Option<Association>,
+    association: Association,
     codec: SetupCodec,
     limits: MatroskaHevcDolbyLimits,
 }
@@ -122,10 +124,10 @@ impl MatroskaHevcDolbySetup {
             _ => return Err(Error::Unsupported("Matroska HEVC/Dolby feed codec")),
         };
         Ok(Self {
-            association: Some(Association {
+            association: Association {
                 configuration: configuration.clone(),
                 track,
-            }),
+            },
             codec,
             limits,
         })
@@ -137,25 +139,20 @@ impl MatroskaHevcDolbySetup {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<MatroskaHevcDolbyFeed>> {
-        if self.association.is_none() {
-            return Ok(BuildStep::Complete);
-        }
         match self.step_codec(work, cancel) {
-            Ok(Some(codec)) => {
-                let association = self
-                    .association
-                    .take()
-                    .ok_or(Error::Invalid("HEVC/Dolby setup consumed"))?;
+            Ok(BuildStep::Ready(codec)) => {
+                self.codec = SetupCodec::Done;
                 Ok(BuildStep::Ready(MatroskaHevcDolbyFeed {
-                    association,
+                    association: self.association.clone(),
                     codec,
                     limits: self.limits,
                 }))
             }
-            Ok(None) => Ok(BuildStep::Yield),
+            Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
+            Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
             Err(error) => {
                 if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                    self.association = None;
+                    self.codec = SetupCodec::Done;
                 }
                 Err(error)
             }
@@ -166,21 +163,26 @@ impl MatroskaHevcDolbySetup {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<FeedCodec>> {
+    ) -> Result<BuildStep<FeedCodec>> {
         match &mut self.codec {
             SetupCodec::Hevc(parser) => match parser.step(work, cancel)? {
-                BuildStep::Ready(record) => {
-                    Ok(Some(FeedCodec::Hevc(HevcAnnexBConfig::new(record)?)))
-                }
-                BuildStep::Yield => Ok(None),
+                BuildStep::Ready(record) => Ok(BuildStep::Ready(FeedCodec::Hevc(
+                    HevcAnnexBConfig::new(record)?,
+                ))),
+                BuildStep::Yield => Ok(BuildStep::Yield),
                 BuildStep::Complete => Err(Error::Invalid("HEVC setup lost its configuration")),
             },
             SetupCodec::Dolby(codec) => {
                 if cancel.load(Ordering::Relaxed) {
                     return Err(Error::Cancelled);
                 }
-                Ok(work.try_charge(1).then_some(FeedCodec::Dolby(*codec)))
+                Ok(if work.try_charge(1) {
+                    BuildStep::Ready(FeedCodec::Dolby(*codec))
+                } else {
+                    BuildStep::Yield
+                })
             }
+            SetupCodec::Done => Ok(BuildStep::Complete),
         }
     }
 }

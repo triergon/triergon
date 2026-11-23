@@ -64,7 +64,7 @@ fn check_limit(requested: usize, maximum: usize) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct Association {
     configuration: Configuration,
     track: usize,
@@ -110,6 +110,8 @@ enum Parser {
         parser: AacAscParser,
         infer_duration: bool,
     },
+    /// The feed was delivered, or the setup failed.
+    Done,
 }
 
 #[derive(Debug)]
@@ -125,7 +127,8 @@ enum FeedCodec {
 /// CodecState or seek generation can require a fresh setup.
 #[derive(Debug)]
 pub struct MatroskaFeedSetup {
-    pending: Option<(Association, Parser)>,
+    association: Association,
+    parser: Parser,
     limits: MatroskaFeedLimits,
 }
 
@@ -207,13 +210,11 @@ impl MatroskaFeedSetup {
             }
         };
         Ok(Self {
-            pending: Some((
-                Association {
-                    configuration: configuration.clone(),
-                    track,
-                },
-                parser,
-            )),
+            association: Association {
+                configuration: configuration.clone(),
+                track,
+            },
+            parser,
             limits,
         })
     }
@@ -224,46 +225,42 @@ impl MatroskaFeedSetup {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<BuildStep<MatroskaTrackFeed>> {
-        let Some((_, parser)) = &mut self.pending else {
-            return Ok(BuildStep::Complete);
-        };
-        let result = parse(parser, work, cancel);
-        match result {
+        match parse(&mut self.parser, work, cancel) {
             Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
             Ok(BuildStep::Ready(codec)) => {
-                let (association, _) = self
-                    .pending
-                    .take()
-                    .ok_or(Error::Invalid("AVC/AAC setup consumed"))?;
+                self.parser = Parser::Done;
                 Ok(BuildStep::Ready(MatroskaTrackFeed {
-                    association,
+                    association: self.association.clone(),
                     codec,
                     limits: self.limits,
                 }))
             }
-            Ok(BuildStep::Complete) => Err(Error::Invalid("AVC/AAC setup lost its configuration")),
             Err(error) => {
                 if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
-                    self.pending = None;
+                    self.parser = Parser::Done;
                 }
                 Err(error)
             }
+            Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
         }
     }
 }
 
+/// The feed's codec once `parser` has read the initialization; `Complete` after
+/// `Done`.
 fn parse(
     parser: &mut Parser,
     work: &mut WorkBudget,
     cancel: &AtomicBool,
 ) -> Result<BuildStep<FeedCodec>> {
     match parser {
+        Parser::Done => Ok(BuildStep::Complete),
         Parser::Avc(parser) => Ok(match parser.step(work, cancel)? {
             BuildStep::Ready(record) => {
                 BuildStep::Ready(FeedCodec::Avc(AvcAnnexBConfig::new(record)?))
             }
             BuildStep::Yield => BuildStep::Yield,
-            BuildStep::Complete => BuildStep::Complete,
+            BuildStep::Complete => return Err(SETUP_LOST),
         }),
         Parser::DerivedAac(params) => {
             if cancel.load(Ordering::Relaxed) {
@@ -294,10 +291,13 @@ fn parse(
                 })
             }
             BuildStep::Yield => BuildStep::Yield,
-            BuildStep::Complete => BuildStep::Complete,
+            BuildStep::Complete => return Err(SETUP_LOST),
         }),
     }
 }
+
+/// A configuration parser that ended without its record.
+const SETUP_LOST: Error = Error::Invalid("AVC/AAC setup lost its configuration");
 
 /// The feed of one bound AVC or AAC track.
 #[derive(Debug)]
@@ -373,10 +373,10 @@ impl<'a> MatroskaFeedJob<'a> {
                 BuildStep::Yield => return Ok(BuildStep::Yield),
                 BuildStep::Complete => return Ok(BuildStep::Complete),
             },
-            PacketJob::Aac(header) => {
-                if header.is_none() {
+            PacketJob::Aac(slot) => {
+                let Some(header) = *slot else {
                     return Ok(BuildStep::Complete);
-                }
+                };
                 if self.cancelled || cancel.load(Ordering::Relaxed) {
                     self.cancelled = true;
                     return Err(Error::Cancelled);
@@ -384,8 +384,9 @@ impl<'a> MatroskaFeedJob<'a> {
                 if !work.try_charge(1) {
                     return Ok(BuildStep::Yield);
                 }
+                *slot = None;
                 MatroskaFeedPayload::Aac {
-                    header: header.take().ok_or(Error::Invalid("AAC feed consumed"))?,
+                    header,
                     raw: self.source.packet.data.as_ref(),
                 }
             }
