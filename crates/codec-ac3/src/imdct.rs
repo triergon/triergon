@@ -300,14 +300,17 @@ impl Imdct {
 
     /// Two interleaved 256-sample transforms (blksw = 1).
     pub(crate) fn short(&mut self, x: &[f32; 256], delay: &mut [f32; 256], out: &mut [f32]) {
-        let out = &mut out[..256];
+        let Some(out) = out.first_chunk_mut::<256>() else {
+            return;
+        };
         let (c2, s2) = (&self.c2, &self.s2);
         // The even coefficients give y1 in yr/yi[0..64], the odd ones y2 in [64..128].
-        #[expect(clippy::expect_used, reason = "64-point ranges are 64 points")]
-        let (re, im): (&mut [f32; 64], &mut [f32; 64]) = (
-            (&mut self.re[..64]).try_into().expect("64 points"),
-            (&mut self.im[..64]).try_into().expect("64 points"),
-        );
+        let (Some(re), Some(im)) = (
+            self.re.first_chunk_mut::<64>(),
+            self.im.first_chunk_mut::<64>(),
+        ) else {
+            return;
+        };
         for half in 0..2 {
             let z = |k: usize| {
                 let (xr, xi) = (x[2 * (127 - 2 * k) + half], x[4 * k + half]);
