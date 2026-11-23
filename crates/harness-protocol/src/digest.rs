@@ -45,7 +45,6 @@ pub fn fold_framed(h: &mut u64, bytes: &[u8]) {
 /// here. This exact loop form vectorises the four 32-byte-strided lanes; an
 /// `as_chunks` rewrite measured about 10% slower on AAC-heavy workloads,
 /// so the slice-chunk form is kept deliberately.
-#[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn fold_bytes(digest: &mut u64, bytes: &[u8]) {
     // Each four-byte group is below 2^23, so the narrow products stay exact.
     let four = |b: &[u8]| {
