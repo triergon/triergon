@@ -69,7 +69,7 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
     /// Seek and return the receipt; packets from the landing point follow.
     pub fn seek(&mut self, request: SeekRequest, cancel: &AtomicBool) -> Result<SeekReceipt> {
         self.open_track(cancel)?;
-        self.driver.seek(request)?;
+        self.driver.begin_seek(request)?;
         loop {
             match self.next_event(cancel)? {
                 Some(Event::Seek(receipt)) => return Ok(receipt),

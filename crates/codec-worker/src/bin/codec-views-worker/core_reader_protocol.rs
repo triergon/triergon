@@ -458,7 +458,7 @@ fn blocking_seek(
         .ok_or("missing initial packet")?;
     let zero = Time::new(0, 1).map_err(|e| e.to_string())?;
     seeking
-        .seek(SeekRequest {
+        .begin_seek(SeekRequest {
             track: first.track(),
             target: zero,
             policy: SeekPolicy::PreviousRandomAccess,

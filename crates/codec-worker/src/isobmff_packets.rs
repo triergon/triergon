@@ -161,7 +161,7 @@ fn read(
                             target,
                             policy: SeekPolicy::PreviousRandomAccess,
                         });
-                    if let Err(error) = request.and_then(|request| blocking.seek(request)) {
+                    if let Err(error) = request.and_then(|request| blocking.begin_seek(request)) {
                         return Ok(Err(error));
                     }
                 }

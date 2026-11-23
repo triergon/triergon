@@ -240,7 +240,9 @@ fn seek(
     work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
-    reader.seek(request).map_err(|error| error.to_string())?;
+    reader
+        .begin_seek(request)
+        .map_err(|error| error.to_string())?;
     let mut landed = false;
     let mut packets = 0;
     while let Some(event) = reader.next_event().map_err(|error| error.to_string())? {
@@ -447,7 +449,9 @@ fn container_seek<'a>(
                 target,
                 policy,
             };
-            driver.seek(request).map_err(|error| error.to_string())?;
+            driver
+                .begin_seek(request)
+                .map_err(|error| error.to_string())?;
             container_suffix(&mut driver, request, base, limit, work, trace)
         }),
     })

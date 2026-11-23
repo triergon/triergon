@@ -113,7 +113,7 @@ impl<R: Read> BlockingReader<R> {
             return Err(Error::Unsupported("seeking a sequential source"));
         }
         self.queued.retain(|event| matches!(event, Event::Other(_)));
-        self.driver.seek(request)?;
+        self.driver.begin_seek(request)?;
         loop {
             self.queued.reserve(1)?;
             match self.driver.next_event_or_cancel(cancel)? {

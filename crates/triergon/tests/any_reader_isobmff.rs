@@ -5,8 +5,8 @@ mod common;
 use std::sync::atomic::AtomicBool;
 use triergon::{
     AnyOther, AnyPacket, AnyReader, Budget, CodecId, ContainerReader, Error, Event, MediaKind,
-    PacketInfo, SeekPolicy, SeekRequest, SourceCapabilities, SourceId, Step, Time, TrackId,
-    WorkBudget, isobmff::ReaderEvent, open_blocking, open_sequential,
+    PacketInfo, SeekPolicy, SeekRequest, SourceCapabilities, SourceFormat, SourceId, Step, Time,
+    TrackId, WorkBudget, isobmff::ReaderEvent, open_blocking, open_sequential,
 };
 
 const FILE: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-config/creation-all.mp4");
@@ -38,7 +38,8 @@ fn drain(reader: &mut AnyReader, pool: &Budget) -> (Vec<AnyPacket>, bool, Option
 #[test]
 fn any_reader_reads_isobmff_through_the_neutral_model() {
     let pool = Budget::new(16 << 20).unwrap();
-    let mut reader = AnyReader::open(&FILE[..16], &pool, SourceId(1), capabilities()).unwrap();
+    let mut reader =
+        AnyReader::of(SourceFormat::Isobmff, &pool, SourceId(1), capabilities()).unwrap();
     let (packets, movie, _) = drain(&mut reader, &pool);
     assert!(movie);
     assert_eq!(reader.track_count(), 2);
@@ -82,6 +83,33 @@ fn any_reader_seeks_isobmff() {
     assert_eq!(landing, Some(target));
     let video = |list: &[AnyPacket]| list.iter().filter(|p| p.track() == track).count();
     assert_eq!(video(&replayed), video(&packets));
+}
+
+#[test]
+fn blocking_seek_returns_the_receipt_before_delivery_resumes() {
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open_blocking(std::io::Cursor::new(FILE), &pool).unwrap();
+    let first = reader.next_packet().unwrap().unwrap();
+    let track = first.track();
+    let target = first.pts_time().unwrap().unwrap();
+    let receipt = reader
+        .seek(SeekRequest {
+            track,
+            target,
+            policy: SeekPolicy::PlaybackPreroll,
+        })
+        .unwrap();
+    assert_eq!(receipt.requested, target);
+    assert_eq!(receipt.landing, target);
+    assert_eq!(receipt.discard_until, target);
+    let mut next = std::iter::from_fn(|| reader.next_packet().transpose());
+    let replayed = next
+        .find_map(|packet| {
+            let packet = packet.unwrap();
+            (packet.track() == track).then_some(packet)
+        })
+        .unwrap();
+    assert_eq!(replayed.payload(), first.payload());
 }
 
 #[test]

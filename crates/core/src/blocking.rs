@@ -5,7 +5,7 @@
 //! thread of its own. A `triergon-playback` player is not driven through them: it
 //! takes a [`Source`](crate::source::Source), whose `poll` answers at once with a
 //! pending reply instead of waiting, so that a player can run on an event loop.
-use crate::container::{ContainerReader, Event, SeekRequest};
+use crate::container::{ContainerReader, Event, SeekReceipt, SeekRequest};
 use crate::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
     SourceCapabilities, SourceFailure, Step, WorkBudget,
@@ -105,8 +105,24 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         Ok(None)
     }
 
-    /// Start a seek; its receipt arrives as an [`Event::Seek`].
-    pub fn seek(&mut self, request: SeekRequest) -> Result<()> {
+    /// Seek and return the landing receipt, skipping format-specific events until
+    /// it arrives. Packets from the landing point follow. An end before the receipt
+    /// is [`Error::Truncated`]; a packet before it violates the reader contract.
+    pub fn seek(&mut self, request: SeekRequest) -> Result<SeekReceipt> {
+        self.begin_seek(request)?;
+        loop {
+            match self.next_event()? {
+                Some(Event::Seek(receipt)) => return Ok(receipt),
+                Some(Event::Other(_)) => {}
+                Some(Event::Packet(_)) => return Err(Error::Invalid("packet before seek receipt")),
+                None => return Err(Error::Truncated),
+            }
+        }
+    }
+
+    /// Start a seek and leave all events, including the receipt, for
+    /// [`Self::next_event`] to deliver.
+    pub fn begin_seek(&mut self, request: SeekRequest) -> Result<()> {
         let request = self.reader.request_seek(request)?;
         self.serve(request)
     }
