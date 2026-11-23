@@ -906,7 +906,7 @@ impl RowState {
             0x0A if doubled => self.boxed = false,
             0x0B if doubled => self.boxed = true,
             0x09 => self.flash = false,
-            0x0C => self.resize(Size::NORMAL),
+            0x0C => self.size = Size::NORMAL,
             0x18 => self.conceal = true,
             0x19 => self.separated = false,
             0x1A => self.separated = true,
@@ -922,18 +922,24 @@ impl RowState {
         match code {
             0x00..=0x07 => self.colour(code, false),
             0x08 => self.flash = true,
-            0x0D if self.double_height => self.resize(Size {
-                width: Part::Single,
-                height: Part::First,
-            }),
-            0x0E => self.resize(Size {
-                width: Part::First,
-                height: Part::Single,
-            }),
-            0x0F if self.double_height => self.resize(Size {
-                width: Part::First,
-                height: Part::First,
-            }),
+            0x0D if self.double_height => {
+                self.size = Size {
+                    width: Part::Single,
+                    height: Part::First,
+                }
+            }
+            0x0E => {
+                self.size = Size {
+                    width: Part::First,
+                    height: Part::Single,
+                }
+            }
+            0x0F if self.double_height => {
+                self.size = Size {
+                    width: Part::First,
+                    height: Part::First,
+                }
+            }
             0x10..=0x17 => self.colour(code - 0x10, true),
             0x1B => self.escaped = !self.escaped,
             0x1F => self.hold = false,
@@ -945,10 +951,6 @@ impl RowState {
         self.foreground = self.remapping.foreground(code);
         self.conceal = false;
         self.mosaics = mosaics;
-    }
-
-    fn resize(&mut self, size: Size) {
-        self.size = size;
     }
 
     fn cell(&self, glyph: Glyph) -> Cell {
