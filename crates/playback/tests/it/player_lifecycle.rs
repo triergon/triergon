@@ -342,7 +342,7 @@ fn actual_queue_pressure_stops_read_and_release_resumes_whole_operation() {
     for _ in 0..10000 {
         if matches!(
             p.advance(&mut WorkBudget::new(32), &off()).unwrap(),
-            Progress::Backpressure { .. }
+            Progress::OutputFull
         ) {
             pressure = true;
             break;
@@ -352,7 +352,7 @@ fn actual_queue_pressure_stops_read_and_release_resumes_whole_operation() {
     let before = calls.lock().unwrap().len();
     assert!(matches!(
         p.advance(&mut WorkBudget::new(32), &off()).unwrap(),
-        Progress::Backpressure { .. }
+        Progress::OutputFull
     ));
     assert_eq!(calls.lock().unwrap().len(), before);
     let mut out = Vec::new();

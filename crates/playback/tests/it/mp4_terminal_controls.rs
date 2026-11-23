@@ -343,14 +343,14 @@ fn native_terminal_payload_owners_survive_player_and_plan_retirement() {
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }
 #[test]
-fn native_terminal_output_queue_backpressure_keeps_every_packet() {
+fn native_terminal_full_output_queue_keeps_every_packet() {
     let c = gold::case("open-ended--pending-terminal");
     let (mut p, _b, _s) = make(c.raw, false, 1, 1, true);
     let mut saw = false;
     for _ in 0..300_000 {
         if matches!(
             p.advance(&mut WorkBudget::new(4096), &off()).unwrap(),
-            Progress::Backpressure { .. }
+            Progress::OutputFull
         ) {
             saw = true;
             break;

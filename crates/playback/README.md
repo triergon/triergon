@@ -157,7 +157,9 @@ bytes. `triergon_core::blocking::{Blocking, Feed}` drive a `ContainerReader` or
 
 **Bounded work.** Every call takes a `WorkBudget` and a cancel flag, and all
 retained memory is charged to a `triergon_core::Budget`. `Backpressure` is
-retryable and keeps the pending request, packet and buffers. `PlayerPolicy`
+retryable and keeps the pending request, packet and buffers. `OutputFull`
+means to empty the caller's slot or pop a queued output before continuing.
+`PlayerPolicy`
 defaults to 16 FIFO slots (at most `PlayerPolicy::MAXIMUM_SLOTS`), 32 MiB queued payload, 128 MiB seek
 input and 10,000,000 events. `Player::new_direct` skips the FIFO for callers
 that use `Player::read_output` with one caller-owned slot. Transport carrier,

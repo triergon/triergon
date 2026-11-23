@@ -358,6 +358,8 @@ pub enum Progress {
     },
     /// A TS entity ended: continue with the next entity or finish the logical source.
     AwaitEntity,
+    /// The output slot is occupied or the queue has no free slots.
+    OutputFull,
 }
 #[derive(Clone, Copy, Debug)]
 struct ActiveSeek {
@@ -1108,7 +1110,7 @@ impl<S: Source> Player<S> {
     }
 
     /// Fills an empty slot, transferring the oldest queued output first.
-    /// Returns `Queued` once the slot is filled, `Backpressure` for an occupied
+    /// Returns `Queued` once the slot is filled, `OutputFull` for an occupied
     /// slot, or `NeedInput` when the source is waiting. Direct reads use the
     /// FIFO's work, payload and event limits.
     pub fn read_output(
@@ -1135,10 +1137,7 @@ impl<S: Source> Player<S> {
             return Ok(Progress::Yield);
         }
         if slot.is_some() {
-            return Ok(Progress::Backpressure {
-                requested: 1,
-                available: 0,
-            });
+            return Ok(Progress::OutputFull);
         }
         if let Some(output) = self.pop() {
             *slot = Some(output);
@@ -1235,10 +1234,7 @@ impl<S: Source> Player<S> {
             return Ok(Progress::Yield);
         }
         if self.count == self.policy.slots {
-            return Ok(Progress::Backpressure {
-                requested: 1,
-                available: 0,
-            });
+            return Ok(Progress::OutputFull);
         }
         if slot.is_none() && self.queue.is_empty() {
             Self::allocate_slots(&mut self.queue, self.policy.slots)?;

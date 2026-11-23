@@ -962,7 +962,7 @@ fn direct_read_preserves_the_queued_prefix_and_all_matroska_events() {
                 let mut work = WorkBudget::new(work_units);
                 assert!(matches!(
                     player.read_output(&mut slot, &mut work, &cancel).unwrap(),
-                    Progress::Backpressure { .. }
+                    Progress::OutputFull
                 ));
                 assert_eq!(work.remaining(), work_units);
                 assert_eq!(player.queued(), queue);
