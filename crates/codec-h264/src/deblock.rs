@@ -908,6 +908,7 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize, t8: bool) -> ([[u8; 4]; 4], [[u8; 4]; 
     (v, h)
 }
 
+// Factoring the vertical load and store ranges through an array helper added 2.7 KiB here on AArch64.
 fn deblock_mb(
     pic: &PicView<'_>,
     uni: &[Uni],
