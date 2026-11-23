@@ -42,6 +42,34 @@ impl ElementId {
     }
 }
 
+/// Which scale-factor bands carry mid/side stereo.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MsMask {
+    None,
+    PerBand,
+    All,
+}
+
+impl MsMask {
+    fn read(br: &mut CachedBitReader<'_>, info: &IcsInfo, mask: &mut [bool]) -> Result<Self> {
+        let mode = match br.read(2) {
+            0 => return Ok(Self::None),
+            1 => Self::PerBand,
+            2 => Self::All,
+            _ => return Err(DecodeError::Invalid("ms_mask_present 3")),
+        };
+        for group in mask.chunks_exact_mut(MAX_SFB).take(info.num_window_groups) {
+            let bands = &mut group[..info.max_sfb];
+            match mode {
+                Self::PerBand => bands.fill_with(|| br.bit()),
+                Self::All => bands.fill(true),
+                Self::None => {}
+            }
+        }
+        Ok(mode)
+    }
+}
+
 const EXT_SBR_DATA: u32 = 13;
 const EXT_SBR_DATA_CRC: u32 = 14;
 /// Samples per channel of one raw data block with SBR.
@@ -754,40 +782,24 @@ impl Core {
     fn decode_cpe(&mut self, br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ei: usize) -> Result<()> {
         let e: &mut ElementState = &mut self.elements[ei];
         let common = br.bit();
-        let mut ms_present = 0u8;
         let mut ms_mask = [false; 8 * MAX_SFB];
-        if common {
+        let ms_mode = if common {
             let mut info = e.cd[0].info;
             parse_ics_info(br, cfg, true, &mut info)?;
             e.cd[0].info = info;
-            ms_present = br.read(2) as u8;
-            match ms_present {
-                0 => {}
-                1 => {
-                    for g in 0..info.num_window_groups {
-                        for sfb in 0..info.max_sfb {
-                            ms_mask[g * MAX_SFB + sfb] = br.bit();
-                        }
-                    }
-                }
-                2 => {
-                    for g in 0..info.num_window_groups {
-                        for sfb in 0..info.max_sfb {
-                            ms_mask[g * MAX_SFB + sfb] = true;
-                        }
-                    }
-                }
-                _ => return Err(DecodeError::Invalid("ms_mask_present 3")),
-            }
+            let mode = MsMask::read(br, &info, &mut ms_mask)?;
             let mut info1 = info;
             // the right channel's LTP data is the second set
             info1.ltp[0] = info.ltp[1];
             e.cd[1].info = info1;
-        }
+            mode
+        } else {
+            MsMask::None
+        };
         let (a, b) = e.cd.split_at_mut(1);
         parse_ics(br, cfg, common, false, &mut a[0], &mut self.random)?;
         parse_ics(br, cfg, common, false, &mut b[0], &mut self.random)?;
-        if common && ms_present != 0 {
+        if ms_mode != MsMask::None {
             apply_ms(&mut a[0], &mut b[0], &ms_mask);
         }
         if let Prediction::Main(p) = &mut e.ch[0].prediction {
@@ -796,12 +808,7 @@ impl Core {
         if let Prediction::Main(p) = &mut e.ch[1].prediction {
             pred::apply(p, &mut b[0], cfg);
         }
-        apply_intensity(
-            &a[0],
-            &mut b[0],
-            if common { ms_present } else { 0 },
-            &ms_mask,
-        );
+        apply_intensity(&a[0], &mut b[0], &ms_mask);
         e.decoded = true;
         e.ch_decoded = [true, true];
         Ok(())

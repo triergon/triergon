@@ -827,7 +827,7 @@ pub(crate) fn apply_ms(l: &mut ChannelData, r: &mut ChannelData, mask: &[bool]) 
 }
 
 /// Intensity stereo (ISO/IEC 14496-3 4.6.8.2.3).
-pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, ms_present: u8, mask: &[bool]) {
+pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, mask: &[bool]) {
     let info = &r.info;
     let mut win = 0;
     for g in 0..info.num_window_groups {
@@ -839,7 +839,7 @@ pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, ms_present: 
                 continue;
             }
             let mut c = if bt == INTENSITY_HCB { 1.0f32 } else { -1.0 };
-            if ms_present != 0 && mask[i] {
+            if mask[i] {
                 c = -c;
             }
             let scale = c * pow2_quarter(-r.sf[i]);
