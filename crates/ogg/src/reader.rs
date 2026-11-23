@@ -944,18 +944,15 @@ impl Reader {
         );
         self.link = link;
         self.link_start = None;
-        match bisection.next_probe() {
-            Some(probe) => {
-                let request = self.input.request_range(probe)?;
-                self.pages.clear();
-                self.phase = Phase::Bisect(bisection);
-                Ok(request)
-            }
-            None => {
-                let offset = bisection.resume();
-                landing.replays_from_start &= offset == start.start;
-                self.resume(offset)
-            }
+        if let Some(probe) = bisection.next_probe() {
+            let request = self.input.request_range(probe)?;
+            self.pages.clear();
+            self.phase = Phase::Bisect(bisection);
+            Ok(request)
+        } else {
+            let offset = bisection.resume();
+            landing.replays_from_start &= offset == start.start;
+            self.resume(offset)
         }
     }
 
