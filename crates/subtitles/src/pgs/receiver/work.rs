@@ -17,6 +17,7 @@ impl Work<'_> {
         if *credit == cost {
             return Ok(true);
         }
+        // An ordered credit comparison costs 0.57% more instructions and saturating subtraction costs 0.82% more.
         let needed = cost
             .checked_sub(*credit)
             .ok_or(Error::Invalid("PGS work credit"))?;

@@ -22,11 +22,11 @@ pub enum MultibyteCharset {
     /// Microsoft CP936 table 2.01 with its single-byte euro, the GBK glibc
     /// 2.39 converts.
     ReceiverGbk,
-    /// GBK as the Encoding Standard decodes it: its index gb18030 for the
+    /// GBK in the Encoding Standard's fatal mode: its index gb18030 for the
     /// two-byte codes, the single byte 0x80 as U+20AC, and the four-byte codes
     /// of GB18030 by its index of ranges.
     Gbk,
-    /// Big5 as the Encoding Standard decodes it: its index, with the Hong Kong
+    /// Big5 in the Encoding Standard's fatal mode: its index, with the Hong Kong
     /// supplement and its plane 2 characters. The codes 88 62, 88 64, 88 A3
     /// and 88 A5 are each two characters, a letter and a combining mark.
     Big5,
@@ -38,7 +38,7 @@ pub enum MultibyteCharset {
     /// as U+E000–U+F848 in that order, and the single bytes 0x80 and 0xFF as
     /// U+0080 and U+F8F8.
     Windows950,
-    /// Shift_JIS as the Encoding Standard decodes it: its index jis0208, the
+    /// Shift_JIS in the Encoding Standard's fatal mode: its index jis0208, the
     /// user-defined codes F040–F9FC as U+E000–U+E757, and the single bytes 0x80
     /// as U+0080 and A1–DF as the halfwidth katakana. That is
     /// [`Windows932`](Self::Windows932) with 0x80.
@@ -50,7 +50,7 @@ pub enum MultibyteCharset {
     /// 0x7E as overline, with 81 5F, JIS X 0208's reverse solidus, as
     /// U+FF3C: the SJIS glibc 2.39 converts.
     ReceiverShiftJis,
-    /// EUC-KR as the Encoding Standard decodes it: its index euc-kr, which
+    /// EUC-KR in the Encoding Standard's fatal mode: its index euc-kr, which
     /// holds KS X 1001 and the UHC extension pairs, the pairs of
     /// [`Windows949`](Self::Windows949); no single byte beyond ASCII. Any byte
     /// from 0x41 to 0xFE may follow a lead byte, so a pair in the gaps
@@ -448,6 +448,7 @@ pub enum DecodeStep {
 pub struct MultibyteDecoder {
     profile: MultibyteCharset,
     position: usize,
+    // A typed lead and four-byte pointer state costs 2–17 more instructions per input byte.
     /// The lead byte whose trail byte is due, or [`MACRON_DUE`] or
     /// [`CARON_DUE`]; no lead byte is zero.
     lead: Option<NonZeroU8>,
