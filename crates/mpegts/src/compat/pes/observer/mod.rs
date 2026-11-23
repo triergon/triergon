@@ -35,8 +35,8 @@ use pes_list::PesList;
 /// The one program and PID a `DemuxObserver` cuts, as the accepted PMT signals them.
 ///
 /// Carriers from another entity or with other epochs are refused unless a method
-/// that crosses that boundary (`continue_media_entity`, the fault recovery's
-/// confirmations) admits it.
+/// that crosses that boundary admits them: `continue_media_entity`, a push after a PCR
+/// discontinuity on the PID (the next clock epoch), the fault recovery's confirmations.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DemuxScope {
     /// The program number whose PMT lists the PID; must be nonzero.
@@ -422,6 +422,16 @@ enum Follow {
     SkipToStart,
 }
 
+/// Which clock epoch the observer admits carriers under.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TimeBase {
+    /// The scope's; a PCR discontinuity on the PID begins the change to the next.
+    Held,
+    /// A carrier on the PID signalled a PCR discontinuity: the first carrier of a later clock
+    /// epoch moves the scope there.
+    Changing,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PayloadFormat {
     Owned,
@@ -448,7 +458,7 @@ const _: () = assert!(size_of::<PayloadFormat>() == size_of::<bool>());
 /// Opt-in, charged, one-transport-input mailbox. Caller keeps the strict source
 /// operation and causal events; this observer cannot replace or suppress them.
 // `repr(C)` keeps the field offsets the compiler chose for the hot assembly paths;
-// `follow` takes a byte of the trailing padding.
+// `follow` and `time_base` take bytes of the trailing padding.
 #[derive(Debug)]
 #[repr(C)]
 pub struct DemuxObserver {
@@ -484,6 +494,7 @@ pub struct DemuxObserver {
     // Only selects a bounded demux view; no source storage or auxiliary queue.
     private_audio: Option<PrivateAudioCarriage>,
     follow: Follow,
+    time_base: TimeBase,
 }
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<DemuxObserver>() == 960 && align_of::<DemuxObserver>() == 8);
@@ -605,6 +616,7 @@ impl DemuxObserver {
             previous_counter: None,
             active: false,
             follow: Follow::Admit,
+            time_base: TimeBase::Held,
             origin: None,
             position: 0,
             raw_header: [0; HEADER_MAX],
@@ -941,6 +953,7 @@ mod tests {
             previous_counter: Option<u8>,
             active: bool,
             follow: Follow,
+            time_base: TimeBase,
             origin: Option<SourceLocation>,
             position: i64,
             raw_header: [u8; HEADER_MAX],

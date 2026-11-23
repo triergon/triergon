@@ -239,7 +239,7 @@ impl TransportFaultRecovery {
             self.inner.push_clock_boundary(packet, context)?;
             self.boundaries.timeline = Some(context);
         } else {
-            self.inner.push(packet, context)?;
+            self.inner.push_unconfirmed(packet, context, None)?;
         }
         // The ordinary assembler checked the full-width physical end already.
         self.boundaries.last_carrier = end.map(|end| (end, context, ts188));

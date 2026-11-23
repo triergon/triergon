@@ -409,10 +409,15 @@ opt-in policies below, a PES whose payload is not the track's framing syntax
 `Invalid`.
 
 The FFmpeg-compatible `DemuxObserver` cuts what the demuxer cuts and refuses what
-its profile does not cover: a carrier with a transport error or scrambling and a
-PCR discontinuity on its PID return `Unsupported` unless `TransportFaultRecovery`
-confirms the source fault or timeline first; a PES whose header fails its start
-code or length is dropped with its continuations up to the next payload unit start.
+its profile does not cover: a carrier with a transport error or scrambling returns
+`Unsupported` unless `TransportFaultRecovery` confirms the source fault first; a PES
+whose header fails its start code or length is dropped with its continuations up to
+the next payload unit start. A PCR discontinuity on its PID in a carrier that starts
+a PES begins a new time base: the packet before it ends there, and the observer
+follows the source to the next clock epoch at the first carrier of that epoch, so
+packets emitted from then on carry it. One in a carrier that continues a PES returns
+`Unsupported` (a PES does not span a change of time base); inside a
+`TransportFaultRecovery` every clock boundary waits for `confirm_source_timeline`.
 
 ## Errors
 

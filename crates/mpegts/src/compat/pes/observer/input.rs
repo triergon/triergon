@@ -1,13 +1,24 @@
 //! Admission of transport carriers: pushes, bounds, input binding and recovery hooks.
 #[cfg(feature = "reference-trace")]
 use super::DemuxScope;
-use super::{CarrierLayout, CarrierStep, DemuxObserver, DemuxSpan, Pending, SourceContext};
+use super::{
+    CarrierLayout, CarrierStep, DemuxObserver, DemuxSpan, Pending, SourceContext, TimeBase,
+};
 use crate::SourceRange;
 use crate::pes::stream_id;
 use crate::psi::stream_type;
 use crate::transport::TransportPacket;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Refused, Result, WorkBudget};
+
+/// A carrier from another entity, or with epochs other than the scope's.
+const OTHER_EPOCH: Error =
+    Error::Unsupported("PES carrier belongs to a different entity or source epoch");
+/// A PCR discontinuity the fault recovery was not configured to confirm.
+const UNCONFIRMED_PCR_DISCONTINUITY: Error =
+    Error::Unsupported("PCR discontinuity requires an explicit PES clock boundary policy");
+/// A PCR discontinuity in a carrier that continues a PES.
+const PCR_DISCONTINUITY_INSIDE_PES: Error = Error::Unsupported("PCR discontinuity inside a PES");
 
 impl DemuxObserver {
     pub(crate) fn validate_input(&self, input: Option<&triergon_core::InputCursor>) -> Result<()> {
@@ -32,7 +43,10 @@ impl DemuxObserver {
         context: SourceContext,
         input: &triergon_core::InputCursor,
     ) -> std::result::Result<(), Refused<TransportPacket>> {
-        self.push_input_boundary(packet, context, false, input)
+        match self.push_input_boundary(packet, context, false, input) {
+            Err(refused) => self.push_refused(refused, context),
+            admitted => admitted,
+        }
     }
 
     #[expect(
@@ -125,6 +139,13 @@ impl DemuxObserver {
     /// Admit one carrier on the selected PID in source order. A foreign pool, mismatched
     /// scope or active pending carrier is refused. The returned refusal owns the original
     /// charged packet, so it can be retried after draining the observer.
+    ///
+    /// A carrier that signals a PCR discontinuity (discontinuity indicator with a PCR) and
+    /// starts a PES, or arrives while no PES is being cut, begins a new time base: the packet
+    /// before it ends there as at any payload unit start, and the observer follows the source
+    /// to its next clock epoch at the first carrier that carries it. Packets emitted from then
+    /// on carry the new epochs. A PCR discontinuity in a carrier that continues a PES is
+    /// refused with `Unsupported`: a PES does not span a change of time base.
     #[expect(
         clippy::result_large_err,
         reason = "recover original inline charged transport input; no uncharged Box allocation"
@@ -134,13 +155,43 @@ impl DemuxObserver {
         packet: TransportPacket,
         context: SourceContext,
     ) -> std::result::Result<(), Refused<TransportPacket>> {
-        self.push_boundary(packet, context, false, None)
+        match self.push_boundary(packet, context, false, None) {
+            Err(refused) => self.push_refused(refused, context),
+            admitted => admitted,
+        }
+    }
+
+    /// As [`Self::push`] or [`Self::push_with_input`], refusing every PCR discontinuity: the
+    /// fault recovery's carriers outside the clock boundary it was configured for.
+    #[expect(
+        clippy::result_large_err,
+        reason = "return original charged transport input inline"
+    )]
+    pub(crate) fn push_unconfirmed(
+        &mut self,
+        packet: TransportPacket,
+        context: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
+        self.push_boundary(packet, context, false, input)
     }
 
     /// Admit a carrier while the caller keeps the original transport event.
     /// The observer retains only the storage and fields used to assemble PES.
     /// Admission checks are those of [`Self::push`] or [`Self::push_with_input`].
     pub fn push_borrowed(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        input: Option<&triergon_core::InputCursor>,
+    ) -> Result<()> {
+        match self.push_borrowed_unconfirmed(packet, context, input) {
+            Err(error) => self.push_borrowed_refused(packet, context, error),
+            admitted => admitted,
+        }
+    }
+
+    fn push_borrowed_unconfirmed(
         &mut self,
         packet: &TransportPacket,
         context: SourceContext,
@@ -156,6 +207,135 @@ impl DemuxObserver {
             context,
         );
         Ok(())
+    }
+
+    /// [`Self::push_borrowed`] of a carrier the observer refused at the scope's time base.
+    #[cold]
+    #[inline(never)]
+    fn push_borrowed_refused(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        error: Error,
+    ) -> Result<()> {
+        if let Some(error) = self.cross_time_base(packet, context, error) {
+            return Err(error);
+        }
+        self.retain_carrier(
+            CarrierLayout::from(packet),
+            packet.source.clone(),
+            packet.payload.clone(),
+            context,
+        );
+        Ok(())
+    }
+
+    /// [`Self::push`] of a carrier the observer refused at the scope's time base.
+    #[cold]
+    #[inline(never)]
+    #[expect(
+        clippy::result_large_err,
+        reason = "return original charged transport input inline"
+    )]
+    fn push_refused(
+        &mut self,
+        refused: Refused<TransportPacket>,
+        context: SourceContext,
+    ) -> std::result::Result<(), Refused<TransportPacket>> {
+        let Refused { error, value } = refused;
+        if let Some(error) = self.cross_time_base(&value, context, error) {
+            return Err(Refused { error, value });
+        }
+        self.retain_carrier(
+            CarrierLayout::from(&value),
+            value.source,
+            value.payload,
+            context,
+        );
+        Ok(())
+    }
+
+    /// Whether a carrier [`Self::input_error`] refused stays refused: only a change of time
+    /// base [`Self::push`] crosses is admitted. Every check before the refusal passed.
+    fn cross_time_base(
+        &mut self,
+        packet: &TransportPacket,
+        context: SourceContext,
+        error: Error,
+    ) -> Option<Error> {
+        if error == UNCONFIRMED_PCR_DISCONTINUITY {
+            if self.active && !packet.payload_unit_start {
+                return Some(PCR_DISCONTINUITY_INSIDE_PES);
+            }
+            let refusal = self.order_error(packet, context);
+            if refusal.is_none() {
+                self.time_base = TimeBase::Changing;
+            }
+            return refusal;
+        }
+        let held = self.scope.epochs;
+        if error != OTHER_EPOCH
+            || self.time_base != TimeBase::Changing
+            || packet.source_id != Some(self.scope.entity)
+            || context.epochs.configuration != held.configuration
+            || context.epochs.clock <= held.clock
+        {
+            return Some(error);
+        }
+        self.scope.epochs = context.epochs;
+        self.time_base = TimeBase::Held;
+        let refusal = self
+            .carrier_error(packet, context)
+            .and_then(|error| self.cross_time_base(packet, context, error));
+        if refusal.is_some() {
+            self.scope.epochs = held;
+            self.time_base = TimeBase::Changing;
+        }
+        refusal
+    }
+
+    /// [`Self::input_error`]'s checks after the entity and epochs, for a carrier the
+    /// observer admits under a later clock epoch.
+    // Its own copy: sharing it with `input_error` cost an instruction per carrier there.
+    fn carrier_error(&self, packet: &TransportPacket, context: SourceContext) -> Option<Error> {
+        if packet.transport_error || packet.scrambling != 0 {
+            Some(Error::Unsupported(
+                "PES carrier has a transport error or scrambling",
+            ))
+        } else if self.finite_private() && packet.prefix.is_some() {
+            Some(self.finite_private_error(
+                "private audio PES requires TS188 carriers",
+                "DVB subtitle PES requires TS188 carriers",
+            ))
+        } else if self.finite_private()
+            && (context.byte_run_epoch.is_some() || packet.discontinuity_indicator())
+        {
+            Some(self.finite_private_error(
+                "private audio PES crosses a damaged byte run or signalled discontinuity",
+                "DVB subtitle PES crosses a damaged byte run or signalled discontinuity",
+            ))
+        } else if packet.discontinuity_indicator()
+            && packet
+                .adaptation
+                .as_ref()
+                .is_some_and(|field| field.pcr.is_some())
+        {
+            Some(UNCONFIRMED_PCR_DISCONTINUITY)
+        } else {
+            self.order_error(packet, context)
+        }
+    }
+
+    /// [`Self::input_error`]'s last checks: source order and transport bounds.
+    fn order_error(&self, packet: &TransportPacket, context: SourceContext) -> Option<Error> {
+        if !self.follows_input(context, packet.source_offset) {
+            Some(Error::Invalid("PES source events are out of order"))
+        } else {
+            let Some(end) = packet.source_offset.checked_add(packet.source.len() as u64) else {
+                return Some(Error::Overflow);
+            };
+            Self::transport_bounds_to(packet, Some(end)).err()
+        }
     }
 
     #[expect(

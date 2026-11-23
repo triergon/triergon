@@ -357,10 +357,9 @@ impl RecoveryObserver {
             }
             self.pending_timeline = Some((context.source_event_ordinal, context.epochs));
         } else if let Some(input) = input {
-            self.inner
-                .push_input_boundary(packet, context, false, input)?;
+            self.inner.push_unconfirmed(packet, context, Some(input))?;
         } else {
-            self.inner.push(packet, context)?;
+            self.inner.push_unconfirmed(packet, context, None)?;
         }
         self.last = Some((context.source_event_ordinal, offset));
         self.entity_first = false;

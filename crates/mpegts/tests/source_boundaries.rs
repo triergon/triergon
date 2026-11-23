@@ -9,7 +9,7 @@ use triergon_mpegts::compat::pes::{
     SourceContext, TransportFaultRecovery,
 };
 use triergon_mpegts::pes::stream_id;
-use triergon_mpegts::psi::stream_type;
+use triergon_mpegts::psi::{PsiCrc32, stream_type};
 use triergon_mpegts::stream::{MediaEntityEnd, ObservedTrace, TraceEvent, TransportStream};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
@@ -836,6 +836,249 @@ fn unfinished_pes_and_unbound_pcr_pid_preserve_strict_refusals() {
                 pushed.unwrap();
                 drain(&mut observer, 1).unwrap();
             }
+        }
+    }
+}
+
+/// One TS188 carrier on `pid`: `adaptation` (flags and fields) and stuffing ahead of `payload`.
+fn carrier(
+    out: &mut Vec<u8>,
+    pid: u16,
+    start: bool,
+    counter: u8,
+    adaptation: &[u8],
+    payload: &[u8],
+) {
+    let [hi, lo] = pid.to_be_bytes();
+    let control = if payload.len() == 184 { 0x10 } else { 0x30 };
+    out.extend_from_slice(&[0x47, hi | (u8::from(start) << 6), lo, control | counter]);
+    if payload.len() < 184 {
+        let length = 183 - payload.len();
+        out.push(length as u8);
+        if length > 0 {
+            let flags = adaptation.first().copied().unwrap_or(0);
+            out.push(flags);
+            out.extend_from_slice(&adaptation[adaptation.len().min(1)..]);
+            out.resize(out.len() + length - adaptation.len().max(1), 0xff);
+        }
+    }
+    out.extend_from_slice(payload);
+}
+
+/// A PES of stream 0xE0 with a PTS and `body`; `bounded` declares its length.
+fn video_pes(pts: u64, body: &[u8], bounded: bool) -> Vec<u8> {
+    let length = if bounded { body.len() + 8 } else { 0 };
+    let mut pes = vec![
+        0,
+        0,
+        1,
+        0xe0,
+        (length >> 8) as u8,
+        length as u8,
+        0x80,
+        0x80,
+        5,
+    ];
+    pes.extend_from_slice(&[
+        0x21 | ((pts >> 29) as u8 & 0x0e),
+        (pts >> 22) as u8,
+        ((pts >> 14) as u8 & 0xfe) | 1,
+        (pts >> 7) as u8,
+        ((pts << 1) as u8 & 0xfe) | 1,
+    ]);
+    pes.extend_from_slice(body);
+    pes
+}
+
+/// Program 1 with AVC on PID 256, its PCR PID: a finite PES at 90000, then a carrier that
+/// signals a PCR discontinuity and starts an unbounded PES at 10 continued by `carriers`
+/// full carriers, then a finite PES at 3610 under the new time base.
+fn time_base_change(carriers: usize) -> Vec<u8> {
+    let section = |mut bytes: Vec<u8>| {
+        bytes.extend_from_slice(&PsiCrc32::of(&bytes).to_be_bytes());
+        bytes.insert(0, 0);
+        bytes
+    };
+    let pcr = |base: u64, discontinuity: bool| {
+        let flags = 0x10 | if discontinuity { 0x80 } else { 0 };
+        [
+            flags,
+            (base >> 25) as u8,
+            (base >> 17) as u8,
+            (base >> 9) as u8,
+            (base >> 1) as u8,
+            ((base & 1) as u8) << 7 | 0x7e,
+            0,
+        ]
+    };
+    let mut out = Vec::new();
+    let pat = section(vec![0, 0xb0, 13, 0, 1, 0xc1, 0, 0, 0, 1, 0xf0, 0]);
+    carrier(&mut out, 0, true, 0, &[], &pat);
+    let pmt = section(vec![
+        2, 0xb0, 18, 0, 1, 0xc1, 0, 0, 0xe1, 0, 0xf0, 0, 0x1b, 0xe1, 0, 0xf0, 0,
+    ]);
+    carrier(&mut out, 0x1000, true, 0, &[], &pmt);
+    let mut counter = 0;
+    carrier(
+        &mut out,
+        256,
+        true,
+        counter,
+        &pcr(80_000, false),
+        &video_pes(90_000, &[1; 27], true),
+    );
+    counter += 1;
+    carrier(
+        &mut out,
+        256,
+        true,
+        counter,
+        &pcr(0, true),
+        &video_pes(10, &[2; 40], false),
+    );
+    for _ in 0..carriers {
+        counter = (counter + 1) & 15;
+        carrier(&mut out, 256, false, counter, &[], &[3; 184]);
+    }
+    counter = (counter + 1) & 15;
+    carrier(
+        &mut out,
+        256,
+        true,
+        counter,
+        &pcr(3_000, false),
+        &video_pes(3_610, &[4; 20], true),
+    );
+    out
+}
+
+#[test]
+fn a_bare_observer_crosses_a_pcr_discontinuity_that_starts_a_pes() {
+    let built = time_base_change(2);
+    for (data, sizes, times, clocks) in [
+        (TIMELINE, vec![27, 3], vec![90_000, 10], vec![0, 0]),
+        (
+            THREE,
+            vec![17, 4, 4],
+            vec![90_000, 10, 90_010],
+            vec![0, 0, 1],
+        ),
+        (
+            built.as_slice(),
+            vec![27, 40 + 2 * 184, 20],
+            vec![90_000, 10, 3_610],
+            vec![0, 1, 1],
+        ),
+    ] {
+        for (window, grant) in [(1, 1), (4096, 4096)] {
+            let pool = Budget::new(1 << 20).unwrap();
+            let mut source = Source::new(data, &pool, window, grant);
+            let mut observer = DemuxObserver::new(
+                DemuxScope {
+                    program: 1,
+                    pid: 256,
+                    stream_type: stream_type::H264,
+                    stream_id: stream_id::VIDEO_FIRST,
+                    entity: SourceId(1),
+                    epochs: EPOCHS,
+                },
+                pool.clone(),
+                ParseLimits::default(),
+            )
+            .unwrap();
+            let mut packets = Vec::new();
+            let drain = |observer: &mut DemuxObserver, packets: &mut Vec<DemuxPacket>| loop {
+                match observer.poll(&mut WorkBudget::new(grant), &RUN).unwrap() {
+                    AssemblyStep::Output(packet) => packets.push(packet),
+                    AssemblyStep::Yield => {}
+                    AssemblyStep::NeedPayload | AssemblyStep::Finished => break,
+                }
+            };
+            loop {
+                match source.next().unwrap() {
+                    Step::Ready(TraceEvent::Transport(packet)) if packet.pid == 256 => {
+                        observer.push(packet, source.context()).unwrap();
+                        drain(&mut observer, &mut packets);
+                    }
+                    Step::Ready(TraceEvent::Finished) => break,
+                    Step::Ready(TraceEvent::Diagnostic(fault)) => panic!("source fault {fault:?}"),
+                    Step::Ready(_) => {}
+                    Step::End(_) => source.stream.end_of_source().unwrap(),
+                    other => panic!("unexpected source state {other:?}"),
+                }
+            }
+            observer.end_of_source().unwrap();
+            drain(&mut observer, &mut packets);
+            assert_eq!(
+                packets.iter().map(|p| p.payload_len).collect::<Vec<_>>(),
+                sizes
+            );
+            assert_eq!(
+                packets
+                    .iter()
+                    .map(|p| p.source_header.pts_raw33.unwrap())
+                    .collect::<Vec<_>>(),
+                times
+            );
+            assert_eq!(
+                packets
+                    .iter()
+                    .map(|p| p.source_epochs.clock)
+                    .collect::<Vec<_>>(),
+                clocks
+            );
+        }
+    }
+}
+
+#[test]
+fn a_pcr_discontinuity_inside_a_pes_stays_refused() {
+    // The discontinuity moves to a carrier that continues the unbounded PES.
+    let mut data = time_base_change(2);
+    let (boundary, next) = (3 * 188, 4 * 188);
+    let flags = data[boundary + 5];
+    data[boundary + 5] &= 0x7f;
+    data[next + 3] = 0x20 | (data[next + 3] & 15);
+    let mut moved = vec![0x47, 1, 0, data[next + 3], 183, flags];
+    moved.extend_from_slice(&data[boundary + 6..boundary + 12]);
+    moved.resize(188, 0xff);
+    data[next..next + 188].copy_from_slice(&moved);
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut source = Source::new(&data, &pool, 4096, 4096);
+    let mut observer = DemuxObserver::new(
+        DemuxScope {
+            program: 1,
+            pid: 256,
+            stream_type: stream_type::H264,
+            stream_id: stream_id::VIDEO_FIRST,
+            entity: SourceId(1),
+            epochs: EPOCHS,
+        },
+        pool.clone(),
+        ParseLimits::default(),
+    )
+    .unwrap();
+    loop {
+        let Step::Ready(event) = source.next().unwrap() else {
+            panic!("no PCR boundary")
+        };
+        if let TraceEvent::Transport(packet) = event
+            && packet.pid == 256
+        {
+            let boundary = packet.discontinuity_indicator();
+            let pushed = observer.push(packet, source.context());
+            if boundary {
+                assert_eq!(
+                    pushed.unwrap_err().error,
+                    Error::Unsupported("PCR discontinuity inside a PES")
+                );
+                return;
+            }
+            pushed.unwrap();
+            while !matches!(
+                observer.poll(&mut WorkBudget::new(4096), &RUN).unwrap(),
+                AssemblyStep::NeedPayload
+            ) {}
         }
     }
 }
