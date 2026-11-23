@@ -24,7 +24,8 @@ fn decode_frames<'a>(frames: impl IntoIterator<Item = &'a [u8]>) -> Result<(), D
 ```
 
 `examples/decode_dts.rs IN.dts [OUT.f32]` splits a stream by sync and FSIZE, skips
-extension substreams and writes interleaved f32le.
+extension substreams and writes interleaved f32le. `--reference-prototype` selects
+the compatibility bank for PCM comparisons.
 
 ## Supported
 
