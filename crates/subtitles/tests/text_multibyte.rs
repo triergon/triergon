@@ -119,7 +119,7 @@ const PROFILES: [(M, &str, usize); 7] = [
     (
         M::EucKr,
         include_str!("multibyte-mapping-data/CP949.TXT"),
-        8354,
+        8355,
     ),
     (
         M::Windows932,
@@ -160,6 +160,10 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
             continue;
         }
         assert!(map.insert(code, value).is_none());
+    }
+    if profile == M::EucKr {
+        // CP949.TXT 2.01 predates A2E8, which KS X 1001:2002 assigns.
+        assert!(map.insert(0xa2e8, '\u{327e}').is_none());
     }
     if matches!(profile, M::Big5Unicode | M::EucKr) {
         for byte in 0..128 {
@@ -297,10 +301,7 @@ fn every_euc_kr_profile_reports_exact_scalars_and_refusals() {
         (M::ReceiverEucKrC1, 0x9f),
         (M::ReceiverEucKrGlibc239, 0x9f),
     ] {
-        let mut pairs = mapping(M::EucKr, include_str!("multibyte-mapping-data/CP949.TXT"));
-        if profile == M::ReceiverEucKrGlibc239 {
-            assert!(pairs.insert(0xa2e8, '\u{327e}').is_none());
-        }
+        let pairs = mapping(M::EucKr, include_str!("multibyte-mapping-data/CP949.TXT"));
         for first in 0..=u8::MAX {
             let prefix = euc_kr_single(first, single_max);
             assert_eq!(

@@ -60,8 +60,8 @@ pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
     Err(Error::Unsupported("captured receiver charset label"))
 }
 /// [`receiver_charset`], with euc-kr resolved to
-/// [`MultibyteCharset::ReceiverEucKrGlibc239`](M::ReceiverEucKrGlibc239),
-/// which adds glibc's A2 E8 → U+327E.
+/// [`MultibyteCharset::ReceiverEucKrGlibc239`](M::ReceiverEucKrGlibc239), the
+/// same repertoire as the profile `receiver_charset` gives.
 pub fn receiver_charset_with_glibc_euc_kr(label: &[u8]) -> Result<Charset> {
     if label.eq_ignore_ascii_case(b"euc-kr") {
         Ok(Charset::Multibyte(M::ReceiverEucKrGlibc239))

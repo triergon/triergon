@@ -80,7 +80,6 @@ fn euc_c1_controls_are_explicit_not_cp949_alias() {
         decode(&p, &[0x81, 0x41], M::Windows949).unwrap(),
         "갂".as_bytes()
     );
-    assert!(decode(&p, &[0xa2, 0xe8], M::ReceiverEucKrC1).is_err());
 }
 #[test]
 fn cp932_pua_all1880_are_independently_indexed() {
@@ -100,7 +99,7 @@ fn cp932_pua_all1880_are_independently_indexed() {
     assert!(decode(&p, &[0xf0, 0x40], M::Windows932).is_err());
 }
 #[test]
-fn labels_do_not_gain_unavailable_native_aliases() {
+fn receiver_labels_have_no_aliases_beyond_the_reference_set() {
     for l in [
         b"euc_kr".as_slice(),
         b"windows-932",
@@ -139,7 +138,7 @@ fn nul_prefix_retains_full_utf8_and_source_owners() {
     }
 }
 #[test]
-fn empty_text_is_fact_not_synthetic_native_return() {
+fn an_empty_packet_converts_to_empty_text() {
     let p = Budget::new(1 << 20).unwrap();
     let v = run(&p, input(&p, b"big5", b""), 1);
     assert_eq!(v.outcome(), Outcome::Converted);
@@ -471,7 +470,7 @@ fn absent_receiver_declaration_remains_unknown_while_source_is_retained() {
     assert!(v.converted().is_none());
 }
 
-fn run_v2(p: &Budget, i: Input, q: u64) -> triergon_subtitles::compat::charset::PacketView {
+fn run_glibc(p: &Budget, i: Input, q: u64) -> triergon_subtitles::compat::charset::PacketView {
     let mut j = AssPacketJob::new_with_glibc_euc_kr(i, p, Limits::default(), 7).unwrap();
     let c = AtomicBool::new(false);
     for _ in 0..100000 {
@@ -479,18 +478,20 @@ fn run_v2(p: &Budget, i: Input, q: u64) -> triergon_subtitles::compat::charset::
             return j.take_output(&c).unwrap();
         }
     }
-    panic!("nonterminal v2")
+    panic!("nonterminal glibc job")
 }
 #[test]
-fn receiver_v2_adds_primary_a2e8_without_upgrading_strict_or_v1() {
+fn every_euc_kr_profile_maps_a2e8_as_ks_x_1001_2002_does() {
     use triergon_subtitles::compat::charset::receiver_charset_with_glibc_euc_kr;
     let p = Budget::new(1 << 20).unwrap();
-    assert_eq!(
-        decode(&p, &[0xa2, 0xe8], M::ReceiverEucKrGlibc239).unwrap(),
-        "\u{327e}".as_bytes()
-    );
-    assert!(decode(&p, &[0xa2, 0xe8], M::EucKr).is_err());
-    assert!(decode(&p, &[0xa2, 0xe8], M::ReceiverEucKrC1).is_err());
+    for profile in [M::EucKr, M::ReceiverEucKrC1, M::ReceiverEucKrGlibc239] {
+        assert_eq!(
+            decode(&p, &[0xa2, 0xe8], profile).unwrap(),
+            "\u{327e}".as_bytes()
+        );
+    }
+    // Windows' CP949 table leaves it unmapped.
+    assert!(decode(&p, &[0xa2, 0xe8], M::Windows949).is_err());
     assert_eq!(
         receiver_charset(b"euc-kr").unwrap(),
         Charset::Multibyte(M::ReceiverEucKrC1)
@@ -509,10 +510,10 @@ fn receiver_v2_adds_primary_a2e8_without_upgrading_strict_or_v1() {
     }
 }
 #[test]
-fn receiver_v2_literal_ass_payload_agrees_with_fresh_native_control() {
+fn glibc_euc_kr_packet_converts_a2e8_as_the_receiver_profile_does() {
     for q in [1, 7, 4096] {
         let p = Budget::new(1 << 20).unwrap();
-        let v = run_v2(&p, input(&p, b"euc-kr", &[0xa2, 0xe8]), q);
+        let v = run_glibc(&p, input(&p, b"euc-kr", &[0xa2, 0xe8]), q);
         assert_eq!(v.outcome(), Outcome::Converted);
         assert_eq!(
             v.visible().unwrap(),
@@ -524,17 +525,15 @@ fn receiver_v2_literal_ass_payload_agrees_with_fresh_native_control() {
             [PREFIX, &[0xa2, 0xe8]].concat()
         );
         assert!(v.source().decoded_utf8.is_none());
-        let old = run(&p, input(&p, b"euc-kr", &[0xa2, 0xe8]), q);
-        assert!(matches!(
-            old.outcome(),
-            Outcome::ConversionRefused(Error::Invalid(_))
-        ));
+        let receiver = run(&p, input(&p, b"euc-kr", &[0xa2, 0xe8]), q);
+        assert_eq!(receiver.outcome(), Outcome::Converted);
+        assert_eq!(receiver.visible(), v.visible());
     }
 }
 #[test]
-fn receiver_v2_nul_tail_retains_all_physical_and_full_unicode_owners() {
+fn glibc_euc_kr_packet_keeps_its_source_and_the_whole_conversion_past_a_nul() {
     let p = Budget::new(1 << 20).unwrap();
-    let v = run_v2(&p, input(&p, b"euc-kr", &[0xa2, 0xe8, 0, 0xa2, 0xe8]), 1);
+    let v = run_glibc(&p, input(&p, b"euc-kr", &[0xa2, 0xe8, 0, 0xa2, 0xe8]), 1);
     assert_eq!(
         v.visible().unwrap(),
         [PREFIX, "\u{327e}".as_bytes()].concat()
@@ -553,7 +552,7 @@ fn receiver_v2_nul_tail_retains_all_physical_and_full_unicode_owners() {
     assert_eq!(p.used(), Budget::control_storage_bytes());
 }
 #[test]
-fn receiver_v2_truncated_tail_work_zero_and_cancel_do_not_hide_source() {
+fn glibc_euc_kr_truncated_tail_work_zero_and_cancel_keep_the_source() {
     let p = Budget::new(1 << 20).unwrap();
     let i = input(&p, b"euc-kr", &[0xa2, 0xe8, 0xa2]);
     let original = i.payload.clone();
@@ -583,7 +582,7 @@ fn receiver_v2_truncated_tail_work_zero_and_cancel_do_not_hide_source() {
     panic!("nonterminal")
 }
 #[test]
-fn receiver_v2_all8387_primary_records_and_negative_neighbours() {
+fn glibc_euc_kr_maps_all_8387_primary_records_and_refuses_their_neighbours() {
     use std::collections::BTreeMap;
     let p = Budget::new(1 << 20).unwrap();
     let mut expected = BTreeMap::new();

@@ -76,10 +76,8 @@ pub mod charset {
     //!
     //! [`AssPacketJob`] converts one opaque ASS packet with the charset label the
     //! receiver accepts ([`receiver_charset`]) and reports the converted text and
-    //! the prefix the receiver keeps. [`receiver_charset_with_glibc_euc_kr`] and
-    //! [`AssPacketJob::new_with_glibc_euc_kr`] add glibc's EUC-KR mapping of
-    //! `A2E8`. The repertoire is the one the reference build's Linux/glibc `iconv`
-    //! accepts.
+    //! the prefix the receiver keeps. The repertoire is the one the reference
+    //! build's Linux/glibc `iconv` accepts.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::text::receiver_charset::{

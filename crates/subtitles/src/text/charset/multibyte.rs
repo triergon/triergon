@@ -20,8 +20,9 @@ pub enum MultibyteCharset {
     /// Unicode historical Shift-JIS table 2.0, which decodes 0x5C as yen and
     /// 0x7E as overline.
     ShiftJisUnicode,
-    /// CP949 table 2.01 restricted to A1–FE byte pairs, plus ASCII; the UHC
-    /// extension pairs are refused.
+    /// KS X 1001:2002 in EUC-KR: CP949 table 2.01 restricted to A1–FE byte
+    /// pairs, plus A2 E8 as U+327E, which KS X 1001:2002 adds, and ASCII; the
+    /// UHC extension pairs are refused.
     EucKr,
     /// Microsoft CP932 table 2.01.
     Windows932,
@@ -36,8 +37,8 @@ pub enum MultibyteCharset {
     ReceiverEucKrC1,
     /// CP932 plus the 1,880 user-defined codes F040–F9FC as U+E000–U+E757.
     ReceiverWindows932Pua,
-    /// [`ReceiverEucKrC1`](Self::ReceiverEucKrC1) plus A2 E8 as U+327E,
-    /// which together equal the glibc 2.39 EUC-KR charmap.
+    /// The glibc 2.39 EUC-KR charmap, which is
+    /// [`ReceiverEucKrC1`](Self::ReceiverEucKrC1).
     ReceiverEucKrGlibc239,
 }
 
@@ -92,9 +93,6 @@ impl MultibyteCharset {
                     // ASCII in every profile, plus the receiver profiles' C1 controls.
                     let last = if self == Self::EucKr { 0x7f } else { 0x9f };
                     return (byte <= last).then(|| char::from(byte));
-                }
-                if self == Self::ReceiverEucKrGlibc239 && code == 0xa2e8 {
-                    return Some('\u{327e}');
                 }
                 include_bytes!("mapping-data/euc_kr.bin")
             }
