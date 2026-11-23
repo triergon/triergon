@@ -1,4 +1,5 @@
 //! Delivery of validated PES continuations to a feed.
+use super::DiscontinuityFlag;
 use super::{Route, TransportStream};
 use crate::SourceEpochs;
 use crate::compat::pes::{DemuxObserver, ReadyContinuation, SourceContext};
@@ -193,7 +194,9 @@ impl TransportStream {
         work: &mut WorkBudget,
     ) -> Result<bool> {
         let pid = carrier.pid();
-        if self.feed_omissions.is_none() || (self.pcr_pid == Some(pid) && self.clock_pending) {
+        if self.feed_omissions.is_none()
+            || (self.pcr_pid == Some(pid) && self.clock_flag == DiscontinuityFlag::Pending)
+        {
             return Ok(false);
         }
         let Route::Pes(index) = self.route else {
@@ -243,7 +246,7 @@ impl TransportStream {
             }
         }
         if self.pcr_pid == Some(pid) {
-            self.clock_signal = false;
+            self.clock_flag = DiscontinuityFlag::Clear;
         }
         // Transport is observed first in the full trace. Count continuity
         // only when the consumer asks for the next source event.
@@ -277,7 +280,7 @@ impl TransportStream {
             &buffered[TS188_BYTES..2 * TS188_BYTES],
             pid,
             (counter + 1) & 15,
-        ) || (self.pcr_pid == Some(pid) && self.clock_pending)
+        ) || (self.pcr_pid == Some(pid) && self.clock_flag == DiscontinuityFlag::Pending)
         {
             return Ok(false);
         }
@@ -320,7 +323,7 @@ impl TransportStream {
             self.entity_end = None;
             self.route = Route::Pes(index);
             if self.pcr_pid == Some(pid) {
-                self.clock_signal = false;
+                self.clock_flag = DiscontinuityFlag::Clear;
             }
         }
         result?;

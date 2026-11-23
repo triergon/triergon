@@ -1,4 +1,5 @@
 //! The entry points and the carrier loop.
+use super::DiscontinuityFlag;
 use super::event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
 use super::feed::{FeedCarrier, FeedContinuation, FeedItem};
 use super::held::Counted;
@@ -74,7 +75,8 @@ impl TransportStream {
         };
         let pid = carrier.pid();
         let clock = self.pcr_pid == Some(pid);
-        if (clock && self.clock_pending) || self.collector.has_pending() {
+        if (clock && self.clock_flag == DiscontinuityFlag::Pending) || self.collector.has_pending()
+        {
             return Ok(ObservedContinuation::Fallback);
         }
         let route = &mut self.routes.as_mut_slice()[index];
@@ -122,7 +124,7 @@ impl TransportStream {
             return Err(Error::Cancelled);
         }
         if clock {
-            self.clock_signal = false;
+            self.clock_flag = DiscontinuityFlag::Clear;
         }
         let Some(bytes) = carrier.source.take() else {
             return Err(Error::SourceMismatch);

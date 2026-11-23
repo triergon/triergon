@@ -61,6 +61,24 @@ enum Route {
     Ignore,
 }
 
+/// The PCR PID's edge-detected discontinuity indicator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u16)]
+enum DiscontinuityFlag {
+    Clear = 0,
+    Raised = 1,
+    Pending = 2,
+}
+
+/// PCR samples since the last accepted discontinuity, saturating at two.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum PcrSamples {
+    Untracked = 0,
+    One = 1,
+    Two = 2,
+}
+
 /// The caller selects the program explicitly or requests single-program
 /// discovery. All PAT associations and raw transport/section facts remain
 /// visible.
@@ -89,17 +107,16 @@ pub struct TransportStream {
     tsid: Option<u16>,
     pcr_pid: Option<u16>,
     pmt_version: Option<u8>,
-    // None until the first explicitly accepted new-clock boundary; then saturate
+    // Untracked until the first explicitly accepted new-clock boundary; then saturate
     // at the normative minimum of two samples before another boundary.
-    clock_samples: Option<u8>,
+    clock_samples: PcrSamples,
     clock_continuity: Option<Continuity>,
     program: u16,
     format: PacketFormat,
     discover_program: bool,
     feed_validated_carriers: bool,
     unbounded_adts: bool,
-    clock_pending: bool,
-    clock_signal: bool,
+    clock_flag: DiscontinuityFlag,
     clock_quarantined: bool,
     logical_end: bool,
     finished: bool,
@@ -235,9 +252,8 @@ impl TransportStream {
             tsid: None,
             pcr_pid: None,
             clock_continuity: None,
-            clock_pending: false,
-            clock_signal: false,
-            clock_samples: None,
+            clock_flag: DiscontinuityFlag::Clear,
+            clock_samples: PcrSamples::Untracked,
             clock_quarantined: false,
             clock_epoch: 0,
             config_epoch: 0,
@@ -292,9 +308,9 @@ impl TransportStream {
                     configuration: 2,
                     clock: 0,
                 })
-            || self.clock_pending
+            || self.clock_flag == DiscontinuityFlag::Pending
             || self.clock_quarantined
-            || self.clock_samples.is_some()
+            || self.clock_samples != PcrSamples::Untracked
         {
             return Err(Error::SourceMismatch);
         }

@@ -1,5 +1,6 @@
 //! Program tables and the routes they bind.
 use super::event::{FaultKind, TraceEvent, TraceFault};
+use super::{DiscontinuityFlag, PcrSamples};
 use super::{PesRoute, PsiRoute, Route, TransportStream};
 use crate::SourceEpochs;
 use crate::pes::PesAssembler;
@@ -159,9 +160,8 @@ impl TransportStream {
             self.pmt_version = None;
             self.pcr_pid = None;
             self.clock_continuity = None;
-            self.clock_pending = false;
-            self.clock_signal = false;
-            self.clock_samples = None;
+            self.clock_flag = DiscontinuityFlag::Clear;
+            self.clock_samples = PcrSamples::Untracked;
             self.config_epoch = epoch;
         }
         if let Some(entry) = entry {
@@ -269,7 +269,7 @@ impl TransportStream {
             None => None,
         };
         let binding_changed = self.pcr_pid != pcr;
-        let pending_rebind = if binding_changed && self.clock_pending {
+        let pending_rebind = if binding_changed && self.clock_flag == DiscontinuityFlag::Pending {
             Some(TraceFault {
                 kind: FaultKind::Program,
                 pid: self.pcr_pid,
@@ -287,8 +287,7 @@ impl TransportStream {
         self.clock_continuity = clock;
         self.config_epoch = build.epoch;
         if binding_changed {
-            self.clock_pending = false;
-            self.clock_signal = false;
+            self.clock_flag = DiscontinuityFlag::Clear;
         }
         if let Some(fault) = pending_rebind {
             self.clock_quarantined = true;

@@ -1,6 +1,7 @@
 //! The program clock: PCR discontinuities and quarantine.
 use super::TransportStream;
 use super::event::{FaultKind, TraceEvent};
+use super::{DiscontinuityFlag, PcrSamples};
 use triergon_core::{Error, Result};
 
 impl TransportStream {
@@ -19,11 +20,10 @@ impl TransportStream {
             .adaptation
             .as_ref()
             .is_some_and(|field| field.pcr.is_some());
-        // Typed flags added 0.0106% to reordered playback or 0.1512% to split PES with bit tests.
-        if !signalled && !self.clock_signal && !self.clock_pending && !self.clock_quarantined {
+        if !signalled && self.clock_flag == DiscontinuityFlag::Clear && !self.clock_quarantined {
             // The ordinary PCR carrier: the second sample after a new time base.
-            if has_pcr && self.clock_samples.is_some() {
-                self.clock_samples = Some(2);
+            if has_pcr && self.clock_samples != PcrSamples::Untracked {
+                self.clock_samples = PcrSamples::Two;
             }
             return Ok(None);
         }
@@ -40,32 +40,38 @@ impl TransportStream {
         has_pcr: bool,
     ) -> Result<Option<TraceEvent>> {
         if self.clock_quarantined {
-            self.clock_signal = signalled;
+            self.clock_flag = if signalled {
+                DiscontinuityFlag::Raised
+            } else {
+                DiscontinuityFlag::Clear
+            };
             return Ok(None);
         }
-        if self.clock_pending && !signalled {
-            self.clock_signal = false;
+        if self.clock_flag == DiscontinuityFlag::Pending && !signalled {
+            self.clock_flag = DiscontinuityFlag::Clear;
             return Ok(Some(
                 self.quarantine_clock(pid, "PCR discontinuity signal dropped"),
             ));
         }
-        if signalled && !self.clock_signal {
-            self.clock_pending = true;
-        }
-        self.clock_signal = signalled;
+        self.clock_flag = match (signalled, self.clock_flag) {
+            (false, _) => DiscontinuityFlag::Clear,
+            (true, DiscontinuityFlag::Clear) => DiscontinuityFlag::Pending,
+            (true, flag) => flag,
+        };
         if !has_pcr {
             return Ok(None);
         }
-        if self.clock_pending {
-            if self.clock_samples == Some(1) {
+        if self.clock_flag == DiscontinuityFlag::Pending {
+            if self.clock_samples == PcrSamples::One {
+                self.clock_flag = DiscontinuityFlag::Raised;
                 return Ok(Some(self.quarantine_clock(
                     pid,
                     "clock discontinuity before two PCR samples",
                 )));
             }
             self.clock_epoch = self.clock_epoch.checked_add(1).ok_or(Error::Overflow)?;
-            self.clock_pending = false;
-            self.clock_samples = Some(1);
+            self.clock_flag = DiscontinuityFlag::Raised;
+            self.clock_samples = PcrSamples::One;
             for route in self.routes.as_mut_slice() {
                 route.epochs.clock = self.clock_epoch;
                 if let Some(assembler) = route.assembler.as_mut() {
@@ -77,13 +83,12 @@ impl TransportStream {
                 clock_epoch: self.clock_epoch,
             }));
         }
-        if self.clock_samples.is_some() {
-            self.clock_samples = Some(2);
+        if self.clock_samples != PcrSamples::Untracked {
+            self.clock_samples = PcrSamples::Two;
         }
         Ok(None)
     }
     fn quarantine_clock(&mut self, pid: u16, reason: &'static str) -> TraceEvent {
-        self.clock_pending = false;
         self.clock_quarantined = true;
         self.diagnostic(FaultKind::Transport, Some(pid), Error::Invalid(reason))
     }

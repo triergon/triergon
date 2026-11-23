@@ -1,5 +1,6 @@
 //! Entity ends, logical EOF, discontinuities and trace identity.
 use super::event::{CompactTraceEvent, FaultKind, TraceEvent};
+use super::{DiscontinuityFlag, PcrSamples};
 use super::{PsiRoute, TransportStream};
 use crate::AssemblyStep;
 use crate::retryable;
@@ -33,9 +34,8 @@ impl TransportStream {
         self.tsid = None;
         self.pcr_pid = None;
         self.clock_continuity = None;
-        self.clock_pending = false;
-        self.clock_signal = false;
-        self.clock_samples = None;
+        self.clock_flag = DiscontinuityFlag::Clear;
+        self.clock_samples = PcrSamples::Untracked;
         self.clock_quarantined = false;
         self.boundary_event = true;
         Ok(())
