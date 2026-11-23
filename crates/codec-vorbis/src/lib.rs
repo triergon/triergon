@@ -147,13 +147,10 @@ impl Decoder {
             return Err(DecodeError::Invalid("comment header"));
         }
         let channels = usize::from(id.channels);
-        if channels > ChannelLayout::CAPACITY {
-            return Err(DecodeError::Unsupported(
-                "more channels than an output layout holds",
-            ));
-        }
         let blocksizes = id.blocksize.map(usize::from);
-        let (layout, planes) = output_layout(channels);
+        let (layout, planes) = output_layout(channels).ok_or(DecodeError::Unsupported(
+            "more channels than an output layout holds",
+        ))?;
         let setup = Setup::parse(setup, channels, blocksizes, budget)?;
 
         let half = blocksizes[1] / 2;
@@ -411,16 +408,12 @@ fn apply_floors(
 /// FFmpeg's layout for `channels` coded channels and the output plane of each: the
 /// Vorbis order mapped to native order up to 8 channels; beyond that, coded order
 /// without positions.
-fn output_layout(channels: usize) -> (ChannelLayout, [u8; ChannelLayout::CAPACITY]) {
+fn output_layout(channels: usize) -> Option<(ChannelLayout, [u8; ChannelLayout::CAPACITY])> {
     if let Some(mapped) = vorbis_order(channels).and_then(native_order) {
-        return mapped;
+        return Some(mapped);
     }
-    let mut planes = [0u8; ChannelLayout::CAPACITY];
-    for (i, plane) in planes.iter_mut().enumerate() {
-        *plane = i as u8;
-    }
-    let layout = ChannelLayout::unspecified(channels).unwrap_or_default();
-    (layout, planes)
+    let layout = ChannelLayout::unspecified(channels)?;
+    Some((layout, core::array::from_fn(|i| i as u8)))
 }
 
 impl AudioDecoder for Decoder {
