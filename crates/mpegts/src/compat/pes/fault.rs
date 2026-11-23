@@ -64,7 +64,8 @@ pub enum PesFaultKind {
     OpcrWithoutPcr,
 }
 impl PesFaultKind {
-    fn source_error(self) -> Error {
+    /// The error the source view reports for this fault.
+    pub fn source_error(self) -> Error {
         match self {
             Self::TransportError => Error::Invalid(TRANSPORT_ERROR_INDICATOR),
             Self::Scrambling => Error::Unsupported(SCRAMBLED_PAYLOAD),
@@ -74,7 +75,8 @@ impl PesFaultKind {
             Self::OpcrWithoutPcr => Error::Invalid(OPCR_WITHOUT_PCR),
         }
     }
-    fn source_layer(self) -> FaultKind {
+    /// The layer the source view reports this fault in.
+    pub fn source_layer(self) -> FaultKind {
         if matches!(self, Self::TimestampMarkers | Self::ForbiddenTimeFlags) {
             FaultKind::Pes
         } else {
@@ -457,7 +459,7 @@ impl TransportFaultRecovery {
                 value: fault,
             });
         }
-        self.pending = Some(TransportFaultJob::new_rejected(
+        self.pending = Some(TransportFaultJob::new_rejected::<false>(
             fault,
             context,
             &self.inner,
@@ -550,7 +552,7 @@ pub(crate) fn video_timing_hint(packet: &TransportPacket) -> bool {
 /// adaptation field of at least one byte.
 // Inlined into `TransportFaultRecovery::poll` it measured +0.084% on a PES fault workload.
 #[inline(never)]
-pub(crate) fn diagnostic_header(raw: &[u8], pid: u16, start: usize) -> Option<CarrierHeader> {
+fn diagnostic_header(raw: &[u8], pid: u16, start: usize) -> Option<CarrierHeader> {
     let header = CarrierHeader::parse(raw).ok()?;
     let payload_start = 5 + usize::from(*raw.get(4)?);
     (header.pusi
@@ -562,7 +564,7 @@ pub(crate) fn diagnostic_header(raw: &[u8], pid: u16, start: usize) -> Option<Ca
 }
 
 /// One damaged carrier being checked and cut into a packet, phase by phase. The
-/// comparison-only selected-AVC view shares its envelope check and timing hint.
+/// comparison-only selected-AVC view stages its carriers as these jobs too.
 #[derive(Debug)]
 pub(crate) struct TransportFaultJob {
     carrier: PesFaultCarrier,
@@ -591,6 +593,7 @@ impl TransportFaultJob {
     ) -> std::result::Result<Self, Refused<TransportPacket>> {
         Self::from_transport(packet, input, inner, cursor, false)
     }
+    /// The job for an accepted carrier whose PES header has a timing fault.
     #[expect(
         clippy::result_large_err,
         reason = "return the original charged transport inline"
@@ -636,7 +639,7 @@ impl TransportFaultJob {
             }
             let kind = match (packet.transport_error, packet.scrambling, header_fault) {
                 (false, 0, true) => {
-                    if body.as_ref()[7] >> 6 == 1 {
+                    if body.as_ref().get(7).is_some_and(|flags| flags >> 6 == 1) {
                         PesFaultKind::ForbiddenTimeFlags
                     } else {
                         PesFaultKind::TimestampMarkers
@@ -682,11 +685,14 @@ impl TransportFaultJob {
             spans,
         })
     }
+    /// The job for a carrier the source view rejected only for its PCR or OPCR field.
+    // `COMPARED` selects nothing: it gives the comparison-only view its own instantiation.
+    // One shared with it measured +0.28% on the rejected-clock workloads.
     #[expect(
         clippy::result_large_err,
         reason = "return the original charged diagnostic inline"
     )]
-    fn new_rejected(
+    fn new_rejected<const COMPARED: bool>(
         fault: TraceFault,
         input: SourceContext,
         inner: &DemuxObserver,
@@ -1081,5 +1087,47 @@ impl TransportFaultJob {
             header_source_ranges: self.header_ranges,
             spans: self.spans,
         })
+    }
+}
+
+/// The entry points of the comparison-only selected-AVC view.
+#[cfg(feature = "reference-trace")]
+impl TransportFaultJob {
+    /// The job for an accepted carrier whose PES header has a timing fault, positioned by
+    /// `cursor`.
+    #[expect(
+        clippy::result_large_err,
+        reason = "return the original charged transport inline"
+    )]
+    pub(crate) fn staged_header(
+        packet: TransportPacket,
+        input: SourceContext,
+        inner: &DemuxObserver,
+        cursor: Option<&triergon_core::InputCursor>,
+    ) -> std::result::Result<Self, Refused<TransportPacket>> {
+        Self::from_transport(packet, input, inner, cursor, true)
+    }
+    /// The job for a carrier the source view rejected only for its PCR or OPCR field.
+    #[expect(
+        clippy::result_large_err,
+        reason = "return the original charged diagnostic inline"
+    )]
+    pub(crate) fn staged_rejected(
+        fault: TraceFault,
+        input: SourceContext,
+        inner: &DemuxObserver,
+    ) -> std::result::Result<Self, Refused<TraceFault>> {
+        Self::new_rejected::<true>(fault, input, inner)
+    }
+    /// The rejected carrier the job holds, when it was staged from a rejection.
+    pub(crate) fn rejection(&self) -> Option<&crate::transport::RejectedTransport> {
+        match &self.carrier {
+            PesFaultCarrier::Rejected(rejection) => Some(rejection),
+            PesFaultCarrier::Transport(_) => None,
+        }
+    }
+    /// The diagnosed packet of a job whose source diagnostic is confirmed.
+    pub(crate) fn finish_staged(self, inner: &mut DemuxObserver) -> Result<PesFaultPacket> {
+        self.finish_source(inner)
     }
 }

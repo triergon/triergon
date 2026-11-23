@@ -5,11 +5,13 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, SourceLocation,
     Step, WorkBudget,
 };
-use triergon_mpegts::compat::pes::{DemuxClock, DemuxScope, RegisteredCarriage, SourceContext};
+use triergon_mpegts::compat::pes::{
+    DemuxClock, DemuxScope, PesFaultKind, PesFaultPacket, RegisteredCarriage, SourceContext,
+};
 use triergon_mpegts::pes::stream_id;
 use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::reference_trace::recovery::{
-    DemuxObservation, DiagnosticPacket, RecoveryObserver, RejectedPolicy, SelectedFault,
+    DemuxObservation, RecoveryObserver, RejectedPolicy,
 };
 use triergon_mpegts::stream::{TraceEvent, TraceFault, TransportStream};
 use triergon_mpegts::transport::{TransportInspection, TransportInspector};
@@ -160,7 +162,7 @@ fn drain(o: &mut RecoveryObserver) -> Vec<DemuxObservation> {
     }
     panic!("bounded PES assembly failed to progress");
 }
-fn diagnostic(id: &str, expected: SelectedFault, raw: Option<u64>) {
+fn diagnostic(id: &str, expected: PesFaultKind, raw: Option<u64>) {
     let b = Budget::new(1 << 20).unwrap();
     let mut o = observer(&b);
     let events = collect(bytes(id), &b);
@@ -181,7 +183,7 @@ fn diagnostic(id: &str, expected: SelectedFault, raw: Option<u64>) {
     let DemuxObservation::FromSelectedDiagnostic(p) = outputs.pop().unwrap() else {
         panic!("source rejection needs distinct neutral header observation")
     };
-    assert_eq!(p.selected_fault, expected);
+    assert_eq!(p.kind, expected);
     assert_eq!(p.source_fault.error, expected.source_error());
     assert_eq!(p.source_fault.kind, expected.source_layer());
     assert_eq!(
@@ -208,7 +210,7 @@ fn diagnostic(id: &str, expected: SelectedFault, raw: Option<u64>) {
     assert_eq!(p.encoded_header.encoded_pts_raw33(), raw);
     assert_eq!(
         p.encoded_header.time_flags(),
-        if expected == SelectedFault::ForbiddenTimeFlags {
+        if expected == PesFaultKind::ForbiddenTimeFlags {
             1
         } else {
             2
@@ -216,13 +218,13 @@ fn diagnostic(id: &str, expected: SelectedFault, raw: Option<u64>) {
     );
     assert_eq!(
         p.encoded_header.markers_valid(),
-        expected != SelectedFault::TimestampMarkers && raw.is_some()
+        raw.map(|_| expected != PesFaultKind::TimestampMarkers)
     );
     let input_n = 8;
     assert_eq!(p.input_context, context(input_n));
     assert_eq!(
         p.diagnostic_context,
-        context(if expected == SelectedFault::PcrEncoding {
+        context(if expected == PesFaultKind::PcrEncoding {
             8
         } else {
             10
@@ -292,7 +294,7 @@ macro_rules! diag {
     ($name:ident,$id:literal,$kind:ident,$raw:expr) => {
         #[test]
         fn $name() {
-            diagnostic($id, SelectedFault::$kind, $raw);
+            diagnostic($id, PesFaultKind::$kind, $raw);
         }
     };
 }
@@ -435,7 +437,7 @@ fn staged(b: &Budget) -> (RecoveryObserver, TraceFault) {
     };
     (o, f.clone())
 }
-fn one(o: &mut RecoveryObserver) -> DiagnosticPacket {
+fn one(o: &mut RecoveryObserver) -> PesFaultPacket {
     let mut p = drain(o);
     assert_eq!(p.len(), 1);
     let DemuxObservation::FromSelectedDiagnostic(p) = p.pop().unwrap() else {

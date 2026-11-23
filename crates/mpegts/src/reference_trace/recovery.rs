@@ -3,12 +3,12 @@
 //! [`RecoveryObserver`] wraps a
 //! [`DemuxObserver`] and also assembles the
 //! packets FFmpeg emits for carriers the source view rejects
-//! ([`RecoveredPacket`], [`DiagnosticPacket`]). It follows one selected program
+//! ([`RecoveredPacket`]) or diagnoses ([`PesFaultPacket`]). It follows one selected program
 //! through PAT and PMT changes ([`PatSelection`], [`PmtBindingJob`]).
 //!
 //! Opt-in real rejected-carrier observation. No validated source packet/header
 //! is forged. OPCR and explicit selected-AVC diagnostic policies are separate.
-use crate::compat::pes::fault::TransportFaultJob;
+use crate::compat::pes::fault::{PesFaultPacket, TransportFaultJob};
 use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage, SourceContext,
@@ -24,7 +24,6 @@ use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, SourceLoca
 mod lifecycle;
 mod selected;
 pub use lifecycle::{PatRoute, PatSelection, PmtBinding, PmtBindingJob};
-pub use selected::{DiagnosticCarrier, DiagnosticHeader, DiagnosticPacket, SelectedFault};
 
 /// Which rejected carriers a [`RecoveryObserver`] assembles packets from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -110,7 +109,7 @@ pub enum DemuxObservation {
     /// A packet from a carrier the source view rejected.
     FromRejectedCarrier(RecoveredPacket),
     /// A packet from a selected carrier with a source diagnostic.
-    FromSelectedDiagnostic(DiagnosticPacket),
+    FromSelectedDiagnostic(PesFaultPacket),
 }
 
 #[derive(Debug)]
@@ -136,9 +135,12 @@ struct Pending {
 }
 
 #[derive(Debug)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one pending carrier inline; dynamic storage is charged, no Box"
+)]
 enum RecoveryPending {
     Opcr(Pending),
-    Selected(selected::SelectedPending),
     TransportFault(TransportFaultJob),
 }
 
@@ -268,8 +270,7 @@ impl RecoveryObserver {
     pub fn pending_rejection(&self) -> Option<&RejectedTransport> {
         self.pending.as_ref().and_then(|p| match p {
             RecoveryPending::Opcr(p) => Some(&p.rejection),
-            RecoveryPending::Selected(p) => p.rejection(),
-            RecoveryPending::TransportFault(_) => None,
+            RecoveryPending::TransportFault(job) => job.rejection(),
         })
     }
     /// Pushes the next accepted carrier of the selected PID in source order.
@@ -515,9 +516,9 @@ impl RecoveryObserver {
     ) -> Result<AssemblyStep<DemuxObservation>> {
         let step = match job.poll(&self.inner, work, cancel) {
             Ok(AssemblyStep::Output(())) => {
-                let packet = job.finish(&mut self.inner)?;
+                let packet = job.finish_staged(&mut self.inner)?;
                 return Ok(AssemblyStep::Output(
-                    DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket::from(packet)),
+                    DemuxObservation::FromSelectedDiagnostic(packet),
                 ));
             }
             Ok(AssemblyStep::Yield) => Ok(AssemblyStep::Yield),
@@ -543,9 +544,6 @@ impl RecoveryObserver {
                     .inner
                     .poll_bound(work, cancel, input)
                     .map(|step| step.map(DemuxObservation::Accepted));
-            }
-            Some(RecoveryPending::Selected(pending)) => {
-                return self.poll_selected(pending, work, cancel);
             }
             Some(RecoveryPending::TransportFault(job)) => {
                 return self.poll_transport_fault(job, work, cancel);

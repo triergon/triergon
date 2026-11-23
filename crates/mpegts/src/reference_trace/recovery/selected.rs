@@ -1,201 +1,10 @@
-//! Explicit finite AVC diagnostic view.
+//! Explicit finite AVC diagnostic view: the selected carriers are staged as the fault jobs of
+//! [`TransportFaultRecovery`](crate::compat::pes::TransportFaultRecovery), under this
+//! observer's own admission.
 use super::*;
-use crate::compat::pes::fault::{diagnostic_header, video_timing_hint};
-use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
+use crate::compat::pes::fault::video_timing_hint;
 use crate::stream::{FaultKind, TraceFault};
-use crate::transport::{PCR_ENCODING, SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
-
-/// The source fault of a selected AVC carrier that the demuxer still emits a packet for.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SelectedFault {
-    /// The PCR's reserved bits or extension are invalid.
-    PcrEncoding,
-    /// The carrier has its transport error indicator set.
-    TransportError,
-    /// The carrier's transport scrambling control is nonzero.
-    Scrambling,
-    /// The PES PTS has invalid marker bits.
-    TimestampMarkers,
-    /// The PES header's timing flags take the forbidden value.
-    ForbiddenTimeFlags,
-}
-impl SelectedFault {
-    /// The error the source view reports for this fault.
-    pub fn source_error(self) -> Error {
-        match self {
-            Self::PcrEncoding => Error::Invalid(PCR_ENCODING),
-            Self::TransportError => Error::Invalid(TRANSPORT_ERROR_INDICATOR),
-            Self::Scrambling => Error::Unsupported(SCRAMBLED_PAYLOAD),
-            Self::TimestampMarkers => Error::Invalid(TIMESTAMP_MARKERS),
-            Self::ForbiddenTimeFlags => Error::Invalid(FORBIDDEN_TIME_FLAGS),
-        }
-    }
-    /// The layer the source view reports this fault in.
-    pub fn source_layer(self) -> FaultKind {
-        match self {
-            Self::TimestampMarkers | Self::ForbiddenTimeFlags => FaultKind::Pes,
-            _ => FaultKind::Transport,
-        }
-    }
-}
-/// The carrier a [`DiagnosticPacket`] was assembled from.
-#[derive(Debug)]
-pub enum DiagnosticCarrier {
-    /// A carrier the transport inspector accepted.
-    Transport(TransportPacket),
-    /// A carrier the transport inspector rejected.
-    Rejected(RejectedTransport),
-}
-impl DiagnosticCarrier {
-    /// The carrier's original bytes, prefix included.
-    pub fn backing_bytes(&self) -> &Bytes {
-        match self {
-            Self::Transport(p) => &p.source,
-            Self::Rejected(p) => p.bytes(),
-        }
-    }
-    fn source_offset(&self) -> u64 {
-        match self {
-            Self::Transport(p) => p.source_offset,
-            Self::Rejected(p) => p.source_offset(),
-        }
-    }
-}
-/// Encoded demux fact, not a source PesHeader. Invalid marker bits remain raw.
-#[derive(Debug)]
-pub struct DiagnosticHeader {
-    pub(crate) bytes: Bytes,
-    pub(crate) pts: Option<u64>,
-    pub(crate) markers_valid: bool,
-    pub(crate) time_flags: u8,
-}
-impl DiagnosticHeader {
-    /// The raw PES header bytes, as encoded in the carrier.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.bytes.as_ref()
-    }
-    /// The storage that holds the header bytes.
-    pub fn backing_bytes(&self) -> &Bytes {
-        &self.bytes
-    }
-    /// The encoded 33-bit PTS, when present.
-    pub fn encoded_pts_raw33(&self) -> Option<u64> {
-        self.pts
-    }
-    /// Whether a PTS is present with valid marker bits.
-    pub fn markers_valid(&self) -> bool {
-        self.markers_valid
-    }
-    /// The 2-bit `PTS_DTS_flags` value of the header.
-    pub fn time_flags(&self) -> u8 {
-        self.time_flags
-    }
-}
-/// A packet the demuxer emits from a selected carrier with a source diagnostic.
-#[derive(Debug)]
-pub struct DiagnosticPacket {
-    /// The program number of the observed scope.
-    pub program: u16,
-    /// The 13-bit PID of the observed scope.
-    pub pid: u16,
-    /// Where the carrier begins in the source.
-    pub source_origin: SourceLocation,
-    /// The clock and configuration epochs of the carrier's input.
-    pub source_epochs: SourceEpochs,
-    /// The demuxer's byte position of the packet.
-    pub position: i64,
-    /// The demuxer's packet flags, as in [`DemuxPacket::flags`].
-    pub flags: u32,
-    /// The demuxer's duration in 90 kHz ticks; 0 is its unknown sentinel.
-    pub duration90_raw: i64,
-    /// The PES stream ID of the observed scope.
-    pub stream_id: u8,
-    /// The fault the packet was assembled despite.
-    pub selected_fault: SelectedFault,
-    /// The source's own diagnostic for the fault.
-    pub source_fault: TraceFault,
-    /// Original accepted or rejected carrier including its complete source bytes.
-    pub carrier: DiagnosticCarrier,
-    /// The source context the carrier was pushed with.
-    pub input_context: SourceContext,
-    /// Event ordinal and epochs at the diagnostic that confirmed the fault.
-    pub diagnostic_context: SourceContext,
-    /// Original header bytes and timestamp fields observed in the faulted carrier.
-    pub encoded_header: DiagnosticHeader,
-    /// Where the header bytes lie in the source.
-    pub header_source_ranges: BudgetVec<SourceRange>,
-    /// Payload bytes after the header.
-    pub payload_len: usize,
-    /// Ordered spans aliasing the original carrier payload after the PES header.
-    pub spans: BudgetVec<DemuxSpan>,
-}
-impl DiagnosticPacket {
-    /// The payload bytes, one slice per span.
-    pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
-        self.spans.as_slice().iter().map(AsRef::as_ref)
-    }
-}
-impl From<crate::compat::pes::fault::TransportFaultPacket> for DiagnosticPacket {
-    fn from(packet: crate::compat::pes::fault::TransportFaultPacket) -> Self {
-        let header = DiagnosticHeader {
-            bytes: packet.encoded_header.backing_bytes().clone(),
-            pts: Some(packet.encoded_header.encoded_pts_raw33()),
-            markers_valid: true,
-            time_flags: 2,
-        };
-        Self {
-            program: packet.program,
-            pid: packet.pid,
-            source_origin: packet.source_origin,
-            source_epochs: packet.source_epochs,
-            position: packet.position,
-            flags: packet.flags,
-            duration90_raw: packet.duration90_raw,
-            stream_id: packet.stream_id,
-            selected_fault: match packet.kind {
-                crate::compat::pes::fault::TransportFaultKind::TransportError => {
-                    SelectedFault::TransportError
-                }
-                crate::compat::pes::fault::TransportFaultKind::Scrambling => {
-                    SelectedFault::Scrambling
-                }
-            },
-            source_fault: packet.source_fault,
-            carrier: DiagnosticCarrier::Transport(packet.carrier),
-            input_context: packet.input_context,
-            diagnostic_context: packet.diagnostic_context,
-            encoded_header: header,
-            header_source_ranges: packet.header_source_ranges,
-            payload_len: packet.payload_len,
-            spans: packet.spans,
-        }
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct SelectedPending {
-    carrier: DiagnosticCarrier,
-    kind: SelectedFault,
-    input: SourceContext,
-    diagnostic: Option<(TraceFault, SourceContext)>,
-    start: usize,
-    phase: u8,
-    header_len: usize,
-    pts: Option<u64>,
-    header_ranges: BudgetVec<SourceRange>,
-    spans: BudgetVec<DemuxSpan>,
-}
-impl SelectedPending {
-    pub(super) fn rejection(&self) -> Option<&RejectedTransport> {
-        match &self.carrier {
-            DiagnosticCarrier::Rejected(r) => Some(r),
-            DiagnosticCarrier::Transport(_) => None,
-        }
-    }
-    fn counter(&self) -> u8 {
-        self.carrier.backing_bytes().as_ref()[3] & 15
-    }
-}
+use crate::transport::PCR_ENCODING;
 
 /// Constant bounded hint only; no source header is validated or replaced here.
 /// The staged carrier cannot emit until its actual strict diagnostic arrives.
@@ -283,65 +92,23 @@ impl RecoveryObserver {
                     "selected diagnostic envelope unobserved",
                 ));
             }
-            let body = packet
-                .payload
-                .as_ref()
-                .ok_or(Error::Unsupported("selected diagnostic no payload"))?;
-            let start = usize::try_from(
-                packet
-                    .payload_source_offset
-                    .checked_sub(packet.source_offset)
-                    .ok_or(Error::Overflow)?,
-            )
-            .map_err(|_| Error::Overflow)?;
-            if start + body.len() != 188 {
-                return Err(Error::Invalid("selected diagnostic payload extent"));
-            }
-            let kind = if packet.transport_error {
-                SelectedFault::TransportError
-            } else if packet.scrambling != 0 {
-                SelectedFault::Scrambling
-            } else if body.as_ref().get(7).is_some_and(|b| b >> 6 == 1) {
-                SelectedFault::ForbiddenTimeFlags
-            } else {
-                SelectedFault::TimestampMarkers
-            };
-            Ok((kind, start))
+            Ok(())
         })();
-        let (kind, start) = match admission {
-            Ok(v) => v,
-            Err(error) => {
-                return Err(Refused {
-                    error,
-                    value: packet,
-                });
-            }
-        };
-        if matches!(
-            kind,
-            SelectedFault::TransportError | SelectedFault::Scrambling
-        ) {
-            let offset = packet.source_offset;
-            let job = TransportFaultJob::new(packet, c, &self.inner, input)?;
-            self.last = Some((c.source_event_ordinal, offset));
-            self.entity_first = false;
-            self.pending = Some(RecoveryPending::TransportFault(job));
-            return Ok(());
+        if let Err(error) = admission {
+            return Err(Refused {
+                error,
+                value: packet,
+            });
         }
-        self.last = Some((c.source_event_ordinal, packet.source_offset));
+        let offset = packet.source_offset;
+        let job = if packet.transport_error || packet.scrambling != 0 {
+            TransportFaultJob::new(packet, c, &self.inner, input)?
+        } else {
+            TransportFaultJob::staged_header(packet, c, &self.inner, input)?
+        };
+        self.last = Some((c.source_event_ordinal, offset));
         self.entity_first = false;
-        self.pending = Some(RecoveryPending::Selected(SelectedPending {
-            carrier: DiagnosticCarrier::Transport(packet),
-            kind,
-            input: c,
-            diagnostic: None,
-            start,
-            phase: 0,
-            header_len: 0,
-            pts: None,
-            header_ranges: BudgetVec::new(&self.budget),
-            spans: BudgetVec::new(&self.budget),
-        }));
+        self.pending = Some(RecoveryPending::TransportFault(job));
         Ok(())
     }
     /// Stage the source diagnostic and its complete original carrier after
@@ -371,7 +138,7 @@ impl RecoveryObserver {
             self.selected_context(r.source_id(), r.source_offset(), c, r.bytes())?;
             if fault.kind != FaultKind::Transport
                 || fault.pid.is_some()
-                || fault.error != SelectedFault::PcrEncoding.source_error()
+                || fault.error != Error::Invalid(PCR_ENCODING)
                 || r.error() != fault.error
                 || fault.location.source != self.scope().entity
                 || fault.location.offset != r.source_offset()
@@ -395,10 +162,10 @@ impl RecoveryObserver {
                     "selected invalid PCR envelope unobserved",
                 ));
             }
-            Ok((r.clone(), f.payload_start))
+            Ok(r.source_offset())
         })();
-        let (r, start) = match admission {
-            Ok(v) => v,
+        let offset = match admission {
+            Ok(offset) => offset,
             Err(error) => {
                 return Err(Refused {
                     error,
@@ -406,52 +173,21 @@ impl RecoveryObserver {
                 });
             }
         };
-        self.last = Some((c.source_event_ordinal, r.source_offset()));
+        let job = TransportFaultJob::staged_rejected(fault, c, &self.inner)?;
+        self.last = Some((c.source_event_ordinal, offset));
         self.entity_first = false;
-        self.pending = Some(RecoveryPending::Selected(SelectedPending {
-            carrier: DiagnosticCarrier::Rejected(r),
-            kind: SelectedFault::PcrEncoding,
-            input: c,
-            diagnostic: Some((fault, c)),
-            start,
-            phase: 0,
-            header_len: 0,
-            pts: None,
-            header_ranges: BudgetVec::new(&self.budget),
-            spans: BudgetVec::new(&self.budget),
-        }));
+        self.pending = Some(RecoveryPending::TransportFault(job));
         Ok(())
     }
     /// A wrong/stale diagnostic leaves the one original pending storage intact.
     pub fn confirm_source_fault(&mut self, fault: &TraceFault, c: SourceContext) -> Result<()> {
-        if let Some(RecoveryPending::TransportFault(job)) = self.pending.as_mut() {
-            job.confirm(fault, c)?;
-            self.last = Some((c.source_event_ordinal, fault.location.offset));
-            self.entity_first = false;
-            return Ok(());
-        }
-        let Some(RecoveryPending::Selected(p)) = self.pending.as_mut() else {
+        let Some(RecoveryPending::TransportFault(job)) = self.pending.as_mut() else {
             return Err(Error::Invalid(
                 "no selected source fault awaiting diagnostic",
             ));
         };
-        if p.diagnostic.is_some()
-            || fault.rejected.is_some()
-            || fault.kind != p.kind.source_layer()
-            || fault.error != p.kind.source_error()
-            || fault.pid != Some(self.inner.scope().pid)
-            || fault.location.source != self.inner.scope().entity
-            || fault.location.offset != p.carrier.source_offset()
-            || c.epochs != p.input.epochs
-            || c.byte_run_epoch.is_some()
-            || c.source_event_ordinal <= p.input.source_event_ordinal
-        {
-            return Err(Error::Invalid(
-                "selected source diagnostic context mismatch",
-            ));
-        }
-        p.diagnostic = Some((fault.clone(), c));
-        self.last = Some((c.source_event_ordinal, p.carrier.source_offset()));
+        job.confirm(fault, c)?;
+        self.last = Some((c.source_event_ordinal, fault.location.offset));
         self.entity_first = false;
         Ok(())
     }
@@ -482,236 +218,5 @@ impl RecoveryObserver {
         }
         self.pending_timeline = None;
         Ok(())
-    }
-    /// Polls the pending selected carrier `p`, which stays pending until its packet is out.
-    pub(super) fn poll_selected(
-        &mut self,
-        mut p: SelectedPending,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<AssemblyStep<DemuxObservation>> {
-        let step = match p.advance(&self.inner, work, cancel) {
-            Ok(Selected::Packet { header, position }) => {
-                return self.finish_selected(p, header, position);
-            }
-            Ok(Selected::Yield) => Ok(AssemblyStep::Yield),
-            Ok(Selected::NeedDiagnostic) => Ok(AssemblyStep::NeedPayload),
-            Err(error) => Err(error),
-        };
-        self.pending = Some(RecoveryPending::Selected(p));
-        step
-    }
-}
-
-/// How far a step of the selected carrier got.
-enum Selected {
-    /// The work grant ran out.
-    Yield,
-    /// The carrier waits for its source diagnostic.
-    NeedDiagnostic,
-    /// Every check passed; the packet's header and demuxer position.
-    Packet {
-        header: DiagnosticHeader,
-        position: i64,
-    },
-}
-
-impl SelectedPending {
-    /// Each unit validates one fixed <=6-byte field or commits one charged span
-    /// action. Pressure retry never repeats the completed syntax phases.
-    fn advance(
-        &mut self,
-        inner: &DemuxObserver,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Selected> {
-        let p = self;
-        loop {
-            if cancel.load(Ordering::Relaxed) {
-                return Err(Error::Cancelled);
-            }
-            if work.remaining() == 0 {
-                return Ok(Selected::Yield);
-            }
-            if p.diagnostic.is_none() {
-                return Ok(Selected::NeedDiagnostic);
-            }
-            if !work.try_charge(1) {
-                return Ok(Selected::Yield);
-            }
-            let raw = p.carrier.backing_bytes().as_ref();
-            let body = raw
-                .get(p.start..)
-                .ok_or(Error::Invalid("selected diagnostic payload offset"))?;
-            match p.phase {
-                0 => {
-                    let Some(header) = diagnostic_header(raw, inner.scope().pid, p.start) else {
-                        return Err(Error::Unsupported(
-                            "selected diagnostic raw envelope unobserved",
-                        ));
-                    };
-                    if inner
-                        .recovery_counter()
-                        .is_some_and(|cc| ((cc + 1) & 15) != header.cc)
-                    {
-                        return Err(Error::Unsupported(
-                            "selected diagnostic counter damage unobserved",
-                        ));
-                    }
-                    let (tei, scramble) = (header.tei, header.scrambling);
-                    let envelope_ok = match p.kind {
-                        SelectedFault::PcrEncoding => !tei && scramble == 0 && raw[5] == 16,
-                        SelectedFault::TransportError => tei && scramble == 0 && raw[5] == 0,
-                        SelectedFault::Scrambling => !tei && scramble != 0 && raw[5] == 0,
-                        _ => !tei && scramble == 0 && raw[5] == 0,
-                    };
-                    if !envelope_ok {
-                        return Err(Error::Unsupported(
-                            "selected diagnostic additional transport fault/context",
-                        ));
-                    }
-                }
-                1 => {
-                    if body.len() < 9 || body[..4] != [0, 0, 1, stream_id::VIDEO_FIRST] {
-                        return Err(Error::Unsupported(
-                            "selected diagnostic PES prefix unobserved",
-                        ));
-                    }
-                }
-                2 => {
-                    let declared = usize::from(u16::from_be_bytes([body[4], body[5]]));
-                    if declared == 0 || declared + 6 != body.len() {
-                        return Err(Error::Unsupported(
-                            "selected incomplete/unbounded finite PES unobserved",
-                        ));
-                    }
-                    if body.len() > inner.limits().pes_bytes {
-                        return Err(crate::limit(body.len(), inner.limits().pes_bytes));
-                    }
-                }
-                3 => {
-                    let forbidden = p.kind == SelectedFault::ForbiddenTimeFlags;
-                    if body[6] != 0x80
-                        || body[7] != (if forbidden { 0x40 } else { 0x80 })
-                        || (!forbidden && body[8] != 5)
-                        || (forbidden && !matches!(body[8], 0 | 5))
-                    {
-                        return Err(Error::Unsupported(
-                            "selected diagnostic additional header fault/context",
-                        ));
-                    }
-                    p.header_len = 9 + usize::from(body[8]);
-                    if p.header_len >= body.len() {
-                        return Err(Error::Unsupported(
-                            "selected diagnostic empty/truncated PES unobserved",
-                        ));
-                    }
-                }
-                4 => {
-                    if p.header_len == 14 {
-                        let t = &body[9..14];
-                        let valid = crate::pes::timestamp_markers(t);
-                        if t[0] >> 4 != 2 || valid == (p.kind == SelectedFault::TimestampMarkers) {
-                            return Err(Error::Unsupported(
-                                "selected diagnostic additional timestamp fault/prefix",
-                            ));
-                        }
-                        if p.kind != SelectedFault::ForbiddenTimeFlags {
-                            p.pts = Some(crate::pes::timestamp_bits(t));
-                        }
-                    }
-                }
-                5 => p.header_ranges.try_reserve_exact(1)?,
-                6 => {
-                    p.header_ranges
-                        .try_push(SourceRange {
-                            entity: inner.scope().entity,
-                            offset: p.carrier.source_offset() + p.start as u64,
-                            bytes: p.header_len,
-                        })
-                        .map_err(|e| e.error)?;
-                }
-                7 => p.spans.try_reserve_exact(1)?,
-                8 => {
-                    p.spans
-                        .try_push(DemuxSpan {
-                            bytes: p
-                                .carrier
-                                .backing_bytes()
-                                .slice(p.start + p.header_len..188)?,
-                            source: SourceRange {
-                                entity: inner.scope().entity,
-                                offset: p.carrier.source_offset() + (p.start + p.header_len) as u64,
-                                bytes: body.len() - p.header_len,
-                            },
-                            transport: SourceRange {
-                                entity: inner.scope().entity,
-                                offset: p.carrier.source_offset(),
-                                bytes: 188,
-                            },
-                            context: p.input,
-                        })
-                        .map_err(|e| e.error)?;
-                }
-                9 => {
-                    let header = DiagnosticHeader {
-                        bytes: p
-                            .carrier
-                            .backing_bytes()
-                            .slice(p.start..p.start + p.header_len)?,
-                        pts: p.pts,
-                        markers_valid: p.pts.is_some() && p.kind != SelectedFault::TimestampMarkers,
-                        time_flags: body[7] >> 6,
-                    };
-                    let position = inner.media_position(p.carrier.source_offset())?;
-                    return Ok(Selected::Packet { header, position });
-                }
-                _ => return Err(Error::Invalid("selected diagnostic phase")),
-            }
-            p.phase += 1;
-        }
-    }
-}
-
-impl RecoveryObserver {
-    /// The packet of the selected carrier `p`, whose checks have all passed.
-    fn finish_selected(
-        &mut self,
-        p: SelectedPending,
-        header: DiagnosticHeader,
-        position: i64,
-    ) -> Result<AssemblyStep<DemuxObservation>> {
-        let offset = p.carrier.source_offset();
-        let counter = p.counter();
-        let (fault, diagnostic) = p
-            .diagnostic
-            .ok_or(Error::Invalid("selected source diagnostic missing"))?;
-        self.inner
-            .note_recovered(counter, offset, diagnostic.source_event_ordinal);
-        let scope = self.inner.scope();
-        Ok(AssemblyStep::Output(
-            DemuxObservation::FromSelectedDiagnostic(DiagnosticPacket {
-                program: scope.program,
-                pid: scope.pid,
-                source_origin: SourceLocation {
-                    source: scope.entity,
-                    offset,
-                },
-                source_epochs: p.input.epochs,
-                position,
-                flags: 0,
-                duration90_raw: 0,
-                stream_id: stream_id::VIDEO_FIRST,
-                selected_fault: p.kind,
-                source_fault: fault,
-                carrier: p.carrier,
-                input_context: p.input,
-                diagnostic_context: diagnostic,
-                encoded_header: header,
-                payload_len: p.spans.as_slice()[0].as_ref().len(),
-                header_source_ranges: p.header_ranges,
-                spans: p.spans,
-            }),
-        ))
     }
 }

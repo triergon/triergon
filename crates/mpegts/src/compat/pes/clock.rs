@@ -371,7 +371,7 @@ impl DemuxClock {
     pub fn project_diagnostic_header(
         &mut self,
         pid: u16,
-        header: &crate::reference_trace::recovery::DiagnosticHeader,
+        header: &crate::compat::pes::fault::PesFaultHeader,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<DiagnosticTimeView>> {

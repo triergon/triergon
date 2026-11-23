@@ -4,11 +4,9 @@ use std::sync::atomic::AtomicBool;
 
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_mpegts::SourceRange;
-use triergon_mpegts::compat::pes::{DemuxSpan, SourceContext};
+use triergon_mpegts::compat::pes::{DemuxSpan, PesFaultPacket, SourceContext};
 use triergon_mpegts::psi::{PatTable, ProgramAssociation, TableStep};
-use triergon_mpegts::reference_trace::recovery::{
-    DiagnosticPacket, PatRoute, PatSelection, RecoveredPacket,
-};
+use triergon_mpegts::reference_trace::recovery::{PatRoute, PatSelection, RecoveredPacket};
 
 use super::{SOURCE, Stop, WORK};
 
@@ -156,7 +154,7 @@ pub(super) fn check_rejected(
 
 pub(super) fn check_diagnostic(
     source: &[u8],
-    packet: &DiagnosticPacket,
+    packet: &PesFaultPacket,
     program: u16,
 ) -> Result<(), Stop> {
     let carrier = packet.carrier.backing_bytes();
@@ -178,10 +176,10 @@ pub(super) fn check_diagnostic(
         || packet.pid != u16::from_be_bytes([carrier[1] & 31, carrier[2]])
         || header.get(3) != Some(&packet.stream_id)
         || packet.encoded_header.time_flags() != flags
-        || packet.encoded_header.markers_valid() != (flags == 2 && marker_bits)
+        || packet.encoded_header.markers_valid() != (flags == 2).then_some(marker_bits)
         || packet.source_fault.location != packet.source_origin
-        || packet.source_fault.kind != packet.selected_fault.source_layer()
-        || packet.source_fault.error != packet.selected_fault.source_error()
+        || packet.source_fault.kind != packet.kind.source_layer()
+        || packet.source_fault.error != packet.kind.source_error()
         || packet.input_context.epochs != packet.source_epochs
         || packet.input_context.source_event_ordinal
             > packet.diagnostic_context.source_event_ordinal
