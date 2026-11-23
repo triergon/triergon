@@ -573,7 +573,10 @@ pub struct SeekJob<'a> {
 
 /// Where a seek stands with reading a track's entries from its tables.
 // One per seek job.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the sample scan inline without allocating per seek"
+)]
 #[derive(Debug)]
 enum Plain<'a> {
     /// The index has not been prepared yet.
@@ -1025,7 +1028,10 @@ struct GlobalSeekSetup<'a> {
 /// Where a global seek stands. A track's seek is boxed: it is several kilobytes, and
 /// the global job moves whole when it is built, returned and finished.
 // Only `Failed` is small; boxing the landing would allocate once more per seek.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Reuse the inline track search for each track in a seek"
+)]
 #[derive(Debug)]
 enum GlobalStage<'a> {
     /// Seeking the reference track.

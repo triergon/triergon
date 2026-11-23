@@ -531,7 +531,10 @@ pub struct MovieSeekResult<'a> {
 /// Where a plan stands. Each phase owns its job and what the phases before it found,
 /// and changes in place.
 // The seek phase is the largest; boxing it would allocate once more per plan.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the active search inline without allocating at each seek phase"
+)]
 #[derive(Debug)]
 enum Phase<'a> {
     /// Mapping the movie time through the edit list.

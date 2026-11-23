@@ -480,7 +480,10 @@ pub struct DirectIndexEntry {
     pub range_error: Option<Error>,
 }
 // One engine is chosen per index; keep it inline rather than allocate it.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep either cursor inline without allocating for direct recovery"
+)]
 #[derive(Debug)]
 enum IndexEngine<'a> {
     Legacy(RecoveryIndexCursor<'a>),

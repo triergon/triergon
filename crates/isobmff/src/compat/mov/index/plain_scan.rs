@@ -40,7 +40,10 @@ pub(super) struct PlainChoice<'a> {
 }
 
 // One per poll of a scan.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Return the selected checkpoint without allocating"
+)]
 #[derive(Debug)]
 pub(super) enum PlainStep<'a> {
     Yield,

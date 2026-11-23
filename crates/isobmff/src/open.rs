@@ -663,7 +663,10 @@ impl MoofWalk {
 
 #[derive(Debug)]
 #[repr(u8)]
-#[allow(clippy::large_enum_variant)] // Keep the builder inline without a per-fragment allocation.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the builder inline without a per-fragment allocation"
+)]
 enum TrafStage {
     Next,
     Scan {

@@ -288,7 +288,10 @@ pub enum ReaderEvent {
 /// Where a reader stands. The tag is explicit, so that the per-packet dispatch reads one
 /// byte.
 // Boxing the opener would allocate on every open and reset.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the opener inline in the reader without allocating on open"
+)]
 #[derive(Debug)]
 #[repr(u8)]
 enum Phase {

@@ -446,7 +446,10 @@ struct OpusTrack<'a> {
 
 /// Where a range seek stands.
 // Only `Failed` is small; boxing a search would allocate once more per seek.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the active track search inline without allocating per track"
+)]
 #[derive(Debug)]
 enum RangeStage<'a> {
     /// Searching the reference track; `None` until the search starts.

@@ -304,7 +304,10 @@ struct Grouping {
 
 /// Where a [`PcmCursor`] stands.
 // Boxing the grouping would put the per-sample state behind a pointer.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the table walk inline without allocating per track"
+)]
 #[derive(Debug)]
 enum PcmState {
     /// Reading `stsc` and the chunk offsets among the `stbl` children.

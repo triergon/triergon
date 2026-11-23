@@ -70,7 +70,10 @@ enum Configuration {
 }
 
 // One scan runs per track during opening, so its size does not matter.
-#[allow(clippy::large_enum_variant)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the descriptor walk inline without allocating per sample entry"
+)]
 #[derive(Debug)]
 enum EntryScan {
     ObjectType(ObjectTypeScan),

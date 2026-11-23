@@ -33,7 +33,10 @@ pub(super) struct Forward {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // One per reader; a box would allocate per media box.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the root reader inline without allocating at each media box"
+)]
 enum At {
     /// Delivering the samples that lie in this media box.
     Media(BoxHeader),
@@ -50,7 +53,10 @@ enum At {
 }
 
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // One per reader; a box would allocate per fragment.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the fragment walk inline without allocating at each fragment"
+)]
 enum Root {
     /// The next header is to be read.
     Next,
