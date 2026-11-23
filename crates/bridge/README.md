@@ -31,7 +31,8 @@ The access-unit readers in `triergon-hls`, `triergon-raw-video` and
 `triergon-mpegts` already frame Annex B and ADTS. For a decoder that takes
 contiguous input, join a sliced unit through `contiguous_feed` or `segments`.
 `Event::DemuxPes` and PES carried in `Event::Ts` have no packet view.
-`AccessUnits::for_track` refuses Matroska AAC without CodecPrivate.
+`AccessUnits::for_track` refuses Matroska AAC without CodecPrivate;
+`AccessUnits::for_matroska` frames it from the Matroska track entry, and
 `AccessUnits::with_record` accepts a caller-supplied AudioSpecificConfig.
 
 **ADTS program configuration.** An ADTS header has no room for an
@@ -41,10 +42,11 @@ program config element, as ISO/IEC 14496-3 1.A.4.3 asks, unless the packet's
 block already opens with one. A job dropped before it publishes leaves the element
 to the next; a framing made afresh, after a seek for example, sends it again.
 
-**Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
-`A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization
-record, the feed derives ADTS parameters from the Audio element's indexed
-sampling frequency and a count of one to six channels. A present Audio element can use the EBML defaults for
+**Legacy Matroska AAC.** Discovery, `MatroskaFeedSetup` and
+`AccessUnits::for_matroska` accept `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. These IDs
+carry no initialization record (a zero-length CodecPrivate is none), so the ADTS
+parameters come from the Audio element's indexed sampling frequency and a count of
+one to six channels. A present Audio element can use the EBML defaults for
 its children. Larger layouts require explicit initialization. The feed
 preserves the source packet bytes. Discovery replays packets in source
 order with the original signed Block time and exact nanosecond CodecDelay.

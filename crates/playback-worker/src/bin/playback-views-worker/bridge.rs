@@ -402,11 +402,11 @@ fn access(pool: &Budget, track: Track<'_>, config: Framing) -> Result<AccessBind
         return Err(Error::Invalid("selected stream codec differs").into());
     }
     let limits = AccessUnitLimits::default();
-    let mut setup = if config.record {
+    let mut setup = match track {
         // The declared configuration of the authored 48 kHz stereo legacy files.
-        AccessUnits::with_record(pool, &track, &[0x11, 0x90], limits)?
-    } else {
-        AccessUnits::for_track(pool, &track, limits)?
+        _ if config.record => AccessUnits::with_record(pool, &track, &[0x11, 0x90], limits)?,
+        Track::Matroska(track) => AccessUnits::for_matroska(pool, track, limits)?,
+        _ => AccessUnits::for_track(pool, &track, limits)?,
     };
     Ok(AccessBinding {
         id: track.id(),

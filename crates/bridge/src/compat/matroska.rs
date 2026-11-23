@@ -1,8 +1,9 @@
 //! Matroska AAC initialization against FFmpeg revision `d32b387f`.
 
+use triergon_core::container::TrackInfo;
 use triergon_core::{Error, Result};
 use triergon_framing::aac::{self, AacAdtsParameters};
-use triergon_matroska::{Configuration, InitializationOrigin, LegacyAacProfile};
+use triergon_matroska::{Configuration, InitializationOrigin, LegacyAacProfile, Track};
 
 pub(crate) fn legacy_aac_lc_parameters(
     configuration: &Configuration,
@@ -18,12 +19,28 @@ pub(crate) fn legacy_aac_lc_parameters(
     let init = configuration
         .initialization(track)
         .ok_or(Error::Invalid("missing Matroska AAC initialization"))?;
-    if descriptor.has_codec_private()
-        || !init.data.is_empty()
-        || init.origin != InitializationOrigin::InitialTrackEntry
+    // The legacy IDs carry no initialization record; an empty CodecPrivate is none.
+    if !init.data.is_empty() || init.origin != InitializationOrigin::InitialTrackEntry {
+        return Ok(None);
+    }
+    audio_parameters(descriptor).map(Some)
+}
+
+/// [`legacy_aac_lc_parameters`] of a track entry alone, whose CodecPrivate is its
+/// initialization.
+pub(crate) fn legacy_aac_lc_track_parameters(
+    descriptor: &Track,
+) -> Result<Option<AacAdtsParameters>> {
+    if descriptor.legacy_aac_profile() != Some(LegacyAacProfile::LowComplexity)
+        || !descriptor.configuration().is_empty()
     {
         return Ok(None);
     }
+    audio_parameters(descriptor).map(Some)
+}
+
+/// The ADTS parameters of a legacy AAC-LC track's Audio element.
+fn audio_parameters(descriptor: &Track) -> Result<AacAdtsParameters> {
     if !descriptor.has_audio_settings() {
         return Err(Error::Unsupported(
             "legacy Matroska AAC needs Audio settings",
@@ -41,7 +58,7 @@ pub(crate) fn legacy_aac_lc_parameters(
         // layout, which cannot be inferred from a count alone.
         .filter(|count| (1..=6).contains(count))
         .ok_or(Error::Unsupported("legacy Matroska AAC channel layout"))?;
-    Ok(Some(AacAdtsParameters {
+    Ok(AacAdtsParameters {
         mpeg2_id: false,
         frequency_index: frequency,
         channel_configuration: channels,
@@ -51,7 +68,7 @@ pub(crate) fn legacy_aac_lc_parameters(
         home: false,
         copyright_id_bit: false,
         copyright_id_start: false,
-    }))
+    })
 }
 
 #[cfg(test)]
@@ -111,14 +128,15 @@ mod tests {
     }
 
     #[test]
-    fn empty_private_data_and_ambiguous_channels_do_not_supply_parameters() {
+    fn empty_private_data_supplies_parameters_and_ambiguous_channels_do_not() {
         let empty = include_bytes!(
             "../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-empty-private.mkv"
         );
         let ambiguous = include_bytes!(
             "../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv"
         );
-        assert_eq!(parameters(empty), Ok(None));
+        assert!(configuration(empty).tracks()[0].has_codec_private());
+        assert_eq!(parameters(empty), Ok(Some((3, 2))));
         assert_eq!(
             parameters(ambiguous),
             Err(Error::Unsupported("legacy Matroska AAC channel layout"))

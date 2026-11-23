@@ -167,6 +167,36 @@ fn collect_with_work<S: triergon_playback::Source>(
     panic!("read stalled")
 }
 
+/// The legacy AAC-LC fixtures whose eight packets frame as `aac-lc.feed`: input,
+/// codec ID and whether the TrackEntry has a (zero-length) CodecPrivate.
+const LEGACY_AAC_LC: [(&[u8], &[u8], bool); 5] = [
+    (
+        include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv"),
+        b"A_AAC/MPEG2/LC",
+        false,
+    ),
+    (
+        include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv"),
+        b"A_AAC/MPEG4/LC",
+        false,
+    ),
+    (
+        include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg2-lc-laced.mkv"),
+        b"A_AAC/MPEG2/LC",
+        false,
+    ),
+    (
+        include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-timed.mkv"),
+        b"A_AAC/MPEG4/LC",
+        false,
+    ),
+    (
+        include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-empty-private.mkv"),
+        b"A_AAC/MPEG4/LC",
+        true,
+    ),
+];
+
 #[test]
 fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
     use triergon_bridge::matroska::{
@@ -174,26 +204,7 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
     };
     use triergon_core::container::{CodecId, TrackInfo};
 
-    for (input, codec) in [
-        (
-            include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv").as_slice(),
-            b"A_AAC/MPEG2/LC",
-        ),
-        (
-            include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv").as_slice(),
-            b"A_AAC/MPEG4/LC",
-        ),
-        (
-            include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg2-lc-laced.mkv")
-                .as_slice(),
-            b"A_AAC/MPEG2/LC",
-        ),
-        (
-            include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-timed.mkv")
-                .as_slice(),
-            b"A_AAC/MPEG4/LC",
-        ),
-    ] {
+    for (input, codec, private) in LEGACY_AAC_LC {
         let (engine, source, pool) =
             matroska_source(input, 7, triergon_matroska::PayloadOwnership::OwnedExact);
         let cancel = AtomicBool::new(false);
@@ -226,7 +237,7 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
                     let track = &configuration.tracks()[0];
                     assert_eq!(track.codec(), CodecId::Aac);
                     assert_eq!(track.codec_tag(), codec);
-                    assert!(!track.has_codec_private());
+                    assert_eq!(track.has_codec_private(), private);
                     assert!(track.configuration().is_empty());
                     feed = Some(setup(&pool, configuration, 0));
                 }
@@ -251,88 +262,88 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
 }
 
 #[test]
-fn access_units_frame_legacy_aac_lc_from_a_supplied_record_and_refuse_it_without() {
+fn access_units_frame_legacy_aac_lc_from_the_matroska_track_or_a_supplied_record() {
     use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
     use triergon_core::container::PacketInfo;
 
-    let input = include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc.mkv");
-    let (mut player, pool) = player_with_input(input, 7);
-    let events = collect(&mut player);
+    // The neutral track view has no Audio element; the Matroska configuration has.
     let cancel = AtomicBool::new(false);
-    let mut gold =
-        include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-lc.feed").as_slice();
-    let mut units = None;
-    let mut count = 0;
-    for output in &events {
-        if let Event::Matroska(MkvEvent::Configuration(configuration)) = output.event() {
-            let track = &configuration.tracks()[0];
-            assert!(matches!(
-                AccessUnits::for_track(&pool, track, AccessUnitLimits::default()),
-                Err(Error::Unsupported(
-                    "Matroska AAC track without an initialization record"
-                ))
-            ));
-            let record = [0x11, 0x90]; // AAC-LC, 48000 Hz, stereo
-            let mut setup =
-                AccessUnits::with_record(&pool, track, &record, AccessUnitLimits::default())
-                    .unwrap();
-            units = Some(crate::framing::ready(|work| {
-                setup.step(work, &cancel).unwrap()
-            }));
+    for ((input, _, _), record) in LEGACY_AAC_LC
+        .into_iter()
+        .flat_map(|fixture| [(fixture, false), (fixture, true)])
+    {
+        let (mut player, pool) = player_with_input(input, 7);
+        let events = collect(&mut player);
+        let mut gold =
+            include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-lc.feed").as_slice();
+        let mut units = None;
+        let mut count = 0;
+        for output in &events {
+            if let Event::Matroska(MkvEvent::Configuration(configuration)) = output.event() {
+                let track = &configuration.tracks()[0];
+                assert!(matches!(
+                    AccessUnits::for_track(&pool, track, AccessUnitLimits::default()),
+                    Err(Error::Unsupported(
+                        "Matroska AAC track without an initialization record"
+                    ))
+                ));
+                let limits = AccessUnitLimits::default();
+                let mut setup = if record {
+                    // AAC-LC, 48000 Hz, stereo
+                    AccessUnits::with_record(&pool, track, &[0x11, 0x90], limits)
+                } else {
+                    AccessUnits::for_matroska(&pool, track, limits)
+                }
+                .unwrap();
+                units = Some(crate::framing::ready(|work| {
+                    setup.step(work, &cancel).unwrap()
+                }));
+            }
+            let Some(packet) = output.packet() else {
+                continue;
+            };
+            let mut job = units.as_mut().unwrap().packet(&packet).unwrap();
+            let unit = crate::framing::ready(|work| job.step(work, &cancel).unwrap());
+            let (want, rest) = gold.split_at(7 + packet.payload().len());
+            assert_eq!(unit.payload(), want);
+            gold = rest;
+            count += 1;
         }
-        let Some(packet) = output.packet() else {
-            continue;
-        };
-        let mut job = units.as_mut().unwrap().packet(&packet).unwrap();
-        let unit = crate::framing::ready(|work| job.step(work, &cancel).unwrap());
-        let (want, rest) = gold.split_at(7 + packet.payload().len());
-        assert_eq!(unit.payload(), want);
-        gold = rest;
-        count += 1;
+        assert_eq!(count, 8);
+        assert!(gold.is_empty());
     }
-    assert_eq!(count, 8);
-    assert!(gold.is_empty());
 }
 
 #[test]
-fn legacy_aac_lc_refuses_empty_initialization_and_ambiguous_channels() {
-    for (input, private_present) in [
-        (
-            include_bytes!(
-                "../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-empty-private.mkv"
-            )
-            .as_slice(),
-            true,
-        ),
-        (
-            include_bytes!(
-                "../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv"
-            )
-            .as_slice(),
-            false,
-        ),
-    ] {
-        let (mut player, pool) = player_with_input(input, 7);
-        let events = collect(&mut player);
-        let configuration = events
-            .iter()
-            .find_map(|output| match output.event() {
-                Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
-                _ => None,
-            })
-            .unwrap();
-        assert_eq!(
-            configuration.tracks()[0].has_codec_private(),
-            private_present
-        );
-        if let Ok(mut setup) = MatroskaFeedSetup::new(&pool, ID, configuration, 0, LIMITS) {
-            assert!(
-                setup
-                    .step(&mut WorkBudget::new(1024), &AtomicBool::new(false))
-                    .is_err()
-            );
-        }
-    }
+fn legacy_aac_lc_refuses_a_channel_count_without_an_adts_layout() {
+    use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
+
+    let input = include_bytes!(
+        "../../../playback/tests/fixtures/mkv-feed/aac-mpeg4-lc-ambiguous-layout.mkv"
+    );
+    let (mut player, pool) = player_with_input(input, 7);
+    let events = collect(&mut player);
+    let configuration = events
+        .iter()
+        .find_map(|output| match output.event() {
+            Event::Matroska(MkvEvent::Configuration(configuration)) => Some(configuration),
+            _ => None,
+        })
+        .unwrap();
+    let refusal = Error::Unsupported("legacy Matroska AAC channel layout");
+    assert_eq!(
+        MatroskaFeedSetup::new(&pool, ID, configuration, 0, LIMITS).unwrap_err(),
+        refusal
+    );
+    assert_eq!(
+        AccessUnits::for_matroska(
+            &pool,
+            &configuration.tracks()[0],
+            AccessUnitLimits::default()
+        )
+        .unwrap_err(),
+        refusal
+    );
 }
 
 #[test]
