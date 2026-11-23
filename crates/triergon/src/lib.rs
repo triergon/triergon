@@ -10,9 +10,23 @@
     clippy::expect_used
 )]
 
+#[cfg(any(
+    feature = "matroska",
+    feature = "isobmff",
+    feature = "mpegts",
+    feature = "ogg",
+    feature = "elementary"
+))]
 mod any;
 mod probe;
 
+#[cfg(any(
+    feature = "matroska",
+    feature = "isobmff",
+    feature = "mpegts",
+    feature = "ogg",
+    feature = "elementary"
+))]
 pub use any::{AnyOther, AnyPacket, AnyReader, Replayed, open_blocking, open_sequential};
 pub use probe::{Probed, SourceFormat, probe, probe_whole};
 pub use triergon_core::blocking::Blocking;

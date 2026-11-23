@@ -1,21 +1,14 @@
-//! One closed reader enum at the consumer boundary.
+//! One closed reader enum at the consumer boundary, built with at least one format.
 //!
 //! A player may receive Matroska directly and TS or fragmented MP4 through HLS,
 //! so the reader is chosen at open time from probed bytes. Each variant sits behind its format
 //! feature; forwarding is one predictable `match` per step with no allocation
 //! and no dynamic dispatch on the packet path.
-// With no format feature the enums are empty and their forwarding is dead code.
-#![cfg_attr(
-    not(any(
-        feature = "matroska",
-        feature = "isobmff",
-        feature = "mpegts",
-        feature = "ogg",
-        feature = "elementary"
-    )),
-    allow(unused_imports, unused_variables, unreachable_code)
-)]
-use crate::probe::{Prefix, ProbeBuffer, Probed, SourceFormat, probe, probe_whole};
+mod open;
+
+pub use open::{Replayed, open_blocking, open_sequential};
+
+use crate::probe::{Probed, SourceFormat, probe, probe_whole};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, PacketInfo, RandomAccess, ReaderStep, SeekRequest, TrackId, TrackInfo,
@@ -27,13 +20,6 @@ use triergon_core::{
 };
 
 /// The largest input window a reader asks for at once.
-#[cfg(any(
-    feature = "matroska",
-    feature = "isobmff",
-    feature = "mpegts",
-    feature = "ogg",
-    feature = "elementary"
-))]
 const WINDOW: usize = 64 * 1024;
 
 /// Every reader the facade can open, one variant per enabled format.
@@ -130,14 +116,6 @@ macro_rules! each {
             Self::Adts($inner) => $body,
             #[cfg(feature = "elementary")]
             Self::Ac3($inner) => $body,
-            #[cfg(not(any(
-                feature = "matroska",
-                feature = "isobmff",
-                feature = "mpegts",
-                feature = "ogg",
-                feature = "elementary"
-            )))]
-            _ => unreachable!("no format feature: the enum is uninhabited"),
         }
     };
 }
@@ -155,26 +133,11 @@ macro_rules! each_packet {
             Self::Ogg($inner) => $body,
             #[cfg(feature = "elementary")]
             Self::Elementary($inner) => $body,
-            #[cfg(not(any(
-                feature = "matroska",
-                feature = "isobmff",
-                feature = "mpegts",
-                feature = "ogg",
-                feature = "elementary"
-            )))]
-            _ => unreachable!("no format feature: the enum is uninhabited"),
         }
     };
 }
 
 /// Wrap one reader's step in the closed enums.
-#[cfg(any(
-    feature = "matroska",
-    feature = "isobmff",
-    feature = "mpegts",
-    feature = "ogg",
-    feature = "elementary"
-))]
 macro_rules! neutral_step {
     ($step:expr, $variant:ident) => {
         match $step {
@@ -219,164 +182,89 @@ impl AnyReader {
     }
 
     /// The reader of `format`, or the refusal of a source no format the facade opens starts.
-    fn of(
+    pub(crate) fn of(
         format: Option<SourceFormat>,
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,
     ) -> Result<Self> {
         let format = format.ok_or(Error::Unsupported("source format not recognised"))?;
-        match format {
-            #[cfg(feature = "matroska")]
-            SourceFormat::Matroska => Ok(Self::Matroska(triergon_matroska::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_matroska::Limits::default(),
-                WINDOW,
-            )?)),
-            #[cfg(feature = "isobmff")]
-            SourceFormat::Isobmff => Ok(Self::Isobmff(triergon_isobmff::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_isobmff::ReaderLimits::default(),
-                WINDOW,
-            )?)),
-            #[cfg(feature = "ogg")]
-            SourceFormat::Ogg => Ok(Self::Ogg(triergon_ogg::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_ogg::Limits::default(),
-                WINDOW,
-            )?)),
-            #[cfg(feature = "elementary")]
-            SourceFormat::Flac => Ok(Self::Flac(triergon_elementary::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_elementary::Limits::default(),
-                WINDOW,
-            )?)),
-            #[cfg(feature = "elementary")]
-            SourceFormat::MpegAudio => Ok(Self::MpegAudio(triergon_elementary::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_elementary::Limits::default(),
-                WINDOW,
-            )?)),
-            #[cfg(feature = "elementary")]
-            SourceFormat::Adts => Ok(Self::Adts(triergon_elementary::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_elementary::Limits::default(),
-                WINDOW,
-            )?)),
-            #[cfg(feature = "elementary")]
-            SourceFormat::Ac3 => Ok(Self::Ac3(triergon_elementary::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_elementary::Limits::default(),
-                WINDOW,
-            )?)),
-            #[cfg(feature = "mpegts")]
-            kind @ (SourceFormat::Ts | SourceFormat::M2ts) => {
-                Ok(Self::MpegTs(triergon_mpegts::Reader::new(
+        // The reader of one variant with its crate's limits.
+        macro_rules! reader {
+            ($variant:ident, $reader:path, $limits:expr) => {
+                Ok(Self::$variant(<$reader>::new(
                     pool,
                     source,
                     capabilities,
-                    triergon_mpegts::ReaderLimits {
-                        format: if kind == SourceFormat::Ts {
-                            triergon_mpegts::PacketFormat::Ts188
-                        } else {
-                            triergon_mpegts::PacketFormat::M2ts192
-                        },
-                        ..triergon_mpegts::ReaderLimits::default()
-                    },
+                    $limits,
                     WINDOW,
                 )?))
+            };
+        }
+        match format {
+            #[cfg(feature = "matroska")]
+            SourceFormat::Matroska => reader!(
+                Matroska,
+                triergon_matroska::Reader,
+                triergon_matroska::Limits::default()
+            ),
+            #[cfg(feature = "isobmff")]
+            SourceFormat::Isobmff => reader!(
+                Isobmff,
+                triergon_isobmff::Reader,
+                triergon_isobmff::ReaderLimits::default()
+            ),
+            #[cfg(feature = "ogg")]
+            SourceFormat::Ogg => {
+                reader!(Ogg, triergon_ogg::Reader, triergon_ogg::Limits::default())
             }
+            #[cfg(feature = "elementary")]
+            SourceFormat::Flac => {
+                reader!(
+                    Flac,
+                    triergon_elementary::FlacReader,
+                    triergon_elementary::Limits::default()
+                )
+            }
+            #[cfg(feature = "elementary")]
+            SourceFormat::MpegAudio => reader!(
+                MpegAudio,
+                triergon_elementary::MpegAudioReader,
+                triergon_elementary::Limits::default()
+            ),
+            #[cfg(feature = "elementary")]
+            SourceFormat::Adts => {
+                reader!(
+                    Adts,
+                    triergon_elementary::AdtsReader,
+                    triergon_elementary::Limits::default()
+                )
+            }
+            #[cfg(feature = "elementary")]
+            SourceFormat::Ac3 => reader!(
+                Ac3,
+                triergon_elementary::Ac3Reader,
+                triergon_elementary::Limits::default()
+            ),
+            #[cfg(feature = "mpegts")]
+            kind @ (SourceFormat::Ts | SourceFormat::M2ts) => reader!(
+                MpegTs,
+                triergon_mpegts::Reader,
+                triergon_mpegts::ReaderLimits {
+                    format: if kind == SourceFormat::Ts {
+                        triergon_mpegts::PacketFormat::Ts188
+                    } else {
+                        triergon_mpegts::PacketFormat::M2ts192
+                    },
+                    ..triergon_mpegts::ReaderLimits::default()
+                }
+            ),
             #[allow(
                 unreachable_patterns,
                 reason = "every format whose feature is enabled has its arm"
             )]
-            _ => {
-                let _ = (pool, source, capabilities);
-                Err(Error::Unsupported("reader feature not enabled"))
-            }
+            _ => Err(Error::Unsupported("reader feature not enabled")),
         }
-    }
-}
-
-/// Probe up to 64 KiB of a seekable source, then feed its reader from the start. The
-/// reader reads it as `SourceId(1)`.
-///
-/// Returns an error if reading or seeking fails, no format the facade opens starts the
-/// source ([`Error::Unsupported`]), or reader construction fails ([`AnyReader::open`]).
-pub fn open_blocking<S: std::io::Read + std::io::Seek>(
-    mut source: S,
-    pool: &Budget,
-) -> Result<triergon_core::blocking::Blocking<AnyReader, S>> {
-    let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
-    let format = ProbeBuffer::new(pool).identify(&mut source, capabilities.length);
-    source.rewind().map_err(|e| Error::Io(e.kind()))?;
-    let reader = AnyReader::of(format?, pool, SourceId(1), capabilities)?;
-    Ok(triergon_core::blocking::Blocking::seekable(
-        reader, source, pool,
-    ))
-}
-
-/// Probe up to 64 KiB of a sequential source and replay the consumed prefix.
-/// The reader sees a pipe with unknown length and no random access, as `SourceId(1)`.
-///
-/// Returns an error if the budget cannot hold the probe or reader, reading fails,
-/// or the prefix cannot select an enabled reader that supports sequential input.
-pub fn open_sequential<S: std::io::Read>(
-    mut source: S,
-    pool: &Budget,
-) -> Result<triergon_core::blocking::Blocking<AnyReader, Replayed<S>>> {
-    let mut prefix = ProbeBuffer::new(pool);
-    let format = prefix.identify_pipe(&mut source)?;
-    let capabilities = SourceCapabilities {
-        length: None,
-        random_access: false,
-    };
-    let reader = AnyReader::of(format, pool, SourceId(1), capabilities)?;
-    let source = Replayed {
-        prefix: Some(prefix.into_replay()?),
-        at: 0,
-        rest: source,
-    };
-    Ok(triergon_core::blocking::Blocking::sequential(
-        reader, source, pool,
-    ))
-}
-
-/// A sequential source with its probed prefix put back in front; the prefix is freed
-/// once it has been read.
-#[derive(Debug)]
-pub struct Replayed<S> {
-    prefix: Option<Prefix>,
-    at: usize,
-    rest: S,
-}
-
-impl<S: std::io::Read> std::io::Read for Replayed<S> {
-    fn read(&mut self, out: &mut [u8]) -> std::io::Result<usize> {
-        if let Some(prefix) = &self.prefix {
-            let count = out.len().min(prefix.bytes.len() - self.at);
-            out[..count].copy_from_slice(&prefix.bytes[self.at..self.at + count]);
-            self.at += count;
-            if self.at == prefix.bytes.len() {
-                self.prefix = None;
-            }
-            return Ok(count);
-        }
-        self.rest.read(out)
     }
 }
 
@@ -465,14 +353,6 @@ impl ContainerReader for AnyReader {
             Self::Ac3(reader) => {
                 neutral_step!(ContainerReader::step(reader, work, cancel)?, Elementary)
             }
-            #[cfg(not(any(
-                feature = "matroska",
-                feature = "isobmff",
-                feature = "mpegts",
-                feature = "ogg",
-                feature = "elementary"
-            )))]
-            _ => unreachable!("no format feature: the enum is uninhabited"),
         })
     }
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {

@@ -131,7 +131,7 @@ The decoder crates can also be selected individually.
 [Vorbis](../codec-vorbis/README.md).
 
 Using `default-features = false` without selecting another feature exposes the
-shared types and leaves `AnyReader` with no enabled formats.
+shared types and `probe`; `AnyReader` and the openers come with the first reader feature.
 
 Re-exported from triergon-core, independent of features:
 
