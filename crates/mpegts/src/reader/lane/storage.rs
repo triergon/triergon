@@ -1,6 +1,9 @@
 //! The storage audit: every owner of reader storage, walked one edge per work unit.
 use super::*;
 
+/// The reader's owners are not the ones the suspended audit was walking.
+const CHANGED: Error = Error::Invalid("MPEG-TS storage audit changed during scan");
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum StorageCursor {
     Transport(TransportStorageCursor),
@@ -29,17 +32,12 @@ enum StorageCursor {
 impl StorageCursor {
     // One structural edge per call, including empty tables. Checking earlier
     // entries for shared backing also consumes cooperative work.
-    // Typing the framer audit cursor measured +0.191971% on one transport workload.
-    #[expect(
-        clippy::expect_used,
-        reason = "the framer cursors are entered only for a lane with a framer"
-    )]
     fn step<'a>(&mut self, reader: &'a crate::reader::Reader) -> Result<Option<StorageItem<'a>>> {
         let item = match *self {
             Self::Transport(cursor) => {
                 let mut next = cursor;
                 let Some(stream) = reader.stream() else {
-                    return Err(Error::Invalid("MPEG-TS storage audit changed during scan"));
+                    return Err(CHANGED);
                 };
                 let item = next.step(stream)?;
                 *self = if next == TransportStorageCursor::End {
@@ -169,14 +167,14 @@ impl StorageCursor {
                 let framer = reader.lanes.as_slice()[lane]
                     .framer
                     .as_ref()
-                    .expect("live framer");
+                    .ok_or(CHANGED)?;
                 Some(StorageItem::Fixed(framer.retained_storage()?))
             }
             Self::FramerBacking(lane, index) => {
                 let framer = reader.lanes.as_slice()[lane]
                     .framer
                     .as_ref()
-                    .expect("live framer");
+                    .ok_or(CHANGED)?;
                 if let Some(bytes) = framer.input_wait_backing(index)? {
                     *self = Self::FramerBacking(lane, index + 1);
                     Some(StorageItem::Bytes(bytes))
@@ -321,7 +319,7 @@ impl StorageScan {
                 // Reborrow the backing so a suspended scan cannot keep input charged.
                 let mut candidate = at;
                 let Some(StorageItem::Bytes(bytes)) = candidate.step(reader)? else {
-                    return Err(Error::Invalid("MPEG-TS storage audit changed during scan"));
+                    return Err(CHANGED);
                 };
                 if self.prior == at {
                     self.total = self
