@@ -1,6 +1,7 @@
-//! Consumer-neutral producer/pump ownership. Accepted envelopes MOVE to the sink;
-//! a blocked or failed submission returns the same source owner. No borrowed
-//! native Feed/Load lifetime or device behavior is inferred by this contract.
+//! Moving player outputs into a consumer: a [`Pump`] hands each output to a [`Sink`]
+//! as a [`Feed`] and keeps a bounded number in flight. A sink that accepts a feed owns
+//! it, and the output's storage, until it reports the feed's token complete; a full or
+//! failed sink hands the same feed back.
 use crate::source::Source;
 use crate::{
     Output, Player, Progress, Result, SeekIntent, Selection, TrackKey,
@@ -10,6 +11,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     BudgetVec, Error, InputCursor, InputToken, SourceCapabilities, SourceId, Time, WorkBudget,
 };
+
+/// The most feeds a [`Pump`] keeps in flight.
+pub const MAXIMUM_IN_FLIGHT: usize = 64;
 
 /// Names one feed a pump handed to its sink; the sink reports its completion with it.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,25 +58,26 @@ pub enum Submission {
 }
 /// A consumer of player outputs, such as a decoder queue.
 pub trait Sink {
-    /// Accepted means this sink owns the envelope; a hardware adapter retains it
-    /// independently until its actual callback/native borrow has retired.
+    /// Takes `feed`: [`Submission::Accepted`] with its token once the sink owns it,
+    /// until it reports that token through [`Self::completion`]; the same feed back
+    /// when the sink is full or failed.
     fn submit(&mut self, feed: Feed) -> Submission;
     /// The token of a feed that finished, if one did.
     fn completion(&mut self) -> Option<FeedToken>;
     /// Pauses or resumes the consumer.
     fn pause(&mut self, paused: bool) -> Result<()>;
-    /// Scope changes fence callbacks. This must not free a still-borrowed native
-    /// buffer; those owners remain in the sink's callback/retirement registry.
+    /// Starts the seek `intent`. Feeds the sink still owns are from before it and their
+    /// completions no longer count; the sink keeps an output's storage for as long as
+    /// its consumer still reads it.
     fn reset(&mut self, intent: &SeekIntent) -> Result<()>;
     /// Stops the consumer.
     fn stop(&mut self);
 }
-/// Optional two-phase catalogue boundary for a sink with no outstanding feeds.
-/// Prepare is prompt/bounded and may reserve resources, but cannot release or
-/// change the old decoder/owners. Abandon restores that preparation on refusal.
-/// Commit is infallible using the prepared resources and preserves the current
-/// pause state; platform scheduling and
-/// native lifetime proof remain the caller's implementation responsibility.
+/// A sink that switches to a replaced MP4 catalogue in two phases, while it holds no
+/// feed. Preparing returns promptly and may reserve what the switch needs, but leaves
+/// the current consumer as it is; abandoning undoes the preparation when the
+/// replacement is refused; committing cannot fail, uses what was reserved and keeps
+/// the pause state.
 pub trait CatalogueSink: Sink {
     /// Prepares for the outputs of `next`, reserving what the change needs.
     fn prepare_catalogue(&mut self, next: &crate::Engine) -> Result<()>;
@@ -123,13 +128,13 @@ pub struct Pump<S: Source, T: Sink> {
 }
 impl<S: Source, T: Sink> Pump<S, T> {
     /// A pump with up to `maximum_in_flight` feeds in flight. Fails with `Invalid`
-    /// unless that is 1 to 64.
+    /// unless that is 1 to [`MAXIMUM_IN_FLIGHT`].
     pub fn new(player: Player<S>, sink: T, maximum_in_flight: usize) -> Result<Self> {
-        if maximum_in_flight == 0 || maximum_in_flight > 64 {
+        if maximum_in_flight == 0 || maximum_in_flight > MAXIMUM_IN_FLIGHT {
             return Err(Error::Invalid("pump in-flight policy"));
         }
         let pool = player.budget();
-        // Control identity only: never emitted as a physical source/native field.
+        // Mints the feed tokens' scope from the pool's generations; it reads nothing.
         let identity = InputCursor::new(
             pool,
             SourceId(0),
@@ -226,8 +231,8 @@ impl<S: Source, T: Sink> Pump<S, T> {
         let intent = player
             .seek_intent()
             .ok_or(Error::Invalid("missing accepted seek intent"))?;
-        // Source player owns its exact selected clock. This intent is a sink
-        // control request, not replacement source timing or a native seek receipt.
+        // The intent tells the sink where the seek lands; packet times still come
+        // from the player.
         if let Err(error) = self.sink.as_mut().ok_or(Error::Closed)?.reset(&intent) {
             self.stop();
             return Err(error);
@@ -239,8 +244,9 @@ impl<S: Source, T: Sink> Pump<S, T> {
         self.ended = false;
         Ok(true)
     }
-    /// Old accepted/blocked Feed owners must retire before the sink boundary.
-    /// Refusal never drops such an owner or advances the active player/source.
+    /// Replaces the player's MP4 catalogue with `next` and switches the sink to it.
+    /// Fails with `Backpressure` while a feed is in flight or pending; a refusal keeps
+    /// the player, its source and every feed as they were.
     pub fn replace_mp4_catalogue(
         &mut self,
         next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
@@ -254,8 +260,8 @@ impl<S: Source, T: Sink> Pump<S, T> {
         self.commit_catalogue_change(next, CatalogueChange::Replace(selection), w, c)
     }
 
-    /// Promote progressive playback to a seek on the same checked source.
-    /// Both queued sink ownership and stale callbacks use the catalogue fence.
+    /// Applies a source-clock seek that switches a progressive player to `next`, a
+    /// complete range index of the same entity, fencing earlier sink callbacks.
     pub fn apply_mp4_progressive_sync_seek(
         &mut self,
         next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
@@ -479,7 +485,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         if self.stopped {
             return;
         }
-        // Source abort/quiescence/close precede sink stop and local owner release.
+        // The source closes before the sink stops and the feeds drop.
         if let Some(player) = self.player.as_mut() {
             player.stop();
         }

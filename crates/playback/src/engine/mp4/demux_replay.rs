@@ -1,10 +1,9 @@
 //! The order in which a demux-clock seek replays the occurrences of a complete source.
 
+use crate::MAXIMUM_TRACKS;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_isobmff::compat::mov::{clock::seekable_head_precedes, packets::PacketOccurrence};
-
-const MAX_TRACKS: usize = 64;
 
 #[derive(Clone, Copy, Debug)]
 struct Slot {
@@ -31,7 +30,7 @@ pub(crate) enum DemuxReplayStep {
 /// immutable occurrence table for the lifetime of this replay and its clones.
 #[derive(Clone, Debug)]
 pub(crate) struct DemuxReplay {
-    slots: [Slot; MAX_TRACKS],
+    slots: [Slot; MAXIMUM_TRACKS],
     track_count: usize,
     row_count: usize,
     first_row: usize,
@@ -44,10 +43,10 @@ impl DemuxReplay {
         starts: &[usize],
         rows: &[PacketOccurrence],
     ) -> Result<Self> {
-        if track_ids.len() > MAX_TRACKS {
+        if track_ids.len() > MAXIMUM_TRACKS {
             return Err(Error::Limit {
                 requested: track_ids.len(),
-                maximum: MAX_TRACKS,
+                maximum: MAXIMUM_TRACKS,
             });
         }
         if track_ids.is_empty() || track_ids.len() != starts.len() {
@@ -58,7 +57,7 @@ impl DemuxReplay {
         let mut slots = [Slot {
             track_id: 0,
             head: None,
-        }; MAX_TRACKS];
+        }; MAXIMUM_TRACKS];
         let mut first = 0;
         for (slot, (&track_id, &start)) in track_ids.iter().zip(starts).enumerate() {
             let occurrence = rows

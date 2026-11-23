@@ -29,6 +29,11 @@ pub use player::{
 pub use source::{ByteSource, Source, SourceOwner, SourceReply};
 pub use triergon_core::{Error, Result};
 
+/// The most tracks an engine works with. An MP4 plan holds at most this many
+/// ([`mp4::PlanLimits::tracks`]); a program map with more streams fails with `Limit`,
+/// and so does a Matroska segment with more tracks where a selection or a seek needs them.
+pub const MAXIMUM_TRACKS: usize = 64;
+
 /// Matroska playback beside the reader's own events.
 pub mod matroska {
     pub use crate::player::MatroskaReplayOutput as ReplayOutput;

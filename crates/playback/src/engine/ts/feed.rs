@@ -131,9 +131,9 @@ pub enum FeedPacket {
 
 /// One step of a PES feed.
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
-    reason = "return original transport events without a heap allocation"
+    reason = "a source event is returned whole; boxing it would allocate per event"
 )]
 pub enum FeedStep {
     /// A source table, clock or fault event the feed delivers whole.
@@ -238,17 +238,5 @@ impl TsStepProjection for FeedStep {
     #[inline]
     fn project(step: Self) -> Result<Self> {
         Ok(step)
-    }
-}
-
-pub(crate) fn map_payload<T, U>(
-    step: ts::AssemblyStep<T>,
-    map: impl FnOnce(T) -> U,
-) -> ts::AssemblyStep<U> {
-    match step {
-        ts::AssemblyStep::Output(packet) => ts::AssemblyStep::Output(map(packet)),
-        ts::AssemblyStep::Yield => ts::AssemblyStep::Yield,
-        ts::AssemblyStep::NeedPayload => ts::AssemblyStep::NeedPayload,
-        ts::AssemblyStep::Finished => ts::AssemblyStep::Finished,
     }
 }

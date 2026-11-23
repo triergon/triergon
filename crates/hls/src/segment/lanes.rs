@@ -226,12 +226,12 @@ impl LaneAssembler for VideoAssembler {
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<Self::Unit>> {
         match self {
-            Self::Avc(reader) => Ok(map_output(reader.poll(work, cancel)?, |unit| {
-                HlsMediaVideoUnit(Picture::Avc(unit))
-            })),
-            Self::Hevc(reader) => Ok(map_output(reader.poll(work, cancel)?, |unit| {
-                HlsMediaVideoUnit(Picture::Hevc(unit))
-            })),
+            Self::Avc(reader) => Ok(reader
+                .poll(work, cancel)?
+                .map(|unit| HlsMediaVideoUnit(Picture::Avc(unit)))),
+            Self::Hevc(reader) => Ok(reader
+                .poll(work, cancel)?
+                .map(|unit| HlsMediaVideoUnit(Picture::Hevc(unit)))),
         }
     }
 
@@ -313,7 +313,7 @@ impl LaneAssembler for AudioAssembler {
         cancel: &AtomicBool,
     ) -> Result<AssemblyStep<Self::Unit>> {
         match self {
-            Self::Aac(reader) => Ok(map_output(reader.poll(work, cancel)?, Into::into)),
+            Self::Aac(reader) => Ok(reader.poll(work, cancel)?.map(Into::into)),
             Self::Dolby(reader) => reader.poll(work, cancel),
         }
     }
@@ -327,14 +327,5 @@ impl LaneAssembler for AudioAssembler {
             Self::Aac(reader) => reader.take_spent(),
             Self::Dolby(_) => SpentLists::default(),
         }
-    }
-}
-
-fn map_output<T, U>(step: AssemblyStep<T>, map: impl FnOnce(T) -> U) -> AssemblyStep<U> {
-    match step {
-        AssemblyStep::Output(unit) => AssemblyStep::Output(map(unit)),
-        AssemblyStep::NeedPayload => AssemblyStep::NeedPayload,
-        AssemblyStep::Yield => AssemblyStep::Yield,
-        AssemblyStep::Finished => AssemblyStep::Finished,
     }
 }

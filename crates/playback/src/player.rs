@@ -309,7 +309,7 @@ pub enum State {
 /// Bounds of a player.
 #[derive(Clone, Copy, Debug)]
 pub struct PlayerPolicy {
-    /// The output queue's slots, 1 to 64 (16 by default).
+    /// The output queue's slots, 1 to [`Self::MAXIMUM_SLOTS`] (16 by default).
     pub slots: usize,
     /// The most payload bytes queued (32 MiB by default); nonzero.
     pub queued_payload_bytes: usize,
@@ -317,6 +317,10 @@ pub struct PlayerPolicy {
     pub seek_input_bytes: u64,
     /// The most events the player reads (10,000,000 by default); nonzero.
     pub maximum_events: u64,
+}
+impl PlayerPolicy {
+    /// The most output queue slots.
+    pub const MAXIMUM_SLOTS: usize = 64;
 }
 impl Default for PlayerPolicy {
     fn default() -> Self {
@@ -538,7 +542,7 @@ impl<S: Source> Player<S> {
         eager: bool,
     ) -> Result<Self> {
         if policy.slots == 0
-            || policy.slots > 64
+            || policy.slots > PlayerPolicy::MAXIMUM_SLOTS
             || policy.queued_payload_bytes == 0
             || policy.maximum_events == 0
         {

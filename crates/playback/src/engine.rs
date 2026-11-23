@@ -12,7 +12,7 @@ use crate::engine::ts::{Delivery as TsDelivery, Entities, TsEngine};
 use crate::event::EngineStep;
 use crate::source::SourceReply;
 use crate::{
-    Result, SeekIntent, TrackKey,
+    MAXIMUM_TRACKS, Result, SeekIntent, TrackKey,
     mp4::plan::{PlanTrack, PreparedMp4},
     player::TrackKind,
 };
@@ -422,10 +422,10 @@ impl Engine {
         match self {
             Self::Matroska(r) => {
                 let tracks = r.reader.tracks();
-                if tracks.len() > 64 {
+                if tracks.len() > MAXIMUM_TRACKS {
                     return Err(Error::Limit {
                         requested: tracks.len(),
-                        maximum: 64,
+                        maximum: MAXIMUM_TRACKS,
                     });
                 }
                 for t in tracks {

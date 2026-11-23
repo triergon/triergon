@@ -12,6 +12,9 @@ use triergon_mpegts::{
     psi::DescriptorNamespace,
 };
 
+/// The most PIDs [`open`] selects.
+pub const MAXIMUM_SELECTIONS: usize = 64;
+
 /// Private audio PID and carriage to check against the active program map.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PrivateAudioSelection {
@@ -30,7 +33,7 @@ pub struct PrivateAudioSelection {
 /// # Errors
 ///
 /// `Invalid` for no selection, a PID outside 1 to 0x1ffe or a PID selected twice;
-/// `Limit` for more than 64 selections; allocation failures.
+/// `Limit` for more than [`MAXIMUM_SELECTIONS`]; allocation failures.
 pub fn open(
     input: InputCursor,
     program: u16,

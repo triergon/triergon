@@ -2,8 +2,8 @@
 
 use crate::{Result, SeekIntent, TrackKey};
 use std::sync::atomic::AtomicBool;
-use triergon_core::Error;
-use triergon_core::{Backpressure, SourceId, Step, WorkBudget};
+use triergon_core::container::{MediaKind, TrackInfo};
+use triergon_core::{Backpressure, Error, SourceId, Step, WorkBudget};
 use triergon_matroska::{Event as MkvEvent, Reader};
 /// The Matroska reader as an engine: the engine of
 /// [`Engine::Matroska`](crate::Engine::Matroska).
@@ -30,7 +30,7 @@ impl MkvEngine {
             .reader
             .tracks()
             .iter()
-            .position(|t| t.number == number && t.kind == 1)
+            .position(|t| t.number == number && t.kind() == MediaKind::Video)
             .ok_or(Error::Invalid("seek needs source video track"))?;
         self.reader.seek_for_playback(
             at,

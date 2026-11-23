@@ -46,7 +46,8 @@ pub(crate) enum PlanView {
 /// Bounds of an MP4 index.
 #[derive(Clone, Copy, Debug)]
 pub struct PlanLimits {
-    /// The most tracks (64 by default).
+    /// The most tracks, 1 to [`MAXIMUM_TRACKS`](crate::MAXIMUM_TRACKS) (that many by
+    /// default).
     pub tracks: usize,
     /// The most source samples (1,000,000 by default).
     pub samples: u64,
@@ -58,7 +59,7 @@ pub struct PlanLimits {
 impl Default for PlanLimits {
     fn default() -> Self {
         Self {
-            tracks: 64,
+            tracks: crate::MAXIMUM_TRACKS,
             samples: 1_000_000,
             occurrences: 1_000_000,
             media_extents: 4096,
@@ -595,10 +596,13 @@ impl<'a> Mp4IndexJob<'a> {
                 "MP4 opened with recovery requires a demux packet plan",
             ));
         }
-        if limits.tracks == 0 || limits.tracks > 64 || movie.tracks().len() > limits.tracks {
+        if limits.tracks == 0
+            || limits.tracks > crate::MAXIMUM_TRACKS
+            || movie.tracks().len() > limits.tracks
+        {
             return Err(Error::Limit {
                 requested: movie.tracks().len(),
-                maximum: limits.tracks.min(64),
+                maximum: limits.tracks.min(crate::MAXIMUM_TRACKS),
             });
         }
         if movie.terminal_mdat().is_some() && view != PlanView::Source && !demux_front {

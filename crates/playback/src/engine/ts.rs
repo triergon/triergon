@@ -4,13 +4,13 @@
 pub(crate) mod feed;
 pub(crate) mod tracks;
 
-use crate::compat::pes::{AdmittedCarriage, Carriage, PidSelection};
-use crate::engine::ts::feed::{FeedPacket, FeedStep, TsStepProjection, map_payload};
+use crate::compat::pes::{AdmittedCarriage, Carriage, MAXIMUM_SELECTIONS, PidSelection};
+use crate::engine::ts::feed::{FeedPacket, FeedStep, TsStepProjection};
 use crate::engine::ts::tracks::{PesTrack, PesTracks, TrackUpdate};
 use crate::engine::{TrackFact, track_kind};
 use crate::event::TsEvent;
 use crate::source::SourceReply;
-use crate::{Result, SeekIntent, TrackKey};
+use crate::{MAXIMUM_TRACKS, Result, SeekIntent, TrackKey};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{BudgetVec, Error, InputCursor, Step, WorkBudget};
 use triergon_mpegts::stream::{FeedContinuation, FeedItem, TraceEvent, TransportStream};
@@ -20,6 +20,7 @@ use triergon_mpegts::{
 };
 use ts::compat::pes::{DemuxClock, ReadyContinuation, SourceContext, selected_track_kind};
 use ts::psi::DescriptorNamespace;
+use ts::transport::pid;
 /// TS delivery mode and track discovery policy.
 // Preserve the byte encoding used on the per-carrier path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -276,7 +277,7 @@ impl TsEngine {
     }
 
     /// The source events of `program` and the demux PES of the selected
-    /// PIDs: 1 to 64 distinct PIDs from 1 to 0x1ffe.
+    /// PIDs: 1 to [`MAXIMUM_SELECTIONS`] distinct PIDs from 1 below the null PID.
     pub(crate) fn with_selections(
         input: InputCursor,
         format: ts::PacketFormat,
@@ -289,15 +290,15 @@ impl TsEngine {
         if selections.is_empty() {
             return Err(Error::Invalid("PES program selection has no PIDs"));
         }
-        if selections.len() > 64 {
+        if selections.len() > MAXIMUM_SELECTIONS {
             return Err(Error::Limit {
                 requested: selections.len(),
-                maximum: 64,
+                maximum: MAXIMUM_SELECTIONS,
             });
         }
         if selections
             .iter()
-            .any(|selection| !(1..=0x1ffe).contains(&selection.pid))
+            .any(|selection| !(1..pid::NULL).contains(&selection.pid))
         {
             return Err(Error::Invalid(
                 "selected PES PID must be between 1 and 8190",
@@ -696,14 +697,14 @@ impl TsEngine {
                     } else {
                         observer.poll_compact_payload(w, c)
                     };
-                    step.map(|step| map_payload(step, FeedPacket::Compact))
+                    step.map(|step| step.map(FeedPacket::Compact))
                 } else {
                     let step = if self.binding.is_bound() {
                         observer.poll_with_input(&self.input, w, c)
                     } else {
                         observer.poll(w, c)
                     };
-                    step.map(|step| map_payload(step, FeedPacket::Owned))
+                    step.map(|step| step.map(FeedPacket::Owned))
                 };
                 match result {
                     Ok(ts::AssemblyStep::Output(packet)) => {
@@ -855,10 +856,10 @@ impl TsEngine {
             configuration_epoch,
         } = event
         {
-            if map.streams.len() > 64 {
+            if map.streams.len() > MAXIMUM_TRACKS {
                 return Err(Error::Limit {
                     requested: map.streams.len(),
-                    maximum: 64,
+                    maximum: MAXIMUM_TRACKS,
                 });
             }
             if self.delivery.discovers_tracks() && self.pes_adopting == 0 {

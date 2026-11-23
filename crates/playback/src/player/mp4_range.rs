@@ -86,9 +86,9 @@ impl<'a> Mp4RangeOpen<'a> {
         }
         let (plan, mut cursor, duration_us) = self.index.finish_demux_range()?;
         // Leave space for packet/input staging and selection validation.
-        // The fact vector grows over at most 64 tracks, including its old
-        // allocation during a growth step.
-        let fact_bytes = 128 * size_of::<crate::engine::TrackFact>();
+        // The fact vector grows over at most `MAXIMUM_TRACKS` tracks, including its
+        // old allocation during a growth step.
+        let fact_bytes = 2 * crate::MAXIMUM_TRACKS * size_of::<crate::engine::TrackFact>();
         if input.budget().available() < maximum_packet.saturating_mul(2).max(fact_bytes) {
             cursor.discard_seek_checkpoints();
         }

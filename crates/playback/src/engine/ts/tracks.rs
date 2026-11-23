@@ -10,7 +10,8 @@ use ts::compat::pes::{
     DemuxObserver, DemuxScope, DvbSubtitlesDescriptors, PrivateAudioCarriage,
     PrivateAudioDescriptors, RegisteredCarriage,
 };
-use ts::psi::{DescriptorNamespace, ProgramMap};
+use ts::pes::stream_id;
+use ts::psi::{DescriptorNamespace, ProgramMap, stream_type};
 #[derive(Debug)]
 pub(crate) enum TrackUpdate {
     Configuration(AdmittedCarriage),
@@ -79,14 +80,16 @@ impl TsEngine {
     pub(crate) fn discover_tracks(&self, map: &ProgramMap) -> Result<PesTracks> {
         let mut selections = map.streams.as_slice().iter().filter_map(|stream| {
             let carriage = match stream.stream_type {
-                0x1b => Carriage::Registered(RegisteredCarriage::Avc),
-                0x24 => Carriage::Registered(RegisteredCarriage::Hevc),
-                0x0f | 0x11 | 0x81 | 0x87 => Carriage::AudioFromPmt,
-                0x06 if (matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
-                    || self.delivery == Delivery::MediaFeed)
-                    && stream.descriptors().any(|entry| {
-                        entry.is_ok_and(|descriptor| matches!(descriptor.tag, 0x6a | 0x7a))
-                    }) =>
+                stream_type::H264 => Carriage::Registered(RegisteredCarriage::Avc),
+                stream_type::HEVC => Carriage::Registered(RegisteredCarriage::Hevc),
+                stream_type::AAC_ADTS
+                | stream_type::AAC_LATM
+                | stream_type::ATSC_AC3
+                | stream_type::ATSC_EAC3 => Carriage::AudioFromPmt,
+                stream_type::PES_PRIVATE_DATA
+                    if (matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_))
+                        || self.delivery == Delivery::MediaFeed)
+                        && PrivateAudioCarriage::is_signalled_by_dvb_descriptor(stream) =>
                 {
                     Carriage::AudioFromPmt
                 }
@@ -129,7 +132,7 @@ impl TsEngine {
             program: self.program,
             pid: spec.pid,
             stream_type: stream.stream_type,
-            stream_id: 0xbd,
+            stream_id: stream_id::PRIVATE_STREAM_1,
             entity: self.input.source(),
             epochs: ts::SourceEpochs {
                 clock: self.stream.source_epochs().clock,
@@ -143,28 +146,31 @@ impl TsEngine {
         let hls_audio = self.delivery == Delivery::MediaFeed;
         let carriage = match spec.carriage {
             Carriage::AudioFromPmt => match stream.stream_type {
-                0x0f => Carriage::Registered(RegisteredCarriage::AacAdts),
-                0x11 => Carriage::Registered(RegisteredCarriage::AacLatm),
-                0x06 if !hls_audio
-                    && !matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_)) =>
+                stream_type::AAC_ADTS => Carriage::Registered(RegisteredCarriage::AacAdts),
+                stream_type::AAC_LATM => Carriage::Registered(RegisteredCarriage::AacLatm),
+                stream_type::PES_PRIVATE_DATA
+                    if !hls_audio
+                        && !matches!(map.descriptor_namespace, DescriptorNamespace::Dvb(_)) =>
                 {
                     return Err(Error::Unsupported(
                         "private PMT audio needs an explicit DVB namespace",
                     ));
                 }
-                0x06 | 0x81 | 0x87 => Carriage::PrivateAudio(if hls_audio {
-                    PrivateAudioCarriage::from_hls_pmt(
-                        stream.stream_type,
-                        private_audio,
-                        self.limits,
-                    )?
-                } else {
-                    PrivateAudioCarriage::from_observed_pmt(
-                        stream.stream_type,
-                        private_audio,
-                        self.limits,
-                    )?
-                }),
+                stream_type::PES_PRIVATE_DATA | stream_type::ATSC_AC3 | stream_type::ATSC_EAC3 => {
+                    Carriage::PrivateAudio(if hls_audio {
+                        PrivateAudioCarriage::from_hls_pmt(
+                            stream.stream_type,
+                            private_audio,
+                            self.limits,
+                        )?
+                    } else {
+                        PrivateAudioCarriage::from_observed_pmt(
+                            stream.stream_type,
+                            private_audio,
+                            self.limits,
+                        )?
+                    })
+                }
                 _ => return Err(mismatch),
             },
             fixed => fixed,
@@ -172,16 +178,10 @@ impl TsEngine {
         let pool = self.input.budget().clone();
         let mut observer = match carriage {
             Carriage::Registered(carriage) => {
-                let (stream_type, stream_id) = match carriage {
-                    RegisteredCarriage::Avc => (0x1b, 0xe0),
-                    RegisteredCarriage::Hevc => (0x24, 0xe0),
-                    RegisteredCarriage::AacAdts => (0x0f, 0xc0),
-                    RegisteredCarriage::AacLatm => (0x11, 0xc0),
-                };
-                if stream.stream_type != stream_type {
+                if stream.stream_type != carriage.stream_type() {
                     return Err(mismatch);
                 }
-                scope.stream_id = stream_id;
+                scope.stream_id = carriage.stream_id();
                 DemuxObserver::new_registered(scope, carriage, pool, self.limits)
             }
             Carriage::PrivateAudio(carriage) if hls_audio => DemuxObserver::new_hls_private_audio(

@@ -3,7 +3,7 @@
 
 use super::{ClockChoice, Player, SeekIntent, Selection, TrackKey};
 use crate::{
-    Engine, Result, Source,
+    Engine, MAXIMUM_TRACKS, Result, Source,
     engine::Mp4RangeLanding,
     engine::mp4::demux_replay::DemuxReplay,
     mp4::catalogue::{CatalogueCommit, Mp4Catalogue, RangeSeek, RetiredCatalogue},
@@ -52,7 +52,7 @@ pub struct Mp4DemuxSeekJob<'a> {
     selection: Selection,
     generation: u64,
     progressive_generation: Option<u64>,
-    anchors: [Anchor; 64],
+    anchors: [Anchor; MAXIMUM_TRACKS],
     tracks: usize,
     pending: usize,
     row: usize,
@@ -223,7 +223,7 @@ impl<'a> Mp4DemuxSeekJob<'a> {
             selection,
             generation: engine.generation(),
             progressive_generation,
-            anchors: [Anchor::default(); 64],
+            anchors: [Anchor::default(); MAXIMUM_TRACKS],
             tracks: 0,
             pending: 0,
             row: 0,

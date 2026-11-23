@@ -9,7 +9,7 @@ use crate::event::{
     EngineStep, Event, Mp4EmptyPacket, Mp4Event, Mp4MissingSample, Mp4Packet, Mp4ShortPacket,
 };
 use crate::{
-    Result, SeekIntent, TrackKey,
+    MAXIMUM_TRACKS, Result, SeekIntent, TrackKey,
     mp4::open::PendingMedia,
     mp4::plan::{Mp4Configuration, PreparedMp4, SourceRow},
 };
@@ -72,7 +72,7 @@ pub struct Mp4Engine {
     pub(crate) progressive: Option<progressive::ProgressiveState>,
     /// The front read boundary, once a packet reached it.
     pub(crate) front_boundary: Option<FrontReadBoundary>,
-    pub(crate) configs: [Option<CachedDescription>; 64],
+    pub(crate) configs: [Option<CachedDescription>; MAXIMUM_TRACKS],
     pub(crate) seek: SeekReplay,
     pub(crate) input: InputCursor,
     /// The media a demux-order replay serves from memory, until it is read.
@@ -109,7 +109,7 @@ impl Mp4Engine {
             row: 0,
             seek: SeekReplay::Forward,
             packet: None,
-            configs: [None; 64],
+            configs: [None; MAXIMUM_TRACKS],
             revision: 0,
             maximum_packet,
         };
@@ -214,7 +214,7 @@ impl Mp4Engine {
         self.seek = seek;
         self.packet = None;
         self.ended_short = false;
-        self.configs = [None; 64];
+        self.configs = [None; MAXIMUM_TRACKS];
         Ok(())
     }
     pub(crate) fn is_progressive(&self) -> bool {
