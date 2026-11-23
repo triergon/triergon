@@ -229,6 +229,9 @@ pub(crate) struct PageReader {
     max_skip: u64,
 }
 
+/// The capture-pattern scanner reached its byte bound without finding a page.
+pub(crate) const CAPTURE_SCAN_LIMIT: Error = Error::Policy("Ogg capture pattern scan");
+
 impl PageReader {
     pub(crate) fn new(input: &InputCursor, max_skip: u64) -> PageReader {
         PageReader {
@@ -263,7 +266,7 @@ impl PageReader {
     fn skip(&mut self, bytes: usize) -> Result<()> {
         self.skipped += bytes as u64;
         if self.skipped > self.max_skip {
-            return Err(Error::Policy("Ogg capture pattern scan"));
+            return Err(CAPTURE_SCAN_LIMIT);
         }
         Ok(())
     }

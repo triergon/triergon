@@ -2,7 +2,7 @@
 use crate::compat::clock::ReferenceClock;
 use crate::mapping::{Configuration, HeaderStep, Headers, Mapping, Previous};
 use crate::packets::{Assembler, Completed, Continuity};
-use crate::page::{MAX_PAGE, Page, PageHeader, PageReader};
+use crate::page::{CAPTURE_SCAN_LIMIT, MAX_PAGE, Page, PageHeader, PageReader};
 use crate::queue::Queue;
 use crate::seek::{Bisection, Landing, Offer, Output, Probe};
 use crate::timing::{Clock, PageClock, Slot};
@@ -311,7 +311,7 @@ impl Reader {
                             }
                             continue;
                         }
-                        Ok(Step::End(_)) | Err(Error::Policy(_)) => {
+                        Ok(Step::End(_)) | Err(CAPTURE_SCAN_LIMIT) => {
                             bisection.exhausted();
                             continue;
                         }
@@ -334,7 +334,7 @@ impl Reader {
                             );
                             continue;
                         }
-                        Ok(Step::End(_)) | Err(Error::Policy(_)) => {
+                        Ok(Step::End(_)) | Err(CAPTURE_SCAN_LIMIT) => {
                             // A scan after a jump may have begun in a later link.
                             if *chained && !*contiguous {
                                 for track in self.tracks.iter_mut() {
