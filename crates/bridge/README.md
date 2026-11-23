@@ -82,7 +82,10 @@ it carries; `new_for_service` selects one of several. Either keeps the
 service's composition and ancillary pages.
 Teletext pages and closed captions become opaque ASS `TextSource`s, which
 `TextBridge` reports as it reports a Matroska ASS track's cues; an empty
-teletext page is a clear. A teletext decode needs the decoder's whole packet
+teletext page is a clear. `TextBridge` returns a text packet or document whose
+bytes break its format or exceed a limit as `TextStep::Refused`, with the
+reason, and reads the next; a feature it does not read (`Error::Unsupported`)
+ends the track. A teletext decode needs the decoder's whole packet
 work in one budget. `CaptionBridge` takes H.264 or HEVC access units or MPEG-2
 PES payloads in decode order and decodes the caption frames FFmpeg's
 extraction settles, in its order. It is made with the track's `avcC` or `hvcC`

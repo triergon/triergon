@@ -134,6 +134,7 @@ fn cues(text: &mut TextBridge, source: TextSource) -> Vec<(Vec<u8>, Option<Time>
                 out.push((cue.input.payload.to_vec(), cue.start, cue.duration));
             }
             TextStep::Finished => panic!("text bridge finished"),
+            TextStep::Refused(rejection) => panic!("{:?}", rejection.error),
         }
     }
 }

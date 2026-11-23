@@ -158,6 +158,78 @@ fn authored_ass_documents_keep_exact_source_bytes() {
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }
 
+/// The in-band tx3g sample `payload` of track 0, generation 7.
+fn tx3g_sample(b: &Budget, payload: &[u8], sequence: u64) -> text_bridge::TextSource {
+    use triergon_subtitles::text;
+    text_bridge::TextSource::document(
+        b,
+        text::Input {
+            format: text::Format::Tx3g,
+            encoding: text::Encoding::Tx3gInBand,
+            payload: Bytes::copy_from_slice(b, payload).unwrap(),
+            codec_id: None,
+            codec_private: None,
+            charset_label: None,
+            addition: None,
+            timing: text::Timing::unknown(),
+            source_id: ID,
+            generation: 7,
+            sequence,
+            configuration_epoch: 0,
+            container_position: None,
+        },
+    )
+}
+
+/// The cues and refusals of `bridge` until it asks for a packet or finishes.
+fn text_steps(
+    bridge: &mut text_bridge::TextBridge,
+) -> std::result::Result<Vec<std::result::Result<Vec<u8>, text_bridge::TextRejection>>, C> {
+    use text_bridge::TextStep;
+    let mut seen = Vec::new();
+    for _ in 0..100_000 {
+        match bridge.step(&mut WorkBudget::new(1), &off())? {
+            TextStep::Yield => {}
+            TextStep::Cue(o) => seen.push(Ok(o.cue.decoded_utf8.unwrap().to_vec())),
+            TextStep::Refused(rejection) => seen.push(Err(rejection)),
+            TextStep::NeedPacket | TextStep::Finished => return Ok(seen),
+        }
+    }
+    panic!("text bridge kept the sample");
+}
+
+/// A tx3g sample whose text is not UTF-8 is refused alone: the bridge returns it
+/// with the reason and reads the next sample.
+#[test]
+fn a_refused_tx3g_sample_loses_only_its_own_cue() {
+    use triergon_subtitles::text;
+    let b = pool();
+    let mut bridge = text_bridge::TextBridge::new(&b, ID, 0, 7, text::Limits::default());
+    bridge
+        .provide(tx3g_sample(&b, &[0, 2, 0xff, b'a'], 1))
+        .unwrap();
+    let [Err(rejection)] = &text_steps(&mut bridge).unwrap()[..] else {
+        panic!("the malformed sample was not refused");
+    };
+    assert!(matches!(rejection.error, C::Invalid(_)));
+    bridge.provide(tx3g_sample(&b, &[0, 1, b'b'], 2)).unwrap();
+    bridge.finish();
+    let seen = text_steps(&mut bridge).unwrap();
+    assert!(matches!(&seen[..], [Ok(text)] if text == b"b"));
+}
+
+/// Byte-reversed UTF-16, which the bridge does not read, ends the track instead.
+#[test]
+fn an_unsupported_tx3g_sample_ends_the_track() {
+    use triergon_subtitles::text;
+    let b = pool();
+    let mut bridge = text_bridge::TextBridge::new(&b, ID, 0, 7, text::Limits::default());
+    bridge
+        .provide(tx3g_sample(&b, &[0, 4, 0xff, 0xfe, b'a', 0], 1))
+        .unwrap();
+    assert!(matches!(text_steps(&mut bridge), Err(C::Unsupported(_))));
+}
+
 fn bitmap_scope() -> bitmap_bridge::BitmapScope {
     bitmap_bridge::BitmapScope {
         source: ID,

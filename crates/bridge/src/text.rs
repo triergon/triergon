@@ -153,6 +153,9 @@ pub enum TextStep {
     Yield,
     /// A cue.
     Cue(TextOutput),
+    /// The pending packet or document was refused, and is returned with the
+    /// reason: its cue is lost, and the bridge takes the next.
+    Refused(TextRejection),
     /// Provide the next packet, or `finish`.
     NeedPacket,
     /// After `finish`, every cue was returned.
@@ -176,7 +179,8 @@ struct CopyStage {
     scanned: bool,
 }
 /// Extracts the cues of one text track's packets in order, one pending packet at a
-/// time.
+/// time. A packet the bridge or its extractor refuses is returned as
+/// [`TextStep::Refused`], and later packets are read as if it had not been sent.
 #[derive(Debug)]
 pub struct TextBridge {
     extractor: Extractor,
@@ -502,7 +506,10 @@ impl TextBridge {
         }
         Ok(true)
     }
-    /// Extracts within `w`.
+    /// Extracts within `w`. A packet whose bytes break the format or exceed a limit
+    /// is [`TextStep::Refused`]; running out of memory or being cancelled keeps it
+    /// pending, and a feature the bridge does not read ([`Error::Unsupported`]) ends
+    /// the track.
     pub fn step(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<TextStep> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
@@ -511,10 +518,16 @@ impl TextBridge {
             return Ok(TextStep::Yield);
         }
         if self.copy.is_some() {
-            self.copy_step(w, c)?;
+            if let Err(error) = self.copy_step(w, c) {
+                return self.refuse(error);
+            }
             return Ok(TextStep::Yield);
         }
-        Ok(match self.extractor.step(w, c)? {
+        let status = match self.extractor.step(w, c) {
+            Ok(status) => status,
+            Err(error) => return self.refuse(error),
+        };
+        Ok(match status {
             text::Status::Yield | text::Status::NeedOutput => TextStep::Yield,
             text::Status::NeedInput => {
                 self.pending = None;
@@ -533,5 +546,31 @@ impl TextBridge {
                 cue,
             }),
         })
+    }
+
+    /// Drops the pending packet for `error` when the packet itself is at fault (its
+    /// bytes break the format or exceed a limit), and the extractor's hold on it.
+    /// Any other error stands: one that leaves the packet pending (cancellation,
+    /// memory), a feature the bridge does not read, or one with no packet pending.
+    #[cold]
+    #[inline(never)]
+    fn refuse(&mut self, error: Error) -> Result<TextStep> {
+        let fault = matches!(
+            error,
+            Error::Invalid(_)
+                | Error::Truncated
+                | Error::Overflow
+                | Error::Limit { .. }
+                | Error::Policy(_)
+        );
+        let Some(source) = self.pending.take_if(|_| fault) else {
+            return Err(error);
+        };
+        self.copy = None;
+        self.extractor.reset(self.generation);
+        if self.finishing {
+            self.extractor.finish_input();
+        }
+        Ok(TextStep::Refused(TextRejection { source, error }))
     }
 }

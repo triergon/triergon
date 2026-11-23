@@ -197,6 +197,15 @@ impl Records {
         }
     }
 
+    /// A refused packet adds nothing to the fold: its cue is lost and the track goes on.
+    #[cold]
+    #[inline(never)]
+    fn refused(&self, error: &triergon_core::Error) {
+        if self.trace {
+            println!("# text packet refused: {error}");
+        }
+    }
+
     fn cue(&mut self, cue: &text::Cue) -> Result<()> {
         let clock = [micros(cue.start)?, micros(cue.duration)?];
         match self.cue_fold {
@@ -332,6 +341,7 @@ fn drain_text(bridge: &mut TextBridge, records: &mut Records) -> Result<()> {
     loop {
         match bridge.step(&mut WorkBudget::new(GRANT), &CANCEL)? {
             TextStep::Cue(event) => records.cue(&event.cue)?,
+            TextStep::Refused(rejection) => records.refused(&rejection.error),
             TextStep::Yield => {}
             TextStep::NeedPacket | TextStep::Finished => return Ok(()),
         }

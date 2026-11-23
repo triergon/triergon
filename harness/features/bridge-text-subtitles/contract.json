@@ -775,69 +775,46 @@
       ]
     },
     {
-      "reading": "Triergon refuses a tx3g sample too short for its 16-bit text length (recovery policy)",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17: a TextSample begins with unsigned int(16) text-length.",
-      "candidate": "Refuses the track with Truncated before any cue (9 1).",
-      "reference": "Publishes no event for the sample and completes (9 0).",
-      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
-      "cases": [
-        "tx3g-missing-length",
-        "capsule-mov-text-empty-physical",
-        "capsule-mov-text-tx3g-missing-length"
-      ]
-    },
-    {
       "reading": "Triergon refuses a tx3g sample whose text is shorter than its length (recovery policy)",
       "clause": "ETSI TS 126 245 V19.0.0 section 5.17: text-length counts the bytes of the string that follows.",
-      "candidate": "Refuses the track with Truncated before any cue.",
-      "reference": "Publishes the bytes present as the text: xy, ab and xy, and nothing for capsule-mov-text-bad-two, whose one counted byte is absent.",
+      "candidate": "Refuses the sample with Truncated and publishes nothing for it; later samples are read.",
+      "reference": "Publishes the bytes present as the text: xy, ab and xy.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-text-overrun",
         "capsule-mov-text-overstated",
-        "capsule-mov-text-tx3g-text-overrun",
-        "capsule-mov-text-bad-two"
+        "capsule-mov-text-tx3g-text-overrun"
       ]
     },
     {
       "reading": "Triergon refuses a tx3g sample with a malformed modifier box (recovery policy)",
       "clause": "ETSI TS 126 245 V19.0.0 section 5.17 fills the rest of the sample with modifier boxes; ISO/IEC 14496-12:2015 section 4.2 gives each box a size of at least its header and within its container.",
-      "candidate": "Refuses the track: Invalid for a complete header whose size is below 8, Truncated for an incomplete header or a box past the sample.",
-      "reference": "Publishes no event for a complete header with a size below 8 (tx3g-short-box, capsule-mov-text-short-box, capsule-mov-text-tx3g-short-box); publishes the text for an incomplete header or an overrunning box (x, abcd, abcd, x, a).",
+      "candidate": "Refuses the sample with Truncated for an incomplete header or a box past the sample and publishes nothing for it; later samples are read.",
+      "reference": "Publishes the text for an incomplete header or an overrunning box: x, abcd, abcd, x and a.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
-        "tx3g-short-box",
         "tx3g-box-overrun",
         "capsule-mov-text-extended-short",
         "capsule-mov-text-overrun-box",
-        "capsule-mov-text-short-box",
         "capsule-mov-text-tx3g-box-overrun",
-        "capsule-mov-text-tx3g-short-box",
         "capsule-mov-text-understated"
       ]
     },
     {
       "reading": "Triergon refuses a tx3g string that is not well formed in its encoding (recovery policy)",
       "clause": "ETSI TS 126 245 V19.0.0 section 5.1 requires UTF-8 or BOM-marked UTF-16; RFC 3629 sections 3 and 4 exclude overlong forms, surrogates and incomplete sequences.",
-      "candidate": "Refuses the track at the sample with Invalid, losing later cues: b at 1001000 us in capsule-mov-text-utf8-refusal-then-good, and in capsule-mov-text-tags-nul-transitions every cue from sample 9 (ab NUL ff d) on.",
-      "reference": "Publishes no event for the sample and continues, or shows the text before a NUL: a in capsule-mov-text-nul-invalid-tail; in capsule-mov-text-tags-nul-transitions ab for each sample, ending at its NUL, through 24000000 us.",
+      "candidate": "Refuses the sample with Invalid and publishes nothing for it; later samples are read. In capsule-mov-text-nul-invalid-tail that is its one sample, a NUL followed by a byte that is not UTF-8; in capsule-mov-text-tags-nul-transitions it is sample 9 (ab NUL ff d) at 18000000 us, and the other 13 samples keep the NUL and the text after it.",
+      "reference": "Ends the text at its first NUL, so the bytes after it are not decoded: a in capsule-mov-text-nul-invalid-tail; in capsule-mov-text-tags-nul-transitions ab for each sample, ending at its NUL, through 24000000 us.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
-        "tx3g-utf16-odd",
-        "tx3g-lone-surrogate",
-        "capsule-mov-text-invalid-overlong",
-        "capsule-mov-text-invalid-tail",
         "capsule-mov-text-nul-invalid-tail",
-        "capsule-mov-text-tx3g-lone-surrogate",
-        "capsule-mov-text-tx3g-utf16-odd",
-        "capsule-mov-text-utf8-refusal-then-good",
         "capsule-mov-text-tags-nul-transitions"
       ]
     },
     {
       "reading": "Triergon refuses Matroska UTF-8 text with a scalar above U+10FFFF (recovery policy)",
       "clause": "Matroska codec mappings draft 21 section 3.5.11 carries S_TEXT/UTF8 as UTF-8 text; RFC 3629 section 3 limits UTF-8 to U+10FFFF.",
-      "candidate": "Refuses the track with Invalid (invalid Unicode scalar) before any cue.",
+      "candidate": "Refuses the Block with Invalid (invalid Unicode scalar) and publishes nothing for it.",
       "reference": "Returns the four-byte Block f4908080.",
       "cases": [
         "utf8-packet-too-large-scalar"
@@ -846,7 +823,7 @@
     {
       "reading": "Triergon refuses a WebVTT BlockAdditional without its identifier line (recovery policy)",
       "clause": "Matroska codec mappings draft 21 section 5.4.4: the type-1 BlockAdditional holds the cue settings, a LF, the cue identifier, a LF, then comments.",
-      "candidate": "Refuses the track with Truncated before any cue.",
+      "candidate": "Refuses the Block with Truncated and publishes nothing for it.",
       "reference": "Returns the Block body and its 41-byte type-1 addition (align:start LF and an unterminated identifier); it does not interpret the addition.",
       "cases": [
         "mkv-vtt-truncated-addition"
