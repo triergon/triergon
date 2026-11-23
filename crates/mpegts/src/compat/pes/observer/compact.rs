@@ -244,19 +244,11 @@ impl PayloadCursor {
     }
     /// Borrow the active range and its source coordinates. Returns `None` before
     /// admission or after retirement.
-    // Matching the active flag with the retained span measured +0.000000267% across the playback workloads.
-    #[expect(
-        clippy::expect_used,
-        reason = "returning these views as options measured +1.2% on progressive TS188 and +0.9% on HLS playback"
-    )]
     pub fn current(&self) -> Option<DemuxSpanView<'_>> {
-        self.active.then(|| {
-            view(
-                self.current.as_ref().expect("active payload range"),
-                self.index,
-                self.current_count != 1,
-            )
-        })
+        let (Some(span), true) = (&self.current, self.active) else {
+            return None;
+        };
+        Some(view(span, self.index, self.current_count != 1))
     }
     /// Borrow the active payload bytes. Returns `None` when no range is active.
     #[inline]
