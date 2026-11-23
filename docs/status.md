@@ -80,6 +80,7 @@ with the specification; every other listed case withholds its comparison's accep
 |---|---|---|---|---|---|---|---|
 | [`codecs/correctness-manifest`](../harness/codecs/correctness-manifest.json) |  | 1 | 35 | 1 |  | 37 |  |
 | [`codecs/nodither-streams`](../harness/codecs/nodither-streams.json) | 7 |  |  |  |  | 7 |  |
+| [`codecs/pcm-policies`](../harness/codecs/pcm-policies.json) | 2 | 2 |  |  |  | 4 |  |
 | [`codecs/play-manifest`](../harness/codecs/play-manifest.json) | 8 | 1 |  |  |  | 9 |  |
 | [`codecs/reader-seeks`](../harness/codecs/reader-seeks.json) | 20 | 10 |  |  |  | 30 |  |
 | [`codecs/session-cases`](../harness/codecs/session-cases.json) | 40 | 189 | 31 |  | 1 | 261 |  |
@@ -148,7 +149,7 @@ with the specification; every other listed case withholds its comparison's accep
 | [`tx3g-configuration`](../harness/features/tx3g-configuration/contract.json) | 56 |  |  |  |  | 56 |  |
 | [`video-nal-input`](../harness/features/video-nal-input/contract.json) | 2 |  | 52 |  |  | 54 |  |
 | [`vobsub-index`](../harness/features/vobsub-index/contract.json) | 3 |  |  |  |  | 3 |  |
-| **Total** | 2266 / 2247 | 2322 / 2314 | 191 | 39 | 1 | 4699 / 4672 | 285 |
+| **Total** | 2268 / 2249 | 2324 / 2316 | 191 | 39 | 1 | 4703 / 4676 | 285 |
 
 ## Linux AArch64
 

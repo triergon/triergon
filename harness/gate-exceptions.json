@@ -189,6 +189,7 @@
       },
       "harness/features/mov-track-seek/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 8832, "thumbv7neon-unknown-linux-gnueabihf": 8832}, "open_deviations": {"aarch64-unknown-linux-gnu": 30, "thumbv7neon-unknown-linux-gnueabihf": 30}, "open_policies": {"aarch64-unknown-linux-gnu": 64, "thumbv7neon-unknown-linux-gnueabihf": 64}},
       "harness/features/isobmff-source-seek/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 13362, "thumbv7neon-unknown-linux-gnueabihf": 13362}, "open_deviations": {"aarch64-unknown-linux-gnu": 43, "thumbv7neon-unknown-linux-gnueabihf": 43}},
+      "harness/codecs/pcm-policies.json": {"open_policies": {"aarch64-unknown-linux-gnu": 2, "thumbv7neon-unknown-linux-gnueabihf": 2}, "open_deviations": {"aarch64-unknown-linux-gnu": 2, "thumbv7neon-unknown-linux-gnueabihf": 2}},
       "harness/status-rows.json": {
         "open_cells": {
           "aarch64-unknown-linux-gnu": 28,

@@ -6,28 +6,32 @@
    "name": "ps-open-dt-envelope-reference.adts",
    "path": "harness/codecs/aac/ps/open/ps-open-dt-envelope-reference.adts",
    "bytes": 1658,
-   "sha256": "1b0795bf3476adf5cc3cb9687346e70282a7c2e78ff83cb2d907057a140304e8"
+   "sha256": "1b0795bf3476adf5cc3cb9687346e70282a7c2e78ff83cb2d907057a140304e8",
+   "reference_extensions": true
   },
   {
    "lane": "aac",
    "name": "ps-open-noext-after-error.adts",
    "path": "harness/codecs/aac/ps/open/ps-open-noext-after-error.adts",
    "bytes": 1257,
-   "sha256": "82b0e0daf21b6c462d60e380144dfe1c141841a747248d24d69d8991a06f4ba7"
+   "sha256": "82b0e0daf21b6c462d60e380144dfe1c141841a747248d24d69d8991a06f4ba7",
+   "reference_extensions": true
   },
   {
    "lane": "aac",
    "name": "ps-open-sbr-after-missing.adts",
    "path": "harness/codecs/aac/ps/open/ps-open-sbr-after-missing.adts",
    "bytes": 1478,
-   "sha256": "54e38063c93985d31f595a8aa7dd3bd031596148b2304b84445e65d7ef1ec9d2"
+   "sha256": "54e38063c93985d31f595a8aa7dd3bd031596148b2304b84445e65d7ef1ec9d2",
+   "reference_extensions": true
   },
   {
    "lane": "aac",
    "name": "ps-open-sbr-truncated.adts",
    "path": "harness/codecs/aac/ps/open/ps-open-sbr-truncated.adts",
    "bytes": 1218,
-   "sha256": "1cde1e039a43011f9c3e35cfab033c76bc6b3263eab5e12cc57d466095f9a5b0"
+   "sha256": "1cde1e039a43011f9c3e35cfab033c76bc6b3263eab5e12cc57d466095f9a5b0",
+   "reference_extensions": true
   }
  ],
  "open_cases": []

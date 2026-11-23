@@ -13,6 +13,7 @@
 //! is applied afterwards by the summary, never by skipping inputs here.
 
 mod native_audio;
+mod pcm_policy;
 mod play;
 pub(super) mod session;
 mod video;
@@ -42,6 +43,7 @@ const AAC_CONTAINER_PRIMING: &str = "aac-container-priming";
 /// The example exposes a decoder policy the device-output worker does not select.
 pub(super) fn decoder_only_lane(lane: &str) -> bool {
     matches!(lane, "aac-mov" | AAC_CONTAINER_PRIMING)
+        || pcm_policy::Policy::for_lane(lane).is_some()
         || damage::recipe_manifest(lane).is_some()
         || lane == "track-reset"
 }
@@ -79,6 +81,9 @@ pub fn session_vector_lanes(lane: &str) -> &'static [&'static str] {
 
 /// The pinned inputs of a lane that does not reuse the base manifest.
 pub fn variant_manifest(lane: &str) -> Option<&'static str> {
+    if let Some(policy) = pcm_policy::Policy::for_lane(lane) {
+        return Some(policy.manifest());
+    }
     if play::lane(lane) {
         return Some(play::MANIFEST);
     }
@@ -689,6 +694,9 @@ fn audio_decoder(
     if lane == AAC_CONTAINER_PRIMING {
         ours_argv.extend(["--priming".into(), "container".into()]);
     }
+    if lane == "aac" && vector.get("reference_extensions") == Some(&Value::Bool(true)) {
+        ours_argv.extend(["--extensions".into(), "reference".into()]);
+    }
     let ours_run = run_text(&ours_argv, RUN_TIMEOUT)?;
     let mut diagnostics = json_lines(&ours_run.stderr);
     let info = if through_session {
@@ -1044,7 +1052,7 @@ fn output_path(
         };
     }
     let (o, r) = (tmp.join("ours.s16"), tmp.join("ref.s16"));
-    let ours_argv = if through_session {
+    let mut ours_argv = if through_session {
         session::args(
             a,
             &media_lane,
@@ -1057,6 +1065,9 @@ fn output_path(
     } else {
         vec![worker, op.clone(), path.to_owned(), python::path(&o)]
     };
+    if lane == "aac" && vector.get("reference_extensions") == Some(&Value::Bool(true)) {
+        ours_argv.extend(["--extensions".into(), "reference".into()]);
+    }
     let po = run_text(&ours_argv, RUN_TIMEOUT)?;
     let coreless = lane == "session-dts" && vector.get("coreless") == Some(&Value::Bool(true));
     let reference_argv =
@@ -1434,6 +1445,11 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             != v.get("sha256").and_then(Value::as_str)
         {
             row.push(("status".into(), Value::str("input-hash-mismatch")));
+        } else if let Some(policy) = pcm_policy::Policy::for_lane(&lane) {
+            row.push((
+                "decoder".into(),
+                observation(policy.compare(a, &path, &tmp.0), &lane)?,
+            ));
         } else if play::lane(&lane) {
             row.push((
                 "output".into(),

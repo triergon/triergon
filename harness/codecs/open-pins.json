@@ -35,41 +35,6 @@
       "output.status": "reference-produced-nothing"
      }
     }
-   },
-   "hevc": {
-    "EXT_A_ericsson_3.bit": {
-     "candidate": {
-      "decoder.ours_bytes": 0,
-      "decoder.ours_errors": {
-       "length": 1,
-       "sha256": "bd92f9d41bc785c24389c8d9d8d2e1bba20a408116273f4426f062031eaf9ddd"
-      },
-      "decoder.ours_frames": 0,
-      "decoder.ours_partial_bytes": 0,
-      "decoder.ours_rc": 1,
-      "output.ours_partial_bytes": 0,
-      "output.ours_rc": 0,
-      "output.pictures_ours": 0
-     },
-     "reference": {
-      "decoder.ffmpeg": "ffprobe found no decodable stream",
-      "decoder.ffmpeg_bytes": 0,
-      "decoder.ffmpeg_partial_bytes": 0,
-      "decoder.ffmpeg_rc": 183,
-      "output.pictures_ref": 0,
-      "output.reference_partial_bytes": 0,
-      "output.reference_rc": 0
-     },
-     "comparison": {
-      "decoder.ffprobe_rc": 0,
-      "decoder.status": "ffmpeg-refused",
-      "output.differing_pictures": 0,
-      "output.first_diff": null,
-      "output.max_abs": 0,
-      "output.pictures_equal": 0,
-      "output.status": "reference-produced-nothing"
-     }
-    }
    }
   },
   "harness/codecs/nodither-streams.json": {
@@ -405,6 +370,80 @@
       "aarch64-unknown-linux-gnu": {
        "decoder.ffmpeg_pcm_sha256": "dc2164d0aa3834eff89a256d657ec8bd690c5ca68e0c74810be5b7416af48407",
        "decoder.ours_pcm_sha256": "e96e9efc00f56b90f1672159dbf9477d51fd49e776e0aeec2e2db6c9c92f68b1"
+      }
+     }
+    }
+   }
+  },
+  "harness/codecs/pcm-policies.json": {
+   "aac-extension-policy": {
+    "ps-open-noext-after-error.adts": {
+     "candidate": {
+      "decoder.ours_pcm_bytes": 65536
+     },
+     "reference": {
+      "decoder.reference_pcm_bytes": 65536
+     },
+     "comparison": {
+      "decoder.status": "fail"
+     },
+     "exact": {
+      "aarch64-unknown-linux-gnu": {
+       "decoder.ours_pcm_sha256": "d819517f13bd3c359bf12987fd6c65477359b9122b009adea309e5dc76afd0a7",
+       "decoder.reference_pcm_sha256": "ee12abb3d48d70ad0e09a0ed0383949c73494ece50f4f84d049fe4b24c9f96e6"
+      }
+     }
+    },
+    "ps-open-sbr-after-missing.adts": {
+     "candidate": {
+      "decoder.ours_pcm_bytes": 81920
+     },
+     "reference": {
+      "decoder.reference_pcm_bytes": 81920
+     },
+     "comparison": {
+      "decoder.status": "fail"
+     },
+     "exact": {
+      "aarch64-unknown-linux-gnu": {
+       "decoder.ours_pcm_sha256": "46837466ba13e0b3fb98fed4c1b93ca61167a35991d256c111877a04cbebbbe8",
+       "decoder.reference_pcm_sha256": "9f465ae09518073801eebf568b5b8d676f2e2f012f52db965186c0149828ef4a"
+      }
+     }
+    }
+   },
+   "dts-filter-policy": {
+    "perfect.dts": {
+     "candidate": {
+      "decoder.ours_pcm_bytes": 147456
+     },
+     "reference": {
+      "decoder.reference_pcm_bytes": 147456
+     },
+     "comparison": {
+      "decoder.status": "fail"
+     },
+     "exact": {
+      "aarch64-unknown-linux-gnu": {
+       "decoder.ours_pcm_sha256": "3cf292aefc539a0690df2e7cffc9fc275e02965fbff1235dae40a0258e99d8bc",
+       "decoder.reference_pcm_sha256": "234914274e9b589ad15c4dfc4e6daf34f7caded74ea09309ee30ab222facba36"
+      }
+     }
+    },
+    "pr_probe.dts": {
+     "candidate": {
+      "decoder.ours_pcm_bytes": 133120
+     },
+     "reference": {
+      "decoder.reference_pcm_bytes": 133120
+     },
+     "comparison": {
+      "decoder.status": "fail"
+     },
+     "exact": {
+      "aarch64-unknown-linux-gnu": {
+       "decoder.ours_pcm_sha256": "6be000f548d7b58429ba3f2be86fbd26dfaea42c6d921590e569115eff002d80",
+       "decoder.reference_pcm_sha256": "aec2e6f53e4ec94c931275239222156165d92cfedf5ef1fa235f81e6d54fb151"
       }
      }
     }

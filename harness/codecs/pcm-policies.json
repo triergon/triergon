@@ -1,0 +1,70 @@
+{
+ "schema": "triergon.codecs.correctness-manifest.v1",
+ "vectors": [
+  {
+   "lane": "aac-extension-policy",
+   "name": "ps-open-noext-after-error.adts",
+   "path": "harness/codecs/aac/ps/open/ps-open-noext-after-error.adts",
+   "bytes": 1257,
+   "sha256": "82b0e0daf21b6c462d60e380144dfe1c141841a747248d24d69d8991a06f4ba7"
+  },
+  {
+   "lane": "aac-extension-policy",
+   "name": "ps-open-sbr-after-missing.adts",
+   "path": "harness/codecs/aac/ps/open/ps-open-sbr-after-missing.adts",
+   "bytes": 1478,
+   "sha256": "54e38063c93985d31f595a8aa7dd3bd031596148b2304b84445e65d7ef1ec9d2"
+  },
+  {
+   "lane": "dts-filter-policy",
+   "name": "perfect.dts",
+   "path": ".research/dca-pcm-policy/perfect.dts",
+   "bytes": 20554,
+   "sha256": "b4e27d13e4c760c25ef7e180f32107a6f52a71212ac301d318b1eedcbcf7c946"
+  },
+  {
+   "lane": "dts-filter-policy",
+   "name": "pr_probe.dts",
+   "path": ".research/dca-pcm-policy/pr_probe.dts",
+   "bytes": 6240,
+   "sha256": "df5b502847b2672ac9d6505287a11d74d4c867cfa7f1dc8198b963fffebea75f"
+  }
+ ],
+ "open_policies": [
+  {
+   "policy": "AAC phase recovery after invalid stereo parameters",
+   "undecided": "ISO/IEC 14496-26:2024 §7.18.1.2.1 specifies parameter decoding and leaves recovery from malformed PS payloads open.",
+   "rule": "Reset phase and disable the phase extension until valid data enables it.",
+   "documented": "crates/codec-aac/README.md#behaviour-and-limits",
+   "reference_rule": "Reset phase values to zero and retain the last enable bit.",
+   "compat": "triergon_codec_aac::compat::ffmpeg::extensions::Policy::Reference",
+   "cases": [
+    "ps-open-noext-after-error.adts"
+   ]
+  },
+  {
+   "policy": "AAC envelope carry after a missing SBR payload",
+   "undecided": "ISO/IEC 14496-3 §4.6.18 defines SBR processing and leaves recovery from this missing payload open.",
+   "rule": "Use the full core band and reset the carry border.",
+   "documented": "crates/codec-aac/README.md#behaviour-and-limits",
+   "reference_rule": "Preserve the preceding border and band limits with zero carried high band.",
+   "compat": "triergon_codec_aac::compat::ffmpeg::extensions::Policy::Reference",
+   "cases": [
+    "ps-open-sbr-after-missing.adts"
+   ]
+  }
+ ],
+ "open_deviations": [
+  {
+   "reading": "The Annex D.8 perfect-reconstruction window applies when FILTS is one.",
+   "clause": "ETSI TS 102 114 V1.6.1 Annex D.8 specifies the 512 coefficients of the perfect-reconstruction prototype.",
+   "candidate": "The default decoder uses the Annex D.8 coefficients to produce PCM.",
+   "reference": "The compatibility policy uses the recovered reference coefficients and produces different PCM of the same extent.",
+   "compat": "triergon_codec_dca::compat::ffmpeg::Policy::Reference",
+   "cases": [
+    "perfect.dts",
+    "pr_probe.dts"
+   ]
+  }
+ ]
+}
