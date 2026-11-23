@@ -145,6 +145,30 @@ pub(crate) struct Slot {
     planes: [Option<u8>; 2],
 }
 
+/// Channels that have been decoded in the current block.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum DecodedChannels {
+    None = 0,
+    First = 1,
+    Second = 2,
+    Both = 3,
+}
+
+impl DecodedChannels {
+    fn includes(self, channel: usize) -> bool {
+        self as u8 & (1 << channel) != 0
+    }
+
+    fn with(self, channel: usize) -> Self {
+        match (self, channel) {
+            (Self::Both, _) | (Self::First, 1) | (Self::Second, 0) => Self::Both,
+            (_, 0) => Self::First,
+            _ => Self::Second,
+        }
+    }
+}
+
 /// Element instance state (channels + SBR).
 #[derive(Debug)]
 pub(crate) struct ElementState {
@@ -155,16 +179,14 @@ pub(crate) struct ElementState {
     /// Time output of the core for this frame (per channel, 1024 samples), and after SBR/PS
     /// up to 2048.
     pub out: [[f32; 2048]; 2],
-    /// Set when the element was decoded in the current raw_data_block.
-    pub decoded: bool,
+    /// An SCE can fill one channel of an element with a CPE slot.
+    decoded: DecodedChannels,
     /// The element's channel count (2 for a mono SBR element carrying PS).
     pub nch: usize,
     /// Spectral data of the current frame (filterbank deferred to the END element).
     pub cd: [Charged<Box<ChannelData>>; 2],
     /// element_instance_tag as coded in the bitstream this block (CCE targets refer to it).
     pub bs_tag: u8,
-    /// Which channels were decoded this block (an SCE may fill one channel of a CPE slot).
-    pub ch_decoded: [bool; 2],
 }
 
 impl ElementState {
@@ -178,13 +200,12 @@ impl ElementState {
             ],
             sbr: None,
             out: [[0.0; 2048]; 2],
-            decoded: false,
+            decoded: DecodedChannels::None,
             nch: if kind == ElementId::Cpe { 2 } else { 1 },
             cd: [
                 Charged::boxed(budget, ChannelData::new())?,
                 Charged::boxed(budget, ChannelData::new())?,
             ],
-            ch_decoded: [false; 2],
             bs_tag: tag,
         })
     }
@@ -202,7 +223,6 @@ impl ElementState {
             nch,
             cd,
             bs_tag,
-            ch_decoded,
         } = self;
         for c in ch {
             c.reset();
@@ -211,14 +231,13 @@ impl ElementState {
             s.renew();
         }
         *out = [[0.0; 2048]; 2];
-        *decoded = false;
+        *decoded = DecodedChannels::None;
         *nch = if *kind == ElementId::Cpe { 2 } else { 1 };
         for cd in cd {
             let cd: &mut ChannelData = cd;
             *cd = ChannelData::new();
         }
         *bs_tag = *tag;
-        *ch_decoded = [false; 2];
     }
 }
 
@@ -591,8 +610,7 @@ impl Core {
         blocks: usize,
     ) -> Result<bool> {
         for e in &mut self.elements {
-            e.decoded = false;
-            e.ch_decoded = [false; 2];
+            e.decoded = DecodedChannels::None;
         }
         for c in &mut self.cce {
             c.point = None;
@@ -626,7 +644,9 @@ impl Core {
                     } else if RAW {
                         raw_elements += 1;
                         self.elements.iter().position(|element| {
-                            element.kind == id && element.tag == tag && !element.decoded
+                            element.kind == id
+                                && element.tag == tag
+                                && element.decoded == DecodedChannels::None
                         })
                     } else {
                         occ[id as usize] += 1;
@@ -788,8 +808,7 @@ impl Core {
         if let Prediction::Main(p) = &mut e.ch[chan].prediction {
             pred::apply(p, &mut e.cd[chan], cfg);
         }
-        e.decoded = true;
-        e.ch_decoded[chan] = true;
+        e.decoded = e.decoded.with(chan);
         Ok(())
     }
 
@@ -823,8 +842,7 @@ impl Core {
             pred::apply(p, &mut b[0], cfg);
         }
         apply_intensity(&a[0], &mut b[0], &ms_mask);
-        e.decoded = true;
-        e.ch_decoded = [true, true];
+        e.decoded = DecodedChannels::Both;
         Ok(())
     }
 
@@ -909,11 +927,11 @@ impl Core {
         crate::cce::process_cces(self);
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];
-            if !RAW && !e.decoded {
+            if !RAW && e.decoded == DecodedChannels::None {
                 continue;
             }
             let (kind, tag) = (
-                if !RAW && e.ch_decoded == [true, false] && e.kind == ElementId::Cpe {
+                if !RAW && e.decoded == DecodedChannels::First && e.kind == ElementId::Cpe {
                     ElementId::Sce
                 } else {
                     e.kind
@@ -922,7 +940,7 @@ impl Core {
             );
             let channels = if RAW { e.nch } else { 2 };
             for c in 0..channels {
-                if RAW || e.ch_decoded[c] {
+                if RAW || e.decoded.includes(c) {
                     let out = if RAW {
                         // Every fixed slot has its own element in wire order. The
                         // frame has already reserved a plane for each channel.
@@ -948,7 +966,7 @@ impl Core {
         let (sbr_active, ps_active) = (self.sbr_active(), self.ps_active());
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];
-            if !e.decoded {
+            if e.decoded == DecodedChannels::None {
                 // element missing in this frame: output silence for it
                 for o in &mut e.out {
                     for v in o.iter_mut() {
@@ -1495,7 +1513,7 @@ pub(crate) mod tests {
                 e.ch[0].overlap.fill(1.0);
                 e.ch[1].prev_shape = WindowShape::KaiserBessel;
                 e.out[1][7] = 2.0;
-                (e.decoded, e.nch, e.bs_tag, e.ch_decoded) = (true, 2, 9, [true; 2]);
+                (e.decoded, e.nch, e.bs_tag) = (DecodedChannels::Both, 2, 9);
                 e.cd[0].global_gain = 120;
                 e.renew();
                 assert_eq!(
