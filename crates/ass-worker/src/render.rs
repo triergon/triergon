@@ -388,6 +388,8 @@ pub fn run(args: &[String]) -> Result<()> {
         Boundary::Begin.mark(&mut out)?;
     }
     let bench = action == Mode::Bench;
+    // Its own loop: the timed interval is the clock inside each operation, which
+    // leaves out loading the fonts, building the renderer and dropping both.
     let (mut total, mut elapsed) = (Totals::default(), Duration::ZERO);
     for _ in 0..iterations {
         let mut folded = Folded::default();

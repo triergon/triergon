@@ -18,11 +18,8 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use triergon_ass::{Options, Script};
 use triergon_core::Budget;
-use triergon_harness_protocol::digest::fold;
 use triergon_harness_runner::records::Dump;
-use triergon_harness_runner::{
-    Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
-};
+use triergon_harness_runner::{Invocation, Mode as RunMode, Totals, measure};
 
 const MAX_INPUT: u64 = 64 << 20;
 const USAGE: &str = "usage: ass-worker ass-fold FILE MODE | ass-bench FILE ITERATIONS MODE
@@ -94,10 +91,7 @@ fn run(args: &[String]) -> Result<()> {
     let (invocation, mode) = parse_args(args)?;
     invocation.check_iterations(|| USAGE)?;
     let Invocation {
-        mode: action,
-        path,
-        iterations,
-        ..
+        mode: action, path, ..
     } = invocation;
     if std::fs::metadata(path)?.len() > MAX_INPUT {
         return Err("input exceeds the size bound".into());
@@ -124,10 +118,8 @@ fn run(args: &[String]) -> Result<()> {
         )?),
         _ => None,
     };
-    let retained = budget.used();
-    let mut out = io::stdout().lock();
     if action == RunMode::Trace {
-        let mut dump = Dump(BufWriter::new(out));
+        let mut dump = Dump(BufWriter::new(io::stdout().lock()));
         operation(
             &mut dump,
             &budget,
@@ -139,13 +131,7 @@ fn run(args: &[String]) -> Result<()> {
         )?;
         return Ok(dump.0.flush()?);
     }
-    let memory = action == RunMode::Memory;
-    if memory {
-        Boundary::Begin.mark(&mut out)?;
-    }
-    let start = Timer::start(action == RunMode::Bench);
-    let mut total = Totals::default();
-    for _ in 0..iterations {
+    measure(&invocation, "ass-parse", Some(&budget), || {
         let mut work = Totals::default();
         operation(
             &mut work,
@@ -156,24 +142,8 @@ fn run(args: &[String]) -> Result<()> {
             mode,
             walked.as_ref(),
         )?;
-        total.packets += work.packets;
-        total.bytes += work.bytes;
-        fold(&mut total.digest, work.digest);
-        if budget.used() != retained {
-            return Err("ass operation retained charged storage".into());
-        }
-    }
-    let elapsed = start.elapsed().as_nanos();
-    if memory {
-        Boundary::End.mark(&mut out)?;
-    }
-    Ok(write_summary(
-        &mut out,
-        "ass-parse",
-        iterations,
-        elapsed,
-        &total,
-    )?)
+        Ok(work)
+    })
 }
 
 #[cfg_attr(test, allow(dead_code))]

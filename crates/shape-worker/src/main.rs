@@ -16,11 +16,8 @@ use std::process::ExitCode;
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::compat::libass;
 use triergon_font::{Font, Limits};
-use triergon_harness_protocol::digest::fold;
 use triergon_harness_runner::records::Dump;
-use triergon_harness_runner::{
-    Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
-};
+use triergon_harness_runner::{Invocation, Mode as RunMode, Totals, measure};
 use triergon_shape::bidi::{self, BaseDirection, BidiClass, Bracket, Level, Resolver};
 use triergon_shape::compat::libass::SizedMetrics;
 use triergon_shape::{
@@ -520,10 +517,7 @@ fn run(args: &[String]) -> Result<()> {
     let (invocation, operation) = parse(args)?;
     invocation.check_iterations(|| USAGE)?;
     let Invocation {
-        mode: action,
-        path,
-        iterations,
-        ..
+        mode: action, path, ..
     } = invocation;
     let size = std::fs::metadata(path)?.len();
     if size > MAX_INPUT {
@@ -531,40 +525,16 @@ fn run(args: &[String]) -> Result<()> {
     }
     let budget = Budget::new(1 << 30)?;
     let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error)?;
-    let retained = budget.used();
-    let mut out = io::stdout().lock();
     if action == RunMode::Trace {
-        let mut dump = Dump(BufWriter::new(out));
+        let mut dump = Dump(BufWriter::new(io::stdout().lock()));
         read(&file, &budget, &operation, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
-    let memory = action == RunMode::Memory;
-    if memory {
-        Boundary::Begin.mark(&mut out)?;
-    }
-    let start = Timer::start(action == RunMode::Bench);
-    let mut total = Totals::default();
-    for _ in 0..iterations {
+    measure(&invocation, operation.name(), Some(&budget), || {
         let mut work = Totals::default();
         read(std::hint::black_box(&file), &budget, &operation, &mut work)?;
-        total.packets += work.packets;
-        total.bytes += work.bytes;
-        fold(&mut total.digest, work.digest);
-        if budget.used() != retained {
-            return Err("shaping operation retained charged storage".into());
-        }
-    }
-    let elapsed = start.elapsed().as_nanos();
-    if memory {
-        Boundary::End.mark(&mut out)?;
-    }
-    Ok(write_summary(
-        &mut out,
-        operation.name(),
-        iterations,
-        elapsed,
-        &total,
-    )?)
+        Ok(work)
+    })
 }
 
 #[cfg_attr(test, allow(dead_code))]

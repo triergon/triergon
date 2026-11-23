@@ -19,11 +19,8 @@ use std::process::ExitCode;
 use triergon_core::{Budget, Bytes};
 use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Limits};
-use triergon_harness_protocol::digest::fold;
 use triergon_harness_runner::records::Dump;
-use triergon_harness_runner::{
-    Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
-};
+use triergon_harness_runner::{Invocation, Mode as RunMode, Totals, measure};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -184,10 +181,7 @@ fn run(args: &[String]) -> Result<()> {
     let (invocation, input) = parse(args)?;
     invocation.check_iterations(|| USAGE)?;
     let Invocation {
-        mode: action,
-        path,
-        iterations,
-        ..
+        mode: action, path, ..
     } = invocation;
     let size = std::fs::metadata(path)?.len();
     if size > MAX_INPUT {
@@ -211,20 +205,12 @@ fn run(args: &[String]) -> Result<()> {
             (None, cases)
         }
     };
-    let retained = budget.used();
-    let mut out = io::stdout().lock();
     if action == RunMode::Trace {
-        let mut dump = Dump(BufWriter::new(out));
+        let mut dump = Dump(BufWriter::new(io::stdout().lock()));
         read(&budget, selection.as_ref(), &cases, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
-    let memory = action == RunMode::Memory;
-    if memory {
-        Boundary::Begin.mark(&mut out)?;
-    }
-    let start = Timer::start(action == RunMode::Bench);
-    let mut total = Totals::default();
-    for _ in 0..iterations {
+    measure(&invocation, "raster", Some(&budget), || {
         let mut work = Totals::default();
         read(
             &budget,
@@ -232,20 +218,8 @@ fn run(args: &[String]) -> Result<()> {
             std::hint::black_box(&cases),
             &mut work,
         )?;
-        total.packets += work.packets;
-        total.bytes += work.bytes;
-        fold(&mut total.digest, work.digest);
-        if budget.used() != retained {
-            return Err("raster operation retained charged storage".into());
-        }
-    }
-    let elapsed = start.elapsed().as_nanos();
-    if memory {
-        Boundary::End.mark(&mut out)?;
-    }
-    Ok(write_summary(
-        &mut out, "raster", iterations, elapsed, &total,
-    )?)
+        Ok(work)
+    })
 }
 
 #[cfg_attr(test, allow(dead_code))]
