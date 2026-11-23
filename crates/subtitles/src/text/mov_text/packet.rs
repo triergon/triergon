@@ -18,12 +18,42 @@ struct Span {
     end: u16,
     style: Style,
 }
+/// A modifier box the decoder reads; it skips every other kind.
 #[derive(Debug, Clone, Copy)]
+enum Modifier {
+    Styles,
+    Highlight,
+    HighlightColour,
+    Wrap,
+}
+impl Modifier {
+    fn of(kind: &[u8]) -> Option<Self> {
+        match kind {
+            b"styl" => Some(Self::Styles),
+            b"hlit" => Some(Self::Highlight),
+            b"hclr" => Some(Self::HighlightColour),
+            b"twrp" => Some(Self::Wrap),
+            _ => None,
+        }
+    }
+    /// The bytes of the box's fixed fields; a shorter box is skipped.
+    fn fixed_bytes(self) -> usize {
+        match self {
+            Self::Styles => 2,
+            Self::Highlight | Self::HighlightColour => 4,
+            Self::Wrap => 1,
+        }
+    }
+}
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 enum Phase {
     Begin,
     BoxHeader,
-    BoxBody,
-    Styles,
+    /// The fixed fields of a box the decoder reads.
+    BoxBody(Modifier),
+    /// The style records of a `styl` box still to read.
+    Styles(u16),
     Skip,
     Validate,
     Prefix,
@@ -56,10 +86,7 @@ pub(super) struct PacketJob {
     visible_end: usize,
     at: usize,
     box_end: usize,
-    box_kind: [u8; 4],
     box_count: usize,
-    style_count: usize,
-    style_read: usize,
     styles: BudgetVec<Span>,
     highlight: Option<(u16, u16)>,
     highlight_color: Option<[u8; 4]>,
@@ -84,10 +111,7 @@ impl PacketJob {
             visible_end: 0,
             at: 0,
             box_end: 0,
-            box_kind: [0; 4],
             box_count: 0,
-            style_count: 0,
-            style_read: 0,
             styles: BudgetVec::new(pool),
             highlight: None,
             highlight_color: None,
@@ -217,24 +241,17 @@ impl PacketJob {
                             maximum: limits.maximum_boxes,
                         });
                     }
-                    self.box_kind = self.bytes()[self.at + 4..self.at + 8]
-                        .try_into()
-                        .map_err(|_| Error::Truncated)?;
+                    let modifier = Modifier::of(&self.bytes()[self.at + 4..self.at + 8]);
                     self.box_end = self.at + usize::try_from(size).map_err(|_| Error::Overflow)?;
                     self.at += header;
                     self.box_count += 1;
-                    self.phase = Phase::BoxBody;
+                    self.phase = modifier.map_or(Phase::Skip, Phase::BoxBody);
                     funding.commit();
                 }
-                Phase::BoxBody => {
+                Phase::BoxBody(modifier) => {
                     let available = self.box_end - self.at;
-                    let needed = match &self.box_kind {
-                        b"styl" => 2,
-                        b"hlit" | b"hclr" => 4,
-                        b"twrp" => 1,
-                        _ => 0,
-                    };
-                    if needed == 0 || available < needed {
+                    let needed = modifier.fixed_bytes();
+                    if available < needed {
                         self.phase = Phase::Skip;
                         continue;
                     }
@@ -242,51 +259,45 @@ impl PacketJob {
                         return Ok(false);
                     }
                     let bytes = &self.bytes()[self.at..self.at + needed];
-                    match &self.box_kind {
-                        b"styl" => {
-                            let count = usize::from(u16::from_be_bytes([bytes[0], bytes[1]]));
-                            if count
-                                .checked_mul(12)
-                                .and_then(|n| n.checked_add(2))
-                                .is_some_and(|n| n <= available)
-                            {
-                                if count > limits.maximum_styles {
+                    let next = match modifier {
+                        Modifier::Styles => {
+                            let count = u16::from_be_bytes([bytes[0], bytes[1]]);
+                            if 12 * usize::from(count) + 2 <= available {
+                                if usize::from(count) > limits.maximum_styles {
                                     return Err(Error::Limit {
-                                        requested: count,
+                                        requested: count.into(),
                                         maximum: limits.maximum_styles,
                                     });
                                 }
                                 self.styles.clear();
-                                self.style_count = count;
-                                self.style_read = 0;
-                                self.phase = Phase::Styles;
+                                Phase::Styles(count)
                             } else {
-                                self.phase = Phase::Skip;
+                                Phase::Skip
                             }
                         }
-                        b"hlit" => {
+                        Modifier::Highlight => {
                             self.highlight = Some((
                                 u16::from_be_bytes([bytes[0], bytes[1]]),
                                 u16::from_be_bytes([bytes[2], bytes[3]]),
                             ));
-                            self.phase = Phase::Skip;
+                            Phase::Skip
                         }
-                        b"hclr" => {
+                        Modifier::HighlightColour => {
                             self.highlight_color =
                                 Some(bytes.try_into().map_err(|_| Error::Truncated)?);
-                            self.phase = Phase::Skip;
+                            Phase::Skip
                         }
-                        b"twrp" => {
+                        Modifier::Wrap => {
                             self.wrap = Some(bytes[0]);
-                            self.phase = Phase::Skip;
+                            Phase::Skip
                         }
-                        _ => return Err(Error::Invalid("native mov_text box dispatch")),
-                    }
+                    };
+                    self.phase = next;
                     self.at += needed;
                     funding.commit();
                 }
-                Phase::Styles => {
-                    if self.style_read == self.style_count {
+                Phase::Styles(left) => {
+                    if left == 0 {
                         self.phase = Phase::Skip;
                         continue;
                     }
@@ -307,22 +318,23 @@ impl PacketJob {
                         end: u16::from_be_bytes([b[2], b[3]]),
                         style: Style::read(&b[4..12]),
                     };
-                    let previous = self.styles.as_slice().last().copied();
-                    if span.end < span.start || previous.is_some_and(|p| span.start < p.end) {
+                    let previous = self.styles.as_mut_slice().last_mut();
+                    if span.end < span.start
+                        || previous.as_ref().is_some_and(|p| span.start < p.end)
+                    {
                         self.styles.clear();
                         self.phase = Phase::Skip;
-                    } else if span.start != span.end && span.style != config.style {
-                        if previous.is_some_and(|p| p.end == span.start && p.style == span.style) {
-                            self.styles
-                                .as_mut_slice()
-                                .last_mut()
-                                .ok_or(Error::Invalid("native style merge"))?
-                                .end = span.end;
-                        } else {
-                            self.styles.try_push(span).map_err(|e| e.error)?;
+                    } else {
+                        if span.start != span.end && span.style != config.style {
+                            match previous {
+                                Some(p) if p.end == span.start && p.style == span.style => {
+                                    p.end = span.end;
+                                }
+                                _ => self.styles.try_push(span).map_err(|e| e.error)?,
+                            }
                         }
+                        self.phase = Phase::Styles(left - 1);
                     }
-                    self.style_read += 1;
                     self.at += 12;
                     funding.commit();
                 }
