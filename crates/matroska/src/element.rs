@@ -189,6 +189,26 @@ struct Master {
     start: u64,
     end: Option<u64>,
 }
+/// How far the reader is through the one EBML document it accepts.
+#[derive(Clone, Copy, Debug)]
+enum Document {
+    /// Before the EBML header.
+    Start,
+    /// After the EBML header, before the Segment.
+    Header,
+    /// Inside the Segment.
+    Segment(Master),
+    /// After the end of a finite Segment.
+    Ended,
+}
+impl Document {
+    fn segment_end(self) -> Option<u64> {
+        match self {
+            Self::Segment(segment) => segment.end,
+            _ => None,
+        }
+    }
+}
 
 /// A source location captured by this parser at a validated Cluster header.
 /// It supplies envelope context only; a packet consumer still owns track/Cues
@@ -226,11 +246,9 @@ pub(crate) struct ElementReader {
     parser: u64,
     limits: Limits,
     phase: Phase,
-    segment: Option<Master>,
+    document: Document,
     cluster: Option<Master>,
     pending_header: Option<ElementHeader>,
-    seen_ebml: bool,
-    seen_segment: bool,
     elements_left: u64,
     scan_left: u64,
     failed: bool,
@@ -272,11 +290,9 @@ impl ElementReader {
             parser,
             limits,
             phase: Phase::Between,
-            segment: None,
+            document: Document::Start,
             cluster: None,
             pending_header: None,
-            seen_ebml: false,
-            seen_segment: false,
             elements_left: limits.elements,
             scan_left: limits.scan_bytes,
             failed: false,
@@ -323,12 +339,15 @@ impl ElementReader {
         self.input.fail(source, token, failure)
     }
     pub(crate) fn cluster_checkpoint(&self) -> Option<ClusterCheckpoint> {
+        let Document::Segment(segment) = self.document else {
+            return None;
+        };
         Some(ClusterCheckpoint {
             pool: self.input.budget().clone(),
             parser: self.parser,
             source: self.input.source(),
             offset: self.cluster?.start,
-            segment: self.segment?,
+            segment,
         })
     }
     /// Explicit logical range seek. Generation changes invalidate every earlier
@@ -348,11 +367,9 @@ impl ElementReader {
         }
         let request = self.input.reset(checkpoint.offset)?;
         self.phase = Phase::Between;
-        self.segment = Some(checkpoint.segment);
+        self.document = Document::Segment(checkpoint.segment);
         self.cluster = None;
         self.pending_header = None;
-        self.seen_ebml = true;
-        self.seen_segment = true;
         self.elements_left = self.limits.elements;
         self.scan_left = self.limits.scan_bytes;
         self.failed = false;
@@ -364,11 +381,9 @@ impl ElementReader {
     pub(crate) fn reset(&mut self) -> Result<InputRequest> {
         let request = self.input.reset(0)?;
         self.phase = Phase::Between;
-        self.segment = None;
+        self.document = Document::Start;
         self.cluster = None;
         self.pending_header = None;
-        self.seen_ebml = false;
-        self.seen_segment = false;
         self.elements_left = self.limits.elements;
         self.scan_left = self.limits.scan_bytes;
         self.failed = false;
@@ -396,10 +411,10 @@ impl ElementReader {
             }
             self.expected_cluster = false;
         }
-        if self.seen_segment && self.segment.is_none() {
+        if matches!(self.document, Document::Ended) {
             return Err(Error::Unsupported("element after finite Segment"));
         }
-        self.check_parent(header, self.segment.and_then(|m| m.end))?;
+        self.check_parent(header, self.document.segment_end())?;
         if (header.id == CLUSTER || is_segment_metadata(header.id))
             && let Some(cluster) = self.cluster
         {
@@ -411,28 +426,29 @@ impl ElementReader {
             return Ok(Some(D::end(cluster.id, header.start, self.generation())));
         }
         self.check_parent(header, self.cluster.and_then(|m| m.end))?;
-        if !self.seen_ebml {
-            if header.id != EBML {
+        match self.document {
+            Document::Start if header.id != EBML => {
                 return Err(Error::Invalid("missing EBML header"));
             }
-            self.seen_ebml = true;
-        } else if !self.seen_segment && header.id == SEGMENT {
-            self.seen_segment = true;
-            self.segment = Some(Master {
-                id: SEGMENT,
-                start: header.start,
-                end: header.end()?,
-            });
-            return Ok(Some(D::start(header)));
-        } else if !self.seen_segment && !matches!(header.id, VOID | CRC32) {
-            return Err(Error::Invalid("element before Segment"));
-        } else if header.id == SEGMENT || header.id == EBML {
-            return Err(Error::Unsupported("multiple EBML documents/Segments"));
-        }
-        if header.id == CLUSTER {
-            if self.segment.is_none() {
-                return Err(Error::Invalid("Cluster outside Segment"));
+            Document::Start => self.document = Document::Header,
+            Document::Header if header.id == SEGMENT => {
+                self.document = Document::Segment(Master {
+                    id: SEGMENT,
+                    start: header.start,
+                    end: header.end()?,
+                });
+                return Ok(Some(D::start(header)));
             }
+            Document::Header if !matches!(header.id, VOID | CRC32) => {
+                return Err(Error::Invalid("element before Segment"));
+            }
+            _ if header.id == SEGMENT || header.id == EBML => {
+                return Err(Error::Unsupported("multiple EBML documents/Segments"));
+            }
+            _ => {}
+        }
+        // Only the Segment admits a Cluster: every other document state failed above.
+        if header.id == CLUSTER {
             self.cluster = Some(Master {
                 id: CLUSTER,
                 start: header.start,
@@ -614,7 +630,8 @@ impl ElementReader {
                     if let Some(master) = self.cluster.take() {
                         return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
-                    if let Some(master) = self.segment.take() {
+                    if let Document::Segment(master) = self.document {
+                        self.document = Document::Ended;
                         return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
                     self.phase = Phase::Done;
@@ -632,10 +649,10 @@ impl ElementReader {
                         self.cluster = None;
                         return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
-                    if let Some(master) = self.segment
+                    if let Document::Segment(master) = self.document
                         && master.end == Some(self.position())
                     {
-                        self.segment = None;
+                        self.document = Document::Ended;
                         return Ok(ParseStep::Event(self.ended::<D>(master)));
                     }
                     if let Some(header) = self.take_buffered_header(work, cancel)? {
@@ -692,10 +709,13 @@ impl ElementReader {
                                 Step::Yield => return Ok(ParseStep::Yield),
                                 Step::End(_) => {
                                     if state.have != 0
-                                        || !self.seen_segment
-                                        || self.segment.is_some_and(|m| {
-                                            m.end.is_some_and(|end| self.input.position() < end)
-                                        })
+                                        || match self.document {
+                                            Document::Start | Document::Header => true,
+                                            Document::Segment(m) => {
+                                                m.end.is_some_and(|end| self.input.position() < end)
+                                            }
+                                            Document::Ended => false,
+                                        }
                                         || self.cluster.is_some_and(|m| {
                                             m.end.is_some_and(|end| self.input.position() < end)
                                         })

@@ -4,7 +4,7 @@
 //! generation; only the explicit seek transition starts a new one.
 use super::control::EnvelopeProgress;
 use super::{
-    BLOCK_GROUP, CLUSTER, CRC32, ClusterCheckpoint, EBML, ElementEvent, ElementHeader,
+    BLOCK_GROUP, CLUSTER, CRC32, ClusterCheckpoint, Document, EBML, ElementEvent, ElementHeader,
     ElementReader, Master, ParseStep, Phase, SEGMENT, SIMPLE_BLOCK, TIMESTAMP, VOID,
     is_segment_metadata,
 };
@@ -67,11 +67,9 @@ impl ElementReader {
     }
     fn install_cluster_range(&mut self, anchor: &ClusterCheckpoint) {
         self.phase = Phase::Between;
-        self.segment = Some(anchor.segment);
+        self.document = Document::Segment(anchor.segment);
         self.cluster = None;
         self.pending_header = None;
-        self.seen_ebml = true;
-        self.seen_segment = true;
         self.elements_left = self.limits.elements;
         self.scan_left = self.limits.scan_bytes;
         self.failed = false;
@@ -98,7 +96,9 @@ impl ElementReader {
             return Err(Error::Invalid("replay block outside Cluster"));
         }
         self.check_parent(header, cluster.end)?;
-        let segment = self.segment.required("missing replay Cluster context")?;
+        let Document::Segment(segment) = self.document else {
+            return Err(Error::Invalid("missing replay Cluster context"));
+        };
         Ok((cluster, segment))
     }
     fn replay_location_from_context(
@@ -170,11 +170,9 @@ impl ElementReader {
         }
         let request = self.input.request_range(location.position)?;
         self.phase = Phase::Between;
-        self.segment = Some(location.checkpoint.segment);
+        self.document = Document::Segment(location.checkpoint.segment);
         self.cluster = Some(location.cluster);
         self.pending_header = None;
-        self.seen_ebml = true;
-        self.seen_segment = true;
         self.elements_left = self.limits.elements;
         self.scan_left = self.limits.scan_bytes;
         self.failed = false;

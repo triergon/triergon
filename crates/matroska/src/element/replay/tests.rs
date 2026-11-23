@@ -1,5 +1,5 @@
 //! Header refill bounds and the refresh of replay locations.
-use super::super::Master;
+use super::super::{Document, Master};
 use super::*;
 use crate::Limits;
 use triergon_core::{Budget, SourceCapabilities, SourceFailure, SourceId};
@@ -46,7 +46,7 @@ fn header_refill_is_bounded_without_mutating_the_exact_leaf_engine() {
 #[test]
 fn header_refill_obeys_core_source_parent_and_scan_bounds() {
     let (mut reader, exact) = pending(Some(19), 13);
-    reader.segment = Some(Master {
+    reader.document = Document::Segment(Master {
         id: 0x18538067,
         start: 0,
         end: Some(11),
@@ -77,7 +77,7 @@ fn header_refill_obeys_core_source_parent_and_scan_bounds() {
         9
     );
     reader.cluster = None;
-    reader.segment = None;
+    reader.document = Document::Header;
     assert_eq!(
         reader
             .bounded_header_refill(&exact, 1024)
@@ -111,7 +111,7 @@ fn header_refill_does_not_invent_parent_scan_or_entity_eof() {
     );
     assert_eq!(exact.maximum, 1);
     reader.scan_left = 100;
-    reader.segment = Some(Master {
+    reader.document = Document::Segment(Master {
         id: 0x18538067,
         start: 0,
         end: Some(0),
@@ -155,7 +155,7 @@ fn setup(pool: &Budget) -> ElementReader {
         64,
     )
     .unwrap();
-    reader.segment = Some(Master {
+    reader.document = Document::Segment(Master {
         id: 0x18538067,
         start: 16,
         end: Some(1000),
@@ -282,7 +282,7 @@ fn replay_refresh_rejection_preserves_prior_value_and_error_order() {
         start: 90,
         end: Some(500),
     });
-    reader.segment = None;
+    reader.document = Document::Header;
     assert!(matches!(
         reader.refresh_block_replay_location(&mut slot, good, None),
         Err(Error::Invalid("missing replay Cluster context"))
@@ -317,7 +317,7 @@ fn replay_refresh_foreign_slot_and_reset_keep_source_fences() {
     ));
     let old = slot.clone().unwrap();
     reader.reset().unwrap();
-    reader.segment = Some(Master {
+    reader.document = Document::Segment(Master {
         id: 0x18538067,
         start: 16,
         end: Some(1000),

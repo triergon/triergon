@@ -1,6 +1,6 @@
 //! Header and discard refills: the exact request and the bounded expanded request
 //! a blocking adapter may issue for an ordinary header or a skipped body.
-use super::{ElementReader, Phase};
+use super::{Document, ElementReader, Phase};
 use crate::{Error, Result};
 use triergon_core::InputRequest;
 
@@ -51,7 +51,7 @@ impl ElementReader {
         if state.have >= state.target || self.failed || maximum == 0 {
             return Ok(None);
         }
-        if self.seen_segment && self.segment.is_none() {
+        if matches!(self.document, Document::Ended) {
             return Ok(None);
         }
         let core = self.input.request();
@@ -85,7 +85,7 @@ impl ElementReader {
         if body.collect || body.remaining == 0 || self.failed || maximum == 0 {
             return Ok(None);
         }
-        if self.seen_segment && self.segment.is_none() {
+        if matches!(self.document, Document::Ended) {
             return Ok(None);
         }
         let core = self.input.request();
@@ -112,7 +112,7 @@ impl ElementReader {
     ) -> Result<Option<HeaderRefillRequest>> {
         let mut cap = cap.min(usize::try_from(self.scan_left).unwrap_or(usize::MAX));
         for end in [
-            self.segment.and_then(|m| m.end),
+            self.document.segment_end(),
             self.cluster.and_then(|m| m.end),
         ]
         .into_iter()
