@@ -199,6 +199,9 @@ impl AnyReader {
     /// [`probe`] needs more bytes of, a format whose reader feature is not enabled, or ISO
     /// BMFF on a source without random access; and with the reader's error when the budget
     /// cannot hold its state.
+    // Out of line: inlined, the probe's code cost a caller's packet loop around it up to
+    // 0.065% of its instructions (subtitle worker, Matroska inputs).
+    #[inline(never)]
     pub fn open(
         prefix: &[u8],
         pool: &Budget,
