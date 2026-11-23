@@ -1,7 +1,7 @@
 use crate::retryable;
 use crate::{
     BuildStep,
-    nal::{Codec, Framing, NalReader, NalUnit, ParameterSetKind, ReaderLimits},
+    nal::{Codec, Framing, NalUnit, ParameterSetKind, ReaderLimits, reader::AnnexBNalReader},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -40,8 +40,8 @@ pub struct ConfigLimits {
     /// The most parameter sets kept. [`AnnexBConfigParser`] reserves their
     /// descriptors at its first step. Must not be zero.
     pub maximum_parameter_sets: usize,
-    /// Bounds of the [`NalReader`] that frames an Annex B configuration; they
-    /// are validated for a declared record too.
+    /// Bounds of the [`NalReader`](crate::nal::NalReader) that frames an Annex B
+    /// configuration; they are validated for a declared record too.
     pub reader: ReaderLimits,
 }
 
@@ -195,7 +195,7 @@ enum State {
 #[derive(Debug)]
 struct Read {
     source: Bytes,
-    reader: NalReader,
+    reader: AnnexBNalReader,
     parameters: BudgetVec<ParameterSet>,
     pending: Option<NalUnit>,
     reserved: bool,
@@ -217,16 +217,16 @@ impl AnnexBConfigParser {
     ) -> Result<Self> {
         limits.check_source(pool, &source)?;
         let length = u64::try_from(source.len()).map_err(|_| Error::Overflow)?;
-        let reader = NalReader::new(
+        let reader = AnnexBNalReader::new(
             pool,
             codec,
-            Framing::AnnexB,
             source_id,
             SourceCapabilities {
                 length: Some(length),
                 random_access: false,
             },
             limits.reader,
+            false,
         )?;
         Ok(Self {
             pool: pool.clone(),
@@ -249,10 +249,10 @@ impl AnnexBConfigParser {
     /// Fails with [`Error::Unsupported`] for a NAL unit that is not a parameter set of
     /// the codec; [`Error::Invalid`] for a source that holds no parameter set;
     /// [`Error::Limit`] past `maximum_parameter_sets`; the errors of
-    /// [`NalReader::step`] for the Annex B framing; [`Error::Cancelled`] when `cancel`
-    /// is set. [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the
-    /// parser keeps its progress. Every other error is final and returned again by each
-    /// later call.
+    /// [`NalReader::step`](crate::nal::NalReader::step) for the Annex B framing;
+    /// [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
+    /// [`Error::Allocation`] are retryable: the parser keeps its progress. Every other
+    /// error is final and returned again by each later call.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -326,7 +326,7 @@ impl AnnexBConfigParser {
             let reader = &mut read.reader;
             let source = &read.source;
             match reader.step(work, cancel)? {
-                Step::Ready(unit) => read.pending = Some(unit),
+                Step::Ready(unit) => read.pending = Some(unit.into()),
                 Step::Yield => return Ok(BuildStep::Yield),
                 Step::NeedInput(request) => {
                     let start = usize::try_from(request.offset).map_err(|_| Error::Overflow)?;

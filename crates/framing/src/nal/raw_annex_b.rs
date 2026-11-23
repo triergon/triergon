@@ -5,7 +5,7 @@ use crate::retryable;
 use crate::{
     avc::picture::AvcPictures,
     hevc,
-    nal::{Codec, NalFraming, NalHeader, NalReader, NalUnit, ReaderLimits},
+    nal::{Codec, NalFraming, NalHeader, NalUnit, ReaderLimits, reader::AnnexBNalReader},
 };
 use std::{
     ops::Range,
@@ -97,7 +97,6 @@ impl RawAccessUnit {
                         START_3
                     },
                 ),
-                // Units typed as Annex B need the per-framing NAL reader (see `NalReader`).
                 NalFraming::LengthPrefixed { .. } => unreachable!("raw reader uses Annex B"),
             };
             zeros(leading)
@@ -122,7 +121,7 @@ struct Role {
     random_access: bool,
 }
 
-fn hevc_role(nal: &NalUnit, reader: &NalReader) -> Result<Role> {
+fn hevc_role(nal: &NalUnit, reader: &AnnexBNalReader) -> Result<Role> {
     let NalHeader::Hevc {
         nal_unit_type,
         layer_id,
@@ -181,22 +180,25 @@ struct PendingNal {
 /// FFmpeg's parser. Every byte of the source belongs to one access unit, zero
 /// padding included.
 ///
-/// The reader is driven like a [`NalReader`]: [`step`](Self::step) asks for
-/// input, and [`provide`](Self::provide), [`finish`](Self::finish) or
-/// [`fail`](Self::fail) answers.
+/// The reader is driven like a [`NalReader`](crate::nal::NalReader):
+/// [`step`](Self::step) asks for input, and [`provide`](Self::provide),
+/// [`finish`](Self::finish) or [`fail`](Self::fail) answers.
+// `repr(C)`: the per-unit fields come before the picture tables, at small offsets.
+#[repr(C)]
 pub struct RawAnnexBReader {
-    nal: NalReader,
-    codec: Codec,
-    avc: Option<AvcPictures>,
-    limits: RawAnnexBLimits,
+    nal: AnnexBNalReader,
+    end: Option<SourceLocation>,
     unit: BudgetVec<NalUnit>,
     pending: Option<PendingNal>,
+    // The NAL limits live in `nal`.
+    maximum_access_unit_bytes: usize,
+    maximum_access_unit_nals: usize,
     unit_start: u64,
     next_offset: u64,
+    codec: Codec,
     has_vcl: bool,
     random_access: bool,
-    end: Option<SourceLocation>,
-    failure: Option<Error>,
+    avc: Option<AvcPictures>,
 }
 
 impl std::fmt::Debug for RawAnnexBReader {
@@ -204,12 +206,19 @@ impl std::fmt::Debug for RawAnnexBReader {
         formatter
             .debug_struct("RawAnnexBReader")
             .field("codec", &self.codec)
-            .field("limits", &self.limits)
+            .field(
+                "limits",
+                &RawAnnexBLimits {
+                    nal: self.nal.limits(),
+                    maximum_access_unit_bytes: self.maximum_access_unit_bytes,
+                    maximum_access_unit_nals: self.maximum_access_unit_nals,
+                },
+            )
             .field("position", &self.nal.position())
             .field("published_bytes", &self.unit_start)
             .field("pending_nals", &self.unit.len())
             .field("end", &self.end)
-            .field("failure", &self.failure)
+            .field("failure", &self.nal.failure())
             .finish_non_exhaustive()
     }
 }
@@ -229,10 +238,11 @@ impl RawAnnexBReader {
             return Err(Error::Invalid("zero raw access-unit limit"));
         }
         Ok(Self {
-            nal: NalReader::compact_annex_b(pool, codec, source, caps, limits.nal)?,
+            nal: AnnexBNalReader::new(pool, codec, source, caps, limits.nal, true)?,
             codec,
             avc: (codec == Codec::Avc).then(AvcPictures::default),
-            limits,
+            maximum_access_unit_bytes: limits.maximum_access_unit_bytes,
+            maximum_access_unit_nals: limits.maximum_access_unit_nals,
             unit: BudgetVec::new(pool),
             pending: None,
             unit_start: 0,
@@ -240,7 +250,6 @@ impl RawAnnexBReader {
             has_vcl: false,
             random_access: false,
             end: None,
-            failure: None,
         })
     }
 
@@ -270,7 +279,7 @@ impl RawAnnexBReader {
         if self.next_offset != 0 || self.pending.is_some() || !self.unit.is_empty() {
             return Err(Error::SourceMismatch);
         }
-        self.nal.resume_annex_b(offset, preceding_nals)?;
+        self.nal.resume(offset, preceding_nals)?;
         self.unit_start = offset;
         self.next_offset = offset;
         Ok(())
@@ -299,7 +308,7 @@ impl RawAnnexBReader {
         if self.pending.is_some() || self.end.is_some() {
             return Ok(false);
         }
-        self.nal.append_annex_payload(request, bytes, work, cancel)
+        self.nal.append_payload(request, bytes, work, cancel)
     }
 
     /// Answers the current request with the end of the source, as
@@ -344,7 +353,8 @@ impl RawAnnexBReader {
     /// [`read_slice_header`](crate::avc::read_slice_header) for an H.264 parameter set
     /// or slice header it refuses (emulation prevention is read strictly);
     /// [`Error::Truncated`] for an H.265 slice of only its header; [`Error::Limit`]
-    /// past an access-unit limit; the errors of [`NalReader::step`] for the framing.
+    /// past an access-unit limit; the errors of
+    /// [`NalReader::step`](crate::nal::NalReader::step) for the framing.
     /// [`Error::Backpressure`] and [`Error::Allocation`] are retryable: the reader
     /// keeps its progress. Every other error is final and returned again by each later
     /// call.
@@ -366,12 +376,12 @@ impl RawAnnexBReader {
         result
     }
 
+    /// The reader's error is its NAL reader's: every stop goes through it.
     fn healthy(&self) -> Result<()> {
-        self.failure.map_or(Ok(()), Err)
+        self.nal.failure().map_or(Ok(()), Err)
     }
 
     fn stop(&mut self, error: Error) {
-        self.failure = Some(error);
         self.nal.stop(error);
         self.pending = None;
         self.unit = BudgetVec::new(self.nal.budget());
@@ -395,7 +405,12 @@ impl RawAnnexBReader {
             }
             if self.pending.is_none() {
                 match self.nal.step(work, cancel)? {
-                    Step::Ready(nal) => self.pending = Some(PendingNal { nal, role: None }),
+                    Step::Ready(nal) => {
+                        self.pending = Some(PendingNal {
+                            nal: nal.into(),
+                            role: None,
+                        });
+                    }
                     Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                     Step::Yield => return Ok(Step::Yield),
                     Step::End(location) => {
@@ -407,7 +422,6 @@ impl RawAnnexBReader {
                     }
                 }
             }
-            // The NAL in a local measured +1.0% on raw HEVC streams, in place +0.2% on transport.
             let pending = self
                 .pending
                 .as_mut()
@@ -436,7 +450,6 @@ impl RawAnnexBReader {
     }
 
     fn append(&mut self, role: Role) -> Result<()> {
-        // The NAL in flight, as at the top of `advance`.
         let pending = self
             .pending
             .as_ref()
@@ -448,7 +461,6 @@ impl RawAnnexBReader {
             ..
         } = facts.framing
         else {
-            // As in `segments`.
             return Err(Error::Invalid("raw NAL framing"));
         };
         let start = prefix_offset
@@ -464,8 +476,8 @@ impl RawAnnexBReader {
             .ok_or(Error::Overflow)?;
         let length = end.checked_sub(self.unit_start).ok_or(Error::Overflow)?;
         let extent = usize::try_from(length).map_err(|_| Error::Overflow)?;
-        check_limit(extent, self.limits.maximum_access_unit_bytes)?;
-        check_limit(self.unit.len() + 1, self.limits.maximum_access_unit_nals)?;
+        check_limit(extent, self.maximum_access_unit_bytes)?;
+        check_limit(self.unit.len() + 1, self.maximum_access_unit_nals)?;
 
         let pending = self
             .pending

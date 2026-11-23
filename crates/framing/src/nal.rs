@@ -18,7 +18,7 @@ mod config;
 mod declared_config;
 pub(crate) mod header;
 mod raw_annex_b;
-mod reader;
+pub(crate) mod reader;
 pub(crate) mod syntax;
 mod units;
 
@@ -32,6 +32,8 @@ pub use declared_config::{
 };
 pub use header::{Codec, NalHeader, ParameterSetKind};
 pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
-pub use reader::{Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits};
+pub use reader::{
+    AnnexBPrefix, Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits,
+};
 pub use syntax::{skip_hevc_profile_tier_level, skip_vui_to_timing};
 pub use units::{AnnexBUnits, split_length_prefixed, start_code};
