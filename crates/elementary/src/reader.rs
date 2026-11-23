@@ -179,23 +179,35 @@ fn scan(view: &[u8], from: usize, sync: u8, work: &mut WorkBudget) -> Scan {
     }
 }
 
-/// The first `byte` in `hay`, eight bytes at a time: frame payloads are long and sync
-/// bytes rare.
+/// The first `byte` in `hay`, sixteen bytes at a time: frame payloads are long and sync
+/// bytes rare. Two words per round share one test, which keeps the scan short where
+/// it is inlined into the reader's step and has few registers to spare.
 #[inline]
 fn find(hay: &[u8], byte: u8) -> Option<usize> {
     const LOW: u64 = 0x0101_0101_0101_0101;
     const HIGH: u64 = 0x8080_8080_8080_8080;
     let pattern = LOW * u64::from(byte);
-    let mut words = hay.chunks_exact(8);
-    for (index, word) in words.by_ref().enumerate() {
+    // The high bit of each byte of `word` equal to `byte`. A borrow can also mark a
+    // byte above a true match, never below one, so the lowest mark is exact.
+    let marks = |word: &[u8]| {
         let word = u64::from_le_bytes(word.try_into().unwrap_or([0; 8])) ^ pattern;
-        let zero = word.wrapping_sub(LOW) & !word & HIGH;
-        if zero != 0 {
-            return Some(index * 8 + zero.trailing_zeros() as usize / 8);
+        word.wrapping_sub(LOW) & !word & HIGH
+    };
+    let mut pairs = hay.chunks_exact(16);
+    for (index, pair) in pairs.by_ref().enumerate() {
+        let (first, second) = pair.split_at(8);
+        let (first, second) = (marks(first), marks(second));
+        if first | second != 0 {
+            let bit = if first != 0 {
+                first.trailing_zeros()
+            } else {
+                64 + second.trailing_zeros()
+            };
+            return Some(index * 16 + bit as usize / 8);
         }
     }
-    let tail = hay.len() - words.remainder().len();
-    words
+    let tail = hay.len() - pairs.remainder().len();
+    pairs
         .remainder()
         .iter()
         .position(|&b| b == byte)
@@ -1196,5 +1208,28 @@ impl<F: Format> ContainerReader for Reader<F> {
     }
     fn capabilities(&self) -> SourceCapabilities {
         self.input.capabilities()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find;
+
+    #[test]
+    fn find_agrees_with_a_byte_search_at_every_offset_and_length() {
+        // Bytes just below and above the sync byte probe the borrow between lanes.
+        for byte in [0x00u8, 0x0b, 0x7f, 0x80, 0xfe, 0xff] {
+            let mut hay: Vec<u8> = (0..70u8).map(|i| byte.wrapping_add(i % 3 + 1)).collect();
+            hay[20] = byte.wrapping_sub(1);
+            for at in 0..hay.len() {
+                let mut with = hay.clone();
+                with[at] = byte;
+                for len in 0..=with.len() {
+                    let expected = with[..len].iter().position(|&b| b == byte);
+                    assert_eq!(find(&with[..len], byte), expected, "{byte} at {at}, {len}");
+                }
+            }
+            assert_eq!(find(&hay, byte), hay.iter().position(|&b| b == byte));
+        }
     }
 }
