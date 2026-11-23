@@ -1,6 +1,7 @@
-//! Compares facade seek receipts and packet suffixes with the existing native trace operations.
+//! Compares facade seek receipts and every delivered packet with the reference's own
+//! native seek, and checks each listed difference against the outputs it pins.
 
-use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -28,6 +29,12 @@ const TIMES_NS: [i64; 6] = [
     15_500_000_000,
     25_000_000_000,
 ];
+/// The compared fields of a packet, in the order [`packet`] builds them.
+const FIELDS: [&str; 7] = [
+    "stream", "track", "pts", "dts", "duration", "key", "payload",
+];
+const USAGE: &str =
+    "usage: cargo xtask play-views seek --record WORKER [--cases ID...] | WORKER OUTPUT";
 
 struct Case {
     id: String,
@@ -139,6 +146,8 @@ fn run(
         .ok_or_else(|| format!("{}: {mode} timed out", case.id))
 }
 
+/// One packet as `[stream, track, pts, dts, duration, key, payload]`. A reference
+/// duration of 0 is FFmpeg's "unknown" and compares as absent.
 fn packet(row: &Value, reference: bool, matroska: bool) -> Result<Value> {
     let common = |ours, native| get(row, if reference { native } else { ours }).cloned();
     let clock = |ours, native| common(ours, if matroska { native } else { ours });
@@ -182,6 +191,8 @@ fn number(value: &Value) -> Result<i128> {
         .ok_or_else(|| format!("expected integer, got {}", json::to_python(value, None)))
 }
 
+/// The reference landing (the presentation time of the first key packet of the
+/// requested track) and every packet the reference's seek delivered.
 fn reference_value(case: &Case, stdout: &[u8]) -> Result<(Value, Vec<Value>)> {
     let mut rows = rows(stdout)?;
     if rows.len() != 1 {
@@ -219,60 +230,11 @@ fn reference_value(case: &Case, stdout: &[u8]) -> Result<(Value, Vec<Value>)> {
     Ok((landing, packets))
 }
 
-fn reference_seek(
-    root: &Path,
-    worker: &Path,
-    case: &Case,
-    scans: &mut BTreeMap<PathBuf, Value>,
-) -> Result<worker::Finished> {
-    if case.matroska {
-        return run(root, worker, "seek-trace", case, &case.reference);
-    }
-    let scan = match scans.entry(case.input.clone()) {
-        Entry::Occupied(scan) => scan.into_mut(),
-        Entry::Vacant(scan) => {
-            let native = run(root, worker, "open-trace", case, &case.reference[4..])?;
-            let mut scan_rows = rows(&native.stdout)?;
-            if native.code != 0 || scan_rows.len() != 1 {
-                return Err(format!("{}: incomplete native source scan", case.id));
-            }
-            let complete = scan_rows.pop().ok_or("missing native source scan")?;
-            if get(&complete, "confirmed_eof")? != &Value::Bool(true) {
-                return Err(format!("{}: native source scan did not reach EOF", case.id));
-            }
-            scan.insert(complete)
-        }
-    };
-    let [track, pts, ..] = case.reference.as_slice() else {
-        return Err("missing reference seek request".into());
-    };
-    let track: i128 = track.parse().map_err(|_| "invalid reference track")?;
-    let target: i128 = pts.parse().map_err(|_| "invalid reference target")?;
-    let (mut first, mut best) = (None, None);
-    for packet in list(scan, "packets")? {
-        if number(get(packet, "pid")?)? != track || number(get(packet, "flags")?)? & 1 == 0 {
-            continue;
-        }
-        let (Some(pts), Some(dts)) = (
-            python::int(get(packet, "pts")?),
-            python::int(get(packet, "dts")?),
-        ) else {
-            continue;
-        };
-        first.get_or_insert(dts);
-        if pts <= target && best.is_none_or(|(previous, _)| pts >= previous) {
-            best = Some((pts, dts));
-        }
-    }
-    // The facade asks for a presentation time. The native backward seek takes
-    // a decode tick. Seek to the DTS of the sync sample chosen on the source timeline.
-    let dts = best
-        .map(|(_, dts)| dts)
-        .or(first)
-        .ok_or("no timed reference sync sample")?;
-    let mut arguments = case.reference.clone();
-    arguments[1] = dts.to_string();
-    run(root, worker, "seek-trace", case, &arguments)
+/// The reference's own backward seek to the requested time: the Matroska worker's
+/// native seek by nanoseconds, or the MOV worker's `av_seek_frame` with the
+/// requested ticks on the requested track.
+fn reference_seek(root: &Path, worker: &Path, case: &Case) -> Result<worker::Finished> {
+    run(root, worker, "seek-trace", case, &case.reference)
 }
 
 /// Identify repeated payloads by the complete sequential packet row and its
@@ -412,6 +374,65 @@ fn matroska_preroll(
     Ok(matched)
 }
 
+/// A packet with its payload replaced by the payload's SHA-256, as reports keep it.
+fn summarised(row: Option<&Value>) -> Value {
+    row.and_then(Value::as_array).map_or(Value::Null, |fields| {
+        let mut fields = fields.to_vec();
+        if let Some(Value::String(payload)) = fields.last_mut() {
+            *payload = sha256::hex(payload.as_bytes());
+        }
+        Value::Array(fields)
+    })
+}
+
+/// Every difference between two aligned packet lists: per field, `F` where both
+/// carry a different value, `F+` where only the candidate carries one and `F-`
+/// where only the reference does, and `count` where the lists differ in length.
+/// Returns the kinds, how many packets differ and the first differing pair.
+fn packet_differences(
+    candidate: &[Value],
+    reference: &[Value],
+    kinds: &mut BTreeSet<String>,
+) -> (usize, Value) {
+    let mut differing = 0;
+    let mut first = Value::Null;
+    for index in 0..candidate.len().max(reference.len()) {
+        let (ours, theirs) = (candidate.get(index), reference.get(index));
+        if ours == theirs {
+            continue;
+        }
+        differing += 1;
+        if first == Value::Null {
+            first = Value::object([
+                ("index", Value::int(index as i64)),
+                ("candidate", summarised(ours)),
+                ("reference", summarised(theirs)),
+            ]);
+        }
+        let (Some(ours), Some(theirs)) = (
+            ours.and_then(Value::as_array),
+            theirs.and_then(Value::as_array),
+        ) else {
+            kinds.insert("count".into());
+            continue;
+        };
+        for ((name, a), b) in FIELDS.iter().zip(ours).zip(theirs) {
+            if a == b {
+                continue;
+            }
+            kinds.insert(match (a, b) {
+                (_, Value::Null) => format!("{name}+"),
+                (Value::Null, _) => format!("{name}-"),
+                _ => (*name).to_owned(),
+            });
+        }
+    }
+    (differing, first)
+}
+
+/// A case's result: every difference between the candidate's receipt and packets
+/// and the reference's landing and packets, and the SHA-256 of the candidate's
+/// complete output (receipt and every packet it delivered, preroll included).
 fn compare(
     root: &Path,
     worker: &Path,
@@ -430,101 +451,101 @@ fn compare(
         ));
     }
     let rows = rows(&ours.stdout)?;
-    let receipt = rows.iter().find_map(|row| row.get("receipt"));
+    let receipt = rows
+        .iter()
+        .find_map(|row| row.get("receipt"))
+        .cloned()
+        .unwrap_or(Value::Null);
     let received = rows
         .iter()
         .filter(|row| row.get("payload").is_some())
         .map(|row| packet(row, false, case.matroska))
         .collect::<Result<Vec<_>>>()?;
+    let output = sha256::hex(
+        json::to_python(
+            &Value::Array(vec![receipt.clone(), Value::Array(received.clone())]),
+            None,
+        )
+        .as_bytes(),
+    );
     let packet_count = received.len();
+    let mut kinds = BTreeSet::new();
     let received = if extra != 0 {
+        kinds.insert("preroll".to_owned());
         matroska_preroll(root, worker, case, received, reference, extra)?
     } else {
         received
     };
-    let receipt_matches =
-        if let Some([requested, actual, discard]) = receipt.and_then(Value::as_array) {
-            let target = case.reference[usize::from(!case.matroska)]
-                .parse::<i64>()
-                .map_err(|_| "invalid reference target")?;
-            let expected_discard = if case.matroska { requested } else { actual };
-            *requested == Value::int(target) && actual == landing && discard == expected_discard
-        } else {
-            false
-        };
-    let first_diff = received
-        .iter()
-        .map(Some)
-        .chain(std::iter::once(None))
-        .zip(reference.iter().map(Some).chain(std::iter::once(None)))
-        .enumerate()
-        .find(|(_, (a, b))| a != b)
-        .map_or(Value::Null, |(index, (a, b))| {
-            // Complete packet payloads are consumed above. Keep each first differing
-            // packet's fields and payload hash in the summary.
-            let row = |row: Option<&Value>| {
-                row.and_then(Value::as_array).map_or(Value::Null, |fields| {
-                    let mut fields = fields.to_vec();
-                    if let Some(Value::String(payload)) = fields.last_mut() {
-                        *payload = sha256::hex(payload.as_bytes());
-                    }
-                    Value::Array(fields)
-                })
-            };
-            Value::object([
-                ("index", Value::int(index as i64)),
-                ("candidate", row(a)),
-                ("reference", row(b)),
-            ])
-        });
-    let pass = receipt_matches && first_diff == Value::Null;
+    let target = Value::int(
+        case.reference[usize::from(!case.matroska)]
+            .parse::<i64>()
+            .map_err(|_| "invalid reference target")?,
+    );
+    let expected_discard = if case.matroska { &target } else { landing };
+    match receipt.as_array() {
+        Some([requested, actual, discard]) => {
+            for (name, ours, theirs) in [
+                ("requested", requested, &target),
+                ("landing", actual, landing),
+                ("discard", discard, expected_discard),
+            ] {
+                if ours != theirs {
+                    kinds.insert(format!("receipt-{name}"));
+                }
+            }
+        }
+        _ => {
+            kinds.insert("receipt".to_owned());
+        }
+    }
+    let (differing, first) = packet_differences(&received, reference, &mut kinds);
     Ok(Value::object([
         ("id", Value::str(&case.id)),
-        ("status", Value::str(if pass { "pass" } else { "fail" })),
+        (
+            "status",
+            Value::str(if kinds.is_empty() { "pass" } else { "fail" }),
+        ),
+        ("differences", Value::strings(kinds)),
+        ("differing_packets", Value::int(differing as i64)),
+        ("candidate_sha256", Value::str(output)),
         ("candidate_exit", Value::int(ours.code)),
         (
             "candidate_error",
             Value::str(String::from_utf8_lossy(&ours.stderr)),
         ),
-        ("candidate_receipt", receipt.cloned().unwrap_or(Value::Null)),
+        ("candidate_receipt", receipt),
         ("reference_landing", landing.clone()),
         ("candidate_packets", Value::int(packet_count as i64)),
+        ("preroll", Value::int(extra as i64)),
         ("reference_packets", Value::int(reference.len() as i64)),
-        ("first_difference", first_diff),
+        ("first_difference", first),
     ]))
 }
 
-pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
-    let (record, candidate, output, selected) = match args {
-        [record] if record == "--record" => (true, PathBuf::new(), None, &[][..]),
-        [record, flag, selected @ ..]
-            if record == "--record" && flag == "--cases" && !selected.is_empty() =>
-        {
-            (true, PathBuf::new(), None, selected)
+/// The listed cases and the differences each must show: open cases and the cases
+/// of every deviation, with the `differences` their entry declares.
+fn declared(previous: &Value, cases: &[Case]) -> Result<BTreeMap<String, Vec<String>>> {
+    let mut listed = BTreeMap::new();
+    let differences = |entry: &Value, what: &str| -> Result<Vec<String>> {
+        let kinds = list(entry, "differences")
+            .map_err(|_| format!("{what} declares no differences"))?
+            .iter()
+            .map(|kind| kind.as_str().map(str::to_owned))
+            .collect::<Option<BTreeSet<_>>>()
+            .ok_or_else(|| format!("{what}: a difference is not text"))?;
+        if kinds.is_empty() {
+            return Err(format!("{what} declares no differences"));
         }
-        [worker, path] => (false, root.join(worker), Some(root.join(path)), &[][..]),
-        _ => {
-            return Err(
-                "usage: cargo xtask play-views seek --record [--cases ID...] | WORKER OUTPUT"
-                    .into(),
-            );
-        }
+        Ok(kinds.into_iter().collect())
     };
-    let file = root.join(MANIFEST);
-    let previous = if file.exists() {
-        json::read(&file)?
-    } else {
-        Value::Null
-    };
-    let open = previous
+    for entry in previous
         .get("open_cases")
         .and_then(Value::as_array)
-        .unwrap_or_default();
-    let mut open_ids = open
-        .iter()
-        .map(|row| text(row, "id").map(str::to_owned))
-        .collect::<Result<BTreeSet<_>>>()?;
-    let cases = cases(root)?;
+        .unwrap_or_default()
+    {
+        let id = text(entry, "id")?;
+        listed.insert(id.to_owned(), differences(entry, id)?);
+    }
     if let Some(deviations) = previous.get("open_deviations") {
         let declarations = Value::object([
             ("open_deviations", deviations.clone()),
@@ -542,21 +563,90 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
                     .collect(),
             ),
         )]);
-        for id in report::open_cases(&declarations, &manifest, &report::gate_target()?)? {
-            if !open_ids.insert(id.clone()) {
-                return Err(format!("{id}: listed as both an open case and a deviation"));
+        let open = report::open_cases(&declarations, &manifest, &report::gate_target()?)?;
+        for entry in deviations.as_array().unwrap_or_default() {
+            let kinds = differences(entry, text(entry, "reading")?)?;
+            for id in list(entry, "cases")? {
+                let id = id.as_str().ok_or("a deviating case is not an id")?;
+                if !open.iter().any(|open| open == id) {
+                    continue;
+                }
+                if listed.insert(id.to_owned(), kinds.clone()).is_some() {
+                    return Err(format!("{id}: listed as both an open case and a deviation"));
+                }
             }
         }
     }
+    Ok(listed)
+}
+
+/// What is wrong with a case's result against its listing, if anything: an
+/// unlisted case must pass; a listed one must show exactly its declared
+/// differences with exactly its pinned candidate output.
+fn verdict(
+    report: &Value,
+    declared: Option<&Vec<String>>,
+    pinned: Option<&Value>,
+) -> Option<String> {
+    let kinds: Vec<&str> = report
+        .get("differences")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    match declared {
+        None if kinds.is_empty() => None,
+        None => Some(format!("unlisted difference {kinds:?}")),
+        Some(_) if kinds.is_empty() => Some("listed but passes".into()),
+        Some(expected) if kinds != *expected => {
+            Some(format!("differs by {kinds:?}, declared {expected:?}"))
+        }
+        Some(_) if pinned != report.get("candidate_sha256") => {
+            Some("candidate output differs from its pin".into())
+        }
+        Some(_) => None,
+    }
+}
+
+pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
+    let (record, candidate, output, selected) = match args {
+        [record, worker, flag, selected @ ..]
+            if record == "--record" && flag == "--cases" && !selected.is_empty() =>
+        {
+            (true, root.join(worker), None, selected)
+        }
+        [record, worker] if record == "--record" => (true, root.join(worker), None, &[][..]),
+        [worker, path] if worker != "--record" => {
+            (false, root.join(worker), Some(root.join(path)), &[][..])
+        }
+        _ => return Err(USAGE.into()),
+    };
+    let file = root.join(MANIFEST);
+    let previous = if file.exists() {
+        json::read(&file)?
+    } else {
+        Value::Null
+    };
+    let cases = cases(root)?;
+    let mut listed = declared(&previous, &cases)?;
     let mut pins = Vec::new();
+    let mut candidate_pins = Vec::new();
     let mut reports = Vec::new();
     let mut bad = Vec::new();
+    let mut as_listed = 0;
     let mut pending: BTreeSet<_> = selected.iter().map(String::as_str).collect();
-    let mut scans = BTreeMap::new();
     for case in cases {
+        let declared = listed.remove(&case.id);
         if !selected.is_empty() && !pending.remove(case.id.as_str()) {
-            let pin = get(get(&previous, "pins")?, &case.id)?.clone();
-            pins.push((case.id, pin));
+            pins.push((
+                case.id.clone(),
+                get(get(&previous, "pins")?, &case.id)?.clone(),
+            ));
+            if declared.is_some() {
+                let pin = get(get(&previous, "candidate_pins")?, &case.id)?.clone();
+                candidate_pins.push((case.id, pin));
+            }
             continue;
         }
         if sha256::file_hex(&case.input)
@@ -570,7 +660,7 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
         } else {
             "target/harness/ffmpeg-isobmff-worker"
         });
-        let native = reference_seek(root, &reference, &case, &mut scans)?;
+        let native = reference_seek(root, &reference, &case)?;
         if native.code != 0 {
             return Err(format!(
                 "{}: reference exited {}: {}",
@@ -587,11 +677,7 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
             )
             .as_bytes(),
         ));
-        if record {
-            pins.push((case.id, pin));
-            continue;
-        }
-        if previous.get("pins").and_then(|rows| rows.get(&case.id)) != Some(&pin) {
+        if !record && previous.get("pins").and_then(|rows| rows.get(&case.id)) != Some(&pin) {
             return Err(format!(
                 "{}: native seek trace differs from its pin",
                 case.id
@@ -605,18 +691,37 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
                 usize::try_from(number(extra)?)
                     .map_err(|_| "invalid expected preroll count".to_owned())
             })?;
-        let report = compare(root, &reference, &case, &ours, &landing, &packets, extra)?;
-        let pass = text(&report, "status")? == "pass";
-        let listed = open_ids.remove(case.id.as_str());
-        if pass == listed {
-            bad.push(case.id.clone());
+        let mut report = compare(root, &reference, &case, &ours, &landing, &packets, extra)?;
+        let output = get(&report, "candidate_sha256")?.clone();
+        let pinned = if record {
+            pins.push((case.id.clone(), pin));
+            if declared.is_some() {
+                candidate_pins.push((case.id.clone(), output.clone()));
+            }
+            Some(&output)
+        } else {
+            previous
+                .get("candidate_pins")
+                .and_then(|rows| rows.get(&case.id))
+        };
+        match verdict(&report, declared.as_ref(), pinned) {
+            Some(problem) => bad.push(format!("{}: {problem}", case.id)),
+            None if declared.is_some() => as_listed += 1,
+            None => (),
         }
+        validation::put(&mut report, "listed", Value::Bool(declared.is_some()))?;
         reports.push(report);
     }
+    if !pending.is_empty() {
+        return Err(format!("unknown selected seek case IDs: {pending:?}"));
+    }
+    if !listed.is_empty() {
+        return Err(format!(
+            "listed cases that are not seek cases: {:?}",
+            listed.keys().collect::<Vec<_>>()
+        ));
+    }
     if record {
-        if !pending.is_empty() {
-            return Err(format!("unknown selected seek case IDs: {pending:?}"));
-        }
         let mut recorded = if previous == Value::Null {
             Value::object([
                 ("schema", Value::int(1)),
@@ -627,24 +732,39 @@ pub(super) fn main(root: &Path, args: &[String]) -> Result<()> {
             previous
         };
         validation::put(&mut recorded, "pins", Value::Object(pins))?;
+        validation::put(
+            &mut recorded,
+            "candidate_pins",
+            Value::Object(candidate_pins),
+        )?;
         json::write(&file, &recorded)?;
         println!("recorded {}", file.display());
-    } else if let Some(output) = output {
-        if let Some(parent) = output.parent() {
-            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        if !bad.is_empty() {
+            println!(
+                "cases that do not match their listing:\n  {}",
+                bad.join("\n  ")
+            );
         }
-        let total = reports.len();
-        let passed = reports
-            .iter()
-            .filter(|row| row.get("status") == Some(&Value::str("pass")))
-            .count();
-        json::write(&output, &Value::Array(reports))?;
-        println!("{passed}/{total} facade container seek cases matched");
-        if !bad.is_empty() || !open_ids.is_empty() {
-            return Err(format!(
-                "unregistered, closed or absent seek cases: {bad:?} {open_ids:?}"
-            ));
-        }
+        return Ok(());
+    }
+    let output = output.ok_or(USAGE)?;
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    let total = reports.len();
+    let passed = reports
+        .iter()
+        .filter(|row| row.get("status") == Some(&Value::str("pass")))
+        .count();
+    json::write(&output, &Value::Array(reports))?;
+    println!(
+        "{passed}/{total} facade container seek cases matched; {as_listed} differ exactly as listed"
+    );
+    if !bad.is_empty() {
+        return Err(format!(
+            "seek cases that do not match their listing:\n  {}",
+            bad.join("\n  ")
+        ));
     }
     Ok(())
 }
