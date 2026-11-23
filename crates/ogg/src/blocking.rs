@@ -29,7 +29,7 @@ impl<R: Read + Seek> BlockingReader<R> {
     pub fn open_in(mut source: R, limits: Limits, pool: &Budget) -> Result<Self> {
         let capabilities = seekable_capabilities(&mut source)?;
         let reader = Reader::new(pool, SourceId(1), capabilities, limits, WINDOW)?;
-        Self::start(Blocking::seekable(reader, source, pool), pool)
+        Self::start(Blocking::seekable(reader, source, pool), pool, limits)
     }
 }
 
@@ -42,30 +42,40 @@ impl<R: Read> BlockingReader<R> {
             random_access: false,
         };
         let reader = Reader::new(&pool, SourceId(1), capabilities, limits, WINDOW)?;
-        Self::start(Blocking::sequential(reader, source, &pool), &pool)
+        Self::start(Blocking::sequential(reader, source, &pool), &pool, limits)
     }
 
-    /// Read until the first packet, so the first link's tracks are known.
-    fn start(driver: Blocking<Reader, R>, pool: &Budget) -> Result<Self> {
+    /// Read until the first packet after every stream of the first link has read its
+    /// headers, queueing at most `limits.header_bytes` of packets meanwhile.
+    fn start(driver: Blocking<Reader, R>, pool: &Budget, limits: Limits) -> Result<Self> {
         let mut blocking = BlockingReader {
             driver,
             queued: Queue::new(pool),
         };
+        let mut queued_bytes = 0usize;
         loop {
             blocking.queued.reserve(1)?;
             let Some(event) = blocking.driver.next_event()? else {
                 break;
             };
-            let packet = matches!(event, Event::Packet(_));
+            let packet = match &event {
+                Event::Packet(packet) => Some(packet.payload.len()),
+                _ => None,
+            };
             blocking.queued.push(event)?;
-            if packet {
-                break;
+            if let Some(len) = packet {
+                queued_bytes = queued_bytes.saturating_add(len);
+                if blocking.reader().headers_read() || queued_bytes > limits.header_bytes {
+                    break;
+                }
             }
         }
         Ok(blocking)
     }
 
-    /// Tracks seen so far; every track of the first link once open returns.
+    /// Tracks seen so far; every track of the first link, configured unless its headers
+    /// are broken or still missing after `Limits::header_bytes` of other packets, once
+    /// open returns.
     pub fn tracks(&self) -> &[Track] {
         self.reader().tracks()
     }

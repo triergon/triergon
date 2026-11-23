@@ -1215,3 +1215,38 @@ fn a_packet_that_is_not_the_opus_comment_header_makes_the_stream_invalid() {
         assert!(packets(&events).is_empty());
     }
 }
+
+#[test]
+fn open_reads_the_headers_of_every_stream_of_the_first_link() {
+    // A Skeleton stream whose packets come before the Speex comment header, as Ogg
+    // Skeleton lays them out: fishead, Speex header, fisbone, Speex comment, Skeleton EOS.
+    let page = |flags, granule, serial, sequence, packet: &[u8], out: &mut Vec<u8>| {
+        write_page(
+            flags,
+            granule,
+            serial,
+            sequence,
+            &[packet.len() as u8],
+            packet,
+            out,
+        );
+    };
+    let mut file = Vec::new();
+    let mut fishead = b"fishead\0".to_vec();
+    fishead.resize(64, 0);
+    page(BEGIN_OF_STREAM, 0, 1, 0, &fishead, &mut file);
+    page(BEGIN_OF_STREAM, 0, 2, 0, &speex_header(), &mut file);
+    let mut fisbone = b"fisbone\0".to_vec();
+    fisbone.resize(52, 0);
+    page(0, 0, 1, 1, &fisbone, &mut file);
+    page(0, 0, 2, 1, b"\x04\0\0\0test\0\0\0\0", &mut file);
+    page(END_OF_STREAM, 0, 1, 2, b"", &mut file);
+    page(END_OF_STREAM, 640, 2, 2, &[7; 30], &mut file);
+    let reader =
+        triergon_ogg::BlockingReader::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+    let tracks = reader.tracks();
+    assert_eq!(tracks.len(), 2);
+    assert!(tracks.iter().all(|track| track.is_configured()));
+    assert_eq!(tracks[1].codec(), CodecId::Speex);
+    assert_eq!(tracks[1].end(), Some(640));
+}

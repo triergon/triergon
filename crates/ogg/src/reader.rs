@@ -243,6 +243,11 @@ impl Reader {
         self.input.request()
     }
 
+    /// Whether every logical stream of the current link has read its headers.
+    pub(crate) fn headers_read(&self) -> bool {
+        !self.streams.is_empty() && self.streams.iter().all(Stream::headers_read)
+    }
+
     fn advance(
         &mut self,
         work: &mut WorkBudget,
@@ -692,6 +697,14 @@ impl Reader {
             && self.streams.iter().all(Stream::headers_read)
         {
             link.data = Some(page.offset + page.bytes.len() as u64);
+        }
+        // A link's streams have all begun once a page begins none (RFC 3533 section 4),
+        // so the end scan waits for one and finds every stream's track.
+        if !self.end_scanned
+            && self.link == 0
+            && !page.header.begin_of_stream()
+            && self.links.first().is_some_and(|link| link.data.is_some())
+        {
             self.start_end_scan()?;
         }
         if again && let Some(landing) = self.landing.take() {
@@ -702,21 +715,18 @@ impl Reader {
         Ok(())
     }
 
-    /// Read the last pages of a seekable source once the first link's headers are read.
+    /// Read the last pages of a seekable source of known length once, when the first
+    /// link's headers are read and no seek is landing.
     fn start_end_scan(&mut self) -> Result<()> {
+        self.end_scanned = true;
         let capabilities = self.input.capabilities();
-        if self.end_scanned
-            || self.link != 0
-            || !capabilities.random_access
-            || self.limits.end_scan_bytes == 0
-            || self.landing.is_some()
+        if !capabilities.random_access || self.limits.end_scan_bytes == 0 || self.landing.is_some()
         {
             return Ok(());
         }
         let Some(length) = capabilities.length else {
             return Ok(());
         };
-        self.end_scanned = true;
         let resume = self.pages.position(&self.input);
         let from = length
             .saturating_sub(self.limits.end_scan_bytes)
