@@ -242,7 +242,10 @@ impl Event {
     /// The presentation time on the demux clock, if the event has one.
     pub fn demux_pts(&self) -> Result<Option<Time>> {
         match self {
-            Self::DemuxPes { clock, .. } => clock.pts90.map(|t| Time::new(t, 90_000)).transpose(),
+            Self::DemuxPes { clock, .. } => clock
+                .pts90
+                .map(|t| Time::from_ticks(t, TimeBase::HZ_90000))
+                .transpose(),
             Self::Mp4(Mp4Event::Packet(p)) => p
                 .occurrence
                 .as_ref()
@@ -265,7 +268,7 @@ impl Event {
             Self::Ts(e) => e
                 .demux_clock
                 .and_then(|n| n.pts90)
-                .map(|t| Time::new(t, 90_000))
+                .map(|t| Time::from_ticks(t, TimeBase::HZ_90000))
                 .transpose(),
             Self::Matroska(MkvEvent::Packet(p)) => p
                 .packet

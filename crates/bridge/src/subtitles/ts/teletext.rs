@@ -152,7 +152,7 @@ impl TeletextTsBridge {
             .bounded(&pes, pts)
             .map(|ticks| {
                 let ticks = i64::try_from(ticks).map_err(|_| Error::Overflow)?;
-                TimeBase::new(1, 90_000)?.rescale(
+                TimeBase::HZ_90000.rescale(
                     ticks,
                     TimeBase::new(1, 1_000_000)?,
                     Rounding::NearestAway,

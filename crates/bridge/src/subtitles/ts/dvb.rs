@@ -191,7 +191,7 @@ impl DvbTsBridge {
             pool,
             &descriptor,
             entry,
-            TimeBase::new(1, 90_000)?,
+            TimeBase::HZ_90000,
             PacketEnvelope::PesDataField,
         )?;
         let options = Options {

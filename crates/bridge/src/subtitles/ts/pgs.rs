@@ -143,7 +143,7 @@ impl PgsTsTrack {
             clock: PacketClock {
                 pts: ticks(facts.pts)?,
                 dts: ticks(facts.dts)?,
-                timebase: TimeBase::new(1, 90_000)?,
+                timebase: TimeBase::HZ_90000,
             },
             duration: None,
             metadata: *facts,
