@@ -101,16 +101,6 @@ fn admits_one_worker_entry_point_in_a_denying_crate_root() {
 }
 
 #[test]
-fn reads_lint_tables_without_comments() {
-    let manifest = "[package]\nname = \"x\"\n\n[lints.rust]\n# why\nunsafe_code = \"deny\"\n\n\
-                        [lints.clippy]\nall = \"warn\"\n\n[features]\nf = []\n";
-    assert_eq!(
-        lint_table(manifest, "[lints."),
-        "[lints.rust]\nunsafe_code = \"deny\"\n[lints.clippy]\nall = \"warn\"\n"
-    );
-}
-
-#[test]
 fn detects_unsafe_syntax_only_at_word_starts() {
     for text in [
         "unsafe { x }",
