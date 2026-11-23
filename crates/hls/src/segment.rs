@@ -9,7 +9,7 @@ use crate::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputCursor, InputRequest, Result, WorkBudget};
-use triergon_mpegts::psi::{ElementaryStream, ProgramMap, descriptor_tag, stream_type};
+use triergon_mpegts::psi::{ElementaryStream, ProgramMap, stream_type};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits,
@@ -970,15 +970,7 @@ fn media_audio_matches(
     match stream.stream_type {
         stream_type::ATSC_AC3 if codec == HlsAudioCodec::Ac3 => {}
         stream_type::ATSC_EAC3 if codec == HlsAudioCodec::Eac3 => {}
-        stream_type::PES_PRIVATE_DATA
-            if stream.descriptors().any(|entry| {
-                entry.is_ok_and(|descriptor| {
-                    matches!(
-                        descriptor.tag,
-                        descriptor_tag::DVB_AC3 | descriptor_tag::DVB_EAC3
-                    )
-                })
-            }) => {}
+        stream_type::PES_PRIVATE_DATA if Dolby::is_signalled_by_dvb_descriptor(stream) => {}
         _ => return Ok(false),
     }
     let carriage = Dolby::from_hls_pmt(

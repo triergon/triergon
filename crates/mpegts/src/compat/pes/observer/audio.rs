@@ -2,7 +2,7 @@
 //! inference, audio-frame parsing, ATSC service conformance or decoder config.
 use super::{DemuxObserver, DemuxScope};
 use crate::pes::stream_id;
-use crate::psi::{Descriptors, descriptor_tag, stream_type};
+use crate::psi::{Descriptors, ElementaryStream, descriptor_tag, stream_type};
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, Error, Result};
 
@@ -30,6 +30,22 @@ pub struct PrivateAudioDescriptors<'a> {
 }
 
 impl PrivateAudioCarriage {
+    /// Whether `stream` is PES private data (stream type 0x06) whose descriptor loop, read
+    /// up to its first malformed descriptor, holds a DVB AC-3 (0x6A) or enhanced AC-3
+    /// (0x7A) descriptor (EN 300 468 Annex D), whatever the PMT's descriptor namespace: an
+    /// entry that may open as [`Self::DvbAc3Tag`] or [`Self::DvbEac3Tag`].
+    pub fn is_signalled_by_dvb_descriptor(stream: &ElementaryStream) -> bool {
+        stream.stream_type == stream_type::PES_PRIVATE_DATA
+            && stream.descriptors().any(|entry| {
+                entry.is_ok_and(|descriptor| {
+                    matches!(
+                        descriptor.tag,
+                        descriptor_tag::DVB_AC3 | descriptor_tag::DVB_EAC3
+                    )
+                })
+            })
+    }
+
     fn stream_type(self) -> u8 {
         match self {
             Self::DvbAc3Tag | Self::DvbEac3Tag => stream_type::PES_PRIVATE_DATA,

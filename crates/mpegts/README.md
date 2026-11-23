@@ -271,7 +271,9 @@ records its clocks, source positions and packet digest.
 (`DemuxScope`: program, PID, stream type and stream ID) into the packets FFmpeg's
 demuxer emits, beside the strict source view. A `DemuxPacket` may be partial and
 says why it ended. Carriages: `RegisteredCarriage` (AVC, HEVC, AAC ADTS and LATM),
-`PrivateAudioCarriage` (AC-3, E-AC-3) and `DvbSubtitlesDescriptors`. `PesCutter`
+`PrivateAudioCarriage` (AC-3, E-AC-3; `is_signalled_by_dvb_descriptor` tells the PES
+private data entries a DVB AC-3 or enhanced AC-3 descriptor signals) and
+`DvbSubtitlesDescriptors`. `PesCutter`
 cuts any stream type, including PGS (`0x90`), teletext and caption-carrying video.
 The [observer comparison](../../harness/features/ts-observer-forms/contract.json)
 checks each owned and borrowed span against its input carrier and checks the
