@@ -221,6 +221,15 @@ impl ElementState {
     }
 }
 
+/// The implicit extensions that determine the core's output format.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum ExtensionMode {
+    Core,
+    Sbr,
+    SbrWithParametricStereo,
+}
+
 #[derive(Debug)]
 pub(crate) struct Core {
     pub aot: ObjectType,
@@ -231,10 +240,7 @@ pub(crate) struct Core {
     pub elements: Vec<Charged<Box<ElementState>>>,
     pub fb: Filterbank,
     pub random: u32,
-    /// SBR has been seen (implicit signalling): output at twice the core rate.
-    pub sbr_active: bool,
-    /// PS has been seen on a mono element: output stereo.
-    pub ps_active: bool,
+    extension: ExtensionMode,
     pub pce: Option<Pce>,
     /// Keep slot order for planes (FFmpeg unspecified-order layouts).
     pub unordered: bool,
@@ -256,6 +262,14 @@ pub(crate) struct Core {
 }
 
 impl Core {
+    fn sbr_active(&self) -> bool {
+        self.extension != ExtensionMode::Core
+    }
+
+    fn ps_active(&self) -> bool {
+        self.extension == ExtensionMode::SbrWithParametricStereo
+    }
+
     pub(crate) fn new(budget: &Budget) -> Core {
         Core {
             aot: ObjectType::Lc,
@@ -266,8 +280,7 @@ impl Core {
             elements: Vec::new(),
             fb: Filterbank::new(),
             random: PNS_INITIAL_STATE,
-            sbr_active: false,
-            ps_active: false,
+            extension: ExtensionMode::Core,
             pce: None,
             unordered: false,
             configured: false,
@@ -299,11 +312,15 @@ impl Core {
 
     pub(crate) fn output_rate(&self) -> u32 {
         let r = SAMPLE_RATES[self.sf_index];
-        if self.sbr_active { r * 2 } else { r }
+        if self.sbr_active() { r * 2 } else { r }
     }
 
     pub(crate) fn frame_len(&self) -> usize {
-        if self.sbr_active { SBR_FRAME_LEN } else { 1024 }
+        if self.sbr_active() {
+            SBR_FRAME_LEN
+        } else {
+            1024
+        }
     }
 
     /// Select the audio object type, indexed rate and channel configuration.
@@ -338,8 +355,7 @@ impl Core {
         self.aot = aot;
         self.sf_index = usize::from(sf_index);
         self.channel_config = channel_config;
-        self.sbr_active = false;
-        self.ps_active = false;
+        self.extension = ExtensionMode::Core;
         self.frames_out = 0;
         self.elements = elements;
         self.configured = true;
@@ -463,7 +479,8 @@ impl Core {
     }
 
     fn rebuild_layout(&mut self) -> Result<()> {
-        self.layout = Self::layout_of(&mut self.slots, self.ps_active, self.unordered)?;
+        let ps_active = self.ps_active();
+        self.layout = Self::layout_of(&mut self.slots, ps_active, self.unordered)?;
         Ok(())
     }
 
@@ -507,11 +524,11 @@ impl Core {
         out: &mut AudioFrame,
         blocks: usize,
     ) -> Result<()> {
-        let layout = Self::layout_of(&mut slots, self.ps_active, unordered)?;
+        let layout = Self::layout_of(&mut slots, self.ps_active(), unordered)?;
         self.make_room(out, layout.channels(), self.frame_len(), blocks)?;
         // Both layouts together hold at most 48 identities (16 tags of each kind), so the
         // switch never holds more element state than that.
-        let added = self.build_elements(self.aot, &slots, self.sbr_active, &self.elements)?;
+        let added = self.build_elements(self.aot, &slots, self.sbr_active(), &self.elements)?;
         // The elements both layouts have, renewed, and the new ones, in the order of their
         // first slot.
         let first_slot = |e: &Charged<Box<ElementState>>| {
@@ -822,10 +839,11 @@ impl Core {
         let is_cpe = self.elements[ei].kind == ElementId::Cpe;
         // A mono stream whose very first frame carries SBR is output as stereo (FFmpeg assumes
         // HE-AAC v2 for implicitly signalled mono SBR).
-        let to_stereo = self.frames_out == 0 && !self.ps_active && !is_cpe && self.slots.len() == 1;
+        let to_stereo =
+            self.frames_out == 0 && !self.ps_active() && !is_cpe && self.slots.len() == 1;
         let channels = if to_stereo { 2 } else { self.layout.channels() };
         let mut changed = false;
-        if !self.sbr_active {
+        if !self.sbr_active() {
             // implicit SBR signalling: FFmpeg switches the output to twice the core rate
             if SAMPLE_RATES[self.sf_index] > 48000 {
                 // FFmpeg refuses SBR above 48 kHz core rate; ignore the payload
@@ -851,7 +869,7 @@ impl Core {
                     e.sbr = s;
                 }
             }
-            self.sbr_active = true;
+            self.extension = ExtensionMode::Sbr;
             changed = true;
         } else if to_stereo {
             self.make_room(out, channels, self.frame_len(), blocks)?;
@@ -875,7 +893,7 @@ impl Core {
             Err(error) => return Err(error),
         }
         if to_stereo {
-            self.ps_active = true;
+            self.extension = ExtensionMode::SbrWithParametricStereo;
             self.rebuild_layout()?;
             changed = true;
         }
@@ -926,6 +944,7 @@ impl Core {
         if RAW {
             return;
         }
+        let (sbr_active, ps_active) = (self.sbr_active(), self.ps_active());
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];
             if !e.decoded {
@@ -938,8 +957,8 @@ impl Core {
                 continue;
             }
             // Every element has its SBR state once SBR runs.
-            if let (true, Some(s)) = (self.sbr_active, e.sbr.as_mut()) {
-                let ps = self.ps_active && e.kind == ElementId::Sce;
+            if let (true, Some(s)) = (sbr_active, e.sbr.as_mut()) {
+                let ps = ps_active && e.kind == ElementId::Sce;
                 let nch = if e.kind == ElementId::Cpe { 2 } else { 1 };
                 let (o0, o1) = e.out.split_at_mut(1);
                 s.process(
