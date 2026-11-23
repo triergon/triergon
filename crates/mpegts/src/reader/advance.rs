@@ -238,13 +238,14 @@ impl Reader {
                 }
         )
     }
-    fn inline_source(event: TraceEvent) -> ReaderStep<Self> {
+    /// The reader event of an event [`Self::is_inline_source`] accepted.
+    fn inline_source(event: TraceEvent) -> Result<ReaderStep<Self>> {
         let event = match event {
             TraceEvent::Transport(packet) => ReaderEvent::Transport(packet),
             TraceEvent::Continuity { pid, outcome } => ReaderEvent::Continuity { pid, outcome },
-            _ => unreachable!("expected an inline source event"),
+            _ => return Err(Error::Invalid("MPEG-TS inline source event")),
         };
-        Step::Ready(Event::Other(event))
+        Ok(Step::Ready(Event::Other(event)))
     }
     fn lane_step(
         &mut self,
@@ -357,16 +358,29 @@ impl Reader {
                 }
             };
             match step {
-                Step::Ready(event) => {
-                    // Prepare, begin and publish can share a grant for events
-                    // that require no additional state or storage.
-                    if Self::is_inline_source(&event) && work.remaining() >= 3 {
-                        if cancel.load(Ordering::Relaxed) {
-                            return Err(Error::Cancelled);
-                        }
-                        work.take(3);
-                        return Ok(Self::inline_source(event));
+                // Prepare, begin and publish can share a grant for events that
+                // require no additional state or storage.
+                Step::Ready(TraceEvent::Transport(packet)) if work.remaining() >= 3 => {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
                     }
+                    work.take(3);
+                    return Ok(Step::Ready(Event::Other(ReaderEvent::Transport(packet))));
+                }
+                Step::Ready(TraceEvent::Continuity {
+                    pid,
+                    outcome: outcome @ (ContinuityOutcome::First | ContinuityOutcome::Continuous),
+                }) if work.remaining() >= 3 => {
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err(Error::Cancelled);
+                    }
+                    work.take(3);
+                    return Ok(Step::Ready(Event::Other(ReaderEvent::Continuity {
+                        pid,
+                        outcome,
+                    })));
+                }
+                Step::Ready(event) => {
                     // Admit the event now unless the loop head would stop first.
                     if cancel.load(Ordering::Relaxed) || work.remaining() == 0 {
                         self.flight = InFlight::Raw {
@@ -470,7 +484,7 @@ impl Reader {
         if seeking {
             return Ok(Flow::Continue);
         }
-        Ok(Flow::Return(Self::inline_source(event)))
+        Ok(Flow::Return(Self::inline_source(event)?))
     }
 
     /// Admits `source` to the lanes from `step` on and publishes it. Unless it is published, the
