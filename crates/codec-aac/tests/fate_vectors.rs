@@ -109,11 +109,8 @@ const NUMERIC: &[&str] = &[
     "ct_sbr_i-ps_i_raw",
 ];
 
-/// Reports a check that did not run on the test run's own standard error, where it shows
-/// although the test passes: the check's input is kept outside the repository. One write,
-/// so the line stays whole beside the test harness's output.
 #[test]
-fn fate_structure() {
+fn vectors_match_expected_frame_structure() {
     let mut absent = 0;
     for &(name, rate, ch, samples, errors) in STRUCTURE {
         let p = suite().join(name);

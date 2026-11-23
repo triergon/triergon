@@ -45,9 +45,6 @@ fn research(dir: &str) -> Vec<PathBuf> {
     files
 }
 
-/// Reports a check that did not run on the test run's own standard error, where it shows
-/// although the test passes: the check's input is kept outside the repository. One write,
-/// so the line stays whole beside the test harness's output.
 /// Files up to this size are checked by default; an unoptimised build decodes the whole
 /// suite (about 500 MB) in minutes.
 const DEFAULT_MAX_BYTES: u64 = 3 << 20;

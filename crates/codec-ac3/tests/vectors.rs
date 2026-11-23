@@ -88,9 +88,6 @@ const VECTORS: &[Expect] = &[
     },
 ];
 
-/// Reports a check that did not run on the test run's own standard error, where it shows
-/// although the test passes: the check's input is kept outside the repository. One write,
-/// so the line stays whole beside the test harness's output.
 #[test]
 fn fate_vectors_frame_counts_layouts_and_coarse_values() {
     let root = suite();
