@@ -3,9 +3,10 @@
 use triergon_bitstream::{LsbReader, LsbWindow};
 use triergon_codec::{Budget, BudgetVec, divide};
 
+use crate::DecodeError;
 use crate::codebook::Codebook;
+use crate::setup::ilog;
 use crate::tables::INVERSE_DB;
-use crate::{DecodeError, ilog};
 
 /// X positions a floor 1 may list, the two implicit ends included.
 pub(crate) const MAX_POINTS: usize = 65;

@@ -32,7 +32,7 @@ use floor0::Coefficients;
 use floor1::Points;
 use mapping::{Mapping, Mode, decouple};
 use residue::Member;
-use setup::{Floor, Setup};
+use setup::{Floor, Setup, ilog};
 use spectra::Spectra;
 use window::{Block, Slopes, fade_out, fold, overlap_add};
 
@@ -52,16 +52,6 @@ impl Default for Limits {
             live_storage_bytes: 32 << 20,
         }
     }
-}
-
-/// ilog (Vorbis I section 9.2.1): the position of the highest set bit.
-pub(crate) fn ilog(x: u32) -> u32 {
-    u32::BITS - x.leading_zeros()
-}
-
-/// Appends `value` to `list`, charging room for it unless reserved.
-pub(crate) fn push<T>(list: &mut BudgetVec<T>, value: T) -> Result<(), Error> {
-    list.try_push(value).map_err(|refused| refused.error)
 }
 
 /// The floor one channel decoded in the current packet.

@@ -8,7 +8,17 @@ use crate::floor0::Floor0;
 use crate::floor1::Floor1;
 use crate::mapping::{Mapping, Mode};
 use crate::residue::Residue;
-use crate::{DecodeError, push};
+use crate::{DecodeError, Error};
+
+/// Position of the highest set bit (Vorbis I section 9.2.1).
+pub(crate) fn ilog(x: u32) -> u32 {
+    u32::BITS - x.leading_zeros()
+}
+
+/// Appends a setup entry and charges for storage unless the space is reserved.
+pub(crate) fn push<T>(list: &mut BudgetVec<T>, value: T) -> Result<(), Error> {
+    list.try_push(value).map_err(|refused| refused.error)
+}
 
 #[derive(Debug)]
 pub(crate) enum Floor {
