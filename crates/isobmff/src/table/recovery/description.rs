@@ -368,6 +368,7 @@ impl DescriptionRecoveryTable {
                 limits,
                 DirectContext {
                     physical_length: context.physical_length,
+                    read_position: context.physical_length,
                 },
                 DirectRecoveryProfile,
             )?;
@@ -835,7 +836,7 @@ impl DescriptionPacketCursor<'_> {
                         read: match old.read {
                             DirectRead::Available => DescriptionRead::Available,
                             DirectRead::ObservedForwardEof => DescriptionRead::UnreviewedContext,
-                            DirectRead::UnreviewedSeekRefusal => DescriptionRead::UnreviewedContext,
+                            DirectRead::ObservedSeekFailure => DescriptionRead::UnreviewedContext,
                         },
                         demux_index_distance: distance,
                         #[cfg(feature = "reference-trace")]

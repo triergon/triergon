@@ -24,9 +24,9 @@ use std::{
 #[derive(Clone, Copy, Debug)]
 pub struct DirectRecoveryProfile;
 impl DirectRecoveryProfile {
-    /// Exact original public reference allocates this AVIO buffer. Demux
-    /// controls establish the common forward-EOF interval for ordinary/tiny
-    /// inputs; this is not an ISO rule or a universal AVIO algorithm claim.
+    /// How far past the position its input has reached FFmpeg reads forward instead of
+    /// seeking. Observed on the pinned release with reads of one byte to the whole
+    /// file; it is not an ISO rule.
     pub(crate) const OBSERVED_FORWARD_READ_CAPACITY: u64 = 32768;
 }
 /// The zero description index in the first `stsc` row that direct recovery accepts, and how
@@ -52,6 +52,11 @@ pub struct InitialDescriptionDiagnostic {
 pub struct DirectContext {
     /// Length of the source file in bytes.
     pub physical_length: u64,
+    /// How far FFmpeg's input has been read when it asks for the first packet: the start
+    /// of the media data when each of its reads returns one byte, the end of the file when
+    /// one read returns the whole file, and a position between the two otherwise. It
+    /// decides how FFmpeg reaches a packet that starts past the end of the file.
+    pub read_position: u64,
 }
 /// How a direct-recovery packet relates to the declared sample it is paired with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,13 +73,13 @@ pub enum DirectAssociation {
 pub enum DirectRead {
     /// The packet is empty or starts before the physical end of the file.
     Available,
-    /// The packet starts at or past the physical end, within 32,768 bytes of the media
-    /// extent's start, where FFmpeg reads forward to the end of the file and reports end of
-    /// file.
+    /// The packet starts at or past the physical end, no more than 32,768 bytes past
+    /// [`DirectContext::read_position`]: FFmpeg reads forward to the end of the file and
+    /// reports end of file.
     ObservedForwardEof,
-    /// The packet starts further past the media extent's start, where FFmpeg would have to
-    /// seek past the end; this view does not model the outcome.
-    UnreviewedSeekRefusal,
+    /// The packet starts further on: FFmpeg seeks to it, the seek past the end of the file
+    /// fails, and it reports invalid data.
+    ObservedSeekFailure,
 }
 /// One packet of a [`DirectPacketCursor`]: the declared sample and the packet FFmpeg
 /// reports in its place.
@@ -121,8 +126,8 @@ impl RunRecoveryTable {
     /// cursor follows FFmpeg's chunk layout and needs one media extent reaching the physical
     /// end, one sample description and at most two `ctts` rows (`Error::Unsupported`
     /// otherwise), and `limits` that admit a track, an extent and every sample
-    /// (`Error::Limit`). Fails with `Error::ForeignPool` when the table is not charged to
-    /// `pool`.
+    /// (`Error::Limit`), and a read position within the file (`Error::Invalid`). Fails with
+    /// `Error::ForeignPool` when the table is not charged to `pool`.
     pub fn direct_packet_cursor<'a>(
         &'a self,
         pool: &Budget,
@@ -148,6 +153,11 @@ impl RunRecoveryTable {
         {
             return Err(Error::Unsupported(
                 "direct recovery requires one terminal media extent/catalogue entry",
+            ));
+        }
+        if context.read_position > context.physical_length {
+            return Err(Error::Invalid(
+                "direct recovery read position past the end of the file",
             ));
         }
         if limits.max_tracks == 0 || media.len() > limits.max_media_extents {
@@ -358,14 +368,14 @@ impl DirectCursor<'_> {
             && projected.range.start >= self.context.physical_length
         {
             let ceiling = self
-                .media
-                .start
+                .context
+                .read_position
                 .checked_add(DirectRecoveryProfile::OBSERVED_FORWARD_READ_CAPACITY)
                 .ok_or(Error::Overflow)?;
             if projected.range.start <= ceiling {
                 DirectRead::ObservedForwardEof
             } else {
-                DirectRead::UnreviewedSeekRefusal
+                DirectRead::ObservedSeekFailure
             }
         } else {
             DirectRead::Available

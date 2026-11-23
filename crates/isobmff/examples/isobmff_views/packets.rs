@@ -27,6 +27,7 @@ mod recovery;
 
 const MAX_PACKET: usize = 16 << 20;
 const EOF: i64 = -541478725;
+const INVALID_DATA: i64 = -1_094_995_529;
 
 #[derive(Clone, Copy)]
 struct Source<'a> {

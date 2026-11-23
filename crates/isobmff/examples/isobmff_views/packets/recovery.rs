@@ -1,4 +1,4 @@
-use super::{EOF, MAX_PACKET, Output, Source, extent};
+use super::{EOF, INVALID_DATA, MAX_PACKET, Output, Source, extent};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, InputCursor, Result, Step, WorkBudget};
 use triergon_isobmff::{
@@ -107,6 +107,17 @@ pub(super) fn run(
         previous: None,
     };
     if direct {
+        // The reference's input stands at the media data once it has read the header a
+        // byte at a time, and at the end of the file once one read has returned all of it.
+        let read_position = match (source.window, media.first()) {
+            (1, Some(extent)) => extent.start.min(length),
+            (window, _) if window as u64 >= length => length,
+            _ => {
+                return Err(Error::Unsupported(
+                    "direct recovery window between one byte and the file",
+                ));
+            }
+        };
         let mut cursor = table.direct_packet_cursor(
             &pool,
             &header,
@@ -114,6 +125,7 @@ pub(super) fn run(
             PacketLimits::default(),
             DirectContext {
                 physical_length: length,
+                read_position,
             },
             DirectRecoveryProfile,
         )?;
@@ -130,11 +142,11 @@ pub(super) fn run(
                             }
                         }
                         DirectRead::ObservedForwardEof => break,
-                        DirectRead::UnreviewedSeekRefusal => {
+                        DirectRead::ObservedSeekFailure => {
                             if reader.follows_short(&item.demux.source_range) {
                                 break;
                             }
-                            return Err(Error::Unsupported("unreviewed past-end seek"));
+                            return out.terminal(Some(INVALID_DATA));
                         }
                     }
                 }

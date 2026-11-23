@@ -62,6 +62,7 @@ fn positions(bytes: &[u8]) -> Vec<(u64, u64, i64)> {
             PacketLimits::default(),
             DirectContext {
                 physical_length: bytes.len() as u64,
+                read_position: m[0].start,
             },
             DirectRecoveryProfile,
         )
@@ -142,6 +143,7 @@ fn raw_description_counts_ranges_and_configuration_are_not_repaired() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
             DirectRecoveryProfile,
         )
@@ -278,6 +280,7 @@ fn outside_source_is_invalid_source_but_observed_forward_eof() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
             DirectRecoveryProfile,
         )
@@ -310,6 +313,7 @@ fn invalid_index_positions_are_not_clipped_sorted_or_removed() {
             IndexLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
             DirectRecoveryProfile,
         )
@@ -359,6 +363,7 @@ fn far_seek_never_invents_clean_eof() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
             DirectRecoveryProfile,
         )
@@ -373,8 +378,73 @@ fn far_seek_never_invents_clean_eof() {
     }
     assert_eq!(
         c.take_occurrence().unwrap().read,
-        DirectRead::UnreviewedSeekRefusal
+        DirectRead::ObservedSeekFailure
     );
+}
+/// The read of the first packet of `bytes`, whose first chunk starts past the end of the
+/// file, when the demuxer's input stands at `read_position`.
+fn first_read(bytes: &[u8], read_position: u64) -> DirectRead {
+    let p = Budget::new(1 << 20).unwrap();
+    let (r, h, m) = parts(bytes, &p);
+    let t = build(r, &p).unwrap();
+    let mut c = t
+        .direct_packet_cursor(
+            &p,
+            &h,
+            &m,
+            PacketLimits::default(),
+            DirectContext {
+                physical_length: bytes.len() as u64,
+                read_position,
+            },
+            DirectRecoveryProfile,
+        )
+        .unwrap();
+    while c
+        .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
+        .unwrap()
+        != CursorStatus::Ready
+    {}
+    c.take_occurrence().unwrap().read
+}
+#[test]
+fn a_packet_past_the_end_is_read_forward_within_the_buffer_of_the_read_position() {
+    // The fixtures are 747 bytes long and their media data starts at 675; the name gives
+    // the first chunk's offset. From the media start the forward read reaches 675 + 32768.
+    let at = |name: &str| {
+        std::fs::read(format!(
+            "{}/tests/fixtures/direct-recovery/edge-{name}.mov",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap()
+    };
+    for (name, from_media_start, from_file_end) in [
+        (
+            "33443",
+            DirectRead::ObservedForwardEof,
+            DirectRead::ObservedForwardEof,
+        ),
+        (
+            "33444",
+            DirectRead::ObservedSeekFailure,
+            DirectRead::ObservedForwardEof,
+        ),
+        (
+            "33515",
+            DirectRead::ObservedSeekFailure,
+            DirectRead::ObservedForwardEof,
+        ),
+        (
+            "33516",
+            DirectRead::ObservedSeekFailure,
+            DirectRead::ObservedSeekFailure,
+        ),
+    ] {
+        let bytes = at(name);
+        assert_eq!(bytes.len(), 747);
+        assert_eq!(first_read(&bytes, 675), from_media_start, "{name}");
+        assert_eq!(first_read(&bytes, 747), from_file_end, "{name}");
+    }
 }
 #[test]
 fn zero_work_yields_cancel_is_sticky_even_ready() {
@@ -389,6 +459,7 @@ fn zero_work_yields_cancel_is_sticky_even_ready() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
             DirectRecoveryProfile,
         )
@@ -420,6 +491,7 @@ fn source_limits_and_index_limits_are_not_waived() {
     let t = build(r, &p).unwrap();
     let ctx = DirectContext {
         physical_length: 747,
+        read_position: 675,
     };
     assert!(matches!(
         t.direct_packet_cursor(
@@ -487,6 +559,7 @@ fn direct_iteration_does_not_allocate_and_raw_backing_survives_close() {
                 PacketLimits::default(),
                 DirectContext {
                     physical_length: 747,
+                    read_position: 675,
                 },
                 DirectRecoveryProfile,
             )

@@ -481,8 +481,7 @@
     }
   ],
   "pending_module_requirements": [
-    "RunRecoveryBuilder refuses a final decode run that stops one sample short (stts [(5, 1000)] for six samples; Invalid: time table sample count mismatch). The reference reads DT 0 to 5000 and a zero last duration, the 8.6.1.2.1 sums with the zero final delta 8.6.1.1 allows; recover it as the builder recovers overlong runs.",
-    "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
+    "RunRecoveryBuilder refuses a final decode run that stops one sample short (stts [(5, 1000)] for six samples; Invalid: time table sample count mismatch). The reference reads DT 0 to 5000 and a zero last duration, the 8.6.1.2.1 sums with the zero final delta 8.6.1.1 allows; recover it as the builder recovers overlong runs."
   ],
   "open_cases": [
     {
@@ -492,86 +491,6 @@
     {
       "id": "run57-04-r-front-stco-lastcount5-tiny",
       "requirement": "RunRecoveryBuilder refuses a final decode run that stops one sample short (stts [(5, 1000)] for six samples; Invalid: time table sample count mismatch). The reference reads DT 0 to 5000 and a zero last duration, the 8.6.1.2.1 sums with the zero final delta 8.6.1.1 allows; recover it as the builder recovers overlong runs."
-    },
-    {
-      "id": "edge-33444-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33444-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33445-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33445-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33514-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33514-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33515-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33515-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33516-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "edge-33516-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "offset-2147483647-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "offset-2147483647-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "offset-4294967295-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "offset-4294967295-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "offset-65536-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "offset-65536-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "prefix-100-edge-1-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "prefix-100-edge-1-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "prefix-4096-edge-1-ordinary",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
-    },
-    {
-      "id": "prefix-4096-edge-1-tiny",
-      "requirement": "The direct recovery profile refuses a first chunk that starts past the end of the file (Unsupported: unreviewed past-end seek) instead of modelling the demuxer's terminal read: invalid data in 14 cases, and in 6 (edge-33444, -33445, -33514, -33515, prefix-100-edge-1 and prefix-4096-edge-1, ordinary windows) a clean EOF with all six declared samples missing."
     }
   ],
   "open_deviations": [
