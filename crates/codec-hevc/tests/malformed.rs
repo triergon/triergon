@@ -32,7 +32,7 @@ fn a_refused_first_irap_allows_trailing_pictures_but_suppresses_rasl() {
     let mut decoder = Decoder::new();
 
     assert_eq!(decoder.send_nal(&trail, None), Ok(()));
-    let missing_pps = Err(DecodeError::MissingParameterSet("PPS"));
+    let missing_pps = Err(DecodeError::Invalid("PPS"));
     assert_eq!(decoder.send_nal(&cra, None), missing_pps);
     assert_eq!(decoder.send_nal(&rasl, None), Ok(()));
     assert_eq!(decoder.send_nal(&trail, None), missing_pps);

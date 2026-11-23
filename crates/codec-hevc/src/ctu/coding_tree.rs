@@ -5,12 +5,12 @@ use super::{
     Cu, PART_2NX2N, PART_2NXN, PART_2NXND, PART_2NXNU, PART_NLX2N, PART_NRX2N, PART_NX2N, PART_NXN,
     SliceDecoder,
 };
-use crate::bits::{BitCursor, BitSource};
+use crate::bits::BitCursor;
 use crate::cabac::ctx;
-use crate::error::{DecodeError, Result};
 use crate::picture::{Pixel, PuMotion};
 use crate::slice::SliceType;
 use crate::state::*;
+use crate::{DecodeError, Result};
 
 impl<P: Pixel> SliceDecoder<'_, P> {
     #[inline(never)]
@@ -432,7 +432,9 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             }
         }
         let consumed = r.position().div_ceil(8);
-        self.cabac.restart(pos + consumed)?;
+        self.cabac
+            .restart(pos + consumed)
+            .map_err(crate::cabac::invalid_offset)?;
         Ok(())
     }
 

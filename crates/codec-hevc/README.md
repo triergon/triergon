@@ -64,11 +64,10 @@ identical output.
 - `Picture` carries cropped `width`/`height`, `bit_depth`, `chroma`, three `Plane`s
   sharing the decoder's frame buffers, `pts`, `poc`, `sar` and `colour`. Each picture
   keeps the timestamp of the access unit that carried it through reordering.
-- Errors are the crate's `DecodeError`: `Unsupported(&str)` names the tool,
-  `Invalid(&str)` the failed check, `Policy(&str)` the exceeded cap,
-  `MissingParameterSet(&str)` the parameter set a slice refers to, and
-  `Budget(triergon_core::Error)` a refused storage charge. It converts to
-  `triergon_core::Error`. The decoder does not panic on malformed input.
+- Errors use `triergon_codec::DecodeError`. `Unsupported(&str)` names the feature,
+  `Invalid(&str)` the failed check or missing parameter set, `Policy(&str)` the exceeded
+  cap, and `Budget(triergon_core::Error)` a refused storage charge. Conversion to
+  `triergon_core::Error` preserves the error class and detail.
 - Refused with `Unsupported`: monochrome, 4:2:2, 4:4:4, separate colour planes, bit depth
   above 10, unequal luma and chroma bit depth, every SPS range-extension tool, PPS
   range-extension tools under RExt profiles, SCC extensions.

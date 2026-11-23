@@ -8,7 +8,16 @@
 
 use std::io::{Read, Write};
 
-use triergon_codec_hevc::{AccessUnitSplitter, Decoder, Picture, Row};
+use triergon_codec_hevc::{AccessUnitSplitter, DecodeError, Decoder, Picture, Row};
+
+fn refusal_text(error: DecodeError) -> String {
+    match error {
+        DecodeError::Unsupported(detail) => format!("unsupported HEVC feature: {detail}"),
+        DecodeError::Invalid("PPS" | "SPS") | DecodeError::Budget(_) => error.to_string(),
+        DecodeError::Invalid(detail) => format!("invalid HEVC data: {detail}"),
+        DecodeError::Policy(detail) => format!("HEVC resource limit: {detail}"),
+    }
+}
 
 fn emit(
     p: &Picture,
@@ -113,7 +122,8 @@ fn main() {
             consumed += au.len();
             if let Err(e) = dec.send(au, Some(au_index as i64)) {
                 errors += 1;
-                eprintln!("{{\"error\":\"{e}\",\"au\":{au_index}}}");
+                let error = refusal_text(e);
+                eprintln!("{{\"error\":\"{error}\",\"au\":{au_index}}}");
             }
             au_index += 1;
             while let Some(p) = dec.receive() {

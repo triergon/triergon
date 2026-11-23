@@ -55,21 +55,9 @@ impl<E: std::fmt::Debug> From<E> for Refusal {
 /// `ResourceLimit`; every other error, like every audio refusal, prints its `Debug` form.
 struct VideoRefusal(String);
 
-impl From<triergon_codec_h264::DecodeError> for VideoRefusal {
-    fn from(error: triergon_codec_h264::DecodeError) -> Self {
-        use triergon_codec_h264::DecodeError;
-
-        Self(match error {
-            DecodeError::Invalid(detail) => format!("InvalidData({detail:?})"),
-            DecodeError::Policy(detail) => format!("ResourceLimit({detail:?})"),
-            _ => format!("{error:?}"),
-        })
-    }
-}
-
-impl From<triergon_codec_hevc::DecodeError> for VideoRefusal {
-    fn from(error: triergon_codec_hevc::DecodeError) -> Self {
-        use triergon_codec_hevc::DecodeError;
+impl From<triergon_codec::DecodeError> for VideoRefusal {
+    fn from(error: triergon_codec::DecodeError) -> Self {
+        use triergon_codec::DecodeError;
 
         Self(match error {
             DecodeError::Invalid(detail) => format!("InvalidData({detail:?})"),

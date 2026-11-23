@@ -1,8 +1,8 @@
 //! Slice segment header (clause 7.3.6, semantics 7.4.7).
 
-use crate::bits::{BitCursor, BitSource, Ranged};
-use crate::error::{DecodeError, Result};
+use crate::bits::BitCursor;
 use crate::ps::{Pps, ShortTermRps, Sps, parse_st_rps};
+use crate::{DecodeError, Result};
 use triergon_framing::hevc;
 
 /// slice_type (Table 7-7).

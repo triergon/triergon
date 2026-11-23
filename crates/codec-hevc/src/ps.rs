@@ -1,9 +1,9 @@
 //! Parameter sets: VPS (clause 7.3.2.1), SPS (7.3.2.2), PPS (7.3.2.3), profile/tier/level
 //! (7.3.3), scaling lists (7.3.4 / 7.4.5), short-term RPS (7.3.7 / 7.4.8), VUI (E.2.1).
 
-use crate::bits::{BitCursor, BitSource, Ranged};
-use crate::error::{DecodeError, Result};
+use crate::bits::BitCursor;
 use crate::tables::{DEFAULT_SCALING_INTER, DEFAULT_SCALING_INTRA, DIAG_SCAN_4X4, DIAG_SCAN_8X8};
+use crate::{DecodeError, Result};
 use triergon_codec::{Budget, BudgetVec};
 
 /// A parameter set as the decoder keeps it: charged for its size, and shared with the

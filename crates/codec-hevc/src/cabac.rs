@@ -1,7 +1,12 @@
 //! CABAC context variable layout and initialization (clause 9.3.2.2, Tables 9-5 .. 9-31)
 //! and the level binarization, over the shared arithmetic engine.
 
-use triergon_bitstream::cabac::{Engine, WithHeadroom, init_state};
+use crate::DecodeError;
+use triergon_bitstream::cabac::{Engine, InvalidOffset, WithHeadroom, init_state};
+
+pub(crate) fn invalid_offset(_: InvalidOffset) -> DecodeError {
+    DecodeError::Invalid("arithmetic code offset out of range")
+}
 
 /// The arithmetic decoder of a slice.
 pub(crate) type Cabac<'a> = Engine<'a, WithHeadroom>;

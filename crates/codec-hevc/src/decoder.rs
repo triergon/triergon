@@ -7,13 +7,13 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::ctu::{RefEntry, RefLists, Scratch, SliceDecoder};
-use crate::error::{DecodeError, Result};
 use crate::nal::{self, NalHeader};
 use crate::output::{OutInfo, Picture};
 use crate::picture::{AnyFrame, ColMotion, ColMv, Frame, FramePool, Pixel, SharedFrame};
 use crate::ps::{self, Layout, Pps, Shared, Sps};
 use crate::slice::{self, SliceHeader, SliceType};
 use crate::state::{PicState, SliceInfo};
+use crate::{DecodeError, Result};
 use crate::{deblock, sao};
 use triergon_codec::{Budget, BudgetVec, Charged, PictureView, VideoDecoder};
 use triergon_framing::picture_output::{
@@ -372,10 +372,10 @@ impl Context {
         }
         let pps = self.pps[pps_id as usize]
             .clone()
-            .ok_or(DecodeError::MissingParameterSet("PPS"))?;
+            .ok_or(DecodeError::Invalid("PPS"))?;
         let sps = self.sps[pps.sps_id as usize]
             .clone()
-            .ok_or(DecodeError::MissingParameterSet("SPS"))?;
+            .ok_or(DecodeError::Invalid("SPS"))?;
         if !first
             && let Some(cur) = &self.cur
             && !Arc::ptr_eq(&cur.pps, &pps)

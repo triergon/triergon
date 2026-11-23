@@ -3,10 +3,10 @@
 
 use super::{Cu, PART_2NX2N, SliceDecoder};
 use crate::cabac::ctx;
-use crate::error::{DecodeError, Result};
 use crate::intra::{self, MAX_REF};
 use crate::picture::Pixel;
 use crate::state::*;
+use crate::{DecodeError, Result};
 
 impl<P: Pixel> SliceDecoder<'_, P> {
     pub(super) fn transform_tree(

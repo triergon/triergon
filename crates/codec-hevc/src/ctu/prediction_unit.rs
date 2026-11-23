@@ -6,10 +6,10 @@ use super::{
     SliceDecoder,
 };
 use crate::cabac::ctx;
-use crate::error::{DecodeError, Result};
 use crate::picture::{ColMotion, Mv, Pixel, PuMotion};
 use crate::slice::SliceType;
 use crate::state::*;
+use crate::{DecodeError, Result};
 
 impl<P: Pixel> SliceDecoder<'_, P> {
     /// Parses a prediction unit, derives its motion, stores it and performs motion

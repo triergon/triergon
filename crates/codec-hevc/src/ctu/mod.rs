@@ -10,13 +10,13 @@ mod residual;
 mod transform_tree;
 
 use crate::cabac::{Bins, Cabac, ctx, init_contexts};
-use crate::error::{DecodeError, Result};
 use crate::inter::{McScratch, PRED_STRIDE};
 use crate::picture::{ColMotion, Frame, Pixel, PuMotion};
 use crate::ps::{Layout, Pps, Sps};
 use crate::slice::{SliceHeader, SliceType};
 use crate::state::*;
 use crate::transform;
+use crate::{DecodeError, Result};
 use triergon_codec::{Budget, BudgetVec};
 
 /// Z-order (Morton) index of 4x4 units inside a 64x64 CTB, [y4 * 16 + x4] (6.5.2 within a CTB).
@@ -191,7 +191,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             refs,
             sc,
             data,
-            cabac: Cabac::new(data, start.min(data.len()))?,
+            cabac: Cabac::new(data, start.min(data.len())).map_err(crate::cabac::invalid_offset)?,
             c: [0; ctx::NUM],
             slice_idx,
             poc,
@@ -427,7 +427,9 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                     return Err(DecodeError::Invalid("end_of_subset_one_bit"));
                 }
                 let pos = self.cabac.aligned_byte_position();
-                self.cabac.restart(pos)?;
+                self.cabac
+                    .restart(pos)
+                    .map_err(crate::cabac::invalid_offset)?;
             }
         }
     }

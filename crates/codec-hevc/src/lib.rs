@@ -21,7 +21,6 @@ mod cabac;
 mod ctu;
 mod deblock;
 mod decoder;
-mod error;
 mod inter;
 mod intra;
 mod kernels;
@@ -33,10 +32,11 @@ mod sao;
 mod slice;
 mod state;
 mod tables;
-pub use triergon_codec::{Budget, Error};
 mod transform;
 
 pub use decoder::{Decoder, Limits};
-pub use error::DecodeError;
 pub use nal::AccessUnitSplitter;
 pub use output::{ChromaFormat, ColourDescription, Picture, Plane, Row};
+pub use triergon_codec::{Budget, DecodeError, Error};
+
+pub(crate) type Result<T> = core::result::Result<T, DecodeError>;

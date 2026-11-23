@@ -1,10 +1,10 @@
 //! Inter prediction: motion compensation and weighted sample prediction (8.5.3.3).
 
 use super::{Scratch, SliceDecoder};
-use crate::error::{DecodeError, Result};
 use crate::inter;
 use crate::picture::{Frame, Pixel, PuMotion};
 use crate::slice::SliceType;
+use crate::{DecodeError, Result};
 
 impl<P: Pixel> SliceDecoder<'_, P> {
     #[inline(never)]
