@@ -317,7 +317,7 @@ pub struct EncodedSource {
 /// demuxer marks a packet disposable when it is `Unreferenced`; the field says nothing
 /// about sync samples or decoder recovery.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DependedOn {
+pub(crate) enum DependedOn {
     /// 0: unknown.
     Unspecified,
     /// 1: other samples depend on this one.
@@ -327,28 +327,13 @@ pub enum DependedOn {
     /// 3: reserved.
     Reserved,
 }
-/// One `sdtp` byte with its decoded `sample_is_depended_on` field.
-#[derive(Clone, Copy, Debug)]
-pub struct DependencyView {
-    /// The byte as stored.
-    pub raw: u8,
-    /// Its `sample_is_depended_on` field.
-    pub depended_on: DependedOn,
-}
-impl DependencyView {
+impl DependedOn {
     pub(crate) fn from_source(raw: u8) -> Self {
-        let depended_on = match raw & 0x0c {
-            0 => DependedOn::Unspecified,
-            4 => DependedOn::Referenced,
-            8 => DependedOn::Unreferenced,
-            _ => DependedOn::Reserved,
-        };
-        Self { raw, depended_on }
-    }
-    /// Whether FFmpeg's MOV demuxer marks the packet disposable: only for `Unreferenced`.
-    /// The metadata view refuses the reserved value; the recovery view reads it through
-    /// `DependencyObservation`. Leading and sync facts are not used.
-    pub(crate) fn demux_disposable_hint(self) -> bool {
-        self.depended_on == DependedOn::Unreferenced
+        match raw & 0x0c {
+            0 => Self::Unspecified,
+            4 => Self::Referenced,
+            8 => Self::Unreferenced,
+            _ => Self::Reserved,
+        }
     }
 }

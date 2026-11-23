@@ -8,6 +8,7 @@ use crate::{
     boxes::BoxView,
     compat::mov::{
         clocks::ClockField,
+        encoded_metadata::DependedOn,
         encoded_stream::{EncodedEntryKind, EncodedStream},
         view::PacketView,
     },
@@ -126,7 +127,6 @@ pub struct EncodedEditPlan {
     opus_timing: Option<Arc<OpusTiming>>,
     dts_scale: Option<u32>,
     dependency_table: bool,
-    dependency_recovery: bool,
     recovery_facts: Option<crate::compat::mov::encoded_recovery::RecoveryFacts>,
     recovery_observation: Option<crate::compat::mov::encoded_recovery_context::RecoveryObservation>,
 }
@@ -322,17 +322,11 @@ impl EncodedEditPlan {
             duration: i64::from(duration),
             flags: u32::from(source.is_container_sync())
                 | if discard { 4 } else { 0 }
-                | if self.dependency_table && source.dependency.is_some_and(|raw| {
-                    if self.dependency_recovery {
-                        crate::compat::mov::encoded_recovery::DependencyObservation::from_source(
-                            raw,
-                        )
-                        .demux_disposable_hint()
-                    } else {
-                        crate::compat::mov::encoded_metadata::DependencyView::from_source(raw)
-                            .demux_disposable_hint()
-                    }
-                }) {
+                | if self.dependency_table
+                    && source
+                        .dependency
+                        .is_some_and(|raw| DependedOn::from_source(raw) == DependedOn::Unreferenced)
+                {
                     16
                 } else {
                     0
@@ -942,7 +936,8 @@ impl<'a> EncodedEditJob<'a> {
                 }
                 if self.dependency_table
                     && !self.dependency_recovery
-                    && s.dependency.is_some_and(|raw| raw & 0x0c == 12)
+                    && s.dependency
+                        .is_some_and(|raw| DependedOn::from_source(raw) == DependedOn::Reserved)
                 {
                     return Err(Error::Unsupported(
                         "encoded dependency view reserved depended-on value",
@@ -1381,7 +1376,6 @@ impl<'a> EncodedEditJob<'a> {
             opus_timing,
             dts_scale: self.dts_scale,
             dependency_table: self.dependency_table,
-            dependency_recovery: self.dependency_recovery,
             recovery_facts: self.recovery_facts.take(),
             recovery_observation: self.recovery_observation.take(),
         })

@@ -6,7 +6,7 @@ use triergon_isobmff::{
     CursorStatus,
     compat::mov::{
         edits::{EncodedEditJob, EncodedEditLimits, EncodedEditPlan},
-        encoded::{DependedOn, DependencyCause, DependencyObservation, EncodedStream},
+        encoded::EncodedStream,
         packets::{PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
@@ -147,14 +147,6 @@ fn reserved_dependency_stays_reserved_while_receiver_adds_no_hint() {
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].source.dependency, Some(0x2e));
     assert_eq!((result[0].demux.flags, result[1].demux.flags), (1, 16));
-    let observation = DependencyObservation::from_source(0x2e);
-    assert_eq!(observation.source.raw, 0x2e);
-    assert_eq!(observation.source.depended_on, DependedOn::Reserved);
-    assert_eq!(
-        observation.cause,
-        DependencyCause::SourceReservedNotAppliedByReceiver
-    );
-    assert!(!observation.demux_disposable_hint());
 }
 #[test]
 fn prol_and_roll_have_separate_owned_namespaces() {

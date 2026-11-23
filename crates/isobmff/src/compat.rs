@@ -103,12 +103,10 @@ pub mod mov {
         };
         pub use super::encoded_contexts::{SourceProfileFault, WaveObservation};
         pub use super::encoded_metadata::{
-            DependedOn, DependencyView, EncodedCreationSource, EncodedSelection, EncodedSource,
-            HandlerSource, LanguageCause, LanguageSource, SoundV1Source,
+            EncodedCreationSource, EncodedSelection, EncodedSource, HandlerSource, LanguageCause,
+            LanguageSource, SoundV1Source,
         };
-        pub use super::encoded_recovery::{
-            DependencyCause, DependencyObservation, RecoveryFacts, RecoveryGroup,
-        };
+        pub use super::encoded_recovery::{RecoveryFacts, RecoveryGroup};
         pub use super::encoded_recovery_context::RecoveryObservation;
         pub use super::encoded_stream::{EncodedEntryKind, EncodedStream, EncodedStreamJob};
     }

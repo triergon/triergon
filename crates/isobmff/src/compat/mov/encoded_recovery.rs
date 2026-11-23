@@ -6,7 +6,6 @@
 use crate::{
     BuildStatus, Limits, Next,
     boxes::BoxChildren,
-    compat::mov::encoded_metadata::DependencyView,
     fields,
     sample_groups::{
         RecoveryDescriptions, RecoveryKind, RecoveryLimits, RecoveryMappings, RecoveryScope,
@@ -17,48 +16,6 @@ use crate::{
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
-/// The `sample_is_depended_on` field of an `sdtp` byte as the recovery view reads it.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DependencyCause {
-    /// 0: unknown.
-    SourceUnspecified,
-    /// 1: other samples depend on this one.
-    SourceReferenced,
-    /// 2: no other sample depends on this one; the packet is marked disposable.
-    SourceUnreferenced,
-    /// 3: reserved. The demuxer does not apply it, and the packet is not marked
-    /// disposable.
-    SourceReservedNotAppliedByReceiver,
-}
-/// One `sdtp` byte as the recovery view reads it. Unlike the metadata view, which
-/// refuses the reserved value, it reads all four values.
-#[derive(Clone, Copy, Debug)]
-pub struct DependencyObservation {
-    /// The byte and its decoded field.
-    pub source: DependencyView,
-    /// How the recovery view reads the field.
-    pub cause: DependencyCause,
-}
-impl DependencyObservation {
-    /// Reads one `sdtp` byte.
-    pub fn from_source(raw: u8) -> Self {
-        let cause = match raw & 0x0c {
-            0 => DependencyCause::SourceUnspecified,
-            4 => DependencyCause::SourceReferenced,
-            8 => DependencyCause::SourceUnreferenced,
-            _ => DependencyCause::SourceReservedNotAppliedByReceiver,
-        };
-        Self {
-            source: DependencyView::from_source(raw),
-            cause,
-        }
-    }
-    /// Whether FFmpeg's MOV demuxer marks the packet disposable: only for
-    /// [`DependencyCause::SourceUnreferenced`].
-    pub fn demux_disposable_hint(self) -> bool {
-        self.cause == DependencyCause::SourceUnreferenced
-    }
-}
 /// One grouping type's `sgpd` descriptions and `sbgp` mappings in a sample table;
 /// either can be absent.
 #[derive(Clone, Debug, Default)]
