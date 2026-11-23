@@ -813,56 +813,50 @@ impl State {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
-            if matches!(self.phase, Phase::Done) {
-                return Ok(ParseStep::Event(self.result.clone()));
-            }
-            // Builder itself charges each alphabet entry and table row.
-            if matches!(
-                self.phase,
-                Phase::BuildCodes | Phase::BuildLiterals | Phase::BuildDistances
-            ) {
-                let lengths = match self.phase {
-                    Phase::BuildCodes => &self.code_lengths[..],
-                    Phase::BuildLiterals => &self.lengths[..self.literals],
-                    _ => &self.lengths[self.literals..self.literals + self.distances],
-                };
-                // The codes exist from the end of the code lengths on.
-                let codes = self.dynamic.get_or_insert_with(DynamicCodes::new);
-                let ready = match self.phase {
-                    Phase::BuildCodes => {
-                        codes
-                            .build
-                            .advance(&mut codes.code_tree, lengths, work, cancel)?
-                    }
-                    Phase::BuildLiterals => {
-                        codes
-                            .build
-                            .advance(&mut codes.literal_tree, lengths, work, cancel)?
-                    }
-                    _ => codes
-                        .build
-                        .advance(&mut codes.distance_tree, lengths, work, cancel)?,
-                };
-                if !ready {
-                    return Ok(ParseStep::Yield);
-                }
-                match self.phase {
-                    Phase::BuildCodes => {
-                        self.at = 0;
-                        self.phase = Phase::Lengths;
-                    }
-                    Phase::BuildLiterals => {
-                        codes.build = Build::new(false);
-                        self.phase = Phase::BuildDistances;
-                    }
-                    _ => self.phase = Phase::Symbol,
-                }
-                continue;
-            }
-            if !work.try_charge(1) {
-                return Ok(ParseStep::Yield);
-            }
             match self.phase {
+                Phase::Done => return Ok(ParseStep::Event(self.result.clone())),
+                // The builder charges each alphabet entry and table row itself.
+                Phase::BuildCodes | Phase::BuildLiterals | Phase::BuildDistances => {
+                    let lengths = match self.phase {
+                        Phase::BuildCodes => &self.code_lengths[..],
+                        Phase::BuildLiterals => &self.lengths[..self.literals],
+                        _ => &self.lengths[self.literals..self.literals + self.distances],
+                    };
+                    // The codes exist from the end of the code lengths on.
+                    let codes = self.dynamic.get_or_insert_with(DynamicCodes::new);
+                    let ready = match self.phase {
+                        Phase::BuildCodes => {
+                            codes
+                                .build
+                                .advance(&mut codes.code_tree, lengths, work, cancel)?
+                        }
+                        Phase::BuildLiterals => {
+                            codes
+                                .build
+                                .advance(&mut codes.literal_tree, lengths, work, cancel)?
+                        }
+                        _ => {
+                            codes
+                                .build
+                                .advance(&mut codes.distance_tree, lengths, work, cancel)?
+                        }
+                    };
+                    if !ready {
+                        return Ok(ParseStep::Yield);
+                    }
+                    match self.phase {
+                        Phase::BuildCodes => {
+                            self.at = 0;
+                            self.phase = Phase::Lengths;
+                        }
+                        Phase::BuildLiterals => {
+                            codes.build = Build::new(false);
+                            self.phase = Phase::BuildDistances;
+                        }
+                        _ => self.phase = Phase::Symbol,
+                    }
+                }
+                _ if !work.try_charge(1) => return Ok(ParseStep::Yield),
                 Phase::Header => {
                     self.window = header(source)?;
                     self.phase = Phase::Block;
@@ -1052,7 +1046,6 @@ impl State {
                         }
                     }
                 }
-                _ => return Err(Error::Invalid("invalid inflate state")),
             }
         }
     }

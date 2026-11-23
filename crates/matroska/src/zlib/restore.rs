@@ -1,5 +1,6 @@
-//! Intended child of zlib, so the pinned header/Adler implementation is reused.
-//! One charged compressed frame, persistent transform state, no I/O adapter.
+//! Content restoration of one charged frame: header stripping, the single stored
+//! zlib block and the inflater, through zlib's header and Adler-32 checks.
+//! Persistent transform state, no I/O adapter.
 use super::{InflateLimits, Inflater, adler32, header};
 use crate::step::Required;
 use crate::{
@@ -116,15 +117,15 @@ impl CopyJob {
     ) -> Result<ParseStep<SharedBytes>> {
         loop {
             cancelled(cancel)?;
-            if matches!(self.phase, CopyPhase::Done) {
-                return Ok(ParseStep::Event(
-                    self.result
-                        .as_ref()
-                        .required("missing restored result")?
-                        .clone(),
-                ));
-            }
             match self.phase {
+                CopyPhase::Done => {
+                    return Ok(ParseStep::Event(
+                        self.result
+                            .as_ref()
+                            .required("missing restored result")?
+                            .clone(),
+                    ));
+                }
                 CopyPhase::Reserve => {
                     if self.prefix.is_empty()
                         && self.size <= COPY_CHUNK_BYTES
@@ -194,7 +195,6 @@ impl CopyJob {
                         }
                     }
                 }
-                CopyPhase::Done => unreachable!(),
             }
         }
     }
@@ -535,7 +535,7 @@ crate::storage::usage::storage!(CopyJob, |s| [s.prefix, s.input, s.buffer, s.res
 crate::storage::usage::storage!(StoredJob, |s| [s.source, s.copy, s.result]);
 crate::storage::usage::storage!(RestoreJob, |s| [s.current, s.plan, s.job]);
 // The allocation itself and every source/output/growth/result owner inside the
-// live inflater are separate terms in the existing deduplicated cold proof.
+// live inflater are separate terms in the deduplicated pressure walk.
 crate::storage::usage::storage!(InflateSlot, |s| [s.jobs, s.jobs.as_slice().first()]);
 
 struct PlanHeaders<'a>(&'a [Option<DecodeStep>; 8]);

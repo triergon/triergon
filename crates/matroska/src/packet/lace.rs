@@ -176,13 +176,9 @@ impl LaceJob {
     fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep<()>> {
         loop {
             check(cancel)?;
-            if matches!(self.phase, Phase::Done) {
-                return Ok(ParseStep::Event(()));
-            }
-            if !work.try_charge(1) {
-                return Ok(ParseStep::Yield);
-            }
             match self.phase {
+                Phase::Done => return Ok(ParseStep::Event(())),
+                _ if !work.try_charge(1) => return Ok(ParseStep::Yield),
                 Phase::Count => {
                     if self.mode == 0 {
                         self.count = 1;
@@ -241,7 +237,6 @@ impl LaceJob {
                     self.previous_size = 0;
                     self.phase = Phase::Done;
                 }
-                Phase::Done => unreachable!(),
             }
         }
     }
