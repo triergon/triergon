@@ -111,16 +111,38 @@ impl Tail {
 struct Pending {
     pes: Bytes,
     pts: Option<i128>,
+    /// `None` until the first step looks at the field.
     scan: Option<Scan>,
 }
 
+/// A field scanned for complete segments.
 #[derive(Debug)]
 struct Scan {
+    /// Where the body starts: after the two bytes that open a group.
     start: usize,
-    prior_len: usize,
+    /// The part of a segment earlier fields left, which starts the body.
+    join: Option<Join>,
     at: usize,
-    copy: Option<BudgetVec<u8>>,
     end: Option<ScanEnd>,
+}
+
+/// The part of a segment earlier fields left, copied with the body to be
+/// scanned as one.
+#[derive(Debug)]
+struct Join {
+    prior_len: usize,
+    /// The part as an earlier field holds it, to be copied first; `None` when
+    /// `copy` starts with it.
+    shared: Option<Bytes>,
+    copy: BudgetVec<u8>,
+}
+
+/// A join's copy once its segments are known to be complete.
+#[derive(Debug)]
+struct Joined {
+    bytes: Bytes,
+    prior_len: usize,
+    shared: Option<Bytes>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -128,6 +150,16 @@ struct ScanEnd {
     active: bool,
     complete: usize,
     len: usize,
+}
+
+/// How far a step took the pending field.
+#[derive(Debug)]
+enum Cut {
+    Yield,
+    Done {
+        end: ScanEnd,
+        joined: Option<Joined>,
+    },
 }
 
 impl PesParser {
@@ -173,167 +205,133 @@ impl PesParser {
     /// byte copied to join a split segment. `Error::Cancelled` when `cancel`
     /// is set, which also [`reset`](Self::reset)s the parser; a pool error
     /// keeps the field pending for the next step.
+    // Out of line, so that a demuxer's per-PES loop, which the other streams'
+    // packets run through, does not carry the step's registers and spills.
+    #[inline(never)]
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<PesProgress> {
         if let Err(error) = cancelled(cancel) {
             self.reset();
             return Err(error);
         }
-        let Some(pending) = self.input.as_mut() else {
+        // The field is held here while it is cut, and kept again when the
+        // step stops short of a packet.
+        let Some(Pending { pes, pts, scan }) = self.input.take() else {
             return Ok(PesProgress::NeedPacket);
         };
-        if work.remaining() == 0 {
-            return Ok(PesProgress::Yield);
-        }
-
-        let scan = match &mut pending.scan {
+        let mut scan = match scan {
+            _ if work.remaining() == 0 => {
+                self.input = Some(Pending { pes, pts, scan });
+                return Ok(PesProgress::Yield);
+            }
             Some(scan) => scan,
-            slot @ None => {
-                let fresh = pending.pts.is_some() && pending.pts != self.last_pts;
-                if fresh {
-                    self.tail = None;
-                }
-                let new_group = fresh && pending.pes.starts_with(&[0x20, 0]);
-                let start = usize::from(new_group) * 2;
-                let prior_len = self.tail.as_ref().map_or(0, Tail::len);
-                if new_group {
-                    self.active = true;
-                }
-                let body_len = pending.pes.len() - start;
-                if (fresh && !new_group) || !self.active || body_len > MAX_GROUP_BYTES - prior_len {
+            None => match self.open(&pes, pts) {
+                Some(scan) => scan,
+                None => {
                     work.take(1);
-                    return self.passthrough();
+                    return Ok(self.passthrough(pes, pts));
                 }
-                let copy = match self.tail.take() {
-                    Some(Tail::Buffered(buffer)) => Some(buffer),
-                    shared => {
-                        self.tail = shared;
-                        None
-                    }
-                };
-                slot.insert(Scan {
-                    start,
-                    prior_len,
-                    at: 0,
-                    copy,
-                    end: None,
-                })
-            }
+            },
         };
-
-        let end = if let Some(end) = scan.end {
-            end
-        } else {
-            if scan.prior_len != 0 {
-                let prior = match &self.tail {
-                    Some(Tail::Shared(bytes)) => Some(bytes),
-                    _ => None,
-                };
-                if !scan.collect(&self.pool, prior, &pending.pes[scan.start..], work)? {
-                    return Ok(PesProgress::Yield);
-                }
+        match scan.cut(&pes, work, cancel) {
+            Ok(Cut::Done { end, joined }) => self.complete(pes, pts, scan, end, joined),
+            Err(Error::Cancelled) => {
+                self.reset();
+                Err(Error::Cancelled)
             }
-            let body = scan
-                .copy
-                .as_ref()
-                .map_or(&pending.pes[scan.start..], BudgetVec::as_slice);
-            let mut active = true;
-            while scan.at < body.len() {
-                if let Err(error) = cancelled(cancel) {
-                    self.reset();
-                    return Err(error);
-                }
-                if !work.try_charge(1) {
-                    return Ok(PesProgress::Yield);
-                }
-                let rest = &body[scan.at..];
-                if rest[0] != 0x0f {
-                    active = false;
-                    break;
-                }
-                let Some(header) = rest.first_chunk::<6>() else {
-                    break;
-                };
-                let size = 6 + usize::from(u16::from_be_bytes([header[4], header[5]]));
-                if size > rest.len() {
-                    break;
-                }
-                scan.at += size;
+            // A yield, or a pool error: the field stays pending.
+            kept => {
+                self.input = Some(Pending {
+                    pes,
+                    pts,
+                    scan: Some(scan),
+                });
+                kept.map(|_| PesProgress::Yield)
             }
-            *scan.end.insert(ScanEnd {
-                active,
-                complete: scan.at,
-                len: body.len(),
-            })
-        };
-        let joined = match scan.copy.take_if(|_| end.complete != 0) {
-            Some(copy) => {
-                if !work.try_charge(1) {
-                    scan.copy = Some(copy);
-                    return Ok(PesProgress::Yield);
-                }
-                match copy.freeze() {
-                    Ok(bytes) => Some(bytes),
-                    Err(error) => {
-                        scan.copy = Some(error.value);
-                        return Err(error.error);
-                    }
-                }
-            }
-            None => None,
-        };
-        self.complete(end, joined)
+        }
     }
 
-    fn passthrough(&mut self) -> Result<PesProgress> {
-        let pending = self
-            .input
-            .take()
-            .ok_or(Error::Invalid("DVB PES parser input absent"))?;
-        self.last_pts = pending.pts.or(self.last_pts);
-        Ok(PesProgress::Packet(PesPacket {
-            codec: pending.pes.clone(),
-            pes: pending.pes,
-            framing: PesFraming::Passthrough,
-            source_pts: pending.pts,
-            codec_pts: pending.pts,
-            prior_tail: None,
-        }))
+    /// Where a field the parser takes up starts its scan, or `None` when it
+    /// passes through: a new PTS that does not open a group, a field outside
+    /// a group, or a group past the ceiling. A new PTS drops the bytes earlier
+    /// fields left.
+    fn open(&mut self, pes: &Bytes, pts: Option<i128>) -> Option<Scan> {
+        let fresh = pts.is_some() && pts != self.last_pts;
+        if fresh {
+            self.tail = None;
+        }
+        let new_group = fresh && pes.starts_with(&[0x20, 0]);
+        let start = usize::from(new_group) * 2;
+        let prior_len = self.tail.as_ref().map_or(0, Tail::len);
+        if new_group {
+            self.active = true;
+        }
+        let body_len = pes.len() - start;
+        if (fresh && !new_group) || !self.active || body_len > MAX_GROUP_BYTES - prior_len {
+            return None;
+        }
+        let join = self.tail.take().map(|tail| match tail {
+            Tail::Shared(bytes) => Join {
+                prior_len,
+                shared: Some(bytes),
+                copy: BudgetVec::new(&self.pool),
+            },
+            Tail::Buffered(copy) => Join {
+                prior_len,
+                shared: None,
+                copy,
+            },
+        });
+        Some(Scan {
+            start,
+            join,
+            at: 0,
+            end: None,
+        })
     }
 
-    fn complete(&mut self, end: ScanEnd, joined: Option<Bytes>) -> Result<PesProgress> {
-        let Some(Pending {
+    fn passthrough(&mut self, pes: Bytes, pts: Option<i128>) -> PesProgress {
+        self.last_pts = pts.or(self.last_pts);
+        PesProgress::Packet(PesPacket {
+            codec: pes.clone(),
             pes,
-            pts,
-            scan: Some(scan),
-        }) = self.input.take()
-        else {
-            return Err(Error::Invalid("DVB PES parser input absent"));
-        };
-        let prior = self.tail.take();
+            framing: PesFraming::Passthrough,
+            source_pts: pts,
+            codec_pts: pts,
+            prior_tail: None,
+        })
+    }
+
+    fn complete(
+        &mut self,
+        pes: Bytes,
+        pts: Option<i128>,
+        scan: Scan,
+        end: ScanEnd,
+        mut joined: Option<Joined>,
+    ) -> Result<PesProgress> {
         let (codec, framing, prior_tail) = if end.complete != 0 {
             let codec = view(&pes, scan.start, joined.as_ref(), 0..end.complete)?;
-            let prior_tail = if scan.prior_len == 0 {
-                None
-            } else if let Some(Tail::Shared(bytes)) = prior {
-                Some(bytes)
-            } else {
-                Some(codec.slice(0..scan.prior_len)?)
+            let prior_tail = match &mut joined {
+                None => None,
+                Some(joined) => match joined.shared.take() {
+                    Some(bytes) => Some(bytes),
+                    None => Some(codec.slice(0..joined.prior_len)?),
+                },
             };
             (codec, PesFraming::CompleteSegments, prior_tail)
         } else {
             (pes.clone(), PesFraming::Passthrough, None)
         };
         self.tail = if end.active && end.complete < end.len {
-            if let Some(copy) = scan.copy {
-                Some(Tail::Buffered(copy))
-            } else {
-                Some(Tail::Shared(view(
+            Some(match scan.join {
+                Some(join) => Tail::Buffered(join.copy),
+                None => Tail::Shared(view(
                     &pes,
                     scan.start,
                     joined.as_ref(),
                     end.complete..end.len,
-                )?))
-            }
+                )?),
+            })
         } else {
             None
         };
@@ -351,15 +349,87 @@ impl PesParser {
 }
 
 impl Scan {
-    fn collect(
-        &mut self,
-        pool: &Budget,
-        prior: Option<&Bytes>,
-        body: &[u8],
-        work: &mut WorkBudget,
-    ) -> Result<bool> {
+    /// Joins the field to the part earlier fields left, scans the segments
+    /// and freezes the join once they are complete, each as `work` allows.
+    fn cut(&mut self, pes: &Bytes, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Cut> {
+        let end = if let Some(end) = self.end {
+            end
+        } else {
+            let field = &pes[self.start..];
+            let body = match &mut self.join {
+                Some(join) => {
+                    if !join.collect(field, work)? {
+                        return Ok(Cut::Yield);
+                    }
+                    join.copy.as_slice()
+                }
+                None => field,
+            };
+            let mut active = true;
+            while self.at < body.len() {
+                cancelled(cancel)?;
+                if !work.try_charge(1) {
+                    return Ok(Cut::Yield);
+                }
+                let rest = &body[self.at..];
+                if rest[0] != 0x0f {
+                    active = false;
+                    break;
+                }
+                let Some(header) = rest.first_chunk::<6>() else {
+                    break;
+                };
+                let size = 6 + usize::from(u16::from_be_bytes([header[4], header[5]]));
+                if size > rest.len() {
+                    break;
+                }
+                self.at += size;
+            }
+            *self.end.insert(ScanEnd {
+                active,
+                complete: self.at,
+                len: body.len(),
+            })
+        };
+        let joined = match self.join.take_if(|_| end.complete != 0) {
+            Some(join) => {
+                if !work.try_charge(1) {
+                    self.join = Some(join);
+                    return Ok(Cut::Yield);
+                }
+                let Join {
+                    prior_len,
+                    shared,
+                    copy,
+                } = join;
+                match copy.freeze() {
+                    Ok(bytes) => Some(Joined {
+                        bytes,
+                        prior_len,
+                        shared,
+                    }),
+                    Err(error) => {
+                        self.join = Some(Join {
+                            prior_len,
+                            shared,
+                            copy: error.value,
+                        });
+                        return Err(error.error);
+                    }
+                }
+            }
+            None => None,
+        };
+        Ok(Cut::Done { end, joined })
+    }
+}
+
+impl Join {
+    /// Copies the part earlier fields left, then `body`, as `work` allows;
+    /// `true` once all of it is in.
+    fn collect(&mut self, body: &[u8], work: &mut WorkBudget) -> Result<bool> {
         let total = self.prior_len + body.len();
-        let copy = self.copy.get_or_insert_with(|| BudgetVec::new(pool));
+        let copy = &mut self.copy;
         if copy.capacity() < total {
             if !work.try_charge(1) {
                 return Ok(false);
@@ -368,13 +438,14 @@ impl Scan {
             // allocation stays within the parser's admitted group ceiling.
             copy.try_reserve_exact(total.next_power_of_two() - copy.len())?;
         }
-        let offset = copy.len();
-        if offset < self.prior_len {
-            let source = prior.ok_or(Error::Invalid("DVB PES shared tail absent"))?;
-            let n = work.take((self.prior_len - offset) as u64) as usize;
-            copy.try_extend_from_slice(&source[offset..offset + n])?;
-            if copy.len() < self.prior_len {
-                return Ok(false);
+        if let Some(shared) = &self.shared {
+            let offset = copy.len();
+            if offset < self.prior_len {
+                let n = work.take((self.prior_len - offset) as u64) as usize;
+                copy.try_extend_from_slice(&shared[offset..offset + n])?;
+                if copy.len() < self.prior_len {
+                    return Ok(false);
+                }
             }
         }
         let offset = copy.len() - self.prior_len;
@@ -384,10 +455,11 @@ impl Scan {
     }
 }
 
-fn view(pes: &Bytes, start: usize, joined: Option<&Bytes>, range: Range<usize>) -> Result<Bytes> {
-    if let Some(joined) = joined {
-        joined.slice(range)
-    } else {
-        pes.slice(start + range.start..start + range.end)
+/// `range` of the segments' bytes: the frozen join, else the field's body
+/// from `start`.
+fn view(pes: &Bytes, start: usize, joined: Option<&Joined>, range: Range<usize>) -> Result<Bytes> {
+    match joined {
+        Some(joined) => joined.bytes.slice(range),
+        None => pes.slice(start + range.start..start + range.end),
     }
 }
