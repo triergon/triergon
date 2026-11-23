@@ -94,8 +94,7 @@ pub struct AnnexBPrefix {
     pub start_code_bytes: u8,
 }
 
-/// The exact framing of a NAL unit in its source, before any output adaptation. Annex-B
-/// `prefix_offset` includes the optional `zero_byte`, but excludes leading padding.
+/// Where the framing bytes of a NAL unit lie in its source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NalFraming {
     /// A length field before the NAL unit.
@@ -108,25 +107,12 @@ pub enum NalFraming {
         declared_length: u32,
     },
     /// A start code before the NAL unit.
-    AnnexB {
-        /// Source offset of the start code's first byte.
-        prefix_offset: u64,
-        /// Length of the start code in bytes: 3, or 4 with its `zero_byte`.
-        start_code_bytes: u8,
-        /// Zero bytes before the start code of the first NAL unit read. Zero
-        /// for every later unit: the zeros before its start code are the
-        /// `trailing_zero_bytes` of the unit before it.
-        leading_zero_bytes: usize,
-    },
+    AnnexB(AnnexBPrefix),
 }
 
 impl From<AnnexBPrefix> for NalFraming {
     fn from(prefix: AnnexBPrefix) -> Self {
-        Self::AnnexB {
-            prefix_offset: prefix.offset,
-            start_code_bytes: prefix.start_code_bytes,
-            leading_zero_bytes: prefix.leading_zero_bytes,
-        }
+        Self::AnnexB(prefix)
     }
 }
 

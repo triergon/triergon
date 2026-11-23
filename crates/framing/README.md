@@ -135,7 +135,8 @@ most 4 GiB − 1 bytes (`NalPacketLimits::MAXIMUM_SPAN`).
 
 **Codec-specific limits.**
 
-- NAL: payload bytes are opaque; no RBSP, SPS/PPS body or decoder-consistency check.
+- NAL: Annex B start-code offsets, padding and widths use `AnnexBPrefix`, also
+  carried by `NalFraming::AnnexB`. Payload bytes are opaque; no RBSP, SPS/PPS body or decoder-consistency check.
   The leading `zero_byte` rule is not enforced. `AnnexBWriter` never edits emulation
   prevention.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and unknown

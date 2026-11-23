@@ -8,9 +8,9 @@ use triergon_core::{
 use triergon_framing::{
     BuildStep,
     nal::{
-        AnnexBConfigParser, AnnexBWriter, Codec, ConfigEncoding, ConfigInspection, ConfigLimits,
-        Configuration, Framing, LengthSize, NalFraming, NalHeader, NalReader, NalUnit,
-        ParameterSetKind,
+        AnnexBConfigParser, AnnexBPrefix, AnnexBWriter, Codec, ConfigEncoding, ConfigInspection,
+        ConfigLimits, Configuration, Framing, LengthSize, NalFraming, NalHeader, NalReader,
+        NalUnit, ParameterSetKind,
     },
 };
 use triergon_harness_protocol::unhex;
@@ -125,11 +125,11 @@ fn authored_corpus_all_chunk_boundaries_and_small_work() {
                         }
                     );
                     match facts.framing {
-                        NalFraming::AnnexB {
-                            prefix_offset,
+                        NalFraming::AnnexB(AnnexBPrefix {
+                            offset: prefix_offset,
                             start_code_bytes,
                             leading_zero_bytes,
-                        } => {
+                        }) => {
                             assert_eq!(prefix_offset, number(7) as u64);
                             assert_eq!(start_code_bytes as usize, number(8));
                             assert_eq!(leading_zero_bytes, number(9));
@@ -191,21 +191,21 @@ fn prefix_and_padding_facts_retain_exact_offsets() {
     assert_eq!(nals[0].facts().trailing_zero_bytes, 2);
     assert_eq!(
         nals[0].facts().framing,
-        NalFraming::AnnexB {
-            prefix_offset: 1,
+        NalFraming::AnnexB(AnnexBPrefix {
+            offset: 1,
             start_code_bytes: 4,
             leading_zero_bytes: 1,
-        }
+        })
     );
     assert_eq!(nals[1].facts().payload_offset, 13);
     assert_eq!(nals[1].facts().trailing_zero_bytes, 3);
     assert_eq!(
         nals[1].facts().framing,
-        NalFraming::AnnexB {
-            prefix_offset: 9,
+        NalFraming::AnnexB(AnnexBPrefix {
+            offset: 9,
             start_code_bytes: 4,
             leading_zero_bytes: 0,
-        }
+        })
     );
     let lp = drive(
         &pool,
