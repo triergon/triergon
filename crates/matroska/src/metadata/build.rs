@@ -323,8 +323,9 @@ impl DocumentJob {
     ) -> Result<()> {
         let id = u64::from(self.nodes.as_slice()[child].id);
         let field = bit(id);
+        // A child that may occur once counts at its first occurrence (RFC 8794 §12).
         if fields.presence & singletons & field != 0 {
-            return Err(Error::Invalid("duplicate metadata field"));
+            return Ok(());
         }
         fields.presence |= field;
         match id {
@@ -494,6 +495,7 @@ impl DocumentJob {
                                 ebml::uint(payload)?
                             };
                             if id == 0x2ad7b1
+                                && self.timestamp_scale.is_none()
                                 && self.nodes.as_slice()[index].parent == 0
                                 && u64::from(self.nodes.as_slice()[0].id) == INFO
                             {

@@ -200,11 +200,18 @@ width fields), a TrackEntry (its scalar fields, flags, languages, Video, Audio, 
 ContentEncodings), a BlockAdditionMapping, MaxBlockAdditionID, a ContentEncoding's
 ContentCompression, a BlockGroup (Block, BlockDuration, DiscardPadding, CodecState,
 BlockAdditions, and a BlockMore's BlockAddID and BlockAdditional), a CuePoint and its
-CueTrackPositions, and a Seek entry. Three rules are of another kind and still fail the
-input: two tracks with one TrackNumber or TrackUID, two additions with one BlockAddID in a
-BlockGroup, and two ContentEncodings with one ContentEncodingOrder. A repeated
-single-occurrence child inside an Info, Chapters, Tags or Attachments document also still
-fails it (`duplicate metadata field`), as does a second Cues or Attachments element.
+CueTrackPositions, a Seek entry, and an Info, Chapters, Tags or Attachments document
+(TimestampScale and every other single-occurrence field). A passed-over child of a
+document stays in its element tree, and its value must still be well formed; the typed
+views read the first. Three rules are of another kind and still fail the input: two
+tracks with one TrackNumber or TrackUID, two additions with one BlockAddID in a
+BlockGroup, and two ContentEncodings with one ContentEncodingOrder. Two places do not
+follow the rule yet. A ContentEncoding's ContentEncodingOrder, ContentEncodingScope,
+ContentEncodingType, ContentCompAlgo and ContentCompSettings keep their last occurrence,
+because tracking their occurrences was measured to cost every open of an encoded track
+0.1% instructions. A second Cues or Attachments element fails (`duplicate Cues`,
+`duplicate Attachments`): it is refused after its bytes are read, and passing it over
+there would leave the slot the reader reserved for it in use.
 
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and

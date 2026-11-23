@@ -105,7 +105,7 @@ fn uid_namespaces_keep_full_u64_values_and_reject_only_same_kind_duplicates() {
 }
 
 #[test]
-fn chapter_displays_repeat_and_the_enabled_flag_is_unique() {
+fn chapter_displays_repeat_and_a_repeated_enabled_flag_keeps_the_first() {
     let mut fields = [
         uint(0x73c4, 1),
         uint(0x91, 0),
@@ -134,10 +134,15 @@ fn chapter_displays_repeat_and_the_enabled_flag_is_unique() {
                 .map(|display| display.title().unwrap())
                 .eq(["First title", "Second title"])
         );
-        assert!(matches!(
-            parse(&duplicate, quantum),
-            Err(Error::Invalid("duplicate metadata field"))
-        ));
+        let (document, _) = parse(&duplicate, quantum).unwrap();
+        let chapter = document
+            .editions()
+            .next()
+            .unwrap()
+            .chapters()
+            .next()
+            .unwrap();
+        assert!(chapter.enabled().unwrap());
     }
 }
 
