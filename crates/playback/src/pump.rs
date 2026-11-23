@@ -108,6 +108,16 @@ pub enum PumpStep {
     /// The pump stopped.
     Stopped,
 }
+/// Where a [`Pump`] is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Run {
+    Running,
+    Paused,
+    /// The player ended; the sink still completes the feeds in flight.
+    Ended,
+    Stopped,
+}
+
 enum CatalogueChange<'a> {
     Replace(Selection),
     ProgressiveSeek(crate::mp4::catalogue::RangeSeek<'a>),
@@ -122,9 +132,7 @@ pub struct Pump<S: Source, T: Sink> {
     credits: BudgetVec<Option<FeedToken>>,
     pending: Option<Feed>,
     ordinal: u64,
-    paused: bool,
-    stopped: bool,
-    ended: bool,
+    run: Run,
 }
 impl<S: Source, T: Sink> Pump<S, T> {
     /// A pump with up to `maximum_in_flight` feeds in flight. Fails with `Invalid`
@@ -156,9 +164,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             credits,
             pending: None,
             ordinal: 0,
-            paused: false,
-            stopped: false,
-            ended: false,
+            run: Run::Running,
         })
     }
     /// The player.
@@ -188,7 +194,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
     /// Pauses or resumes the sink, then the player. A sink failure stops the pump.
     /// Fails with `Closed` once the pump stopped or the player ended.
     pub fn pause(&mut self, paused: bool) -> Result<()> {
-        if self.stopped {
+        if self.run == Run::Stopped {
             return Err(Error::Closed);
         }
         if !matches!(
@@ -202,7 +208,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             return Err(error);
         }
         self.player.as_mut().ok_or(Error::Closed)?.pause(paused)?;
-        self.paused = paused;
+        self.run = if paused { Run::Paused } else { Run::Running };
         Ok(())
     }
     /// Seeks the player to `target` on `track` with `selection`, then resets the sink
@@ -220,7 +226,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             self.stop();
             return Err(Error::Cancelled);
         }
-        if self.stopped {
+        if self.run == Run::Stopped {
             return Err(Error::Closed);
         }
         let player = self.player.as_mut().ok_or(Error::Closed)?;
@@ -241,7 +247,9 @@ impl<S: Source, T: Sink> Pump<S, T> {
         for credit in self.credits.as_mut_slice() {
             *credit = None;
         }
-        self.ended = false;
+        if self.run == Run::Ended {
+            self.run = Run::Running;
+        }
         Ok(true)
     }
     /// Replaces the player's MP4 catalogue with `next` and switches the sink to it.
@@ -303,7 +311,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.stopped {
+        if self.run == Run::Stopped {
             return Err(Error::Closed);
         }
         if w.remaining() == 0 {
@@ -352,7 +360,9 @@ impl<S: Source, T: Sink> Pump<S, T> {
         };
         sink.commit_catalogue(boundary);
         self.identity = identity;
-        self.ended = false;
+        if self.run == Run::Ended {
+            self.run = Run::Running;
+        }
         let intent = match change {
             CatalogueChange::Replace(_) => None,
             CatalogueChange::ProgressiveSeek(seek) => Some(seek.intent),
@@ -391,21 +401,13 @@ impl<S: Source, T: Sink> Pump<S, T> {
             self.stop();
             return Err(Error::Cancelled);
         }
-        if self.stopped {
-            return Ok(PumpStep::Stopped);
-        }
-        if self.paused {
-            return Ok(PumpStep::Paused);
-        }
-        if w.remaining() == 0 {
-            return Ok(PumpStep::Yield);
-        }
-        if self.ended {
-            return if self.in_flight() == 0 {
-                Ok(PumpStep::Ended)
-            } else {
-                self.complete(w)
-            };
+        match self.run {
+            Run::Stopped => return Ok(PumpStep::Stopped),
+            Run::Paused => return Ok(PumpStep::Paused),
+            _ if w.remaining() == 0 => return Ok(PumpStep::Yield),
+            Run::Ended if self.in_flight() == 0 => return Ok(PumpStep::Ended),
+            Run::Ended => return self.complete(w),
+            Run::Running => {}
         }
         if let Some(feed) = self.pending.as_ref() {
             let player = self.player.as_ref().ok_or(Error::Closed)?;
@@ -465,7 +467,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         }
         match player.advance_ready(w, c) {
             Ok(Progress::Ended) => {
-                self.ended = true;
+                self.run = Run::Ended;
                 Ok(PumpStep::Yield)
             }
             Ok(Progress::Paused) => Ok(PumpStep::Paused),
@@ -482,7 +484,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
     }
     /// Stops the player, then the sink, and drops the feeds; once.
     pub fn stop(&mut self) {
-        if self.stopped {
+        if self.run == Run::Stopped {
             return;
         }
         // The source closes before the sink stops and the feeds drop.
@@ -496,7 +498,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
         for s in self.credits.as_mut_slice() {
             *s = None;
         }
-        self.stopped = true;
+        self.run = Run::Stopped;
     }
     /// Stops the pump and returns its sink.
     pub fn into_sink(mut self) -> Result<T> {
