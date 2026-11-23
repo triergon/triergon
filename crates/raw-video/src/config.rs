@@ -84,6 +84,16 @@ struct Set<T> {
     info: T,
 }
 
+/// The parameter-set NAL types a tracker records.
+#[derive(Clone, Copy)]
+enum ParameterSet {
+    HevcVps,
+    HevcSps,
+    HevcPps,
+    AvcSps,
+    AvcPps,
+}
+
 #[derive(Clone, Copy)]
 enum Update<'a> {
     Vps(u8, &'a Bytes),
@@ -176,12 +186,14 @@ impl RawVideoConfigTracker {
     }
 
     fn parameter<'a>(&self, nal_type: u8, bytes: &'a Bytes) -> Result<Option<Update<'a>>> {
-        if !matches!(
-            (self.codec, nal_type),
-            (Codec::Avc, 7 | 8) | (Codec::Hevc, 32..=34)
-        ) {
-            return Ok(None);
-        }
+        let kind = match (self.codec, nal_type) {
+            (Codec::Hevc, 32) => ParameterSet::HevcVps,
+            (Codec::Hevc, 33) => ParameterSet::HevcSps,
+            (Codec::Hevc, 34) => ParameterSet::HevcPps,
+            (Codec::Avc, 7) => ParameterSet::AvcSps,
+            (Codec::Avc, 8) => ParameterSet::AvcPps,
+            _ => return Ok(None),
+        };
         if bytes.len() > self.max_parameter_set_bytes {
             return Err(Error::Limit {
                 requested: bytes.len(),
@@ -189,17 +201,17 @@ impl RawVideoConfigTracker {
             });
         }
         let raw = &bytes[self.codec.minimum_header_bytes()..];
-        let update = match (self.codec, nal_type) {
-            (Codec::Hevc, 32) => Update::Vps(hevc::read_vps_id(raw)?, bytes),
-            (Codec::Hevc, 33) => {
+        let update = match kind {
+            ParameterSet::HevcVps => Update::Vps(hevc::read_vps_id(raw)?, bytes),
+            ParameterSet::HevcSps => {
                 let (id, info) = hevc::sps(raw)?;
                 Update::Sps(id, info, bytes)
             }
-            (Codec::Hevc, 34) => {
+            ParameterSet::HevcPps => {
                 let (id, sps) = hevc::read_pps_ids(raw)?;
                 Update::Pps(id, sps, bytes)
             }
-            (Codec::Avc, 7) => {
+            ParameterSet::AvcSps => {
                 let (id, raster, avc_timing) = avc::read_sps_timing(raw)?;
                 Update::Sps(
                     id,
@@ -212,11 +224,10 @@ impl RawVideoConfigTracker {
                     bytes,
                 )
             }
-            (Codec::Avc, 8) => {
+            ParameterSet::AvcPps => {
                 let (id, sps) = avc::read_pps_ids(raw)?;
                 Update::Pps(id, sps, bytes)
             }
-            _ => unreachable!("checked parameter-set type"),
         };
         Ok(Some(update))
     }
