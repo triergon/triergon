@@ -761,63 +761,6 @@
       "cause": "Run paired runtime and memory collections on the two isolated gate hosts."
     }
   ],
-  "pending_module_requirements": [
-    "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-  ],
-  "open_cases": [
-    {
-      "id": "cc-third-copy",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "cc-same-counter-changed-payload",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "cc-loss-clean-pusi",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "pcr-timeline-discontinuity",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "transport-partial-final-packet",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "transport-sync-loss",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "pes-finite-extra-payload",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "opcr-change-is-not-duplicate",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "finite-continuation-body-401",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "finite-continuation-body-408",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "finite-continuation-body-409",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "finite-continuation-body-414",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    },
-    {
-      "id": "finite-continuation-body-415",
-      "requirement": "Keep a complete PES the strict source view delivers when a later continuity change, PCR discontinuity, short or sync-less carrier, or payload past a finite PES's declared length ends an unframed AVC or HEVC run in Reader with VideoEofPolicy::ReportUnframed, instead of discarding the whole run."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "A legal duplicate transport packet carries no new payload",
@@ -841,23 +784,46 @@
     {
       "reading": "An excess copy of a transport packet inside an unframed run: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 allows at most two consecutive packets with one continuity_counter value; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the excess copy discards the run it interrupts; the later clean unit is published.",
-      "reference": "Observed rule: merges the copies and the clean unit into one opaque packet.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the excess copy ends the run: the complete PES before it are published as one opaque run, the PES it interrupts is discarded, and a later clean unit starts the next run.",
+      "reference": "Observed rule: merges the copies and a later clean unit into one opaque packet.",
       "compat": "compat::annex_b::ContinuityReader reports the run the reference demuxes as one packet (its ts-reader-container case passes)",
       "cases": [
+        "cc-third-copy",
         "third-middle-copy-then-clean"
       ]
     },
     {
       "reading": "An unframed run interrupted by a continuity-counter gap: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 defines continuity_counter per PID, so a gap means lost packets; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the interrupted run is not delivered; the next admitted run is.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the gap ends the run: the complete PES before it are published as one opaque run, the PES it interrupts is discarded, and the next admitted run is published by itself.",
       "reference": "Observed rule: returns the bytes across the gap as one opaque packet with the first run's clock and position.",
       "compat": "compat::annex_b::ContinuityReader reports the run the reference demuxes as one packet (its ts-reader-container case passes)",
       "cases": [
         "cc-loss-mid-pes",
+        "cc-loss-clean-pusi",
         "loss-then-clean-pusi",
         "loss-at-clean-pusi"
+      ]
+    },
+    {
+      "reading": "A carrier that repeats a continuity counter with other bytes inside an unframed run: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 lets a packet repeat the continuity_counter only as a duplicate, byte-identical apart from a valid PCR; changed payload or a changed OPCR under the repeated counter is not one; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier is a continuity fault that ends the run: the complete PES before it is published as one opaque run, and the PES the faulted carrier starts opens the next run.",
+      "reference": "Observed rule: joins both payloads into one opaque packet with the first run's clock and position.",
+      "compat": "compat::annex_b::ContinuityReader reports the run the reference demuxes as one packet (its ts-reader-container case passes)",
+      "cases": [
+        "cc-same-counter-changed-payload",
+        "opcr-change-is-not-duplicate"
+      ]
+    },
+    {
+      "reading": "An elementary run does not continue across a signalled change of time base",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5: discontinuity_indicator on the PCR PID announces a new system time base, which begins with the next PCR; a presentation time stamp coded before the discontinuity belongs to the old time base and does not apply to bytes after it.",
+      "candidate": "Publishes the opaque run before the discontinuity (27 bytes at PTS 90000) and the run after it (3 bytes at PTS 10) separately, each in its own clock epoch.",
+      "reference": "Joins both runs into one 30-byte opaque packet at PTS 90000.",
+      "compat": "compat::annex_b::ContinuityReader reports the run the reference demuxes as one packet (its ts-reader-container case passes)",
+      "cases": [
+        "pcr-timeline-discontinuity"
       ]
     },
     {
@@ -928,6 +894,20 @@
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-finite-truncated-eof passes) at the PES level; no option reproduces the parsed packet",
       "cases": [
         "pes-finite-truncated-eof"
+      ]
+    },
+    {
+      "reading": "Payload past the declared length of an opaque finite PES: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7: PES_packet_length gives the extent of the PES packet, and a carrier without payload_unit_start_indicator continues it past that extent; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the PES is delivered with the 400 bytes its PES_packet_length declares and the bytes past them are reported as a Pes fault and dropped; Reader publishes the 400 bytes as an opaque run before that fault.",
+      "reference": "Observed rule: publishes every carried byte, 401 to 415, as one opaque packet.",
+      "compat": "compat::opaque_video::OpaqueRecovery replays the entity and reports the run with the bytes past the declared length, as the reference does (the mpegts-access-units cases of these inputs pass)",
+      "cases": [
+        "finite-continuation-body-401",
+        "finite-continuation-body-408",
+        "finite-continuation-body-409",
+        "finite-continuation-body-414",
+        "finite-continuation-body-415"
       ]
     },
     {

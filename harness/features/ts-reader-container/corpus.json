@@ -1045,11 +1045,6 @@
         "packets": 3,
         "bytes": 28,
         "digest": 4920676914473364020
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
       }
     },
     {
@@ -1083,11 +1078,6 @@
         "packets": 3,
         "bytes": 28,
         "digest": 4920676914473364020
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
       }
     },
     {
@@ -2057,11 +2047,6 @@
         "packets": 3,
         "bytes": 28,
         "digest": 4920676914473364020
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
       }
     },
     {
@@ -3092,9 +3077,9 @@
         "digest": 4098183668182938678
       },
       "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
+        "packets": 3,
+        "bytes": 401,
+        "digest": 17857486222411750618
       }
     },
     {
@@ -3125,9 +3110,9 @@
         "digest": 3453068082783287634
       },
       "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
+        "packets": 3,
+        "bytes": 401,
+        "digest": 17857486222411750618
       }
     },
     {
@@ -3158,9 +3143,9 @@
         "digest": 17339141737385579966
       },
       "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
+        "packets": 3,
+        "bytes": 401,
+        "digest": 17857486222411750618
       }
     },
     {
@@ -3191,9 +3176,9 @@
         "digest": 12707294254874158380
       },
       "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
+        "packets": 3,
+        "bytes": 401,
+        "digest": 17857486222411750618
       }
     },
     {
@@ -3224,9 +3209,9 @@
         "digest": 8380382796008759396
       },
       "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7
+        "packets": 3,
+        "bytes": 401,
+        "digest": 17857486222411750618
       }
     },
     {
