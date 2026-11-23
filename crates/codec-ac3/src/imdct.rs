@@ -256,8 +256,9 @@ impl Imdct {
 
     /// 512-sample transform (blksw = 0). Writes 256 output samples and updates `delay`.
     pub(crate) fn long(&mut self, x: &[f32; 256], delay: &mut [f32; 256], out: &mut [f32]) {
-        #[expect(clippy::expect_used, reason = "a 256-sample range is 256 samples")]
-        let out: &mut [f32; 256] = (&mut out[..256]).try_into().expect("256 samples");
+        let Some(out) = out.first_chunk_mut::<256>() else {
+            return;
+        };
         let (c1, s1) = (&self.c1, &self.s1);
         // Pre-twiddle (step 2) as the transform reads its input.
         let z = |k: usize| {
