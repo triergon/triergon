@@ -2,13 +2,14 @@
 
 use super::RawVideoSource;
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::source::{Source, SourceOwner, SourceReply};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
     SourceCapabilities, SourceId, Step, WorkBudget, nonzero_prefix_len,
 };
 use triergon_framing::nal::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
 use triergon_playback::{
-    Format, Source, SourceOwner, SourceReply,
+    Format,
     probe::{CONTAINER_SIGNATURE_BYTES, SelectedInput, detect_container, detect_container_whole},
 };
 

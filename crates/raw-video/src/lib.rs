@@ -11,9 +11,9 @@
 )]
 
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Error, Result, SourceFailure, SourceLocation, Step, WorkBudget};
+use triergon_core::source::{Source, SourceOwner, SourceReply};
+use triergon_core::{Error, Result, SourceLocation, Step, WorkBudget};
 use triergon_framing::nal::{RawAccessUnit, RawAnnexBReader};
-use triergon_playback::{Source, SourceOwner, SourceReply};
 
 mod config;
 mod feed;
@@ -98,6 +98,9 @@ fn poll_source<S: Source>(
             Step::NeedInput(request) => request,
             step => return Ok(step),
         };
+        // Matched by value, not handed to `SourceReply::provide_to`: borrowing the reply
+        // changed the register allocation of the worker's inlined read loop (+0.15 to
+        // +0.23% of the instructions of raw Annex B input).
         match source.poll(&request, work, cancel)? {
             SourceReply::Pending => return Ok(Step::NeedInput(request)),
             SourceReply::Data(window) => {
@@ -113,10 +116,7 @@ fn poll_source<S: Source>(
                 failure,
             } => {
                 reader.fail(source, token, failure)?;
-                return Err(match failure {
-                    SourceFailure::Transport => Error::Transport,
-                    SourceFailure::Cancelled => Error::Cancelled,
-                });
+                return Err(failure.into());
             }
         }
     }

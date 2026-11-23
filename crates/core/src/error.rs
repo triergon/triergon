@@ -190,6 +190,17 @@ impl From<Backpressure> for Error {
     }
 }
 
+impl From<crate::SourceFailure> for Error {
+    /// The error every later read of a failed input returns.
+    #[inline]
+    fn from(failure: crate::SourceFailure) -> Self {
+        match failure {
+            crate::SourceFailure::Transport => Self::Transport,
+            crate::SourceFailure::Cancelled => Self::Cancelled,
+        }
+    }
+}
+
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         match value.kind() {

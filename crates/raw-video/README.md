@@ -1,8 +1,8 @@
 # triergon-raw-video
 
-Probes and reads raw AVC and HEVC Annex B over the
-[`triergon-playback`](../playback/README.md) source protocol, delivering access
-units with their active parameter sets and an optional submission clock.
+Probes and reads raw AVC and HEVC Annex B over the source protocol of
+`triergon_core::source`, delivering access units with their active parameter sets
+and an optional submission clock.
 
 | Area | Entry points |
 |---|---|

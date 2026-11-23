@@ -2,12 +2,12 @@
 //! as a [`Feed`] and keeps a bounded number in flight. A sink that accepts a feed owns
 //! it, and the output's storage, until it reports the feed's token complete; a full or
 //! failed sink hands the same feed back.
-use crate::source::Source;
 use crate::{
     Output, Player, Progress, Result, SeekIntent, Selection, TrackKey,
     mp4::{Mp4DemuxSeekCommand, Mp4SyncSeekCommand},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::source::Source;
 use triergon_core::{
     BudgetVec, Error, InputCursor, InputToken, SourceCapabilities, SourceId, Time, WorkBudget,
 };

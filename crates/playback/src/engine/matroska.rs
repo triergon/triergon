@@ -3,7 +3,10 @@
 use crate::{Result, SeekIntent, TrackKey};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{MediaKind, TrackInfo};
-use triergon_core::{Backpressure, Error, SourceId, Step, WorkBudget};
+use triergon_core::source::Provide;
+use triergon_core::{
+    Backpressure, Error, InputToken, InputWindow, SourceFailure, SourceId, Step, WorkBudget,
+};
 use triergon_matroska::{Event as MkvEvent, Reader};
 /// The Matroska reader as an engine: the engine of
 /// [`Engine::Matroska`](crate::Engine::Matroska).
@@ -39,5 +42,20 @@ impl MkvEngine {
                 .to_nanoseconds(triergon_core::Rounding::Floor)?,
         )?;
         Ok(())
+    }
+}
+
+impl Provide for MkvEngine {
+    #[inline]
+    fn provide(&mut self, window: &InputWindow) -> Result<()> {
+        self.reader.provide(window)
+    }
+    #[inline]
+    fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
+        self.reader.finish(source, token)
+    }
+    #[inline]
+    fn fail(&mut self, source: SourceId, token: InputToken, failure: SourceFailure) -> Result<()> {
+        self.reader.fail(source, token, failure)
     }
 }

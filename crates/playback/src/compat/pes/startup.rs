@@ -4,14 +4,12 @@
 use super::PidSelection;
 use crate::engine::ts::Binding;
 use crate::pes_feed::TsEngine;
-use crate::source::{Source, SourceReply};
 use crate::{
     Engine, Format, Player, PlayerPolicy, Result, Selection, SourceOwner, probe::SelectedInput,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{
-    BudgetVec, Error, InputCursor, InputRequest, InputWindow, SourceFailure, WorkBudget,
-};
+use triergon_core::source::{Source, SourceReply};
+use triergon_core::{BudgetVec, Error, InputCursor, InputRequest, InputWindow, WorkBudget};
 use triergon_mpegts::{
     PacketFormat, ParseLimits,
     clock::SourceTimePolicy,
@@ -138,10 +136,7 @@ impl<S: Source> Startup<S> {
                     failure,
                 } => {
                     input.fail(source, token, failure)?;
-                    return Err(match failure {
-                        SourceFailure::Cancelled => Error::Cancelled,
-                        SourceFailure::Transport => Error::Transport,
-                    });
+                    return Err(failure.into());
                 }
                 SourceReply::End { source, token } => {
                     input.finish(source, token)?;
@@ -180,10 +175,7 @@ impl<S: Source> Startup<S> {
                     failure,
                 } => {
                     input.fail(source, token, failure)?;
-                    return Err(match failure {
-                        SourceFailure::Cancelled => Error::Cancelled,
-                        SourceFailure::Transport => Error::Transport,
-                    });
+                    return Err(failure.into());
                 }
                 SourceReply::Data(window) => {
                     if window.source != input.source() {
@@ -273,10 +265,7 @@ impl PrefixRead {
                     failure,
                 } => {
                     input.fail(source, token, failure)?;
-                    return Err(match failure {
-                        SourceFailure::Cancelled => Error::Cancelled,
-                        SourceFailure::Transport => Error::Transport,
-                    });
+                    return Err(failure.into());
                 }
                 SourceReply::End { source, token } => {
                     if source != request.source {

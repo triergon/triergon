@@ -3,9 +3,9 @@
 
 use super::{RawVideoConfigTracker, RawVideoConfiguration, RawVideoSource, State as SourceState};
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::source::Source;
 use triergon_core::{Error, Result, Rounding, SourceLocation, Step, Time, WorkBudget};
 use triergon_framing::nal::RawAccessUnit;
-use triergon_playback::Source;
 
 /// Caller-supplied submission cadence in coded-picture order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

@@ -60,6 +60,7 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 | Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `TickScale`, `Rounding`, `round_ties_even_i32` |
 | Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `BytesView`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
+| Sources | module `source`: `Source` (a caller's transport, polled without blocking), `SourceReply` and `provide_to`, `Provide` (what takes replies: `InputCursor` or a reader), `SourceOwner`, `ByteSource` |
 | Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes and how to resolve ambiguous transport. |
 | Steps | `Step<T, B>`, `Backpressure` |
 | Blocking I/O | module `blocking`: `Blocking` drives a `ContainerReader` from a `std::io::Read` (and `Seek`) source, `Feed` supplies an `InputCursor`, `seekable_capabilities` |

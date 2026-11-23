@@ -165,7 +165,7 @@ opener as separate operations.
 
 | Area | Entry points |
 |---|---|
-| Source protocol | `Source`, `SourceReply` (`provide_to` an input), `ByteSource`, `SourceOwner` |
+| Source protocol | `triergon_core::source`, re-exported: `Source`, `SourceReply` (`provide_to` an input), `ByteSource`, `SourceOwner` |
 | Neutral views | `Packet` (`PacketInfo`, `demux_times`), `Track` (`TrackInfo`, `key`), `Engine::{track_count, track}`, `mp4::PreparedMp4::identify_tracks` |
 | Probe | `probe::Probe`: Matroska, MP4, TS188 and M2TS192 |
 | Matroska | `Engine::matroska` (an unstarted reader built with `Reader::new`, `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`), `Engine::matroska_reader`, `matroska::ReplayOutput` |

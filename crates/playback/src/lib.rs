@@ -17,7 +17,6 @@ pub mod pes_feed;
 mod player;
 pub mod probe;
 pub mod pump;
-mod source;
 
 pub use engine::{Engine, Track};
 pub(crate) use event::EngineStep;
@@ -26,7 +25,7 @@ pub use player::{
     ClockChoice, Delivery, Output, OutputScope, Player, PlayerPolicy, Progress, SeekIntent,
     Selection, State, TrackKey,
 };
-pub use source::{ByteSource, Source, SourceOwner, SourceReply};
+pub use triergon_core::source::{ByteSource, Source, SourceOwner, SourceReply};
 pub use triergon_core::{Error, Result};
 
 /// The most tracks an engine works with. An MP4 plan holds at most this many

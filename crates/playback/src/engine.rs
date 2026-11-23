@@ -10,7 +10,6 @@ use crate::engine::matroska::MkvEngine;
 use crate::engine::mp4::Mp4Engine;
 use crate::engine::ts::{Delivery as TsDelivery, Entities, TsEngine};
 use crate::event::EngineStep;
-use crate::source::SourceReply;
 use crate::{
     MAXIMUM_TRACKS, Result, SeekIntent, TrackKey,
     mp4::plan::{PlanTrack, PreparedMp4},
@@ -18,6 +17,7 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, ColourDescription, MediaKind, TrackId, TrackInfo};
+use triergon_core::source::SourceReply;
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget,
 };
@@ -360,28 +360,7 @@ impl Engine {
         match self {
             Self::Mp4(r) => reply.provide_to(&mut r.input),
             Self::Ts(r) => r.provide(reply),
-            Self::Matroska(r) => match reply {
-                SourceReply::Pending => Ok(false),
-                SourceReply::Data(w) => {
-                    r.reader.provide(w)?;
-                    Ok(!w.bytes().is_empty())
-                }
-                SourceReply::End { source, token } => {
-                    r.reader.finish(*source, token.clone())?;
-                    Ok(true)
-                }
-                SourceReply::Failed {
-                    source,
-                    token,
-                    failure,
-                } => {
-                    r.reader.fail(*source, token.clone(), *failure)?;
-                    Err(match failure {
-                        triergon_core::SourceFailure::Transport => Error::Transport,
-                        triergon_core::SourceFailure::Cancelled => Error::Cancelled,
-                    })
-                }
-            },
+            Self::Matroska(r) => reply.provide_to(r),
         }
     }
     /// Demuxes within `w`. Fails with `Invalid` for a compact progressive TS engine,

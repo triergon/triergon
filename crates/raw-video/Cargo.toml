@@ -1,7 +1,7 @@
 [package]
 name = "triergon-raw-video"
 version = "0.0.0"
-description = "Raw AVC and HEVC Annex B input over the playback source protocol: probe, source, configuration tracker and feed"
+description = "Raw AVC and HEVC Annex B input over the core source protocol: probe, source, configuration tracker and feed"
 repository.workspace = true
 license.workspace = true
 edition.workspace = true

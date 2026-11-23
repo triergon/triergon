@@ -1,6 +1,6 @@
-use crate::source::{Source, SourceReply};
-use crate::{Engine, EngineStep, Event, Result, SourceOwner};
+use crate::{Engine, EngineStep, Event, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::source::{Source, SourceOwner, SourceReply};
 use triergon_core::{Budget, BudgetVec, Error, InputRequest, Step, Time, TimeBase, WorkBudget};
 use triergon_isobmff::compat::mov::packets::PacketCursor;
 use triergon_mpegts::stream::TraceEvent;

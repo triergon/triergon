@@ -1,7 +1,8 @@
 //! Opens an MP4 movie over the source protocol: drives the ISO BMFF movie opener
 //! from a selected input, within work budgets.
-use crate::{Format, Result, Source, SourceOwner, probe::SelectedInput};
+use crate::{Format, Result, probe::SelectedInput};
 use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::source::{Source, SourceOwner};
 use triergon_core::{Error, InputCursor, WorkBudget};
 pub(crate) use triergon_isobmff::open::{
     CachedMedia, PendingMedia, RETAINED_MEDIA_BYTES, box_reader,

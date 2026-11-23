@@ -18,6 +18,7 @@ mod error;
 mod input;
 mod round;
 pub mod signature;
+pub mod source;
 mod time;
 mod wide;
 mod work;

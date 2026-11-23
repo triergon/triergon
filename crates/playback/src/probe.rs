@@ -1,15 +1,13 @@
 //! Container probing: [`Probe`] selects Matroska, MP4, TS188 or M2TS192 from a bounded
 //! prefix, and the selected input replays that prefix.
-use crate::{
-    Format, Result,
-    source::{Source, SourceOwner, SourceReply},
-};
+use crate::{Format, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::signature::{
     self, Container, Selection,
     TransportSync::{M2ts192, Ts188},
     TransportTie,
 };
+use triergon_core::source::{Source, SourceOwner, SourceReply};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities,
     SourceId, Step, WorkBudget,
