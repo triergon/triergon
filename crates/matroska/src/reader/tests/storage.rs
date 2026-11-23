@@ -232,6 +232,12 @@ fn reader_fields_keep_their_measured_offsets() {
     }
     let fields = layout![
         cluster_time,
+        failed,
+        recovery_audio,
+        state_coverage_contiguous,
+        state_seen,
+        webm_vp9_t35,
+        envelope,
         segment_end,
         scan_remaining,
         first_cluster,
@@ -240,17 +246,9 @@ fn reader_fields_keep_their_measured_offsets() {
         seek_targets,
         subtitle_recovery,
         replay_prefix,
-        seek_stage,
-        state,
         configuration,
-        envelope,
-        resolver,
-        epoch_reference,
-        pressure,
         catalogue,
         cues,
-        opening,
-        pending_seek,
         pool,
         limits,
         scale,
@@ -263,11 +261,13 @@ fn reader_fields_keep_their_measured_offsets() {
         state_coverage_end,
         owned_root,
         seek_index,
-        failed,
-        recovery_audio,
-        state_coverage_contiguous,
-        state_seen,
-        webm_vp9_t35,
+        opening,
+        pending_seek,
+        epoch_reference,
+        pressure,
+        resolver,
+        seek_stage,
+        state,
     ];
     let offsets = fields.map(|(_, offset)| offset);
     println!(
@@ -283,9 +283,9 @@ fn reader_fields_keep_their_measured_offsets() {
         (offsets, size_of::<Reader>()),
         (
             [
-                0, 16, 32, 48, 112, 240, 352, 464, 528, 576, 1040, 7792, 7824, 8392, 8912, 8952,
-                9024, 9096, 9136, 9160, 9184, 9192, 9296, 9304, 9312, 9320, 9328, 9336, 9344, 9352,
-                9360, 9384, 9392, 9393, 9394, 9395, 9396,
+                0, 16, 17, 18, 19, 20, 24, 592, 608, 624, 688, 816, 928, 1040, 1104, 1152, 1184,
+                1256, 1296, 1304, 1408, 1416, 1424, 1432, 1440, 1448, 1456, 1464, 1472, 1496, 1504,
+                1528, 1552, 1592, 1664, 2192, 2656,
             ],
             9408
         )
