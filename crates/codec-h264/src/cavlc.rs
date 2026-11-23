@@ -2,7 +2,7 @@
 //! spec tables in `tables_vlc` (Tables 9-5, 9-7, 9-8, 9-9, 9-10).
 
 use crate::tables_vlc::*;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_bitstream::BitReader;
 
 /// Two-level VLC lookup table. Entry: (symbol or subtable base, length or -subtable_bits).
@@ -92,8 +92,7 @@ fn cvt3(t: &[(u32, u8, u8)]) -> Vec<(u32, u8, u16)> {
 }
 
 pub(crate) fn tables() -> &'static CavlcTables {
-    static T: OnceLock<CavlcTables> = OnceLock::new();
-    T.get_or_init(|| {
+    static TABLES: LazyLock<CavlcTables> = LazyLock::new(|| {
         let ct = |t: &[(u32, u8, u8, u8)]| {
             let v: Vec<(u32, u8, u16)> = t
                 .iter()
@@ -112,7 +111,8 @@ pub(crate) fn tables() -> &'static CavlcTables {
             total_zeros: std::array::from_fn(|i| Vlc::build(&cvt3(TOTAL_ZEROS_4X4[i]), 6)),
             total_zeros_dc: std::array::from_fn(|i| Vlc::build(&cvt3(TOTAL_ZEROS_2X2[i]), 3)),
         }
-    })
+    });
+    &TABLES
 }
 
 /// run_before (Table 9-10): small direct table for zerosLeft <= 6, closed form for > 6.
