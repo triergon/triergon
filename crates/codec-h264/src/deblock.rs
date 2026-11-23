@@ -542,7 +542,7 @@ fn filter_luma(l: &mut Lanes, pr: &LineParams) -> bool {
 /// Luma filter of the lines flagged in `f` (8.7.2.3 and 8.7.2.4), in place: each lane reads
 /// only its own samples. Returns whether any sample changed.
 #[inline(always)]
-#[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+// The clamp assertion blocks vectorisation.
 fn filter_luma_lines(l: &mut Lanes, pr: &LineParams, f: &[i16; 16]) -> bool {
     let mut diff = [0u8; 16];
     for i in 0..16 {
@@ -611,7 +611,7 @@ fn filter_luma_lines(l: &mut Lanes, pr: &LineParams, f: &[i16; 16]) -> bool {
 /// and of Cr in lanes 8..16. Returns whether samples changed: bit 0 in Cb's lanes, bit 1 in
 /// Cr's.
 #[inline(never)]
-#[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+// The clamp assertion blocks vectorisation.
 fn filter_chroma(l: &mut Lanes, pr: &LineParams) -> u8 {
     let mut op = [0u8; 16];
     let mut oq = [0u8; 16];

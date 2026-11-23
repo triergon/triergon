@@ -142,7 +142,10 @@ impl Default for Decoder {
 impl Decoder {
     /// A decoder with its own pool of the default [`Limits`].
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit covers the pool itself"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 

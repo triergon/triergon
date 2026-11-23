@@ -92,7 +92,10 @@ pub(crate) fn luma_mc(
 /// Clip1((v + 16) >> 5) of a 6-tap intermediate; every first-stage intermediate (b1 / h1) lies
 /// in -2550 ..= 10710, so 16-bit lanes suffice.
 #[inline(always)]
-#[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+#[expect(
+    clippy::manual_clamp,
+    reason = "the clamp assertion blocks vectorisation"
+)]
 fn clip_h(v: i16) -> u8 {
     ((v + 16) >> 5).max(0).min(255) as u8
 }
@@ -438,7 +441,7 @@ struct Weighted<T> {
 
 impl<T: WLane> Combine for Weighted<T> {
     #[inline(always)]
-    #[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+    // The clamp assertion blocks vectorisation.
     fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]) {
         for x in 0..N {
             let r = (T::from(a[x]) * self.w0 + T::from(b[x]) * self.w1 + self.round) >> self.sh;

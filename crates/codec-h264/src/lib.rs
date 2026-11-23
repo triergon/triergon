@@ -203,7 +203,10 @@ pub struct Picture {
 
 /// Where the picture being decoded is kept until it is stored.
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // One per decoder, moved once per picture.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one per decoder, moved once per picture"
+)]
 enum Target {
     /// A frame or first field: the frame store it takes when it is finished.
     New(FrameStore),
@@ -422,7 +425,10 @@ impl Default for Decoder {
 impl Decoder {
     /// A decoder with its own pool of the default limit.
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit covers the pool itself"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 

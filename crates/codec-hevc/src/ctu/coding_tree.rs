@@ -472,8 +472,10 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 [cand_a, cand_b, third]
             };
             let mode = if prev[i] {
-                // Each call reads the next bypass bin (truncated unary, 9.3.3.2).
-                #[allow(clippy::same_functions_in_if_condition)]
+                #[expect(
+                    clippy::same_functions_in_if_condition,
+                    reason = "each call reads a fresh bypass bin (truncated unary, 9.3.3.2)"
+                )]
                 let idx = if self.cabac.bypass() == 0 {
                     0
                 } else if self.cabac.bypass() == 0 {

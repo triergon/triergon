@@ -192,7 +192,7 @@ impl core::ops::Deref for SharedFrame {
 
     #[inline]
     fn deref(&self) -> &AnyFrame {
-        #[allow(clippy::expect_used)] // Only `drop` takes the frame.
+        #[expect(clippy::expect_used, reason = "only drop takes the frame")]
         self.frame.as_ref().expect("frame present until dropped")
     }
 }
