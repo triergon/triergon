@@ -445,18 +445,18 @@ fn open_ended_packet_pressure_retries_all_declared_samples() {
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }
 #[test]
-fn open_ended_unknown_fragment_clock_stays_unknown() {
+fn open_ended_fragment_without_tfdt_continues_its_track_clock() {
     let raw = include_bytes!("../fixtures/open-ended/unknown-clock-terminal.mp4");
     let (mut p, _, _) = make(raw, None, true);
     let mut out = Vec::new();
     read(&mut p, &mut out).unwrap();
     check_fragment(&out, "pending-unknown-clock");
-    assert!(
-        packets(&out)
-            .iter()
-            .skip(6)
-            .all(|p| p.source.sample.dts_ticks.is_none())
-    );
+    let times: Vec<_> = packets(&out)
+        .iter()
+        .map(|p| (p.source.sample.dts_ticks, p.source.sample.cts_ticks))
+        .collect();
+    let expected: Vec<_> = (0..9).map(|n| (Some(n * 1000), Some(n * 1000))).collect();
+    assert_eq!(times, expected);
 }
 #[test]
 fn open_ended_empty_declared_samples_are_source_facts_before_end() {

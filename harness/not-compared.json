@@ -93,7 +93,7 @@
         "name": "neutral-views",
         "entry_points": ["DemuxTimes", "Track::key", "mp4::PreparedMp4::identify_tracks", "Engine::mp4_plan", "Engine::matroska_reader"],
         "degree": "step",
-        "needs": "Playback-source-view checks the neutral track keys, reader and prepared-plan accessors, and DemuxTimes. Three progressive MP4 cases remain open because an implicit fragment loses the decode origin of a known predecessor."
+        "needs": "Playback-source-view checks the neutral track keys, reader and prepared-plan accessors, and DemuxTimes. One progressive MP4 case remains open because the source view sorts one track's fragment samples by byte position."
       }
     ],
     "triergon-raster": [],

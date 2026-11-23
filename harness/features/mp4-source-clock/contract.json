@@ -110,18 +110,5 @@
       ],
       "cause": "the source-clock oracle has no equivalent runtime or memory comparator"
     }
-  ],
-  "pending_module_requirements": [
-    "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved."
-  ],
-  "open_cases": [
-    {
-      "id": "progressive-pending-unknown-clock",
-      "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved."
-    },
-    {
-      "id": "progressive-unknown-clock-terminal",
-      "requirement": "A subsequent fragment has no explicit tfdt. The ISO BMFF oracle continues the track decode clock from the preceding fragment end, while the source player leaves DTS and PTS unresolved."
-    }
   ]
 }

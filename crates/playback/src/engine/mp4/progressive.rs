@@ -469,6 +469,7 @@ impl ProgressiveState {
                 return Ok(EngineStep::Yield);
             }
             let end = cursor.cursor.index().implicit_data_end()?;
+            let decode_end = cursor.cursor.index().decode_end();
             let next = engine.plan.tracks.as_slice()[self.track]
                 .next_ordinal
                 .checked_add(cursor.cursor.index().sample_count())
@@ -501,9 +502,10 @@ impl ProgressiveState {
             self.cursor_tracks[slot] = self.track as u8;
             self.retained += 1;
             self.previous_traf = Some(end);
-            engine.plan.tracks.as_mut_slice()[self.track].next_ordinal = next;
+            let track = &mut engine.plan.tracks.as_mut_slice()[self.track];
+            track.next_ordinal = next;
+            track.decode_end = decode_end.and_then(|end| i64::try_from(end).ok());
             self.scan = None;
-            self.traf = None;
             return Ok(EngineStep::Yield);
         }
         if let Some(job) = self.builder.as_mut() {
@@ -547,9 +549,8 @@ impl ProgressiveState {
                             .ok_or(Error::Invalid("progressive fragment missing trex"))?;
                         let raw = self
                             .traf
-                            .as_ref()
-                            .ok_or(Error::Invalid("progressive traf"))?
-                            .clone();
+                            .take()
+                            .ok_or(Error::Invalid("progressive traf"))?;
                         let context = FragmentContext {
                             moof_start: self
                                 .moof
@@ -566,12 +567,15 @@ impl ProgressiveState {
                                 .map_err(|_| Error::Overflow)?,
                         };
                         self.track = at;
-                        self.builder = Some(FragmentBuilder::new(
+                        // Without `tfdt` the fragment starts where its track's indexed
+                        // samples end (ISO/IEC 14496-12 §8.8.12.1).
+                        self.builder = Some(FragmentBuilder::new_with_inherited_decode_end(
                             raw,
                             trex,
                             context,
                             engine.input.budget().clone(),
                             self.limits.format,
+                            track.decode_end.map(i128::from),
                         )?);
                     }
                 }

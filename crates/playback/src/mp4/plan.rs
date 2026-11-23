@@ -135,16 +135,23 @@ pub struct Mp4Configuration {
 }
 /// One track of a plan.
 #[derive(Debug)]
+// The compiler's order, held by `repr(C)`; the decode end takes the bytes the boxed
+// identity leaves, so that no other field moves.
+#[repr(C)]
 pub struct PlanTrack {
+    edits: Option<EditList>,
+    pub(crate) descriptions: BudgetVec<SampleDescription>,
     pub(crate) trex: Option<iso::fragment::Trex>,
-    pub(crate) next_ordinal: u64,
-    pub(crate) fragment_aac_trim: u32,
     /// The track's metadata.
     pub snapshot: TrackSnapshot,
-    pub(crate) descriptions: BudgetVec<SampleDescription>,
-    edits: Option<EditList>,
+    pub(crate) next_ordinal: u64,
     /// What [`PreparedMp4::identify_tracks`] read of the first sample entry.
-    identity: Option<Charged<Box<EntryConfiguration>>>,
+    identity: Option<Box<Charged<EntryConfiguration>>>,
+    /// The decode time just after the last indexed sample, in media ticks, where a
+    /// later fragment of a forward source without `tfdt` starts; `None` when unknown,
+    /// beyond `i64`, or for a track without fragment defaults or a source read whole.
+    pub(crate) decode_end: Option<i64>,
+    pub(crate) fragment_aac_trim: u32,
 }
 impl PlanTrack {
     fn first_description(&self) -> Option<&SampleDescription> {
@@ -299,7 +306,11 @@ impl PreparedMp4 {
                     limits,
                     iso::Limits::default(),
                 );
-                track.identity.insert(Charged::boxed(&self.pool, identity)?)
+                track.identity.insert(Box::new(Charged::try_new(
+                    &self.pool,
+                    size_of::<EntryConfiguration>(),
+                    || identity,
+                )?))
             };
             if identity.poll(work)? == BuildStatus::Yield {
                 return Ok(false);
@@ -889,16 +900,26 @@ impl<'a> Mp4IndexJob<'a> {
                         ),
                     )
                 };
+                let trex = self
+                    .movie
+                    .trex()
+                    .iter()
+                    .find(|x| x.track_id == t.header().track_id)
+                    .copied();
                 push(
                     &mut p.tracks,
                     PlanTrack {
-                        trex: self
-                            .movie
-                            .trex()
-                            .iter()
-                            .find(|x| x.track_id == t.header().track_id)
-                            .copied(),
+                        trex,
                         next_ordinal: t.next_ordinal(),
+                        decode_end: if trex.is_some()
+                            && matches!(
+                                self.movie.read_scope(),
+                                crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+                            ) {
+                            t.decode_end()?.and_then(|end| i64::try_from(end).ok())
+                        } else {
+                            None
+                        },
                         fragment_aac_trim: 0,
                         snapshot: TrackSnapshot(Arc::new(TrackMetadata {
                             track_id: h.track_id,

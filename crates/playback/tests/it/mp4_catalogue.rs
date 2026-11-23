@@ -316,13 +316,8 @@ fn check_outputs_with_roots(
                 assert_eq!(p.source.sample.description_index, wanted.description);
                 assert_eq!(p.source.sample.duration_ticks, wanted.delta);
                 assert_eq!(p.source.sample.is_container_sync(), wanted.sync);
-                if proof.is_some() && case.name == "f-no-second-tfdt" && wanted.ordinal > 3 {
-                    assert_eq!(p.source.sample.dts_ticks, None);
-                    assert_eq!(p.source.sample.cts_ticks, None);
-                } else {
-                    assert_eq!(p.source.sample.dts_ticks, Some(wanted.dts));
-                    assert_eq!(p.source.sample.cts_ticks, Some(wanted.cts));
-                }
+                assert_eq!(p.source.sample.dts_ticks, Some(wanted.dts));
+                assert_eq!(p.source.sample.cts_ticks, Some(wanted.cts));
                 assert_eq!(
                     configs.get(&p.configuration.track.track_id),
                     Some(&(wanted.description, p.configuration.revision)),
@@ -1002,7 +997,7 @@ fn catalogue_replacement_selects_native_terminal_and_waits_for_source_end() {
 }
 
 #[test]
-fn catalogue_progressive_replacement_keeps_future_batches_and_unknown_clocks() {
+fn catalogue_progressive_replacement_keeps_future_batches_and_continued_clocks() {
     let b = Budget::new(64 << 20).unwrap();
     let (mut p, old) = player(&b, SourceId(9501), &gold::CASES[0], PlayerPolicy::default());
     let case = &gold::CASES[9]; // independently authored absent-second-tfdt facts
@@ -1027,8 +1022,9 @@ fn catalogue_progressive_replacement_keeps_future_batches_and_unknown_clocks() {
                     Some(packet),
                 _ => None,
             })
-            .all(|packet| packet.source.sample.dts_ticks.is_none()
-                && packet.source.sample.cts_ticks.is_none()
+            .all(|packet| packet.source.sample.dts_ticks
+                == Some(i128::from(packet.source.sample.ordinal - 1) * 1000)
+                && packet.source.sample.cts_ticks == packet.source.sample.dts_ticks
                 && packet.occurrence.is_none())
     );
     once(&old);

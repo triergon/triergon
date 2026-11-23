@@ -500,6 +500,16 @@ impl MovieTrack {
     pub fn next_ordinal(&self) -> u64 {
         self.next_ordinal
     }
+    /// Decode time just after the last regular or fragment sample, in media ticks: where
+    /// a following fragment without `tfdt` starts (ISO/IEC 14496-12 §8.8.12.1). The last
+    /// fragment's end, `None` when its times are unknown, or else the `stts` total, zero
+    /// for an empty table. `Error::Overflow` when that total does not fit.
+    pub fn decode_end(&self) -> Result<Option<i128>> {
+        match self.fragments().last() {
+            Some(fragment) => Ok(fragment.decode_end()),
+            None => self.table.decode_end().map(Some),
+        }
+    }
 }
 /// What one [`MovieOpen::advance`] did.
 #[derive(Debug)]
@@ -1080,12 +1090,7 @@ impl MovieOpen {
                     } else {
                         FragmentBuilder::new_with_inherited_decode_end
                     };
-                    // Without `tfdt` a fragment starts where the track's preceding
-                    // samples end: its last fragment, or the `moov` table.
-                    let inherited = match t.fragments().last() {
-                        Some(previous) => previous.decode_end(),
-                        None => Some(t.table.decode_end()?),
-                    };
+                    let inherited = t.decode_end()?;
                     walk.traf = TrafStage::Build {
                         track,
                         builder: build(

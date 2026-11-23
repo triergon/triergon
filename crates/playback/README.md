@@ -107,8 +107,8 @@ packet: `Packet::demux_times`, `Event::demux_pts`. `Player::set_clock_view` choo
 which of the two times delivery and seeking (`ClockChoice::Source`, the default,
 or `ClockChoice::Demux`). MP4 packets carry demux times only on a plan indexed by
 `compat::mov`; TS tracks only when selected through `compat::pes`.
-Forward MP4 leaves source timestamps absent until the track's decode origin is
-known. A truncated fragment sample ends source delivery with a data refusal after
+A forward MP4 fragment without `tfdt` starts where its track's indexed samples end,
+so source timestamps continue across fragments. A truncated fragment sample ends source delivery with a data refusal after
 the complete samples.
 
 **Seeking.** `Player::seek_and_select` seeks to a time on a video track: Matroska

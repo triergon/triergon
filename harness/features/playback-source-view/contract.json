@@ -475,22 +475,9 @@
     }
   ],
   "pending_module_requirements": [
-    "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit.",
     "The progressive MP4 source view sorts one track's fragment samples by byte position when a later fragment's data precedes an earlier one's in the media, so it delivers decode times 6000 to 8000 before 3000 to 5000. Packets must keep per-track decode order (ISO/IEC 14496-12 sections 8.8.4.1 and 8.8.8)."
   ],
   "open_cases": [
-    {
-      "id": "mp4-forward-progressive-pending-unknown-clock",
-      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
-    },
-    {
-      "id": "mp4-forward-progressive-f-no-second-tfdt",
-      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
-    },
-    {
-      "id": "mp4-forward-progressive-unknown-clock-terminal",
-      "requirement": "The source clock oracle identifies missing decode-time inheritance in the progressive reader under ISO/IEC 14496-12 sections 8.6.1.2 and 8.8.12.1. The fix must retain each track\u2019s proved decode end across fragment batches within the playback instruction limit."
-    },
     {
       "id": "mp4-forward-progressive-pending-reverse-ranges",
       "requirement": "The progressive MP4 source view sorts one track's fragment samples by byte position when a later fragment's data precedes an earlier one's in the media, so it delivers decode times 6000 to 8000 before 3000 to 5000. Packets must keep per-track decode order (ISO/IEC 14496-12 sections 8.8.4.1 and 8.8.8)."

@@ -277,23 +277,18 @@ fn native_progressive_pending_forward_corpus_preserves_complete_ordered_objects(
     }
 }
 #[test]
-fn native_terminal_unknown_source_clocks_and_literal_origin_chain_are_retained() {
+fn native_terminal_fragment_without_tfdt_continues_the_source_clock() {
     let c = gold::case("open-ended--unknown-clock-terminal");
     let (mut p, _b, _s) = make(c.raw, false, 7, 1, true);
     let out = collect(&mut p, 1).unwrap();
     check(&out, c);
     for (at, p) in packets(&out).iter().enumerate() {
-        if at >= 6 {
-            assert_eq!(p.source.sample.dts_ticks, None);
-            assert_eq!(p.source.sample.cts_ticks, None);
-            let ClockOrigin::PredecessorEnd(origin) = p.occurrence.as_ref().unwrap().clock_origin
-            else {
-                panic!("derived demux clock origin required")
-            };
-            assert_eq!(origin.predecessor_sample, at as u64);
-            assert_eq!(origin.derived_dts_ticks, at as i128 * 1000);
-            assert_eq!(origin.predecessor_source_dts_known, at == 6);
-        }
+        assert_eq!(p.source.sample.dts_ticks, Some(at as i128 * 1000));
+        assert_eq!(p.source.sample.cts_ticks, Some(at as i128 * 1000));
+        assert!(matches!(
+            p.occurrence.as_ref().unwrap().clock_origin,
+            ClockOrigin::SourceClock
+        ));
     }
 }
 #[test]
