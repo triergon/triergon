@@ -286,7 +286,7 @@ impl<S: Source> TsProgressiveReader<S> {
         }
         Ok(Self {
             transport: Some(Transport {
-                engine: TsEngine::progressive(input, limits.transport, true)?,
+                engine: TsEngine::progressive(input, limits.transport)?,
                 request: None,
                 pending: None,
                 source,
@@ -483,7 +483,8 @@ impl<S: Source> TsProgressiveReader<S> {
         Ok(())
     }
 
-    /// Owned payloads come only from an engine built without compact payloads.
+    /// Owned payloads come from tracks of a carriage without compact payloads, such
+    /// as private audio.
     #[cold]
     fn on_owned_packet(
         &mut self,
@@ -788,7 +789,7 @@ mod tests {
         };
         let error = Error::Unsupported("test carriage");
         let mut transport = Transport {
-            engine: TsEngine::progressive(input, ParseLimits::default(), true).unwrap(),
+            engine: TsEngine::progressive(input, ParseLimits::default()).unwrap(),
             request: None,
             pending: Some(FeedStep::Refusal {
                 track,
@@ -907,7 +908,7 @@ mod tests {
             )
             .unwrap();
             Transport {
-                engine: TsEngine::progressive(input, ParseLimits::default(), true).unwrap(),
+                engine: TsEngine::progressive(input, ParseLimits::default()).unwrap(),
                 request: None,
                 pending: None,
                 source: SourceOwner::new(Waiting(seen.clone())),
@@ -1036,13 +1037,8 @@ mod tests {
     }
 
     #[test]
-    fn compact_payloads_preserve_every_output_work_boundary_and_retained_charge() {
-        fn read(
-            compact: bool,
-            quantum: u64,
-            window: usize,
-            private_audio: bool,
-        ) -> Vec<(String, Vec<u8>, u64, usize)> {
+    fn every_retained_charge_returns_once_the_reader_and_its_units_drop() {
+        fn read(quantum: u64, window: usize, private_audio: bool) {
             let pool = Budget::new(8 << 20).unwrap();
             let mut wire =
                 include_bytes!("../../playback/tests/fixtures/hls/baseline-stereo.ts").to_vec();
@@ -1068,76 +1064,39 @@ mod tests {
             let input = InputCursor::new(&pool, id, caps, window).unwrap();
             let limits = TsProgressiveLimits::default();
             let mut reader = TsProgressiveReader::new(input, source, limits).unwrap();
-            if !compact {
-                let input = InputCursor::new(&pool, id, caps, window).unwrap();
-                reader.transport.as_mut().unwrap().engine =
-                    TsEngine::progressive(input, limits.transport, false).unwrap();
-            }
             let cancel = AtomicBool::new(false);
-            let mut trace = Vec::new();
             let mut retained = Vec::new();
             for _ in 0..2_000_000 {
                 let mut work = WorkBudget::new(quantum);
-                let step = match reader.advance(&mut work, &cancel) {
-                    Ok(step) => step,
-                    Err(error) => {
-                        assert!(private_audio);
-                        trace.push((
-                            format!("error {error:?}"),
-                            Vec::new(),
-                            work.spent(),
-                            pool.used(),
-                        ));
-                        drop(reader);
-                        drop(retained);
-                        assert_eq!(pool.used(), Budget::control_storage_bytes());
-                        return trace;
-                    }
-                };
-                let (tag, bytes) = match step {
-                    TsProgressiveStep::Unit(unit) => {
-                        let result = match &unit {
-                            TsProgressiveUnit::Video(video) => (
-                                format!("video {:?} {:?} {}", video.clock, video.raster, video.idr),
-                                video.feed_spans().flatten().copied().collect(),
-                            ),
-                            TsProgressiveUnit::Audio {
-                                frame,
-                                presentation,
-                            } => (
-                                format!(
-                                    "audio {:?} {:?} {:?} {:?} {presentation:?}",
-                                    frame.header, frame.pts, frame.dts, frame.duration
-                                ),
-                                frame.bytes.as_ref().to_vec(),
-                            ),
-                        };
+                let ended = match reader.advance(&mut work, &cancel) {
+                    Ok(TsProgressiveStep::Unit(unit)) => {
                         retained.push(unit);
-                        result
+                        false
                     }
-                    TsProgressiveStep::Yield => ("yield".into(), Vec::new()),
-                    TsProgressiveStep::End => {
+                    Ok(TsProgressiveStep::Yield) => false,
+                    Ok(TsProgressiveStep::End) => {
                         assert!(!private_audio);
-                        trace.push(("end".into(), Vec::new(), work.spent(), pool.used()));
-                        drop(reader);
-                        drop(retained);
-                        assert_eq!(pool.used(), Budget::control_storage_bytes());
-                        return trace;
+                        true
                     }
-                    other => panic!("unexpected {other:?}"),
+                    Ok(other) => panic!("unexpected {other:?}"),
+                    Err(_) => {
+                        assert!(private_audio);
+                        true
+                    }
                 };
-                trace.push((tag, bytes, work.spent(), pool.used()));
+                if ended {
+                    drop(reader);
+                    drop(retained);
+                    assert_eq!(pool.used(), Budget::control_storage_bytes());
+                    return;
+                }
             }
             panic!("progressive input did not complete");
         }
         for quantum in [1, 31, 4096] {
             for window in [188, 4096] {
                 for private_audio in [false, true] {
-                    assert_eq!(
-                        read(false, quantum, window, private_audio),
-                        read(true, quantum, window, private_audio),
-                        "work {quantum}, window {window}"
-                    );
+                    read(quantum, window, private_audio);
                 }
             }
         }

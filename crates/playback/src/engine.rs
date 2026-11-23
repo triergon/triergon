@@ -391,7 +391,7 @@ impl Engine {
             Self::Matroska(r) => Ok(EngineStep::from_matroska(r.step(w, c)?)),
             Self::Mp4(r) => r.poll(w, c, None),
             Self::Ts(r) => {
-                if r.delivery == TsDelivery::CompactProgressive {
+                if r.delivery == TsDelivery::Progressive {
                     return Err(Error::Invalid("compact TS payload polling required"));
                 }
                 r.poll::<EngineStep>(w, c)

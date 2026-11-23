@@ -586,7 +586,7 @@ fn progressive(input: InputCursor, read: &ReadBody<'_>, view: View, trace: bool)
 
 fn compact(input: InputCursor, read: &ReadBody<'_>, trace: bool) -> Result<Totals> {
     let pool = input.budget().clone();
-    let mut engine = TsEngine::progressive(input, ParseLimits::default(), true)?;
+    let mut engine = TsEngine::progressive(input, ParseLimits::default())?;
     let (mut avc, mut aac) = (None, None);
     let (mut pictures, mut frames) = (BudgetVec::new(&pool), BudgetVec::new(&pool));
     loop {

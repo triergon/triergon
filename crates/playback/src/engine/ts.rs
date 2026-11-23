@@ -28,10 +28,9 @@ use ts::transport::pid;
 pub(crate) enum Delivery {
     /// Source events, plus demux PES of the tracks found in the segment's own PMT.
     Segment = 0,
-    /// Demux PES only, owned payloads, to a progressive reader.
-    Progressive = 1,
-    /// Demux PES only, compact payloads, to a progressive reader.
-    CompactProgressive = 2,
+    /// Demux PES only, to a progressive reader: compact payloads of the registered
+    /// carriages, owned payloads of the others.
+    Progressive = 2,
     /// Demux PES only, to an AVC and AAC segment reader.
     AvcAacFeed = 3,
     /// Demux PES only, to a media segment reader (HLS audio carriage rules).
@@ -50,16 +49,13 @@ impl Delivery {
     /// Whether a progressive reader takes the PES.
     #[inline]
     pub(crate) const fn is_progressive(self) -> bool {
-        matches!(self, Self::Progressive | Self::CompactProgressive)
+        matches!(self, Self::Progressive)
     }
 
     /// Whether only the PES feed is delivered, not the source events.
     #[inline]
     pub(crate) const fn is_feed(self) -> bool {
-        matches!(
-            self,
-            Self::Progressive | Self::CompactProgressive | Self::AvcAacFeed | Self::MediaFeed
-        )
+        matches!(self, Self::Progressive | Self::AvcAacFeed | Self::MediaFeed)
     }
 }
 
@@ -388,20 +384,16 @@ impl TsEngine {
         })
     }
 
-    /// A progressive PES feed of a single-program TS188 source: AVC and AAC
-    /// tracks found in its PMT, delivered as owned or, with `compact`, compact
+    /// A progressive PES feed of a single-program TS188 source: the PES of the tracks
+    /// found in its PMT, those of a registered carriage (AVC, HEVC, AAC) as compact
     /// payloads. Poll it with [`Self::poll_progressive_payload`].
-    pub fn progressive(input: InputCursor, limits: ts::ParseLimits, compact: bool) -> Result<Self> {
+    pub fn progressive(input: InputCursor, limits: ts::ParseLimits) -> Result<Self> {
         Self::segment(
             input,
             limits,
             SourceTimePolicy::Unanchored,
             DescriptorNamespace::Unspecified,
-            if compact {
-                Delivery::CompactProgressive
-            } else {
-                Delivery::Progressive
-            },
+            Delivery::Progressive,
         )
     }
 

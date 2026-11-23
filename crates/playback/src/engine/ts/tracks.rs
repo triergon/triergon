@@ -206,9 +206,7 @@ impl TsEngine {
             ),
             Carriage::AudioFromPmt => Err(mismatch),
         }?;
-        if self.delivery == Delivery::CompactProgressive
-            && matches!(carriage, Carriage::Registered(_))
-        {
+        if self.delivery == Delivery::Progressive && matches!(carriage, Carriage::Registered(_)) {
             observer.enable_compact_payloads()?;
         }
         Ok((observer, carriage))
