@@ -706,35 +706,7 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     } else {
         Vui::default()
     };
-    if r.flag()? {
-        let range = r.flag()?;
-        let _multilayer = r.flag()?;
-        let _3d = r.flag()?;
-        let scc = r.flag()?;
-        let _ext4 = r.read(4)?;
-        if range {
-            let names = [
-                "transform_skip_rotation_enabled_flag (RExt)",
-                "transform_skip_context_enabled_flag (RExt)",
-                "implicit_rdpcm_enabled_flag (RExt)",
-                "explicit_rdpcm_enabled_flag (RExt)",
-                "extended_precision_processing_flag (RExt)",
-                "intra_smoothing_disabled_flag (RExt)",
-                "high_precision_offsets_enabled_flag (RExt)",
-                "persistent_rice_adaptation_enabled_flag (RExt)",
-                "cabac_bypass_alignment_enabled_flag (RExt)",
-            ];
-            for name in names {
-                if r.flag()? {
-                    return Err(DecodeError::Unsupported(name));
-                }
-            }
-        }
-        if scc {
-            return Err(DecodeError::Unsupported("sps_scc_extension (SCC)"));
-        }
-        // Multilayer / 3D extensions only constrain non-base layers; ignored for the base layer.
-    }
+    parse_sps_extensions(&mut r)?;
     let ctb_size = 1 << log2_ctb;
     let pic_w_ctb = width.div_ceil(ctb_size);
     let pic_h_ctb = height.div_ceil(ctb_size);
@@ -789,6 +761,40 @@ pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         pic_w_ctb,
         pic_h_ctb,
     })
+}
+
+/// SPS range and screen-content extensions (7.3.2.2).
+fn parse_sps_extensions(r: &mut BitCursor<'_>) -> Result<()> {
+    if r.flag()? {
+        let range = r.flag()?;
+        let _multilayer = r.flag()?;
+        let _3d = r.flag()?;
+        let scc = r.flag()?;
+        let _ext4 = r.read(4)?;
+        if range {
+            let names = [
+                "transform_skip_rotation_enabled_flag (RExt)",
+                "transform_skip_context_enabled_flag (RExt)",
+                "implicit_rdpcm_enabled_flag (RExt)",
+                "explicit_rdpcm_enabled_flag (RExt)",
+                "extended_precision_processing_flag (RExt)",
+                "intra_smoothing_disabled_flag (RExt)",
+                "high_precision_offsets_enabled_flag (RExt)",
+                "persistent_rice_adaptation_enabled_flag (RExt)",
+                "cabac_bypass_alignment_enabled_flag (RExt)",
+            ];
+            for name in names {
+                if r.flag()? {
+                    return Err(DecodeError::Unsupported(name));
+                }
+            }
+        }
+        if scc {
+            return Err(DecodeError::Unsupported("sps_scc_extension (SCC)"));
+        }
+        // Multilayer / 3D extensions only constrain non-base layers; ignored for the base layer.
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
