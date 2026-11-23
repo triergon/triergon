@@ -296,70 +296,47 @@ impl Staged {
             Self::Laced(packets) => packets.len(),
         }
     }
-    /// Resolve every fallible capacity requirement before the ready-frame owner
-    /// is moved. Normal batches already reserved the complete lace count.
+    /// Keep the complete packet on any capacity rejection.
     #[inline(always)]
-    fn prepare(&mut self) -> Result<()> {
+    fn push(
+        &mut self,
+        packet: Packet,
+    ) -> std::result::Result<(), triergon_core::Refused<Option<Packet>>> {
         match self {
             Self::Single(slot) => {
                 if slot.is_some() {
-                    return Err(Error::Invalid("single packet already staged"));
+                    return Err(triergon_core::Refused {
+                        value: Some(packet),
+                        error: Error::Invalid("single packet already staged"),
+                    });
                 }
-            }
-            Self::Laced(packets) => {
-                if packets.len() == packets.capacity() {
-                    packets.try_reserve_exact(1)?;
-                }
-            }
-        }
-        Ok(())
-    }
-    /// Keep ownership at the caller on any rejection. No allocation can occur
-    /// after prepare succeeds, but the core owned-error value also makes the
-    /// commit retry-safe if that invariant ever changes.
-    #[inline(always)]
-    fn push(&mut self, packet: &mut Option<Packet>) -> Result<()> {
-        if packet.is_none() {
-            return Err(Error::Invalid("missing staged packet"));
-        }
-        match self {
-            Self::Single(slot) => {
-                if slot.is_some() {
-                    return Err(Error::Invalid("single packet already staged"));
-                }
-                *slot = packet.take();
+                *slot = Some(packet);
                 Ok(())
             }
-            Self::Laced(packets) => match packets.try_push(packet.take()) {
-                Ok(()) => Ok(()),
-                Err(error) => {
-                    *packet = error.value;
-                    Err(error.error)
-                }
-            },
+            Self::Laced(packets) => packets.try_push(Some(packet)),
         }
     }
+
     fn peek(&self, index: usize) -> Result<&Packet> {
-        let slot = match self {
-            Self::Single(slot) if index == 0 => slot,
-            Self::Single(_) => return Err(Error::Invalid("missing staged packet")),
-            Self::Laced(packets) => packets
-                .as_slice()
-                .get(index)
-                .required("missing staged packet")?,
+        let slots = match self {
+            Self::Single(slot) => std::slice::from_ref(slot),
+            Self::Laced(packets) => packets.as_slice(),
         };
-        slot.as_ref().required("missing staged packet")
+        slots
+            .get(index)
+            .and_then(Option::as_ref)
+            .required("missing staged packet")
     }
+
     fn take(&mut self, index: usize) -> Result<Packet> {
-        let slot = match self {
-            Self::Single(slot) if index == 0 => slot,
-            Self::Single(_) => return Err(Error::Invalid("missing staged packet")),
-            Self::Laced(packets) => packets
-                .as_mut_slice()
-                .get_mut(index)
-                .required("missing staged packet")?,
+        let slots = match self {
+            Self::Single(slot) => std::slice::from_mut(slot),
+            Self::Laced(packets) => packets.as_mut_slice(),
         };
-        slot.take().required("missing staged packet")
+        slots
+            .get_mut(index)
+            .and_then(Option::take)
+            .required("missing staged packet")
     }
 }
 /// A job that must finish before the block's own steps continue: the BlockGroup's
@@ -805,18 +782,14 @@ impl PacketBatchJob {
                             },
                             self.discard,
                         )?;
-                        self.staged.prepare()?;
-                        // Timing, limits and capacity are now validated. Consume
-                        // the handle without an Arc clone/drop pair.
                         let storage = std::mem::take(&mut self.ready);
                         let range = 0..storage.len();
-                        let mut packet = Some(fields.finish(PacketData { storage, range }));
-                        if let Err(error) = self.staged.push(&mut packet) {
-                            // A core rejection returns the exact uncommitted value;
-                            // keep the same restored owner pending for retry.
-                            self.ready = packet
+                        let packet = fields.finish(PacketData { storage, range });
+                        if let Err(rejected) = self.staged.push(packet) {
+                            self.ready = rejected
+                                .value
                                 .map_or_else(SharedBytes::default, |packet| packet.data.storage);
-                            return Err(error);
+                            return Err(rejected.error);
                         }
                         self.decoded_capacity = capacity;
                         self.frame += 1;
