@@ -213,22 +213,21 @@ impl CaptionBridge {
             if let Some(cue) = self.next_line()? {
                 return Ok(CaptionStep::Cue(cue));
             }
-            if let Some(pending) = &mut self.pending {
-                let size = pending.unit.data.len() as u64;
-                pending.paid += work.take(size - pending.paid);
-                if pending.paid < size {
+            if let Some(Pending { unit, paid }) = &mut self.pending {
+                let size = unit.data.len() as u64;
+                *paid += work.take(size - *paid);
+                if *paid < size {
                     return Ok(CaptionStep::Yield);
                 }
-                let Some(Pending { unit, .. }) = self.pending.take() else {
-                    unreachable!("pending packet")
-                };
                 let packet = VideoPacket {
                     data: &unit.data,
                     pts: unit.pts,
                     dts: unit.dts,
                     duration: unit.duration,
                 };
-                self.extractor.push(packet, &mut WorkBudget::new(size))?;
+                let pushed = self.extractor.push(packet, &mut WorkBudget::new(size));
+                self.pending = None;
+                pushed?;
                 continue;
             }
             match self.decode_next(work)? {

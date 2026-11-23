@@ -659,7 +659,7 @@ impl<M> DvdReceiver<M> {
             self.finished = true;
             return Err(Error::Cancelled);
         }
-        let Some(packet) = &self.packet else {
+        let Some(packet) = self.packet.take() else {
             return Ok(if self.finished {
                 DvdReceiverStep::Finished
             } else {
@@ -673,7 +673,10 @@ impl<M> DvdReceiver<M> {
         };
         self.yielded = matches!(status, Ok(compat::dvd::Status::Yield));
         let picture = match status {
-            Ok(compat::dvd::Status::Yield) => return Ok(DvdReceiverStep::Yield),
+            Ok(compat::dvd::Status::Yield) => {
+                self.packet = Some(packet);
+                return Ok(DvdReceiverStep::Yield);
+            }
             Ok(compat::dvd::Status::Nothing) => None,
             Ok(compat::dvd::Status::Subtitle(subtitle)) => match DvdPicture::copy(
                 &self.pool,
@@ -684,20 +687,17 @@ impl<M> DvdReceiver<M> {
             ) {
                 Ok(picture) => Some(picture),
                 Err(error) => {
+                    self.packet = Some(packet);
                     self.decoder.rewind()?;
                     return Err(error);
                 }
             },
-            Err(error @ Error::Backpressure { .. }) => return Err(error),
-            Err(error) => {
-                self.packet = None;
+            Err(error @ Error::Backpressure { .. }) => {
+                self.packet = Some(packet);
                 return Err(error);
             }
+            Err(error) => return Err(error),
         };
-        let packet = self
-            .packet
-            .take()
-            .ok_or(Error::Invalid("DVD packet absent"))?;
         Ok(DvdReceiverStep::Output(DvdOutput {
             packet,
             picture,
