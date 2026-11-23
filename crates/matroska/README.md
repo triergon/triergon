@@ -180,6 +180,15 @@ subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering va
 exact `f64`. Zero-length numbers take the schema default. Duplicates, bad widths,
 non-finite values, negative luminance and chromaticity outside [0, 1] fail.
 
+**Block addition mappings.** `TrackExtensions` reports MaxBlockAdditionID and each
+BlockAdditionMapping as written. A mapping field the reader does not need to read blocks
+is not judged: a BlockAddIDValue below 2 (RFC 9559 §5.1.4.1.17.1 allows 2 and above) is
+reported and describes no BlockAddID, and BlockAddIDExtraData is the BlockAddIDType's
+private data (§5.1.4.1.17.4), however short for that type. Neither RFC 9559 nor
+RFC 8794 tells a reader to refuse a value outside its range. What blocks depend on still
+fails the input: a BlockAddID above the track's MaxBlockAdditionID, a repeated mapping
+child and malformed EBML.
+
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
 each names the FFmpeg revision it reproduces: `compat::clock` gives FFmpeg's packet

@@ -422,6 +422,38 @@ fn default_maximum_prohibits_additions_and_type_zero_conflict_is_not_normalized(
 }
 
 #[test]
+fn mapping_fields_are_reported_as_written_without_judging_their_values() {
+    // A BlockAddIDValue below the schema's range and BlockAddIDExtraData too short
+    // for its type's record (an HEVC configuration record for `hvcE`) both open.
+    let low = e(0x41e4, &[u(0x41f0, 1), u(0x41e7, 4)].concat());
+    let short = e(
+        0x41e4,
+        &[
+            u(0x41f0, 2),
+            u(0x41e7, 0x6876_6345),
+            e(0x41ed, &[1, 1, 0, 0, 0]),
+        ]
+        .concat(),
+    );
+    let raw = file(&[u(0x55ee, 12), low, short].concat(), &[e(0xa0, &block())]);
+    let mut reader = BlockingReader::open(Cursor::new(raw), Limits::default()).unwrap();
+    let packet = reader
+        .next_typed_packet(&AtomicBool::new(false))
+        .unwrap()
+        .unwrap();
+    let extensions = finish_mapping(
+        packet
+            .configuration
+            .track_extensions_job(0, Limits::default())
+            .unwrap(),
+    );
+    let mappings: Vec<_> = extensions.mappings().collect();
+    assert_eq!(mappings.len(), 2);
+    assert_eq!((mappings[0].value(), mappings[0].kind()), (Some(1), 4));
+    assert_eq!(mappings[1].extra_data(), Some(&[1, 1, 0, 0, 0][..]));
+}
+
+#[test]
 fn state_revisions_are_track_local_and_do_not_change_parser_generation_or_clocks() {
     let entry2 = e(
         0xae,

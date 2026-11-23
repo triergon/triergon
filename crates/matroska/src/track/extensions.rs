@@ -103,8 +103,9 @@ pub struct MappingView<'a> {
     record: &'a Mapping,
 }
 impl<'a> MappingView<'a> {
-    /// BlockAddIDValue: the BlockAddID this mapping describes, at least 2; `None`
-    /// when absent.
+    /// BlockAddIDValue: the BlockAddID this mapping describes, as written; `None`
+    /// when absent. RFC 9559 allows 2 and above; a smaller value is reported, not
+    /// refused, and describes no BlockAddID.
     pub fn value(self) -> Option<u64> {
         self.record.value.map(|(_, value)| value)
     }
@@ -353,11 +354,7 @@ impl TrackExtensionsJob {
                                 if record.value.is_some() {
                                     return Err(Error::Invalid("duplicate BlockAddIDValue"));
                                 }
-                                let value = ebml::uint(&self.raw[span.payload()])?;
-                                if value < 2 {
-                                    return Err(Error::Invalid("BlockAddIDValue below two"));
-                                }
-                                record.value = Some((span, value));
+                                record.value = Some((span, ebml::uint(&self.raw[span.payload()])?));
                             }
                             0x41e7 => {
                                 if record.kind.is_some() {
