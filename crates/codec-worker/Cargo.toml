@@ -30,7 +30,7 @@ triergon-worker-entry = { path = "../worker-entry" }
 [features]
 play = ["triergon/playback", "triergon/codecs", "triergon/render", "triergon/isobmff", "triergon/mpegts"]
 # Dependencies needed only by the comparison views binary.
-views = ["dep:triergon-bitstream", "dep:triergon-codec-mpeg1", "dep:triergon-codec-opus", "dep:triergon-core", "triergon/codecs", "triergon/framing", "triergon/render", "triergon-codec-h264/inspect"]
+views = ["triergon-codec/reference-trace", "dep:triergon-bitstream", "dep:triergon-codec-mpeg1", "dep:triergon-codec-opus", "dep:triergon-core", "triergon/codecs", "triergon/framing", "triergon/render", "triergon-codec-h264/inspect"]
 # Nightly-only explicit SIMD kernels in the HEVC decoder; output is identical.
 hevc-simd = ["triergon-session/hevc-simd"]
 # Nightly-only explicit SIMD forms of the AAC decoder's SBR QMF banks; the gate build

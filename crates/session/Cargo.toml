@@ -24,6 +24,7 @@ triergon-codec-opus = { path = "../codec-opus", optional = true }
 triergon-codec-vorbis = { path = "../codec-vorbis", optional = true }
 
 [dev-dependencies]
+triergon-codec = { path = "../codec", features = ["reference-trace"] }
 triergon-harness-protocol = { path = "../harness-protocol" }
 triergon-harness-runner = { path = "../harness-runner" }
 triergon = { path = "../triergon", features = ["matroska", "isobmff", "ogg", "elementary", "mpegts"] }

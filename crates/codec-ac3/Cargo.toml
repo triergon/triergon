@@ -25,6 +25,7 @@ name = "trace"
 required-features = ["reference-trace"]
 
 [dev-dependencies]
+triergon-codec = { path = "../codec", features = ["reference-trace"] }
 triergon-harness-protocol = { path = "../harness-protocol" }
 
 [lints]

@@ -55,10 +55,10 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `VideoDecoder` | `send(au, pts) -> Result<(), Self::Error>`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
 | `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, Self::Error>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
 | `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
-| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
+| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `EMPTY`, `MONO`, `STEREO`, `CAPACITY` |
 | `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
 | `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `new` charges its tables to a budget |
-| `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
+| `Speaker` | loudspeaker position; `mask()` gives its WAVEFORMATEXTENSIBLE or extended bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
 | `Error` (associated) | the decoder's error type: `DecodeError`, or a codec crate's own `DecodeError` with the same classes and more detail; each is `Copy` and converts to `triergon_core::Error` without formatting or allocating |
 | `DecodeError` | `Unsupported`, `Invalid`, `Policy` (each with a `&'static str` naming the feature, check or cap) and `Budget` (a refused storage charge): the error of the H.264, DTS, MPEG audio, Opus and Vorbis decoders |
@@ -72,8 +72,9 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 
 ### Channel order
 
-A `Speaker`'s discriminant is FFmpeg's channel id (`AV_CHAN_*`), which is also the bit
-index of its `AV_CH_*` mask:
+A `Speaker`'s discriminant is its bit index in the channel mask. The first eighteen
+positions follow WAVEFORMATEXTENSIBLE. The optional `reference-trace` feature
+exposes `ChannelLayout::name()` and `Speaker::name()` for textual comparisons.
 
 | Id | Speakers |
 |---|---|

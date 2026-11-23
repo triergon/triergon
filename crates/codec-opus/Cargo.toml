@@ -14,6 +14,7 @@ triergon-codec = { path = "../codec" }
 triergon-framing = { path = "../framing" }
 
 [dev-dependencies]
+triergon-codec = { path = "../codec", features = ["reference-trace"] }
 triergon = { path = "../triergon", features = ["ogg"] }
 
 [lints]
