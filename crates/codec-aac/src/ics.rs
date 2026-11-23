@@ -186,7 +186,7 @@ pub(crate) fn parse_ics_info(
     info: &mut IcsInfo,
 ) -> Result<()> {
     if br.bit() {
-        // ics_reserved_bit: FFmpeg reports and continues; we treat as invalid like the spec.
+        // ics_reserved_bit shall be 0: a set bit is refused (FFmpeg reports it and continues)
         return Err(DecodeError::Invalid("ics_reserved_bit"));
     }
     info.window_sequence = WindowSequence::from_bits(br.read(2));

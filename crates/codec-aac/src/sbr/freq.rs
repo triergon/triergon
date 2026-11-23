@@ -1,5 +1,5 @@
 //! SBR frequency band tables (ISO/IEC 14496-3 4.6.18.3.2), patch construction
-//! (4.6.18.6.3) and limiter band table (4.6.18.7.5? "limiter frequency band table").
+//! (4.6.18.6.3) and the limiter frequency band table.
 
 use super::Header;
 use crate::error::{DecodeError, Result};

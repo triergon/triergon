@@ -252,8 +252,8 @@ impl Filterbank {
             }
         }
         let b: &[f32] = &self.buf;
-        // MDCT of a windowed block; the spec forward MDCT has no extra factor, our time
-        // samples are float-scaled (1/32768) so the transform scale restores the spectral domain.
+        // MDCT of a windowed block. The specification's forward MDCT has no extra factor;
+        // the time samples are at float scale (1/32768), which the transform's scale undoes.
         self.mdct_long.mdct(b, out);
     }
 }
