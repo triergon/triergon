@@ -99,9 +99,22 @@ impl Decoder {
         self.frames.reset();
     }
 
-    /// Decode exactly one DTS core frame. Replaces the contents of `out`, reusing its
-    /// buffers.
+    /// Decodes exactly one DTS core frame.
+    /// Replaces `out`; a refusal leaves `samples_per_channel == 0`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed core frames, unsupported extensions and frames that exceed
+    /// the decoder's storage limit.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        let result = self.decode_frame(au, out);
+        if result.is_err() {
+            out.clear();
+        }
+        result
+    }
+
+    fn decode_frame(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         // A failed frame is dropped without touching the synthesis, LFE or ADPCM history,
         // so the next frame continues as if the failed one were absent (FFmpeg's
         // behaviour; checked with the synthetic `bad_dsync5` stream).
@@ -122,7 +135,6 @@ impl AudioDecoder for Decoder {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeError> {
-        out.clear();
         Decoder::decode(self, au, out)?;
         Ok(None)
     }

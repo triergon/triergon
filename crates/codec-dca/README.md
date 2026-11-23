@@ -40,6 +40,8 @@ extension substreams and writes interleaved f32le.
 
 ## Behaviour and limits
 
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
+
 - Output layout: AMODE 0 → FC; 1–4 → FL FR; 5 → 3.0; 6 → 3.0(back); 7 → 4.0; 8 →
   quad(side); 9 → 5.0(side). The LFF field adds LFE; XCh adds BC. Planes follow the
   triergon-codec [channel order](../codec/README.md#channel-order), e.g. 5.1(side) is FL

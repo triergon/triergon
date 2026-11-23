@@ -119,6 +119,7 @@ fn errors_are_typed() {
     let bytes = scenario("basic");
     let frames = harness::split(&bytes);
     let good = frames[0];
+    dec.decode(good, &mut out).unwrap();
     assert!(matches!(
         dec.decode(&good[..good.len() / 2], &mut out),
         Err(DecodeError::Invalid(_))
@@ -143,6 +144,8 @@ fn errors_are_typed() {
     ));
     // A failed frame must not poison the next good one.
     dec.decode(good, &mut out).expect("good frame after errors");
+    assert_eq!(out.samples_per_channel, 0);
+    assert!(out.planes.iter().all(Vec::is_empty));
 }
 
 #[test]
