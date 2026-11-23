@@ -7,6 +7,7 @@
 
 use super::super::{CompositionObject, Crop};
 use super::{Limits, PacketClock, Refusal, reserve_amortised, reserve_room};
+use std::ops::Range;
 use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
@@ -325,7 +326,7 @@ impl Receiver {
     pub(super) fn composition(
         &mut self,
         raw: &[u8],
-        body: std::ops::Range<usize>,
+        body: Range<usize>,
         subtitle_pts: Option<i64>,
         limits: &Limits,
     ) -> Result<()> {
@@ -389,7 +390,7 @@ impl Receiver {
     pub(super) fn palette_definition(
         &mut self,
         raw: &[u8],
-        body: std::ops::Range<usize>,
+        body: Range<usize>,
         limits: &Limits,
         budget: &Budget,
     ) -> Result<()> {
@@ -413,29 +414,17 @@ impl Receiver {
             None => return Ok(()),
         };
         let matrix = ColourMatrix::for_canvas(self.canvas[1]);
+        let entries = body.start + 2..body.end.max(body.start + 2);
         let slot = &mut self.palettes.as_mut_slice()[index];
-        if Arc::get_mut(&mut slot.words).is_none() {
-            slot.words = PaletteWords::new(budget, slot.words.words)?;
+        // A palette a display still holds is written as a copy.
+        if let Some(owned) = Arc::get_mut(&mut slot.words) {
+            define(&mut owned.words, raw, entries, matrix);
+        } else {
+            let mut words = slot.words.words;
+            define(&mut words, raw, entries, matrix);
+            slot.words = PaletteWords::new(budget, words)?;
         }
         slot.id = Some(id);
-        let Some(PaletteWords { words, .. }) = Arc::get_mut(&mut slot.words) else {
-            return Err(Error::Invalid("PGS receiver palette shared"));
-        };
-        let entries = body.start + 2..body.end.max(body.start + 2);
-        let (whole, _) = raw
-            .get(entries.clone())
-            .unwrap_or_default()
-            .as_chunks::<5>();
-        let tail = entries.start + 5 * whole.len();
-        for &[index, y, cr, cb, alpha] in whole {
-            words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
-        }
-        // An entry starting inside the segment but ending past it reads on,
-        // into the next segment and, past the packet, zeros.
-        if tail < entries.end {
-            let [index, y, cr, cb, alpha] = std::array::from_fn(|i| byte(raw, tail + i));
-            words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
-        }
         Ok(())
     }
 
@@ -488,6 +477,25 @@ impl Receiver {
             }
         }
         Ok(refusal)
+    }
+}
+
+/// Converts the PDS entries at `entries` of `raw` into `words`: each 5-byte
+/// entry that starts inside the segment, the last one reading on past its
+/// end, into the next segment and, past the packet, zeros.
+#[inline(always)]
+fn define(words: &mut [u32; 256], raw: &[u8], entries: Range<usize>, matrix: ColourMatrix) {
+    let (whole, _) = raw
+        .get(entries.clone())
+        .unwrap_or_default()
+        .as_chunks::<5>();
+    let tail = entries.start + 5 * whole.len();
+    for &[index, y, cr, cb, alpha] in whole {
+        words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
+    }
+    if tail < entries.end {
+        let [index, y, cr, cb, alpha] = std::array::from_fn(|i| byte(raw, tail + i));
+        words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
     }
 }
 
