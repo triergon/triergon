@@ -50,13 +50,15 @@ impl TransportSync {
         Some(true)
     }
 
-    /// Whether `source`, which no more bytes follow, ends before this spacing's third
-    /// sync byte and holds the first two.
-    fn ends_after_two(self, source: &[u8]) -> bool {
-        let [first, second, third] = self.offsets();
-        source.len() <= third
-            && source.get(first) == Some(&0x47)
-            && source.get(second) == Some(&0x47)
+    /// Whether `source`, which no more bytes follow, reaches at least two of this
+    /// spacing's sync offsets and holds a sync byte at every one it reaches.
+    fn fits_whole(self, source: &[u8]) -> bool {
+        let [_, second, _] = self.offsets();
+        second < source.len()
+            && self
+                .offsets()
+                .iter()
+                .all(|&at| source.get(at).is_none_or(|&byte| byte == 0x47))
     }
 }
 
@@ -176,14 +178,16 @@ pub fn select(prefix: &[u8], policy: &Policy) -> Selection {
 }
 
 /// [`select`] for a whole source, which no more bytes follow: never
-/// [`Selection::Need`]. Every signature needs the bytes it needs in a prefix, but a
-/// source that ends before a third transport sync byte is selected by the first two, as
-/// a stream of one packet and all or part of a second.
+/// [`Selection::Need`]. Every other signature needs the bytes it needs in a prefix, but
+/// a transport spacing is decided by the sync bytes the source holds: it fits when the
+/// source reaches at least two of its sync offsets (one packet and all or part of a
+/// second; one sync byte is no evidence) and holds a sync byte at every one it reaches.
+/// A source both spacings fit is resolved by the policy's [`TransportTie`].
 pub fn select_whole(source: &[u8], policy: &Policy) -> Selection {
     match select(source, policy) {
         Selection::Need(_) => {
-            let [ts188, m2ts192] = [TransportSync::Ts188, TransportSync::M2ts192]
-                .map(|sync| sync.ends_after_two(source));
+            let [ts188, m2ts192] =
+                [TransportSync::Ts188, TransportSync::M2ts192].map(|sync| sync.fits_whole(source));
             match (ts188, m2ts192) {
                 (true, true) if policy.transport_tie == TransportTie::Refuse => {
                     Selection::Ambiguous
@@ -304,5 +308,62 @@ mod tests {
             );
         }
         assert_eq!(select_whole(b"OggS", &FIRST), Selection::Unrecognised);
+    }
+
+    #[test]
+    fn every_length_of_a_transport_stream_asks_for_more_as_a_prefix_and_decides_as_a_source() {
+        use Selection::{Ambiguous, Need, Unrecognised};
+        let ts188 = Selection::Container(Container::Transport(TransportSync::Ts188));
+        let m2ts192 = Selection::Container(Container::Transport(TransportSync::M2ts192));
+        let [mut ts, mut m2ts, mut both] = [[0; 600]; 3];
+        for at in (0..600).step_by(188) {
+            ts[at] = 0x47;
+            both[at] = 0x47;
+        }
+        for at in (4..600).step_by(192) {
+            m2ts[at] = 0x47;
+            both[at] = 0x47;
+        }
+        let mut cut = ts;
+        cut[376] = 0;
+        for len in 188..=600 {
+            let from = |first: usize, decided: Selection| {
+                if len < first { Unrecognised } else { decided }
+            };
+            let until = |end: usize, decided: Selection| {
+                if len < end { Need(end) } else { decided }
+            };
+            // Under the refusing tie, two TS188 sync bytes and one M2TS192 sync byte
+            // select TS188; once both spacings have two, neither wins.
+            let tie = match len {
+                ..189 => Unrecognised,
+                189..197 => ts188,
+                _ => Ambiguous,
+            };
+            // Without its third sync byte a TS188 stream fits only while it ends first.
+            let cut_whole = match len {
+                189..377 => ts188,
+                _ => Unrecognised,
+            };
+            // Each stream under each policy: its answer as a prefix, then as a whole source.
+            let cases = [
+                (&ts, &FIRST, until(377, ts188), from(189, ts188)),
+                (&ts, &REFUSING, until(389, ts188), from(189, ts188)),
+                (&m2ts, &FIRST, until(389, m2ts192), from(197, m2ts192)),
+                (&m2ts, &REFUSING, until(389, m2ts192), from(197, m2ts192)),
+                (&both, &FIRST, until(377, ts188), from(189, ts188)),
+                (&both, &REFUSING, until(389, Ambiguous), tie),
+                (&cut, &FIRST, until(377, Unrecognised), cut_whole),
+                (&cut, &REFUSING, until(389, Unrecognised), cut_whole),
+            ];
+            for (stream, policy, prefix, whole) in cases {
+                assert_eq!(select(&stream[..len], policy), prefix, "{len}-byte prefix");
+                assert_eq!(
+                    select_whole(&stream[..len], policy),
+                    whole,
+                    "{len}-byte source"
+                );
+            }
+        }
     }
 }
