@@ -62,11 +62,6 @@ impl PollOutput for CompactTraceEvent {
 }
 
 impl TransportStream {
-    // Checking the observed carrier take measured +5 instructions on reordered 48 kHz playback.
-    #[expect(
-        clippy::expect_used,
-        reason = "an error return here measured with the span refusal: +0.24% (seek split-PES +0.72%)"
-    )]
     fn retain_observed_continuation(
         &mut self,
         carrier: &mut PlainContinuation,
@@ -129,7 +124,9 @@ impl TransportStream {
         if clock {
             self.clock_signal = false;
         }
-        let bytes = carrier.source.take().expect("observed carrier source");
+        let Some(bytes) = carrier.source.take() else {
+            return Err(Error::SourceMismatch);
+        };
         let len = bytes.len();
         assembler.append_body_carrier(bytes.into_slice(start..len)?, location, work);
         Ok(assembler.take_complete_body()?.map_or(
