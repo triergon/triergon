@@ -6,19 +6,19 @@ use crate::{
     Output, Player, Progress, Result, SeekIntent, Selection, TrackKey,
     mp4::{Mp4DemuxSeekCommand, Mp4SyncSeekCommand},
 };
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use triergon_core::source::Source;
-use triergon_core::{
-    BudgetVec, Error, InputCursor, InputToken, SourceCapabilities, SourceId, Time, WorkBudget,
-};
+use triergon_core::{BudgetVec, Error, Time, WorkBudget};
 
 /// The most feeds a [`Pump`] keeps in flight.
 pub const MAXIMUM_IN_FLIGHT: usize = 64;
 
+static NEXT_PUMP: AtomicUsize = AtomicUsize::new(0);
+
 /// Names one feed a pump handed to its sink; the sink reports its completion with it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FeedToken {
-    scope: InputToken,
+    pump: usize,
     ordinal: u64,
 }
 /// One player output on its way to a sink.
@@ -128,7 +128,7 @@ enum CatalogueChange<'a> {
 pub struct Pump<S: Source, T: Sink> {
     player: Option<Player<S>>,
     sink: Option<T>,
-    identity: InputCursor,
+    identity: usize,
     credits: BudgetVec<Option<FeedToken>>,
     pending: Option<Feed>,
     ordinal: u64,
@@ -142,16 +142,19 @@ impl<S: Source, T: Sink> Pump<S, T> {
             return Err(Error::Invalid("pump in-flight policy"));
         }
         let pool = player.budget();
-        // Mints the feed tokens' scope from the pool's generations; it reads nothing.
-        let identity = InputCursor::new(
-            pool,
-            SourceId(0),
-            SourceCapabilities {
-                length: Some(0),
-                random_access: true,
-            },
-            1,
-        )?;
+        let mut identity = NEXT_PUMP.load(Ordering::Relaxed);
+        loop {
+            let next = identity.checked_add(1).ok_or(Error::Overflow)?;
+            match NEXT_PUMP.compare_exchange_weak(
+                identity,
+                next,
+                Ordering::Relaxed,
+                Ordering::Relaxed,
+            ) {
+                Ok(_) => break,
+                Err(observed) => identity = observed,
+            }
+        }
         let mut credits = BudgetVec::new(pool);
         credits.try_reserve_exact(maximum_in_flight)?;
         for _ in 0..maximum_in_flight {
@@ -233,7 +236,6 @@ impl<S: Source, T: Sink> Pump<S, T> {
         if !player.seek_and_select(track, target, selection, w, c)? {
             return Ok(false);
         }
-        self.identity.reset(0)?;
         let intent = player
             .seek_intent()
             .ok_or(Error::Invalid("missing accepted seek intent"))?;
@@ -324,16 +326,6 @@ impl<S: Source, T: Sink> Pump<S, T> {
                 available: 0,
             }));
         }
-        // Construct the new callback fence before changing the player or sink.
-        let identity = InputCursor::new(
-            self.player.as_ref().ok_or(Error::Closed)?.budget(),
-            SourceId(0),
-            SourceCapabilities {
-                length: Some(0),
-                random_access: true,
-            },
-            1,
-        )?;
         let player = self.player.as_mut().ok_or(Error::Closed)?;
         let transaction = match change {
             CatalogueChange::Replace(selection) => {
@@ -359,7 +351,6 @@ impl<S: Source, T: Sink> Pump<S, T> {
             }
         };
         sink.commit_catalogue(boundary);
-        self.identity = identity;
         if self.run == Run::Ended {
             self.run = Run::Running;
         }
@@ -458,7 +449,7 @@ impl<S: Source, T: Sink> Pump<S, T> {
             self.ordinal = self.ordinal.checked_add(1).ok_or(Error::Overflow)?;
             self.pending = Some(Feed {
                 token: FeedToken {
-                    scope: self.identity.token(),
+                    pump: self.identity,
                     ordinal: self.ordinal,
                 },
                 output,

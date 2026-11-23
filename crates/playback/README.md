@@ -282,8 +282,9 @@ Delivery without a seek uses the presence of the projected presentation
 timestamp directly.
 
 **Sinks.** `pump::Sink` owns an accepted `Feed` until it reports the feed's token
-complete; a full or failed sink hands the same feed back. Threading and the
-consumer's own configuration are the sink's; no `Send` bound is imposed.
+complete. A full or failed sink hands the same feed back. Each token is unique
+to its pump and stays distinct across seeks and catalogue replacements.
+The sink manages its own threading, and the trait has no `Send` bound.
 
 ## Conformance
 
