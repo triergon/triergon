@@ -19,11 +19,11 @@ RGBA in, coded YUV 4:2:0 out (the encoder input of
 [triergon-codec-mpeg1](../codec-mpeg1/README.md)):
 
 ```rust
-use triergon_pixel::{Converter, Geometry, Orientation, Picture};
+use triergon_pixel::{Converter, MacroblockGeometry, Orientation, CodedPicture};
 
-let geometry = Geometry::new(960, 540)?;           // even, 2..=4094
+let geometry = MacroblockGeometry::new(960, 540)?;           // even, 2..=4094
 let rgba = vec![128u8; geometry.rgba_len()];        // the caller's frame: mid grey
-let mut picture = Picture::new(geometry);
+let mut picture = CodedPicture::new(geometry);
 let mut converter = Converter::new(geometry);       // reusable scratch
 converter.convert(&rgba, Orientation::BottomUp, &mut picture)?;
 // picture.y(), cb(), cr(): coded planes, strides geometry.luma_stride() / chroma_stride()
@@ -32,7 +32,7 @@ assert!(picture.cb().iter().chain(picture.cr()).all(|&c| c == 128)); // grey sta
 ```
 
 `rgba_to_yuv420(&rgba, orientation, &mut picture)` is the same conversion with its
-own scratch. `Picture::visible_yuv420()` packs the visible planes (Y, Cb, Cr) for
+own scratch. `CodedPicture::visible_yuv420()` packs the visible planes (Y, Cb, Cr) for
 comparisons.
 
 Decoded picture in, letterboxed RGBA out:
@@ -69,7 +69,7 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 | Area | Coverage |
 |---|---|
 | Picture views | `PictureView`: cropped `width`/`height`, `bit_depth`, three `Plane`s (`U8` or `U16` samples with `stride` and `offset`), caller `pts`, `sar` (`Option<SampleAspectRatio>`), `Colour` (H.273 `matrix` code and `full_range`) |
-| Coded picture | `Picture` at the macroblock-aligned size of a `Geometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
+| Coded picture | `CodedPicture` at the macroblock-aligned size of a `MacroblockGeometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
 | RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass; width-dependent conversion or filtering at every width |
 | Letterbox input | 4:2:0, 8-bit and high bit depth (10-bit verified); limited and full range |
 | Palette Y'CbCr → RGB | `YcbcrMatrix::BT601` and `BT709`, studio range in, full range out, `ChannelRounding::Nearest` or `HalfDown`; `rgb(y, cr, cb, rounding)` gives `0xRRGGBB` |
@@ -77,7 +77,7 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 
 ## Behaviour and limits
 
-**Geometry.** `Geometry::new` accepts non-zero even sizes that fit the 12-bit MPEG-1
+**Macroblock geometry.** `MacroblockGeometry::new` accepts non-zero even sizes that fit the 12-bit MPEG-1
 size fields (at most 4094) and refuses others with `Error::Geometry`. The coded size
 rounds each dimension up to 16; `luma_stride` is `16 × macroblock_width()` and
 `chroma_stride` half of it.

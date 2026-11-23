@@ -1,10 +1,10 @@
-//! Picture plans against the headers already written and an I picture's side
+//! CodedPicture plans against the headers already written and an I picture's side
 //! bits, and what a picture coded under the VBV guard (censored: its texture cost
 //! was not measured) may teach the model.
 
 use super::*;
 use crate::{Encoder, EncoderConfig};
-use triergon_pixel::{Geometry, Picture};
+use triergon_pixel::{CodedPicture, MacroblockGeometry};
 
 /// A controller at 30 kbit/s whose intra model is seeded at α = 3200.
 fn seeded(gop: u32) -> RateControl {
@@ -20,7 +20,7 @@ fn finish(rc: &mut RateControl, bits: f64, texture: f64, q: f64, censored: bool)
 /// A 16×16 encoder at 30 kbit/s with a VBV buffer of `vbv_bits`.
 fn encoder(vbv_bits: u32) -> Encoder {
     Encoder::new(EncoderConfig {
-        geometry: Geometry::new(16, 16).unwrap(),
+        geometry: MacroblockGeometry::new(16, 16).unwrap(),
         bit_rate: 30_000,
         max_rate: 42_000,
         vbv_bits,
@@ -113,7 +113,7 @@ fn headers_larger_than_the_target_do_not_enlarge_the_buffer() {
 #[test]
 fn the_average_bank_counts_the_byte_alignment() {
     let mut encoder = encoder(30_000);
-    let mut picture = Picture::new(encoder.cfg.geometry);
+    let mut picture = CodedPicture::new(encoder.cfg.geometry);
     picture.y_mut().fill(128);
     picture.cb_mut().fill(128);
     picture.cr_mut().fill(128);
@@ -196,7 +196,7 @@ fn censored_and_measured_pictures_debit_the_same_bits_and_underflow() {
 fn an_intra_picture_under_the_vbv_guard_underflows_and_keeps_the_seeded_model() {
     // 200 bits hold two pictures at the average 3 kbit/s, but no 64×64 I picture:
     // its headers and DC-only macroblocks alone are larger.
-    let geometry = Geometry::new(64, 64).unwrap();
+    let geometry = MacroblockGeometry::new(64, 64).unwrap();
     let mut e = Encoder::new(EncoderConfig {
         geometry,
         bit_rate: 3_000,
@@ -207,7 +207,7 @@ fn an_intra_picture_under_the_vbv_guard_underflows_and_keeps_the_seeded_model() 
     .unwrap();
     e.rc.seed_intra(0.0, 800.0, 4, 1.0);
     let model = e.rc.alpha_i;
-    let mut input = Picture::new(geometry);
+    let mut input = CodedPicture::new(geometry);
     for (i, p) in input.y_mut().iter_mut().enumerate() {
         *p = ((i * 137) % 256) as u8;
     }
@@ -225,7 +225,7 @@ fn a_measured_intra_picture_updates_the_model_and_keeps_the_gop() {
     let mut e = encoder(30_000);
     e.rc.seed_intra(0.0, 800.0, 4, 1.0);
     let model = e.rc.alpha_i;
-    let input = Picture::new(e.cfg.geometry);
+    let input = CodedPicture::new(e.cfg.geometry);
     let mut output = Vec::new();
     let first = e.encode(&input, &mut output).unwrap();
     assert!(first.key);
@@ -332,7 +332,7 @@ fn a_predicted_picture_models_all_its_texture_bits() {
 /// row measures for the whole picture.
 #[test]
 fn the_trial_pass_measures_the_side_bits_of_the_whole_picture() {
-    let geometry = Geometry::new(480, 272).unwrap();
+    let geometry = MacroblockGeometry::new(480, 272).unwrap();
     let mut e = Encoder::new(EncoderConfig {
         geometry,
         bit_rate: 600_000,
@@ -341,7 +341,7 @@ fn the_trial_pass_measures_the_side_bits_of_the_whole_picture() {
         gop: 30,
     })
     .unwrap();
-    let mut input = Picture::new(geometry);
+    let mut input = CodedPicture::new(geometry);
     let stride = geometry.luma_stride();
     for (i, p) in input.y_mut().iter_mut().enumerate() {
         let (x, y) = (i % stride / 8, i / stride / 8);
@@ -360,7 +360,7 @@ fn the_trial_pass_measures_the_side_bits_of_the_whole_picture() {
 }
 
 /// The luma squared error of the encoder's reconstruction against `input`.
-fn luma_error(e: &Encoder, input: &Picture) -> u64 {
+fn luma_error(e: &Encoder, input: &CodedPicture) -> u64 {
     let g = e.cfg.geometry;
     (0..g.height())
         .flat_map(|y| (0..g.width()).map(move |x| y * g.luma_stride() + x))
@@ -374,7 +374,7 @@ fn luma_error(e: &Encoder, input: &Picture) -> u64 {
 /// the reference below the quantiser that bounds a first P picture.
 #[test]
 fn a_static_scene_is_refined_by_its_first_repeated_picture() {
-    let geometry = Geometry::new(480, 272).unwrap();
+    let geometry = MacroblockGeometry::new(480, 272).unwrap();
     let mut e = Encoder::new(EncoderConfig {
         geometry,
         bit_rate: 450_000,
@@ -383,7 +383,7 @@ fn a_static_scene_is_refined_by_its_first_repeated_picture() {
         gop: 30,
     })
     .unwrap();
-    let mut input = Picture::new(geometry);
+    let mut input = CodedPicture::new(geometry);
     let stride = geometry.luma_stride();
     let mut seed = 7u32;
     for (i, p) in input.y_mut().iter_mut().enumerate() {

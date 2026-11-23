@@ -3,7 +3,7 @@
 use crate::{CaptureError, Result};
 use triergon_codec_mpeg1::{EncodedPicture, Encoder, EncoderConfig};
 use triergon_mpegts::mux::{MuxConfig, Muxer};
-use triergon_pixel::{Converter, Geometry, Orientation, Picture, PictureView};
+use triergon_pixel::{CodedPicture, Converter, MacroblockGeometry, Orientation, PictureView};
 
 /// Receives each frame's complete transport stream bytes.
 pub trait Sink {
@@ -79,7 +79,7 @@ pub struct FrameReport {
 #[derive(Debug)]
 pub struct Session {
     converter: Converter,
-    input: Picture,
+    input: CodedPicture,
     encoder: Encoder,
     muxer: Muxer,
     es: Vec<u8>,
@@ -108,9 +108,9 @@ impl Session {
 
     fn open_with_converter(
         cfg: &SessionConfig,
-        converter: fn(Geometry) -> Converter,
+        converter: fn(MacroblockGeometry) -> Converter,
     ) -> Result<Session> {
-        let geometry = Geometry::new(cfg.width, cfg.height)?;
+        let geometry = MacroblockGeometry::new(cfg.width, cfg.height)?;
         let encoder = Encoder::new(EncoderConfig {
             geometry,
             bit_rate: cfg.bit_rate,
@@ -120,7 +120,7 @@ impl Session {
         })?;
         Ok(Session {
             converter: converter(geometry),
-            input: Picture::new(geometry),
+            input: CodedPicture::new(geometry),
             encoder,
             muxer: Muxer::new(&cfg.mux).map_err(CaptureError::Mux)?,
             es: Vec::new(),
@@ -130,7 +130,7 @@ impl Session {
     }
 
     /// The frame size and the coded size it is padded to.
-    pub fn geometry(&self) -> Geometry {
+    pub fn geometry(&self) -> MacroblockGeometry {
         self.input.geometry()
     }
 
@@ -170,7 +170,7 @@ impl Session {
     }
 
     /// The last frame as converted to YUV 4:2:0, before encoding.
-    pub fn converted(&self) -> &Picture {
+    pub fn converted(&self) -> &CodedPicture {
         &self.input
     }
 

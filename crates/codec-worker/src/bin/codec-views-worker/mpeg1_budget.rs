@@ -5,7 +5,7 @@ use std::io::Write;
 
 use triergon::Budget;
 use triergon_codec_mpeg1::{Encoder, EncoderConfig, Error, Limits};
-use triergon_pixel::{Geometry, Picture};
+use triergon_pixel::{CodedPicture, MacroblockGeometry};
 
 use triergon_harness_runner::{Operation, Totals};
 
@@ -24,7 +24,7 @@ pub(super) fn operation<'a>(
             .parse()
             .map_err(|_| "invalid dimension")
     };
-    let geometry = Geometry::new(dimension()?, dimension()?).map_err(explain)?;
+    let geometry = MacroblockGeometry::new(dimension()?, dimension()?).map_err(explain)?;
     if tokens.next().is_some() || !arguments.is_empty() {
         return Err("expected only the coded width and height".into());
     }
@@ -70,7 +70,7 @@ fn run(
     let idle = pool.used();
     let mut encoder = Encoder::new_in(cfg, &pool).map_err(explain)?;
     let mut ordinary = Encoder::new(cfg).map_err(explain)?;
-    let mut input = Picture::new(cfg.geometry);
+    let mut input = CodedPicture::new(cfg.geometry);
     input.pad_edges();
     let mut output = vec![0xa5, 0x5a];
     let mut expected = Vec::new();

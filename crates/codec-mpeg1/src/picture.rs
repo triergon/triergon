@@ -7,13 +7,13 @@ use crate::macroblock::{Inter, SliceState};
 use crate::motion::Mv;
 use crate::syntax::{self, PictureType};
 use crate::{EncodedPicture, Encoder, Result};
-use triergon_pixel::Picture;
+use triergon_pixel::CodedPicture;
 
 impl Encoder {
     /// Code `input`, of the configured geometry, as the next picture into `out`.
     pub(crate) fn encode_picture(
         &mut self,
-        input: &Picture,
+        input: &CodedPicture,
         out: &mut Vec<u8>,
     ) -> Result<EncodedPicture> {
         debug_assert_eq!(input.geometry(), self.cfg.geometry);
@@ -60,7 +60,7 @@ impl Encoder {
                 picture_type,
                 activity,
                 header_bits,
-                repetition == Repetition::Picture,
+                repetition == Repetition::CodedPicture,
             )
             .hard_limit;
         let g = self.cfg.geometry;
@@ -74,7 +74,7 @@ impl Encoder {
             f_code,
             edge: false,
             tight: false,
-            repeated: repetition == Repetition::Picture,
+            repeated: repetition == Repetition::CodedPicture,
         };
         let mut q_sum = 0u64;
         let mut slice = None;
@@ -124,7 +124,7 @@ impl Encoder {
     /// First intra picture of a session: trial-encode every second row at a
     /// fixed quantiser into scratch bits to seed the intra rate model, its side
     /// bits scaled to every row. Only the final pass reconstructs the picture.
-    fn probe_intra(&mut self, input: &Picture, mut scratch: BitWriter) -> Result<()> {
+    fn probe_intra(&mut self, input: &CodedPicture, mut scratch: BitWriter) -> Result<()> {
         const PROBE_Q: u32 = 8;
         let g = self.cfg.geometry;
         std::mem::swap(&mut self.writer, &mut scratch);

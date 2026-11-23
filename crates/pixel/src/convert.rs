@@ -17,7 +17,7 @@
 //! [`Converter::filtered`] uses the filtered conversion at every width, as the
 //! AArch64 reference does.
 
-use crate::{Error, Geometry, Picture, Result};
+use crate::{CodedPicture, Error, MacroblockGeometry, Result};
 
 /// Row order of the caller's RGBA buffer. Bottom-up buffers are read in reverse
 /// without a separate flip pass.
@@ -30,7 +30,7 @@ pub enum Orientation {
 }
 
 /// Whether `geometry` takes the block path (see the module documentation).
-pub(crate) const fn block_path(geometry: Geometry) -> bool {
+pub(crate) const fn block_path(geometry: MacroblockGeometry) -> bool {
     geometry.width >= 16 && geometry.width.is_multiple_of(4)
 }
 
@@ -65,7 +65,7 @@ enum Scratch {
 }
 
 impl Scratch {
-    fn new(geometry: Geometry, use_blocks: bool) -> Scratch {
+    fn new(geometry: MacroblockGeometry, use_blocks: bool) -> Scratch {
         let width = geometry.width;
         if use_blocks {
             Scratch::Block {
@@ -82,7 +82,7 @@ impl Scratch {
         }
     }
 
-    fn fits(&self, geometry: Geometry, use_blocks: bool) -> bool {
+    fn fits(&self, geometry: MacroblockGeometry, use_blocks: bool) -> bool {
         match self {
             Scratch::Block { width, .. } => use_blocks && *width == geometry.width,
             Scratch::Filtered { half, .. } => !use_blocks && *half == geometry.width / 2,
@@ -93,7 +93,7 @@ impl Scratch {
 impl Converter {
     /// A converter that takes the block or the filtered path by the picture's
     /// width, as the module documentation describes.
-    pub fn new(geometry: Geometry) -> Converter {
+    pub fn new(geometry: MacroblockGeometry) -> Converter {
         Converter {
             scratch: Scratch::new(geometry, block_path(geometry)),
             paths: Paths::ByWidth,
@@ -101,7 +101,7 @@ impl Converter {
     }
 
     /// A converter that takes the filtered path at every width.
-    pub fn filtered(geometry: Geometry) -> Converter {
+    pub fn filtered(geometry: MacroblockGeometry) -> Converter {
         Converter {
             scratch: Scratch::new(geometry, false),
             paths: Paths::Filtered,
@@ -115,7 +115,7 @@ impl Converter {
         &mut self,
         rgba: &[u8],
         orientation: Orientation,
-        out: &mut Picture,
+        out: &mut CodedPicture,
     ) -> Result<()> {
         let g = out.geometry;
         if rgba.len() < g.rgba_len() {
@@ -146,14 +146,14 @@ impl Converter {
 }
 
 /// [`Converter::convert`] with a converter made for this one call.
-pub fn rgba_to_yuv420(rgba: &[u8], orientation: Orientation, out: &mut Picture) -> Result<()> {
+pub fn rgba_to_yuv420(rgba: &[u8], orientation: Orientation, out: &mut CodedPicture) -> Result<()> {
     Converter::new(out.geometry).convert(rgba, orientation, out)
 }
 
 /// The block path in 16-bit arithmetic: every intermediate below lies in
 /// 0..2^16, so the loops vectorise into 16-bit lanes.
 mod block {
-    use crate::Picture;
+    use crate::CodedPicture;
 
     const Y: [u16; 3] = [66, 129, 25];
     const Y_OFFSET: u16 = (16 << 8) + (1 << 7);
@@ -162,7 +162,7 @@ mod block {
     pub(super) fn convert<'a>(
         source_row: impl Fn(usize) -> &'a [u8],
         sums: &mut [Vec<u16>; 4],
-        out: &mut Picture,
+        out: &mut CodedPicture,
     ) {
         let g = out.geometry;
         let (luma_stride, chroma_stride) = (g.luma_stride(), g.chroma_stride());
@@ -244,7 +244,7 @@ mod block {
 /// short_filtered_frames_against_reference test checks the coefficients,
 /// rounding and edge taps against that output.
 mod filtered {
-    use crate::Picture;
+    use crate::CodedPicture;
 
     pub(super) const Y_R: i32 = 8414;
     pub(super) const Y_G: i32 = 16519;
@@ -258,7 +258,7 @@ mod filtered {
         source_row: impl Fn(usize) -> &'a [u8],
         cb_rows: &mut [Vec<i16>; 4],
         cr_rows: &mut [Vec<i16>; 4],
-        out: &mut Picture,
+        out: &mut CodedPicture,
     ) {
         let g = out.geometry;
         let half = g.width / 2;
@@ -456,15 +456,15 @@ mod tests {
 
     #[test]
     fn path_follows_width() {
-        let path = |w| block_path(Geometry::new(w, 8).unwrap());
+        let path = |w| block_path(MacroblockGeometry::new(w, 8).unwrap());
         assert!(!path(2) && !path(14) && !path(18) && !path(962) && !path(4094));
         assert!(path(16) && path(20) && path(476) && path(480) && path(960) && path(4092));
     }
 
     fn solid(width: u32, (r, g, b, a): (u8, u8, u8, u8)) -> (u8, u8, u8) {
-        let geometry = Geometry::new(width, 8).unwrap();
+        let geometry = MacroblockGeometry::new(width, 8).unwrap();
         let rgba: Vec<u8> = [r, g, b, a].repeat(width as usize * 8);
-        let mut picture = Picture::new(geometry);
+        let mut picture = CodedPicture::new(geometry);
         rgba_to_yuv420(&rgba, Orientation::TopDown, &mut picture).unwrap();
         (picture.y[0], picture.cb[0], picture.cr[0])
     }
@@ -472,9 +472,9 @@ mod tests {
     #[test]
     fn filtered_luma_matches_the_observed_rounding_boundary() {
         let [r, g, b, a] = [0, 85, 170, 255];
-        let geometry = Geometry::new(16, 8).unwrap();
+        let geometry = MacroblockGeometry::new(16, 8).unwrap();
         let rgba = [r, g, b, a].repeat(16 * 8);
-        let mut picture = Picture::new(geometry);
+        let mut picture = CodedPicture::new(geometry);
         Converter::filtered(geometry)
             .convert(&rgba, Orientation::TopDown, &mut picture)
             .unwrap();
@@ -536,14 +536,14 @@ mod tests {
                 126,
             ),
         ];
-        let geometry = Geometry::new(16, 2).unwrap();
+        let geometry = MacroblockGeometry::new(16, 2).unwrap();
         for (block, luma, cb, cr) in cases {
             let mut rgba = [128u8, 128, 128, 255].repeat(32);
             for (i, rgb) in block.iter().enumerate() {
                 let at = (i / 2) * 64 + (i % 2) * 4;
                 rgba[at..at + 3].copy_from_slice(rgb);
             }
-            let mut picture = Picture::new(geometry);
+            let mut picture = CodedPicture::new(geometry);
             rgba_to_yuv420(&rgba, Orientation::TopDown, &mut picture).unwrap();
             let stride = geometry.luma_stride();
             let y = [
@@ -556,8 +556,13 @@ mod tests {
         }
     }
 
-    fn red_row_on_grey(width: u32, height: u32, row: usize, orientation: Orientation) -> Picture {
-        let geometry = Geometry::new(width, height).unwrap();
+    fn red_row_on_grey(
+        width: u32,
+        height: u32,
+        row: usize,
+        orientation: Orientation,
+    ) -> CodedPicture {
+        let geometry = MacroblockGeometry::new(width, height).unwrap();
         let mut rgba = Vec::new();
         for y in 0..height as usize {
             let pixel = if y == row {
@@ -567,14 +572,14 @@ mod tests {
             };
             rgba.extend(pixel.repeat(width as usize));
         }
-        let mut picture = Picture::new(geometry);
+        let mut picture = CodedPicture::new(geometry);
         rgba_to_yuv420(&rgba, orientation, &mut picture).unwrap();
         picture
     }
 
     #[test]
     fn filtered_vertical_taps_are_center_sited() {
-        let column = |p: &Picture| (0..4).map(|k| p.cr[k * 8]).collect::<Vec<_>>();
+        let column = |p: &CodedPicture| (0..4).map(|k| p.cr[k * 8]).collect::<Vec<_>>();
         let red = |row, orientation| red_row_on_grey(14, 8, row, orientation);
         assert_eq!(column(&red(0, Orientation::TopDown)), [184, 128, 128, 128]);
         assert_eq!(column(&red(1, Orientation::TopDown)), [170, 142, 128, 128]);
@@ -627,7 +632,7 @@ mod tests {
 
     #[test]
     fn block_chroma_covers_its_row_pair() {
-        let column = |p: &Picture| (0..4).map(|k| p.cr[k * 8]).collect::<Vec<_>>();
+        let column = |p: &CodedPicture| (0..4).map(|k| p.cr[k * 8]).collect::<Vec<_>>();
         let red = |row, orientation| red_row_on_grey(16, 8, row, orientation);
         assert_eq!(column(&red(0, Orientation::TopDown)), [184, 128, 128, 128]);
         assert_eq!(column(&red(1, Orientation::TopDown)), [184, 128, 128, 128]);
@@ -642,7 +647,7 @@ mod tests {
 
     #[test]
     fn short_input_is_rejected() {
-        let mut picture = Picture::new(Geometry::new(16, 8).unwrap());
+        let mut picture = CodedPicture::new(MacroblockGeometry::new(16, 8).unwrap());
         let err = rgba_to_yuv420(&[0; 16], Orientation::TopDown, &mut picture).unwrap_err();
         assert_eq!(
             err,
@@ -656,13 +661,13 @@ mod tests {
     #[test]
     fn padding_replicates_edges() {
         for width in [18, 20] {
-            let geometry = Geometry::new(width, 6).unwrap();
+            let geometry = MacroblockGeometry::new(width, 6).unwrap();
             let w = width as usize;
             let mut rgba = vec![0u8; w * 6 * 4];
             for (i, px) in rgba.chunks_exact_mut(4).enumerate() {
                 px[1] = (i * 7 % 251) as u8;
             }
-            let mut picture = Picture::new(geometry);
+            let mut picture = CodedPicture::new(geometry);
             rgba_to_yuv420(&rgba, Orientation::TopDown, &mut picture).unwrap();
             let stride = geometry.luma_stride();
             for y in 0..16 {

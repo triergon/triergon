@@ -2,20 +2,20 @@
 //! fixed-size reads of sample rows.
 
 use triergon_core::{Budget, BudgetVec, Error};
-use triergon_pixel::{Colour, Geometry, PictureView, Plane, SampleAspectRatio};
+use triergon_pixel::{Colour, MacroblockGeometry, PictureView, Plane, SampleAspectRatio};
 
-/// A YUV 4:2:0 picture at the coded size, laid out like `triergon_pixel::Picture`.
+/// A YUV 4:2:0 picture at the coded size, laid out like `triergon_pixel::CodedPicture`.
 #[derive(Debug)]
 pub(crate) struct Planes {
-    geometry: Geometry,
+    geometry: MacroblockGeometry,
     y: BudgetVec<u8>,
     cb: BudgetVec<u8>,
     cr: BudgetVec<u8>,
 }
 
 impl Planes {
-    /// Black luma and neutral chroma, as `Picture::new`.
-    pub(crate) fn try_new(budget: &Budget, geometry: Geometry) -> Result<Planes, Error> {
+    /// Black luma and neutral chroma, as `CodedPicture::new`.
+    pub(crate) fn try_new(budget: &Budget, geometry: MacroblockGeometry) -> Result<Planes, Error> {
         let rows = geometry.macroblock_height() * 16;
         let chroma = geometry.chroma_stride() * rows / 2;
         Ok(Planes {

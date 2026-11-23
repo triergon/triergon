@@ -3,14 +3,14 @@ use crate::{Error, Result};
 /// A visible picture size and the coded size around it: each dimension
 /// rounded up to a whole number of 16×16 macroblocks.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Geometry {
+pub struct MacroblockGeometry {
     pub(crate) width: usize,
     pub(crate) height: usize,
     pub(crate) mb_width: usize,
     pub(crate) mb_height: usize,
 }
 
-impl Geometry {
+impl MacroblockGeometry {
     /// Visible width in pixels.
     pub const fn width(self) -> usize {
         self.width
@@ -31,7 +31,7 @@ impl Geometry {
     /// A geometry of `width` × `height` visible pixels. Both must be even and
     /// from 2 to 4094, the range of the 12-bit MPEG-1 size fields;
     /// [`Error::Geometry`] otherwise.
-    pub fn new(width: u32, height: u32) -> Result<Geometry> {
+    pub fn new(width: u32, height: u32) -> Result<MacroblockGeometry> {
         if width == 0
             || height == 0
             || !width.is_multiple_of(2)
@@ -42,7 +42,7 @@ impl Geometry {
             return Err(Error::Geometry { width, height });
         }
         let (width, height) = (width as usize, height as usize);
-        Ok(Geometry {
+        Ok(MacroblockGeometry {
             width,
             height,
             mb_width: width.div_ceil(16),
@@ -66,22 +66,22 @@ impl Geometry {
     }
 }
 
-/// An 8-bit YUV 4:2:0 picture stored at the coded size of its [`Geometry`]:
-/// rows of [`luma_stride`](Geometry::luma_stride) and
-/// [`chroma_stride`](Geometry::chroma_stride) samples. After
+/// An 8-bit YUV 4:2:0 picture stored at the coded size of its [`MacroblockGeometry`]:
+/// rows of [`luma_stride`](MacroblockGeometry::luma_stride) and
+/// [`chroma_stride`](MacroblockGeometry::chroma_stride) samples. After
 /// [`pad_edges`](Self::pad_edges) the samples beyond the visible area repeat
 /// the nearest visible one.
 #[derive(Clone, Debug)]
-pub struct Picture {
-    pub(crate) geometry: Geometry,
+pub struct CodedPicture {
+    pub(crate) geometry: MacroblockGeometry,
     pub(crate) y: Vec<u8>,
     pub(crate) cb: Vec<u8>,
     pub(crate) cr: Vec<u8>,
 }
 
-impl Picture {
+impl CodedPicture {
     /// The picture's sizes.
-    pub const fn geometry(&self) -> Geometry {
+    pub const fn geometry(&self) -> MacroblockGeometry {
         self.geometry
     }
     /// The coded luma plane, padding included.
@@ -133,10 +133,10 @@ impl Picture {
     }
 
     /// A picture of luma 0 and chroma 128 throughout.
-    pub fn new(geometry: Geometry) -> Picture {
+    pub fn new(geometry: MacroblockGeometry) -> CodedPicture {
         let luma = geometry.luma_stride() * geometry.mb_height * 16;
         let chroma = geometry.chroma_stride() * geometry.mb_height * 8;
-        Picture {
+        CodedPicture {
             geometry,
             y: vec![0; luma],
             cb: vec![128; chroma],

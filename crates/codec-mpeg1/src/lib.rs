@@ -32,14 +32,14 @@ use planes::Planes;
 use rate::RateControl;
 pub use triergon_core::Budget;
 use triergon_core::{BudgetVec, Reservation};
-use triergon_pixel::{Geometry, Picture, PictureView};
+use triergon_pixel::{CodedPicture, MacroblockGeometry, PictureView};
 
 /// The parameters of one coded sequence. [`Encoder::new`] refuses values outside the
 /// ranges given here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EncoderConfig {
     /// Size of every input picture, and of the coded pictures.
-    pub geometry: Geometry,
+    pub geometry: MacroblockGeometry,
     /// Average rate the GOP allocation aims for, in bit/s; nonzero.
     pub bit_rate: u32,
     /// Rate at which the VBV buffer fills, in bit/s, and the sequence header's
@@ -237,12 +237,12 @@ impl Encoder {
 
     /// Code `input` as the next picture and replace the contents of `out` with its
     /// bytes. The input must have the configured geometry and its coded padding
-    /// filled ([`Picture::pad_edges`]).
+    /// filled ([`CodedPicture::pad_edges`]).
     ///
     /// A geometry mismatch is [`Error::PictureGeometry`]; storage refused before
     /// coding is [`Error::Budget`]. Either error codes nothing and leaves `out` as it
     /// was: release space and retry the same input at the same picture index.
-    pub fn encode(&mut self, input: &Picture, out: &mut Vec<u8>) -> Result<EncodedPicture> {
+    pub fn encode(&mut self, input: &CodedPicture, out: &mut Vec<u8>) -> Result<EncodedPicture> {
         if input.geometry() != self.cfg.geometry {
             return Err(Error::PictureGeometry {
                 expected: self.cfg.geometry,
@@ -283,7 +283,7 @@ fn validate(cfg: &EncoderConfig) -> Result<()> {
 /// macroblocks, so one full macroblock and guarded ones are all that can follow.
 fn picture_bound(cfg: &EncoderConfig) -> Result<usize> {
     let g = cfg.geometry;
-    // Geometry caps the macroblock count at 65 536.
+    // MacroblockGeometry caps the macroblock count at 65 536.
     let mbs = g.macroblock_width() * g.macroblock_height();
     let bits = (cfg.vbv_bits as usize)
         .checked_add(HEADER_BITS + MB_BITS + mbs * GUARDED_MB_BITS)
@@ -301,7 +301,7 @@ mod tests {
     #[test]
     fn the_default_limit_holds_the_largest_configuration() {
         let cfg = EncoderConfig {
-            geometry: Geometry::new(4094, 4094).unwrap(),
+            geometry: MacroblockGeometry::new(4094, 4094).unwrap(),
             bit_rate: 100_000_000,
             max_rate: 100_000_000,
             vbv_bits: 1023 * 16384,

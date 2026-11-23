@@ -11,7 +11,7 @@
 //! half-sample refinement, all on SAD plus a rate term.
 
 use crate::planes::samples;
-use triergon_pixel::Geometry;
+use triergon_pixel::MacroblockGeometry;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Mv {
@@ -40,7 +40,7 @@ pub(crate) struct Bounds {
 
 impl Bounds {
     /// `range` caps |component| (half-samples) to what the f_code can code.
-    pub(crate) fn new(g: &Geometry, mb_x: usize, mb_y: usize, range: i32) -> Bounds {
+    pub(crate) fn new(g: &MacroblockGeometry, mb_x: usize, mb_y: usize, range: i32) -> Bounds {
         let (w, h) = (
             (g.macroblock_width() * 16) as i32,
             (g.macroblock_height() * 16) as i32,
@@ -709,7 +709,7 @@ mod tests {
 
     #[test]
     fn bounds_keep_blocks_inside() {
-        let g = Geometry::new(64, 48).unwrap();
+        let g = MacroblockGeometry::new(64, 48).unwrap();
         let b = Bounds::new(&g, 0, 0, 256);
         assert!(b.contains(Mv { x: 0, y: 0 }));
         assert!(!b.contains(Mv { x: -1, y: 0 }));
@@ -734,7 +734,7 @@ mod tests {
 
     #[test]
     fn search_finds_a_translation() {
-        let g = Geometry::new(128, 96).unwrap();
+        let g = MacroblockGeometry::new(128, 96).unwrap();
         let stride = g.luma_stride();
         let texture = |x: usize, y: usize| {
             let (x, y) = (x as f64, y as f64);

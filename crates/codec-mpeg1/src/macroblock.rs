@@ -9,7 +9,7 @@ use crate::rate::VBV_GUARD_BITS;
 use crate::syntax::{PictureType, write_coefficients, write_dc, write_mv_component};
 use crate::tables::*;
 use crate::{block, dct};
-use triergon_pixel::{Geometry, Picture};
+use triergon_pixel::{CodedPicture, MacroblockGeometry};
 
 /// How `inter_mb` codes one macroblock of a P picture.
 #[derive(Clone, Copy)]
@@ -71,7 +71,7 @@ impl Encoder {
     )]
     pub(crate) fn encode_row(
         &mut self,
-        input: &Picture,
+        input: &CodedPicture,
         mb_y: usize,
         s: &mut SliceState,
         kind: PictureType,
@@ -153,7 +153,7 @@ impl Encoder {
     )]
     pub(crate) fn intra_mb<const MEASURE: bool>(
         &mut self,
-        input: &Picture,
+        input: &CodedPicture,
         mb_x: usize,
         mb_y: usize,
         address: usize,
@@ -238,7 +238,7 @@ impl Encoder {
     /// that is allowed and exact, and reconstruct it.
     pub(crate) fn inter_mb(
         &mut self,
-        input: &Picture,
+        input: &CodedPicture,
         mb_x: usize,
         mb_y: usize,
         address: usize,
@@ -439,7 +439,7 @@ enum Component {
 /// Component, stride and sample origin of block `b` of the macroblock at (mb_x, mb_y).
 #[inline]
 fn block_origin(
-    g: Geometry,
+    g: MacroblockGeometry,
     b: usize,
     mb_x: usize,
     mb_y: usize,

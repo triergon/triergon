@@ -1,4 +1,4 @@
-//! Picture analysis before coding: the motion vector and intra or inter decision of
+//! CodedPicture analysis before coding: the motion vector and intra or inter decision of
 //! every macroblock of a P picture, the scene-change test that turns a P picture into
 //! an I picture, and the per-row activity the rate model plans with.
 
@@ -6,7 +6,7 @@ use crate::motion::{self, Bounds, Coarse, Mv, Search};
 use crate::planes::samples;
 use crate::syntax::PictureType;
 use crate::{Encoder, Result};
-use triergon_pixel::Picture;
+use triergon_pixel::CodedPicture;
 
 /// Search window in half-samples (±64 luma samples).
 const SEARCH_RANGE: i32 = 128;
@@ -32,29 +32,29 @@ pub(crate) enum Repetition {
     /// The luma repeats and the chroma differs.
     Luma,
     /// Every plane repeats.
-    Picture,
+    CodedPicture,
 }
 
 impl Encoder {
     /// How `input` repeats the previous source picture.
-    pub(crate) fn repetition(&self, input: &Picture) -> Repetition {
+    pub(crate) fn repetition(&self, input: &CodedPicture) -> Repetition {
         if input.y() != &self.previous_luma[..] {
             return Repetition::None;
         }
         let (previous_cb, previous_cr) = self.previous_chroma.split_at(input.cb().len());
         if input.cb() == previous_cb && input.cr() == previous_cr {
-            Repetition::Picture
+            Repetition::CodedPicture
         } else {
             Repetition::Luma
         }
     }
 
     /// Keep `input` as the previous source picture, copying the planes that changed.
-    pub(crate) fn remember_source(&mut self, input: &Picture, repetition: Repetition) {
+    pub(crate) fn remember_source(&mut self, input: &CodedPicture, repetition: Repetition) {
         if repetition == Repetition::None {
             self.previous_luma.copy_from_slice(input.y());
         }
-        if repetition != Repetition::Picture {
+        if repetition != Repetition::CodedPicture {
             let (cb, cr) = self.previous_chroma.split_at_mut(input.cb().len());
             cb.copy_from_slice(input.cb());
             cr.copy_from_slice(input.cr());
@@ -85,7 +85,7 @@ impl Encoder {
     /// content rather than about the reconstruction's quantisation.
     pub(crate) fn analyse(
         &mut self,
-        input: &Picture,
+        input: &CodedPicture,
         same_source_luma: bool,
     ) -> Result<(u32, bool)> {
         let g = self.cfg.geometry;
@@ -229,7 +229,7 @@ impl Encoder {
     }
 
     /// Per-row intra activity of an I picture.
-    pub(crate) fn intra_analysis(&mut self, input: &Picture) {
+    pub(crate) fn intra_analysis(&mut self, input: &CodedPicture) {
         let g = self.cfg.geometry;
         let stride = g.luma_stride();
         for mb_y in 0..g.macroblock_height() {

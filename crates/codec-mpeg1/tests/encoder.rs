@@ -1,8 +1,8 @@
 use triergon_codec_mpeg1::{Budget, Encoder, EncoderConfig, Error, Limits};
-use triergon_pixel::{Geometry, Picture};
+use triergon_pixel::{CodedPicture, MacroblockGeometry};
 fn cfg() -> EncoderConfig {
     EncoderConfig {
-        geometry: Geometry::new(16, 16).unwrap(),
+        geometry: MacroblockGeometry::new(16, 16).unwrap(),
         bit_rate: 1_000_000,
         max_rate: 1_400_000,
         vbv_bits: 142_857,
@@ -31,8 +31,11 @@ fn a_max_rate_the_header_would_code_as_variable_bit_rate_is_refused() {
     })
     .unwrap();
     let mut out = Vec::new();
-    e.encode(&Picture::new(Geometry::new(16, 16).unwrap()), &mut out)
-        .unwrap();
+    e.encode(
+        &CodedPicture::new(MacroblockGeometry::new(16, 16).unwrap()),
+        &mut out,
+    )
+    .unwrap();
     assert_eq!(out[..4], [0, 0, 1, 0xB3]);
     let bit_rate = u32::from_be_bytes([0, out[8], out[9], out[10]]) >> 6;
     assert_eq!(bit_rate, 0x3FFFE);
@@ -56,14 +59,14 @@ fn a_vbv_buffer_below_one_picture_at_the_average_rate_is_refused() {
 #[test]
 fn mismatched_picture_returns_owner_unchanged_before_encoder_mutation() {
     let mut e = Encoder::new(cfg()).unwrap();
-    let p = Picture::new(Geometry::new(32, 16).unwrap());
+    let p = CodedPicture::new(MacroblockGeometry::new(32, 16).unwrap());
     let mut out = vec![1, 2, 3];
     assert!(matches!(
         e.encode(&p, &mut out),
         Err(Error::PictureGeometry { .. })
     ));
     assert_eq!(out, [1, 2, 3]);
-    let p = Picture::new(Geometry::new(16, 16).unwrap());
+    let p = CodedPicture::new(MacroblockGeometry::new(16, 16).unwrap());
     let first = e.encode(&p, &mut out).unwrap();
     assert!(first.key && first.index == 0);
     assert_eq!(first.bits, out.len() * 8);
@@ -86,7 +89,7 @@ fn a_refused_output_charge_changes_no_state_and_the_pool_drains_on_drop() {
     let budget = Budget::new(1 << 20).unwrap();
     let idle = budget.used();
     let mut e = Encoder::new_in(cfg(), &budget).unwrap();
-    let p = Picture::new(Geometry::new(16, 16).unwrap());
+    let p = CodedPicture::new(MacroblockGeometry::new(16, 16).unwrap());
     let mut out = Vec::new();
     let held = budget.reserve(budget.available()).unwrap();
     assert!(matches!(
@@ -106,7 +109,7 @@ fn motion_scratch_backpressure_retries_the_same_picture_exactly() {
     let budget = Budget::new(1 << 20).unwrap();
     let mut retry = Encoder::new_in(cfg(), &budget).unwrap();
     let mut control = Encoder::new(cfg()).unwrap();
-    let mut input = Picture::new(cfg().geometry);
+    let mut input = CodedPicture::new(cfg().geometry);
     for (index, sample) in input.y_mut().iter_mut().enumerate() {
         *sample = (index % 197) as u8;
     }
@@ -155,7 +158,7 @@ fn motion_scratch_backpressure_retries_the_same_picture_exactly() {
 fn repeated_luma_needs_no_motion_scratch_even_when_chroma_changes() {
     let budget = Budget::new(1 << 20).unwrap();
     let mut encoder = Encoder::new_in(cfg(), &budget).unwrap();
-    let mut input = Picture::new(cfg().geometry);
+    let mut input = CodedPicture::new(cfg().geometry);
     let mut out = Vec::new();
     encoder.encode(&input, &mut out).unwrap();
     input.cb_mut().fill(97);
