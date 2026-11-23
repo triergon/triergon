@@ -1,6 +1,7 @@
 //! Recognising an elementary stream from its first bytes.
 use triergon_bitstream::crc::crc16_a52;
 use triergon_framing::{
+    aac::{AacAdtsHeader, inspect_adts_header},
     ac3,
     flac::{FlacBlocking, FlacFrameHeader},
     mpeg_audio::MpegAudioHeader,
@@ -59,7 +60,12 @@ pub fn probe(bytes: &[u8]) -> Option<Kind> {
     for at in 1..bytes.len() {
         let rest = &bytes[at..];
         match rest[0] {
-            0xff if consecutive(rest, 3, adts_frame, PartialEq::eq) => return Some(Kind::Adts),
+            0xff if consecutive(rest, 3, adts_frame, |a, b| {
+                a.mpeg2_id() == b.mpeg2_id() && a.frequency_index() == b.frequency_index()
+            }) =>
+            {
+                return Some(Kind::Adts);
+            }
             0x0b if consecutive(rest, 3, ac3_frame, PartialEq::eq) => return Some(Kind::Ac3),
             _ => {}
         }
@@ -111,14 +117,12 @@ fn consecutive<H>(
     true
 }
 
-/// An ADTS header's MPEG version and sampling frequency index, and its frame length;
-/// ADTS sets the two layer bits MPEG audio reserves.
-fn adts_frame(b: &[u8]) -> Option<((u8, u8), usize)> {
-    if b.len() < 7 || b[0] != 0xff || b[1] & 0xf6 != 0xf0 {
-        return None;
-    }
-    let len = (usize::from(b[3] & 3) << 11) | (usize::from(b[4]) << 3) | usize::from(b[5] >> 5);
-    (len >= 7).then_some(((b[1] & 0x08, b[2] & 0x3c), len))
+/// Probe by wire extent and sync. The reader also requires a known sample rate and
+/// room for audio after the header and CRC.
+fn adts_frame(b: &[u8]) -> Option<(AacAdtsHeader, usize)> {
+    let header = inspect_adts_header(b).ok()?;
+    let len = usize::from(header.frame_length());
+    (header.syncword() == 0xfff && header.layer() == 0 && len >= 7).then_some((header, len))
 }
 
 fn mpeg_frame(b: &[u8]) -> Option<(MpegAudioHeader, usize)> {
@@ -132,7 +136,8 @@ fn ac3_frame(b: &[u8]) -> Option<(u32, usize)> {
     (header.frame_bytes > 0).then_some((header.sample_rate_hz, header.frame_bytes))
 }
 
-/// Bytes of an ID3v2 tag at the start of `bytes`, footer included.
+/// Bytes to skip while probing, counting a signalled footer for any version.
+/// [`crate::tags::id3v2`] validates version bytes and counts a footer only from v2.4.
 fn id3v2_len(bytes: &[u8]) -> Option<usize> {
     let header = bytes.get(..10)?;
     if &header[..3] != b"ID3" || header[6..10].iter().any(|&b| b & 0x80 != 0) {

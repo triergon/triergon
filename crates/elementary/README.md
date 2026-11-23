@@ -30,6 +30,11 @@ assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100))
 
 ## Behaviour and limits
 
+The readers follow the packetization of FFmpeg 9.0.2's raw demuxers where the formats
+leave room, including how bytes between frames and incomplete tails are delivered.
+The public API exposes this single packetization policy. Frame headers, sample counts
+and retained metadata follow the format syntax.
+
 All four formats run one frame-stream engine: leading ID3v2 tags, the format's
 opening, a sync confirmed by the frames after it, then access units until a trailing
 ID3v1 or APEv2 tag or the end. Packet times are samples (`1/sample_rate`); every frame
