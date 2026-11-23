@@ -577,6 +577,7 @@ where
             }
         };
         let initial_raster = self.video.as_slice()[0].raster();
+        // Sealing sets the tail clock and retains the selected PMT tracks for the segment.
         let video_tail90 = self
             .video_tail90
             .ok_or(Error::Invalid("sealed video clock"))?;
@@ -611,6 +612,7 @@ where
                 match player.read_output(&mut slot, work, cancel)? {
                     Progress::Yield => {}
                     Progress::Queued => {
+                        // Queued means the player filled the caller-provided slot.
                         let output = slot.ok_or(Error::Invalid("HLS player output"))?;
                         self.on_event(output.into_event())?;
                     }
@@ -639,6 +641,7 @@ where
                         }
                         self.phase = Phase::EndVideo;
                     }
+                    // This private player only reads the segment from start to end.
                     _ => return Err(Error::Invalid("unexpected HLS player state")),
                 }
             }

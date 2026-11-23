@@ -198,6 +198,7 @@ impl<S: Source> Transport<S> {
                     if work.remaining() == 0 {
                         return Ok(FeedStep::Yield);
                     }
+                    // An unaccepted source reply leaves the current request outstanding.
                     let request = self
                         .request
                         .clone()
@@ -461,6 +462,7 @@ impl<S: Source> TsProgressiveReader<S> {
     /// Makes the reader of a configured track, once per track.
     #[cold]
     fn configure(&mut self, config: AdmittedCarriage) -> Result<()> {
+        // The feed delivers the PMT before its track configuration.
         let tracks = self
             .tracks
             .as_ref()
@@ -513,6 +515,7 @@ impl<S: Source> TsProgressiveReader<S> {
         mailbox: &mut Option<P>,
         clock: &triergon_mpegts::compat::pes::DemuxTimeView,
     ) -> Result<()> {
+        // The active PMT determines which assembler owns the packet.
         let tracks = self
             .tracks
             .as_ref()

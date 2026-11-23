@@ -397,6 +397,7 @@ impl PesWork {
         match parser.step(work, cancel)? {
             PesProgress::Yield => Ok(None),
             PesProgress::Packet(packet) => Ok(Some(self.codec.insert(packet))),
+            // The parser has this PES until it reports completion.
             PesProgress::NeedPacket => Err(Error::Invalid("DVB parser input disappeared")),
         }
     }

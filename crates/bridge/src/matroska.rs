@@ -295,6 +295,7 @@ fn parse(
 }
 
 /// A configuration parser that ended without its record.
+// A completed framing job must already have delivered its configuration.
 const SETUP_LOST: Error = Error::Invalid("AVC/AAC setup lost its configuration");
 
 /// The feed of one bound AVC or AAC track.

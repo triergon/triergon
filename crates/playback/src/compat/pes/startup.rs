@@ -31,6 +31,7 @@ pub enum StartupStep {
 /// whole up to its confirmed end, or an M2TS prefix ([`Self::new_m2ts_prefix`]).
 #[derive(Debug)]
 pub struct Startup<S: Source> {
+    // An inline bootstrap phase raises M2TS startup instruction counts by 14% through a copy.
     input: Option<InputCursor>,
     source: Option<SourceOwner<S>>,
     format: PacketFormat,

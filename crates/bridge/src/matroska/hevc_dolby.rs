@@ -170,6 +170,7 @@ impl MatroskaHevcDolbySetup {
                     HevcAnnexBConfig::new(record)?,
                 ))),
                 BuildStep::Yield => Ok(BuildStep::Yield),
+                // A completed framing job must already have delivered its configuration.
                 BuildStep::Complete => Err(Error::Invalid("HEVC setup lost its configuration")),
             },
             SetupCodec::Dolby(codec) => {

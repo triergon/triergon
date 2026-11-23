@@ -569,10 +569,12 @@ impl TsEngine {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<T> {
+        // Borrow the packet until its clock is ready to leave it pending across a yield.
         let packet = self
             .pes_pending
             .as_ref()
             .ok_or(Error::Invalid("pending PES packet missing"))?;
+        // The PMT installs the projector before a PES can be delivered.
         let projector = self
             .pes_clock
             .as_mut()
@@ -584,6 +586,7 @@ impl TsEngine {
         let Some(clock) = projector.project_header(pid, epochs, header, work, cancel)? else {
             return T::project(FeedStep::Yield);
         };
+        // Clock projection succeeded above, so the packet can now be moved into the output.
         let packet = self
             .pes_pending
             .take()
@@ -774,6 +777,7 @@ impl TsEngine {
             {
                 return T::project(FeedStep::Yield);
             }
+            // A source event stays pending until its delivery path is chosen.
             let event = self
                 .pending
                 .as_ref()
@@ -793,6 +797,7 @@ impl TsEngine {
                             | TraceEvent::Timeline { .. }
                     ))
             {
+                // Feed-only events are consumed here without passing through source-event delivery.
                 let event = self
                     .pending
                     .take()
@@ -934,6 +939,7 @@ impl TsEngine {
         w: &mut WorkBudget,
         c: &AtomicBool,
     ) -> Result<T> {
+        // Clock projection borrows the pending event because it can yield.
         let event = self
             .pending
             .as_ref()
@@ -969,6 +975,7 @@ impl TsEngine {
                 return T::project(FeedStep::Yield);
             }
         }
+        // Taking the source event follows completion of its clock projection.
         let event = self
             .pending
             .take()
