@@ -49,7 +49,7 @@ pub const SUITES: [Suite; 7] = [
         inputs: &[".research/flac-test-files", ".research/flac-generated"],
     },
     Suite {
-        source: "crates/codec-h264/tests/conformance.rs",
+        source: "crates/codec-h264/tests/vectors.rs",
         inputs: &[".research/fate-samples/h264-conformance"],
     },
     Suite {
@@ -57,7 +57,7 @@ pub const SUITES: [Suite; 7] = [
         inputs: &[".research/fate-samples/h264-conformance"],
     },
     Suite {
-        source: "crates/codec-hevc/tests/conformance.rs",
+        source: "crates/codec-hevc/tests/vectors.rs",
         inputs: &[".research/fate-samples/hevc-conformance"],
     },
 ];

@@ -2,8 +2,8 @@
 
 use triergon_codec_hevc::{DecodeError, Decoder};
 
-mod common;
-use common::{access_unit, bare_nal, slice_segment};
+mod support;
+use support::{access_unit, bare_nal, slice_segment};
 
 /// A picture whose first slice references nothing, then a P slice of it that does: the
 /// P slice is refused, and a later slice of the same picture, fed NAL unit by NAL unit,

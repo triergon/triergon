@@ -6,8 +6,8 @@
 use triergon_codec::{Budget, Error};
 use triergon_codec_hevc::{DecodeError, Decoder, Limits};
 
-mod common;
-use common::{access_unit, idr_access_unit, nal, p_slice};
+mod support;
+use support::{access_unit, idr_access_unit, nal, p_slice};
 
 /// Send `au`, which the filler slice data may make invalid, but not over budget.
 fn send_within_budget(decoder: &mut Decoder, au: &[u8]) {
