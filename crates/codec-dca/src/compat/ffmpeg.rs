@@ -17,7 +17,7 @@ pub enum Policy {
 impl Policy {
     pub(crate) fn prototype(self) -> &'static [f64; 512] {
         match self {
-            Self::Specification => &crate::tables::QMF_PERFECT,
+            Self::Specification => &crate::perfect_reconstruction::QMF_PERFECT,
             Self::Reference => &pr_table::QMF_PERFECT_REF,
         }
     }

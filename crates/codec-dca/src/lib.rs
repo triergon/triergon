@@ -17,6 +17,8 @@ mod frame;
 mod header;
 mod lfe;
 mod pack;
+#[rustfmt::skip]
+mod perfect_reconstruction;
 mod qmf;
 mod subframe;
 #[rustfmt::skip]
