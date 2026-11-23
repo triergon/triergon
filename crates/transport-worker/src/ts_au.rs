@@ -521,6 +521,7 @@ fn operation<const TRACE: bool>(
     let mut deferred_continuity = None;
     let mut recovered = None;
     let mut observed_media = false;
+    let mut unproved = None;
     let (proof, reader_refusal) = loop {
         let step = match reader.step_with_carriers(&mut WorkBudget::new(WORK), cancel, |_| ()) {
             Ok(step) => step,
@@ -798,15 +799,17 @@ fn operation<const TRACE: bool>(
                     }
                     _ => None,
                 };
-                let refusal = refused(
+                if let Some(trigger) = recovery {
+                    // The observation's text is the refusal only when the recovery
+                    // proof fails, so it is written then.
+                    unproved = Some((event, at));
+                    break (SourceProof::OpaqueRecovery(trigger), totals);
+                }
+                return Ok(refused(
                     totals,
                     &format!("incomplete access-unit observation: {event:?}"),
                     at,
-                );
-                if let Some(trigger) = recovery {
-                    break (SourceProof::OpaqueRecovery(trigger), refusal);
-                }
-                return Ok(refusal);
+                ));
             }
             Step::Ready(_) => return Err("unexpected container event".into()),
             Step::Yield => (),
@@ -902,7 +905,17 @@ fn operation<const TRACE: bool>(
     // completed reader attempt before reserving storage for the replay.
     drop(reader);
     drop(tracks);
-    Ok(prove_source(pool, request, proof, cancel)?.unwrap_or(reader_refusal))
+    Ok(match prove_source(pool, request, proof, cancel)? {
+        Some(totals) => totals,
+        None => match unproved {
+            Some((event, at)) => refused(
+                reader_refusal,
+                &format!("incomplete access-unit observation: {event:?}"),
+                at,
+            ),
+            None => reader_refusal,
+        },
+    })
 }
 
 #[cold]
