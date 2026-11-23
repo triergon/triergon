@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::io::Write;
 
 use triergon::Budget;
-use triergon_codec_mpeg1::{Encoder, EncoderConfig, EncodeError, Limits};
+use triergon_codec_mpeg1::{EncodeError, Encoder, EncoderConfig, Limits};
 use triergon_pixel::{CodedPicture, MacroblockGeometry};
 
 use triergon_harness_runner::{Operation, Totals};
