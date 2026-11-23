@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 //! Decode a Matroska file and render a separate ASS script at a time in milliseconds.
 
 use std::{env, path::Path};
@@ -17,5 +19,3 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     Ok(())
 }
-#![forbid(unsafe_code)]
-
