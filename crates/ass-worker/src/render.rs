@@ -26,7 +26,6 @@ use triergon_harness_runner::{Boundary, Invocation, Mode, Totals, write_summary}
 
 use crate::fixture::{Command, Fixture, Frames as Frames_, frames_error};
 use crate::perform::{Result, parse};
-use crate::record::Work;
 
 const USAGE: &str =
     "usage: ass-worker ass-render-fold FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H [KEY=VALUE ...]
@@ -157,7 +156,7 @@ trait Frames {
 
 /// The protocol's digest of the images.
 #[derive(Debug, Default)]
-struct Folded(Work);
+struct Folded(Totals);
 
 impl Frames for Folded {
     fn frame(&mut self, now: i64, change: Change, images: &[Image]) -> io::Result<()> {
@@ -389,13 +388,15 @@ pub fn run(args: &[String]) -> Result<()> {
         Boundary::Begin.mark(&mut out)?;
     }
     let bench = action == Mode::Bench;
-    let (mut total, mut elapsed) = (Work::default(), Duration::ZERO);
+    let (mut total, mut elapsed) = (Totals::default(), Duration::ZERO);
     for _ in 0..iterations {
         let mut folded = Folded::default();
         let rendered = case.render(&budget, std::hint::black_box(&data), &mut folded)?;
         elapsed += rendered.elapsed;
         drop(rendered);
-        total.accumulate(&folded.0);
+        total.packets += folded.0.packets;
+        total.bytes += folded.0.bytes;
+        fold(&mut total.digest, folded.0.digest);
     }
     let elapsed = if bench { elapsed.as_nanos() } else { 0 };
     if memory {
@@ -406,11 +407,6 @@ pub fn run(args: &[String]) -> Result<()> {
         "ass-render",
         iterations,
         elapsed,
-        &Totals {
-            packets: total.packets,
-            bytes: total.bytes,
-            digest: total.digest,
-            refusal: None,
-        },
+        &total,
     )?)
 }

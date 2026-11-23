@@ -11,7 +11,8 @@ use triergon_core::{Budget, Error};
 use triergon_raster::Outline;
 
 use crate::fixture::Command;
-use crate::record::{Kind, Sink, fnv};
+use crate::record::{Kind, Values};
+use triergon_harness_runner::records::{FNV_OFFSET, fnv};
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -42,7 +43,7 @@ const fn karaoke_code(kind: Option<Karaoke>) -> i64 {
     }
 }
 
-fn style(sink: &mut impl Sink, index: usize, s: &Style) -> io::Result<()> {
+fn style(sink: &mut impl Values, index: usize, s: &Style) -> io::Result<()> {
     sink.begin(Kind::Style)?;
     sink.int(index as i64)?;
     sink.text(s.name())?;
@@ -76,7 +77,7 @@ fn style(sink: &mut impl Sink, index: usize, s: &Style) -> io::Result<()> {
 }
 
 /// The track: header values, formats, styles, events and embedded fonts.
-pub fn record_script(sink: &mut impl Sink, script: &Script) -> io::Result<()> {
+pub fn record_script(sink: &mut impl Values, script: &Script) -> io::Result<()> {
     let info = script.info();
     sink.begin(Kind::Track)?;
     let kind = match info.script_type {
@@ -144,10 +145,7 @@ pub fn record_script(sink: &mut impl Sink, script: &Script) -> io::Result<()> {
         sink.begin(Kind::Font)?;
         sink.int(i as i64)?;
         sink.text(&font.name)?;
-        sink.ints(&[
-            font.data.len() as i64,
-            fnv(0xcbf2_9ce4_8422_2325, &font.data) as i64,
-        ])?;
+        sink.ints(&[font.data.len() as i64, fnv(FNV_OFFSET, &font.data) as i64])?;
         sink.end()?;
     }
     Ok(())
@@ -170,7 +168,7 @@ pub fn parse(
 /// A stream fixture's commands on a new track, recording it at every
 /// `@dump` and at the end.
 pub fn run_stream(
-    sink: &mut impl Sink,
+    sink: &mut impl Values,
     budget: &Budget,
     options: &triergon_ass::Options<'_>,
     commands: &[Command<'_>],
@@ -224,7 +222,12 @@ impl Walker {
     }
 
     /// The play resolution, then every event at every time.
-    pub fn walk_all(&mut self, sink: &mut impl Sink, script: &Script, times: &[i64]) -> Result<()> {
+    pub fn walk_all(
+        &mut self,
+        sink: &mut impl Values,
+        script: &Script,
+        times: &[i64],
+    ) -> Result<()> {
         let (x, y) = script.info().play_res();
         sink.begin(Kind::PlayRes)?;
         sink.ints(&[x.into(), y.into()])?;
@@ -239,7 +242,7 @@ impl Walker {
 
     fn drawing(
         &mut self,
-        sink: &mut impl Sink,
+        sink: &mut impl Values,
         kind: Kind,
         text: &[u8],
         script: &Script,
@@ -252,7 +255,7 @@ impl Walker {
 
     fn walk(
         &mut self,
-        sink: &mut impl Sink,
+        sink: &mut impl Values,
         script: &Script,
         index: usize,
         now: i64,
@@ -296,7 +299,7 @@ impl Walker {
     /// Karaoke over synthetic positions: runs start at the first glyph, a
     /// nonzero karaoke time, a new karaoke kind and either side of a drawing;
     /// every glyph is 10 pixels plus its index mod 3 wide, spaces invisible.
-    fn karaoke(&mut self, sink: &mut impl Sink, elapsed: i64) -> Result<()> {
+    fn karaoke(&mut self, sink: &mut impl Values, elapsed: i64) -> Result<()> {
         let mut last_kind = self.glyphs.first().and_then(|g| g.karaoke.mark.kind);
         let mut x = 0;
         self.karaoke.clear();
@@ -345,7 +348,7 @@ impl Walker {
     }
 }
 
-fn record_glyph(sink: &mut impl Sink, g: &Glyph<'_>) -> io::Result<()> {
+fn record_glyph(sink: &mut impl Values, g: &Glyph<'_>) -> io::Result<()> {
     sink.begin(Kind::Glyph)?;
     sink.int(g.offset as i64)?;
     match g.symbol {
@@ -390,7 +393,7 @@ fn record_glyph(sink: &mut impl Sink, g: &Glyph<'_>) -> io::Result<()> {
     sink.end()
 }
 
-fn record_state(sink: &mut impl Sink, context: &Context<'_>) -> io::Result<()> {
+fn record_state(sink: &mut impl Values, context: &Context<'_>) -> io::Result<()> {
     let s = context.state();
     sink.begin(Kind::State)?;
     sink.ints(&[

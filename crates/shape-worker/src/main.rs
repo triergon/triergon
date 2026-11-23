@@ -8,7 +8,7 @@
 mod record;
 mod unicode;
 
-use record::{Dump, Record, Sink, Work};
+use record::{Record, Records};
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::ops::Range;
@@ -16,6 +16,8 @@ use std::process::ExitCode;
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::compat::libass;
 use triergon_font::{Font, Limits};
+use triergon_harness_protocol::digest::fold;
+use triergon_harness_runner::records::Dump;
 use triergon_harness_runner::{
     Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
 };
@@ -222,7 +224,7 @@ fn shape_text(
     file: &Bytes,
     budget: &Budget,
     settings: &Settings,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let faces = Font::face_count(file.as_ref()).unwrap_or(0);
     let mut buffer = Buffer::new(budget);
@@ -262,7 +264,7 @@ fn shape_texts(
     budget: &Budget,
     settings: &Settings,
     buffer: &mut Buffer,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let face = Face::new(font);
     let plan = Plan::new(
@@ -306,7 +308,7 @@ fn shape_texts(
 
 /// Every glyph's extents through [`OtMetrics`] at units per em, the font
 /// functions `shape` uses, for every face of the file.
-fn shape_extents(file: &Bytes, budget: &Budget, sink: &mut impl Sink) -> Result<()> {
+fn shape_extents(file: &Bytes, budget: &Budget, sink: &mut impl Records) -> Result<()> {
     let faces = Font::face_count(file.as_ref()).unwrap_or(0);
     for index in 0..faces {
         let Ok(font) = Font::new(file.clone(), index, budget, Limits::default()) else {
@@ -378,7 +380,7 @@ fn shape_bidi(
     budget: &Budget,
     base: BaseDirection,
     brackets: bool,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let mut resolver = Resolver::new(budget);
     for (index, line) in lines(data).enumerate() {
@@ -406,7 +408,7 @@ fn shape_simple(
     data: &[u8],
     budget: &Budget,
     base: BaseDirection,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let mut resolver = Resolver::new(budget);
     for (index, line) in lines(data).enumerate() {
@@ -427,7 +429,7 @@ fn shape_simple(
     Ok(())
 }
 
-fn shape_unicode(data: &[u8], sink: &mut impl Sink) -> Result<()> {
+fn shape_unicode(data: &[u8], sink: &mut impl Records) -> Result<()> {
     for (index, line) in lines(data).enumerate() {
         let range = line.iter().position(|&b| b == b' ').and_then(|space| {
             let (first, last) = (scalar(&line[..space])?, scalar(&line[space + 1..])?);
@@ -446,7 +448,12 @@ fn shape_unicode(data: &[u8], sink: &mut impl Sink) -> Result<()> {
     Ok(())
 }
 
-fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Sink) -> Result<()> {
+fn read(
+    file: &Bytes,
+    budget: &Budget,
+    operation: &Operation,
+    sink: &mut impl Records,
+) -> Result<()> {
     match operation {
         Operation::Shape(settings) => shape_text(file, budget, settings, sink),
         Operation::Bidi(base, brackets) => {
@@ -536,11 +543,13 @@ fn run(args: &[String]) -> Result<()> {
         Boundary::Begin.mark(&mut out)?;
     }
     let start = Timer::start(action == RunMode::Bench);
-    let mut total = Work::default();
+    let mut total = Totals::default();
     for _ in 0..iterations {
-        let mut work = Work::default();
+        let mut work = Totals::default();
         read(std::hint::black_box(&file), &budget, &operation, &mut work)?;
-        total.accumulate(&work);
+        total.packets += work.packets;
+        total.bytes += work.bytes;
+        fold(&mut total.digest, work.digest);
         if budget.used() != retained {
             return Err("shaping operation retained charged storage".into());
         }
@@ -554,12 +563,7 @@ fn run(args: &[String]) -> Result<()> {
         operation.name(),
         iterations,
         elapsed,
-        &Totals {
-            packets: total.packets,
-            bytes: total.bytes,
-            digest: total.digest,
-            refusal: None,
-        },
+        &total,
     )?)
 }
 

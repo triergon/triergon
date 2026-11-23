@@ -13,11 +13,13 @@ mod render;
 
 use fixture::Fixture;
 use perform::{Result, Walker, parse, record_script, run_stream};
-use record::{Dump, Kind, Sink, Work};
+use record::{Kind, Values};
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use triergon_ass::{Options, Script};
 use triergon_core::Budget;
+use triergon_harness_protocol::digest::fold;
+use triergon_harness_runner::records::Dump;
 use triergon_harness_runner::{
     Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
 };
@@ -55,7 +57,7 @@ fn parse_args(args: &[String]) -> Result<(Invocation<'_>, Mode)> {
 
 /// One operation.
 fn operation(
-    sink: &mut impl Sink,
+    sink: &mut impl Values,
     budget: &Budget,
     data: &[u8],
     fixture: &Fixture<'_>,
@@ -115,7 +117,7 @@ fn run(args: &[String]) -> Result<()> {
     let walked = match mode {
         Mode::Events { stream: false } => parse(&budget, &data, &options)?,
         Mode::Events { stream: true } => Some(run_stream(
-            &mut Work::default(),
+            &mut Totals::default(),
             &budget,
             &options,
             &fixture.commands,
@@ -142,9 +144,9 @@ fn run(args: &[String]) -> Result<()> {
         Boundary::Begin.mark(&mut out)?;
     }
     let start = Timer::start(action == RunMode::Bench);
-    let mut total = Work::default();
+    let mut total = Totals::default();
     for _ in 0..iterations {
-        let mut work = Work::default();
+        let mut work = Totals::default();
         operation(
             &mut work,
             &budget,
@@ -154,7 +156,9 @@ fn run(args: &[String]) -> Result<()> {
             mode,
             walked.as_ref(),
         )?;
-        total.accumulate(&work);
+        total.packets += work.packets;
+        total.bytes += work.bytes;
+        fold(&mut total.digest, work.digest);
         if budget.used() != retained {
             return Err("ass operation retained charged storage".into());
         }
@@ -168,12 +172,7 @@ fn run(args: &[String]) -> Result<()> {
         "ass-parse",
         iterations,
         elapsed,
-        &Totals {
-            packets: total.packets,
-            bytes: total.bytes,
-            digest: total.digest,
-            refusal: None,
-        },
+        &total,
     )?)
 }
 

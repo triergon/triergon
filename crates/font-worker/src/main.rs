@@ -7,13 +7,14 @@
 mod record;
 mod store;
 
-use record::{Dump, Record, Sink, Size, Style, Work};
+use record::{Dump, Record, Sink, Size, Style};
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_font::compat::libass::{self, Synthesis};
 use triergon_font::{Font, GlyphId, Limits, Load, NameRecord, Outline, OutlineFormat, SizedFont};
+use triergon_harness_protocol::digest::fold;
 use triergon_harness_runner::{
     Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
 };
@@ -374,11 +375,13 @@ fn run(args: &[String]) -> Result<()> {
         Boundary::Begin.mark(&mut out)?;
     }
     let start = Timer::start(action == RunMode::Bench);
-    let mut total = Work::default();
+    let mut total = Totals::default();
     for _ in 0..iterations {
-        let mut work = Work::default();
+        let mut work = Totals::default();
         read(std::hint::black_box(&file), &budget, &operation, &mut work)?;
-        total.accumulate(&work);
+        total.packets += work.packets;
+        total.bytes += work.bytes;
+        fold(&mut total.digest, work.digest);
         if budget.used() != retained {
             return Err("font operation retained charged storage".into());
         }
@@ -392,12 +395,7 @@ fn run(args: &[String]) -> Result<()> {
         operation.name(),
         iterations,
         elapsed,
-        &Totals {
-            packets: total.packets,
-            bytes: total.bytes,
-            digest: total.digest,
-            refusal: None,
-        },
+        &total,
     )?)
 }
 

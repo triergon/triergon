@@ -12,13 +12,15 @@ mod record;
 
 use case::{Case, Glyph};
 use perform::Runner;
-use record::{Dump, Kind, Sink, Work};
+use record::{Kind, Values};
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 use triergon_core::{Budget, Bytes};
 use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Limits};
+use triergon_harness_protocol::digest::fold;
+use triergon_harness_runner::records::Dump;
 use triergon_harness_runner::{
     Boundary, Invocation, Mode as RunMode, Timer, Totals, write_summary,
 };
@@ -97,19 +99,19 @@ fn load(file: &Bytes, budget: &Budget, height: i32, count: usize) -> Selection {
 }
 
 /// The records of the selection, before the cases.
-fn record_selection(selection: &Selection, sink: &mut impl Sink) -> io::Result<()> {
+fn record_selection(selection: &Selection, sink: &mut impl Values) -> io::Result<()> {
     sink.begin(Kind::Glyphs)?;
     let Some(glyphs) = selection else {
         sink.absent()?;
         return sink.end();
     };
-    sink.value(glyphs.len() as i64)?;
+    sink.int(glyphs.len() as i64)?;
     sink.end()?;
     for (id, glyph) in glyphs {
         sink.begin(Kind::Glyph)?;
-        sink.value((*id).into())?;
+        sink.int((*id).into())?;
         match glyph {
-            Some(glyph) => sink.value(glyph.points.len() as i64)?,
+            Some(glyph) => sink.int(glyph.points.len() as i64)?,
             None => sink.absent()?,
         }
         sink.end()?;
@@ -122,7 +124,7 @@ fn read(
     budget: &Budget,
     selection: Option<&Selection>,
     cases: &[Option<Case>],
-    sink: &mut impl Sink,
+    sink: &mut impl Values,
 ) -> io::Result<()> {
     if let Some(selection) = selection {
         record_selection(selection, sink)?;
@@ -221,16 +223,18 @@ fn run(args: &[String]) -> Result<()> {
         Boundary::Begin.mark(&mut out)?;
     }
     let start = Timer::start(action == RunMode::Bench);
-    let mut total = Work::default();
+    let mut total = Totals::default();
     for _ in 0..iterations {
-        let mut work = Work::default();
+        let mut work = Totals::default();
         read(
             &budget,
             selection.as_ref(),
             std::hint::black_box(&cases),
             &mut work,
         )?;
-        total.accumulate(&work);
+        total.packets += work.packets;
+        total.bytes += work.bytes;
+        fold(&mut total.digest, work.digest);
         if budget.used() != retained {
             return Err("raster operation retained charged storage".into());
         }
@@ -240,16 +244,7 @@ fn run(args: &[String]) -> Result<()> {
         Boundary::End.mark(&mut out)?;
     }
     Ok(write_summary(
-        &mut out,
-        "raster",
-        iterations,
-        elapsed,
-        &Totals {
-            packets: total.packets,
-            bytes: total.bytes,
-            digest: total.digest,
-            refusal: None,
-        },
+        &mut out, "raster", iterations, elapsed, &total,
     )?)
 }
 

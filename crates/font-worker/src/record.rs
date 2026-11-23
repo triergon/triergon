@@ -1,5 +1,6 @@
 //! The values the font operations read, and the two ways of consuming them: the
-//! ordered work digest of the harness protocol and the readable line format.
+//! ordered work digest of the harness protocol and the line format of the
+//! reference worker's dump.
 
 use std::io::{self, Write};
 use triergon_font::compat::libass::{self, Band};
@@ -7,6 +8,8 @@ use triergon_font::{
     Charmap, GlyphMetrics, Orientation, Outline, PointKind, SizeMetrics, SizedFont,
 };
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
+use triergon_harness_runner::Totals;
+use triergon_harness_runner::records::ABSENT;
 
 /// What one size reports besides its glyphs.
 pub struct Size {
@@ -180,7 +183,6 @@ const HINTED: u64 = 25;
 const VERTICAL: u64 = 26;
 const DEFAULT: u64 = 27;
 const REQUEST: u64 = 28;
-const ABSENT: u64 = u64::MAX;
 
 const fn point_tag(kind: PointKind) -> u8 {
     match kind {
@@ -200,16 +202,18 @@ fn orientation(outline: &Outline) -> (u64, &'static str) {
     }
 }
 
-/// The work of one or more operations: glyph outlines (or advances), their
-/// points and the digest.
-#[derive(Default)]
-pub struct Work {
-    pub packets: u64,
-    pub bytes: u64,
-    pub digest: u64,
+/// How the digest folds the values of a record. The totals count glyph outlines (or
+/// advances) and their points.
+trait Fold {
+    fn words(&mut self, words: &[u64]);
+    fn text(&mut self, tag: u64, text: Option<&str>);
+    fn charmap(&mut self, tag: u64, charmap: Option<Charmap<'_>>);
+    fn band(&mut self, band: Option<Band>);
+    fn outline(&mut self, outline: &Outline);
+    fn oriented(&mut self, outline: &Outline);
 }
 
-impl Work {
+impl Fold for Totals {
     fn words(&mut self, words: &[u64]) {
         for &word in words {
             fold(&mut self.digest, word);
@@ -267,16 +271,9 @@ impl Work {
         fold(&mut self.digest, orientation(outline).0);
         self.outline(outline);
     }
-
-    /// Adds the work of one operation, its digest folded as one value.
-    pub fn accumulate(&mut self, operation: &Work) {
-        self.packets += operation.packets;
-        self.bytes += operation.bytes;
-        fold(&mut self.digest, operation.digest);
-    }
 }
 
-impl Sink for Work {
+impl Sink for Totals {
     #[inline]
     fn record(&mut self, record: Record<'_>) -> io::Result<()> {
         match record {

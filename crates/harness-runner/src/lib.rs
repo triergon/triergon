@@ -10,6 +10,8 @@
     clippy::expect_used
 )]
 
+pub mod records;
+
 use std::fmt::{self, Display};
 use std::io::{self, Write};
 use std::ops::RangeInclusive;
