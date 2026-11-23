@@ -219,8 +219,6 @@ pub(crate) type PlaneMap = [Option<usize>; NCH];
 
 pub(crate) struct BlockSink<'a> {
     pub planes: &'a mut [Vec<f32>],
-    /// Sample offset of block 0 within each plane.
-    pub base: usize,
     pub map: PlaneMap,
     pub scratch: &'a mut [f32; 256],
 }

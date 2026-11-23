@@ -17,8 +17,7 @@ fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
     let mut pos = 0;
     while pos < stream.len() {
         let len = access_unit_len(&stream[pos..])?;
-        frame.clear();
-        let info = dec.decode(&stream[pos..pos + len], &mut frame)?; // appends samples
+        let info = dec.decode(&stream[pos..pos + len], &mut frame)?;
         // info.sample_rate, info.layout, info.downmix, info.concealed
         pos += len;
     }
@@ -55,9 +54,8 @@ Further independent programs are skipped.
 
 ## Behaviour and limits
 
-- `decode` appends to `out`, which must be empty or hold the same rate and layout
-  (`OutputLayoutMismatch` otherwise). `reset` drops delay lines, concealment history and
-  noise state.
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
+  `reset` drops delay lines, concealment history and noise state.
 - Planes follow the triergon-codec [channel order](../codec/README.md#channel-order); 7.1
   is FL FR FC LFE BL BR SL SR.
 - Refused with `Unsupported(Feature)`: bsid > 16, reserved fscod2 and stream type 3, and

@@ -45,8 +45,6 @@ pub enum DecodeError {
     },
     /// Recognised but unimplemented bitstream feature.
     Unsupported(Feature),
-    /// The output frame already holds samples with a different rate or layout.
-    OutputLayoutMismatch,
     /// The first syncframe of an E-AC-3 access unit is not independent substream 0.
     MissingIndependentSubstream,
     /// Storage the access unit needs does not fit the decoder's budget.
@@ -77,7 +75,6 @@ impl From<DecodeError> for Error {
                 Feature::ReservedSampleRate => "reserved sample rate",
                 Feature::ReservedStreamType => "reserved stream type",
             }),
-            DecodeError::OutputLayoutMismatch => Self::Invalid("output frame layout"),
             DecodeError::MissingIndependentSubstream => {
                 Self::Invalid("access unit without independent substream 0")
             }
@@ -102,9 +99,6 @@ impl fmt::Display for DecodeError {
                 write!(f, "CRC mismatch (crc1 ok: {crc1_ok}, crc2 ok: {crc2_ok})")
             }
             DecodeError::Unsupported(feat) => write!(f, "unsupported feature: {feat:?}"),
-            DecodeError::OutputLayoutMismatch => {
-                write!(f, "output frame holds samples with a different layout")
-            }
             DecodeError::MissingIndependentSubstream => {
                 write!(f, "access unit does not start with independent substream 0")
             }

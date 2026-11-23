@@ -117,7 +117,7 @@ pub struct FrameInfo {
     pub dialnorm: u8,
     /// Output sample rate in Hz.
     pub sample_rate: u32,
-    /// Samples per channel appended to the output frame.
+    /// Samples per channel in the output frame.
     pub samples: usize,
     /// Speakers of the output planes, in plane order.
     pub layout: ChannelLayout,
@@ -296,20 +296,32 @@ impl Decoder {
         &self.trace
     }
 
-    /// Decode one access unit: one AC-3 syncframe, or one E-AC-3 independent substream 0
-    /// syncframe plus its dependent substreams (other independent programs are skipped).
-    /// Appends the decoded samples to `out` (which must be empty or hold the same layout).
+    /// Decodes one AC-3 syncframe or one E-AC-3 independent substream and its dependents.
+    /// Replaces `out`; a refusal leaves `samples_per_channel == 0`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for an invalid or unsupported access unit or a storage
+    /// limit. Under [`CrcPolicy::Reject`], a failing CRC or a truncated frame is refused.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<FrameInfo, DecodeError> {
+        let result = self.decode_access_unit(au, out);
+        if result.is_err() {
+            out.clear();
+        }
+        result
+    }
+
+    fn decode_access_unit(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<FrameInfo, DecodeError> {
         let program = self.program(au)?;
         let first = program.frames[0].header;
         let ProgramLayout { layout, maps } = program_layout(au, program.frames())?;
         let dual_mono = first.acmod == 0;
         let rate = program.sample_rate;
-        if out.samples_per_channel > 0 && (out.layout != layout || out.sample_rate != rate) {
-            return Err(DecodeError::OutputLayoutMismatch);
-        }
         let samples = first.samples();
-        let base = out.samples_per_channel;
 
         if first.frame_bytes > au.len() {
             let truncated = DecodeError::Truncated {
@@ -339,7 +351,7 @@ impl Decoder {
             }
         }
 
-        self.prepare_output(out, &layout, rate, base + samples)?;
+        self.prepare_output(out, &layout, rate, samples)?;
         self.trace.frames.clear();
         let mut concealed = None;
         let mut info_dialnorm = 0;
@@ -360,7 +372,6 @@ impl Decoder {
             sub.reference_compat = self.opts.compat == Compat::Reference;
             let mut sink = BlockSink {
                 planes: &mut out.planes,
-                base,
                 map,
                 scratch: &mut self.scratch,
             };
@@ -397,11 +408,11 @@ impl Decoder {
                 concealed.get_or_insert(e);
                 let repeat_from =
                     (self.last_layout == Some((layout, dual_mono))).then_some(&*self.last_block);
-                repeat_blocks(out, base, &map, blk..h.num_blocks, repeat_from);
+                repeat_blocks(out, &map, blk..h.num_blocks, repeat_from);
             }
         }
         // Remember the last block for concealment.
-        let last = base + samples - 256;
+        let last = samples - 256;
         for p in 0..layout.channels() {
             self.last_block[p].copy_from_slice(&out.planes[p][last..last + 256]);
         }
@@ -493,12 +504,11 @@ impl Decoder {
     ) -> Result<FrameInfo, DecodeError> {
         let dual_mono = first.acmod == 0;
         let samples = first.samples();
-        let base = out.samples_per_channel;
-        self.prepare_output(out, &layout, rate, base + samples)?;
+        self.prepare_output(out, &layout, rate, samples)?;
         let same = self.last_layout == Some((layout, dual_mono));
         for p in 0..layout.channels() {
             for blk in 0..first.num_blocks {
-                let dst = &mut out.planes[p][base + blk * 256..base + blk * 256 + 256];
+                let dst = &mut out.planes[p][blk * 256..blk * 256 + 256];
                 if same {
                     dst.copy_from_slice(&self.last_block[p]);
                 } else {
@@ -650,14 +660,13 @@ fn program_layout(au: &[u8], frames: &[SyncframeRef]) -> Result<ProgramLayout, D
 /// 0 repeats `last` (or is silent without it), later blocks repeat their predecessor.
 fn repeat_blocks(
     out: &mut AudioFrame,
-    base: usize,
     map: &PlaneMap,
     blocks: core::ops::Range<usize>,
     last: Option<&[[f32; 256]; MAX_CHANNELS]>,
 ) {
     for &p in map.iter().flatten() {
         for b in blocks.clone() {
-            let dst = base + b * 256;
+            let dst = b * 256;
             if b == 0 {
                 let block = &mut out.planes[p][dst..dst + 256];
                 match last {
@@ -694,7 +703,6 @@ impl AudioDecoder for Decoder {
         au: &[u8],
         out: &mut AudioFrame,
     ) -> Result<Option<DownmixLevels>, DecodeError> {
-        out.clear();
         let info = Decoder::decode(self, au, out)?;
         Ok(info.downmix.map(|info| info.levels()))
     }

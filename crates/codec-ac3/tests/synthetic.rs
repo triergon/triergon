@@ -374,19 +374,22 @@ fn eac3_truncation_and_substream_errors() {
 }
 
 #[test]
-fn output_layout_mismatch_is_refused() {
+fn decoding_replaces_output_and_a_refusal_empties_it() {
     let mut dec = Decoder::new();
     let mut out = AudioFrame::default();
-    dec.decode(&mono_frame(0), &mut out).unwrap();
+    let frame = mono_frame(0);
+    let mono = dec.decode(&frame, &mut out).unwrap();
     out.layout =
         triergon_codec_ac3::ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight]).unwrap();
+    let again = dec.decode(&frame, &mut out).unwrap();
     assert_eq!(
-        dec.decode(&mono_frame(0), &mut out).err(),
-        Some(DecodeError::OutputLayoutMismatch)
+        (out.layout, out.samples_per_channel),
+        (mono.layout, again.samples)
     );
-    dec.reset();
-    out.clear();
-    assert!(dec.decode(&mono_frame(0), &mut out).is_ok());
+    assert_eq!(out.planes[0].len(), mono.samples);
+    assert_eq!(dec.decode(&[], &mut out).err(), Some(DecodeError::Empty));
+    assert_eq!(out.samples_per_channel, 0);
+    assert!(out.planes.iter().all(Vec::is_empty));
 }
 
 #[test]

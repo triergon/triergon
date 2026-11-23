@@ -230,7 +230,7 @@ impl Substream {
             let short = ch != LFE && self.blksw[ch];
             let out: &mut [f32] = match sink.map[ch] {
                 Some(p) => {
-                    let o = sink.base + blk * 256;
+                    let o = blk * 256;
                     &mut sink.planes[p][o..o + 256]
                 }
                 None => &mut sink.scratch[..],
