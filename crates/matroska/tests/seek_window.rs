@@ -19,7 +19,7 @@ fn seek_window_fragmented_packets_and_retained_parent_lifetimes() {
             let base = pool.used();
             let cancel = Arc::new(AtomicBool::new(false));
             let (source, log, _) = source(fixture(), chunk, &pool, &cancel);
-            let mut reader = BlockingReader::open_in(
+            let mut reader = BlockingReader::open_source_in(
                 BlockingSource::from(source).with_payload_ownership(policy),
                 Limits::default(),
                 &pool,
@@ -57,7 +57,7 @@ fn seek_window_reentrant_seeks_keep_complete_receipts_and_provider_order() {
             let base = pool.used();
             let cancel = Arc::new(AtomicBool::new(false));
             let (source, log, _) = source(fixture(), chunk, &pool, &cancel);
-            let mut reader = BlockingReader::open_in(
+            let mut reader = BlockingReader::open_source_in(
                 BlockingSource::from(source).with_payload_ownership(policy),
                 Limits::default(),
                 &pool,
@@ -95,7 +95,7 @@ fn seek_window_late_transport_and_cancellation_priorities() {
             let base = pool.used();
             let cancel = Arc::new(AtomicBool::new(false));
             let (source, log, mode) = source(fixture(), 7, &pool, &cancel);
-            let mut reader = BlockingReader::open_in(
+            let mut reader = BlockingReader::open_source_in(
                 BlockingSource::from(source).with_payload_ownership(policy),
                 Limits::default(),
                 &pool,
@@ -126,7 +126,7 @@ fn seek_window_whole_core_response_reduces_physical_callback_bounces() {
         let base = pool.used();
         let cancel = Arc::new(AtomicBool::new(false));
         let (input, log, _) = source(fixture(), 8192, &pool, &cancel);
-        let mut reader = BlockingReader::open_in(
+        let mut reader = BlockingReader::open_source_in(
             BlockingSource::from(input).with_payload_ownership(policy),
             Limits::default(),
             &pool,
@@ -175,7 +175,7 @@ fn seek_window_truncated_seek_keeps_error_and_old_output_owner() {
             let base = pool.used();
             let cancel = Arc::new(AtomicBool::new(false));
             let (input, log, _mode) = source(raw, chunk, &pool, &cancel);
-            let mut reader = BlockingReader::open_in(
+            let mut reader = BlockingReader::open_source_in(
                 BlockingSource::from(input).with_payload_ownership(policy),
                 Limits::default(),
                 &pool,
@@ -219,7 +219,7 @@ fn seek_window_scan_limit_keeps_refusal_and_retained_output() {
                 scan_bytes: 4096,
                 ..Limits::default()
             };
-            let mut reader = BlockingReader::open_in(
+            let mut reader = BlockingReader::open_source_in(
                 BlockingSource::from(input).with_payload_ownership(policy),
                 limits,
                 &pool,
@@ -257,7 +257,7 @@ fn scan_projection_group_fallback_keeps_typed_facts_and_owner_lifetimes() {
             let base = pool.used();
             let cancel = Arc::new(AtomicBool::new(false));
             let (input, log, _) = source(raw.to_vec(), chunk, &pool, &cancel);
-            let mut reader = BlockingReader::open_in(
+            let mut reader = BlockingReader::open_source_in(
                 BlockingSource::from(input).with_payload_ownership(policy),
                 Limits::default(),
                 &pool,
@@ -331,7 +331,7 @@ fn scan_projection_late_transport_cancel_and_reentrant_reset_keep_priority() {
             let base = pool.used();
             let cancel = Arc::new(AtomicBool::new(false));
             let (input, log, flag) = source(fixture(), 7, &pool, &cancel);
-            let mut reader = BlockingReader::open_in(
+            let mut reader = BlockingReader::open_source_in(
                 BlockingSource::from(input).with_payload_ownership(policy),
                 Limits::default(),
                 &pool,

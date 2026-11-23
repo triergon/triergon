@@ -127,26 +127,32 @@ pub fn seek_initial_trim<R: Read>(
 }
 
 impl<R: Read> BlockingReader<R> {
-    /// Open a seekable source or one described by [BlockingSource] in a new
-    /// pool bounded by [Limits::live_storage_bytes]. Fails on I/O errors or
-    /// refused metadata.
-    pub fn open(source: impl Into<BlockingSource<R>>, limits: Limits) -> Result<Self> {
+    /// Open a sequential source in a new pool bounded by [Limits::live_storage_bytes].
+    /// Fails on I/O errors or refused metadata.
+    pub fn open(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_in(source, limits, &pool)
     }
 
-    /// Open a source and charge its storage to the caller's pool. A seekable
-    /// source can follow SeekHead links to late metadata.
-    pub fn open_in(
-        source: impl Into<BlockingSource<R>>,
+    /// Open a sequential source and charge its storage to the caller's pool.
+    pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        Self::open_source_in(BlockingSource::stream(source), limits, pool)
+    }
+
+    /// Open a source with explicit access and payload ownership options.
+    /// The new pool is bounded by [Limits::live_storage_bytes].
+    pub fn open_source(source: BlockingSource<R>, limits: Limits) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_source_in(source, limits, &pool)
+    }
+
+    /// Open a source with explicit options, charging the caller's pool.
+    #[inline(always)]
+    pub fn open_source_in(
+        source: BlockingSource<R>,
         limits: Limits,
         pool: &Budget,
     ) -> Result<Self> {
-        Self::open_source(source.into(), limits, pool)
-    }
-
-    #[inline(always)]
-    fn open_source(source: BlockingSource<R>, limits: Limits, pool: &Budget) -> Result<Self> {
         if let Some(open) = source.owned {
             return open(source.source, limits, pool, source.payload);
         }
@@ -458,6 +464,17 @@ impl<R: Read> BlockingReader<R> {
     }
 }
 impl<R: Read + Seek> BlockingReader<R> {
+    /// Open a seekable source in a new pool bounded by [Limits::live_storage_bytes].
+    /// The reader can follow SeekHead links and seek to packets.
+    pub fn open_seekable(source: R, limits: Limits) -> Result<Self> {
+        Self::open_source(source.into(), limits)
+    }
+
+    /// Open a seekable source and charge its storage to the caller's pool.
+    pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        Self::open_source_in(source.into(), limits, pool)
+    }
+
     const SEEK: Seeking<R> = (
         |reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset)),
         |feed, cursor, request, cancel| feed.synchronize_seekable_position(cursor, request, cancel),
@@ -493,7 +510,7 @@ impl BlockingReader<Cursor<OwnedInputBytes>> {
 }
 
 /// Configure immutable input to admit WebM VP9's implicit ITU-T T.35 addition.
-/// Pass the source to [BlockingReader::open_in] with the input's budget.
+/// Pass the source to [BlockingReader::open_source_in] with the input's budget.
 pub fn owned_source(source: OwnedInputBytes) -> BlockingSource<Cursor<OwnedInputBytes>> {
     BlockingSource {
         owned: Some(|source, limits, pool, payload| {

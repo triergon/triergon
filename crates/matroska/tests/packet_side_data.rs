@@ -82,7 +82,7 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
         .concat(),
     );
     let raw = file(&[u(0x55ee, 4), mapping.clone()].concat(), &[group]);
-    let mut reader = BlockingReader::open_in(
+    let mut reader = BlockingReader::open_source_in(
         BlockingSource::stream(Cursor::new(raw)),
         Limits::default(),
         &pool,
@@ -212,9 +212,11 @@ fn side_data_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
     let raw = file(&config, &[packet]);
     let cancel = AtomicBool::new(false);
     let open = || {
-        let mut reader =
-            BlockingReader::open(BlockingSource::stream(Cursor::new(&raw)), Limits::default())
-                .unwrap();
+        let mut reader = BlockingReader::open_source(
+            BlockingSource::stream(Cursor::new(&raw)),
+            Limits::default(),
+        )
+        .unwrap();
         let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
         let extensions = finish_mapping(
             packet
@@ -287,7 +289,8 @@ fn side_data_projection_keeps_opaque_additions_beside_hdr10_plus() {
     let raw = file(&config, &[packet]);
     let cancel = AtomicBool::new(false);
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(&raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(&raw)), Limits::default())
+            .unwrap();
     let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
     let extensions = finish_mapping(
         packet
@@ -338,7 +341,7 @@ fn codec_state_has_exact_owned_bytes_and_preserves_initial_track_evidence() {
         + timestamp.len() as u64;
     let group_data = group_header + (e(0xa0, &body).len() - body.len()) as u64;
     let state_header = group_data + (block().len() + e(0xec, &vec![0; 128 * 1024]).len()) as u64;
-    let mut reader = BlockingReader::open_in(
+    let mut reader = BlockingReader::open_source_in(
         BlockingSource::stream(Cursor::new(raw)),
         Limits::default(),
         &pool,
@@ -414,7 +417,8 @@ fn default_maximum_prohibits_additions_and_type_zero_conflict_is_not_normalized(
     );
     let raw = file(&mapping, &[e(0xa0, &block())]);
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(raw)), Limits::default())
+            .unwrap();
     let packet = reader
         .next_typed_packet(&AtomicBool::new(false))
         .unwrap()
@@ -452,7 +456,8 @@ fn mapping_fields_are_reported_as_written_without_judging_their_values() {
     );
     let raw = file(&[u(0x55ee, 12), low, short].concat(), &[e(0xa0, &block())]);
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(raw)), Limits::default())
+            .unwrap();
     let packet = reader
         .next_typed_packet(&AtomicBool::new(false))
         .unwrap()
@@ -491,7 +496,8 @@ fn a_repeated_single_occurrence_child_keeps_its_first_occurrence() {
         &[e(0xa0, &group)],
     );
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(raw)), Limits::default())
+            .unwrap();
     let packet = reader
         .next_typed_packet(&AtomicBool::new(false))
         .unwrap()
@@ -700,9 +706,11 @@ fn epoch_fixture(indexed: bool, forged: u8) -> Vec<u8> {
 fn plain_and_preroll_seek_reconstruct_track_states_at_the_actual_replay_boundary() {
     for indexed in [false, true] {
         for after_eof in [false, true] {
-            let mut reader =
-                BlockingReader::open(Cursor::new(epoch_fixture(indexed, 0)), Limits::default())
-                    .unwrap();
+            let mut reader = BlockingReader::open_seekable(
+                Cursor::new(epoch_fixture(indexed, 0)),
+                Limits::default(),
+            )
+            .unwrap();
             let cancel = AtomicBool::new(false);
             if after_eof {
                 while reader.next_typed_packet(&cancel).unwrap().is_some() {}
@@ -759,9 +767,11 @@ fn plain_and_preroll_seek_reconstruct_track_states_at_the_actual_replay_boundary
 #[test]
 fn cue_state_payload_wrong_track_and_false_initial_pointers_are_rejected_before_receipt() {
     for forged in [1, 2, 3] {
-        let mut reader =
-            BlockingReader::open(Cursor::new(epoch_fixture(true, forged)), Limits::default())
-                .unwrap();
+        let mut reader = BlockingReader::open_seekable(
+            Cursor::new(epoch_fixture(true, forged)),
+            Limits::default(),
+        )
+        .unwrap();
         let result = reader.seek_previous(0, 25_000_000, &AtomicBool::new(false));
         assert!(
             matches!(
@@ -785,7 +795,8 @@ fn compatibility_packet_shape_explicitly_refuses_side_data_instead_of_discarding
         )],
     );
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(raw)), Limits::default())
+            .unwrap();
     assert!(matches!(
         reader.next_packet(&AtomicBool::new(false)),
         Err(Error::Unsupported(
@@ -832,7 +843,8 @@ fn unknown_more_children_preserve_scope_and_cannot_become_a_group_codec_state() 
         )],
     );
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(raw)), Limits::default())
+            .unwrap();
     let packet = reader
         .next_typed_packet(&AtomicBool::new(false))
         .unwrap()
@@ -889,7 +901,8 @@ fn initial_private_encoding_does_not_imply_codec_state_or_additional_encoding() 
     ]
     .concat());
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(raw)), Limits::default())
+            .unwrap();
     let packet = reader
         .next_typed_packet(&AtomicBool::new(false))
         .unwrap()
@@ -1008,7 +1021,8 @@ fn whole_first_cluster_replay_restores_all_tracks_without_a_second_input_pass() 
     for video_state in [false, true] {
         for after_eof in [false, true] {
             let (raw, first_cluster_bytes, index_bytes) = initial_epoch_fixture(video_state, false);
-            let mut reader = BlockingReader::open(Cursor::new(raw), Limits::default()).unwrap();
+            let mut reader =
+                BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
             if after_eof {
                 while reader.next_typed_packet(&cancel).unwrap().is_some() {}
             }
@@ -1049,7 +1063,7 @@ fn whole_first_cluster_replay_restores_all_tracks_without_a_second_input_pass() 
         }
     }
     let (raw, _, _) = initial_epoch_fixture(true, true);
-    let mut reader = BlockingReader::open(Cursor::new(raw), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
     assert!(
         matches!(
             reader.seek_for_playback(0, 5_000_000, &cancel),
@@ -1170,7 +1184,7 @@ fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
         } else {
             BlockingSource::owned(source)
         };
-        let mut reader = BlockingReader::open_in(
+        let mut reader = BlockingReader::open_source_in(
             source.with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
             &pool,
@@ -1215,7 +1229,8 @@ fn control_ordinary_group_keeps_initial_private_and_timestamp() {
     let raw = file(&[], &[e(0xa0, &block())]);
     let cancel = AtomicBool::new(false);
     let mut reader =
-        BlockingReader::open(BlockingSource::stream(Cursor::new(raw)), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(Cursor::new(raw)), Limits::default())
+            .unwrap();
     let packet = reader.next_typed_packet(&cancel).unwrap().unwrap();
     assert_eq!(packet.packet.data.as_ref(), b"V");
     assert_eq!(packet.packet.pts_ns, Some(7_000_000));

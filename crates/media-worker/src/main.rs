@@ -28,7 +28,7 @@ type Outcome = Result<(), Error>;
 /// A reader whose packets share their input windows (`SharedBounded`); the library
 /// default is `OwnedExact`.
 fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<Demuxer<R>> {
-    Demuxer::open(
+    Demuxer::open_source(
         BlockingSource::stream(source)
             .with_payload_ownership(triergon_matroska::PayloadOwnership::SharedBounded),
         limits,
@@ -44,7 +44,7 @@ fn open_owned(
     let pool = triergon_core::Budget::new(limits.live_storage_bytes)?;
     let source =
         triergon_core::OwnedInputBytes::try_from_vec(&pool, data).map_err(|error| error.error)?;
-    Demuxer::open_in(
+    Demuxer::open_source_in(
         BlockingSource::owned(source)
             .with_payload_ownership(triergon_matroska::PayloadOwnership::SharedBounded),
         limits,

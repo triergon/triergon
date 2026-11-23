@@ -280,7 +280,7 @@ fn seek_optimization_validated_unchanged_target_prefix_is_not_read_twice_for_epo
     let fixture = checkpoint_file(true, false, false, false);
     let expected = fixture.target_prefix + fixture.prefix + fixture.target_header;
     let mut reader =
-        crate::BlockingReader::open(Cursor::new(fixture.raw), Limits::default()).unwrap();
+        crate::BlockingReader::open_seekable(Cursor::new(fixture.raw), Limits::default()).unwrap();
     let receipt = reader
         .seek_for_playback(0, 10_000_000, &AtomicBool::new(false))
         .unwrap();
@@ -313,7 +313,8 @@ fn seek_optimization_missing_index_reuses_all_track_configuration_at_validated_s
     let pool = Budget::new(256 * 1024).unwrap();
     let baseline = pool.used();
     let mut reader =
-        crate::BlockingReader::open_in(Cursor::new(fixture.raw), Limits::default(), &pool).unwrap();
+        crate::BlockingReader::open_seekable_in(Cursor::new(fixture.raw), Limits::default(), &pool)
+            .unwrap();
     let receipt = reader
         .seek_for_playback(0, 10_000_000, &AtomicBool::new(false))
         .unwrap();
@@ -347,7 +348,7 @@ fn seek_optimization_missing_index_reuses_all_track_configuration_at_validated_s
 fn seek_optimization_unchanged_target_proof_still_restores_prior_states_on_every_track() {
     let fixture = checkpoint_file(true, true, false, false);
     let mut reader =
-        crate::BlockingReader::open(Cursor::new(fixture.raw), Limits::default()).unwrap();
+        crate::BlockingReader::open_seekable(Cursor::new(fixture.raw), Limits::default()).unwrap();
     reader
         .seek_for_playback(0, 10_000_000, &AtomicBool::new(false))
         .unwrap();
@@ -370,7 +371,8 @@ fn seek_optimization_prefix_bad_crc_and_false_initial_state_never_publish_a_rece
     for (bad_crc, false_state) in [(true, false), (false, true)] {
         let fixture = checkpoint_file(true, true, bad_crc, false_state);
         let mut reader =
-            crate::BlockingReader::open(Cursor::new(fixture.raw), Limits::default()).unwrap();
+            crate::BlockingReader::open_seekable(Cursor::new(fixture.raw), Limits::default())
+                .unwrap();
         assert!(
             reader
                 .seek_for_playback(0, 10_000_000, &AtomicBool::new(false))

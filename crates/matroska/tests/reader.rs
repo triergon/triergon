@@ -366,7 +366,8 @@ fn playback_and_compatibility_seeks_can_land_on_the_first_keyframe() {
     let cancel = AtomicBool::new(false);
     for block_start in [false, true] {
         for target in [0, 250_000_000] {
-            let mut reader = BlockingReader::open(Cursor::new(&input), Limits::default()).unwrap();
+            let mut reader =
+                BlockingReader::open_seekable(Cursor::new(&input), Limits::default()).unwrap();
             for _ in 0..2 {
                 let landed = if block_start {
                     triergon_matroska::compat::seek::at_block_start(&mut reader, 0, target, &cancel)
@@ -412,7 +413,7 @@ fn compatibility_seek_prefers_an_earlier_uncued_keyframe() {
     let cues = element(0x1c53bb6b, &cue);
     let input = mkv(&[tracks, first, later, cues].concat());
     let cancel = AtomicBool::new(false);
-    let mut reader = BlockingReader::open(Cursor::new(input), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open_seekable(Cursor::new(input), Limits::default()).unwrap();
     while reader.next_typed_packet(&cancel).unwrap().is_some() {}
     let landing =
         triergon_matroska::compat::seek::at_block_start(&mut reader, 0, 2_000_000_000, &cancel)
@@ -436,7 +437,7 @@ fn compatibility_seek_keeps_the_zero_clamped_preroll_landing() {
     );
     let input = mkv(&[tracks, initial].concat());
     let cancel = AtomicBool::new(false);
-    let mut reader = BlockingReader::open(Cursor::new(input), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open_seekable(Cursor::new(input), Limits::default()).unwrap();
     let landing =
         triergon_matroska::compat::seek::at_block_start(&mut reader, 0, 0, &cancel).unwrap();
     assert_eq!(landing.actual_ns, 0);
@@ -514,7 +515,8 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
         );
         let cues = element(0x1c53bb6b, &cue);
         let raw = mkv(&[tracks.as_slice(), &first, &second, &cues].concat());
-        let mut reader = BlockingReader::open(Cursor::new(raw), Limits::default()).unwrap();
+        let mut reader =
+            BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
         let mut audio_packets = Vec::new();
         for at_block_start in [false, true, false] {
             let landed = if at_block_start {

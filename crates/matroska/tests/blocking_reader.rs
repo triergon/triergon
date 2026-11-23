@@ -46,7 +46,7 @@ fn fixture_with_duration(clusters: Vec<u8>, unknown_segment: bool, with_duration
     }
 }
 fn collect(bytes: &[u8], limits: Limits) -> triergon_matroska::Result<Vec<Packet>> {
-    let mut d = BlockingReader::open(BlockingSource::stream(Cursor::new(bytes)), limits)?;
+    let mut d = BlockingReader::open(Cursor::new(bytes), limits)?;
     let mut out = Vec::new();
     while let Some(p) = d.next_packet(&AtomicBool::new(false))? {
         out.push(p);
@@ -68,7 +68,7 @@ fn retained_packet_view_survives_reads_and_reader_drop_without_header_bytes() {
         cluster(0, [block(0, true), block(1, false)].concat()),
         false,
     );
-    let mut reader = BlockingReader::open(
+    let mut reader = BlockingReader::open_source(
         BlockingSource::stream(Cursor::new(bytes)),
         Limits::default(),
     )
@@ -117,7 +117,7 @@ fn header_removal_restores_zero_length_blocks_and_private_scope_independently() 
     let cancel = AtomicBool::new(false);
     for scope in [1, 2, 3] {
         let bytes = header_removed(b"ab", scope, b"cd");
-        let mut demux = BlockingReader::open(
+        let mut demux = BlockingReader::open_source(
             BlockingSource::stream(Cursor::new(bytes)),
             Limits::default(),
         )
@@ -141,7 +141,7 @@ fn header_removal_restores_zero_length_blocks_and_private_scope_independently() 
 #[test]
 fn restored_header_is_bounded_by_the_decoded_packet_limit() {
     let bytes = header_removed(&[0x55; 32], 1, &[]);
-    let mut demux = BlockingReader::open(
+    let mut demux = BlockingReader::open_source(
         BlockingSource::stream(Cursor::new(bytes)),
         Limits {
             block_bytes: 8,
@@ -167,7 +167,7 @@ fn cyclic_seek_heads_are_bounded_and_cannot_fabricate_missing_tracks() {
     let body = [element(0x114d9b74, &entry), cluster(0, block(0, true))].concat();
     let document = mkv(&body);
     assert!(matches!(
-        BlockingReader::open(Cursor::new(document), Limits::default()),
+        BlockingReader::open_seekable(Cursor::new(document), Limits::default()),
         Err(Error::Invalid("missing Tracks"))
     ));
 }
@@ -269,7 +269,7 @@ fn a_zero_block_duration_times_only_the_first_laced_frame_before_and_after_a_see
         ];
         let packets = collect(&bytes, Limits::default()).unwrap();
         assert_eq!(timed(&packets[1..]), expected, "default {with_default}");
-        let mut d = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+        let mut d = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
         let cancel = AtomicBool::new(false);
         let receipt = d.seek_previous(0, 40_000_000, &cancel).unwrap();
         assert_eq!(receipt.actual_ns, 40_000_000);
@@ -285,7 +285,7 @@ fn a_zero_block_duration_times_only_the_first_laced_frame_before_and_after_a_see
 fn laced_keyframe_seek_receipt_describes_the_block_that_is_replayed() {
     let laced = element(0xa3, &[0x81, 0, 0, 0x84, 1, 1, 2]);
     let bytes = fixture(cluster(0, laced), false);
-    let mut d = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+    let mut d = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     let cancel = AtomicBool::new(false);
     let receipt = d.seek_previous(0, 1_000_000, &cancel).unwrap();
     assert_eq!(receipt.actual_ns, 0);
@@ -355,7 +355,7 @@ fn seek_after_eof_lands_on_previous_keyframe_and_restarts_packet_reads() {
         ),
         false,
     );
-    let mut d = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+    let mut d = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     let cancel = AtomicBool::new(false);
     while d.next_packet(&cancel).unwrap().is_some() {}
     for (target, expected) in [(15_000_000, 0), (99_000_000, 20_000_000), (0, 0)] {
@@ -372,7 +372,7 @@ fn seek_after_eof_lands_on_previous_keyframe_and_restarts_packet_reads() {
 #[test]
 fn cancel_and_failed_seek_cannot_leave_stale_pending_packets() {
     let bytes = fixture(cluster(0, block(0, true)), false);
-    let mut d = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+    let mut d = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     let cancel = AtomicBool::new(true);
     assert!(matches!(d.next_packet(&cancel), Err(Error::Cancelled)));
     cancel.store(false, Ordering::Relaxed);
@@ -410,7 +410,8 @@ fn transport_failure_is_not_eof() {
         source: Cursor::new(fixture(clusters, true)),
         fail: fail.clone(),
     };
-    let mut d = BlockingReader::open(BlockingSource::stream(source), Limits::default()).unwrap();
+    let mut d =
+        BlockingReader::open_source(BlockingSource::stream(source), Limits::default()).unwrap();
     fail.store(true, Ordering::Relaxed);
     let cancel = AtomicBool::new(false);
     let error = loop {
@@ -473,7 +474,7 @@ fn zlib_compressed_frames_and_private_restore_their_original_bytes() {
         ),
     ]
     .concat());
-    let mut reader = BlockingReader::open(
+    let mut reader = BlockingReader::open_source(
         BlockingSource::stream(Cursor::new(bytes)),
         Limits::default(),
     )
@@ -569,7 +570,7 @@ fn indexed_fixture_with_sparse_tail(sparse: bool) -> Vec<u8> {
             reader read under 32 KiB"]
 fn cues_seek_skips_distant_data_with_a_small_scan_budget() {
     let bytes = indexed_fixture();
-    let mut reader = BlockingReader::open(
+    let mut reader = BlockingReader::open_seekable(
         Cursor::new(bytes),
         Limits {
             scan_bytes: 32768,
@@ -590,7 +591,7 @@ fn cues_seek_skips_distant_data_with_a_small_scan_budget() {
 #[test]
 fn playback_seek_retains_all_track_preroll_and_resets_after_eof_and_cancel() {
     let mut reader =
-        BlockingReader::open(Cursor::new(indexed_fixture()), Limits::default()).unwrap();
+        BlockingReader::open_seekable(Cursor::new(indexed_fixture()), Limits::default()).unwrap();
     let cancel = AtomicBool::new(false);
     while reader.next_packet(&cancel).unwrap().is_some() {}
     for target in [7_500_000_000, 2_500_000_000, 9_000_000_000, 0] {
@@ -628,7 +629,7 @@ fn forged_cue_targets_and_index_limits_are_rejected_without_stale_packets() {
     let mut bytes = indexed_fixture();
     let cue = bytes.windows(4).position(|b| b == [0x1c, 0x53, 0xbb, 0x6b]);
     assert!(cue.is_some());
-    let mut reader = BlockingReader::open(
+    let mut reader = BlockingReader::open_seekable(
         Cursor::new(bytes.clone()),
         Limits {
             index_entries: 1,
@@ -643,7 +644,7 @@ fn forged_cue_targets_and_index_limits_are_rejected_without_stale_packets() {
     // Corrupt the final CueClusterPosition to point at Segment metadata.
     let at = bytes.windows(2).rposition(|b| b == [0xf1, 0x88]).unwrap();
     bytes[at + 2..at + 10].fill(0);
-    let mut reader = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     assert!(matches!(
         reader.seek_for_playback(0, 20_000_000_000, &AtomicBool::new(false)),
         Err(Error::Invalid(_))
@@ -688,7 +689,7 @@ fn extreme_cue_timestamps_never_overflow_during_lookup() {
     ]
     .concat();
     let bytes = mkv(&body);
-    let mut reader = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     let _ = reader.seek_previous(0, 0, &AtomicBool::new(false));
 }
 
@@ -721,7 +722,7 @@ fn compressed_private_data_is_charged_to_the_shared_metadata_budget() {
     }
     let bytes = mkv(&[element(0x1654ae6b, &tracks), cluster(0, block(0, true))].concat());
     assert!(matches!(
-        BlockingReader::open(
+        BlockingReader::open_source(
             BlockingSource::stream(Cursor::new(bytes)),
             Limits {
                 metadata_bytes: 1024,
@@ -737,7 +738,7 @@ fn failed_index_load_cannot_become_a_silent_missing_index_on_retry() {
     let mut bytes = indexed_fixture();
     let at = bytes.windows(2).rposition(|b| b == [0xf1, 0x88]).unwrap();
     bytes[at + 2..at + 10].fill(255);
-    let mut reader = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     let cancel = AtomicBool::new(false);
     assert!(reader.seek_previous(0, 7_500_000_000, &cancel).is_err());
     assert!(reader.seek_previous(0, 7_500_000_000, &cancel).is_err());
@@ -745,7 +746,7 @@ fn failed_index_load_cannot_become_a_silent_missing_index_on_retry() {
 
 #[test]
 fn sparse_cues_seek_past_end_reaches_the_last_actual_random_access_block() {
-    let mut reader = BlockingReader::open(
+    let mut reader = BlockingReader::open_seekable(
         Cursor::new(indexed_fixture_with_sparse_tail(true)),
         Limits::default(),
     )
@@ -810,7 +811,7 @@ fn beginning_replay_is_a_source_position_fact_not_a_zero_timestamp_guess() {
         .concat(),
         false,
     );
-    let mut d = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
+    let mut d = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
     let cancel = AtomicBool::new(false);
     let later = d.seek_for_playback(0, 20_500_000_000, &cancel).unwrap();
     assert_eq!(later.actual_ns, 20_000_000_000);
@@ -853,7 +854,7 @@ fn colour_metadata_obeys_byte_and_track_budgets_and_retains_source_after_drop() 
     ]
     .concat();
     let bytes = colour_track_fixture(&colour);
-    let d = BlockingReader::open(
+    let d = BlockingReader::open_source(
         BlockingSource::stream(Cursor::new(&bytes)),
         Limits::default(),
     )
@@ -883,7 +884,7 @@ fn colour_metadata_obeys_byte_and_track_budgets_and_retains_source_after_drop() 
         },
     ] {
         assert!(matches!(
-            BlockingReader::open(BlockingSource::stream(Cursor::new(&bytes)), limits),
+            BlockingReader::open_source(BlockingSource::stream(Cursor::new(&bytes)), limits),
             Err(Error::Policy(_))
         ));
     }
@@ -892,7 +893,7 @@ fn colour_metadata_obeys_byte_and_track_budgets_and_retains_source_after_drop() 
 #[test]
 fn colour_values_are_reported_as_written_repeats_keep_the_first_and_bad_widths_fail() {
     let open = |colour: &[u8]| {
-        BlockingReader::open(
+        BlockingReader::open_source(
             BlockingSource::stream(Cursor::new(colour_track_fixture(colour))),
             Limits::default(),
         )
@@ -947,7 +948,7 @@ fn disabled_track_lacing_and_duplicate_track_uid_are_rejected() {
     ]
     .concat();
     assert!(matches!(
-        BlockingReader::open(
+        BlockingReader::open_source(
             BlockingSource::stream(Cursor::new(bytes)),
             Limits::default()
         ),
@@ -984,7 +985,7 @@ fn ietf_source_language_precedes_legacy_independently_of_storage_order() {
             ),
         ]
         .concat();
-        let d = BlockingReader::open(
+        let d = BlockingReader::open_source(
             BlockingSource::stream(Cursor::new(bytes)),
             Limits::default(),
         )
@@ -1023,7 +1024,7 @@ fn late_catalogue_metadata_and_attachments_survive_eof_repeated_seeks_and_faults
         inner: Cursor::new(bytes),
         fail: Arc::clone(&fail),
     };
-    let mut d = BlockingReader::open(reader, Limits::default()).unwrap();
+    let mut d = BlockingReader::open_seekable(reader, Limits::default()).unwrap();
     let docs = d.metadata_documents().len();
     assert_eq!(docs, 4);
     let retained = d.metadata_retained_bytes();
@@ -1110,12 +1111,12 @@ fn sequential_short_reads_restore_private_and_laced_packets_without_a_second_par
             self.0.read(&mut out[..len])
         }
     }
-    let mut old = BlockingReader::open(
+    let mut old = BlockingReader::open_source(
         BlockingSource::stream(Cursor::new(raw.clone())),
         Limits::default(),
     )
     .unwrap();
-    let mut new = BlockingReader::open(
+    let mut new = BlockingReader::open_source(
         BlockingSource::stream(Short(Cursor::new(raw))),
         Limits::default(),
     )
@@ -1206,8 +1207,9 @@ fn seekable_adapter_resolves_late_catalogue_and_matches_preroll_receipt_and_repl
     let head = make_head(cues_position as u64, (cues_position + cues.len()) as u64);
     assert_eq!(head.len(), placeholder.len());
     let raw = mkv(&[head, tracks, first, second, cues, chapters].concat());
-    let mut old = BlockingReader::open(Cursor::new(raw.clone()), Limits::default()).unwrap();
-    let mut new = BlockingReader::open(Cursor::new(raw), Limits::default()).unwrap();
+    let mut old =
+        BlockingReader::open_seekable(Cursor::new(raw.clone()), Limits::default()).unwrap();
+    let mut new = BlockingReader::open_seekable(Cursor::new(raw), Limits::default()).unwrap();
     let a: Vec<_> = old
         .opaque_metadata()
         .map(|(id, raw)| (id, raw.to_vec()))
@@ -1271,7 +1273,7 @@ fn retaining_only_an_existing_static_codec_id_does_not_retain_the_tracks_allocat
     let raw = mkv(&[element(0x1654ae6b, &entry), element(0x1f43b675, &[])].concat());
     let pool = Budget::new(128 * 1024).unwrap();
     let baseline = pool.used();
-    let reader = BlockingReader::open_in(
+    let reader = BlockingReader::open_source_in(
         BlockingSource::stream(Cursor::new(raw)),
         Limits::default(),
         &pool,
@@ -1375,7 +1377,7 @@ fn header_refill_default_matches_canonical_io_packets_and_output_capacity() {
     }
     assert!(finished);
     let calls = Rc::new(RefCell::new(Vec::new()));
-    let mut blocking = BlockingReader::open(
+    let mut blocking = BlockingReader::open_source(
         BlockingSource::stream(Recorded {
             cursor: Cursor::new(raw),
             calls: calls.clone(),
@@ -1461,7 +1463,7 @@ fn ordinary_default_header_refill_is_real_io_and_complete_output() {
         }
     }
     let calls = Rc::new(RefCell::new(Vec::new()));
-    let mut reader = BlockingReader::open(
+    let mut reader = BlockingReader::open_source(
         BlockingSource::stream(Recorded {
             inner: Cursor::new(raw),
             calls: calls.clone(),
@@ -1542,7 +1544,7 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
         calls: reads.clone(),
     };
     let mut blocking =
-        BlockingReader::open(BlockingSource::stream(source), Limits::default()).unwrap();
+        BlockingReader::open_source(BlockingSource::stream(source), Limits::default()).unwrap();
     let mut packets = 0;
     while blocking.next_packet(&cancel).unwrap().is_some() {
         packets += 1;

@@ -587,7 +587,7 @@ fn shared_bounded_partial_commit_transport_stays_before_cancel_and_final_unit() 
 struct Fact(usize, Option<i64>, Option<u64>, bool, i64, Vec<u8>);
 
 fn facts(policy: PayloadOwnership) -> Vec<Fact> {
-    let mut reader = BlockingReader::open(
+    let mut reader = BlockingReader::open_source(
         BlockingSource::from(Cursor::new(RAW)).with_payload_ownership(policy),
         Limits::default(),
     )

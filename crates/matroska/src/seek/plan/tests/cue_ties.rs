@@ -248,9 +248,12 @@ fn observed_landing(case: &Case, target: i64, playback: bool) -> Landing {
 fn configuration_from_fixture(case: &Case, pool: &Budget) -> Configuration {
     // Only source tracks are used from the existing blocking parser. Its Cues
     // vector and std unstable tie permutation never enter this expectation.
-    let reader =
-        crate::BlockingReader::open_in(Cursor::new(case.bytes), crate::Limits::default(), pool)
-            .unwrap();
+    let reader = crate::BlockingReader::open_seekable_in(
+        Cursor::new(case.bytes),
+        crate::Limits::default(),
+        pool,
+    )
+    .unwrap();
     let mut tracks = BudgetVec::new(pool);
     tracks.try_reserve_exact(reader.tracks().len()).unwrap();
     for track in reader.tracks() {
@@ -355,9 +358,11 @@ fn cue_ties_replay_the_complete_native_observed_suffix_fresh_and_after_eof() {
     for case in CASES {
         for target in TARGETS {
             for after_eof in [false, true] {
-                let mut reader =
-                    crate::BlockingReader::open(Cursor::new(case.bytes), crate::Limits::default())
-                        .unwrap();
+                let mut reader = crate::BlockingReader::open_seekable(
+                    Cursor::new(case.bytes),
+                    crate::Limits::default(),
+                )
+                .unwrap();
                 assert_eq!(reader.tracks().len(), 2);
                 assert_eq!(reader.tracks()[0].codec_delay_ns, 0);
                 assert_eq!(reader.tracks()[1].codec_delay_ns, 21_333_333);

@@ -45,7 +45,7 @@ fn open(policy: PayloadOwnership) -> (Budget, Bytes, BlockingReader<Cursor<Owned
     let pool = Budget::new(Limits::default().live_storage_bytes).unwrap();
     let input = OwnedInputBytes::try_from_vec(&pool, source()).unwrap();
     let root = input.as_bytes().clone();
-    let reader = BlockingReader::open_in(
+    let reader = BlockingReader::open_source_in(
         BlockingSource::owned(input).with_payload_ownership(policy),
         Limits::default(),
         &pool,
@@ -131,7 +131,7 @@ fn an_unrelated_pool_cannot_admit_a_charged_source_as_operation_storage() {
     let alias = root.as_bytes().clone();
     let before = (first.used(), second.used());
     assert!(matches!(
-        BlockingReader::open_in(
+        BlockingReader::open_source_in(
             BlockingSource::owned(root).with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
             &second
@@ -178,14 +178,14 @@ fn every_physical_prefix_keeps_the_existing_error_or_complete_packet_outcome() {
         }
     }
     for end in 0..=raw.len() {
-        let before = drain(BlockingReader::open(
+        let before = drain(BlockingReader::open_source(
             BlockingSource::from(Cursor::new(&raw[..end]))
                 .with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
         ));
         let pool = Budget::new(Limits::default().live_storage_bytes).unwrap();
         let root = OwnedInputBytes::try_from_vec(&pool, raw[..end].to_vec()).unwrap();
-        let after = drain(BlockingReader::open_in(
+        let after = drain(BlockingReader::open_source_in(
             BlockingSource::owned(root).with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
             &pool,

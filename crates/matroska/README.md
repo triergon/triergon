@@ -25,7 +25,7 @@ use triergon_matroska::{BlockingReader, Limits};
 
 # let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/seek/cues-front.mkv");
 let cancel = AtomicBool::new(false);
-let mut reader = BlockingReader::open(File::open(path)?, Limits::default())?;
+let mut reader = BlockingReader::open_seekable(File::open(path)?, Limits::default())?;
 for track in reader.tracks() { /* number, kind, codec, codec_private, colour, languages … */ }
 let video = reader.tracks().iter().position(|t| t.kind == 1).ok_or("no video track")?;
 let receipt = reader.seek_for_playback(video, 1_000_000_000, &cancel)?; // MatroskaSeekReceipt
@@ -36,9 +36,10 @@ while let Some(p) = reader.next_typed_packet(&cancel)? {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-Pass a `Read + Seek` source directly to `BlockingReader::open`, or pass
-`BlockingSource::stream(source)` for forward-only input. Use
-`BlockingSource::owned(input)` with `BlockingReader::open_in` to read and seek
+Use `BlockingReader::open` for forward-only input and
+`BlockingReader::open_seekable` for random access. The corresponding `_in`
+methods accept the caller's pool. Use `BlockingSource::owned(input)` with
+`BlockingReader::open_source_in` to read and seek
 within an already charged `OwnedInputBytes`. A `BlockingSource` also selects
 the payload ownership policy. `open_in` uses the caller's `Budget`.
 `compat::block_additions::owned_source` selects the WebM compatibility policy

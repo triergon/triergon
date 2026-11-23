@@ -70,12 +70,12 @@ fn compare_sources(
 ) {
     let pool = Budget::new(limits.live_storage_bytes).unwrap();
     let input = OwnedInputBytes::try_from_vec(&pool, raw.to_vec()).unwrap();
-    let owned = BlockingReader::open_in(
+    let owned = BlockingReader::open_source_in(
         BlockingSource::owned(input).with_payload_ownership(policy),
         limits,
         &pool,
     );
-    let ordinary = BlockingReader::open(
+    let ordinary = BlockingReader::open_source(
         BlockingSource::from(Cursor::new(raw.to_vec())).with_payload_ownership(policy),
         limits,
     );

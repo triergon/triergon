@@ -16,7 +16,7 @@ fn optional<T: ToString>(value: Option<T>) -> String {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = env::args().nth(1).ok_or("usage: matroska_packets FILE")?;
     let file = BufReader::new(File::open(path)?);
-    let mut reader = BlockingReader::open(file, Limits::default())?;
+    let mut reader = BlockingReader::open_seekable(file, Limits::default())?;
     for track in reader.tracks() {
         let kind = match track.kind {
             1 => "video",

@@ -534,7 +534,7 @@ mod tests {
     use triergon_matroska::Limits;
 
     fn check_language(input: &[u8], legacy: &str, bcp47: Option<&str>, expected: &str) {
-        let mut demux = Demuxer::open(Cursor::new(input), Limits::default()).unwrap();
+        let mut demux = Demuxer::open_seekable(Cursor::new(input), Limits::default()).unwrap();
         while demux
             .next_packet(&AtomicBool::new(false))
             .unwrap()

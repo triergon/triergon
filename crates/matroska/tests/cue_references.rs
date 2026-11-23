@@ -45,7 +45,7 @@ impl Seek for Chunks {
     }
 }
 fn blocking(name: &str, policy: PayloadOwnership, maximum: usize) -> BlockingReader<Chunks> {
-    BlockingReader::open(
+    BlockingReader::open_source(
         BlockingSource::from(Chunks {
             input: Cursor::new(raw(name)),
             maximum,
@@ -372,13 +372,13 @@ fn default_or_owned(name: &str, explicit: bool, maximum: usize) -> BlockingReade
         maximum,
     };
     let r = if explicit {
-        BlockingReader::open(
+        BlockingReader::open_source(
             BlockingSource::from(source).with_payload_ownership(PayloadOwnership::OwnedExact),
             Limits::default(),
         )
         .unwrap()
     } else {
-        BlockingReader::open(source, Limits::default()).unwrap()
+        BlockingReader::open_seekable(source, Limits::default()).unwrap()
     };
     assert_eq!(r.payload_ownership(), PayloadOwnership::OwnedExact);
     r

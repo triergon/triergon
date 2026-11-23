@@ -15,7 +15,7 @@ pub(crate) fn seed_configuration(pool: &Budget, extra: &[u8]) -> Configuration {
 /// The configuration of the TrackEntry elements `entries`, read the same way.
 pub(crate) fn seed_configuration_tracks(pool: &Budget, entries: &[u8]) -> Configuration {
     let raw = mkv(&[element(0x1654ae6b, entries), element(0x1f43b675, &[])].concat());
-    let reader = BlockingReader::open_in(
+    let reader = BlockingReader::open_source_in(
         BlockingSource::stream(std::io::Cursor::new(raw)),
         crate::Limits::default(),
         pool,
