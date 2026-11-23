@@ -567,19 +567,19 @@ impl<S: Source> Player<S> {
     pub fn pending_request(&self) -> Option<&InputRequest> {
         self.request.as_ref()
     }
-    /// Whether `o` matches the active scope while running or paused.
-    pub fn current(&self, o: &Output) -> bool {
+    /// Whether `output` matches the active scope while running or paused.
+    pub fn current(&self, output: &Output) -> bool {
         !matches!(
             self.state,
             State::Stopped | State::Cancelled | State::Failed
-        ) && self.pool.same_pool(o.pool())
-            && self.session == o.session
-            && self.generation == o.generation
-            && self.epoch == o.epoch
+        ) && self.pool.same_pool(output.pool())
+            && self.session == output.session
+            && self.generation == output.generation
+            && self.epoch == output.epoch
     }
-    /// Whether `o` is current and the player is not paused.
-    pub fn may_deliver(&self, o: &Output) -> bool {
-        self.current(o) && self.state != State::Paused
+    /// Whether `output` is current and the player is not paused.
+    pub fn may_deliver(&self, output: &Output) -> bool {
+        self.current(output) && self.state != State::Paused
     }
     /// Pauses or resumes delivery. Fails with `Closed` unless running or paused.
     pub fn pause(&mut self, paused: bool) -> Result<()> {
@@ -649,17 +649,17 @@ impl<S: Source> Player<S> {
         self.shutdown(State::Cancelled);
     }
     /// Seeks to `target` on the video track `track` and switches to `selection`;
-    /// `false` when `w` had no work left. Outputs from before the seek are no longer
+    /// `false` when `work` had no work left. Outputs from before the seek are no longer
     /// current. Fails with `Invalid` when `track` is not an enabled video track.
     pub fn seek_and_select(
         &mut self,
         track: TrackKey,
         target: Time,
         selection: Selection,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<bool> {
-        self.apply_seek(track, target, selection, None, w, c)
+        self.apply_seek(track, target, selection, None, work, cancel)
     }
 
     fn apply_seek(
@@ -757,30 +757,30 @@ impl<S: Source> Player<S> {
 
     /// Continues a TS entity sequence with `next`, the source of the next entity, as
     /// `id` with `caps`; `discontinuity` marks a clock discontinuity between them.
-    /// Returns `false` when `w` had no work left.
+    /// Returns `false` when `work` had no work left.
     pub fn continue_entity(
         &mut self,
         id: triergon_core::SourceId,
         caps: triergon_core::SourceCapabilities,
         next: &mut Option<S>,
         discontinuity: bool,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<bool> {
-        if c.load(Ordering::Relaxed) {
+        if cancel.load(Ordering::Relaxed) {
             self.cancel();
             return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused) {
             return Err(Error::Closed);
         }
-        if w.remaining() == 0 {
+        if work.remaining() == 0 {
             return Ok(false);
         }
         if next.is_none() {
             return Err(Error::Invalid("next source owner missing"));
         }
-        if !w.try_charge(1) {
+        if !work.try_charge(1) {
             return Ok(false);
         }
         self.engine
@@ -805,16 +805,16 @@ impl<S: Source> Player<S> {
         &'a mut self,
         next: &'a mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         selection: Selection,
-        w: &mut WorkBudget,
-        c: &'a AtomicBool,
+        work: &mut WorkBudget,
+        cancel: &'a AtomicBool,
     ) -> Result<Option<crate::mp4::catalogue::CatalogueCommit<'a, S>>> {
-        if c.load(Ordering::Relaxed) {
+        if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
         if !matches!(self.state, State::Running | State::Paused | State::Ended) {
             return Err(Error::Closed);
         }
-        if w.remaining() == 0 {
+        if work.remaining() == 0 {
             return Ok(None);
         }
         let old = self.engine.as_ref().ok_or(Error::Closed)?;
@@ -830,7 +830,7 @@ impl<S: Source> Player<S> {
             return Err(Error::SourceMismatch);
         }
         let epoch = self.epoch.checked_add(1).ok_or(Error::Overflow)?;
-        if !w.try_charge(1) {
+        if !work.try_charge(1) {
             return Ok(None);
         }
         selection.validate(&candidate.engine)?;
@@ -841,7 +841,7 @@ impl<S: Source> Player<S> {
             selection,
             epoch,
             queue,
-            cancel: c,
+            cancel: cancel,
             seek: None,
         }))
     }
@@ -979,15 +979,15 @@ impl<S: Source> Player<S> {
     }
 
     /// Replaces the MP4 catalogue with `next`, preparing and committing in one call;
-    /// `None` when `w` had no work left.
+    /// `None` when `work` had no work left.
     pub fn replace_mp4_catalogue(
         &mut self,
         next: &mut Option<crate::mp4::catalogue::Mp4Catalogue<S>>,
         selection: Selection,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<Option<crate::mp4::catalogue::RetiredCatalogue>> {
-        self.prepare_mp4_catalogue(next, selection, w, c)?
+        self.prepare_mp4_catalogue(next, selection, work, cancel)?
             .map(crate::mp4::catalogue::CatalogueCommit::commit)
             .transpose()
     }
@@ -1034,15 +1034,19 @@ impl<S: Source> Player<S> {
         retired
     }
     /// Ends a TS sequence after its last entity. Returns `false` when out of work.
-    pub fn finish_logical_source(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
-        if c.load(Ordering::Relaxed) {
+    pub fn finish_logical_source(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if cancel.load(Ordering::Relaxed) {
             self.cancel();
             return Err(Error::Cancelled);
         }
-        if w.remaining() == 0 {
+        if work.remaining() == 0 {
             return Ok(false);
         }
-        if !w.try_charge(1) {
+        if !work.try_charge(1) {
             return Ok(false);
         }
         self.engine
@@ -1088,15 +1092,19 @@ impl<S: Source> Player<S> {
         }
         Ok(accepted)
     }
-    /// Reads, classifies and queues within `w`.
-    pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<Progress> {
-        self.drive::<false>(w, c, None, None)
+    /// Reads, classifies and queues within `work`.
+    pub fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Progress> {
+        self.drive::<false>(work, cancel, None, None)
     }
 
     /// Queues a ready event in this call if its work and FIFO charges fit.
     /// Otherwise the event is retained for retry.
-    pub fn advance_ready(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<Progress> {
-        self.drive::<true>(w, c, None, None)
+    pub fn advance_ready(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Progress> {
+        self.drive::<true>(work, cancel, None, None)
     }
 
     /// Fills an empty slot, transferring the oldest queued output first.
