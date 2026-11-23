@@ -49,6 +49,7 @@ pub struct Decoder {
     charset: Option<(Bytes, Charset)>,
     /// The clock of the packet being decoded.
     clock: Clock,
+    // One enum of these (repr(u8), stored per arm, one loop): +7 per packet (+0.92%).
     /// Converting the packet from the label's charset.
     converter: Option<CharsetJob>,
     /// Checking the text, with how many of its bytes are paid for.
