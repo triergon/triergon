@@ -6,9 +6,7 @@
 //! (composition objects, palette entries, object data) stop at the segment end.
 
 use super::super::{CompositionObject, Crop};
-use super::{
-    DisplayLimits, PacketClock, ReceiverObservations, Refusal, reserve_amortised, reserve_room,
-};
+use super::{DisplayLimits, PacketClock, Refusal, reserve_amortised, reserve_room};
 use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
@@ -389,7 +387,6 @@ impl Receiver {
         body: std::ops::Range<usize>,
         limits: &DisplayLimits,
         budget: &Budget,
-        observations: &mut ReceiverObservations,
     ) -> Result<()> {
         let id = byte(raw, body.start);
         let slots = self.palettes.as_slice();
@@ -428,12 +425,11 @@ impl Receiver {
         for &[index, y, cr, cb, alpha] in whole {
             words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
         }
-        // An entry starting inside the segment but ending past it reads on.
+        // An entry starting inside the segment but ending past it reads on,
+        // into the next segment and, past the packet, zeros.
         if tail < entries.end {
             let [index, y, cr, cb, alpha] = std::array::from_fn(|i| byte(raw, tail + i));
             words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
-            observations.palette_cross_segment_bytes += tail + 5 - entries.end;
-            observations.palette_zero_padding_bytes += (tail + 5).saturating_sub(raw.len());
         }
         Ok(())
     }

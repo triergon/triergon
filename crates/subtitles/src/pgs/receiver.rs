@@ -229,21 +229,6 @@ impl RecoveredEvent {
     }
 }
 
-/// How the receiver read a packet where its bytes run short. The zeros it
-/// reads past the end of the packet are never part of
-/// [`ReceiverPacket::raw_packet`].
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct ReceiverObservations {
-    /// A segment other than END declared a body running past the end of the
-    /// packet, which ended the packet there.
-    pub truncated_segment_tail: bool,
-    /// Bytes that a PDS's partial last entry read past the end of its
-    /// segment, summed over the packet.
-    pub palette_cross_segment_bytes: usize,
-    /// Of those, the bytes past the end of the packet, read as zero.
-    pub palette_zero_padding_bytes: usize,
-}
-
 /// One decoded packet. Segments after its first display still update the
 /// decoder's caches and `context_canvas`.
 #[derive(Debug)]
@@ -257,8 +242,6 @@ pub struct ReceiverPacket {
     /// the receiver accepted, `[0, 0]` before one or after a PCS whose size
     /// it rejects.
     pub context_canvas: [u16; 2],
-    /// Where the receiver read past a segment or the packet.
-    pub receiver_observations: ReceiverObservations,
 }
 
 impl ReceiverPacket {
@@ -398,7 +381,6 @@ pub struct ReceiverDecoder {
     subtitle_pts: Option<i64>,
     displayed: bool,
     refusal: Option<Refusal>,
-    observations: ReceiverObservations,
     draft: Option<Draft>,
     planes: Planes,
 }
@@ -431,7 +413,6 @@ impl ReceiverDecoder {
             subtitle_pts: None,
             displayed: false,
             refusal: None,
-            observations: ReceiverObservations::default(),
             draft: None,
             planes: Planes::None,
         })
@@ -485,7 +466,6 @@ impl ReceiverDecoder {
         self.subtitle_pts = state::microseconds(clock);
         self.displayed = false;
         self.refusal = None;
-        self.observations = ReceiverObservations::default();
         // `finish`, `poison` and `reset` leave no event behind; release
         // builds clear it anyway, out of line.
         debug_assert!(self.event.is_none());
@@ -615,7 +595,6 @@ impl ReceiverDecoder {
         let body = self.at + 3
             ..self.at + 3 + usize::from(u16::from_be_bytes([byte(self.at + 1), byte(self.at + 2)]));
         if body.end > length && kind != END {
-            self.observations.truncated_segment_tail = true;
             return Ok(Some(Phase::Finish));
         }
         // Fixed when first computed, so a retry after pressure pays nothing
@@ -631,15 +610,7 @@ impl ReceiverDecoder {
         let (receiver, limits) = (&mut self.receiver, &self.limits);
         match kind {
             COMPOSITION => receiver.composition(raw, body.clone(), self.subtitle_pts, limits)?,
-            PALETTE => {
-                receiver.palette_definition(
-                    raw,
-                    body.clone(),
-                    limits,
-                    &self.budget,
-                    &mut self.observations,
-                )?;
-            }
+            PALETTE => receiver.palette_definition(raw, body.clone(), limits, &self.budget)?,
             OBJECT => {
                 self.refusal =
                     receiver.object_fragment(&raw[body.clone()], limits, &self.budget)?;
@@ -898,7 +869,6 @@ impl ReceiverDecoder {
             event: self.event.take(),
             refusal: self.refusal,
             context_canvas: self.receiver.canvas,
-            receiver_observations: self.observations,
         });
         Ok(Some(Phase::Ready))
     }

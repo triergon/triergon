@@ -504,12 +504,10 @@ fn unknown_and_sentinel_clocks_are_never_relabelled_known_zero() {
     }
 }
 #[test]
-fn receiver_read_ahead_and_api_zero_padding_are_explicit_and_never_added_to_raw_bytes() {
+fn a_palette_entry_read_past_the_packet_adds_nothing_to_the_raw_bytes() {
     let raw = [pcs(0x80, false), segment(0x14, &[0, 0, 1])].concat();
     let out = run(&raw, 1);
     assert_eq!(out.raw_packet().as_ref(), raw);
-    assert_eq!(out.receiver_observations.palette_cross_segment_bytes, 4);
-    assert_eq!(out.receiver_observations.palette_zero_padding_bytes, 4);
 }
 
 #[test]
