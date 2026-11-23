@@ -50,6 +50,23 @@ pub use triergon_elementary as elementary;
 #[cfg(feature = "framing")]
 /// Codec configuration readers and packet framing adapters.
 pub use triergon_framing as framing;
+
+/// Run a framing job to its next output, supplying a fresh work budget on each
+/// yield. Returns `None` when the job completes without another output. The job's
+/// errors and cancellation are returned unchanged.
+#[cfg(feature = "framing")]
+pub fn run_build<T>(
+    mut step: impl FnMut(&mut WorkBudget) -> Result<framing::BuildStep<T>>,
+) -> Result<Option<T>> {
+    loop {
+        match step(&mut WorkBudget::new(1 << 20))? {
+            framing::BuildStep::Ready(value) => return Ok(Some(value)),
+            framing::BuildStep::Yield => {}
+            framing::BuildStep::Complete => return Ok(None),
+        }
+    }
+}
+
 #[cfg(feature = "playback")]
 /// Read segment feeds and progressive MPEG transport.
 pub use triergon_hls as hls;

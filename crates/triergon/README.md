@@ -24,6 +24,11 @@ while let Some(packet) = source.next_packet()? {
 # }
 ```
 
+Track metadata becomes available as the reader consumes input. Before reading its
+opening events, `source.reader().track_count()` can be zero. ISO BMFF publishes
+its tracks with `ReaderEvent::Movie`. `next_event` lets you inspect the opening
+events before pulling packets.
+
 To decode and render as well, with `playback,codecs,render`, open the source with
 `playback::probe::Probe` and
 read outputs from a `playback::Player`. Look up the packet's track with
@@ -31,7 +36,8 @@ read outputs from a `playback::Player`. Look up the packet's track with
 and step `AccessUnits::for_track` once per selected track to obtain its framer.
 For indexed MP4, finish `PreparedMp4::identify_tracks` before selecting tracks
 or creating framers so their codec identities and sample descriptions are available.
-Here `ready` supplies a fresh work budget when the framing job yields.
+Use `run_build` to drive a framing job to its next output with a fresh work
+budget each time it yields.
 
 ```rust,no_run
 # #[cfg(all(feature = "playback", feature = "codecs", feature = "render"))]
@@ -43,26 +49,14 @@ Here `ready` supplies a fresh work budget when the framing job yields.
 #     renderer: &mut triergon::render::ass::Renderer, script: &mut triergon::render::ass::Script,
 #     time_ms: i64,
 # ) -> Result<(), Box<dyn std::error::Error>> {
-# use triergon::framing::BuildStep;
-# fn ready<T>(mut step: impl FnMut(&mut triergon::WorkBudget) -> triergon::Result<BuildStep<T>>) -> triergon::Result<T> {
-#     loop {
-#         match step(&mut triergon::WorkBudget::new(1 << 20))? {
-#             BuildStep::Ready(value) => return Ok(value),
-#             BuildStep::Yield => {}
-#             BuildStep::Complete => return Err(triergon::Error::Invalid("no access unit")),
-#         }
-#     }
-# }
-use triergon::{MediaKind, PacketInfo, Rounding, TimeBase, session::Discard};
+use triergon::{Error, MediaKind, run_build};
 
 let mut job = units.packet(packet)?;
-let unit = ready(|work| job.step(work, cancel))?;
-let pts = unit.pts().map(|t| unit.time_base()
-    .rescale(t, TimeBase::NANOSECONDS, Rounding::Floor)).transpose()?;
+let unit = run_build(|work| job.step(work, cancel))?
+    .ok_or(Error::Invalid("missing access unit"))?;
 match track.kind() {
-    MediaKind::Video => { video.feed(unit.payload(), pts)?; while video.step(None) {} }
-    MediaKind::Audio => { audio.feed_discarding(unit.payload(), pts, Discard::of(&unit))?;
-                          audio.pull(None, 0, pcm); }
+    MediaKind::Video => { video.feed_packet(&unit)?; while video.step(None) {} }
+    MediaKind::Audio => { audio.feed_packet(&unit)?; audio.pull(None, 0, pcm); }
     _ => {}
 }
 let images = renderer.render(script, time_ms)?.images;
@@ -82,15 +76,20 @@ cargo run -p triergon --features playback,codecs,render --example play -- \
   harness/fixtures/ass-render/decorations-orientation.ass 500
 ```
 
-For demuxing alone, use `AnyReader::open` with the source prefix and capabilities,
-then supply the ranges requested by `ContainerReader::step`. After
+For caller-driven input, use `AnyReader::open` with the source prefix and
+capabilities, or `AnyReader::of` with a format already selected by `probe`.
+Supply the ranges requested by `ContainerReader::step`. After
 `reader.request_seek(SeekRequest { track, target, policy })`, the reader delivers
 `Event::Seek(SeekReceipt)` before the next packet.
 
 `open_blocking(source, &pool)` does the probing and input handling for a
 `std::io::Read + Seek` source and returns a `Blocking` driver with `next_event`,
-`next_packet` and `seek`; `open_sequential` does the same for a pipe, which the readers
-read without seeking or a known length. Both adapters stop
+`next_packet` and `seek`. `reader()` gives access to tracks and format-specific
+metadata. `into_inner()` returns the source at its current read position.
+`open_sequential` supports pipes without random access or a known length. Its
+`Replayed` source serves the unread prefix before the rest of the pipe. Calling
+`Replayed::into_inner()` yields the pipe at its current position and discards the
+unread prefix. Both adapters stop
 reading as soon as a fixed container signature selects the format, by the rules under
 [Behaviour and limits](#behaviour-and-limits). A native FLAC marker also suffices once
 higher-priority container signatures are ruled out. Frame-based and ID3-prefixed
@@ -151,7 +150,7 @@ The meaning of each type is documented in
 ## Behaviour and limits
 
 - **Probing.** `probe(prefix)` answers `Probed::Format(SourceFormat::…)`,
-  `Probed::Need(n)` (a prefix of `n` bytes decides) or `Probed::Unrecognised`.
+  `Probed::Need(n)` (wait for at least `n` bytes) or `Probed::Unrecognised`.
   `Matroska` is an EBML header (`1A 45 DF A3`, four bytes); `Isobmff` a first box whose
   type, bytes 4–8, is `ftyp`, `styp`, `moov`, `moof`, `mdat`, `free`, `skip`, `sidx` or
   `wide`; `Ogg` an `OggS` page with its version byte (five bytes); `Ts` sync bytes `0x47`
@@ -196,7 +195,11 @@ The meaning of each type is documented in
   `AnyOther::MpegTs(event)` retains source transport/PES events, header-only
   video bytes and explicit unsupported/interrupted framing outcomes. A PES
   never becomes a neutral packet. See the MPEG-TS README for admitted carriages.
-- **Seeking.** `request_seek` forwards to the format reader. For Matroska the
+- **Seeking.** `Blocking::seek` returns the receipt before packet delivery resumes.
+  Decode from `receipt.landing` and present from `receipt.discard_until`. Flush
+  the sessions and rebuild track framers before feeding packets from the landing
+  point. Use `Blocking::begin_seek` to read the format events and `Event::Seek`
+  yourself with `next_event`. For Matroska the
   `TrackId` is the TrackNumber, the target is floored to nanoseconds, and only
   video tracks can be seek targets. For ISO BMFF the `TrackId` is the `track_ID`, the
   target is on that track's media clock without edits, and any track can be a target.

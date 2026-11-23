@@ -1,33 +1,22 @@
 use std::{fs::File, io::Read, path::Path, sync::atomic::AtomicBool};
 use triergon::{
-    AnyReader, Budget, BudgetVec, ContainerReader, Error, PacketInfo, Result, Rounding, TimeBase,
-    TrackInfo, WorkBudget,
+    AnyReader, Budget, BudgetVec, ContainerReader, Error, PacketInfo, Result, TrackInfo,
     bridge::access::{AccessUnitLimits, AccessUnits},
-    framing::BuildStep,
     open_blocking,
     render::ass::{Fonts, Options, Renderer, Script, Settings, Size},
+    run_build,
     session::{
-        AudioSession, Canvas, Discard, PcmBlock, QueueLimits, SessionState, VideoSession,
-        audio_codec, audio_configuration, audio_decoder_in, video_codec, video_decoder_in,
+        AudioSession, Canvas, PcmBlock, QueueLimits, SessionState, VideoSession, audio_codec,
+        audio_configuration, audio_decoder_in, video_codec, video_decoder_in,
     },
 };
 
 const WIDTH: u32 = 640;
 const HEIGHT: u32 = 360;
 
-fn ready<T>(mut step: impl FnMut(&mut WorkBudget) -> Result<BuildStep<T>>) -> Result<T> {
-    loop {
-        match step(&mut WorkBudget::new(1 << 20))? {
-            BuildStep::Ready(value) => return Ok(value),
-            BuildStep::Yield => {}
-            BuildStep::Complete => return Err(Error::Invalid("framing produced no access unit")),
-        }
-    }
-}
-
 fn framer(pool: &Budget, track: &dyn TrackInfo, cancel: &AtomicBool) -> Result<AccessUnits> {
     let mut setup = AccessUnits::for_track(pool, track, AccessUnitLimits::default())?;
-    ready(|work| setup.step(work, cancel))
+    run_build(|work| setup.step(work, cancel))?.ok_or(Error::Invalid("missing track framer"))
 }
 
 #[derive(Default)]
@@ -108,19 +97,13 @@ fn decode(
         };
         if let Some(units) = units {
             let mut job = units.packet(&packet)?;
-            let unit = ready(|work| job.step(work, &cancel))?;
-            let pts = unit
-                .pts()
-                .map(|pts| {
-                    unit.time_base()
-                        .rescale(pts, TimeBase::NANOSECONDS, Rounding::Floor)
-                })
-                .transpose()?;
+            let unit = run_build(|work| job.step(work, &cancel))?
+                .ok_or(Error::Invalid("missing access unit"))?;
             if is_video {
-                video.feed(unit.payload(), pts)?;
+                video.feed_packet(&unit)?;
                 played.video(&mut video);
             } else {
-                audio.feed_discarding(unit.payload(), pts, Discard::of(&unit))?;
+                audio.feed_packet(&unit)?;
                 played.audio(&mut audio);
             }
         }
