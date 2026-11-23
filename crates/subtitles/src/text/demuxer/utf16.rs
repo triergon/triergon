@@ -57,6 +57,9 @@ impl Decoder {
 
     /// Converts until `work` runs out (`None`) or the document is converted.
     /// Each code unit costs one unit.
+    // Out of line: called once per poll, its loop keeps its own registers
+    // whatever else the caller inlines (measured).
+    #[inline(never)]
     pub(super) fn advance(
         &mut self,
         source: &[u8],
