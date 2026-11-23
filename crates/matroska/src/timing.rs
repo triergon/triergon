@@ -103,8 +103,8 @@ pub struct BlockTiming {
 /// Exact presentation time and duration of one frame, in rational nanoseconds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PacketTiming {
-    /// Presentation time; `None` when it cannot be derived, as for a later laced
-    /// frame without a known duration.
+    /// Presentation time; `None` for a later laced frame that no nonzero frame
+    /// duration places.
     pub pts: Option<ExactTime>,
     /// Frame duration; `None` when unknown.
     pub duration: Option<ExactTime>,
@@ -129,10 +129,14 @@ impl BlockTiming {
     }
 
     /// The exact source time (RFC 9559 §11.2): the Block timestamp in nanoseconds
-    /// less CodecDelay, plus the earlier frames' share of BlockDuration, or of
-    /// DefaultDuration when BlockDuration is absent. Fails with [`Error::Invalid`]
-    /// for zero `scale_ns` or `frame` not below `frames`, and with
-    /// [`Error::Overflow`] when a value does not fit.
+    /// less CodecDelay, plus the duration of the earlier frames of the lace. The
+    /// duration is each frame's share of BlockDuration, or DefaultDuration when
+    /// BlockDuration is absent. The Block timestamp is the first frame's and the
+    /// later frames follow one another (§10.3.5), so a later frame has a time only
+    /// when a nonzero frame duration places it: a zero BlockDuration places none,
+    /// DefaultDuration still does. Fails with [`Error::Invalid`] for zero
+    /// `scale_ns` or `frame` not below `frames`, and with [`Error::Overflow`] when a
+    /// value does not fit.
     pub fn source(self) -> Result<PacketTiming> {
         let base = self.source_base_ns()?;
         let duration = if let Some(ticks) = self.duration_ticks {
@@ -151,20 +155,27 @@ impl BlockTiming {
             // A validated single frame always has index zero. Its integral
             // duration does not contribute to its presentation timestamp.
             _ if self.frames == 1 => Some(ExactTime::new(base, 1)?),
-            Some(d) => {
-                let value = base
-                    .checked_mul(i128::from(d.denominator))
-                    .and_then(|n| {
-                        d.numerator
-                            .checked_mul(i128::from(self.frame))
-                            .and_then(|step| n.checked_add(step))
-                    })
-                    .ok_or(Error::Overflow)?;
-                Some(ExactTime::new(value, d.denominator)?)
-            }
-            None if self.frame == 0 => Some(ExactTime::new(base, 1)?),
-            None => None,
+            Some(step) if step.numerator != 0 => Some(self.after(base, step)?),
+            _ if self.frame == 0 => Some(ExactTime::new(base, 1)?),
+            _ => match self.default_duration_ns {
+                Some(step) if step != 0 && self.duration_ticks == Some(0) => {
+                    Some(self.after(base, ExactTime::new(i128::from(step), 1)?)?)
+                }
+                _ => None,
+            },
         };
         Ok(PacketTiming { pts, duration })
+    }
+    /// The time of this frame when every frame before it in the lace lasts `step`.
+    fn after(self, base: i128, step: ExactTime) -> Result<ExactTime> {
+        let value = base
+            .checked_mul(i128::from(step.denominator))
+            .and_then(|n| {
+                step.numerator
+                    .checked_mul(i128::from(self.frame))
+                    .and_then(|step| n.checked_add(step))
+            })
+            .ok_or(Error::Overflow)?;
+        ExactTime::new(value, step.denominator)
     }
 }

@@ -110,7 +110,11 @@ def timing_trace(path):
         track=tracks[number]
         base=Fraction((cluster_time+relative)*scale-track["delay"])
         duration=Fraction(duration_ticks*scale,count) if duration_ticks is not None else None if track["duration"] is None else Fraction(track["duration"])
+        # RFC 9559 10.3.5: the Block timestamp is the first frame's and the frames
+        # follow one another, so only a nonzero frame duration places a later frame.
+        # A zero BlockDuration places none of them; DefaultDuration still does.
+        step=duration if duration else Fraction(track["duration"]) if duration_ticks==0 and track["duration"] else None
         for frame in range(count):
-            pts=base+frame*duration if duration is not None else base if frame==0 else None
+            pts=base if frame==0 else base+frame*step if step is not None else None
             packets.append({"track":track["index"],"pts":rational(pts),"duration":rational(duration)})
     return {"schema":1,"packets":packets}

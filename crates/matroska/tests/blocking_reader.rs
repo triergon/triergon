@@ -216,6 +216,41 @@ fn later_lace_timestamps_remain_unknown_without_container_duration() {
 }
 
 #[test]
+fn a_zero_block_duration_times_only_the_first_laced_frame_before_and_after_a_seek() {
+    // A keyframe BlockGroup whose fixed-size lace holds two frames, BlockDuration 0.
+    let group = element(
+        0xa0,
+        &[element(0xa1, &[0x81, 0, 0, 0x04, 1, 1, 2]), uint(0x9b, 0)].concat(),
+    );
+    let clusters = [cluster(0, block(0, true)), cluster(40, group)].concat();
+    for with_default in [false, true] {
+        let bytes = fixture_with_duration(clusters.clone(), false, with_default);
+        let timed = |packets: &[Packet]| {
+            packets
+                .iter()
+                .map(|p| (p.pts_ns, p.duration_ns))
+                .collect::<Vec<_>>()
+        };
+        // DefaultDuration (1 ms here) places the second frame; the zero does not.
+        let expected = [
+            (Some(40_000_000), Some(0)),
+            (with_default.then_some(41_000_000), Some(0)),
+        ];
+        let packets = collect(&bytes, Limits::default()).unwrap();
+        assert_eq!(timed(&packets[1..]), expected, "default {with_default}");
+        let mut d = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
+        let cancel = AtomicBool::new(false);
+        let receipt = d.seek_previous(0, 40_000_000, &cancel).unwrap();
+        assert_eq!(receipt.actual_ns, 40_000_000);
+        let mut after = Vec::new();
+        while let Some(p) = d.next_packet(&cancel).unwrap() {
+            after.push(p);
+        }
+        assert_eq!(timed(&after), expected, "default {with_default} after seek");
+    }
+}
+
+#[test]
 fn laced_keyframe_seek_receipt_describes_the_block_that_is_replayed() {
     let laced = element(0xa3, &[0x81, 0, 0, 0x84, 1, 1, 2]);
     let bytes = fixture(cluster(0, laced), false);

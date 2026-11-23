@@ -925,152 +925,7 @@
       "cause": "Equivalent container seek runtime, peak live heap and total RSS need paired gate-host collection."
     }
   ],
-  "open_cases": [
-    {
-      "id": "cues-opus-zero-before-cutoff-0-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-before-cutoff-0-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-before-cutoff-250000000-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-before-cutoff-250000000-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-0-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-0-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-250000000-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-250000000-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-2500000000-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-2500000000-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-7500000000-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-7500000000-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-15500000000-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-15500000000-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-25000000000-fresh",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    },
-    {
-      "id": "cues-opus-zero-at-cutoff-25000000000-after-eof",
-      "requirement": "The facade gives the second frame of a laced Opus Block a presentation time derived from its explicit zero BlockDuration (1993500000 ns, the first frame's time); RFC 9559 section 10.3.5 leaves later laced frames' timestamps underdetermined and the reference reports none. Report it absent, or mark it derived (container contract rule 1). The exact CodecDelay times (section 11.2) and the present zero BlockDuration (section 5.1.3.5.3 sets no range) remain deviations once the frame is fixed.",
-      "differences": [
-        "duration+",
-        "pts",
-        "pts+"
-      ]
-    }
-  ],
+  "open_cases": [],
   "open_deviations": [
     {
       "reading": "CodecDelay is subtracted from the Block time in nanoseconds",
@@ -1154,6 +1009,35 @@
         "cues-opus-two-tracks-input-rate-15500000000-after-eof",
         "cues-opus-two-tracks-input-rate-25000000000-fresh",
         "cues-opus-two-tracks-input-rate-25000000000-after-eof"
+      ]
+    },
+    {
+      "reading": "An explicit zero BlockDuration is the Block's duration, and CodecDelay is subtracted from the Block time in nanoseconds",
+      "clause": "RFC 9559 section 5.1.3.5.3 sets no range on BlockDuration, so 0 gives each frame of the lace a zero share; sections 5.1.4.1.25 and 11.2: the nanosecond CodecDelay MUST be subtracted from each frame timestamp",
+      "candidate": "reports the zero duration on both frames of the laced Opus Block and exact presentation times, for example 1993500000 ns on the first frame; the second frame has no time, as in the reference, because a zero duration places no later frame of a lace (section 10.3.5)",
+      "reference": "reports no duration for those frames (FFmpeg's 0 is unknown) and rounds the times to the 1 ms Segment tick, for example 1993000000 ns; payloads, flags and order agree",
+      "compat": "triergon_matroska::compat::clock::packet_timing",
+      "differences": [
+        "duration+",
+        "pts"
+      ],
+      "cases": [
+        "cues-opus-zero-before-cutoff-0-fresh",
+        "cues-opus-zero-before-cutoff-0-after-eof",
+        "cues-opus-zero-before-cutoff-250000000-fresh",
+        "cues-opus-zero-before-cutoff-250000000-after-eof",
+        "cues-opus-zero-at-cutoff-0-fresh",
+        "cues-opus-zero-at-cutoff-0-after-eof",
+        "cues-opus-zero-at-cutoff-250000000-fresh",
+        "cues-opus-zero-at-cutoff-250000000-after-eof",
+        "cues-opus-zero-at-cutoff-2500000000-fresh",
+        "cues-opus-zero-at-cutoff-2500000000-after-eof",
+        "cues-opus-zero-at-cutoff-7500000000-fresh",
+        "cues-opus-zero-at-cutoff-7500000000-after-eof",
+        "cues-opus-zero-at-cutoff-15500000000-fresh",
+        "cues-opus-zero-at-cutoff-15500000000-after-eof",
+        "cues-opus-zero-at-cutoff-25000000000-fresh",
+        "cues-opus-zero-at-cutoff-25000000000-after-eof"
       ]
     },
     {
@@ -1568,30 +1452,30 @@
     "regular-front-1800-t1-between-one-seek-ordinary": "c814abe3472878f2333c44572929bcef77564b05e2472454ea8f2bd1161ba6db"
   },
   "candidate_pins": {
-    "cues-opus-zero-before-cutoff-0-fresh": "76ba8d32c7f72b1cc1effd1829236d33a932480fbddb46567da0d69db17ab7eb",
-    "cues-opus-zero-before-cutoff-0-after-eof": "76ba8d32c7f72b1cc1effd1829236d33a932480fbddb46567da0d69db17ab7eb",
-    "cues-opus-zero-before-cutoff-250000000-fresh": "ae3bab20ea811853d01af3c22e12f05121613c6c17e9b4f91eb846d2b3cd006b",
-    "cues-opus-zero-before-cutoff-250000000-after-eof": "ae3bab20ea811853d01af3c22e12f05121613c6c17e9b4f91eb846d2b3cd006b",
-    "cues-opus-zero-before-cutoff-2500000000-fresh": "8c2a88bae80a555fa42a289809dc4c2a3797ee86363bddc440a4ab063c61441f",
-    "cues-opus-zero-before-cutoff-2500000000-after-eof": "8c2a88bae80a555fa42a289809dc4c2a3797ee86363bddc440a4ab063c61441f",
-    "cues-opus-zero-before-cutoff-7500000000-fresh": "65034fc776daf4137f9083196247020395ddb2193e0abe59fde5117173f571b0",
-    "cues-opus-zero-before-cutoff-7500000000-after-eof": "65034fc776daf4137f9083196247020395ddb2193e0abe59fde5117173f571b0",
-    "cues-opus-zero-before-cutoff-15500000000-fresh": "61c2b42746f5d0bb195337411df6a507bdb104cd6daad50c18fde4ed02c62409",
-    "cues-opus-zero-before-cutoff-15500000000-after-eof": "61c2b42746f5d0bb195337411df6a507bdb104cd6daad50c18fde4ed02c62409",
-    "cues-opus-zero-before-cutoff-25000000000-fresh": "115e2470d4989f0e9090dd231079f4817809e9699a57abf5c4e3a1bc4070b683",
-    "cues-opus-zero-before-cutoff-25000000000-after-eof": "115e2470d4989f0e9090dd231079f4817809e9699a57abf5c4e3a1bc4070b683",
-    "cues-opus-zero-at-cutoff-0-fresh": "29c29ddce9cbf35fae7d9623fbf907cada6e8ba9f9a5c7df4efc38796e05e206",
-    "cues-opus-zero-at-cutoff-0-after-eof": "29c29ddce9cbf35fae7d9623fbf907cada6e8ba9f9a5c7df4efc38796e05e206",
-    "cues-opus-zero-at-cutoff-250000000-fresh": "652102db3b19e28927c9363cd126c7c301ef313a35d079af11e3c33832301d8d",
-    "cues-opus-zero-at-cutoff-250000000-after-eof": "652102db3b19e28927c9363cd126c7c301ef313a35d079af11e3c33832301d8d",
-    "cues-opus-zero-at-cutoff-2500000000-fresh": "d7d5f311a4ddd5eb7a0824e9a9d72dc278c47854e78a95e897ee6c389f422a9b",
-    "cues-opus-zero-at-cutoff-2500000000-after-eof": "d7d5f311a4ddd5eb7a0824e9a9d72dc278c47854e78a95e897ee6c389f422a9b",
-    "cues-opus-zero-at-cutoff-7500000000-fresh": "ddf7102d11ca68fa809a53815fc67cea4df7c5e63133eb37d44ef76cd1af173f",
-    "cues-opus-zero-at-cutoff-7500000000-after-eof": "ddf7102d11ca68fa809a53815fc67cea4df7c5e63133eb37d44ef76cd1af173f",
-    "cues-opus-zero-at-cutoff-15500000000-fresh": "d1b4916e7a450bfb7f2b76469bde703083efb2838c14bd3877d33a2a8466be86",
-    "cues-opus-zero-at-cutoff-15500000000-after-eof": "d1b4916e7a450bfb7f2b76469bde703083efb2838c14bd3877d33a2a8466be86",
-    "cues-opus-zero-at-cutoff-25000000000-fresh": "426cae30055e8c83b514b84fa0910703b652a6ed65f7655ac62d6dba67dd438f",
-    "cues-opus-zero-at-cutoff-25000000000-after-eof": "426cae30055e8c83b514b84fa0910703b652a6ed65f7655ac62d6dba67dd438f",
+    "cues-opus-zero-before-cutoff-0-fresh": "041d6bea13e422e23482110dbb43aaf4e7214b09a03295605ef370f47b66d6a2",
+    "cues-opus-zero-before-cutoff-0-after-eof": "041d6bea13e422e23482110dbb43aaf4e7214b09a03295605ef370f47b66d6a2",
+    "cues-opus-zero-before-cutoff-250000000-fresh": "ea8d1afd29de8da931c4f3dea98d431a872661b55a9c18144bd75d07357f516c",
+    "cues-opus-zero-before-cutoff-250000000-after-eof": "ea8d1afd29de8da931c4f3dea98d431a872661b55a9c18144bd75d07357f516c",
+    "cues-opus-zero-before-cutoff-2500000000-fresh": "26429e95c796f86c2cb55eea9d018a266ecbcd303b712c88447e63b3af333461",
+    "cues-opus-zero-before-cutoff-2500000000-after-eof": "26429e95c796f86c2cb55eea9d018a266ecbcd303b712c88447e63b3af333461",
+    "cues-opus-zero-before-cutoff-7500000000-fresh": "dabeace3cf3424abca7adf9e5d01bc243fb1dc061c626f58b89f9055eeef7096",
+    "cues-opus-zero-before-cutoff-7500000000-after-eof": "dabeace3cf3424abca7adf9e5d01bc243fb1dc061c626f58b89f9055eeef7096",
+    "cues-opus-zero-before-cutoff-15500000000-fresh": "7ba3b940160e33b1f4804c5dc746600d63303cfb958fd31764890840ecd7a6fd",
+    "cues-opus-zero-before-cutoff-15500000000-after-eof": "7ba3b940160e33b1f4804c5dc746600d63303cfb958fd31764890840ecd7a6fd",
+    "cues-opus-zero-before-cutoff-25000000000-fresh": "a4186932037d5fb569ac2d08f828dd6cea224c4bad8f4053c12ac149a3cc88ed",
+    "cues-opus-zero-before-cutoff-25000000000-after-eof": "a4186932037d5fb569ac2d08f828dd6cea224c4bad8f4053c12ac149a3cc88ed",
+    "cues-opus-zero-at-cutoff-0-fresh": "66628cffd21ba66b7cfcd8d386290681462acf8dbf3129b254904fba8f5cc6d6",
+    "cues-opus-zero-at-cutoff-0-after-eof": "66628cffd21ba66b7cfcd8d386290681462acf8dbf3129b254904fba8f5cc6d6",
+    "cues-opus-zero-at-cutoff-250000000-fresh": "dd1d5309736e05865c3617a04aa404042404a1574e4c5af14ec4d4b18b5432c7",
+    "cues-opus-zero-at-cutoff-250000000-after-eof": "dd1d5309736e05865c3617a04aa404042404a1574e4c5af14ec4d4b18b5432c7",
+    "cues-opus-zero-at-cutoff-2500000000-fresh": "bf216b18557b4fc8be289a124eb2afa340f62866eb9d0768606bd302d5f18f96",
+    "cues-opus-zero-at-cutoff-2500000000-after-eof": "bf216b18557b4fc8be289a124eb2afa340f62866eb9d0768606bd302d5f18f96",
+    "cues-opus-zero-at-cutoff-7500000000-fresh": "f8891feea22460867ca522ea023d509c046676f97c0e6e485041e842f70ba489",
+    "cues-opus-zero-at-cutoff-7500000000-after-eof": "f8891feea22460867ca522ea023d509c046676f97c0e6e485041e842f70ba489",
+    "cues-opus-zero-at-cutoff-15500000000-fresh": "a81fb75386f6a73eca59fce6cf3235023d1aa319ea91eebdfe4ad4a2e155d140",
+    "cues-opus-zero-at-cutoff-15500000000-after-eof": "a81fb75386f6a73eca59fce6cf3235023d1aa319ea91eebdfe4ad4a2e155d140",
+    "cues-opus-zero-at-cutoff-25000000000-fresh": "2f4f9e93bb626482fdeedd7a2ba1721c23a0c4b5bc9bd8ee847a27e202d24b7a",
+    "cues-opus-zero-at-cutoff-25000000000-after-eof": "2f4f9e93bb626482fdeedd7a2ba1721c23a0c4b5bc9bd8ee847a27e202d24b7a",
     "cues-opus-omitted-before-cutoff-0-fresh": "719d4221b2698c799779610c495a83d6f0496355afae738d31e08811ef9c7627",
     "cues-opus-omitted-before-cutoff-0-after-eof": "719d4221b2698c799779610c495a83d6f0496355afae738d31e08811ef9c7627",
     "cues-opus-omitted-before-cutoff-250000000-fresh": "6c445cf16696ffe1808953c5a778455d2319b6aec49c091794af8cfe7951a3ab",

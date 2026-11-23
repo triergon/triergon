@@ -1,6 +1,6 @@
 //! Exact block and packet clocks: integral times and their rounding, the packet
-//! clock with codec delay and its overflow, signed block times, fractional laces
-//! and lace tick boundaries.
+//! clock with codec delay and its overflow, signed block times, fractional laces,
+//! the frame durations that place later laced frames, and lace tick boundaries.
 use triergon_matroska::Error;
 use triergon_matroska::compat::clock::packet_timing;
 use triergon_matroska::timing::{BlockTiming, ExactTime, PacketTiming};
@@ -153,6 +153,46 @@ fn fractional_lace_duration_remains_exact() {
     assert_eq!(t.pts.unwrap(), ExactTime::new(2_000_000, 3).unwrap());
     assert_eq!(t.duration.unwrap(), ExactTime::new(1_000_000, 3).unwrap());
     assert_eq!(ExactTime::new(-3, 2).unwrap().rounded_ns().unwrap(), -2);
+}
+
+#[test]
+fn only_a_nonzero_frame_duration_places_a_later_laced_frame() {
+    let lace = |duration_ticks, default_duration_ns, frame| {
+        BlockTiming {
+            timestamp_ticks: 2,
+            codec_delay_ns: 0,
+            default_duration_ns,
+            duration_ticks,
+            frame,
+            frames: 3,
+            ..block()
+        }
+        .source()
+        .unwrap()
+    };
+    let ns = |value: i128| ExactTime::new(value, 1).unwrap();
+    // A zero BlockDuration gives each frame a zero share and places no later frame.
+    for frame in [1, 2] {
+        assert_eq!(
+            lace(Some(0), None, frame),
+            PacketTiming {
+                pts: None,
+                duration: Some(ns(0)),
+            }
+        );
+    }
+    assert_eq!(lace(Some(0), None, 0).pts, Some(ns(2_000_000)));
+    // DefaultDuration still places them; the zero BlockDuration stays the duration.
+    assert_eq!(
+        lace(Some(0), Some(20_000_000), 2),
+        PacketTiming {
+            pts: Some(ns(42_000_000)),
+            duration: Some(ns(0)),
+        }
+    );
+    assert_eq!(lace(None, Some(0), 1).pts, None);
+    assert_eq!(lace(None, Some(0), 0).pts, Some(ns(2_000_000)));
+    assert_eq!(lace(Some(3), Some(0), 1).pts, Some(ns(3_000_000)));
 }
 
 #[test]

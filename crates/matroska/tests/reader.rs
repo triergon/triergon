@@ -550,12 +550,16 @@ fn playback_recovery_keeps_audio_laces_that_can_cross_the_cutoff() {
             }
             assert_eq!(other_packets, [b"subtitle".to_vec(), b"target".to_vec()]);
             let start = 1_983_500_000;
+            // The second frame follows the first by a nonzero frame duration: half
+            // the BlockDuration, else DefaultDuration; a zero BlockDuration places
+            // it only with DefaultDuration.
             let expected = [
                 (0, duration, Some(start), A.to_vec()),
                 (
                     1,
                     duration,
                     duration
+                        .filter(|&ticks| ticks != 0)
                         .map(|ticks| ticks * 500_000)
                         .or(default_duration)
                         .map(|ns| start + ns as i64),

@@ -57,8 +57,8 @@ pub struct Packet {
     /// not its TrackNumber.
     pub track: usize,
     /// Presentation time in nanoseconds, rounded once from the exact source time;
-    /// `None` for a later laced frame when neither BlockDuration nor DefaultDuration
-    /// gives the frames' duration.
+    /// `None` for a later laced frame that no nonzero frame duration places
+    /// ([`BlockTiming::source`]).
     pub pts_ns: Option<i64>,
     /// Frame duration in nanoseconds, rounded once from the exact source duration;
     /// `None` when neither BlockDuration nor DefaultDuration is known.
@@ -94,11 +94,11 @@ impl PacketFields {
             let base = timing.source_base_ns()?;
             let pts = match (timing.frame, timing.default_duration_ns) {
                 (0, _) => Some(base),
-                (frame, Some(duration)) => Some(
+                (frame, Some(duration)) if duration != 0 => Some(
                     base.checked_add(i128::from(duration) * i128::from(frame))
                         .ok_or(Error::Overflow)?,
                 ),
-                (_, None) => None,
+                _ => None,
             };
             (
                 pts.map(i64::try_from)

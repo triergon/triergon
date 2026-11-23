@@ -152,8 +152,11 @@ input follows bounded SeekHead chains to load late Tracks, Cues, chapters, tags
 and attachments; it never scans media to build an index.
 
 **Timing.** `packet.timing.source()` gives exact rational nanoseconds with
-CodecDelay subtracted (RFC 9559 §11.2); later laced frames get a PTS only when a
-duration is known, and fractional lace durations and negative PTS are kept.
+CodecDelay subtracted (RFC 9559 §11.2); fractional lace durations and negative PTS are
+kept. A frame's duration is its share of BlockDuration, or DefaultDuration when
+BlockDuration is absent. The Block timestamp is the first laced frame's and the later
+frames follow one another (§10.3.5), so a later frame gets a PTS only from a nonzero
+frame duration: a zero BlockDuration places none of them, DefaultDuration still does.
 `pts_ns`/`duration_ns` are that value rounded once to the nearest nanosecond.
 Matroska carries no decode time and a packet has none. `compat::clock::packet_timing` is an opt-in view in
 Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
