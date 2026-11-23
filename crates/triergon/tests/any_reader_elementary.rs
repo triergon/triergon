@@ -3,8 +3,8 @@
 mod common;
 
 use triergon::{
-    AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, Probe, open_blocking,
-    open_sequential, probe,
+    AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, Probed, SourceFormat,
+    open_blocking, open_sequential, probe,
 };
 
 #[test]
@@ -13,7 +13,7 @@ fn any_reader_reads_mpeg_audio_frames() {
     let mut frame = vec![0u8; 417];
     frame[..4].copy_from_slice(&0xfffb_9064u32.to_be_bytes());
     let file = frame.repeat(3);
-    assert_eq!(probe(&file), Probe::MpegAudio);
+    assert_eq!(probe(&file), Probed::Format(SourceFormat::MpegAudio));
     let (reader, packets) = common::read(&file);
     let track = reader.track(0).unwrap();
     assert_eq!(track.kind(), MediaKind::Audio);
@@ -54,7 +54,7 @@ fn any_reader_reads_flac_that_starts_at_a_frame() {
     let frames: Vec<u8> = (0..4).flat_map(|i| flac_frame(i, 200)).collect();
     // Bytes before the first frame, as a stream joined mid-way has.
     let file = [vec![0x21; 300], frames].concat();
-    assert_eq!(probe(&file), Probe::Flac);
+    assert_eq!(probe(&file), Probed::Format(SourceFormat::Flac));
     let (reader, packets) = common::read(&file);
     let track = reader.track(0).unwrap();
     assert_eq!(track.codec(), CodecId::Flac);
@@ -77,7 +77,7 @@ fn blocking_probe_preserves_late_elementary_candidates_and_their_priority() {
     let mut mpeg = vec![0; 417];
     mpeg[..4].copy_from_slice(&0xfffb_9064u32.to_be_bytes());
     bytes.extend(mpeg.repeat(3));
-    assert_eq!(probe(&bytes), Probe::MpegAudio);
+    assert_eq!(probe(&bytes), Probed::Format(SourceFormat::MpegAudio));
     assert!(matches!(
         open_sequential(&bytes[..], &pool).unwrap().reader(),
         AnyReader::MpegAudio(_)

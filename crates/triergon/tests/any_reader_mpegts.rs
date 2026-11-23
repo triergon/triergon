@@ -4,7 +4,7 @@ use triergon::mpegts::stream::TraceEvent;
 use triergon::mpegts::{AccessUnit, ReaderEvent};
 use triergon::{
     AnyOther, AnyPacket, AnyReader, Budget, Bytes, ContainerReader, Event, InputWindow, PacketInfo,
-    Probe, SourceCapabilities, SourceId, Step, WorkBudget, probe,
+    Probed, SourceCapabilities, SourceFormat, SourceId, Step, WorkBudget, probe,
 };
 
 #[test]
@@ -122,10 +122,10 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
 }
 
 #[test]
-fn m2ts_probe_selects_the_192_byte_reader_and_short_prefixes_stay_unknown() {
+fn m2ts_probe_selects_the_192_byte_reader_and_short_prefixes_ask_for_the_third_sync() {
     let bytes = include_bytes!("../../mpegts/tests/data/m2ts192-opaque-prefix.m2ts");
-    assert_eq!(probe(bytes), Probe::M2ts);
-    assert_eq!(probe(&bytes[..388]), Probe::Unknown);
+    assert_eq!(probe(bytes), Probed::Format(SourceFormat::M2ts));
+    assert_eq!(probe(&bytes[..388]), Probed::Need(389));
     let pool = Budget::new(1 << 20).unwrap();
     let reader = AnyReader::open(
         bytes,

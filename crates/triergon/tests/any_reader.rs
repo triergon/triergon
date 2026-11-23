@@ -3,7 +3,8 @@
 use std::sync::atomic::AtomicBool;
 use triergon::{
     AnyReader, Budget, Bytes, CodecId, ContainerReader, Event, InputWindow, MediaKind, PacketInfo,
-    Probe, SourceCapabilities, SourceId, Step, TrackId, WorkBudget, probe,
+    Probed, SourceCapabilities, SourceFormat, SourceId, Step, TrackId, WorkBudget, probe,
+    probe_whole,
 };
 
 fn element(id: u64, data: &[u8]) -> Vec<u8> {
@@ -47,14 +48,18 @@ fn matroska() -> Vec<u8> {
 
 #[test]
 fn probe_classifies_the_three_container_families() {
-    assert_eq!(probe(&matroska()), Probe::Matroska);
-    assert_eq!(probe(b"\0\0\0\x18ftypisom"), Probe::Isobmff);
+    assert_eq!(probe(&matroska()), Probed::Format(SourceFormat::Matroska));
+    assert_eq!(
+        probe(b"\0\0\0\x18ftypisom"),
+        Probed::Format(SourceFormat::Isobmff)
+    );
     let mut ts = vec![0u8; 188 * 3];
     for packet in ts.chunks_mut(188) {
         packet[0] = 0x47;
     }
-    assert_eq!(probe(&ts), Probe::Ts);
-    assert_eq!(probe(b"RIFF"), Probe::Unknown);
+    assert_eq!(probe(&ts), Probed::Format(SourceFormat::Ts));
+    assert_eq!(probe(b"RIFF"), Probed::Need(8));
+    assert_eq!(probe_whole(b"RIFF"), None);
 }
 
 #[test]

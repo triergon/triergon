@@ -7,12 +7,12 @@ use triergon_core::signature::{
 };
 use triergon_core::{Budget, Error, Reservation, Result};
 
-/// What the first bytes of a source look like.
+/// A source format the facade opens, as [`probe`] recognises it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Probe {
+pub enum SourceFormat {
     /// An EBML header (Matroska or WebM).
     Matroska,
-    /// An ISO BMFF box sequence (`ftyp`, `styp`, `moov`, `moof`, ...).
+    /// An ISO BMFF box sequence (`ftyp`, `styp`, `moov`, `moof`, `wide`, ...).
     Isobmff,
     /// 188-byte MPEG transport packets.
     Ts,
@@ -29,69 +29,102 @@ pub enum Probe {
     Adts,
     /// Two consecutive AC-3 or E-AC-3 syncframes.
     Ac3,
-    /// Not recognised from these bytes.
-    Unknown,
 }
 
-/// Classify a source from its first bytes. A short prefix may give `Unknown`: an
-/// elementary stream (MPEG audio, ADTS, AC-3) is recognised only once the prefix holds
-/// the start of its second frame, and an ID3v2 tag must fit in it whole.
-pub fn probe(bytes: &[u8]) -> Probe {
-    match container(bytes) {
-        Selection::Container(kind) => format(kind),
-        _ => elementary(bytes),
+/// What a source prefix says about its format.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Probed {
+    /// The source starts this format.
+    Format(SourceFormat),
+    /// Undecided: a prefix of this many bytes decides. A source that ends first is decided
+    /// by [`probe_whole`].
+    Need(usize),
+    /// No format the facade opens starts with these bytes, whatever follows them.
+    Unrecognised,
+}
+
+/// Classify a source from a prefix that more bytes may follow. A container is decided as
+/// soon as its signature is (Matroska from four bytes, Ogg from five, ISO BMFF from
+/// eight, MPEG transport from three sync bytes); an elementary stream (MPEG audio, ADTS,
+/// AC-3) once the prefix holds the start of its second frame and any ID3v2 tag whole,
+/// and the facade's openers look for one in the first 64 KiB, so a shorter prefix that
+/// holds none yet is [`Probed::Need`] of 64 KiB.
+pub fn probe(prefix: &[u8]) -> Probed {
+    match select(prefix) {
+        Selection::Container(kind) => Probed::Format(container(kind)),
+        Selection::Need(end) => Probed::Need(end),
+        Selection::Unrecognised | Selection::Ambiguous => match elementary(prefix) {
+            Some(format) => Probed::Format(format),
+            None if ELEMENTARY && prefix.len() < LIMIT => Probed::Need(LIMIT),
+            None => Probed::Unrecognised,
+        },
+    }
+}
+
+/// Classify a whole source, which no more bytes follow: [`probe`]'s answer where that
+/// decides, else the format the bytes it has select. A source that ends before a third
+/// transport sync byte is MPEG transport when its first two sync bytes are in place (one
+/// packet and all or part of a second); a container signature cut short is not one.
+/// `None` when no format the facade opens starts the source.
+pub fn probe_whole(source: &[u8]) -> Option<SourceFormat> {
+    match signature::select_whole(source, &POLICY) {
+        Selection::Container(kind) => Some(container(kind)),
+        Selection::Need(_) | Selection::Unrecognised | Selection::Ambiguous => elementary(source),
     }
 }
 
 /// What the readers select where the signatures leave a choice: every box a source
 /// they read may open with, a fragment or an index included; Ogg; and TS188 for a
 /// prefix that fits both transport spacings. `triergon-playback` selects for a
-/// player instead (`triergon_playback::probe::SELECTION`): `wide` but no `moof`,
-/// `sidx` or `skip`, no Ogg, and no packet size for such a prefix.
+/// player instead (`triergon_playback::probe::SELECTION`): no `moof`, `sidx` or `skip`,
+/// no Ogg, and no packet size for such a prefix.
 const POLICY: signature::Policy = signature::Policy {
     opening_boxes: &[
-        *b"ftyp", *b"styp", *b"moov", *b"moof", *b"mdat", *b"free", *b"skip", *b"sidx",
+        *b"ftyp", *b"styp", *b"moov", *b"moof", *b"mdat", *b"free", *b"skip", *b"sidx", *b"wide",
     ],
     ogg: true,
     transport_tie: TransportTie::Ts188,
 };
 
-fn format(container: Container) -> Probe {
-    match container {
-        Container::Matroska => Probe::Matroska,
-        Container::Isobmff => Probe::Isobmff,
-        Container::Ogg => Probe::Ogg,
-        Container::Transport(Ts188) => Probe::Ts,
-        Container::Transport(M2ts192) => Probe::M2ts,
-    }
-}
-
-fn container(bytes: &[u8]) -> Selection {
-    // One more byte settles an Ogg page, and tells a FLAC marker from the size of
-    // an opening box, where a box type would ask for four.
-    if bytes.len() == 4 && (bytes == b"OggS" || bytes == b"fLaC") {
+/// The container `prefix` starts under [`POLICY`].
+fn select(prefix: &[u8]) -> Selection {
+    // One more byte settles an Ogg page, and tells a FLAC marker from the size of an
+    // opening box, where a box type would ask for four.
+    if prefix.len() == 4 && (prefix == b"OggS" || prefix == b"fLaC") {
         return Selection::Need(5);
     }
-    signature::select(bytes, &POLICY)
+    signature::select(prefix, &POLICY)
+}
+
+/// Whether the elementary stream readers are built in.
+const ELEMENTARY: bool = cfg!(feature = "elementary");
+
+fn container(container: Container) -> SourceFormat {
+    match container {
+        Container::Matroska => SourceFormat::Matroska,
+        Container::Isobmff => SourceFormat::Isobmff,
+        Container::Ogg => SourceFormat::Ogg,
+        Container::Transport(Ts188) => SourceFormat::Ts,
+        Container::Transport(M2ts192) => SourceFormat::M2ts,
+    }
 }
 
 /// The elementary stream `bytes` starts, when that reader is built in.
-fn elementary(bytes: &[u8]) -> Probe {
+fn elementary(bytes: &[u8]) -> Option<SourceFormat> {
     #[cfg(feature = "elementary")]
     {
         use triergon_elementary::Kind;
-        match triergon_elementary::probe(bytes) {
-            Some(Kind::Flac) => Probe::Flac,
-            Some(Kind::MpegAudio) => Probe::MpegAudio,
-            Some(Kind::Adts) => Probe::Adts,
-            Some(Kind::Ac3) => Probe::Ac3,
-            None => Probe::Unknown,
-        }
+        triergon_elementary::probe(bytes).map(|kind| match kind {
+            Kind::Flac => SourceFormat::Flac,
+            Kind::MpegAudio => SourceFormat::MpegAudio,
+            Kind::Adts => SourceFormat::Adts,
+            Kind::Ac3 => SourceFormat::Ac3,
+        })
     }
     #[cfg(not(feature = "elementary"))]
     {
         let _ = bytes;
-        Probe::Unknown
+        None
     }
 }
 
@@ -126,7 +159,7 @@ pub(super) struct ProbeBuffer {
 
 impl ProbeBuffer {
     pub(super) fn new(pool: &Budget) -> Self {
-        let bound = if cfg!(feature = "elementary") {
+        let bound = if ELEMENTARY {
             LIMIT
         } else {
             M2ts192.prefix_len()
@@ -144,7 +177,7 @@ impl ProbeBuffer {
 
     /// A pipe cannot put bytes back if its allocation is refused midway.
     /// Claim its possible replay capacity before the first irreversible read.
-    pub(super) fn identify_pipe(&mut self, source: &mut impl Read) -> Result<Probe> {
+    pub(super) fn identify_pipe(&mut self, source: &mut impl Read) -> Result<Option<SourceFormat>> {
         self.prefix.charge.resize_to(self.maximum)?;
         let kind = self.identify(source, None)?;
         if self.prefix.bytes.is_empty() {
@@ -154,24 +187,26 @@ impl ProbeBuffer {
         Ok(kind)
     }
 
+    /// The format of the source, read from its start: `None` when none the facade opens
+    /// starts it.
     pub(super) fn identify(
         &mut self,
         source: &mut impl Read,
         length: Option<u64>,
-    ) -> Result<Probe> {
+    ) -> Result<Option<SourceFormat>> {
         loop {
             let bytes = &self.header[..self.used];
-            match container(bytes) {
-                Selection::Container(kind) => return Ok(format(kind)),
+            match select(bytes) {
+                Selection::Container(kind) => return Ok(Some(container(kind))),
                 Selection::Need(end) => {
                     let count = read(source, &mut self.header[self.used..end])?;
                     if count == 0 {
-                        return Ok(elementary(&self.header[..self.used]));
+                        return Ok(probe_whole(&self.header[..self.used]));
                     }
                     self.used += count;
                 }
                 Selection::Unrecognised | Selection::Ambiguous => {
-                    if !cfg!(feature = "elementary") || bytes.starts_with(b"fLaC") {
+                    if !ELEMENTARY || bytes.starts_with(b"fLaC") {
                         return Ok(elementary(bytes));
                     }
                     return self.read_elementary(source, length);
@@ -193,7 +228,11 @@ impl ProbeBuffer {
     /// Search the full bounded prefix once. Buffer the first block on the stack
     /// so a short input needs only its actual length. A longer input takes one
     /// allocation and never has to charge both an old and a replacement window.
-    fn read_elementary(&mut self, source: &mut impl Read, length: Option<u64>) -> Result<Probe> {
+    fn read_elementary(
+        &mut self,
+        source: &mut impl Read,
+        length: Option<u64>,
+    ) -> Result<Option<SourceFormat>> {
         let hint = length.unwrap_or(0).min(self.maximum as u64) as usize;
         let mut block = [0; 4096];
         block[..self.used].copy_from_slice(&self.header[..self.used]);

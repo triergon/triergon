@@ -14,7 +14,7 @@ mod any;
 mod probe;
 
 pub use any::{AnyOther, AnyPacket, AnyReader, Replayed, open_blocking, open_sequential};
-pub use probe::{Probe, probe};
+pub use probe::{Probed, SourceFormat, probe, probe_whole};
 pub use triergon_core::blocking::Blocking;
 pub use triergon_core::container::{
     CodecId, ColourDescription, ColourRange, ContainerReader, ContentLight, Event,

@@ -15,7 +15,7 @@
     )),
     allow(unused_imports, unused_variables, unreachable_code)
 )]
-use crate::probe::{Prefix, Probe, ProbeBuffer, probe};
+use crate::probe::{Prefix, ProbeBuffer, Probed, SourceFormat, probe, probe_whole};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
     ContainerReader, Event, PacketInfo, RandomAccess, ReaderStep, SeekRequest, TrackId, TrackInfo,
@@ -190,29 +190,42 @@ macro_rules! neutral_step {
 }
 
 impl AnyReader {
-    /// Open the reader selected by [`probe`] with the format's default limits.
-    /// The prefix selects the format. Feed it to the reader with the rest of the source.
+    /// Open the reader of the format `prefix` starts, with the format's default limits;
+    /// feed it the source from its start. A prefix of the length `capabilities` give is
+    /// the whole source ([`probe_whole`]); any other is the start of a longer one
+    /// ([`probe`]).
     ///
-    /// Returns an error if the prefix cannot select an enabled reader, the source
-    /// lacks capabilities that reader requires, or the budget cannot hold its state.
+    /// Fails with [`Error::Unsupported`] when the prefix selects no format, including one
+    /// [`probe`] needs more bytes of, a format whose reader feature is not enabled, or ISO
+    /// BMFF on a source without random access; and with the reader's error when the budget
+    /// cannot hold its state.
     pub fn open(
         prefix: &[u8],
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,
     ) -> Result<Self> {
-        Self::from_probe(probe(prefix), pool, source, capabilities)
+        let format = if capabilities.length == Some(prefix.len() as u64) {
+            probe_whole(prefix)
+        } else if let Probed::Format(format) = probe(prefix) {
+            Some(format)
+        } else {
+            None
+        };
+        Self::of(format, pool, source, capabilities)
     }
 
-    fn from_probe(
-        kind: Probe,
+    /// The reader of `format`, or the refusal of a source no format the facade opens starts.
+    fn of(
+        format: Option<SourceFormat>,
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,
     ) -> Result<Self> {
-        match kind {
+        let format = format.ok_or(Error::Unsupported("source format not recognised"))?;
+        match format {
             #[cfg(feature = "matroska")]
-            Probe::Matroska => Ok(Self::Matroska(triergon_matroska::Reader::new(
+            SourceFormat::Matroska => Ok(Self::Matroska(triergon_matroska::Reader::new(
                 pool,
                 source,
                 capabilities,
@@ -220,7 +233,7 @@ impl AnyReader {
                 WINDOW,
             )?)),
             #[cfg(feature = "isobmff")]
-            Probe::Isobmff => Ok(Self::Isobmff(triergon_isobmff::Reader::new(
+            SourceFormat::Isobmff => Ok(Self::Isobmff(triergon_isobmff::Reader::new(
                 pool,
                 source,
                 capabilities,
@@ -228,7 +241,7 @@ impl AnyReader {
                 WINDOW,
             )?)),
             #[cfg(feature = "ogg")]
-            Probe::Ogg => Ok(Self::Ogg(triergon_ogg::Reader::new(
+            SourceFormat::Ogg => Ok(Self::Ogg(triergon_ogg::Reader::new(
                 pool,
                 source,
                 capabilities,
@@ -236,7 +249,7 @@ impl AnyReader {
                 WINDOW,
             )?)),
             #[cfg(feature = "elementary")]
-            Probe::Flac => Ok(Self::Flac(triergon_elementary::Reader::new(
+            SourceFormat::Flac => Ok(Self::Flac(triergon_elementary::Reader::new(
                 pool,
                 source,
                 capabilities,
@@ -244,7 +257,7 @@ impl AnyReader {
                 WINDOW,
             )?)),
             #[cfg(feature = "elementary")]
-            Probe::MpegAudio => Ok(Self::MpegAudio(triergon_elementary::Reader::new(
+            SourceFormat::MpegAudio => Ok(Self::MpegAudio(triergon_elementary::Reader::new(
                 pool,
                 source,
                 capabilities,
@@ -252,7 +265,7 @@ impl AnyReader {
                 WINDOW,
             )?)),
             #[cfg(feature = "elementary")]
-            Probe::Adts => Ok(Self::Adts(triergon_elementary::Reader::new(
+            SourceFormat::Adts => Ok(Self::Adts(triergon_elementary::Reader::new(
                 pool,
                 source,
                 capabilities,
@@ -260,7 +273,7 @@ impl AnyReader {
                 WINDOW,
             )?)),
             #[cfg(feature = "elementary")]
-            Probe::Ac3 => Ok(Self::Ac3(triergon_elementary::Reader::new(
+            SourceFormat::Ac3 => Ok(Self::Ac3(triergon_elementary::Reader::new(
                 pool,
                 source,
                 capabilities,
@@ -268,48 +281,54 @@ impl AnyReader {
                 WINDOW,
             )?)),
             #[cfg(feature = "mpegts")]
-            kind @ (Probe::Ts | Probe::M2ts) => Ok(Self::MpegTs(triergon_mpegts::Reader::new(
-                pool,
-                source,
-                capabilities,
-                triergon_mpegts::ReaderLimits {
-                    format: if kind == Probe::Ts {
-                        triergon_mpegts::PacketFormat::Ts188
-                    } else {
-                        triergon_mpegts::PacketFormat::M2ts192
+            kind @ (SourceFormat::Ts | SourceFormat::M2ts) => {
+                Ok(Self::MpegTs(triergon_mpegts::Reader::new(
+                    pool,
+                    source,
+                    capabilities,
+                    triergon_mpegts::ReaderLimits {
+                        format: if kind == SourceFormat::Ts {
+                            triergon_mpegts::PacketFormat::Ts188
+                        } else {
+                            triergon_mpegts::PacketFormat::M2ts192
+                        },
+                        ..triergon_mpegts::ReaderLimits::default()
                     },
-                    ..triergon_mpegts::ReaderLimits::default()
-                },
-                WINDOW,
-            )?)),
-            #[cfg(not(feature = "mpegts"))]
-            Probe::Ts | Probe::M2ts => Err(Error::Unsupported("MPEG-TS reader feature disabled")),
+                    WINDOW,
+                )?))
+            }
+            #[allow(
+                unreachable_patterns,
+                reason = "every format whose feature is enabled has its arm"
+            )]
             _ => {
                 let _ = (pool, source, capabilities);
-                Err(Error::Unsupported("source format not recognised"))
+                Err(Error::Unsupported("reader feature not enabled"))
             }
         }
     }
 }
 
-/// Probe up to 64 KiB of a seekable source, then feed its reader from the start.
+/// Probe up to 64 KiB of a seekable source, then feed its reader from the start. The
+/// reader reads it as `SourceId(1)`.
 ///
-/// Returns an error if reading, seeking, format selection or reader construction fails.
+/// Returns an error if reading or seeking fails, no format the facade opens starts the
+/// source ([`Error::Unsupported`]), or reader construction fails ([`AnyReader::open`]).
 pub fn open_blocking<S: std::io::Read + std::io::Seek>(
     mut source: S,
     pool: &Budget,
 ) -> Result<triergon_core::blocking::Blocking<AnyReader, S>> {
     let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
-    let kind = ProbeBuffer::new(pool).identify(&mut source, capabilities.length);
+    let format = ProbeBuffer::new(pool).identify(&mut source, capabilities.length);
     source.rewind().map_err(|e| Error::Io(e.kind()))?;
-    let reader = AnyReader::from_probe(kind?, pool, SourceId(1), capabilities)?;
+    let reader = AnyReader::of(format?, pool, SourceId(1), capabilities)?;
     Ok(triergon_core::blocking::Blocking::seekable(
         reader, source, pool,
     ))
 }
 
 /// Probe up to 64 KiB of a sequential source and replay the consumed prefix.
-/// The reader sees a pipe with unknown length and no random access.
+/// The reader sees a pipe with unknown length and no random access, as `SourceId(1)`.
 ///
 /// Returns an error if the budget cannot hold the probe or reader, reading fails,
 /// or the prefix cannot select an enabled reader that supports sequential input.
@@ -318,12 +337,12 @@ pub fn open_sequential<S: std::io::Read>(
     pool: &Budget,
 ) -> Result<triergon_core::blocking::Blocking<AnyReader, Replayed<S>>> {
     let mut prefix = ProbeBuffer::new(pool);
-    let kind = prefix.identify_pipe(&mut source)?;
+    let format = prefix.identify_pipe(&mut source)?;
     let capabilities = SourceCapabilities {
         length: None,
         random_access: false,
     };
-    let reader = AnyReader::from_probe(kind, pool, SourceId(1), capabilities)?;
+    let reader = AnyReader::of(format, pool, SourceId(1), capabilities)?;
     let source = Replayed {
         prefix: Some(prefix.into_replay()?),
         at: 0,

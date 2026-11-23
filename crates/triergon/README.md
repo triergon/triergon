@@ -74,8 +74,8 @@ then supply the ranges requested by `ContainerReader::step`. After
 `std::io::Read + Seek` source and returns a `Blocking` driver with `next_event`,
 `next_packet` and `seek`; `open_sequential` does the same for a pipe, which the readers
 then treat as FFmpeg treats one (no seeking, no known length). Both adapters stop
-reading as soon as a fixed container signature selects the format. Matroska needs
-four bytes, Ogg five and ISO BMFF eight. A native FLAC marker also suffices once
+reading as soon as a fixed container signature selects the format, by the rules under
+[Behaviour and limits](#behaviour-and-limits). A native FLAC marker also suffices once
 higher-priority container signatures are ruled out. Frame-based and ID3-prefixed
 inputs use the elementary probe once at EOF or 64 KiB, whichever comes first.
 After the first 4 KiB of an elementary stream, the seekable adapter uses the reported
@@ -88,11 +88,8 @@ consumed. Longer elementary probes use one buffer. The sequential adapter
 releases its retained capacity after replaying the last byte.
 
 The [facade probe comparison](../../harness/features/facade-probe/contract.json)
-checks prefix verdicts and the format selected by both adapters. ISO BMFF
-signature selection works on a pipe. Constructing the facade's ISO BMFF reader
-requires random access and returns `Unsupported` on a pipe before reading movie
-metadata. For admitted inputs the comparison checks every supplied byte through
-EOF after a rewind or sequential replay.
+checks prefix verdicts and the format selected by both adapters. For admitted inputs the
+comparison checks every supplied byte through EOF after a rewind or sequential replay.
 
 ## Features and lower-level crates
 
@@ -133,21 +130,30 @@ The meaning of each type is documented in
 
 ## Behaviour and limits
 
-- **Probing.** `probe` returns `Probe::Matroska` for an EBML header
-  (`1A 45 DF A3`), `Probe::Isobmff` when bytes 4–8 are `ftyp`, `styp`, `moov`,
-  `moof`, `mdat`, `free`, `skip` or `sidx`, and `Probe::Ts` when sync bytes `0x47`
-  sit at offsets 0, 188 and 376 (at least 377 bytes). `Probe::M2ts` checks sync
-  at offsets 4, 196 and 388 behind the original arrival prefixes. When both patterns
-  match, the facade selects TS188.
-  `Probe::Ogg` is an `OggS` page. With the `elementary` feature,
-  `triergon_elementary::probe` recognises native FLAC (`fLaC`, or a frame header that a
-  second one continues) and MPEG audio, ADTS and AC-3 by two frames that agree, after
-  any ID3v2 tag. Anything else, including a prefix too short to decide, is
-  `Probe::Unknown`.
+- **Probing.** `probe(prefix)` answers `Probed::Format(SourceFormat::…)`,
+  `Probed::Need(n)` (a prefix of `n` bytes decides) or `Probed::Unrecognised`.
+  `Matroska` is an EBML header (`1A 45 DF A3`, four bytes); `Isobmff` a first box whose
+  type, bytes 4–8, is `ftyp`, `styp`, `moov`, `moof`, `mdat`, `free`, `skip`, `sidx` or
+  `wide`; `Ogg` an `OggS` page with its version byte (five bytes); `Ts` sync bytes `0x47`
+  at offsets 0, 188 and 376 (377 bytes) and `M2ts` at 4, 196 and 388 (389 bytes), behind
+  the arrival prefixes. When both spacings match, the facade selects TS188. With the
+  `elementary` feature, `triergon_elementary::probe` recognises native FLAC (`fLaC`, or a
+  frame header that a second one continues) and MPEG audio, ADTS and AC-3 by two frames
+  that agree, after any ID3v2 tag; a prefix shorter than 64 KiB that holds none of them
+  yet is `Need(65536)`, the most the openers read. `probe_whole(source)` decides a source
+  no more bytes follow: a container signature cut short is not one, and a transport
+  stream that ends before its third sync byte is selected by the first two (one packet
+  and all or part of a second). The openers and `AnyReader::open` with a prefix of the
+  source's known length decide the same way at the end of the input.
 - **Opening.** MPEG-TS opens through `AnyReader::MpegTs` with its `mpegts`
   feature. Its default program selection requires a single PAT media program;
-  use `mpegts::ReaderLimits` for an explicit selection. Unknown sources, a format without its feature, and ISO
-  BMFF on a source without random access are also `Error::Unsupported`.
+  use `mpegts::ReaderLimits` for an explicit selection. An unrecognised source (`source
+  format not recognised`) and a format without its feature (`reader feature not
+  enabled`) are `Error::Unsupported`.
+- **ISO BMFF needs random access.** The facade's ISO BMFF reader reads the movie index
+  where it lies, so it refuses a source without random access, a pipe through
+  `open_sequential` included, with `Error::Unsupported("ISO BMFF reader needs random
+  access")` once the signature has selected it.
 - **Defaults.** `open` builds each reader with its default limits
   (`triergon_matroska::Limits`, `triergon_isobmff::ReaderLimits`,
   `triergon_mpegts::ReaderLimits`) and asks for at most

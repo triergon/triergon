@@ -49,6 +49,15 @@ impl TransportSync {
         }
         Some(true)
     }
+
+    /// Whether `source`, which no more bytes follow, ends before this spacing's third
+    /// sync byte and holds the first two.
+    fn ends_after_two(self, source: &[u8]) -> bool {
+        let [first, second, third] = self.offsets();
+        source.len() <= third
+            && source.get(first) == Some(&0x47)
+            && source.get(second) == Some(&0x47)
+    }
 }
 
 /// A container selected from a source prefix.
@@ -150,6 +159,28 @@ pub fn select(prefix: &[u8], policy: &Policy) -> Selection {
     }
 }
 
+/// [`select`] for a whole source, which no more bytes follow: never
+/// [`Selection::Need`]. Every signature needs the bytes it needs in a prefix, but a
+/// source that ends before a third transport sync byte is selected by the first two, as
+/// a stream of one packet and all or part of a second.
+pub fn select_whole(source: &[u8], policy: &Policy) -> Selection {
+    match select(source, policy) {
+        Selection::Need(_) => {
+            let [ts188, m2ts192] = [TransportSync::Ts188, TransportSync::M2ts192]
+                .map(|sync| sync.ends_after_two(source));
+            match (ts188, m2ts192) {
+                (true, true) if policy.transport_tie == TransportTie::Refuse => {
+                    Selection::Ambiguous
+                }
+                (true, _) => Selection::Container(Container::Transport(TransportSync::Ts188)),
+                (false, true) => Selection::Container(Container::Transport(TransportSync::M2ts192)),
+                (false, false) => Selection::Unrecognised,
+            }
+        }
+        decided => decided,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -204,5 +235,44 @@ mod tests {
         assert_eq!(select(&both, &REFUSING), Selection::Unrecognised);
         both[188] = 0x47;
         assert_eq!(select(&both, &REFUSING), ts188);
+    }
+
+    #[test]
+    fn a_whole_source_is_decided_with_the_bytes_it_has() {
+        let ts188 = Selection::Container(Container::Transport(TransportSync::Ts188));
+        let m2ts192 = Selection::Container(Container::Transport(TransportSync::M2ts192));
+        let mut two = [0; 384];
+        two[0] = 0x47;
+        two[188] = 0x47;
+        assert_eq!(select(&two[..376], &FIRST), Selection::Need(377));
+        assert_eq!(select_whole(&two[..376], &FIRST), ts188);
+        assert_eq!(select_whole(&two[..189], &REFUSING), ts188);
+        assert_eq!(select_whole(&two[..188], &FIRST), Selection::Unrecognised);
+        let mut m2ts = [0; 384];
+        m2ts[4] = 0x47;
+        m2ts[196] = 0x47;
+        assert_eq!(select_whole(&m2ts, &FIRST), m2ts192);
+        assert_eq!(select_whole(&m2ts[..377], &REFUSING), m2ts192);
+        two[4] = 0x47;
+        two[196] = 0x47;
+        assert_eq!(
+            select_whole(&two, &FIRST),
+            m2ts192,
+            "the third TS188 sync is missing"
+        );
+        assert_eq!(select_whole(&two[..376], &FIRST), ts188);
+        assert_eq!(select_whole(&two[..376], &REFUSING), Selection::Ambiguous);
+        for policy in [&FIRST, &REFUSING] {
+            assert_eq!(select_whole(b"\0\0", policy), Selection::Unrecognised);
+            assert_eq!(
+                select_whole(b"\0\0\0\x10ft", policy),
+                Selection::Unrecognised
+            );
+            assert_eq!(
+                select_whole(&[0x1a, 0x45, 0xdf, 0xa3], policy),
+                Selection::Container(Container::Matroska)
+            );
+        }
+        assert_eq!(select_whole(b"OggS", &FIRST), Selection::Unrecognised);
     }
 }
