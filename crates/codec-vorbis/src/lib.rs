@@ -217,12 +217,16 @@ impl Decoder {
         self.layout
     }
 
-    /// Decode one audio packet into `out`: the samples from the centre of the previous
-    /// block to the centre of this one, none for the first packet after construction or
-    /// [`Decoder::reset`].
-    pub fn decode(&mut self, packet: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let r = &mut LsbReader::new(packet);
-        let mode = self.read_mode(r)?;
+    /// Decodes the samples from the centre of the previous block to the centre of the
+    /// current block. The first packet after construction or reset primes the overlap.
+    /// Replaces `out`; a refusal leaves `samples_per_channel == 0`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an invalid audio packet or a storage charge the pool cannot cover.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        let r = &mut LsbReader::new(au);
+        let mode = self.read_mode(r).inspect_err(|_| out.clear())?;
         let block = mode.block;
         let half = self.blocksizes[block as usize] / 2;
         let Decoder {
@@ -233,7 +237,7 @@ impl Decoder {
             ..
         } = self;
         let mapping = &setup.mappings[usize::from(mode.mapping)];
-        decode_floors(setup, mapping, r, floors)?;
+        decode_floors(setup, mapping, r, floors).inspect_err(|_| out.clear())?;
         // Spectral lines past `coded` are zero in every channel until the transform.
         let coded = decode_residues(setup, mapping, r, half, floors, spectra, scratch);
         for step in mapping.coupling.iter().rev() {
@@ -242,7 +246,7 @@ impl Decoder {
             decouple(&mut magnitude[..coded], &mut angle[..coded]);
         }
         apply_floors(setup, mapping, block, floors, spectra, coded);
-        self.synthesize(block, out)
+        self.synthesize(block, out).inspect_err(|_| out.clear())
     }
 
     /// Drop the overlap after a discontinuity: the next packet primes it again.

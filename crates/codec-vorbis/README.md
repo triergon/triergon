@@ -45,6 +45,8 @@ layout holds) at any sample rate.
 
 ## Behaviour and limits
 
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
+
 - Each packet yields the samples from the centre of the previous block to the centre
   of its own (`previous / 4 + current / 4`); the first packet after construction or
   `reset` primes the overlap and yields none. Without that priming output, a stream's
