@@ -7,19 +7,16 @@
 //! | [`Crc32Mpeg`] | `0x04c11db7` | MSB first | ITU-T H.222.0 Annex A sections, Ogg pages |
 //! | [`Crc32Ieee`] | `0xedb88320` (reflected) | LSB first | EBML CRC-32 elements |
 
-const fn msb_table_16(polynomial: u16) -> [u16; 256] {
+const fn msb_table(width: u32, polynomial: u32) -> [u32; 256] {
+    let high = 1 << (width - 1);
+    let mask = u32::MAX >> (32 - width);
     let mut table = [0; 256];
     let mut byte = 0;
     while byte < 256 {
-        let mut register = (byte as u16) << 8;
+        let mut register = (byte as u32) << (width - 8);
         let mut bit = 0;
         while bit < 8 {
-            register = (register << 1)
-                ^ if register & 0x8000 != 0 {
-                    polynomial
-                } else {
-                    0
-                };
+            register = ((register << 1) & mask) ^ if register & high != 0 { polynomial } else { 0 };
             bit += 1;
         }
         table[byte] = register;
@@ -31,7 +28,13 @@ const fn msb_table_16(polynomial: u16) -> [u16; 256] {
 /// Slicing-by-4 tables: entry `k` of a table holds the contribution of a byte followed by
 /// `k` zero bytes.
 const fn a52_tables() -> [[u16; 256]; 4] {
-    let first = msb_table_16(0x8005);
+    let wide = msb_table(16, 0x8005);
+    let mut first = [0; 256];
+    let mut byte = 0;
+    while byte < first.len() {
+        first[byte] = wide[byte] as u16;
+        byte += 1;
+    }
     let mut tables = [[0; 256]; 4];
     tables[0] = first;
     let mut k = 1;
@@ -50,16 +53,11 @@ const fn a52_tables() -> [[u16; 256]; 4] {
 static A52: [[u16; 256]; 4] = a52_tables();
 
 static CRC8: [u8; 256] = {
+    let wide = msb_table(8, 0x07);
     let mut table = [0; 256];
     let mut byte = 0;
-    while byte < 256 {
-        let mut register = byte as u8;
-        let mut bit = 0;
-        while bit < 8 {
-            register = (register << 1) ^ if register & 0x80 != 0 { 0x07 } else { 0 };
-            bit += 1;
-        }
-        table[byte] = register;
+    while byte < table.len() {
+        table[byte] = wide[byte] as u8;
         byte += 1;
     }
     table
@@ -154,22 +152,7 @@ pub fn crc16_a52(mut crc: u16, data: &[u8]) -> u16 {
 /// bytes; entry 0 is the plain byte table.
 static MPEG: [[u32; 256]; 8] = {
     let mut tables = [[0; 256]; 8];
-    let mut byte = 0;
-    while byte < 256 {
-        let mut register = (byte as u32) << 24;
-        let mut bit = 0;
-        while bit < 8 {
-            register = (register << 1)
-                ^ if register & 0x8000_0000 != 0 {
-                    0x04c1_1db7
-                } else {
-                    0
-                };
-            bit += 1;
-        }
-        tables[0][byte] = register;
-        byte += 1;
-    }
+    tables[0] = msb_table(32, 0x04c1_1db7);
     let mut k = 1;
     while k < 8 {
         let mut byte = 0;
@@ -239,9 +222,7 @@ impl Crc32Mpeg {
     #[must_use]
     pub fn of(bytes: &[u8]) -> u32 {
         let mut crc = Self::default();
-        for &byte in bytes {
-            crc.update_byte(byte);
-        }
+        crc.update(bytes);
         crc.remainder()
     }
 }
