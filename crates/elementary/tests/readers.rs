@@ -3,7 +3,7 @@ mod common;
 use common::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
-    CodecId, ContainerReader, Event, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
+    CodecId, ContainerReader, Event, PacketInfo, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
 };
 use triergon_core::{Budget, Error, Step, Time, WorkBudget};
 use triergon_elementary::{
@@ -643,10 +643,8 @@ fn the_blocking_reader_reads_and_seeks() {
     // Sample 24000 is in frame 15 of 1536 samples.
     assert_eq!(receipt.landing, Time::new(15 * 1536, 48000).unwrap());
     let next = reader.next_packet(&cancel).unwrap().unwrap();
-    assert_eq!(
-        triergon_core::container::PacketInfo::pts(&next),
-        Some(15 * 1536)
-    );
+    assert_eq!(next.pts(), Some(15 * 1536));
+    assert_eq!(next.dts(), None);
 }
 
 #[test]

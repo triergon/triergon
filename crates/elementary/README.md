@@ -37,8 +37,9 @@ and retained metadata follow the format syntax.
 
 All four formats run one frame-stream engine: leading ID3v2 tags, the format's
 opening, a sync confirmed by the frames after it, then access units until a trailing
-ID3v1 or APEv2 tag or the end. Packet times are samples (`1/sample_rate`); every frame
-is a random-access point. Tags are kept as bounded opaque bytes (`Reader::tags`).
+ID3v1 or APEv2 tag or the end. Packet times are samples (`1/sample_rate`). The native
+view leaves DTS absent. Every frame is a random-access point. Tags are kept as bounded
+opaque bytes (`Reader::tags`).
 Tags above the retention limit are kept by offset and length. Every tag entry
 uses the reader's pool, and a full pool pauses the reader until it can retain the entry.
 

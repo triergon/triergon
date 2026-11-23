@@ -254,7 +254,7 @@ fn opus_packets_are_timed_from_granules_with_pre_skip_and_end_trim() {
     assert_eq!(packets.len(), 23);
     for (n, packet) in packets.iter().enumerate() {
         assert_eq!(packet.pts(), Some(960 * n as i64 - 312), "packet {n}");
-        assert_eq!(packet.dts(), packet.pts());
+        assert_eq!(packet.dts(), None);
         assert_eq!(packet.duration(), Some(960));
         assert_eq!(packet.payload(), opus_packet(n, 20 + n % 7));
     }

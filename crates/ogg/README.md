@@ -79,7 +79,7 @@ frames since (Theora I appendix A.2.3; bitstreams before 3.2.1 count from 0). Th
 page is timed forwards; for Vorbis, Opus and Speex the samples its granule position
 leaves out are the last packets' `Trim::end`, and samples before time zero (Opus
 pre-skip, a start offset) are `Trim::start`. Every audio packet is a random-access
-point; of Theora, the intra frames. DTS equals PTS.
+point; of Theora, the intra frames. The native view leaves DTS absent.
 `Track::end` holds the last granule position, found by reading at most
 `Limits::end_scan_bytes` at the end of a seekable source of known length.
 

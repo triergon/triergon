@@ -163,9 +163,8 @@ impl TrackInfo for Track {
 /// Times are ticks of the track time base, 1/sample rate (Opus 1/48000), on the
 /// physical stream's timeline: a packet starts where the previous one's samples end,
 /// the duration counts every sample the packet completes, and [`PacketInfo::trim`]
-/// says how many of them are not presented. A Theora packet is one frame. Decode order
-/// is presentation order, so the DTS is the PTS. A packet of an uninterpreted mapping
-/// has no time.
+/// says how many of them are not presented. A Theora packet is one frame. Ogg carries
+/// no distinct decode timestamp. A packet of an uninterpreted mapping has no time.
 #[derive(Clone, Debug)]
 pub struct Packet {
     pub(crate) track: TrackId,
@@ -225,7 +224,7 @@ impl PacketInfo for Packet {
         self.pts
     }
     fn dts(&self) -> Option<i64> {
-        self.pts
+        None
     }
     fn duration(&self) -> Option<i64> {
         self.duration
