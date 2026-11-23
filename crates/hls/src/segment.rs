@@ -15,6 +15,7 @@ use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits,
     compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors},
 };
+use triergon_playback::compat::pes::AdmittedCarriage;
 use triergon_playback::{
     ClockChoice, Event, Player, PlayerPolicy, Progress, Selection, Source, SourceOwner,
     SourceReply, State, TrackKey, pes_feed::SpentLists,
@@ -80,6 +81,38 @@ enum Lane {
     Audio,
 }
 
+/// The tracks a segment reads, as the active PMT of its program names them.
+#[derive(Clone, Copy, Debug)]
+struct ProgramTracks {
+    program: u16,
+    video: u16,
+    audio: Option<u16>,
+    configuration_epoch: u64,
+}
+
+impl ProgramTracks {
+    /// The lane of the track on `pid` of `program`, if it is one of these.
+    fn lane(self, program: u16, pid: u16) -> Option<Lane> {
+        if program != self.program {
+            None
+        } else if pid == self.video {
+            Some(Lane::Video)
+        } else if Some(pid) == self.audio {
+            Some(Lane::Audio)
+        } else {
+            None
+        }
+    }
+
+    /// The lane of `track`, if it is one of these.
+    fn lane_of(self, track: TrackKey) -> Option<Lane> {
+        match track {
+            TrackKey::Ts { program, pid } => self.lane(program, pid),
+            _ => None,
+        }
+    }
+}
+
 /// One access unit of a segment.
 #[derive(Debug)]
 pub enum HlsFeedUnit<'a, C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
@@ -92,8 +125,8 @@ pub enum HlsFeedUnit<'a, C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> 
 /// The access units of one complete segment, in feed order, with their clocks.
 #[derive(Debug)]
 pub struct HlsSegment<C = HlsAacClock, V = AvcTsAccessUnit, A = HlsAacFrame> {
-    /// The PIDs of the video and audio tracks.
-    pids: (u16, Option<u16>),
+    video_pid: u16,
+    audio_pid: Option<u16>,
     video: BudgetVec<V>,
     audio: BudgetVec<A>,
     clocks: BudgetVec<C>,
@@ -117,10 +150,9 @@ impl HlsSegment {
     /// or `Overflow` when a timestamp cannot fit its packet clock.
     pub fn packet<'a>(&self, unit: &HlsFeedUnit<'a>) -> Result<UnitPacket<'a>> {
         match *unit {
-            HlsFeedUnit::Video(unit) => UnitPacket::video(self.pids.0, unit),
+            HlsFeedUnit::Video(unit) => UnitPacket::video(self.video_pid, unit),
             HlsFeedUnit::Audio(frame, clock) => UnitPacket::audio(
-                self.pids
-                    .1
+                self.audio_pid
                     .ok_or(Error::Invalid("HLS segment has no audio track"))?,
                 frame,
                 clock.pts,
@@ -281,8 +313,8 @@ struct SegmentReader<S: Source, V: LaneAssembler, A: LaneAssembler> {
     pool: Budget,
     player: Option<Player<LimitedSource<S>>>,
     limits: HlsSegmentLimits,
-    tracks: TrackSelection,
-    map: Option<(TrackKey, Option<TrackKey>, u64)>,
+    selection: TrackSelection,
+    tracks: Option<ProgramTracks>,
     video_assembler: Option<V>,
     audio_assembler: Option<A>,
     phase: Phase,
@@ -406,7 +438,7 @@ where
     fn new(
         input: InputCursor,
         source: S,
-        tracks: TrackSelection,
+        selection: TrackSelection,
         limits: HlsSegmentLimits,
     ) -> Result<Self> {
         let owner = SourceOwner::new(LimitedSource {
@@ -426,7 +458,7 @@ where
         let engine = triergon_playback::pes_feed::open_segment_feed(
             input,
             limits.transport,
-            matches!(tracks, TrackSelection::Media(_)),
+            matches!(selection, TrackSelection::Media(_)),
         )?;
         let mut player = Player::new_direct(
             engine,
@@ -443,8 +475,8 @@ where
             player: Some(player),
             pool: pool.clone(),
             limits,
-            tracks,
-            map: None,
+            selection,
+            tracks: None,
             video_assembler: None,
             audio_assembler: None,
             phase: Phase::Read,
@@ -532,18 +564,11 @@ where
         let video_tail90 = self
             .video_tail90
             .ok_or(Error::Invalid("sealed video clock"))?;
-        let pid = |track| match track {
-            TrackKey::Ts { pid, .. } => Some(pid),
-            _ => None,
-        };
-        let (video, audio, _) = self.map.ok_or(Error::Invalid("sealed segment tracks"))?;
-        let pids = (
-            pid(video).ok_or(Error::Invalid("sealed segment tracks"))?,
-            audio.and_then(pid),
-        );
+        let tracks = self.tracks.ok_or(Error::Invalid("sealed segment tracks"))?;
         self.phase = Phase::Taken;
         Ok(Some(HlsSegment {
-            pids,
+            video_pid: tracks.video,
+            audio_pid: tracks.audio,
             initial_raster,
             video_tail90,
             feed_bytes: self.feed_bytes,
@@ -609,7 +634,7 @@ where
                     AssemblyStep::Yield => {}
                     AssemblyStep::NeedPayload if self.phase == Phase::Video => {
                         let lists = video.take_spent();
-                        self.reuse_pes_lists(|(video, _, _)| Some(video), lists);
+                        self.reuse_pes_lists(self.tracks.map(|tracks| tracks.video), lists);
                         self.phase = Phase::Read;
                     }
                     AssemblyStep::Finished if self.phase == Phase::EndVideo => {
@@ -626,7 +651,10 @@ where
                         AssemblyStep::Yield => {}
                         AssemblyStep::NeedPayload if self.phase == Phase::Audio => {
                             let lists = audio.take_spent();
-                            self.reuse_pes_lists(|(_, audio, _)| audio, lists);
+                            self.reuse_pes_lists(
+                                self.tracks.and_then(|tracks| tracks.audio),
+                                lists,
+                            );
                             self.phase = Phase::Read;
                         }
                         AssemblyStep::Finished if self.phase == Phase::EndAudio => {
@@ -651,14 +679,8 @@ where
 
     /// The observer of a track allocates nothing for its next PES when it gets
     /// back the lists of the one a reader has just consumed.
-    fn reuse_pes_lists(
-        &mut self,
-        track: impl Fn((TrackKey, Option<TrackKey>, u64)) -> Option<TrackKey>,
-        lists: SpentLists,
-    ) {
-        if let (Some(player), Some(TrackKey::Ts { pid, .. })) =
-            (self.player.as_mut(), self.map.and_then(track))
-        {
+    fn reuse_pes_lists(&mut self, pid: Option<u16>, lists: SpentLists) {
+        if let (Some(player), Some(pid)) = (self.player.as_mut(), pid) {
             player.reuse_pes_lists(pid, lists);
         }
     }
@@ -670,17 +692,7 @@ where
                     map,
                     active: true,
                     configuration_epoch,
-                } => {
-                    if self.map.is_some() {
-                        return Err(Error::Unsupported("HLS segment changes active program map"));
-                    }
-                    self.map = Some(select_tracks(
-                        &map,
-                        self.tracks,
-                        configuration_epoch,
-                        self.limits.transport,
-                    )?);
-                }
+                } => self.bind_program(&map, configuration_epoch)?,
                 TraceEvent::Diagnostic(fault)
                     if fault.kind == FaultKind::Transport
                         || fault.pid.is_some_and(|pid| self.selected_pid(pid)) =>
@@ -689,51 +701,41 @@ where
                 }
                 _ => {}
             },
-            Event::PesCarriage(config) => {
-                let (video, audio, epoch) = self
-                    .map
-                    .ok_or(Error::Invalid("HLS configuration precedes PMT"))?;
-                if config.configuration_epoch != epoch {
-                    return Err(Error::Invalid("HLS configuration epoch"));
-                }
-                if config.track == video {
-                    self.video_assembler = Some(V::bind(&self.pool, config, self.limits)?);
-                } else if Some(config.track) == audio {
-                    self.audio_assembler = Some(A::bind(&self.pool, config, self.limits)?);
-                }
-            }
+            Event::PesCarriage(config) => self.configure(config)?,
             Event::DemuxPes { packet, clock } => {
-                let (video, audio, _) =
-                    self.map.ok_or(Error::Invalid("HLS packet precedes PMT"))?;
-                let track = TrackKey::Ts {
-                    program: packet.program,
-                    pid: packet.pid,
-                };
+                let tracks = self
+                    .tracks
+                    .ok_or(Error::Invalid("HLS packet precedes PMT"))?;
+                let lane = tracks.lane(packet.program, packet.pid);
                 let mut mailbox = Some(packet);
-                if track == video {
-                    let reader = self
-                        .video_assembler
-                        .as_mut()
-                        .ok_or(Error::Invalid("HLS video packet precedes configuration"))?;
-                    if !reader.push(&mut mailbox, clock)? {
-                        return Err(Error::Invalid("HLS video mailbox still busy"));
+                match lane {
+                    Some(Lane::Video) => {
+                        let reader = self
+                            .video_assembler
+                            .as_mut()
+                            .ok_or(Error::Invalid("HLS video packet precedes configuration"))?;
+                        if !reader.push(&mut mailbox, clock)? {
+                            return Err(Error::Invalid("HLS video mailbox still busy"));
+                        }
+                        self.phase = Phase::Video;
                     }
-                    self.phase = Phase::Video;
-                } else if Some(track) == audio {
-                    let reader = self
-                        .audio_assembler
-                        .as_mut()
-                        .ok_or(Error::Invalid("HLS audio packet precedes configuration"))?;
-                    if !reader.push(&mut mailbox, clock)? {
-                        return Err(Error::Invalid("HLS audio mailbox still busy"));
+                    Some(Lane::Audio) => {
+                        let reader = self
+                            .audio_assembler
+                            .as_mut()
+                            .ok_or(Error::Invalid("HLS audio packet precedes configuration"))?;
+                        if !reader.push(&mut mailbox, clock)? {
+                            return Err(Error::Invalid("HLS audio mailbox still busy"));
+                        }
+                        self.phase = Phase::Audio;
                     }
-                    self.phase = Phase::Audio;
+                    None => {}
                 }
             }
             Event::PesRefusal { track, error, .. }
                 if self
-                    .map
-                    .is_some_and(|(video, audio, _)| track == video || Some(track) == audio) =>
+                    .tracks
+                    .is_some_and(|tracks| tracks.lane_of(track).is_some()) =>
             {
                 return Err(error);
             }
@@ -742,13 +744,45 @@ where
         Ok(())
     }
 
+    /// Selects the tracks of the program's PMT, once per segment.
+    #[cold]
+    fn bind_program(&mut self, map: &ProgramMap, configuration_epoch: u64) -> Result<()> {
+        if self.tracks.is_some() {
+            return Err(Error::Unsupported("HLS segment changes active program map"));
+        }
+        self.tracks = Some(select_tracks(
+            map,
+            self.selection,
+            configuration_epoch,
+            self.limits.transport,
+        )?);
+        Ok(())
+    }
+
+    /// Makes the assembler of a configured track, once per track.
+    #[cold]
+    fn configure(&mut self, config: AdmittedCarriage) -> Result<()> {
+        let tracks = self
+            .tracks
+            .ok_or(Error::Invalid("HLS configuration precedes PMT"))?;
+        if config.configuration_epoch != tracks.configuration_epoch {
+            return Err(Error::Invalid("HLS configuration epoch"));
+        }
+        match tracks.lane_of(config.track) {
+            Some(Lane::Video) => {
+                self.video_assembler = Some(V::bind(&self.pool, config, self.limits)?);
+            }
+            Some(Lane::Audio) => {
+                self.audio_assembler = Some(A::bind(&self.pool, config, self.limits)?);
+            }
+            None => {}
+        }
+        Ok(())
+    }
+
     fn selected_pid(&self, pid: u16) -> bool {
-        let Some((video, audio, _)) = self.map else {
-            return false;
-        };
-        std::iter::once(video)
-            .chain(audio)
-            .any(|track| matches!(track, TrackKey::Ts { pid: current, .. } if current == pid))
+        self.tracks
+            .is_some_and(|tracks| tracks.video == pid || tracks.audio == Some(pid))
     }
 
     fn commit_unit(&mut self) -> Result<()> {
@@ -797,7 +831,7 @@ where
         if self.video.is_empty() {
             return Err(Error::Invalid("HLS segment produced no video pictures"));
         }
-        if self.tracks.requires_audio() && self.audio.is_empty() {
+        if self.selection.requires_audio() && self.audio.is_empty() {
             return Err(Error::Invalid(
                 "HLS segment produced no required audio frames",
             ));
@@ -821,29 +855,36 @@ where
 fn select_tracks(
     map: &ProgramMap,
     selection: TrackSelection,
-    epoch: u64,
+    configuration_epoch: u64,
     limits: ParseLimits,
-) -> Result<(TrackKey, Option<TrackKey>, u64)> {
+) -> Result<ProgramTracks> {
+    const AMBIGUOUS: &str = "HLS segment requires explicit PID selection";
     let (video, audio) = match selection {
         TrackSelection::AvcAac(tracks) => {
-            let video = find_track(map, tracks.video_pid, |stream| {
-                Ok(stream.stream_type == stream_type::H264)
-            })?
+            let video = select_pid(
+                map,
+                tracks.video_pid,
+                |stream| Ok(stream.stream_type == stream_type::H264),
+                AMBIGUOUS,
+            )?
             .ok_or(Error::Unsupported("HLS segment has no selected AVC track"))?;
-            let find_aac = |pid| {
-                find_track(map, pid, |stream| {
-                    Ok(stream.stream_type == stream_type::AAC_ADTS)
-                })
+            let aac = |pid| {
+                select_pid(
+                    map,
+                    pid,
+                    |stream| Ok(stream.stream_type == stream_type::AAC_ADTS),
+                    AMBIGUOUS,
+                )
             };
             let audio = match tracks.audio {
                 HlsSegmentAudio::Disabled => None,
-                HlsSegmentAudio::Optional => find_aac(None)?,
+                HlsSegmentAudio::Optional => aac(None)?,
                 HlsSegmentAudio::Required => Some(
-                    find_aac(None)?
+                    aac(None)?
                         .ok_or(Error::Unsupported("HLS segment has no required AAC track"))?,
                 ),
                 HlsSegmentAudio::Pid(pid) => Some(
-                    find_aac(Some(pid))?
+                    aac(Some(pid))?
                         .ok_or(Error::Unsupported("HLS segment has no requested AAC PID"))?,
                 ),
             };
@@ -854,15 +895,23 @@ fn select_tracks(
                 HlsVideoCodec::Avc => stream_type::H264,
                 HlsVideoCodec::Hevc => stream_type::HEVC,
             };
-            let video = find_track(map, None, |stream| Ok(stream.stream_type == video_type))?
-                .ok_or(Error::Unsupported(
-                    "HLS segment has no matching video track",
-                ))?;
+            let video = select_pid(
+                map,
+                None,
+                |stream| Ok(stream.stream_type == video_type),
+                AMBIGUOUS,
+            )?
+            .ok_or(Error::Unsupported(
+                "HLS segment has no matching video track",
+            ))?;
             let audio = if let Some(codec) = profile.audio {
                 Some(
-                    find_track(map, None, |stream| {
-                        media_audio_matches(map, stream, codec, limits)
-                    })?
+                    select_pid(
+                        map,
+                        None,
+                        |stream| media_audio_matches(map, stream, codec, limits),
+                        AMBIGUOUS,
+                    )?
                     .ok_or(Error::Unsupported(
                         "HLS segment has no matching audio track",
                     ))?,
@@ -873,24 +922,12 @@ fn select_tracks(
             (video, audio)
         }
     };
-    Ok((video, audio, epoch))
-}
-
-fn find_track(
-    map: &ProgramMap,
-    pid: Option<u16>,
-    accepts: impl Fn(&ElementaryStream) -> Result<bool>,
-) -> Result<Option<TrackKey>> {
-    let pid = select_pid(
-        map,
-        pid,
-        accepts,
-        "HLS segment requires explicit PID selection",
-    )?;
-    Ok(pid.map(|pid| TrackKey::Ts {
+    Ok(ProgramTracks {
         program: map.header.extension,
-        pid,
-    }))
+        video,
+        audio,
+        configuration_epoch,
+    })
 }
 
 fn media_audio_matches(
