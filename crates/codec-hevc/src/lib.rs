@@ -33,6 +33,7 @@ mod sao;
 mod slice;
 mod state;
 mod tables;
+pub use triergon_codec::{Budget, Error};
 mod transform;
 
 pub use decoder::{Decoder, Limits};

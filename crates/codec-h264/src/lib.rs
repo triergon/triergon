@@ -45,10 +45,9 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 use tables::*;
 use triergon_bitstream::BitReader;
-pub use triergon_codec::DecodeError;
-use triergon_codec::{
-    Budget, BudgetVec, Colour, Error, PictureView, SampleAspectRatio, VideoDecoder,
-};
+pub use triergon_codec::{Budget, DecodeError, Error};
+use triergon_codec::{BudgetVec, Colour, PictureView, SampleAspectRatio, VideoDecoder};
+use triergon_framing::avc;
 use triergon_framing::nal::AnnexBUnits;
 use triergon_framing::picture_output::levels::max_dpb_mbs;
 use triergon_framing::picture_output::{
@@ -79,7 +78,7 @@ impl From<SliceError> for DecodeError {
 }
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Live storage that depends on the stream: frame sample buffers (also while output
     /// pictures share them), motion and macroblock arrays, deblocking state, RBSP and slice
@@ -528,11 +527,11 @@ impl Decoder {
             return Err(DecodeError::Invalid("forbidden_zero_bit"));
         };
         match h.nal_unit_type {
-            1 | 5 => self.decode_slice_nal(nal, h),
+            avc::SLICE | avc::IDR => self.decode_slice_nal(nal, h),
             2..=4 => Err(DecodeError::Unsupported(
                 "data partitioning (Extended profile)",
             )),
-            7 => {
+            avc::SPS => {
                 self.finish_picture();
                 let len = unescape(&nal[1..], &mut self.rbsp)?;
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
@@ -541,7 +540,7 @@ impl Decoder {
                 self.spss[id] = Some(Arc::new(sps));
                 Ok(())
             }
-            8 => {
+            avc::PPS => {
                 self.finish_picture();
                 let len = unescape(&nal[1..], &mut self.rbsp)?;
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
@@ -551,7 +550,7 @@ impl Decoder {
                 Ok(())
             }
             // SEI, access unit delimiter, end of sequence, end of stream: a picture boundary.
-            6 | 9..=11 => {
+            avc::SEI | avc::AUD | 10 | 11 => {
                 self.finish_picture();
                 Ok(())
             }

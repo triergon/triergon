@@ -22,7 +22,7 @@ use triergon_framing::picture_output::{
 use triergon_framing::{hevc, nal::AnnexBUnits};
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Bytes of live storage that depends on the stream: decoded and reference pictures
     /// (also while a caller holds them), the frame pool, collocated motion, per-picture
