@@ -97,6 +97,113 @@ static void facade_ts_fold(const AVStream *stream, const AVPacket *packet, ViewW
     }
 }
 
+/* PTS_DTS_flags (H.222.0 §2.4.3.7) of the PES that starts in the carrier at
+ * `carrier`, read across the PID's following carriers, or -1 when that carrier
+ * does not start a PES of `pid`. */
+static int facade_ts_wire_flags(const ViewCase *input, size_t width, unsigned pid, size_t carrier)
+{
+    const size_t prefix = width - 188;
+    uint8_t header[8];
+    size_t have = 0;
+    int started = 0;
+    for (size_t at = carrier; input->size - at >= width; at += width) {
+        const uint8_t *ts = input->data + at + prefix;
+        if (ts[0] != 0x47)
+            return -1;
+        if ((((unsigned)ts[1] & 0x1f) << 8 | ts[2]) != pid) {
+            if (!started)
+                return -1;
+            continue;
+        }
+        if (!!(ts[1] & 0x40) == started)
+            return -1;
+        started = 1;
+        if (!(ts[3] & 0x10))
+            continue;
+        const size_t payload = ts[3] & 0x20 ? 5u + ts[4] : 4u;
+        if (payload >= 188)
+            return -1;
+        size_t take = 188 - payload;
+        if (take > sizeof(header) - have)
+            take = sizeof(header) - have;
+        memcpy(header + have, ts + payload, take);
+        have += take;
+        if (have == sizeof(header))
+            return !header[0] && !header[1] && header[2] == 1 ? header[7] >> 6 : -1;
+    }
+    return -1;
+}
+
+/* The duration in 90 kHz ticks that an ADTS (ISO/IEC 13818-7 §6.2.1) or MPEG
+ * audio (ISO/IEC 11172-3 §2.4.2.3, ISO/IEC 13818-3 §2.4.2.3) frame header gives,
+ * when it is a whole number of ticks; zero otherwise. */
+static int64_t facade_ts_frame_duration(const AVStream *stream, const AVPacket *packet)
+{
+    const uint8_t *data = packet->data;
+    unsigned samples = 0, rate = 0;
+    if (stream->codecpar->codec_id == AV_CODEC_ID_AAC) {
+        static const unsigned rates[] = {96000, 88200, 64000, 48000, 44100, 32000, 24000,
+                                         22050, 16000, 12000, 11025, 8000, 7350};
+        if (packet->size < 7 || data[0] != 0xff || (data[1] & 0xf6) != 0xf0 ||
+            ((data[2] >> 2) & 15u) >= sizeof(rates) / sizeof(*rates))
+            return 0;
+        const unsigned index = (data[2] >> 2) & 15u;
+        samples = 1024u * ((data[6] & 3u) + 1u);
+        rate = rates[index];
+    } else if (stream->codecpar->codec_id == AV_CODEC_ID_MP1 ||
+               stream->codecpar->codec_id == AV_CODEC_ID_MP2 ||
+               stream->codecpar->codec_id == AV_CODEC_ID_MP3) {
+        static const unsigned rates[] = {44100, 48000, 32000};
+        if (packet->size < 4 || data[0] != 0xff || (data[1] & 0xe0) != 0xe0)
+            return 0;
+        const unsigned version = (data[1] >> 3) & 3u, layer = (data[1] >> 1) & 3u;
+        const unsigned index = (data[2] >> 2) & 3u;
+        if (version == 1 || !layer || index == 3)
+            return 0;
+        rate = rates[index] >> (version == 3 ? 0 : version == 2 ? 1 : 2);
+        samples = layer == 3 ? 384u : layer == 2 || version == 3 ? 1152u : 576u;
+    }
+    if (!rate || (UINT64_C(90000) * samples) % rate)
+        return 0;
+    return (int64_t)(UINT64_C(90000) * samples / rate);
+}
+
+/* Project a demuxed packet onto the coded transport facts the strict reader
+ * publishes, as the source-poll projection does: the position of the packet's
+ * source carrier (including an M2TS prefix), PTS and DTS as their coded 33-bit
+ * values, DTS only where the PES header codes it, and, where the demuxer reports
+ * no duration, the duration the coded audio frame header gives. A packet that
+ * does not start at a PES carries neither clock. */
+static int facade_ts_project(const ViewCase *input, size_t width, const AVStream *stream,
+                             AVPacket *packet)
+{
+    const uint64_t mask = (UINT64_C(1) << 33) - 1;
+    if (packet->pos >= 0) {
+        /* The demuxer reports either the carrier start or its sync byte. */
+        const size_t position = (size_t)packet->pos;
+        if (position % width && position % width != width - 188)
+            return AVERROR_INVALIDDATA;
+        const size_t carrier = position - position % width;
+        const int flags = facade_ts_wire_flags(input, width, (unsigned)stream->id, carrier);
+        /* PTS_DTS_flags 01 is forbidden and codes no timestamp. */
+        if (flags < 0 || (flags < 2 && packet->pts != AV_NOPTS_VALUE) ||
+            (flags == 3 && packet->dts == AV_NOPTS_VALUE))
+            return AVERROR_INVALIDDATA;
+        if (flags != 3)
+            packet->dts = AV_NOPTS_VALUE;
+        packet->pos = (int64_t)carrier;
+    } else if (packet->pts != AV_NOPTS_VALUE || packet->dts != AV_NOPTS_VALUE) {
+        return AVERROR_INVALIDDATA;
+    }
+    if (packet->pts != AV_NOPTS_VALUE)
+        packet->pts = (int64_t)((uint64_t)packet->pts & mask);
+    if (packet->dts != AV_NOPTS_VALUE)
+        packet->dts = (int64_t)((uint64_t)packet->dts & mask);
+    if (!packet->duration)
+        packet->duration = facade_ts_frame_duration(stream, packet);
+    return 0;
+}
+
 typedef struct {
     uint8_t data[8194];
     size_t used, size;
@@ -203,6 +310,10 @@ static int facade_ts_native(const ViewCase *input, int program, ViewWork *work)
         if (ts_in_program(format, packet->stream_index, program)) {
             const AVStream *stream = format->streams[packet->stream_index];
             if (!frame_audio) {
+                if (facade_ts_project(input, (size_t)atoi(input->argv[0]), stream, packet) < 0) {
+                    rc = AVERROR_INVALIDDATA;
+                    goto done;
+                }
                 facade_ts_fold(stream, packet, work);
             } else if (facade_ts_audio_feed(&audio, input, stream, packet, work)) {
                 rc = AVERROR_INVALIDDATA;

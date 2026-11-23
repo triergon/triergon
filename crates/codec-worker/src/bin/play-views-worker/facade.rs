@@ -60,9 +60,24 @@ fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, Str
             if admission_only {
                 return ts_admission(input, &pool, work, trace);
             }
-            let reader = reader(input, &pool, format)?;
+            let capabilities = SourceCapabilities {
+                length: Some(input.len() as u64),
+                random_access: true,
+            };
+            let reader = match AnyReader::open(input, &pool, SourceId(1), capabilities) {
+                Ok(reader) => reader,
+                Err(error) => return refusal(&error, work, trace),
+            };
+            if triergon::probe(input) != triergon::Probed::Format(format) {
+                return Err("the requested format differs from the facade probe".into());
+            }
             let mut driver = Blocking::seekable(reader, Cursor::new(input), &pool);
-            while let Some(packet) = driver.next_packet().map_err(|error| error.to_string())? {
+            loop {
+                let packet = match driver.next_packet() {
+                    Ok(Some(packet)) => packet,
+                    Ok(None) => return Ok(()),
+                    Err(error) => return refusal(&error, work, trace),
+                };
                 let AnyPacket::MpegTs(packet) = packet else {
                     return Err("the facade returned a non-TS packet".into());
                 };
@@ -93,9 +108,24 @@ fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, Str
                     }
                 }
             }
-            Ok(())
         }),
     })
+}
+
+/// Ends the access-unit fold at a library refusal with one kind 8 record whose
+/// payload is the error's text, so the fold names the refusal that ended it. A
+/// failure of the worker's own checks still ends the worker with an error.
+fn refusal(
+    error: &triergon::Error,
+    work: &mut Totals,
+    trace: Option<&mut dyn Write>,
+) -> Result<(), String> {
+    let text = error.to_string();
+    work.record(8, &[], text.as_bytes());
+    if let Some(trace) = trace {
+        writeln!(trace, "8 {text}").map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 fn ts_admission(
@@ -115,6 +145,8 @@ fn ts_admission(
             let mut driver = Blocking::seekable(reader, Cursor::new(input), pool);
             match driver.next_packet() {
                 Err(Error::Unsupported("segment PAT has multiple media programs")) => 2,
+                // Admitted: the source ends without a packet and without a refusal.
+                Ok(None) => 0,
                 other => return Err(format!("unexpected program admission: {other:?}")),
             }
         }
