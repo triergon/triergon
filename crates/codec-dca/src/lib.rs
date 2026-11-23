@@ -26,8 +26,6 @@ pub(crate) mod vq;
 mod x96;
 
 #[cfg(test)]
-extern crate self as triergon_codec_dca;
-#[cfg(test)]
 mod synthetic;
 
 pub use pack::Packing;
