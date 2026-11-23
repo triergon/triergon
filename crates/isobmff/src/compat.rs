@@ -132,7 +132,8 @@ pub mod mov {
         //!   [`SampleReader::poll_recovery`](crate::payload::SampleReader::poll_recovery)
         //!   return the part of a sample that exists ([`ShortSample`]).
         //! - Run recovery. [`RunRecoveryBuilder`] accepts overlong timing and sync
-        //!   tables. [`RunRecoveryTable`] keeps the raw tables with their
+        //!   tables and a decode table one sample short. [`RunRecoveryTable`] keeps the
+        //!   raw tables with their
         //!   [`RunCoverage`] and reads the usable prefix through
         //!   [`RecoveryPacketCursor`] and [`RecoveryIndexCursor`].
         //! - Direct recovery. [`RunRecoveryBuilder::new_direct`] also accepts a zero

@@ -480,19 +480,6 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "RunRecoveryBuilder refuses a final decode run that stops one sample short (stts [(5, 1000)] for six samples; Invalid: time table sample count mismatch). The reference reads DT 0 to 5000 and a zero last duration, the 8.6.1.2.1 sums with the zero final delta 8.6.1.1 allows; recover it as the builder recovers overlong runs."
-  ],
-  "open_cases": [
-    {
-      "id": "run57-04-r-front-stco-lastcount5-ordinary",
-      "requirement": "RunRecoveryBuilder refuses a final decode run that stops one sample short (stts [(5, 1000)] for six samples; Invalid: time table sample count mismatch). The reference reads DT 0 to 5000 and a zero last duration, the 8.6.1.2.1 sums with the zero final delta 8.6.1.1 allows; recover it as the builder recovers overlong runs."
-    },
-    {
-      "id": "run57-04-r-front-stco-lastcount5-tiny",
-      "requirement": "RunRecoveryBuilder refuses a final decode run that stops one sample short (stts [(5, 1000)] for six samples; Invalid: time table sample count mismatch). The reference reads DT 0 to 5000 and a zero last duration, the 8.6.1.2.1 sums with the zero final delta 8.6.1.1 allows; recover it as the builder recovers overlong runs."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "Decode timing with no sample in it",

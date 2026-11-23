@@ -246,10 +246,6 @@
           "aarch64-unknown-linux-gnu": 432,
           "thumbv7neon-unknown-linux-gnueabihf": 432
         },
-        "open_cases": {
-          "aarch64-unknown-linux-gnu": 2,
-          "thumbv7neon-unknown-linux-gnueabihf": 2
-        },
         "open_deviations": {
           "aarch64-unknown-linux-gnu": 20,
           "thumbv7neon-unknown-linux-gnueabihf": 20

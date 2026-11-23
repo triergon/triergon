@@ -239,14 +239,49 @@ fn run_controls_cover_large_final_counts_and_vfr() {
     }
 }
 #[test]
-fn zero_and_short_run_counts_are_not_recovered() {
+fn a_decode_table_one_sample_short_is_completed_with_a_zero_last_delta() {
     let p = Budget::new(1 << 20).unwrap();
-    for bytes in [
-        include_bytes!("fixtures/run-recovery/run57-04-r-front-stco-lastcount5.mov").as_slice(),
-        include_bytes!("fixtures/run-recovery/run57-05-r-front-stco-lastcount0.mov"),
-    ] {
-        assert!(build(bytes, &p, 1).is_err());
+    // stts [(5, 1000)] for six samples: the sums give the sixth sample's decode time.
+    let short = include_bytes!("fixtures/run-recovery/run57-04-r-front-stco-lastcount5.mov");
+    let table = build(short, &p, 1).unwrap();
+    assert!(table.decode_run_completed());
+    assert_eq!(table.coverage(), &[None, None]);
+    let mut cursor = table.source_prefix_cursor();
+    let mut samples = Vec::new();
+    while let Next::Item(sample) = cursor.poll(&mut WorkBudget::new(1)).unwrap() {
+        samples.push((sample.ordinal, sample.dts_ticks, sample.duration_ticks));
     }
+    assert_eq!(
+        samples,
+        (0..6)
+            .map(|i| (
+                i + 1,
+                Some(i128::from(i) * 1000),
+                if i == 5 { 0 } else { 1000 }
+            ))
+            .collect::<Vec<_>>()
+    );
+    let exact = include_bytes!("fixtures/run-recovery/run57-00-r-front-stco-unchanged.mov");
+    assert!(!build(exact, &p, 1).unwrap().decode_run_completed());
+}
+#[test]
+fn zero_run_counts_and_tables_two_samples_short_are_not_recovered() {
+    let p = Budget::new(1 << 20).unwrap();
+    let zero = include_bytes!("fixtures/run-recovery/run57-05-r-front-stco-lastcount0.mov");
+    assert_eq!(
+        build(zero, &p, 1).unwrap_err(),
+        Error::Invalid("zero sample count in time run")
+    );
+    // The same six samples with stts [(4, 1000)].
+    let mut two =
+        include_bytes!("fixtures/run-recovery/run57-04-r-front-stco-lastcount5.mov").to_vec();
+    let at = two.windows(4).position(|b| b == b"stts").unwrap();
+    assert_eq!(two[at + 12..at + 16], 5u32.to_be_bytes());
+    two[at + 12..at + 16].copy_from_slice(&4u32.to_be_bytes());
+    assert_eq!(
+        build(&two, &p, 1).unwrap_err(),
+        Error::Invalid("time table sample count mismatch")
+    );
 }
 #[test]
 fn ctts_unused_trailing_zero_is_still_rejected() {

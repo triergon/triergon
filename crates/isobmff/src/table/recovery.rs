@@ -1,9 +1,10 @@
 //! Sample tables of malformed MOV files, read as FFmpeg's MOV demuxer reads them.
-//! Run recovery ([`RunRecoveryBuilder::new`]) accepts timing runs past the sample count and
-//! out-of-order or out-of-range sync entries; direct recovery
-//! ([`RunRecoveryBuilder::new_direct`]) also a zero first description index; description
-//! recovery ([`DescriptionRecoveryBuilder`]) invalid description indexes in any row. The
-//! raw tables stay as stated, and each table reports what strict parsing rejects.
+//! Run recovery ([`RunRecoveryBuilder::new`]) accepts timing runs past the sample count, a
+//! decode table one sample short and out-of-order or out-of-range sync entries; direct
+//! recovery ([`RunRecoveryBuilder::new_direct`]) also a zero first description index;
+//! description recovery ([`DescriptionRecoveryBuilder`]) invalid description indexes in
+//! any row. The raw tables stay as stated, and each table reports what strict parsing
+//! rejects.
 use super::*;
 
 mod description;
@@ -47,9 +48,12 @@ pub struct RunCoverage {
 }
 /// Builds a [`RunRecoveryTable`] from an `stbl` box whose runs overrun its sample count, as
 /// FFmpeg's MOV demuxer reads it: `stts` and `ctts` runs past the last sample are not read.
-/// `stss` entries out of order or past the last
-/// sample are accepted too, and every sample then has unknown access. All other checks and
-/// limits are those of [`SampleTableBuilder`].
+/// An `stts` that stops one sample short is completed: its sums give the last sample's
+/// decode time (ISO/IEC 14496-12 §8.6.1.2.1), and the demuxer reports that sample with
+/// duration 0. `stss` entries out of order or past the last sample are accepted too, and
+/// every sample then has unknown access. All other checks and limits are those of
+/// [`SampleTableBuilder`]; a decode table more than one sample short and a short `ctts`
+/// stay `Error::Invalid`.
 #[derive(Debug)]
 pub struct RunRecoveryBuilder {
     inner: SampleTableBuilder,
@@ -138,6 +142,17 @@ impl RunRecoveryTable {
     /// table covers exactly the sample count or is absent.
     pub fn coverage(&self) -> &[Option<RunCoverage>; 2] {
         &self.coverage
+    }
+    /// Whether the `stts` runs stopped one sample short of the sample count. The cursors
+    /// then time the last sample where the stated deltas end and give it duration 0;
+    /// [`raw`](Self::raw) keeps the table as stated.
+    pub fn decode_run_completed(&self) -> bool {
+        !self
+            .storage
+            .stts
+            .raw
+            .bytes()
+            .shares_storage_with(self.storage.raw.bytes())
     }
     /// Walks the samples the sample sizes declare, in decode order, timed by the runs that
     /// cover them; runs past the last sample are not read. The table is still invalid:

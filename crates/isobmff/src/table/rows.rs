@@ -7,7 +7,7 @@
 //! Specification: Adobe F4V 10.1 §§2.7.6, 2.8; ISO/IEC 14496-12:2008/Amd1:2009
 //! §§8.6.1.3.1–.3 (signed `ctts`); MPEG m76694 Table 9 and SDL M2902 (draft `stz2`).
 use crate::{Limits, boxes::BoxView, fields, policy};
-use triergon_core::{Error, Result};
+use triergon_core::{BudgetVec, Error, Result};
 
 /// A composition table with its full-box version and flags checked.
 #[derive(Debug)]
@@ -53,6 +53,43 @@ impl Words {
             version,
             start: 8,
             stride,
+        })
+    }
+    /// A copy of a table of two-word rows with `row` appended, in storage of its own
+    /// charged to the table's budget, at the table's place in the file. `Error::Limit`
+    /// when the copy has more rows than `limits` admits.
+    // Out of line: inlined into run recovery's completion it changes the code of the
+    // seek job's entry loop (+0.14% on six seek workloads).
+    #[inline(never)]
+    pub(crate) fn with_row(&self, row: [u32; 2], limits: Limits) -> Result<Self> {
+        let count = self.count.checked_add(1).ok_or(Error::Overflow)?;
+        policy(count, limits.max_records)?;
+        let (head, rows) = self
+            .raw
+            .payload()
+            .split_at_checked(8)
+            .ok_or(Error::Truncated)?;
+        let size = u32::try_from(rows.len())
+            .ok()
+            .and_then(|length| length.checked_add(24))
+            .ok_or(Error::Overflow)?;
+        let mut bytes = BudgetVec::new(self.raw.bytes().budget());
+        bytes.try_reserve_exact(size as usize)?;
+        bytes.try_extend_from_slice(&size.to_be_bytes())?;
+        bytes.try_extend_from_slice(&self.raw.header().kind)?;
+        bytes.try_extend_from_slice(&head[..4])?;
+        bytes.try_extend_from_slice(&count.to_be_bytes())?;
+        bytes.try_extend_from_slice(rows)?;
+        for word in row {
+            bytes.try_extend_from_slice(&word.to_be_bytes())?;
+        }
+        let bytes = bytes.freeze().map_err(|refused| refused.error)?;
+        Ok(Self {
+            raw: BoxView::new(bytes, self.raw.header().start)?,
+            count,
+            version: self.version,
+            start: self.start,
+            stride: self.stride,
         })
     }
     pub(crate) fn word(&self, row: u32, column: usize) -> Result<u32> {

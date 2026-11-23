@@ -530,9 +530,40 @@ impl SampleTableBuilder {
         if let Err(error) = result
             && !matches!(error, Error::Backpressure { .. })
         {
-            self.stage = Stage::Failed(error);
+            match self.complete_decode_runs() {
+                Ok(true) => return Ok(BuildStatus::Yield),
+                Ok(false) => self.stage = Stage::Failed(error),
+                Err(error) => {
+                    self.stage = Stage::Failed(error);
+                    return Err(error);
+                }
+            }
         }
         result
+    }
+    /// Run recovery's answer to a row check that failed because the decode runs end one
+    /// sample short of the sample count: the table is completed and the check goes on
+    /// (`true`). The last sample starts where the stated deltas end (ISO/IEC 14496-12
+    /// §8.6.1.2.1) and gets the zero delta FFmpeg's demuxer reports. `false` for any
+    /// other failure.
+    // Out of line and reached only from a failed poll: the row check stays as it is.
+    #[cold]
+    #[inline(never)]
+    fn complete_decode_runs(&mut self) -> Result<bool> {
+        let Stage::Validate { table, rows } = &mut self.stage else {
+            return Ok(false);
+        };
+        if !(self.acceptance.recovers_runs()
+            && rows.check == Check::Decode
+            && rows.row != 0
+            && rows.row == table.stts.count
+            && rows.total.checked_add(1) == Some(table.sample_count()))
+        {
+            return Ok(false);
+        }
+        table.stts = table.stts.with_row([1, 0], self.limits)?;
+        *rows = RowCheck::new(Check::Composition);
+        Ok(true)
     }
     fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         loop {
