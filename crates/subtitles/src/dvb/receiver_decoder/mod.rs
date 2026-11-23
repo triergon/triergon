@@ -267,7 +267,7 @@ impl<'a> Parsed<'a> {
             Kind::PageComposition => Self::Page(PageComposition::parse(segment)),
             Kind::RegionComposition => Self::Region(RegionComposition::parse(segment.body)),
             Kind::ClutDefinition => Self::Clut(ClutDefinition::parse(segment)),
-            Kind::ObjectData => Self::Object(ObjectData::parse(segment.body).ok()),
+            Kind::ObjectData => Self::Object(ObjectData::parse(segment.body)),
             Kind::DisplayDefinition => Self::Display(DisplayDefinition::parse(segment.body)),
             Kind::EndOfDisplaySet => Self::End,
             Kind::Other => Self::Other,

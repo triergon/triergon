@@ -42,12 +42,9 @@ pub(super) struct Segment<'a> {
     pub(super) tail: &'a [u8],
 }
 
-/// Why the segment loop stopped before the end of the packet.
+/// A segment claims more bytes than the packet holds.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Stop {
-    /// A segment claims more bytes than the packet holds.
-    Overrun,
-}
+pub(super) struct Overrun;
 
 /// The segments of a packet in order, while a sync byte and a complete
 /// header follow; anything after the last one is ignored.
@@ -68,7 +65,7 @@ impl<'a> Segments<'a> {
 }
 
 impl<'a> Iterator for Segments<'a> {
-    type Item = Result<Segment<'a>, Stop>;
+    type Item = Result<Segment<'a>, Overrun>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let (&[sync, kind, p0, p1, l0, l1], after) = self.rest.split_first_chunk::<6>()?;
@@ -78,7 +75,7 @@ impl<'a> Iterator for Segments<'a> {
         let length = usize::from(u16::from_be_bytes([l0, l1]));
         let Some((body, rest)) = after.split_at_checked(length) else {
             self.rest = &[];
-            return Some(Err(Stop::Overrun));
+            return Some(Err(Overrun));
         };
         self.rest = rest;
         Some(Ok(Segment {
@@ -345,23 +342,17 @@ pub(super) enum ObjectCoding<'a> {
     Other,
 }
 
-/// Why an object data segment cannot be read.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum ObjectFault {
-    Short,
-    FieldsOverrun,
-}
-
 impl<'a> ObjectData<'a> {
-    pub(super) fn parse(body: &'a [u8]) -> Result<Self, ObjectFault> {
-        let (&[i0, i1, flags], rest) = body.split_first_chunk::<3>().ok_or(ObjectFault::Short)?;
+    /// `None` when the fixed fields are short, or pixel fields run past the
+    /// body.
+    pub(super) fn parse(body: &'a [u8]) -> Option<Self> {
+        let (&[i0, i1, flags], rest) = body.split_first_chunk::<3>()?;
         let coding = if (flags >> 2) & 3 == 0 {
-            let (&[t0, t1, b0, b1], fields) =
-                rest.split_first_chunk::<4>().ok_or(ObjectFault::Short)?;
+            let (&[t0, t1, b0, b1], fields) = rest.split_first_chunk::<4>()?;
             let top = usize::from(u16::from_be_bytes([t0, t1]));
             let bottom = usize::from(u16::from_be_bytes([b0, b1]));
             if top + bottom > fields.len() {
-                return Err(ObjectFault::FieldsOverrun);
+                return None;
             }
             let (top, rest) = fields.split_at(top);
             ObjectCoding::Pixels {
@@ -371,7 +362,7 @@ impl<'a> ObjectData<'a> {
         } else {
             ObjectCoding::Other
         };
-        Ok(Self {
+        Some(Self {
             id: u16::from_be_bytes([i0, i1]),
             non_modifying: flags & 0x02 != 0,
             coding,
