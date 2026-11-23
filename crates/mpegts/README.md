@@ -402,6 +402,10 @@ and where it resumes is fixed per fault:
 | A PSI section with a bad CRC, length, pointer or stuffing, a malformed PAT or PMT, a descriptor overrunning its loop, a PMT section other than 0 of 0 | `Psi` | the section | the next section |
 | A signalled PCR discontinuity | `TraceEvent::Timeline` (new clock epoch) | partial PES of the program | the carrier that brought the new PCR |
 
+PAT and PMT sections and the AVC and HEVC video descriptors in them are read whatever
+their reserved bits hold (H.222.0 §2.1 leaves those bits to the encoder): a malformed PAT
+or PMT is one whose lengths, section numbers or PIDs are out of range.
+
 The access-unit `Reader` adds one rule: it publishes complete access units only,
 and a PES is not one. Bytes of a track's elementary run that a fault, a clock
 epoch or a table change cuts before they complete an access unit are reported as
