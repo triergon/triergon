@@ -30,11 +30,14 @@ pub enum MultibyteCharset {
     Windows932,
     /// Microsoft CP949 table 2.01, including the UHC extension pairs.
     Windows949,
-    /// Microsoft CP950 table 2.01.
+    /// Code page 950 as Windows converts it: Microsoft CP950 table 2.01, the
+    /// 6,217 user-defined codes FA40–FEFE, 8E40–A0FE, 8140–8DFE and C6A1–C8FE
+    /// as U+E000–U+F848 in that order, and the single bytes 0x80 and 0xFF as
+    /// U+0080 and U+F8F8.
     Windows950,
-    /// The GNU Big5 charmap 0.92 as glibc 2.39 has it, the repertoire FFmpeg
-    /// converts with glibc `iconv`.
-    ReceiverBig5Glibc239,
+    /// The GNU Big5 charmap 0.92 as glibc 2.39 has it, which its `iconv`
+    /// converts both `big5` and `cp950` with: the repertoire FFmpeg decodes.
+    ReceiverBig5,
     /// [`EucKr`](Self::EucKr) plus bytes 0x80–0x9F as the C1 controls: the
     /// glibc 2.39 EUC-KR charmap.
     ReceiverEucKrC1,
@@ -99,7 +102,7 @@ impl MultibyteCharset {
             }
             Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
             Self::Windows950 => include_bytes!("mapping-data/windows950.bin"),
-            Self::ReceiverBig5Glibc239 => include_bytes!("mapping-data/receiver_big5_glibc239.bin"),
+            Self::ReceiverBig5 => include_bytes!("mapping-data/receiver_big5.bin"),
         };
         let mut low = 0;
         let mut high = data.len() / 4;
@@ -127,7 +130,7 @@ impl MultibyteCharset {
             Self::Windows932 => {
                 matches!(byte, 0x81..=0x9f | 0xe0..=0xfc)
             }
-            Self::Big5Unicode | Self::ReceiverBig5Glibc239 => matches!(byte, 0xa1..=0xf9),
+            Self::Big5Unicode | Self::ReceiverBig5 => matches!(byte, 0xa1..=0xf9),
             Self::EucKr | Self::ReceiverEucKrC1 => {
                 matches!(byte, 0xa1..=0xfe)
             }
@@ -141,7 +144,7 @@ impl MultibyteCharset {
                 matches!(byte, 0x40..=0x7e | 0x80..=0xfc)
             }
             Self::GbkCp936 => matches!(byte, 0x40..=0x7e | 0x80..=0xfe),
-            Self::Big5Unicode | Self::Windows950 | Self::ReceiverBig5Glibc239 => {
+            Self::Big5Unicode | Self::Windows950 | Self::ReceiverBig5 => {
                 matches!(byte, 0x40..=0x7e | 0xa1..=0xfe)
             }
             Self::EucKr | Self::ReceiverEucKrC1 => {

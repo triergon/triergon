@@ -59,10 +59,7 @@ fn big5_seven_undefined_and_punctuation_are_receiver_only() {
         (&[0xa2, 0xce], "卅"),
         (&[0xa1, 0x45, 0xa1, 0x4e, 0xa1, 0xc2], "‧﹑¯"),
     ] {
-        assert_eq!(
-            decode(&p, raw, M::ReceiverBig5Glibc239).unwrap(),
-            text.as_bytes()
-        );
+        assert_eq!(decode(&p, raw, M::ReceiverBig5).unwrap(), text.as_bytes());
     }
     assert!(decode(&p, &[0xa1, 0x5a], M::Big5Unicode).is_err());
 }
@@ -112,7 +109,7 @@ fn receiver_labels_have_no_aliases_beyond_the_reference_set() {
     assert_eq!(M::from_label(b"euc_kr").unwrap(), M::EucKr);
     assert_eq!(
         receiver_charset(b"BIG-5").unwrap(),
-        Charset::Multibyte(M::ReceiverBig5Glibc239)
+        Charset::Multibyte(M::ReceiverBig5)
     );
 }
 #[test]
@@ -314,7 +311,7 @@ fn whole_free_big5_charmap_is_checked_independently() {
             let mut j = CharsetJob::new(
                 &bytes,
                 None,
-                Charset::Multibyte(M::ReceiverBig5Glibc239),
+                Charset::Multibyte(M::ReceiverBig5),
                 &p,
                 Limits::default(),
             )

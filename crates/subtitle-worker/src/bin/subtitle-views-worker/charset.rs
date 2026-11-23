@@ -46,7 +46,9 @@ pub(super) fn operation<'a>(
         });
     }
     let profile = match profile.to_str() {
-        Some("big5-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverBig5Glibc239),
+        Some("big5-receiver" | "cp950-receiver") => {
+            Charset::Multibyte(MultibyteCharset::ReceiverBig5)
+        }
         Some("kr-c1" | "kr-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverEucKrC1),
         Some("cp932-receiver") => Charset::Multibyte(MultibyteCharset::Windows932),
         Some(profile) => Charset::from_label(profile.as_bytes())

@@ -1114,8 +1114,8 @@
       },
       "candidate_expected": {
         "packets": 256,
-        "bytes": 128,
-        "digest": 14774233805492925760
+        "bytes": 133,
+        "digest": 10741078185049207393
       }
     },
     {
@@ -1136,8 +1136,8 @@
       },
       "candidate_expected": {
         "packets": 65536,
-        "bytes": 73216,
-        "digest": 8003245322290132737
+        "bytes": 93679,
+        "digest": 11975520078172283559
       }
     },
     {
@@ -1155,11 +1155,6 @@
         "packets": 1,
         "bytes": 1095,
         "digest": 1688790522727597989
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7689
       }
     },
     {
@@ -1177,11 +1172,6 @@
         "packets": 1,
         "bytes": 8710,
         "digest": 6464163685447816549
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7696
       }
     },
     {
@@ -1199,11 +1189,6 @@
         "packets": 1,
         "bytes": 69819,
         "digest": 13344678681017818779
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 7697
       }
     },
     {
@@ -1544,6 +1529,91 @@
         "packets": 1,
         "bytes": 67757,
         "digest": 12483723167197576094
+      }
+    },
+    {
+      "id": "cp950-receiver-bytes",
+      "profile": "cp950-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950-receiver",
+        "CP950",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 130,
+        "digest": 5399830465608152869
+      }
+    },
+    {
+      "id": "cp950-receiver-pairs",
+      "profile": "cp950-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950-receiver",
+        "CP950",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 75212,
+        "digest": 16944356409950247880
+      }
+    },
+    {
+      "id": "cp950-receiver-1024",
+      "profile": "cp950-receiver",
+      "file": "harness/features/charset-streams/inputs/cp950-1024.bin",
+      "sha256": "af53a7cca9f4e316ad830ce1c4af05fac73fca945dd2a5a1d4f9ad04e608f9df",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950-receiver",
+        "CP950",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1095,
+        "digest": 1688790522727597989
+      }
+    },
+    {
+      "id": "cp950-receiver-8192",
+      "profile": "cp950-receiver",
+      "file": "harness/features/charset-streams/inputs/cp950-8192.bin",
+      "sha256": "3fb097f1f0e4463752ffd9a1e9d2e8b8b99ce65efee5b908126ef0b85894ce03",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950-receiver",
+        "CP950",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8710,
+        "digest": 6464163685447816549
+      }
+    },
+    {
+      "id": "cp950-receiver-65536",
+      "profile": "cp950-receiver",
+      "file": "harness/features/charset-streams/inputs/cp950-65536.bin",
+      "sha256": "ecfffd78b53130ed7704ef20b25d1e97c6083826d6ce9632ef95622ed35316e3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cp950-receiver",
+        "CP950",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 69819,
+        "digest": 13344678681017818779
       }
     },
     {

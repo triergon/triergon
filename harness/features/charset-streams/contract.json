@@ -21,6 +21,7 @@
     "cp932-receiver",
     "cp949",
     "cp950",
+    "cp950-receiver",
     "euc-kr",
     "gbk",
     "iso-8859-1",
@@ -131,6 +132,11 @@
         "cp932-receiver-1024",
         "cp932-receiver-8192",
         "cp932-receiver-65536",
+        "cp950-receiver-bytes",
+        "cp950-receiver-pairs",
+        "cp950-receiver-1024",
+        "cp950-receiver-8192",
+        "cp950-receiver-65536",
         "utf-8-invalid",
         "utf-16-invalid",
         "gbk-invalid",
@@ -230,6 +236,11 @@
         "cp932-receiver-1024",
         "cp932-receiver-8192",
         "cp932-receiver-65536",
+        "cp950-receiver-bytes",
+        "cp950-receiver-pairs",
+        "cp950-receiver-1024",
+        "cp950-receiver-8192",
+        "cp950-receiver-65536",
         "utf-8-invalid",
         "utf-16-invalid",
         "gbk-invalid",
@@ -329,6 +340,11 @@
         "cp932-receiver-1024",
         "cp932-receiver-8192",
         "cp932-receiver-65536",
+        "cp950-receiver-bytes",
+        "cp950-receiver-pairs",
+        "cp950-receiver-1024",
+        "cp950-receiver-8192",
+        "cp950-receiver-65536",
         "utf-8-invalid",
         "utf-16-invalid",
         "gbk-invalid",
@@ -345,7 +361,7 @@
       "clause": "Big5 has no normative Unicode mapping: Unicode's BIG5.TXT, which the strict profile follows, is marked obsolete; glibc, Microsoft CP950, HKSCS and the WHATWG Encoding Standard differ among themselves. The WHATWG decoder, like the strict profile, refuses byte 80, and its index maps A145 to U+2027 as glibc does.",
       "candidate": "Refuses byte 80 and pairs BIG5.TXT leaves unmapped such as A15A; maps A145 to U+2022 and C6A1 to U+30FE.",
       "reference": "glibc 2.39 iconv decodes 80 as U+0080 and A15A as U+2574, and maps A145 to U+2027 and C6A1 to U+F6B1.",
-      "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5 and euc-kr profiles convert as the reference build's glibc iconv does",
+      "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "big5-bytes",
         "big5-pairs",
@@ -355,16 +371,14 @@
       ]
     },
     {
-      "reading": "The strict windows-950 profile follows Microsoft's published CP950.TXT (a profile choice)",
-      "clause": "Microsoft CP950.TXT 2.01 lists the code page's assigned characters and omits byte 80 and the user-defined areas; Windows' own conversion maps the user-defined areas to private use, as glibc does.",
-      "candidate": "Refuses byte 80 and the pairs CP950.TXT omits, such as C6A1.",
-      "reference": "glibc 2.39 iconv maps 80 to U+0080 and the user-defined pairs to private use, C6A1 to U+F6B1.",
+      "reading": "The strict windows-950 profile converts code page 950 as Windows does (a profile choice: the reference's C library converts cp950 with its Big5 charmap)",
+      "clause": "Microsoft CP950.TXT 2.01 lists the code page's assigned characters; Windows converts the four user-defined areas FA40 to FEFE, 8E40 to A0FE, 8140 to 8DFE and C6A1 to C8FE to U+E000 to U+F848, and the single bytes 80 and FF to U+0080 and U+F8F8.",
+      "candidate": "Maps FF to U+F8F8 and every user-defined pair to private use, FA40 to U+E000.",
+      "reference": "glibc 2.39 iconv converts CP950 as BIG5: of the user-defined areas it maps C6A1 to C8FE only, and it refuses FF and pairs such as FA40.",
+      "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "cp950-bytes",
-        "cp950-pairs",
-        "cp950-1024",
-        "cp950-8192",
-        "cp950-65536"
+        "cp950-pairs"
       ]
     },
     {
@@ -372,7 +386,7 @@
       "clause": "EUC-KR (RFC 1557, KS X 2901) codes ASCII and KS X 1001 in A1 to FE; ISO/IEC 2022 and ISO/IEC 4873 let an EUC carry C1 controls in 80 to 9F, which glibc decodes, while the strict profile and the WHATWG decoder leave them undefined.",
       "candidate": "Refuses every byte 80 to 9F, alone or in a pair.",
       "reference": "glibc 2.39 iconv decodes them as the C1 controls U+0080 to U+009F.",
-      "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5 and euc-kr profiles convert as the reference build's glibc iconv does",
+      "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "euc-kr-bytes",
         "euc-kr-pairs"

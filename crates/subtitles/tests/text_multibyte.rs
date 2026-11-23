@@ -134,7 +134,7 @@ const PROFILES: [(M, &str, usize); 7] = [
     (
         M::Windows950,
         include_str!("multibyte-mapping-data/CP950.TXT"),
-        13631,
+        19850,
     ),
 ];
 
@@ -175,6 +175,30 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
         for (code, scalar) in codes.zip(0xe000..) {
             assert!(map.insert(code, char::from_u32(scalar).unwrap()).is_none());
         }
+    }
+    if profile == M::Windows950 {
+        // CP950.TXT 2.01 leaves out the four user-defined areas, which Windows
+        // converts to the private use area, area by area and row by row, and
+        // the two single bytes it converts outside the table.
+        let rows = |leads: std::ops::RangeInclusive<u16>, trails: Vec<u16>| {
+            leads.flat_map(move |lead| {
+                trails
+                    .clone()
+                    .into_iter()
+                    .map(move |trail| lead << 8 | trail)
+            })
+        };
+        let whole: Vec<u16> = (0x40..=0x7e).chain(0xa1..=0xfe).collect();
+        let codes = rows(0xfa..=0xfe, whole.clone())
+            .chain(rows(0x8e..=0xa0, whole.clone()))
+            .chain(rows(0x81..=0x8d, whole.clone()))
+            .chain(rows(0xc6..=0xc6, (0xa1..=0xfe).collect()))
+            .chain(rows(0xc7..=0xc8, whole));
+        for (code, scalar) in codes.zip(0xe000..) {
+            assert!(map.insert(code, char::from_u32(scalar).unwrap()).is_none());
+        }
+        assert!(map.insert(0x80, '\u{80}').is_none());
+        assert!(map.insert(0xff, '\u{f8f8}').is_none());
     }
     if profile == M::EucKr {
         // CP949.TXT 2.01 predates A2E8, which KS X 1001:2002 assigns.
@@ -277,9 +301,8 @@ fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>)
 fn every_receiver_big5_and_cp932_one_and_two_byte_input() {
     for (profile, records) in [
         (
-            M::ReceiverBig5Glibc239,
-            include_bytes!("../src/text/charset/mapping-data/receiver_big5_glibc239.bin")
-                .as_slice(),
+            M::ReceiverBig5,
+            include_bytes!("../src/text/charset/mapping-data/receiver_big5.bin").as_slice(),
         ),
         (
             M::Windows932,
@@ -511,10 +534,50 @@ fn big5_seven_unmapped_records_are_all_required_refusals() {
 }
 
 #[test]
-fn no_private_use_or_gb18030_four_byte_inference() {
+fn gbk_has_no_gb18030_four_byte_codes_and_big5_no_supplement() {
     assert!(decode(&[0x81, 0x30, 0x81, 0x30], M::GbkCp936, 1).is_err());
-    assert!(decode(&[0xfa, 0x40], M::Windows950, 1).is_err());
     assert!(decode(&[0x87, 0x40], M::Big5Unicode, 1).is_err());
+}
+
+#[test]
+fn cp950_user_defined_areas_map_all_6217_codes_to_private_use() {
+    // The first and last code of each area, in the order Windows numbers them.
+    for (code, scalar) in [
+        ([0xfa, 0x40], '\u{e000}'),
+        ([0xfe, 0xfe], '\u{e310}'),
+        ([0x8e, 0x40], '\u{e311}'),
+        ([0xa0, 0xfe], '\u{eeb7}'),
+        ([0x81, 0x40], '\u{eeb8}'),
+        ([0x8d, 0xfe], '\u{f6b0}'),
+        ([0xc6, 0xa1], '\u{f6b1}'),
+        ([0xc8, 0xfe], '\u{f848}'),
+    ] {
+        assert_eq!(
+            decode(&code, M::Windows950, 1).unwrap(),
+            scalar.to_string().as_bytes()
+        );
+    }
+    assert_eq!(
+        decode(&[0x80], M::Windows950, 1).unwrap(),
+        "\u{80}".as_bytes()
+    );
+    assert_eq!(
+        decode(&[0xff], M::Windows950, 1).unwrap(),
+        "\u{f8f8}".as_bytes()
+    );
+    // The reference's C library converts cp950 with its Big5 charmap, which
+    // has the last area and byte 0x80 only.
+    assert_eq!(
+        decode(&[0xc6, 0xa1], M::ReceiverBig5, 1).unwrap(),
+        "\u{f6b1}".as_bytes()
+    );
+    assert_eq!(
+        decode(&[0x80], M::ReceiverBig5, 1).unwrap(),
+        "\u{80}".as_bytes()
+    );
+    for refused in [&[0xfa, 0x40][..], &[0x8e, 0x40], &[0x81, 0x40], &[0xff]] {
+        assert!(decode(refused, M::ReceiverBig5, 1).is_err());
+    }
 }
 
 #[test]
