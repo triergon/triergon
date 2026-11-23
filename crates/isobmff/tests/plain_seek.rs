@@ -150,10 +150,11 @@ fn global_seek<'a>(
 }
 
 /// The entry a backward seek to `target` selects, restated from the seek's
-/// rule over every entry: the last key at or before the target, or else the
+/// rule over every entry in index order: the last key at or before the target,
+/// also where repeated edits put earlier times after later ones, or else the
 /// first key, or a fragment track's first entry where `prefix` admits it. The
-/// seek refuses an entry with the null timestamp, a target at or after an
-/// entry out of timestamp order, and an index without a key to fall back to.
+/// seek refuses an entry with the null timestamp and an index without a key to
+/// fall back to.
 fn select(
     entries: &[IndexEntry],
     target: i64,
@@ -162,8 +163,6 @@ fn select(
 ) -> Result<usize, Error> {
     let mut first = None;
     let mut best = None;
-    let mut previous = None;
-    let mut unordered: Option<i64> = None;
     for (at, entry) in entries.iter().enumerate() {
         if entry.timestamp == i64::MIN {
             return Err(Error::Unsupported("seek over a null index clock"));
@@ -172,21 +171,12 @@ fn select(
         if at == 0 && !key && fragments {
             first = Some(at);
         }
-        if previous.is_some_and(|prior| entry.timestamp <= prior) || unordered.is_some() {
-            unordered = Some(unordered.map_or(entry.timestamp, |least| least.min(entry.timestamp)));
-        }
-        previous = Some(entry.timestamp);
         if key {
             first = first.or(Some(at));
             if entry.timestamp <= target {
                 best = Some(at);
             }
         }
-    }
-    if unordered.is_some_and(|least| target >= least) {
-        return Err(Error::Unsupported(
-            "seek query between overlapping index clocks",
-        ));
     }
     best.or(first.filter(|&at| entries[at].flags & 1 != 0 || prefix))
         .ok_or(Error::Unsupported("seek fallback is not a key packet"))

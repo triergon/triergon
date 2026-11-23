@@ -1535,19 +1535,19 @@ fn native_range_seek_refusals_leave_the_current_player_untouched() {
         native_range_player(include_bytes!("../fixtures/mp4/r-edits-repeat.mov"));
     let current = first_packet(&mut player);
     calls.lock().unwrap().clear();
+    let mut limits = triergon_isobmff::compat::mov::seek::SeekLimits::default();
+    limits.index.max_entries = 1;
     let request = Mp4DemuxSeekRequest {
         video: 1,
         timestamp: 3500,
-        limits: triergon_isobmff::compat::mov::seek::SeekLimits::default(),
+        limits,
     };
     let mut job = player
         .prepare_mp4_demux_seek(&movie, request, Selection::All)
         .unwrap();
     assert!(matches!(
         job.poll(&mut WorkBudget::new(10_000), &off()),
-        Err(C::Unsupported(
-            "seek query between overlapping index clocks"
-        ))
+        Err(C::Limit { .. })
     ));
     drop(job);
     assert!(player.current(&current));

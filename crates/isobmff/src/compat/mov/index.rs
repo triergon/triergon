@@ -553,19 +553,10 @@ pub struct SeekJob<'a> {
     best_resume: Option<TrackResume<'a>>,
     keep_resume: bool,
     plain: Plain<'a>,
-    order: SeekOrder,
     scanned: u64,
     allow_initial_prefix: bool,
     ready: bool,
     failed: Option<Error>,
-}
-
-#[derive(Debug)]
-#[repr(u8)]
-enum SeekOrder {
-    Empty,
-    Increasing(i64),
-    Overlapping(i64),
 }
 
 /// Where a seek stands with reading a track's entries from its tables.
@@ -661,7 +652,6 @@ impl<'a> SeekJob<'a> {
             best_resume: None,
             keep_resume: false,
             plain: Plain::Untried,
-            order: SeekOrder::Empty,
             scanned: 0,
             allow_initial_prefix: false,
             ready: false,
@@ -669,8 +659,8 @@ impl<'a> SeekJob<'a> {
         })
     }
     /// Advances the seek; failures are sticky. `Error::Unsupported` where the
-    /// demuxer's choice is not reproduced: a null index timestamp, index timestamps
-    /// out of order around the target, or no key entry to land on.
+    /// demuxer's choice is not reproduced: a null index timestamp or no key entry to
+    /// land on.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -717,14 +707,6 @@ impl<'a> SeekJob<'a> {
                         // searching. Packet and presentation clocks can differ.
                         self.index_timestamp -= i128::from(self.index.cursor.index_edit_offset());
                     }
-                    match &mut self.order {
-                        SeekOrder::Empty => self.order = SeekOrder::Increasing(timestamp),
-                        SeekOrder::Increasing(prior) if timestamp <= *prior => {
-                            self.order = SeekOrder::Overlapping(timestamp);
-                        }
-                        SeekOrder::Increasing(prior) => *prior = timestamp,
-                        SeekOrder::Overlapping(minimum) => *minimum = (*minimum).min(timestamp),
-                    }
                     self.scanned = self.scanned.checked_add(1).ok_or(Error::Overflow)?;
                     let first = nonkey_first || (key && self.first.is_none());
                     let best = key && i128::from(timestamp) <= self.index_timestamp;
@@ -756,16 +738,9 @@ impl<'a> SeekJob<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStatus::Yield);
                     }
-                    // The observed repeated-edit prefix is separated from all
-                    // later rollback entries by this query. Overlapping/late
-                    // searches stay refused until the demux search is established.
-                    if let SeekOrder::Overlapping(minimum) = self.order
-                        && self.index_timestamp >= i128::from(minimum)
-                    {
-                        return Err(Error::Unsupported(
-                            "seek query between overlapping index clocks",
-                        ));
-                    }
+                    // Repeated edits put earlier times after later ones; the last
+                    // key at or before the target in index order is the landing the
+                    // edit list defines (ISO/IEC 14496-12 §8.6.6).
                     if self.best.is_none()
                         && self
                             .first

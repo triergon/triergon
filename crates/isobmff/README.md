@@ -248,7 +248,7 @@ Limits of the reader:
 | Edit lists | `elst` v0/v1; empty edits; rate-one point mapping |
 | Seek and indexes | sync/preroll plans, movie-time and composition targets, `sidx`, `tfra`/`mfro`, `roll`/`prol` groups |
 | Codec configuration | AAC `AudioSpecificConfig` (incl. QuickTime `wave`), DTS core signalling, AC-3/E-AC-3, opaque `avcC`/`hvcC`/`av1C`/`vpcC` |
-| QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`QtPcmSampleReaderV0`) |
+| QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`quicktime::PcmSampleReader`, `compat::mov::pcm::PcmCursor`); sound description versions 1 and 2 are refused |
 | FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
 
 `AacConfigurationJob` returns the AudioSpecificConfig bytes of an `mp4a` entry
@@ -291,7 +291,12 @@ Limits of the reader:
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before publishing
   a plan. A sync sample is a container fact, not proof of decoder recovery. `sidx`
-  and `tfra` entries are hints, not verified against the media.
+  and `tfra` entries are hints, not verified against the media. The
+  FFmpeg-compatible `SeekJob` lands on the last key entry at or before the target
+  in index order, also where repeated edits put earlier times after later ones. It
+  searches the target as given, without a per-track composition shift, and refuses
+  an index with a decode time at or above 2^63 (a version-1 `tfdt` is unsigned),
+  which its signed index timestamps cannot carry.
 - **Refusals.** Unknown box versions, unknown flags, unselected `stz2` widths,
   non-unit edits and unobserved FFmpeg-compatible profiles return
   `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.
