@@ -636,10 +636,6 @@ pub fn safety(root: &Path) -> Result<String, String> {
     let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
     let metadata = json::parse(&text).map_err(|e| format!("cargo metadata: {e}"))?;
     let owned = [root.join("crates"), root.join("xtask")];
-    let workspace_toml = fs::read_to_string(root.join("Cargo.toml")).map_err(|e| e.to_string())?;
-    let worker_lints = lint_table(&workspace_toml, "[workspace.lints.")
-        .replace("[workspace.lints.", "[lints.")
-        .replace("unsafe_code = \"forbid\"", "unsafe_code = \"deny\"");
     let packages = metadata
         .get("packages")
         .and_then(Value::as_array)
@@ -671,11 +667,8 @@ pub fn safety(root: &Path) -> Result<String, String> {
             fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
         if manifest.starts_with(root.join("crates"))
             && !cargo_toml.contains("[lints]\nworkspace = true\n")
-            && lint_table(&cargo_toml, "[lints.") != worker_lints
         {
-            return Err(format!(
-                "{name}: [lints] is neither the workspace's nor the workers' (the workspace's with unsafe_code denied)"
-            ));
+            return Err(format!("{name}: [lints] is not the workspace's"));
         }
         for target in package
             .get("targets")
@@ -748,23 +741,6 @@ fn without_worker_entry(text: &str) -> Result<String, String> {
             "{count} worker entry points; a worker binary has one, with #![deny(unsafe_code)] and #![cfg_attr(not(test), no_main)]"
         )),
     }
-}
-
-/// The lint tables of a Cargo manifest whose headers start with `prefix`, without
-/// comments or blank lines.
-fn lint_table(manifest: &str, prefix: &str) -> String {
-    let mut table = String::new();
-    let mut inside = false;
-    for line in manifest.lines().map(str::trim) {
-        if line.starts_with('[') {
-            inside = line.starts_with(prefix);
-        }
-        if inside && !line.is_empty() && !line.starts_with('#') {
-            table.push_str(line);
-            table.push('\n');
-        }
-    }
-    table
 }
 
 /// `unsafe` as a word followed by a block, `impl`, `trait`, `fn`, `extern` or an

@@ -26,11 +26,10 @@ assume it.
 
 ## Ground rules
 
-- **Safe Rust only.** Every library crate forbids `unsafe_code`. There is no exception
-  for performance. Packages that build a worker binary (the worker crates, and
-  `triergon-framing` and `triergon-isobmff` for their worker examples) deny it at
-  package level instead, so that each worker binary's C entry point is its one allowed
-  exception ([quality](docs/quality.md#measuring-performance)).
+- **Safe Rust only.** Every library crate forbids `unsafe_code` in its `lib.rs`. There is
+  no exception for performance. The workspace lint table, which every package inherits,
+  denies it rather than forbidding it, so that each worker binary's C entry point is its
+  one allowed exception ([quality](docs/quality.md#measuring-performance)).
 - **No dependencies by default.** A third-party crate is admitted only if its whole
   dependency graph is safe Rust, it fits the exact contract (timing, bounds, errors,
   incremental input), it passes the same gates as our own code, and reusing it is

@@ -329,7 +329,7 @@ have the same hashes.
   sides link as their toolchains do.
 - **Entry point.** Every Rust worker enters through C's `main`, as the C references do,
   so a measurement compares the library's work and not the Rust runtime's start-up.
-  Libraries forbid unsafe code; worker packages deny it, and each worker binary's C
+  Libraries forbid unsafe code; the workspace denies it, and each worker binary's C
   entry point, `#[allow(unsafe_code)] #[unsafe(no_mangle)] extern "C" fn main`, calling
   the safe [`triergon_worker_entry::enter`](../crates/worker-entry), is its one allowed
   exception, which `cargo xtask check` admits once per worker binary. A worker gives up

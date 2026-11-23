@@ -10,7 +10,10 @@ repository = "https://github.com/triergon/triergon"
 license = "MIT OR Apache-2.0"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# Denied, not forbidden, so that each worker binary's C entry point can allow it
+# (docs/quality.md); every library's `lib.rs` forbids it, and `cargo xtask check-safety`
+# admits no other unsafe syntax.
+unsafe_code = "deny"
 rust_2018_idioms = { level = "warn", priority = -1 }
 unused_qualifications = "warn"
 # Library crates also enable `missing_docs`, `missing_debug_implementations`,
