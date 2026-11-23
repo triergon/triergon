@@ -1246,7 +1246,7 @@ fn open_reads_the_headers_of_every_stream_of_the_first_link() {
         triergon_ogg::BlockingReader::open(std::io::Cursor::new(file), Limits::default()).unwrap();
     let tracks = reader.tracks();
     assert_eq!(tracks.len(), 2);
-    assert!(tracks.iter().all(|track| track.is_configured()));
+    assert!(tracks.iter().all(triergon_ogg::Track::is_configured));
     assert_eq!(tracks[1].codec(), CodecId::Speex);
     assert_eq!(tracks[1].end(), Some(640));
 }
