@@ -74,6 +74,137 @@ fn require(condition: bool, what: &'static str) -> triergon_core::Result<()> {
     }
 }
 
+fn checked_window(
+    reader: &mut InputCursor,
+    input: &[u8],
+) -> triergon_core::Result<(InputRequest, Bytes)> {
+    let pool = reader.budget().clone();
+    let first = reader.request();
+    require(
+        reader.source() == SOURCE
+            && first.source == SOURCE
+            && first.offset == 0
+            && first.token.request() == 0
+            && first.token.generation() == reader.generation(),
+        "initial cursor source and token",
+    )?;
+    require(
+        reader
+            .pending_request(&READY)?
+            .is_some_and(|r| r.token == first.token),
+        "initial pending request",
+    )?;
+    reader.provide(&window(&pool, &first, &[])?)?;
+    require(
+        matches!(reader.read_discard(1, &mut WorkBudget::new(2), &READY)?,
+                   Step::NeedInput(request) if request.token == first.token && request.offset == 0),
+        "empty response must starve",
+    )?;
+    let foreign = Budget::new(1 << 20)?;
+    let same_request_wrong_pool = window(&foreign, &first, &input[..1])?;
+    let mut wrong_source = window(&pool, &first, &input[..1])?;
+    wrong_source.source = NEXT;
+    let mut wrong_offset = window(&pool, &first, &input[..1])?;
+    wrong_offset.offset = 1;
+    require(
+        reader.provide(&same_request_wrong_pool) == Err(Error::ForeignPool)
+            && reader.provide(&wrong_source) == Err(Error::SourceMismatch)
+            && matches!(reader.provide(&wrong_offset), Err(Error::Invalid(_)))
+            && matches!(
+                reader.provide(&window(&pool, &first, &input[..9])?),
+                Err(Error::Limit { .. })
+            )
+            && reader.position() == 0,
+        "refused windows move the cursor",
+    )?;
+    reader.provide_owned(window(&pool, &first, &input[..8])?)?;
+    let owner = reader
+        .buffered_owner()
+        .ok_or(Error::Invalid("no supplied owner"))?
+        .clone();
+    require(
+        reader.pending_request(&READY)?.is_none()
+            && reader.buffered() == &input[..8]
+            && matches!(
+                reader.provide_inline(SOURCE, first.token.clone(), 0, &input[..1]),
+                Err(Error::Invalid(_))
+            ),
+        "buffered window can be replaced",
+    )?;
+    Ok((first, owner))
+}
+
+fn check_sequential(reader: &mut InputCursor, last: &InputRequest) -> triergon_core::Result<()> {
+    let next = reader.continue_source(NEXT, caps(None, false))?;
+    require(
+        next.source == NEXT
+            && next.offset == 0
+            && next.token.request() == 3
+            && next.token.generation() == last.token.generation(),
+        "continuation reset the generation or wrong source",
+    )?;
+    require(
+        matches!(
+            reader.continue_source(SOURCE, caps(None, false)),
+            Err(Error::Invalid(_))
+        ) && matches!(reader.request_range(1), Err(Error::Unsupported(_)))
+            && matches!(reader.reset(1), Err(Error::Unsupported(_))),
+        "sequential source allowed a jump or premature handoff",
+    )?;
+    let mut budget = WorkBudget::new(2);
+    require(
+        !reader.consume_response(&next, 3, &mut budget, &READY, || Err(Error::Transport))?
+            && reader.consume_response(&next, 2, &mut budget, &READY, || Err(Error::Transport))
+                == Err(Error::Transport)
+            && reader.position() == 0
+            && budget.remaining() == 2
+            && reader.consume_response(&next, 2, &mut budget, &READY, || Ok(()))?
+            && reader.position() == 2
+            && budget.remaining() == 0,
+        "direct response consumption was not atomic",
+    )?;
+    for (failure, error) in [
+        (Some(SourceFailure::Transport), Error::Transport),
+        (Some(SourceFailure::Cancelled), Error::Cancelled),
+        (None, Error::Cancelled),
+    ] {
+        let before = reader.request();
+        if let Some(failure) = failure {
+            reader.fail(NEXT, before.token.clone(), failure)?;
+        } else if !matches!(reader.pending_request(&CANCEL), Err(Error::Cancelled)) {
+            return Err(Error::Invalid("cancellation not observed"));
+        }
+        require(
+            matches!(reader.read_discard(1, &mut WorkBudget::new(1), &READY), Err(e) if e == error),
+            "source failure not sticky",
+        )?;
+        let restarted = reader.reset(0)?;
+        require(
+            restarted.token.generation() != before.token.generation()
+                && restarted.token.request() == 0
+                && matches!(
+                    reader.fail(NEXT, before.token, SourceFailure::Transport),
+                    Err(Error::StaleGeneration { .. })
+                ),
+            "old generation accepted or not replaced",
+        )?;
+    }
+    let final_request = reader.request();
+    reader.finish(NEXT, final_request.token)?;
+    require(
+        reader.capabilities() == caps(Some(0), false),
+        "finish did not establish length",
+    )?;
+
+    let mut short = InputCursor::new(reader.budget(), SOURCE, caps(Some(1), false), 8)?;
+    require(
+        short.finish(SOURCE, short.token()) == Err(Error::Truncated)
+            && matches!(short.pending_request(&READY), Err(Error::Truncated)),
+        "known-length truncation must be sticky",
+    )?;
+    Ok(())
+}
+
 fn cursor(
     input: &[u8],
     trace: &mut Option<&mut dyn Write>,
@@ -83,50 +214,14 @@ fn cursor(
     let mut reader = InputCursor::new(&pool, SOURCE, caps(Some(input.len() as u64), true), 8)
         .map_err(|e| e.to_string())?;
     let controls = (|| -> triergon_core::Result<_> {
-        let first = reader.request();
-        require(
-            reader.source() == SOURCE && first.source == SOURCE && first.offset == 0
-                && first.token.request() == 0 && first.token.generation() == reader.generation(),
-            "initial cursor source and token",
-        )?;
-        require(
-            reader.pending_request(&READY)?.is_some_and(|r| r.token == first.token),
-            "initial pending request",
-        )?;
-        reader.provide(&window(&pool, &first, &[])?)?;
-        require(
-            matches!(reader.read_discard(1, &mut WorkBudget::new(2), &READY)?,
-                       Step::NeedInput(request) if request.token == first.token && request.offset == 0),
-            "empty response must starve",
-        )?;
-        let foreign = Budget::new(1 << 20)?;
-        let same_request_wrong_pool = window(&foreign, &first, &input[..1])?;
-        let mut wrong_source = window(&pool, &first, &input[..1])?;
-        wrong_source.source = NEXT;
-        let mut wrong_offset = window(&pool, &first, &input[..1])?;
-        wrong_offset.offset = 1;
-        require(
-            reader.provide(&same_request_wrong_pool) == Err(Error::ForeignPool)
-                && reader.provide(&wrong_source) == Err(Error::SourceMismatch)
-                && matches!(reader.provide(&wrong_offset), Err(Error::Invalid(_)))
-                && matches!(reader.provide(&window(&pool, &first, &input[..9])?), Err(Error::Limit { .. }))
-                && reader.position() == 0,
-            "refused windows move the cursor",
-        )?;
-        reader.provide_owned(window(&pool, &first, &input[..8])?)?;
-        let owner = reader.buffered_owner().ok_or(Error::Invalid("no supplied owner"))?.clone();
-        require(
-            reader.pending_request(&READY)?.is_none()
-                && reader.buffered() == &input[..8]
-                && matches!(reader.provide_inline(SOURCE, first.token.clone(), 0, &input[..1]),
-                            Err(Error::Invalid(_))),
-            "buffered window can be replaced",
-        )?;
+        let (first, owner) = checked_window(&mut reader, input)?;
         let mut copied = [0; 4];
         let mut budget = WorkBudget::new(2);
         require(
-            matches!(reader.read_into(&mut copied, &mut budget, &READY)?, Step::Ready(2))
-                && matches!(reader.read_discard(1, &mut budget, &READY)?, Step::Yield)
+            matches!(
+                reader.read_into(&mut copied, &mut budget, &READY)?,
+                Step::Ready(2)
+            ) && matches!(reader.read_discard(1, &mut budget, &READY)?, Step::Yield)
                 && reader.position() == 2
                 && budget.remaining() == 0,
             "partial read and work yield",
@@ -135,9 +230,12 @@ fn cursor(
         let reused = reader.request_range_reusing_window(1)?;
         let span_start = reader.position();
         require(
-            reused.token.request() == 1 && reused.token.generation() == first.token.generation()
-                && matches!(reader.provide(&window(&pool, &first, &input[..1])?),
-                            Err(Error::StaleRequest { .. })),
+            reused.token.request() == 1
+                && reused.token.generation() == first.token.generation()
+                && matches!(
+                    reader.provide(&window(&pool, &first, &input[..1])?),
+                    Err(Error::StaleRequest { .. })
+                ),
             "range token and identity",
         )?;
         let Step::Ready(span) = reader.read_span(2, &mut WorkBudget::new(2), &READY)? else {
@@ -154,25 +252,48 @@ fn cursor(
         let held = output_pool.reserve(output_pool.available())?;
         let mut budget = WorkBudget::new(3);
         require(
-            matches!(reader.read_append(&mut accumulated, 3, &mut budget, &READY), Err(Error::Backpressure(_)))
-                && reader.position() == 3 && budget.remaining() == 3 && accumulated.is_empty(),
+            matches!(
+                reader.read_append(&mut accumulated, 3, &mut budget, &READY),
+                Err(Error::Backpressure(_))
+            ) && reader.position() == 3
+                && budget.remaining() == 3
+                && accumulated.is_empty(),
             "append consumed cursor or work under backpressure",
         )?;
         drop(held);
         require(
-            matches!(reader.read_append(&mut accumulated, 3, &mut budget, &READY)?, Step::Ready(3))
-                && reader.position() == 6 && budget.remaining() == 0,
+            matches!(
+                reader.read_append(&mut accumulated, 3, &mut budget, &READY)?,
+                Step::Ready(3)
+            ) && reader.position() == 6
+                && budget.remaining() == 0,
             "append retry did not consume the bytes",
         )?;
         let appended_end = reader.position();
-        require(matches!(reader.read_discard(2, &mut WorkBudget::new(2), &READY)?, Step::Ready(2)),
-                "discard did not reach the end of a window")?;
+        require(
+            matches!(
+                reader.read_discard(2, &mut WorkBudget::new(2), &READY)?,
+                Step::Ready(2)
+            ),
+            "discard did not reach the end of a window",
+        )?;
 
         let discarded_end = reader.position();
         let last = reader.request_range(input.len() as u64 - 1)?;
-        require(last.maximum == 1 && last.token.request() == 2, "known length did not clip request")?;
-        reader.provide_inline(SOURCE, last.token.clone(), last.offset, &input[input.len() - 1..])?;
-        require(reader.buffered_owner().is_none(), "inline input has an allocation")?;
+        require(
+            last.maximum == 1 && last.token.request() == 2,
+            "known length did not clip request",
+        )?;
+        reader.provide_inline(
+            SOURCE,
+            last.token.clone(),
+            last.offset,
+            &input[input.len() - 1..],
+        )?;
+        require(
+            reader.buffered_owner().is_none(),
+            "inline input has an allocation",
+        )?;
         reader.finish(SOURCE, last.token.clone())?;
         let Step::Ready(inline) = reader.read_span(1, &mut WorkBudget::new(1), &READY)? else {
             return Err(Error::Invalid("final inline byte was not available"));
@@ -180,63 +301,18 @@ fn cursor(
         let Step::End(end) = reader.read_discard(1, &mut WorkBudget::new(1), &READY)? else {
             return Err(Error::Invalid("explicit end not reported"));
         };
-        let next = reader.continue_source(NEXT, caps(None, false))?;
-        require(
-            next.source == NEXT && next.offset == 0 && next.token.request() == 3
-               && next.token.generation() == last.token.generation(),
-            "continuation reset the generation or wrong source",
-        )?;
-        require(
-            matches!(reader.continue_source(SOURCE, caps(None, false)), Err(Error::Invalid(_)))
-                && matches!(reader.request_range(1), Err(Error::Unsupported(_)))
-                && matches!(reader.reset(1), Err(Error::Unsupported(_))),
-            "sequential source allowed a jump or premature handoff",
-        )?;
-        let mut budget = WorkBudget::new(2);
-        require(
-            !reader.consume_response(&next, 3, &mut budget, &READY, || Err(Error::Transport))?
-                && reader.consume_response(&next, 2, &mut budget, &READY, || Err(Error::Transport))
-                    == Err(Error::Transport)
-                && reader.position() == 0 && budget.remaining() == 2
-                && reader.consume_response(&next, 2, &mut budget, &READY, || Ok(()))?
-                && reader.position() == 2 && budget.remaining() == 0,
-            "direct response consumption was not atomic",
-        )?;
-        for (failure, error) in [(Some(SourceFailure::Transport), Error::Transport),
-                                 (Some(SourceFailure::Cancelled), Error::Cancelled),
-                                 (None, Error::Cancelled)] {
-            let before = reader.request();
-            if let Some(failure) = failure {
-                reader.fail(NEXT, before.token.clone(), failure)?;
-            } else if !matches!(reader.pending_request(&CANCEL), Err(Error::Cancelled)) {
-                return Err(Error::Invalid("cancellation not observed"));
-            }
-            require(
-                matches!(reader.read_discard(1, &mut WorkBudget::new(1), &READY), Err(e) if e == error),
-                "source failure not sticky",
-            )?;
-            let restarted = reader.reset(0)?;
-            require(
-                restarted.token.generation() != before.token.generation()
-                    && restarted.token.request() == 0
-                    && matches!(reader.fail(NEXT, before.token, SourceFailure::Transport),
-                                Err(Error::StaleGeneration { .. })),
-                "old generation accepted or not replaced",
-            )?;
-        }
-        let final_request = reader.request();
-        reader.finish(NEXT, final_request.token)?;
-        require(reader.capabilities() == caps(Some(0), false), "finish did not establish length")?;
+        check_sequential(&mut reader, &last)?;
 
-        let mut short = InputCursor::new(&pool, SOURCE, caps(Some(1), false), 8)?;
-        require(
-            short.finish(SOURCE, short.token()) == Err(Error::Truncated)
-                && matches!(short.pending_request(&READY), Err(Error::Truncated)),
-            "known-length truncation must be sticky",
-        )?;
-        let offsets = [copied_end, span_start, span_end, appended_end, discarded_end];
+        let offsets = [
+            copied_end,
+            span_start,
+            span_end,
+            appended_end,
+            discarded_end,
+        ];
         Ok((copied, span, accumulated, inline, end, offsets))
-    })().map_err(|e| e.to_string())?;
+    })()
+    .map_err(|e| e.to_string())?;
     let (copied, span, accumulated, inline, end, offsets) = controls;
     let [
         copied_end,
