@@ -1,4 +1,7 @@
-/* Compare a session discontinuity using the public decoder flush API. */
+/* Compare a session discontinuity: at a reset index the decoder is closed and opened again,
+ * a fresh decoder state as a decoder reset gives. The reopened decoder continues the stream,
+ * so an Opus ID header's pre-skip, which RFC 7845 section 4.2 applies once at the start of a
+ * stream, is not applied again. */
 #define main reference_decode_main
 #include "reference_decode.h"
 #undef main
@@ -85,6 +88,25 @@ static int reset_at(const char *indices, uint64_t packet_index) {
     return 0;
 }
 
+static AVCodecContext *open_decoder(const AVCodec *codec, const AVStream *stream, int raw_mov,
+                                    int continued) {
+    AVCodecContext *decoder = avcodec_alloc_context3(codec);
+    if (!decoder) die("allocate decoder", AVERROR(ENOMEM));
+    int rc = avcodec_parameters_to_context(decoder, stream->codecpar);
+    if (rc < 0) die("codec parameters", rc);
+    decoder->thread_count = 1;
+    decoder->pkt_timebase = stream->time_base;
+    /* OpusHead: magic (8), version (1), channel count (1), pre-skip (2, little-endian). */
+    if (continued && decoder->codec_id == AV_CODEC_ID_OPUS && decoder->extradata_size >= 12)
+        decoder->extradata[10] = decoder->extradata[11] = 0;
+    AVDictionary *options = NULL;
+    if (raw_mov) av_dict_set(&options, "flags2", "+skip_manual", 0);
+    rc = avcodec_open2(decoder, codec, &options);
+    av_dict_free(&options);
+    if (rc < 0) die("open decoder", rc);
+    return decoder;
+}
+
 int main(int argc, char **argv) {
     if (argc != 6) {
         fprintf(stderr, "usage: reference-session FORMAT INPUT OUTPUT planar|device RESET_INDEXES\n");
@@ -106,18 +128,10 @@ int main(int argc, char **argv) {
                                     -1, -1, &codec, 0);
     if (index < 0) die("select stream", index);
     AVStream *stream = format->streams[index];
-    AVCodecContext *decoder = avcodec_alloc_context3(codec);
+    AVCodecContext *decoder = open_decoder(codec, stream, raw_mov, 0);
     AVPacket *packet = av_packet_alloc();
     AVFrame *frame = av_frame_alloc();
-    if (!decoder || !packet || !frame) die("allocate decoder state", AVERROR(ENOMEM));
-    if ((rc = avcodec_parameters_to_context(decoder, stream->codecpar)) < 0)
-        die("codec parameters", rc);
-    decoder->thread_count = 1;
-    decoder->pkt_timebase = stream->time_base;
-    if (raw_mov) av_dict_set(&options, "flags2", "+skip_manual", 0);
-    rc = avcodec_open2(decoder, codec, &options);
-    av_dict_free(&options);
-    if (rc < 0) die("open decoder", rc);
+    if (!packet || !frame) die("allocate decoder state", AVERROR(ENOMEM));
     struct session_output output = {
         .device.raw = !strcmp(argv[3], "-") ? stdout : fopen(argv[3], "wb"),
         .time_base = stream->time_base,
@@ -128,7 +142,10 @@ int main(int argc, char **argv) {
     uint64_t packet_index = 0;
     while ((rc = av_read_frame(format, packet)) >= 0) {
         if (packet->stream_index == index) {
-            if (reset_at(argv[5], packet_index++)) avcodec_flush_buffers(decoder);
+            if (reset_at(argv[5], packet_index++)) {
+                avcodec_free_context(&decoder);
+                decoder = open_decoder(codec, stream, raw_mov, 1);
+            }
             decode_packet(&output, decoder, frame, packet);
         }
         av_packet_unref(packet);

@@ -80,8 +80,10 @@ one directly.
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
-configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). The
-generic AAC track decoder takes ADTS; raw packets use `aac_access_units_in` above.
+configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). For AAC,
+a track with an AudioSpecificConfig takes raw LC packets. An AAC track without
+configuration takes ADTS packets. Use `aac_access_units_in` when the packet's sample
+description supplies a different configuration.
 `TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
 pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a
@@ -138,7 +140,10 @@ bytes, plus queue and decoder refusals, flush and unload. The existing session
 grades compare decoded output and the declared mid-GOP reset behaviour.
 The [track reset comparison](../../harness/codecs/session-cases.json) covers
 `TrackDecoder` restarts after actual AAC, AC-3, E-AC-3, DTS, FLAC, MPEG
-audio, Opus and Vorbis packets. The [AAC access-unit comparison](../../harness/features/aac-access-units/contract.json)
+audio, Opus and Vorbis packets, against the reference decoder closed and opened again
+at the same packet: a reset drops all signal history and is not the start of a stream,
+so an Opus pre-skip, which applies once at the start (RFC 7845 section 4.2), is not
+discarded again. The [AAC access-unit comparison](../../harness/features/aac-access-units/contract.json)
 covers configured fixed and program layouts, and the clocked video gate
 exercises both standalone video factories.
 The [audio lifecycle comparison](../../harness/features/audio-session-lifecycle/contract.json)

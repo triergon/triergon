@@ -862,53 +862,6 @@
       }
      }
     },
-    "reset-aac-aac-lc-stereo.aac": {
-     "candidate": {
-      "decoder.ours_channels": 2,
-      "decoder.ours_info.channels": 2,
-      "decoder.ours_info.errors": 0,
-      "decoder.ours_info.frames": 432,
-      "decoder.ours_info.layout": "stereo",
-      "decoder.ours_info.sample_rate": 44100,
-      "decoder.ours_info.samples_per_channel": 442368,
-      "decoder.ours_layout": "stereo",
-      "decoder.ours_pcm_bytes": 3538944,
-      "decoder.ours_rate": 44100,
-      "decoder.ours_rc": 0,
-      "decoder.ours_samples": 442368,
-      "decoder.timeline.ours_at_difference": null,
-      "decoder.timeline.ours_blocks": 432,
-      "output.ours_rc": 0,
-      "output.samples_ours": 442368
-     },
-     "reference": {
-      "decoder.ffmpeg_channels": 2,
-      "decoder.ffmpeg_layout": "stereo",
-      "decoder.ffmpeg_pcm_bytes": 3538944,
-      "decoder.ffmpeg_rate": 44100,
-      "decoder.ffmpeg_rc": 0,
-      "decoder.ffmpeg_samples": 442368,
-      "decoder.timeline.reference_at_difference": null,
-      "decoder.timeline.reference_frames": 432,
-      "output.reference_rc": 0,
-      "output.samples_ref": 442368
-     },
-     "comparison": {
-      "decoder.status": "fail",
-      "decoder.timeline.first_difference": null,
-      "decoder.timeline.status": "pass",
-      "output.status": "fail"
-     },
-     "exact": {
-      "aarch64-unknown-linux-gnu": {
-       "decoder.ffmpeg_pcm_sha256": "f9d1b1f491658fb60d0465a28ae6655cce22f963665df5b8f019e63b4ffe7494",
-       "decoder.ours_pcm_sha256": "57970f474cc0b86a1bfdcb5cbc3dd15195a24b242bb6c4a9acb630550ece98b9",
-       "output.differing_samples": 26192,
-       "output.exact": false,
-       "output.max_abs_lsb": 676
-      }
-     }
-    },
     "session-aac:.research/codec-derived/aac/foo.adts": {
      "candidate": {
       "decoder.ours_channels": 2,
@@ -954,53 +907,6 @@
     }
    },
    "session-ac3": {
-    "reset-ac3-millers_crossing_4.0.ac3": {
-     "candidate": {
-      "decoder.ours_channels": 4,
-      "decoder.ours_info.channels": 4,
-      "decoder.ours_info.errors": 0,
-      "decoder.ours_info.frames": 62,
-      "decoder.ours_info.layout": "4.0",
-      "decoder.ours_info.sample_rate": 48000,
-      "decoder.ours_info.samples_per_channel": 95232,
-      "decoder.ours_layout": "4.0",
-      "decoder.ours_pcm_bytes": 1523712,
-      "decoder.ours_rate": 48000,
-      "decoder.ours_rc": 0,
-      "decoder.ours_samples": 95232,
-      "decoder.timeline.ours_at_difference": null,
-      "decoder.timeline.ours_blocks": 62,
-      "output.ours_rc": 0,
-      "output.samples_ours": 95232
-     },
-     "reference": {
-      "decoder.ffmpeg_channels": 4,
-      "decoder.ffmpeg_layout": "4.0",
-      "decoder.ffmpeg_pcm_bytes": 1523712,
-      "decoder.ffmpeg_rate": 48000,
-      "decoder.ffmpeg_rc": 0,
-      "decoder.ffmpeg_samples": 95232,
-      "decoder.timeline.reference_at_difference": null,
-      "decoder.timeline.reference_frames": 62,
-      "output.reference_rc": 0,
-      "output.samples_ref": 95232
-     },
-     "comparison": {
-      "decoder.status": "fail",
-      "decoder.timeline.first_difference": null,
-      "decoder.timeline.status": "pass",
-      "output.status": "fail"
-     },
-     "exact": {
-      "aarch64-unknown-linux-gnu": {
-       "decoder.ffmpeg_pcm_sha256": "ad3154c6df3317de002075ea97a5b6f21f5481b7e945c51cc63f440cd711e34c",
-       "decoder.ours_pcm_sha256": "579221440fc5ec50b3b0a587154fd2db995ea6ec1595d00d065eb0c51a37980a",
-       "output.differing_samples": 153392,
-       "output.exact": false,
-       "output.max_abs_lsb": 4748
-      }
-     }
-    },
     "session-ac3:.research/codec-derived/ac3/diatonis.ac3": {
      "candidate": {
       "decoder.ours_channels": 6,
@@ -10436,76 +10342,6 @@
        "output.differing_samples": 500,
        "output.exact": false,
        "output.max_abs_lsb": 1
-      }
-     }
-    }
-   },
-   "track-reset": {
-    "reset-track-reset-avc-aac-quicktime-7-1.mov": {
-     "candidate": {
-      "decoder.ours_channels": 8,
-      "decoder.ours_info.channels": 8,
-      "decoder.ours_info.errors": 0,
-      "decoder.ours_info.frames": 174,
-      "decoder.ours_info.last_error": "",
-      "decoder.ours_info.layout": "7.1",
-      "decoder.ours_info.sample_rate": 44100,
-      "decoder.ours_info.samples_per_channel": 178176,
-      "decoder.ours_layout": "7.1",
-      "decoder.ours_pcm_bytes": 5701632,
-      "decoder.ours_rate": 44100,
-      "decoder.ours_rc": 0,
-      "decoder.ours_samples": 178176
-     },
-     "reference": {
-      "decoder.ffmpeg_channels": 8,
-      "decoder.ffmpeg_layout": "7.1",
-      "decoder.ffmpeg_pcm_bytes": 5701632,
-      "decoder.ffmpeg_rate": 44100,
-      "decoder.ffmpeg_rc": 0,
-      "decoder.ffmpeg_samples": 178176
-     },
-     "comparison": {
-      "decoder.status": "fail"
-     },
-     "exact": {
-      "aarch64-unknown-linux-gnu": {
-       "decoder.ffmpeg_pcm_sha256": "6842fcff7c45339b5d27f81d7e707a4a1543c1a6805e7c71154d386c568843a7",
-       "decoder.ours_pcm_sha256": "51880a13588ccc1059ee245edd24cd726674b436cd41b543886796ae63f47a70"
-      }
-     }
-    },
-    "reset-track-reset-millers_crossing_4.0.ac3": {
-     "candidate": {
-      "decoder.ours_channels": 4,
-      "decoder.ours_info.channels": 4,
-      "decoder.ours_info.errors": 0,
-      "decoder.ours_info.frames": 62,
-      "decoder.ours_info.last_error": "",
-      "decoder.ours_info.layout": "4.0",
-      "decoder.ours_info.sample_rate": 48000,
-      "decoder.ours_info.samples_per_channel": 95232,
-      "decoder.ours_layout": "4.0",
-      "decoder.ours_pcm_bytes": 1523712,
-      "decoder.ours_rate": 48000,
-      "decoder.ours_rc": 0,
-      "decoder.ours_samples": 95232
-     },
-     "reference": {
-      "decoder.ffmpeg_channels": 4,
-      "decoder.ffmpeg_layout": "4.0",
-      "decoder.ffmpeg_pcm_bytes": 1523712,
-      "decoder.ffmpeg_rate": 48000,
-      "decoder.ffmpeg_rc": 0,
-      "decoder.ffmpeg_samples": 95232
-     },
-     "comparison": {
-      "decoder.status": "fail"
-     },
-     "exact": {
-      "aarch64-unknown-linux-gnu": {
-       "decoder.ffmpeg_pcm_sha256": "ad3154c6df3317de002075ea97a5b6f21f5481b7e945c51cc63f440cd711e34c",
-       "decoder.ours_pcm_sha256": "579221440fc5ec50b3b0a587154fd2db995ea6ec1595d00d065eb0c51a37980a"
       }
      }
     }

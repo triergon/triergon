@@ -1,6 +1,6 @@
 {
  "schema": "triergon.codecs.correctness-manifest.v1",
- "note": "Additional session operations over pinned inputs. Reset indices are zero-based within the selected track. Skip cases reuse every CRC-policy damage input. At a reset index the reference decoder is flushed (avcodec_flush_buffers), the operation its API documents for a discontinuity.",
+ "note": "Additional session operations over pinned inputs. Reset indices are zero-based within the selected track. Skip cases reuse every CRC-policy damage input. At a reset index the reference decoder is closed and opened again: a fresh decoder state that continues the stream, so an Opus ID header's pre-skip, which RFC 7845 section 4.2 applies once at the start of a stream, is not applied again.",
  "vectors": [
   {
    "lane": "session-flac",
@@ -2893,20 +2893,6 @@
    "candidate": "emits 24 drain-only samples with an absent PTS after the source block at 25020000000 ns",
    "reference": "reuses 25020000000 ns for the final 24 samples; PCM and device output match",
    "cases": ["session-opus:.research/fate-samples/opus/testvector02.mka"]
-  },
-  {
-   "reading": "After a reset the AAC decoder starts without signal history; the reference keeps overlap and noise state across its flush",
-   "clause": "ISO/IEC 14496-3 subpart 4 defines the filterbank overlap and perceptual noise substitution of consecutive frames; no clause defines decoding across a discontinuity, where TrackDecoder::reset drops the history and avcodec_flush_buffers keeps it",
-   "candidate": "session ADTS and configured MOV resets match the reference reopened at the same packet indices within 5.97e-8 and 2.24e-8 maximum absolute planar error, respectively",
-   "reference": "decoder buffer flush differs from fresh open at the reset packets, by up to 0.02064 on ADTS and 0.00967 on MOV",
-   "cases": ["reset-aac-aac-lc-stereo.aac", "reset-track-reset-avc-aac-quicktime-7-1.mov"]
-  },
-  {
-   "reading": "After a reset the AC-3 decoder restarts synthesis and its noise sequence; the reference keeps both across its flush",
-   "clause": "ATSC A/52:2018 §§7.3.4 and 7.9 define dither and the synthesis overlap of consecutive blocks; no clause defines decoding across a discontinuity, where TrackDecoder::reset drops the history and avcodec_flush_buffers keeps it",
-   "candidate": "the session and track decoders give identical PCM and match a freshly reopened reference within 4.48e-8 maximum absolute planar error",
-   "reference": "flushing at packets 12 and 24 differs from fresh open by up to 0.279032, with the same sample count",
-   "cases": ["reset-ac3-millers_crossing_4.0.ac3", "reset-track-reset-millers_crossing_4.0.ac3"]
   },
   {
    "reading": "A decoder reset in the middle of an AVC GOP removes required references",
