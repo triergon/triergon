@@ -203,58 +203,8 @@ impl<'a> Packet<'a> {
                 last_size = rest.len() - sizes[0];
             }
             _ => {
-                let (&frames, tail) = rest.split_first().ok_or(PacketError::FrameCount)?;
-                rest = tail;
-                count = usize::from(frames & 0x3f);
-                if count == 0 || count * toc.duration.samples() > 5760 {
-                    return Err(PacketError::FrameCount);
-                }
-                // Padding: each 255 adds 254 bytes and continues.
-                if frames & 0x40 != 0 {
-                    loop {
-                        let (&p, tail) = rest.split_first().ok_or(PacketError::Truncated)?;
-                        rest = tail;
-                        padding += if p == 255 { 254 } else { usize::from(p) };
-                        if p != 255 {
-                            break;
-                        }
-                    }
-                }
-                if frames & 0x80 != 0 {
-                    // Variable bitrate: lengths of all but the last frame.
-                    let mut available = rest
-                        .len()
-                        .checked_sub(padding)
-                        .ok_or(PacketError::Truncated)?;
-                    let mut sum = 0usize;
-                    for size in &mut sizes[..count - 1] {
-                        let before = rest.len();
-                        *size = read_size(&mut rest)?;
-                        available = available
-                            .checked_sub(before - rest.len())
-                            .ok_or(PacketError::Truncated)?;
-                        if *size > available {
-                            return Err(PacketError::Truncated);
-                        }
-                        sum += *size;
-                    }
-                    last_size = available.checked_sub(sum).ok_or(PacketError::Truncated)?;
-                } else {
-                    cbr = true;
-                    let payload = rest
-                        .len()
-                        .checked_sub(padding)
-                        .ok_or(PacketError::Truncated)?;
-                    if !self_delimited {
-                        last_size = payload / count;
-                        if last_size * count != payload {
-                            return Err(PacketError::UnevenFrames);
-                        }
-                        sizes[..count - 1].fill(last_size);
-                    } else {
-                        last_size = payload;
-                    }
-                }
+                (count, cbr, last_size, padding) =
+                    read_multiframe_header(&mut rest, &mut sizes, toc.duration, self_delimited)?;
             }
         }
         // Frame data follows the headers; the padding ends the packet.
@@ -313,6 +263,66 @@ impl<'a> Packet<'a> {
             len,
         })
     }
+}
+
+/// Code 3 framing (section 3.2.5): frame count, rate mode, last size and padding.
+#[inline(always)]
+fn read_multiframe_header(
+    rest: &mut &[u8],
+    sizes: &mut [usize; MAX_FRAMES],
+    duration: FrameDuration,
+    self_delimited: bool,
+) -> Result<(usize, bool, usize, usize), PacketError> {
+    let (&frames, tail) = rest.split_first().ok_or(PacketError::FrameCount)?;
+    *rest = tail;
+    let count = usize::from(frames & 0x3f);
+    if count == 0 || count * duration.samples() > 5760 {
+        return Err(PacketError::FrameCount);
+    }
+    let mut padding = 0;
+    if frames & 0x40 != 0 {
+        loop {
+            let (&p, tail) = rest.split_first().ok_or(PacketError::Truncated)?;
+            *rest = tail;
+            padding += if p == 255 { 254 } else { usize::from(p) };
+            if p != 255 {
+                break;
+            }
+        }
+    }
+    let payload = rest
+        .len()
+        .checked_sub(padding)
+        .ok_or(PacketError::Truncated)?;
+    let cbr = frames & 0x80 == 0;
+    let last_size = if cbr {
+        if self_delimited {
+            payload
+        } else {
+            let last_size = payload / count;
+            if last_size * count != payload {
+                return Err(PacketError::UnevenFrames);
+            }
+            sizes[..count - 1].fill(last_size);
+            last_size
+        }
+    } else {
+        let mut available = payload;
+        let mut sum = 0;
+        for size in &mut sizes[..count - 1] {
+            let before = rest.len();
+            *size = read_size(rest)?;
+            available = available
+                .checked_sub(before - rest.len())
+                .ok_or(PacketError::Truncated)?;
+            if *size > available {
+                return Err(PacketError::Truncated);
+            }
+            sum += *size;
+        }
+        available.checked_sub(sum).ok_or(PacketError::Truncated)?
+    };
+    Ok((count, cbr, last_size, padding))
 }
 
 /// A frame length: one byte below 252, else two (RFC 6716 section 3.2.1).
