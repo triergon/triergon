@@ -30,13 +30,11 @@ pub mod packets;
 
 use std::io::Write;
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};
-use triergon_codec::{
-    AudioCodec, AudioDecoder, AudioFrame, DownmixLevels, VideoCodec, VideoDecoder,
-};
+use triergon_codec::{AudioDecoder, AudioFrame, DownmixLevels, VideoDecoder};
 use triergon_harness_protocol::interleaved::InterleavedDigest;
 use triergon_harness_runner::{BenchLine, Boundary, Timer};
 use triergon_pixel::letterbox::{Canvas, Scaler};
-use triergon_session::TrackDecoder;
+use triergon_session::{AudioCodec, TrackDecoder, VideoCodec};
 use triergon_session::mix::Downmix;
 
 /// A refused access unit as a `decode error` line prints it: the `Debug` form of the

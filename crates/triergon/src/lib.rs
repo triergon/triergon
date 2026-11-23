@@ -99,12 +99,13 @@ pub use triergon_subtitles as subtitles;
 #[cfg(feature = "session")]
 pub mod codec {
     pub use triergon_codec::{
-        AudioCodec, AudioDecoder, AudioFrame, ChannelLayout, Colour, DecodeError, DownmixLevels,
+        AudioDecoder, AudioFrame, ChannelLayout, Colour, DecodeError, DownmixLevels,
         DynAudioDecoder, DynVideoDecoder, PictureView, Plane, SampleFormat, Speaker,
-        SurroundEncoding, VideoCodec, VideoDecoder,
+        SurroundEncoding, VideoDecoder,
     };
     /// Pixel formats, colour conversion and letterboxing.
     pub use triergon_pixel as pixel;
+    pub use triergon_session::{AudioCodec, VideoCodec};
 
     #[cfg(feature = "codecs")]
     /// Decode AAC audio.

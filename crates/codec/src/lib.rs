@@ -14,46 +14,21 @@ use core::marker::PhantomData;
 
 mod division;
 mod error;
-pub mod layout;
+mod layout;
 pub mod mdct;
 mod window;
 
+/// Selectable channel-layout compatibility rules.
+pub mod compat {
+    pub use crate::layout::ffmpeg;
+}
+
 pub use division::{Divisor, divide, divide_u32};
 pub use error::DecodeError;
-pub use layout::{ChannelLayout, Speaker};
+pub use layout::{ChannelLayout, Speaker, flac_order, native_order, vorbis_order};
 pub use triergon_core::{Budget, BudgetVec, Charged, Error, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane, SampleAspectRatio};
 pub use window::{kbd_window, vorbis_window};
-
-/// A video codec a workspace decoder decodes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VideoCodec {
-    /// H.264 / AVC.
-    H264,
-    /// H.265 / HEVC.
-    Hevc,
-}
-
-/// An audio codec a workspace decoder decodes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AudioCodec {
-    /// AC-3 (Dolby Digital).
-    Ac3,
-    /// E-AC-3 (Dolby Digital Plus).
-    Eac3,
-    /// AAC.
-    Aac,
-    /// DTS (the core substream).
-    Dts,
-    /// FLAC.
-    Flac,
-    /// Opus.
-    Opus,
-    /// Vorbis.
-    Vorbis,
-    /// MPEG-1/2 audio Layer I, II or III.
-    MpegAudio,
-}
 
 /// The sample format a decoder produces natively, before its samples become the
 /// frame's `f32` planes. Mixing follows it: FFmpeg's resampler mixes 16-bit input in
@@ -197,8 +172,12 @@ pub trait VideoDecoder: Send {
     /// to [`Error`], keeping its class and its detail text.
     type Error;
 
-    /// One Annex-B access unit with its caller timestamp. A refused access unit leaves
-    /// the decoder usable.
+    /// Decodes one Annex B access unit with its caller timestamp.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first NAL unit error without consuming later units in the access
+    /// unit. The decoder remains usable.
     fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), Self::Error>;
     /// The next picture in output order, if ready. The view borrows the decoder until
     /// the next call; it returns `None` once no picture is ready.

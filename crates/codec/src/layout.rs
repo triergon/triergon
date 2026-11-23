@@ -212,20 +212,6 @@ impl ChannelLayout {
         ChannelLayout::new(core::iter::repeat_n(Speaker::FrontCenter, channels))
     }
 
-    /// FFmpeg's default layout for `channels` channels: the first standard layout with
-    /// that many speakers (`stereo` for 2, `7.1` for 8). Mixing treats an unspecified
-    /// layout as this one, as FFmpeg's resampler does.
-    pub fn default_for(channels: usize) -> Option<ChannelLayout> {
-        let (mask, _) = STANDARD
-            .iter()
-            .find(|(mask, _)| mask.count_ones() as usize == channels)?;
-        ChannelLayout::new(
-            (0..64u8)
-                .filter(|bit| mask & (1 << bit) != 0)
-                .filter_map(Speaker::from_bit),
-        )
-    }
-
     /// Speakers in plane order.
     pub fn speakers(&self) -> &[Speaker] {
         &self.speakers[..usize::from(self.len)]
@@ -516,5 +502,23 @@ mod tests {
             "3 channels"
         );
         assert!(native_order(&[FrontLeft, FrontLeft]).is_none());
+    }
+}
+
+/// Default speaker assignments matching FFmpeg 9.0.2.
+pub mod ffmpeg {
+    use super::{ChannelLayout, STANDARD, Speaker};
+
+    /// The first standard layout with this channel count, for example stereo for
+    /// two channels. Returns `None` if no standard layout has that count.
+    pub fn default_layout(channels: usize) -> Option<ChannelLayout> {
+        let (mask, _) = STANDARD
+            .iter()
+            .find(|(mask, _)| mask.count_ones() as usize == channels)?;
+        ChannelLayout::new(
+            (0..64u8)
+                .filter(|bit| mask & (1 << bit) != 0)
+                .filter_map(Speaker::from_bit),
+        )
     }
 }

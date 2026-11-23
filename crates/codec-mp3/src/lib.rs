@@ -182,9 +182,8 @@ impl State {
         State {
             synthesis: [Synthesis::default(), Synthesis::default()],
             layer3: Layer3::new(),
-            mono: ChannelLayout::new([Speaker::FrontCenter]).unwrap_or_default(),
-            stereo: ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight])
-                .unwrap_or_default(),
+            mono: ChannelLayout::MONO,
+            stereo: ChannelLayout::STEREO,
         }
     }
 }

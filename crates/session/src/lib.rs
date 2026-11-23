@@ -42,12 +42,40 @@ pub use lane::OnRefusal;
 pub use queue::{FeedError, QueueLimits};
 #[cfg(feature = "codecs")]
 pub use track::{AacAccessUnitConfig, TrackDecoder};
-pub use triergon_codec::{
-    AudioCodec, AudioDecoder, DynAudioDecoder, DynVideoDecoder, VideoCodec, VideoDecoder,
-};
+pub use triergon_codec::{AudioDecoder, DynAudioDecoder, DynVideoDecoder, VideoDecoder};
 pub use triergon_core::Error;
 pub use triergon_pixel::letterbox::Canvas;
 pub use video::{Published, VideoSession};
+
+/// A video codec that a session can decode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VideoCodec {
+    /// H.264 / AVC.
+    H264,
+    /// H.265 / HEVC.
+    Hevc,
+}
+
+/// An audio codec that a session can decode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AudioCodec {
+    /// AC-3 (Dolby Digital).
+    Ac3,
+    /// E-AC-3 (Dolby Digital Plus).
+    Eac3,
+    /// AAC.
+    Aac,
+    /// DTS (the core substream).
+    Dts,
+    /// FLAC.
+    Flac,
+    /// Opus.
+    Opus,
+    /// Vorbis.
+    Vorbis,
+    /// MPEG-1/2 audio Layer I, II or III.
+    MpegAudio,
+}
 
 /// The codecs of one stream: a video lane and, optionally, an audio lane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

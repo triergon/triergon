@@ -9,6 +9,7 @@
 //! Float and 32-bit input mixes in `f32`. 16-bit input mixes in fixed point, as
 //! the reference's resampler does (`harness/codecs/downmix-integer.md`): Q15
 //! gains, one rounding per output sample and two's-complement wraparound.
+use triergon_codec::compat::ffmpeg::default_layout;
 use triergon_codec::{
     AudioFrame, ChannelLayout, DownmixLevels, SampleFormat, Speaker, SurroundEncoding,
 };
@@ -160,7 +161,7 @@ impl Mixer {
     fn new(layout: ChannelLayout, levels: DownmixLevels, format: SampleFormat) -> Self {
         // FFmpeg's resampler mixes an unspecified order as its default layout.
         let layout = if layout.mask() == 0 && layout.channels() >= 2 {
-            ChannelLayout::default_for(layout.channels()).unwrap_or(layout)
+            default_layout(layout.channels()).unwrap_or(layout)
         } else {
             layout
         };

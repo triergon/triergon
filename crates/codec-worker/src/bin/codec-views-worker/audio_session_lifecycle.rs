@@ -59,7 +59,7 @@ impl CallerPcm {
     fn frame(out: &mut AudioFrame, values: &[u8], rate: u32) -> Result<(), Error> {
         *out = AudioFrame {
             sample_rate: rate,
-            layout: ChannelLayout::default_for(1).ok_or(Error::Invalid("mono layout absent"))?,
+            layout: ChannelLayout::MONO,
             sample_format: SampleFormat::Float,
             samples_per_channel: values.len(),
             planes: vec![

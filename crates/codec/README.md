@@ -2,7 +2,7 @@
 
 The decoder vocabulary shared by the codec crates: the `VideoDecoder` and
 `AudioDecoder` traits, decoded audio as `AudioFrame` with a `ChannelLayout` of
-`Speaker`s, stream downmix metadata, the codec selectors, and the windows, inverse MDCT
+`Speaker`s, stream downmix metadata, and the windows, inverse MDCT
 and run-time integer division several decoders share. It depends only on
 [triergon-core](../core/README.md), whose storage types it re-exports for the decoders'
 budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`,
@@ -44,9 +44,7 @@ fn erase(decoder: impl AudioDecoder<Error: Into<Error>> + 'static) -> Box<DynAud
 Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decoder`
 (`VideoDecoder`); `triergon_codec_aac::Decoder`, `triergon_codec_ac3::Decoder` and
 `triergon_codec_dca::Decoder`, and the FLAC, Opus, Vorbis and MPEG audio decoders
-(`AudioDecoder`). `VideoCodec` (`H264`, `Hevc`) and `AudioCodec` (`Ac3`, `Eac3`, `Aac`,
-`Dts`, `Flac`, `Opus`, `Vorbis`, `MpegAudio`) name a decoder;
-[triergon-session](../session/README.md) maps them to boxed decoders.
+(`AudioDecoder`). [triergon-session](../session/README.md) selects the decoder for a codec.
 
 ## Supported
 
@@ -55,8 +53,8 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 | `VideoDecoder` | `send(au, pts) -> Result<(), Self::Error>`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
 | `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, Self::Error>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
 | `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
-| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `EMPTY`, `MONO`, `STEREO`, `CAPACITY` |
-| `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
+| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `speakers`, `channels`, `position`, `mask`, `EMPTY`, `MONO`, `STEREO`, `CAPACITY` |
+| `vorbis_order`, `flac_order`, `native_order` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
 | `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `new` charges its tables to a budget |
 | `Speaker` | loudspeaker position; `mask()` gives its WAVEFORMATEXTENSIBLE or extended bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
@@ -74,7 +72,8 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 
 A `Speaker`'s discriminant is its bit index in the channel mask. The first eighteen
 positions follow WAVEFORMATEXTENSIBLE. The optional `reference-trace` feature
-exposes `ChannelLayout::name()` and `Speaker::name()` for textual comparisons.
+exposes `ChannelLayout::name()` and `Speaker::name()` for textual comparisons. The `compat::ffmpeg::default_layout` policy assigns positions
+by channel count when the stream supplies none.
 
 | Id | Speakers |
 |---|---|
@@ -91,7 +90,8 @@ then keeps the element order of the PCE, and so does the AAC decoder.
 
 - **Video.** `send` takes one Annex B access unit and a caller timestamp; the
   timestamp is carried through reordering to `PictureView::pts` and is never
-  interpreted. `receive` returns pictures in output order; the view borrows the
+  interpreted. A refusal stops the access unit at the first failing NAL unit.
+  `receive` returns pictures in output order; the view borrows the
   decoder until the next call. `flush` makes every remaining picture receivable at
   end of stream; `reset` drops all state except parameter sets after a
   discontinuity. How planes, strides and crop offsets are laid out is described in

@@ -94,7 +94,7 @@ mod tests {
     fn frame(len: usize) -> AudioFrame {
         AudioFrame {
             sample_rate: 48_000,
-            layout: ChannelLayout::default_for(1).unwrap_or_default(),
+            layout: ChannelLayout::MONO,
             samples_per_channel: len,
             sample_format: triergon_codec::SampleFormat::Float,
             planes: vec![(0..len).map(|i| i as f32).collect()],
