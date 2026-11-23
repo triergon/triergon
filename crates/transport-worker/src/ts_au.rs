@@ -5,6 +5,7 @@
 use crate::runner::{Invocation, Refusal, Result, Totals, measure, measure_repeated};
 use crate::ts::{au_recovery, confirm_control_only_entity, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
+use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
@@ -57,13 +58,40 @@ struct TrackProjection {
     mpeg_audio_seen: bool,
 }
 
-#[derive(Clone, Copy)]
-struct PacketPosition<'a, const TRACE: bool> {
-    request: &'a Request,
-    basis: PositionBasis,
+trait Observation: Copy {
+    type Output: Observation; // Giving the explanation its own packet fold cost up to +0.114%.
+    const TRACE: bool = false;
+    const EXPLAIN: bool = false;
 }
 
-impl<const TRACE: bool> PacketPosition<'_, TRACE> {
+#[derive(Clone, Copy)]
+struct Fold;
+impl Observation for Fold {
+    type Output = Self;
+}
+
+#[derive(Clone, Copy)]
+struct Trace;
+impl Observation for Trace {
+    type Output = Self;
+    const TRACE: bool = true;
+}
+
+#[derive(Clone, Copy)]
+struct Explain;
+impl Observation for Explain {
+    type Output = Fold;
+    const EXPLAIN: bool = true;
+}
+
+#[derive(Clone, Copy)]
+struct PacketPosition<'a, Policy: Observation> {
+    request: &'a Request,
+    basis: PositionBasis,
+    policy: PhantomData<Policy>,
+}
+
+impl<Policy: Observation> PacketPosition<'_, Policy> {
     fn at(self, entity: SourceId, offset: u64) -> Result<i64> {
         let carrier = match self.request.format {
             PacketFormat::Ts188 => offset / 188 * 188,
@@ -312,11 +340,11 @@ impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
 }
 
 // One function on purpose: the fold of each access unit inside the timed loop; a split is a hot-path change not yet measured.
-fn fold_packet<const TRACE: bool>(
+fn fold_packet<Policy: Observation>(
     totals: &mut Totals,
     packet: PacketProjection<'_>,
     index: usize,
-    position: PacketPosition<'_, TRACE>,
+    position: PacketPosition<'_, Policy>,
     duration: i64,
     clock: &mut DemuxClock,
     cancel: &AtomicBool,
@@ -391,7 +419,7 @@ fn fold_packet<const TRACE: bool>(
         bytes as u64,
     ];
     let stream_id = pes.header.stream_id;
-    if TRACE {
+    if Policy::TRACE {
         use std::io::Write;
         let mut out = std::io::stdout().lock();
         write!(
@@ -442,9 +470,9 @@ fn diagnostic_refusal(fault: &triergon_mpegts::stream::TraceFault) -> Refusal {
     }
 }
 
-fn fold_continuity<const TRACE: bool>(
+fn fold_continuity<Policy: Observation>(
     residue: &ContinuityResidue,
-    position: PacketPosition<'_, TRACE>,
+    position: PacketPosition<'_, Policy>,
 ) -> Result<Totals> {
     let first = residue
         .chunks()
@@ -492,7 +520,7 @@ fn replay_of_ended_run(event: &ReaderEvent) -> Option<au_recovery::Trigger> {
 }
 
 // One function on purpose: the timed loop of every access-unit workload; a split is a hot-path change not yet measured.
-fn operation<const TRACE: bool, const EXPLAIN: bool>(
+fn operation<Policy: Observation>(
     pool: &Budget,
     request: &Request,
     cancel: &AtomicBool,
@@ -506,7 +534,11 @@ fn operation<const TRACE: bool, const EXPLAIN: bool>(
         Ok(basis) => basis,
         Err(error) => return Ok(refused(totals, error.as_ref(), at)),
     };
-    let position = PacketPosition::<TRACE> { request, basis };
+    let position = PacketPosition::<Policy::Output> {
+        request,
+        basis,
+        policy: PhantomData,
+    };
     let limits = ReaderLimits {
         format: request.format,
         program: Some(request.program),
@@ -639,7 +671,7 @@ fn operation<const TRACE: bool, const EXPLAIN: bool>(
                 observed_media = true;
                 // The replay proves a run that a recoverable fault ended again, with the
                 // bytes the fault cut. Should it fail, the rerun folds the run as it is.
-                if !EXPLAIN
+                if !Policy::EXPLAIN
                     && single_entity
                     && request.format == PacketFormat::Ts188
                     && totals.packets == 0
@@ -828,10 +860,10 @@ fn operation<const TRACE: bool, const EXPLAIN: bool>(
                     }
                     _ => None,
                 };
-                // The observation's text is the refusal only when the replay fails: a
-                // timed run leaves it to the rerun that explains that failure.
-                if !TRACE
-                    && !EXPLAIN
+                // Holding the event for a failed replay cost up to +0.078% as a local and +0.154% boxed.
+                // The rerun formats it only when the replay fails.
+                if !Policy::TRACE
+                    && !Policy::EXPLAIN
                     && let Some(trigger) = recovery
                 {
                     break (SourceProof::ObservedRecovery(trigger), totals);
@@ -841,7 +873,9 @@ fn operation<const TRACE: bool, const EXPLAIN: bool>(
                     &format!("incomplete access-unit observation: {event:?}"),
                     at,
                 );
-                if !EXPLAIN && let Some(trigger) = recovery {
+                if !Policy::EXPLAIN
+                    && let Some(trigger) = recovery
+                {
                     break (SourceProof::OpaqueRecovery(trigger), refusal);
                 }
                 return Ok(refusal);
@@ -954,7 +988,7 @@ fn operation<const TRACE: bool, const EXPLAIN: bool>(
 #[cold]
 #[inline(never)]
 fn explain(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
-    operation::<false, true>(pool, request, cancel)
+    operation::<Explain>(pool, request, cancel)
 }
 
 #[cold]
@@ -1001,9 +1035,9 @@ pub fn run(args: &[String]) -> Result<()> {
         ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
     // Select a monomorphization before measurement; ordinary folds carry no trace flag.
     let operation = if invocation.mode == triergon_harness_runner::Mode::Trace {
-        operation::<true, false>
+        operation::<Trace>
     } else {
-        operation::<false, false>
+        operation::<Fold>
     };
     let name = if eac3 {
         "mpegts-atsc-eac3-six-block"
@@ -1026,7 +1060,7 @@ pub fn run(args: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, Totals, operation, ts_input};
+    use super::{Fold, Request, Totals, operation, ts_input};
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
     use triergon_core::{Budget, BudgetVec, Bytes};
@@ -1053,7 +1087,7 @@ mod tests {
             following: BudgetVec::new(&pool),
         };
         let baseline = pool.used();
-        let totals = operation::<false, false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<Fold>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(pool.used(), baseline);
         totals
     }
@@ -1083,8 +1117,7 @@ mod tests {
         let retained = pool.used();
         let mut first = None;
         for _ in 0..50 {
-            let totals =
-                operation::<false, false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+            let totals = operation::<Fold>(&pool, &request, &AtomicBool::new(false)).unwrap();
             assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
             let refusal = totals.refusal.expect("malformed DTS remains unsupported");
             assert!(
@@ -1140,7 +1173,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let totals = operation::<false, false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<Fold>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(totals.packets, 0);
         assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Psi");
     }
