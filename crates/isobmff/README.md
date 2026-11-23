@@ -300,9 +300,9 @@ Limits of the reader:
   in index order, also where repeated edits put earlier times after later ones. As
   the demuxer does, it first lowers the target of an unedited track by the track's
   composition shift, the largest amount by which a composition time the demuxer took
-  into account precedes its decode time. It refuses an index with a decode time at
-  or above 2^63 (a version-1 `tfdt` is unsigned), which its signed index timestamps
-  cannot carry.
+  into account precedes its decode time. Its index times are the demuxer's signed
+  64-bit field: a decode time from 2^63 on (a version-1 `tfdt` is unsigned) reads
+  there as a negative time and is compared as one.
 - **Refusals.** Unknown box versions, unknown flags, unselected `stz2` widths,
   non-unit edits and unobserved FFmpeg-compatible profiles return
   `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.

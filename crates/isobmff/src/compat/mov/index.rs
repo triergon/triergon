@@ -550,6 +550,11 @@ type EncodedEdits<'a> = &'a [Option<crate::compat::mov::encoded_edits::EncodedEd
 /// target; a fragmented track's index keeps the decode times, so there the key's decode
 /// time lies at least the shift before the target. The standard's presentation mapping
 /// (sections 8.6.6 and 8.6.1.3) would compare composition times instead.
+///
+/// The index times are the demuxer's signed 64-bit field. A decode time from 2^63 on,
+/// which a version 1 `tfdt` may state (section 8.8.12), reads there as a negative time
+/// and is compared as one, as the demuxer compares it; the source samples keep such
+/// times exact.
 #[derive(Debug)]
 pub struct SeekJob<'a> {
     context: Context<'a>,
@@ -670,8 +675,7 @@ impl<'a> SeekJob<'a> {
         })
     }
     /// Advances the seek; failures are sticky. `Error::Unsupported` where the
-    /// demuxer's choice is not reproduced: a null index timestamp or no key entry to
-    /// land on.
+    /// demuxer's choice is not reproduced: no key entry to land on.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -703,10 +707,9 @@ impl<'a> SeekJob<'a> {
                         return Ok(BuildStatus::Yield);
                     }
                     let (fields, occurrence) = self.index.ready_entry()?;
+                    // The index field as the demuxer compares it: signed, its null
+                    // value and the times that wrap from 2^63 on included.
                     let (timestamp, key) = (fields.timestamp, fields.flags & 1 != 0);
-                    if timestamp == i64::MIN {
-                        return Err(Error::Unsupported("seek over a null index clock"));
-                    }
                     // A secondary track can replay its non-sync prefix. The
                     // primary needs a preceding key.
                     let nonkey_first = self.scanned == 0

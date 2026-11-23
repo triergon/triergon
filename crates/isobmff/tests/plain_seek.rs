@@ -175,8 +175,8 @@ fn composition_shift(entries: &[IndexEntry]) -> i128 {
 /// rule over every entry in index order: the last key at or before the target
 /// lowered by `shift`, also where repeated edits put earlier times after later
 /// ones, or else the first key, or a fragment track's first entry where `prefix`
-/// admits it. The seek refuses an entry with the null timestamp and an index
-/// without a key to fall back to.
+/// admits it. Times compare as the index's signed field holds them. The seek
+/// refuses an index without a key to fall back to.
 fn select(
     entries: &[IndexEntry],
     target: i64,
@@ -188,9 +188,6 @@ fn select(
     let mut best = None;
     let target = i128::from(target) - shift;
     for (at, entry) in entries.iter().enumerate() {
-        if entry.timestamp == i64::MIN {
-            return Err(Error::Unsupported("seek over a null index clock"));
-        }
         let key = entry.flags & 1 != 0;
         if at == 0 && !key && fragments {
             first = Some(at);
@@ -478,8 +475,11 @@ fn malformed_tables_refuse_as_full_scans_do() {
         Error::Unsupported("index signed size"),
     );
 
-    // f-tfdt64's fragments start at 2^63 ticks: the first entry's timestamp
-    // reads as i64::MIN, the index's null clock.
+    // f-tfdt64's fragments start at 2^63 ticks, a valid unsigned `tfdt` (ISO/IEC
+    // 14496-12 section 8.8.12) that the index's signed field holds as i64::MIN, its
+    // null value, and the following times as the negative numbers after it. The
+    // seek compares the field as the demuxer does: the first key is the landing
+    // just above i64::MIN, the second key from i64::MIN + 3000 on.
     let mut bytes = fixture("f-tfdt64.mp4");
     for (n, tfdt) in payloads(&bytes, b"tfdt").into_iter().enumerate() {
         // Version 1 and flags, then a 64-bit decode time; three samples of
@@ -490,11 +490,25 @@ fn malformed_tables_refuse_as_full_scans_do() {
     let movie = support::parse(&pool, &bytes);
     let entries = index(&pool, movie.demux()[0], &movie.media).unwrap();
     assert_eq!(entries[0].timestamp, i64::MIN);
-    check(
-        "timestamp at i64::MIN",
-        &movie,
-        Error::Unsupported("seek over a null index clock"),
+    assert_eq!(
+        entries[3].occurrence.source.dts_ticks,
+        Some((1 << 63) + 3000)
     );
+    assert!(
+        compare("decode times from 2^63", &pool, &movie)
+            .refused
+            .is_empty()
+    );
+    for (target, entry) in [
+        (i64::MIN + 1, 0),
+        (i64::MIN + 2999, 0),
+        (i64::MIN + 3000, 3),
+        (0, 3),
+    ] {
+        let landing = seek(&pool, movie.demux()[0], &movie.media, target, 4096).unwrap();
+        assert!(!landing.used_first_fallback, "target {target}");
+        assert_eq!(landing.selected.ordinal, entry, "target {target}");
+    }
 
     // f-explicit's two fragments in reverse order: the second's ordinals,
     // 4 to 6, come before the first's.
