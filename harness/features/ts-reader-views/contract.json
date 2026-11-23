@@ -806,7 +806,7 @@
     {
       "policy": "An excess copy of a transport packet inside an unframed run",
       "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 allows at most two consecutive packets with one continuity_counter value; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the excess copy ends the run: the complete PES before it are published as one opaque run, the PES it interrupts is discarded, and a later clean unit starts the next run.",
+      "rule": "Discard the excess copy and the partial PES it interrupts. Publish preceding complete PES as one opaque run. A later clean unit starts the next run.",
       "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
       "reference_rule": "Observed rule: merges the copies and a later clean unit into one opaque packet.",
       "compat": "compat::annex_b::ContinuityReader reports the run the reference demuxes as one packet (its ts-reader-container case passes)",
