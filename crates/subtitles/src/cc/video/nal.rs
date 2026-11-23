@@ -63,7 +63,7 @@ impl Codec {
 
     /// The NAL unit after its header.
     #[must_use]
-    pub fn payload(self, nal: &[u8]) -> &[u8] {
+    pub(crate) fn payload(self, nal: &[u8]) -> &[u8] {
         let header = match self {
             Self::H264 => 1,
             Self::Hevc => 2,

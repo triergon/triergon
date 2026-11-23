@@ -3,5 +3,5 @@
 //! presentation policy.
 mod model;
 mod session;
-pub use model::*;
+pub use model::{Attachment, Context, Header, Identity, Limits, Metadata, Recovery, Status};
 pub use session::Builder;

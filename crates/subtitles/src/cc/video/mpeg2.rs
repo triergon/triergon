@@ -5,6 +5,7 @@
 //! each followed by its data up to the next start code. A picture is its
 //! picture header, its extensions and user data, and its slices; its user data
 //! (`0xB2`) comes before the first slice.
+// The transport reader validates a restricted PES profile and does not expose caption timing fields.
 
 /// The start codes of `es` in order, each with its data up to the next one.
 #[must_use]

@@ -3,6 +3,7 @@
 //! picture set, `no_output_of_prior_pics_flag`, `pic_output_flag`, the
 //! sub-layer buffering values and the VUI frame period. The rest of each RBSP
 //! is passed over.
+// The framing reader skips the short-term reference sets needed for caption picture output.
 
 use super::nal::{LastPayload, Timing, vui_timing};
 use triergon_bitstream::{BitError, BitSource, Rbsp};

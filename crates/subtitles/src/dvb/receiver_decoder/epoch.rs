@@ -450,10 +450,8 @@ impl Epoch {
     }
 }
 
-/// Convert the entries of `definition` and store them in `tables`. A CLUT
-/// definition is rare next to the pixels a packet draws: out of line and cold,
-/// the entry loop keeps its values in registers, and the packet loop that
-/// inlines [`Epoch::define_clut`] keeps its registers and block layout.
+/// Converts the CLUT entries of `definition` and stores them in `tables`.
+// Keep palette conversion separate from the packet loop that draws each region's pixels.
 #[cold]
 #[inline(never)]
 fn store_entries(tables: &mut Tables, definition: &ClutDefinition<'_>) {
