@@ -1,6 +1,6 @@
 //! Caller-owned, preloaded immutable input. Codec parsing remains in each operation.
 use triergon_core::{Budget, Bytes, Error, Result};
-use triergon_framing::nal::{Codec, NalPacketFields};
+use triergon_framing::{compat::nal::NalPacketFields, nal::Codec};
 
 pub(super) const CAP: usize = 16 * 1024 * 1024;
 

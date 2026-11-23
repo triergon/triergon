@@ -88,7 +88,7 @@ assert_eq!(decoder_input, [
 | `nal` | `NalReader`, `AnnexBUnits`, `RawAnnexBReader`, `AnnexBConfigParser`, `DeclaredConfigParser` | AVC/HEVC NAL units, raw access units and declared configurations with original bytes and offsets |
 | `avc` | `AvcConfigParser`, `AvcAnnexBJob`, `read_sps`, `read_pps`, `read_slice_header` | avcC records, Annex B samples and validated SPS, PPS and slice syntax |
 | `hevc` | `HvcConfigParser`, `HevcAnnexBJob`, `HvcAnnexBWriter`, `HvcDecoderConfigWriter`, `read_sps_prefix` | hvcC records, Annex B samples and parameter-set prefixes |
-| `nal` packet adaptation | `NalPacketSession`, `NalPacketConfigWriter` | Stateful AVC and HEVC Annex B packet adaptation with in-band parameter sets |
+| `compat::nal` | `NalPacketSession`, `NalPacketConfigWriter`, `ReceiverAvcConfigParser`, `ReceiverHevcConfigParser` | Annex B packets and configuration as FFmpeg's `mp4toannexb` filters frame them, with in-band parameter sets |
 | `picture_output` | `DecodedPictures`, `order::{AvcOrder, HevcOrder}`, `levels::{max_dpb_mbs, max_dpb_frames}` | Picture order, marking and bounded output for H.264 and H.265 |
 | `av1` | `Av1ObuReader`, `Av1ConfigParser`, `Av1TemporalUnitJob` | Low-overhead or externally sized OBUs, av1C and temporal units |
 | `vp9` | `Vp9ConfigParser` | vpcC profile, level, bit depth, range and CICP |
@@ -126,8 +126,8 @@ keeps the whole backing allocation charged.
 **Resources.** All arithmetic is checked. Every operation has caller limits (bytes,
 NAL/OBU/frame counts, input window) and charges work per byte or field. Allocation
 pressure returns retryable `Backpressure` at the exact checkpoint; no partial output is
-published. A `NalPacketSession` frames packets, records and outputs of at most
-4 GiB − 1 bytes (`NalPacketLimits::MAXIMUM_SPAN`).
+published. A `compat::nal::NalPacketSession` frames packets, records and outputs of at
+most 4 GiB − 1 bytes (`NalPacketLimits::MAXIMUM_SPAN`).
 
 **Codec-specific limits.**
 

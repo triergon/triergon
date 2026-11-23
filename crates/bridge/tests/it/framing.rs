@@ -7,8 +7,10 @@ use triergon_core::{Budget, SourceLocation, WorkBudget};
 use triergon_framing::{
     BuildStep,
     avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource},
+    compat::nal::{
+        NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketOutput, NalPacketSession,
+    },
     hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource},
-    nal::{NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketOutput, NalPacketSession},
 };
 use triergon_isobmff::{Limits, Next, movie::EntryLayout};
 use triergon_playback::mp4::Mp4Packet;

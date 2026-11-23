@@ -157,7 +157,7 @@ pub enum BuildStep<T> {
 }
 
 /// Progress of a job that publishes its output into a caller-provided slot
-/// (`step_into` of the AVC and HEVC record parsers and of [`nal::NalPacketJob`]).
+/// (`step_into` of the AVC and HEVC record parsers and of [`compat::nal::NalPacketJob`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SlotProgress {
     /// The work budget is spent and the slot stays empty; call again with more.

@@ -6,7 +6,7 @@
 //! | NAL units of a buffer | [`AnnexBUnits`], [`start_code`], [`split_length_prefixed`], [`NalHeader::parse`] |
 //! | NAL units of a stream, any chunking | [`NalReader`] with [`Framing`] |
 //! | Access units of an elementary stream | [`RawAnnexBReader`] |
-//! | Length-prefixed samples to Annex B packets | [`NalPacketSession`], [`NalPacketConfigWriter`] |
+//! | Length-prefixed samples to Annex B | [`AvcAnnexBJob`](crate::avc::AvcAnnexBJob), [`HevcAnnexBJob`](crate::hevc::HevcAnnexBJob); framed as FFmpeg's bitstream filters frame them: [`compat::nal`](crate::compat::nal) |
 //! | Parameter sets of Annex B or declared configuration data | [`AnnexBConfigParser`], [`DeclaredConfigParser`] |
 //! | One NAL unit behind a start code | [`AnnexBWriter`] |
 //!
@@ -17,8 +17,6 @@ pub(crate) mod annexb;
 mod config;
 mod declared_config;
 pub(crate) mod header;
-pub(crate) mod packet;
-mod packet_config;
 mod raw_annex_b;
 mod reader;
 pub(crate) mod syntax;
@@ -33,12 +31,6 @@ pub use declared_config::{
     DeclaredConfigNalView, DeclaredConfigParser, DeclaredConfiguration,
 };
 pub use header::{Codec, NalHeader, ParameterSetKind};
-pub use packet::{
-    NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketJob, NalPacketLimits,
-    NalPacketOrigin, NalPacketOutput, NalPacketReceiverErrorKind, NalPacketRejection,
-    NalPacketSegment, NalPacketSession,
-};
-pub use packet_config::{NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter};
 pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
 pub use reader::{Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits};
 pub use syntax::{skip_hevc_profile_tier_level, skip_vui_to_timing};

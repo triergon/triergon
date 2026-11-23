@@ -1,9 +1,9 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, SourceLocation, WorkBudget};
-use triergon_framing::{
-    BuildStep,
-    nal::{Codec, NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketSession},
+use triergon_framing::compat::nal::{
+    NalPacket, NalPacketConfiguration, NalPacketLimits, NalPacketSession,
 };
+use triergon_framing::{BuildStep, nal::Codec};
 
 #[test]
 fn unchanged_packet_fits_without_a_second_payload_owner() {

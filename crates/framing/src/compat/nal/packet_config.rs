@@ -1,9 +1,10 @@
 //! The configuration of a packet session as Annex B extradata, in a bounded output.
-use crate::nal::packet::{
+use super::NalPacketConfiguration;
+use crate::compat::nal::packet::{
     NalConfigurationRefusal, copy_annex_b_segment, copy_annex_b_whole, start_annex_b_output,
 };
 use crate::retryable;
-use crate::{BuildStep, avc::AvcConfigArrayKind, nal::NalPacketConfiguration};
+use crate::{BuildStep, avc::AvcConfigArrayKind};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
@@ -105,7 +106,7 @@ enum Phase {
     Failed(Error),
 }
 
-/// Writes the configuration of a [`NalPacketSession`](crate::nal::NalPacketSession)
+/// Writes the configuration of a [`NalPacketSession`](crate::compat::nal::NalPacketSession)
 /// as Annex B extradata, as FFmpeg's `h264_mp4toannexb` and `hevc_mp4toannexb`
 /// bitstream filters publish it when they are initialised.
 pub struct NalPacketConfigWriter<'a> {

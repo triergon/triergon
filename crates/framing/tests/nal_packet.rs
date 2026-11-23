@@ -1,15 +1,16 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, SourceLocation, WorkBudget};
+use triergon_framing::compat::nal::{
+    NalPacket, NalPacketConfigOutput, NalPacketConfigWriter, NalPacketConfiguration,
+    NalPacketFields, NalPacketLimits, NalPacketOrigin, NalPacketOutput, NalPacketReceiverErrorKind,
+    NalPacketSegment, NalPacketSession,
+};
 use triergon_framing::{
     BuildStep,
     avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource, AvcConfiguration},
     hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration},
-    nal::{
-        Codec, NalPacket, NalPacketConfigOutput, NalPacketConfigWriter, NalPacketConfiguration,
-        NalPacketFields, NalPacketLimits, NalPacketOrigin, NalPacketOutput,
-        NalPacketReceiverErrorKind, NalPacketSegment, NalPacketSession,
-    },
+    nal::Codec,
 };
 
 fn pool() -> Budget {

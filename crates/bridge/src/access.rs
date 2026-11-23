@@ -10,8 +10,10 @@ use triergon_framing::{
     BuildStep,
     aac::{AacAdtsParameters, AacAdtsWriter, AacAscParser, AacConfigLimits, AacSource},
     avc::{AvcConfigLimits, AvcConfigParser, AvcConfigSource},
+    compat::nal::{
+        NalPacket, NalPacketConfiguration, NalPacketJob, NalPacketLimits, NalPacketSession,
+    },
     hevc::{HvcConfigLimits, HvcConfigParser, HvcConfigSource},
-    nal::{NalPacket, NalPacketConfiguration, NalPacketJob, NalPacketLimits, NalPacketSession},
 };
 
 /// The source the framing jobs report: packets come through [`PacketInfo`], which

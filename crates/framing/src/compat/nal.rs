@@ -1,24 +1,29 @@
-//! The NAL packet receiver's configuration acceptance.
+//! Length-prefixed AVC and HEVC samples framed as Annex B packets as FFmpeg's
+//! `h264_mp4toannexb` and `hevc_mp4toannexb` bitstream filters frame them, and the
+//! configuration records the filters accept.
 //!
-//! [`NalPacketSession`](crate::nal::NalPacketSession) frames length-prefixed AVC
-//! and HEVC samples as FFmpeg's `h264_mp4toannexb` and `hevc_mp4toannexb`
-//! bitstream filters do. The record parsers of the format modules
-//! ([`AvcConfigParser`], [`HvcConfigParser`]) refuse a three-byte NAL length
-//! (`lengthSizeMinusOne = 2`); the filters accept it. The parsers here accept what
-//! the receiver accepts and keep the strict refusal readable through
-//! `strict_source_refusal()`.
+//! [`NalPacketSession`] frames the samples of one stream, inserting the parameter
+//! sets where the filters insert them; [`NalPacketConfigWriter`] writes its
+//! configuration as the filters' initialization does. The record parsers of the
+//! format modules ([`AvcConfigParser`], [`HvcConfigParser`]) refuse a three-byte NAL
+//! length (`lengthSizeMinusOne = 2`); the filters accept it. The parsers here accept
+//! what the filters accept and keep the strict refusal readable through
+//! `strict_source_refusal()`. Pass their output as
+//! [`NalPacketConfiguration::ReceiverAvc`] or
+//! [`ReceiverHevc`](NalPacketConfiguration::ReceiverHevc), and AVC side-data updates
+//! to [`NalPacketSession::receiver_packet`]. That path also frames NAL units whose
+//! header the strict path refuses and records the refusal on the output or rejection.
 //!
-//! Pass their output as
-//! [`NalPacketConfiguration::ReceiverAvc`](crate::nal::NalPacketConfiguration::ReceiverAvc)
-//! or [`ReceiverHevc`](crate::nal::NalPacketConfiguration::ReceiverHevc), and AVC
-//! side-data updates to
-//! [`NalPacketSession::receiver_packet`](crate::nal::NalPacketSession::receiver_packet).
-//! That path also frames NAL units whose header the strict path refuses and records
-//! the refusal on the output or rejection.
+//! The specification's framing of a sample, without the filters' insertion rules, is
+//! [`AvcAnnexBJob`](crate::avc::AvcAnnexBJob) and
+//! [`HevcAnnexBJob`](crate::hevc::HevcAnnexBJob).
 //!
 //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+
+mod packet;
+mod packet_config;
+
 use crate::avc::config::profile_extension_required;
-use crate::nal::packet::NalConfigurationRefusal;
 use crate::{
     BuildStep, SlotProgress,
     avc::{
@@ -28,6 +33,13 @@ use crate::{
     hevc::{HvcConfigFields, HvcConfigLimits, HvcConfigParser, HvcConfigSource, HvcConfiguration},
     nal::LengthSize,
 };
+use packet::NalConfigurationRefusal;
+pub use packet::{
+    NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketJob, NalPacketLimits,
+    NalPacketOrigin, NalPacketOutput, NalPacketReceiverErrorKind, NalPacketRejection,
+    NalPacketSegment, NalPacketSession,
+};
+pub use packet_config::{NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
