@@ -53,6 +53,7 @@ pub struct BoxReader {
     prefix: [u8; 16],
     filled: usize,
     needed: usize,
+    // Putting the header and buffer in the phase adds up to 0.230% open instructions.
     header: Option<BoxHeader>,
     phase: Phase,
     metadata_limit: usize,

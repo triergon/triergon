@@ -394,7 +394,6 @@ impl<'a> Slot<'a> {
             "first origin needs a complete-source context",
         ))
     }
-    // Returning a borrowed head from fill adds up to 1.719% instructions.
     /// Project the next occurrence into `head`. `micros`, when given, converts
     /// the demux base to the microseconds of a global schedule.
     fn fill(
