@@ -349,12 +349,10 @@ impl OpaqueRecovery {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let Phase::Route(event, context) =
-                        std::mem::replace(&mut self.phase, Phase::Read)
-                    else {
-                        unreachable!()
+                    self.phase = match std::mem::replace(&mut self.phase, Phase::Read) {
+                        Phase::Route(event, context) => self.route(event, context, input)?,
+                        other => other,
                     };
-                    self.phase = self.route(event, context, input)?;
                 }
                 Phase::Drain => {
                     let Some(observer) = self.observer.as_mut() else {
@@ -401,12 +399,13 @@ impl OpaqueRecovery {
                         return Ok(Step::Yield);
                     }
                     check_cancel(cancel)?;
-                    let Phase::Scan(scan) = std::mem::replace(&mut self.phase, Phase::Drain) else {
-                        unreachable!()
-                    };
-                    self.observations
-                        .try_push(scan.packet)
-                        .map_err(|failure| failure.error)?;
+                    match std::mem::replace(&mut self.phase, Phase::Drain) {
+                        Phase::Scan(scan) => self
+                            .observations
+                            .try_push(scan.packet)
+                            .map_err(|failure| failure.error)?,
+                        other => self.phase = other,
+                    }
                 }
                 Phase::SealEnd => {
                     let Some(end) = self.source.media_entity_end(input, work, cancel)? else {
