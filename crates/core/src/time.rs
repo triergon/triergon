@@ -133,12 +133,12 @@ impl TickScale {
     }
 
     /// The base converted from.
-    pub fn from(&self) -> TimeBase {
+    pub fn source(&self) -> TimeBase {
         self.from
     }
 
     /// The base converted to.
-    pub fn to(&self) -> TimeBase {
+    pub fn target(&self) -> TimeBase {
         self.to
     }
 

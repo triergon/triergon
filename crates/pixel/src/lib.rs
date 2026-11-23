@@ -10,7 +10,7 @@
     clippy::expect_used
 )]
 
-pub mod convert;
+mod convert;
 mod error;
 pub mod letterbox;
 mod picture;

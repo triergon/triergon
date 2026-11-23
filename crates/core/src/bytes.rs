@@ -301,6 +301,8 @@ impl BytesWriter {
         len: usize,
         fill: impl FnOnce(&mut [u8]) -> std::result::Result<T, E>,
     ) -> std::result::Result<T, E> {
+        // Never refused: a writer is made only from a uniquely owned allocation, and no
+        // `Weak` to one exists.
         let storage = Arc::get_mut(&mut self.0).ok_or(Error::Invalid("byte writer shared"))?;
         let end = offset.checked_add(len).ok_or(Error::Overflow)?;
         if end > storage.data.capacity() {
