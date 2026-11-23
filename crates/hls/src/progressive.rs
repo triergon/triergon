@@ -627,10 +627,6 @@ impl<S: Source> TsProgressiveReader<S> {
     /// The observer of a track allocates nothing for its next PES when it gets
     /// back the lists of the one a reader has just consumed.
     fn reuse_pes_lists(&mut self, pid: impl Fn(&Tracks) -> u16, lists: SpentLists) {
-        #[cfg(test)]
-        if !tests::RETURN_PES_LISTS.get() {
-            return;
-        }
         if let (Some(transport), Some(tracks)) = (self.transport.as_mut(), self.tracks.as_ref()) {
             transport.engine.reuse_pes_lists(pid(tracks), lists);
         }
@@ -761,15 +757,8 @@ fn select_track(map: &ProgramMap, kind: u8) -> Result<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::Cell;
     use std::collections::VecDeque;
     use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId};
-
-    thread_local! {
-        /// Whether readers on this thread hand consumed PES lists back to their
-        /// observers. A test clears it to read without that reuse.
-        pub(super) static RETURN_PES_LISTS: Cell<bool> = const { Cell::new(true) };
-    }
 
     #[test]
     fn refusal_delivery_waits_for_work_and_keeps_its_original_fields() {
@@ -1106,10 +1095,9 @@ mod tests {
     }
 
     #[test]
-    fn reused_storage_keeps_every_output_and_work_boundary() {
-        // Like the progressive worker, hold two units per track and hand the
-        // oldest back when a third arrives. Reused storage is at most twice
-        // the item it serves, so the peak may rise by at most one unit.
+    fn returning_units_keeps_every_output_and_work_boundary() {
+        // Hold two units per track. When a third arrives, either return the oldest
+        // or let it drop. Returning a unit may raise the peak by at most its size.
         fn read(
             wire: &[u8],
             reuse: bool,
@@ -1131,7 +1119,6 @@ mod tests {
             let input = InputCursor::new(&pool, id, caps, window).unwrap();
             let mut reader =
                 TsProgressiveReader::new(input, source, TsProgressiveLimits::default()).unwrap();
-            RETURN_PES_LISTS.set(reuse);
             let cancel = AtomicBool::new(false);
             let mut trace = Vec::new();
             let mut held: [VecDeque<TsProgressiveUnit>; 2] = Default::default();
@@ -1171,7 +1158,6 @@ mod tests {
                         }
                     }
                     TsProgressiveStep::End => {
-                        RETURN_PES_LISTS.set(true);
                         drop((reader, held));
                         assert_eq!(pool.used(), Budget::control_storage_bytes());
                         return (trace, peak, largest);
