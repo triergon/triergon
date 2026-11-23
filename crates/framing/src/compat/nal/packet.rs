@@ -194,10 +194,10 @@ pub enum NalPacketConfiguration {
     Hevc(HvcConfiguration),
     /// An AVC record as FFmpeg's filter accepts it ([`crate::compat::nal`]). The
     /// error with which the strict parser refuses it stays readable.
-    ReceiverAvc(crate::compat::nal::ReceiverAvcConfiguration),
+    AvcRecord(crate::compat::nal::AvcRecord),
     /// An HEVC record as FFmpeg's filter accepts it ([`crate::compat::nal`]).
     /// The error with which the strict parser refuses it stays readable.
-    ReceiverHevc(crate::compat::nal::ReceiverHevcConfiguration),
+    HevcRecord(crate::compat::nal::HevcRecord),
     /// No record: every packet is published as it is and shares its bytes with
     /// the output. Neither `raw` nor a packet is checked to be Annex B.
     Passthrough {
@@ -216,8 +216,8 @@ impl NalPacketConfiguration {
     }
     pub(super) fn codec(&self) -> Codec {
         match self {
-            Self::Avc(_) | Self::ReceiverAvc(_) => Codec::Avc,
-            Self::Hevc(_) | Self::ReceiverHevc(_) => Codec::Hevc,
+            Self::Avc(_) | Self::AvcRecord(_) => Codec::Avc,
+            Self::Hevc(_) | Self::HevcRecord(_) => Codec::Hevc,
             Self::Passthrough { codec, .. } => *codec,
         }
     }
@@ -229,8 +229,8 @@ impl NalPacketConfiguration {
     }
     pub(crate) fn refusal(&self) -> NalConfigurationRefusal {
         match self {
-            Self::ReceiverAvc(v) => v.refusal(),
-            Self::ReceiverHevc(v) if v.fields().length_size_minus_one() == 2 => {
+            Self::AvcRecord(v) => v.refusal(),
+            Self::HevcRecord(v) if v.fields().length_size_minus_one() == 2 => {
                 NalConfigurationRefusal::HevcWidthThree
             }
             _ => NalConfigurationRefusal::None,
@@ -240,8 +240,8 @@ impl NalPacketConfiguration {
         match self {
             Self::Avc(record) => ConfigurationRef::Avc(record),
             Self::Hevc(record) => ConfigurationRef::Hevc(record),
-            Self::ReceiverAvc(record) => ConfigurationRef::Avc(record.record()),
-            Self::ReceiverHevc(record) => ConfigurationRef::Hevc(record.record()),
+            Self::AvcRecord(record) => ConfigurationRef::Avc(record.record()),
+            Self::HevcRecord(record) => ConfigurationRef::Hevc(record.record()),
             Self::Passthrough { raw, .. } => ConfigurationRef::Passthrough(raw),
         }
     }
@@ -339,7 +339,7 @@ impl NalConfigurationRefusal {
 // distinction without reserving space for HEVC or passthrough configurations.
 enum AvcUpdate {
     Source(AvcConfiguration),
-    Receiver(crate::compat::nal::ReceiverAvcConfiguration),
+    Receiver(crate::compat::nal::AvcRecord),
 }
 impl AvcUpdate {
     fn record(&self) -> &AvcConfiguration {
@@ -504,7 +504,7 @@ impl Default for AvcState {
 /// independent of the generations the caller gives its sources.
 ///
 /// One packet is framed at a time, by the [`NalPacketJob`] that
-/// [`packet`](Self::packet) or [`receiver_packet`](Self::receiver_packet)
+/// [`packet`](Self::packet) or [`packet_with_filter_acceptance`](Self::packet_with_filter_acceptance)
 /// returns. A job that fails or is cancelled publishes no partial packet and
 /// leaves the in-band tracking as it was. An AVC update that the job has
 /// verified is adopted even when the packet's payload is then refused as
@@ -602,7 +602,7 @@ impl NalPacketSession {
     fn install_avc(&mut self, update: AvcUpdate, length_width: Option<LengthSize>) {
         self.configuration = match update {
             AvcUpdate::Source(record) => NalPacketConfiguration::Avc(record),
-            AvcUpdate::Receiver(record) => NalPacketConfiguration::ReceiverAvc(record),
+            AvcUpdate::Receiver(record) => NalPacketConfiguration::AvcRecord(record),
         };
         // Only an AVC side-data update can reach this path. Its width was
         // selected from the parsed update when the packet began.
@@ -660,15 +660,15 @@ impl NalPacketSession {
     /// buffering-period SEI that no in-band parameter set precedes, the SPS and
     /// PPS are inserted: those the rest of the packet carries before its next
     /// slice, else the configuration's. An update is a
-    /// [`ReceiverAvcConfiguration`](crate::compat::nal::ReceiverAvcConfiguration);
+    /// [`AvcRecord`](crate::compat::nal::AvcRecord);
     /// the error with which the strict parser refuses a record stays on the
     /// configuration and on every output and rejection.
     ///
     /// Fails as [`packet`](Self::packet) does.
-    pub fn receiver_packet<M>(
+    pub fn packet_with_filter_acceptance<M>(
         &mut self,
         source: NalPacket<M>,
-        update: Option<crate::compat::nal::ReceiverAvcConfiguration>,
+        update: Option<crate::compat::nal::AvcRecord>,
     ) -> Result<NalPacketJob<'_, M>> {
         self.begin_packet(source, update.map(AvcUpdate::Receiver), true)
     }
@@ -1019,7 +1019,7 @@ impl<M> NalPacketRejection<M> {
     /// constant for comparison, compiled with the `reference-trace` feature;
     /// FFmpeg is not called.
     #[cfg(feature = "reference-trace")]
-    pub fn native_receive_result(&self) -> i32 {
+    pub fn filter_result_code(&self) -> i32 {
         -1_094_995_529
     }
     /// The input packet, with its metadata and side data as given.
@@ -1042,7 +1042,7 @@ impl<M> NalPacketRejection<M> {
         self.configuration_source_refusal.error()
     }
     /// The first NAL header refusal that
-    /// [`NalPacketSession::receiver_packet`] framed past before the failure:
+    /// [`NalPacketSession::packet_with_filter_acceptance`] framed past before the failure:
     /// the error [`NalPacketSession::packet`] returns for this packet. `None`
     /// when it accepts every header up to the failure.
     pub fn packet_source_refusal(&self) -> Option<Error> {
@@ -1086,7 +1086,7 @@ impl<M> NalPacketOutput<M> {
         self.configuration_source_refusal.error()
     }
     /// The first NAL header refusal that
-    /// [`NalPacketSession::receiver_packet`] framed past: the error
+    /// [`NalPacketSession::packet_with_filter_acceptance`] framed past: the error
     /// [`NalPacketSession::packet`] returns for this packet. `None` when it
     /// accepts every header.
     pub fn packet_source_refusal(&self) -> Option<Error> {

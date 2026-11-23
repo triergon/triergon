@@ -119,7 +119,7 @@ fn configuration(pool: &Budget, framed: bool) -> NalPacketConfiguration {
             raw: Bytes::copy_from_slice(pool, &[]).unwrap(),
         };
     }
-    let mut parser = ReceiverAvcConfigParser::new(
+    let mut parser = AvcRecordParser::new(
         pool,
         AvcConfigSource {
             source: SourceId(11),
@@ -139,7 +139,7 @@ fn configuration(pool: &Budget, framed: bool) -> NalPacketConfiguration {
             .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
             .unwrap()
         {
-            BuildStep::Ready(value) => return NalPacketConfiguration::ReceiverAvc(value),
+            BuildStep::Ready(value) => return NalPacketConfiguration::AvcRecord(value),
             BuildStep::Yield => (),
             BuildStep::Complete => panic!("missing configuration"),
         }
@@ -172,7 +172,7 @@ fn trace(framed: bool, raw: &[u8], plan: &[u64], direct: bool) -> Vec<String> {
     let baseline = pool.used();
     let mut session = NalPacketSession::new(&pool, configuration(&pool, framed), limits()).unwrap();
     let mut job = session
-        .receiver_packet(input(hidden(&pool, raw)), None)
+        .packet_with_filter_acceptance(input(hidden(&pool, raw)), None)
         .unwrap();
     let cancel = AtomicBool::new(false);
     let mut ready = None;
@@ -275,7 +275,7 @@ fn direct_and_compatibility_paths_keep_literal_work_owner_and_failure_traces() {
 fn passthrough_output(pool: &Budget, raw: &[u8]) -> NalPacketOutput {
     let mut session = NalPacketSession::new(pool, configuration(pool, false), limits()).unwrap();
     let mut job = session
-        .receiver_packet(input(hidden(pool, raw)), None)
+        .packet_with_filter_acceptance(input(hidden(pool, raw)), None)
         .unwrap();
     let mut ready = None;
     assert_eq!(
@@ -296,7 +296,7 @@ fn occupied_sink_is_preserved_without_work_job_or_cancel_side_effects() {
     let owner = ready.as_ref().unwrap().bytes().clone();
     let mut session = NalPacketSession::new(&pool, configuration(&pool, false), limits()).unwrap();
     let mut job = session
-        .receiver_packet(
+        .packet_with_filter_acceptance(
             input(Bytes::copy_from_slice(&pool, &[0x61, 9]).unwrap()),
             None,
         )
@@ -327,7 +327,7 @@ fn zero_work_never_publishes_and_cancellation_is_sticky() {
     let pool = Budget::new(16384).unwrap();
     let mut session = NalPacketSession::new(&pool, configuration(&pool, true), limits()).unwrap();
     let mut job = session
-        .receiver_packet(
+        .packet_with_filter_acceptance(
             input(Bytes::copy_from_slice(&pool, &[0, 0, 0, 1, 0x61]).unwrap()),
             None,
         )
@@ -362,7 +362,7 @@ fn recoverable_pressure_keeps_sink_empty_and_retry_keeps_all_source_facts() {
     let baseline = pool.used();
     let mut session = NalPacketSession::new(&pool, configuration(&pool, true), limits()).unwrap();
     let mut job = session
-        .receiver_packet(
+        .packet_with_filter_acceptance(
             input(Bytes::copy_from_slice(&pool, &[0, 0, 0, 1, 0x61]).unwrap()),
             None,
         )
@@ -419,7 +419,7 @@ fn non_copy_caller_metadata_moves_once_and_outlives_the_job_and_session() {
         new_extradata: source.new_extradata,
     };
     let mut session = NalPacketSession::new(&pool, configuration(&pool, false), limits()).unwrap();
-    let mut job = session.receiver_packet(packet, None).unwrap();
+    let mut job = session.packet_with_filter_acceptance(packet, None).unwrap();
     let mut ready = None;
     assert_eq!(
         job.step_into(
@@ -707,7 +707,7 @@ fn observed_packet_publishes_with_its_strict_header_refusal_attached() {
     let baseline = pool.used();
     let mut session = avc_session(&pool);
     let mut job = session
-        .receiver_packet(input(hidden(&pool, &[0, 0, 0, 1, 0x81])), None)
+        .packet_with_filter_acceptance(input(hidden(&pool, &[0, 0, 0, 1, 0x81])), None)
         .unwrap();
     let (_, ready) = drive(&[0, 1, 7], |w, out| {
         job.step_into(w, &AtomicBool::new(false), out)
@@ -726,7 +726,7 @@ fn physical_rejection_retains_verified_update_and_original_source_with_no_partia
     let baseline = pool.used();
     let mut session = avc_session(&pool);
     let new_raw = hidden(&pool, &avcc(129));
-    let mut parser = ReceiverAvcConfigParser::new_update(
+    let mut parser = AvcRecordParser::new_update(
         &pool,
         AvcConfigSource {
             source: SourceId(12),
@@ -754,7 +754,9 @@ fn physical_rejection_retains_verified_update_and_original_source_with_no_partia
     drop(parser);
     let mut source = input(hidden(&pool, &[0, 0]));
     source.new_extradata = Some(new_raw);
-    let mut job = session.receiver_packet(source, Some(update)).unwrap();
+    let mut job = session
+        .packet_with_filter_acceptance(source, Some(update))
+        .unwrap();
     let (polls, ready) = drive(&[0, 1, 7], |w, out| {
         job.step_into(w, &AtomicBool::new(false), out)
     });

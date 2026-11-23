@@ -20,7 +20,7 @@ fn avc_into(
     raw: Bytes,
     offset: u64,
     update: bool,
-    ready: &mut Option<ReceiverAvcConfiguration>,
+    ready: &mut Option<AvcRecord>,
 ) -> std::result::Result<(), (Error, Option<i32>)> {
     let source = AvcConfigSource {
         source: SourceId(1),
@@ -33,9 +33,9 @@ fn avc_into(
         maximum_nal_bytes: 65535,
     };
     let mut parser = if update {
-        ReceiverAvcConfigParser::new_update(pool, source, raw, limits)
+        AvcRecordParser::new_update(pool, source, raw, limits)
     } else {
-        ReceiverAvcConfigParser::new(pool, source, raw, limits)
+        AvcRecordParser::new(pool, source, raw, limits)
     }
     .map_err(|e| (e, None))?;
     loop {
@@ -50,7 +50,7 @@ fn avc_into(
                     e,
                     parser
                         .take_update_rejection()
-                        .map(|r| r.native_receive_result()),
+                        .map(|r| r.filter_result_code()),
                 ));
             }
         }
@@ -77,13 +77,13 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
                 &mut record,
             )
             .map_err(|(e, _)| e)?;
-            *ready = Some(NalPacketConfiguration::ReceiverAvc(
+            *ready = Some(NalPacketConfiguration::AvcRecord(
                 record.ok_or(Error::Invalid("configuration missing"))?,
             ));
             Ok(())
         }
         Codec::Hevc => {
-            let mut parser = ReceiverHevcConfigParser::new(
+            let mut parser = HevcRecordParser::new(
                 &case.pool,
                 HvcConfigSource {
                     source: SourceId(1),
@@ -102,7 +102,7 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
             loop {
                 match parser.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, &mut record)? {
                     SlotProgress::Ready => {
-                        *ready = Some(NalPacketConfiguration::ReceiverHevc(
+                        *ready = Some(NalPacketConfiguration::HevcRecord(
                             record.ok_or(Error::Invalid("configuration missing"))?,
                         ));
                         return Ok(());
@@ -338,7 +338,7 @@ fn operation(case: &Case) -> Result<Outcome> {
             generation: 1,
             new_extradata: extra.clone(),
         };
-        let mut job = match session.receiver_packet(packet, update) {
+        let mut job = match session.packet_with_filter_acceptance(packet, update) {
             Ok(job) => job,
             Err(Error::Invalid("packet after drain requires flush")) if drained => continue,
             Err(error) => return Err(error),
@@ -368,7 +368,7 @@ fn operation(case: &Case) -> Result<Outcome> {
                 }
                 Err(error) => {
                     if let Some(rejection) = job.take_rejection() {
-                        let words = receive_failure_words(index, rejection.native_receive_result());
+                        let words = receive_failure_words(index, rejection.filter_result_code());
                         outcome.digest.fold(&words, &[]);
                         break;
                     }

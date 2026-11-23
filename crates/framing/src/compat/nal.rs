@@ -9,9 +9,9 @@
 //! length (`lengthSizeMinusOne = 2`); the filters accept it. The parsers here accept
 //! what the filters accept and keep the strict refusal readable through
 //! `strict_source_refusal()`. Pass their output as
-//! [`NalPacketConfiguration::ReceiverAvc`] or
-//! [`ReceiverHevc`](NalPacketConfiguration::ReceiverHevc), and AVC side-data updates
-//! to [`NalPacketSession::receiver_packet`]. That path also frames NAL units whose
+//! [`NalPacketConfiguration::AvcRecord`] or
+//! [`HevcRecord`](NalPacketConfiguration::HevcRecord), and AVC side-data updates
+//! to [`NalPacketSession::packet_with_filter_acceptance`]. That path also frames NAL units whose
 //! header the strict path refuses and records the refusal on the output or rejection.
 //!
 //! The specification's framing of a sample, without the filters' insertion rules, is
@@ -46,16 +46,16 @@ use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 /// An AVC configuration update that the filter rejects together with its packet:
 /// a record of `configurationVersion` 1 that is shorter than seven bytes and so
 /// ends before its PPS count. Only a parser made with
-/// [`ReceiverAvcConfigParser::new_update`] creates it, after it failed with
+/// [`AvcRecordParser::new_update`] creates it, after it failed with
 /// [`Error::Truncated`].
 #[derive(Debug)]
-pub struct ReceiverAvcUpdateRejection {
+pub struct AvcUpdateRejection {
     raw: Bytes,
     source: AvcConfigSource,
     error: Error,
     strict_source_refusal: Option<Error>,
 }
-impl ReceiverAvcUpdateRejection {
+impl AvcUpdateRejection {
     /// The update record as it was given.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
@@ -78,7 +78,7 @@ impl ReceiverAvcUpdateRejection {
     /// `AVERROR_INVALIDDATA`. It is a constant for comparison, compiled with the
     /// `reference-trace` feature; FFmpeg is not called.
     #[cfg(feature = "reference-trace")]
-    pub fn native_receive_result(&self) -> i32 {
+    pub fn filter_result_code(&self) -> i32 {
         -1_094_995_529
     }
 }
@@ -91,20 +91,20 @@ impl ReceiverAvcUpdateRejection {
 /// directly after one that declares SPS extension entries.
 /// [`strict_source_refusal`](Self::strict_source_refusal) tells such a record
 /// from one that [`AvcConfigParser`] accepts.
-pub struct ReceiverAvcConfiguration {
+pub struct AvcRecord {
     inner: AvcConfiguration,
     refusal: NalConfigurationRefusal,
 }
-impl std::fmt::Debug for ReceiverAvcConfiguration {
+impl std::fmt::Debug for AvcRecord {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("ReceiverAvcConfiguration")
+            .debug_struct("AvcRecord")
             .field("record", &self.inner)
             .field("strict_source_refusal", &self.strict_source_refusal())
             .finish_non_exhaustive()
     }
 }
-impl ReceiverAvcConfiguration {
+impl AvcRecord {
     fn from_record(inner: AvcConfiguration) -> Self {
         let fields = inner.fields();
         let refusal = if fields.length_size_minus_one() == 2 {
@@ -181,10 +181,10 @@ impl ReceiverAvcConfiguration {
 /// it: what an [`HvcConfiguration`] holds, and also a record that declares a
 /// three-byte NAL length.
 #[derive(Debug)]
-pub struct ReceiverHevcConfiguration {
+pub struct HevcRecord {
     inner: HvcConfiguration,
 }
-impl ReceiverHevcConfiguration {
+impl HevcRecord {
     pub(crate) fn record(&self) -> &HvcConfiguration {
         &self.inner
     }
@@ -227,24 +227,24 @@ impl ReceiverHevcConfiguration {
 /// `h264_mp4toannexb` filter: a session's initial configuration
 /// ([`new`](Self::new)) or the `new_extradata` side data of a packet
 /// ([`new_update`](Self::new_update)).
-pub struct ReceiverAvcConfigParser {
+pub struct AvcRecordParser {
     inner: AvcConfigParser,
     raw: Bytes,
     refusal: NalConfigurationRefusal,
     update_role: bool,
     rejection_taken: bool,
 }
-impl std::fmt::Debug for ReceiverAvcConfigParser {
+impl std::fmt::Debug for AvcRecordParser {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("ReceiverAvcConfigParser")
+            .debug_struct("AvcRecordParser")
             .field("parser", &self.inner)
             .field("update", &self.update_role)
             .field("strict_source_refusal", &self.strict_source_refusal())
             .finish_non_exhaustive()
     }
 }
-impl ReceiverAvcConfigParser {
+impl AvcRecordParser {
     /// A parser for `raw`, the record of a session's initial configuration (the payload
     /// of an `avcC` box), charged to `pool`. Fails with [`Error::Invalid`] when a byte
     /// limit is zero; [`Error::ForeignPool`] when `raw` is charged to another pool;
@@ -322,7 +322,7 @@ impl ReceiverAvcConfigParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<ReceiverAvcConfiguration>> {
+    ) -> Result<BuildStep<AvcRecord>> {
         let mut ready = None;
         Ok(self
             .step_into(work, cancel, &mut ready)?
@@ -337,10 +337,10 @@ impl ReceiverAvcConfigParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        ready: &mut Option<ReceiverAvcConfiguration>,
+        ready: &mut Option<AvcRecord>,
     ) -> Result<SlotProgress> {
         self.inner.step_into_with(work, cancel, ready, |inner| {
-            let record = ReceiverAvcConfiguration::from_record(inner);
+            let record = AvcRecord::from_record(inner);
             self.refusal = record.refusal();
             record
         })
@@ -349,7 +349,7 @@ impl ReceiverAvcConfigParser {
     /// `configurationVersion` 1 that is shorter than seven bytes: the record
     /// and the error, once. `None` for a parser made with [`new`](Self::new),
     /// for every other failure, before a failure and on later calls.
-    pub fn take_update_rejection(&mut self) -> Option<ReceiverAvcUpdateRejection> {
+    pub fn take_update_rejection(&mut self) -> Option<AvcUpdateRejection> {
         // A complete AVC record needs its six-byte prefix and a PPS count. Only a
         // record that ends before its PPS count is rejected with its packet; every
         // other failure is the parser's own.
@@ -361,7 +361,7 @@ impl ReceiverAvcConfigParser {
             return None;
         }
         self.rejection_taken = true;
-        Some(ReceiverAvcUpdateRejection {
+        Some(AvcUpdateRejection {
             raw: self.raw.clone(),
             source: self.inner.source(),
             error,
@@ -374,10 +374,10 @@ impl ReceiverAvcConfigParser {
 /// `hevc_mp4toannexb` filter: as [`HvcConfigParser`] does, and also with a
 /// three-byte NAL length.
 #[derive(Debug)]
-pub struct ReceiverHevcConfigParser {
+pub struct HevcRecordParser {
     inner: HvcConfigParser,
 }
-impl ReceiverHevcConfigParser {
+impl HevcRecordParser {
     /// A parser for `raw`, the record of a session's configuration (the payload of an
     /// `hvcC` box), charged to `pool`. Fails with [`Error::Invalid`] when a byte limit
     /// is zero; [`Error::ForeignPool`] when `raw` is charged to another pool;
@@ -408,7 +408,7 @@ impl ReceiverHevcConfigParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<BuildStep<ReceiverHevcConfiguration>> {
+    ) -> Result<BuildStep<HevcRecord>> {
         let mut ready = None;
         Ok(self
             .step_into(work, cancel, &mut ready)?
@@ -423,11 +423,9 @@ impl ReceiverHevcConfigParser {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        ready: &mut Option<ReceiverHevcConfiguration>,
+        ready: &mut Option<HevcRecord>,
     ) -> Result<SlotProgress> {
         self.inner
-            .step_into_with(work, cancel, ready, |inner| ReceiverHevcConfiguration {
-                inner,
-            })
+            .step_into_with(work, cancel, ready, |inner| HevcRecord { inner })
     }
 }

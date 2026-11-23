@@ -92,7 +92,7 @@ that parse configurations or assemble decoder input. Comparison projections requ
 | `nal` | `NalReader`, `AnnexBUnits`, `RawAnnexBReader`, `AnnexBConfigParser`, `DeclaredConfigParser` | AVC/HEVC NAL units, raw access units and declared configurations with original bytes and offsets |
 | `avc` | `AvcConfigParser`, `AvcAnnexBJob`, `read_sps`, `read_pps`, `read_slice_header` | avcC records, Annex B samples and validated SPS, PPS and slice syntax |
 | `hevc` | `HvcConfigParser`, `HevcAnnexBJob`, `HvcAnnexBWriter`, `HvcDecoderConfigWriter`, `read_sps_prefix` | hvcC records, Annex B samples and parameter-set prefixes |
-| `compat::nal` | `NalPacketSession`, `NalPacketConfigWriter`, `ReceiverAvcConfigParser`, `ReceiverHevcConfigParser` | Annex B packets and configuration as FFmpeg's `mp4toannexb` filters frame them, with in-band parameter sets |
+| `compat::nal` | `NalPacketSession`, `NalPacketConfigWriter`, `AvcRecordParser`, `HevcRecordParser` | Annex B packets and configuration as FFmpeg's `mp4toannexb` filters frame them, with in-band parameter sets |
 | `picture_output` | `DecodedPictures`, `order::{AvcOrder, HevcOrder}`, `levels::{max_dpb_mbs, max_dpb_frames}` | Picture order, marking and bounded output for H.264 and H.265 |
 | `av1` | `Av1ObuReader`, `Av1ConfigParser`, `Av1TemporalUnitJob` | Low-overhead or externally sized OBUs, av1C and temporal units |
 | `vp9` | `Vp9ConfigParser` | vpcC profile, level, bit depth, range and CICP |

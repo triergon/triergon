@@ -105,9 +105,8 @@ fn avc(p: &Budget) -> AvcConfiguration {
     }
     panic!("bounded AVC fixture");
 }
-fn observed_avc(p: &Budget, width: u8) -> ReceiverAvcConfiguration {
-    let mut parser =
-        ReceiverAvcConfigParser::new(p, source(), bytes(p, &avcc(width)), alimits()).unwrap();
+fn observed_avc(p: &Budget, width: u8) -> AvcRecord {
+    let mut parser = AvcRecordParser::new(p, source(), bytes(p, &avcc(width)), alimits()).unwrap();
     for _ in 0..10000 {
         if let BuildStep::Ready(v) = parser
             .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -224,7 +223,7 @@ fn physical_prefix_rejection_moves_nonclone_metadata_once_and_outlives_session()
         NalPacketRejectionKind::IncompleteLengthPrefix
     );
     #[cfg(feature = "reference-trace")]
-    assert_eq!(rejected.native_receive_result(), -1_094_995_529);
+    assert_eq!(rejected.filter_result_code(), -1_094_995_529);
     assert_eq!(rejected.source_error(), Error::Truncated);
     assert_eq!(rejected.source().bytes.as_ref(), [0, 0]);
     assert_eq!(rejected.source().generation, 81);
@@ -380,9 +379,9 @@ fn source_avc_width_three_refusal_and_observed_bytes_remain_distinct() {
         Some(Error::Invalid("AVC three-byte sample length"))
     );
     let mut s =
-        NalPacketSession::new(&p, NalPacketConfiguration::ReceiverAvc(cfg), limits()).unwrap();
+        NalPacketSession::new(&p, NalPacketConfiguration::AvcRecord(cfg), limits()).unwrap();
     let mut job = s
-        .receiver_packet(packet(&p, &[0, 0, 3, 0x65, 0xb8, 128]), None)
+        .packet_with_filter_acceptance(packet(&p, &[0, 0, 3, 0x65, 0xb8, 128]), None)
         .unwrap();
     let out = output(&mut job);
     assert_eq!(out.source().bytes.as_ref(), [0, 0, 3, 0x65, 0xb8, 128]);
@@ -427,8 +426,7 @@ fn avc_receiver_preserves_short_profile_extension_and_frames_complete_parameter_
         ));
         for budget in [1, 4096] {
             let mut receiver =
-                ReceiverAvcConfigParser::new(&pool, source(), raw_bytes.clone(), alimits())
-                    .unwrap();
+                AvcRecordParser::new(&pool, source(), raw_bytes.clone(), alimits()).unwrap();
             let config = (0..128)
                 .find_map(|_| {
                     match receiver
@@ -450,7 +448,7 @@ fn avc_receiver_preserves_short_profile_extension_and_frames_complete_parameter_
                 config.strict_source_refusal()
             );
             let mut session =
-                NalPacketSession::new(&pool, NalPacketConfiguration::ReceiverAvc(config), limits())
+                NalPacketSession::new(&pool, NalPacketConfiguration::AvcRecord(config), limits())
                     .unwrap();
             let framed = output(&mut session.packet(packet(&pool, &idr), None).unwrap());
             assert_eq!(framed.bytes().as_ref(), expected.bytes().as_ref());
@@ -483,8 +481,7 @@ fn avc_receiver_frames_base_parameter_sets_when_extension_entries_are_absent() {
         Err(Error::Truncated)
     ));
     for quantum in [1, 4096] {
-        let mut receiver =
-            ReceiverAvcConfigParser::new(&pool, source(), raw.clone(), alimits()).unwrap();
+        let mut receiver = AvcRecordParser::new(&pool, source(), raw.clone(), alimits()).unwrap();
         let config = (0..128)
             .find_map(|_| {
                 match receiver
@@ -502,7 +499,7 @@ fn avc_receiver_frames_base_parameter_sets_when_extension_entries_are_absent() {
         assert!(config.array(2).unwrap().nal_indices().is_empty());
         assert_eq!(config.strict_source_refusal(), Some(Error::Truncated));
         let mut session =
-            NalPacketSession::new(&pool, NalPacketConfiguration::ReceiverAvc(config), limits())
+            NalPacketSession::new(&pool, NalPacketConfiguration::AvcRecord(config), limits())
                 .unwrap();
         let framed = output(&mut session.packet(packet(&pool, &idr), None).unwrap());
         assert_eq!(framed.bytes().as_ref(), expected);
@@ -523,8 +520,7 @@ fn source_hevc_width_three_refusal_and_observed_header_bits_remain_distinct() {
         strict.step(&mut WorkBudget::new(1), &AtomicBool::new(false)),
         Err(Error::Unsupported("hvcC three-byte sample length"))
     ));
-    let mut parser =
-        ReceiverHevcConfigParser::new(&p, hevc_source(), bytes(&p, &raw), hlimits()).unwrap();
+    let mut parser = HevcRecordParser::new(&p, hevc_source(), bytes(&p, &raw), hlimits()).unwrap();
     let cfg = loop {
         if let BuildStep::Ready(v) = parser
             .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -536,9 +532,9 @@ fn source_hevc_width_three_refusal_and_observed_header_bits_remain_distinct() {
     assert_eq!(cfg.fields().length_size_minus_one(), 2);
     assert_ne!(cfg.fields().syntax_issues() & 32, 0);
     let mut s =
-        NalPacketSession::new(&p, NalPacketConfiguration::ReceiverHevc(cfg), limits()).unwrap();
+        NalPacketSession::new(&p, NalPacketConfiguration::HevcRecord(cfg), limits()).unwrap();
     let mut job = s
-        .receiver_packet(packet(&p, &[0, 0, 3, 38, 1, 128]), None)
+        .packet_with_filter_acceptance(packet(&p, &[0, 0, 3, 38, 1, 128]), None)
         .unwrap();
     let out = output(&mut job);
     assert_eq!(
@@ -559,7 +555,9 @@ fn buffering_period_uses_later_in_band_sets_and_keeps_the_original_nals() {
         0, 0, 0, 3, 0x68, 0x25, 0x80, // PPS
         0, 0, 0, 2, 0x65, 0x80, // first IDR slice
     ];
-    let mut job = s.receiver_packet(packet(&p, &raw), None).unwrap();
+    let mut job = s
+        .packet_with_filter_acceptance(packet(&p, &raw), None)
+        .unwrap();
     let out = output(&mut job);
     assert_eq!(
         out.bytes().as_ref(),
@@ -591,7 +589,9 @@ fn buffering_period_insertion_survives_packet_boundaries_and_flush_rearms_it() {
     let idr = [0, 0, 0, 2, 0x65, 0x80];
     let cancelled = AtomicBool::new(true);
     let initial = {
-        let mut job = s.receiver_packet(packet(&p, &sei), None).unwrap();
+        let mut job = s
+            .packet_with_filter_acceptance(packet(&p, &sei), None)
+            .unwrap();
         assert!(matches!(
             job.step(&mut WorkBudget::new(0), &AtomicBool::new(false))
                 .unwrap(),
@@ -599,18 +599,28 @@ fn buffering_period_insertion_survives_packet_boundaries_and_flush_rearms_it() {
         ));
         output(&mut job)
     };
-    let subsequent = output(&mut s.receiver_packet(packet(&p, &idr), None).unwrap());
+    let subsequent = output(
+        &mut s
+            .packet_with_filter_acceptance(packet(&p, &idr), None)
+            .unwrap(),
+    );
     assert_eq!(subsequent.bytes().as_ref(), [0, 0, 0, 1, 0x65, 0x80]);
     assert_eq!(initial.segments().len(), 3);
     s.flush();
     {
-        let mut job = s.receiver_packet(packet(&p, &sei), None).unwrap();
+        let mut job = s
+            .packet_with_filter_acceptance(packet(&p, &sei), None)
+            .unwrap();
         assert!(matches!(
             job.step(&mut WorkBudget::new(0), &cancelled),
             Err(Error::Cancelled)
         ));
     }
-    let restarted = output(&mut s.receiver_packet(packet(&p, &sei), None).unwrap());
+    let restarted = output(
+        &mut s
+            .packet_with_filter_acceptance(packet(&p, &sei), None)
+            .unwrap(),
+    );
     assert_eq!(restarted.bytes().as_ref(), initial.bytes().as_ref());
 }
 
@@ -623,7 +633,11 @@ fn receiver_retains_header_only_idr_with_end_of_packet_padding() {
         let mut job = s.packet(packet(&p, &idr), None).unwrap();
         assert_eq!(error(&mut job), Error::Truncated);
     }
-    let out = output(&mut s.receiver_packet(packet(&p, &idr), None).unwrap());
+    let out = output(
+        &mut s
+            .packet_with_filter_acceptance(packet(&p, &idr), None)
+            .unwrap(),
+    );
     assert_eq!(out.segments().len(), 3);
     assert_eq!(out.segment_bytes(2).unwrap(), [0x65]);
     assert!(out.bytes().ends_with(&[0, 0, 1, 0x65]));
@@ -636,7 +650,9 @@ fn observed_avc_update_changes_native_width_but_keeps_source_refusal_and_epoch()
     let raw = avcc(3);
     let mut src = packet(&p, &[0, 0, 3, 0x65, 0xb8, 128]);
     src.new_extradata = Some(bytes(&p, &raw));
-    let mut job = s.receiver_packet(src, Some(observed_avc(&p, 3))).unwrap();
+    let mut job = s
+        .packet_with_filter_acceptance(src, Some(observed_avc(&p, 3)))
+        .unwrap();
     let out = output(&mut job);
     assert_eq!(out.configuration_updates(), 1);
     assert_eq!(out.source().new_extradata.as_ref().unwrap().as_ref(), raw);
@@ -648,14 +664,14 @@ fn observed_avc_update_changes_native_width_but_keeps_source_refusal_and_epoch()
     assert_eq!(s.configuration_updates(), 1);
     assert!(matches!(
         s.configuration(),
-        NalPacketConfiguration::ReceiverAvc(_)
+        NalPacketConfiguration::AvcRecord(_)
     ));
 }
 #[test]
 fn observed_record_work_zero_and_cancellation_do_not_publish_or_invent_errors() {
     let p = Budget::new(100000).unwrap();
     let mut parser =
-        ReceiverAvcConfigParser::new_update(&p, source(), bytes(&p, &avcc(3)), alimits()).unwrap();
+        AvcRecordParser::new_update(&p, source(), bytes(&p, &avcc(3)), alimits()).unwrap();
     let c = AtomicBool::new(false);
     for _ in 0..8 {
         let mut w = WorkBudget::new(0);
@@ -674,7 +690,7 @@ fn observed_record_parser_rejects_foreign_pool_before_any_result() {
     let p = Budget::new(100000).unwrap();
     let q = Budget::new(100000).unwrap();
     assert!(matches!(
-        ReceiverAvcConfigParser::new(&p, source(), bytes(&q, &avcc(3)), alimits()),
+        AvcRecordParser::new(&p, source(), bytes(&q, &avcc(3)), alimits()),
         Err(Error::ForeignPool)
     ));
 }
@@ -682,13 +698,13 @@ fn observed_record_parser_rejects_foreign_pool_before_any_result() {
 fn short_avc_update_rejection_is_bound_to_update_role_and_retains_exact_raw_header() {
     let p = Budget::new(100000).unwrap();
     let raw = bytes(&p, &[1]);
-    let mut initial = ReceiverAvcConfigParser::new(&p, source(), raw.clone(), alimits()).unwrap();
+    let mut initial = AvcRecordParser::new(&p, source(), raw.clone(), alimits()).unwrap();
     assert!(matches!(
         initial.step(&mut WorkBudget::new(1), &AtomicBool::new(false)),
         Err(Error::Truncated)
     ));
     assert!(initial.take_update_rejection().is_none());
-    let mut update = ReceiverAvcConfigParser::new_update(&p, source(), raw, alimits()).unwrap();
+    let mut update = AvcRecordParser::new_update(&p, source(), raw, alimits()).unwrap();
     assert!(update.take_update_rejection().is_none());
     assert!(matches!(
         update.step(&mut WorkBudget::new(1), &AtomicBool::new(false)),
@@ -701,13 +717,12 @@ fn short_avc_update_rejection_is_bound_to_update_role_and_retains_exact_raw_head
     assert_eq!(rejected.source_bytes().as_ref(), [1]);
     assert_eq!(rejected.source(), source());
     #[cfg(feature = "reference-trace")]
-    assert_eq!(rejected.native_receive_result(), -1_094_995_529);
+    assert_eq!(rejected.filter_result_code(), -1_094_995_529);
 }
 #[test]
 fn unsupported_update_version_does_not_get_a_predicted_native_error() {
     let p = Budget::new(100000).unwrap();
-    let mut parser =
-        ReceiverAvcConfigParser::new_update(&p, source(), bytes(&p, &[2]), alimits()).unwrap();
+    let mut parser = AvcRecordParser::new_update(&p, source(), bytes(&p, &[2]), alimits()).unwrap();
     assert!(matches!(
         parser.step(&mut WorkBudget::new(1), &AtomicBool::new(false)),
         Err(Error::Unsupported(_))
@@ -749,7 +764,7 @@ fn unsupported_hevc_initial_array_retains_raw_source_and_has_no_fake_output() {
 #[test]
 fn observed_initialization_retains_width_three_refusal_after_config_drop() {
     let p = Budget::new(100000).unwrap();
-    let cfg = NalPacketConfiguration::ReceiverAvc(observed_avc(&p, 3));
+    let cfg = NalPacketConfiguration::AvcRecord(observed_avc(&p, 3));
     let mut writer = NalPacketConfigWriter::new(&p, &cfg, 65536).unwrap();
     let output = loop {
         if let BuildStep::Ready(v) = writer
@@ -774,14 +789,14 @@ fn physical_error_after_observed_update_keeps_new_config_without_committing_inba
     let mut source = packet(&p, &[0, 0]);
     source.new_extradata = Some(bytes(&p, &avcc(3)));
     let mut job = s
-        .receiver_packet(source, Some(observed_avc(&p, 3)))
+        .packet_with_filter_acceptance(source, Some(observed_avc(&p, 3)))
         .unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
     let r = job.take_rejection().unwrap();
     drop(job);
     assert!(matches!(
         s.configuration(),
-        NalPacketConfiguration::ReceiverAvc(_)
+        NalPacketConfiguration::AvcRecord(_)
     ));
     drop(s);
     assert_eq!(r.configuration_updates(), 1);
@@ -804,7 +819,9 @@ fn observed_hevc_short_header_retains_source_refusal_before_later_physical_failu
     drop(job);
     let mut native =
         NalPacketSession::new(&p, NalPacketConfiguration::Hevc(hevc(&p, false)), limits()).unwrap();
-    let mut job = native.receiver_packet(packet(&p, &raw), None).unwrap();
+    let mut job = native
+        .packet_with_filter_acceptance(packet(&p, &raw), None)
+        .unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
     let rejected = job.take_rejection().unwrap();
     assert_eq!(
@@ -825,7 +842,7 @@ fn short_observed_update_retains_prior_width_three_source_refusal_separately() {
         Err(Error::Invalid("AVC three-byte sample length"))
     ));
     let mut observed =
-        ReceiverAvcConfigParser::new_update(&p, source(), bytes(&p, raw), alimits()).unwrap();
+        AvcRecordParser::new_update(&p, source(), bytes(&p, raw), alimits()).unwrap();
     loop {
         match observed.step(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
             Err(Error::Truncated) => break,

@@ -64,8 +64,8 @@ macro_rules! drive {
 drive!(
     AvcConfigParser => AvcConfiguration,
     HvcConfigParser => HvcConfiguration,
-    ReceiverAvcConfigParser => ReceiverAvcConfiguration,
-    ReceiverHevcConfigParser => ReceiverHevcConfiguration,
+    AvcRecordParser => AvcRecord,
+    HevcRecordParser => HevcRecord,
 );
 
 struct Slots<P>(P);
@@ -1293,7 +1293,7 @@ fn configuration_slots_preserve_traces_and_facts() {
             );
             compare(
                 || {
-                    ReceiverAvcConfigParser::new_update(
+                    AvcRecordParser::new_update(
                         &pool,
                         avc_source(),
                         bytes(&pool, &record),
@@ -1332,13 +1332,8 @@ fn configuration_slots_preserve_traces_and_facts() {
             );
             compare(
                 || {
-                    ReceiverHevcConfigParser::new(
-                        &pool,
-                        hvc_source(),
-                        bytes(&pool, &record),
-                        hvc_limits(),
-                    )
-                    .unwrap()
+                    HevcRecordParser::new(&pool, hvc_source(), bytes(&pool, &record), hvc_limits())
+                        .unwrap()
                 },
                 |v| {
                     (
@@ -1411,16 +1406,11 @@ fn occupied_configuration_slots_are_inert_and_cancellation_stays_sticky() {
         .unwrap()
     });
     check(&pool, || {
-        ReceiverAvcConfigParser::new_update(
-            &pool,
-            avc_source(),
-            bytes(&pool, &avc_rich()),
-            avc_limits(),
-        )
-        .unwrap()
+        AvcRecordParser::new_update(&pool, avc_source(), bytes(&pool, &avc_rich()), avc_limits())
+            .unwrap()
     });
     check(&pool, || {
-        ReceiverHevcConfigParser::new(
+        HevcRecordParser::new(
             &pool,
             hvc_source(),
             bytes(&pool, &hvc_example(&[])),
@@ -1453,8 +1443,7 @@ fn strict_and_observed_configurations_keep_distinct_typed_refusals() {
     // Explicit observed receivers accept the same bytes with the refusal attached.
     for quantum in [1, 7, 4096] {
         let mut parser =
-            ReceiverAvcConfigParser::new(&pool, avc_source(), bytes(&pool, &avc3), avc_limits())
-                .unwrap();
+            AvcRecordParser::new(&pool, avc_source(), bytes(&pool, &avc3), avc_limits()).unwrap();
         let v = run(&mut parser, quantum).1.unwrap();
         assert_eq!(v.sample_length_size().bytes(), 3);
         assert_eq!(
@@ -1467,8 +1456,7 @@ fn strict_and_observed_configurations_keep_distinct_typed_refusals() {
         assert_eq!(v.opaque_suffix(), [0xaa, 0xbb]);
 
         let mut parser =
-            ReceiverHevcConfigParser::new(&pool, hvc_source(), bytes(&pool, &hvc3), hvc_limits())
-                .unwrap();
+            HevcRecordParser::new(&pool, hvc_source(), bytes(&pool, &hvc3), hvc_limits()).unwrap();
         let v = run(&mut parser, quantum).1.unwrap();
         assert_eq!(v.sample_length_size().bytes(), 3);
         assert_eq!(
@@ -1487,9 +1475,9 @@ fn strict_and_observed_configurations_keep_distinct_typed_refusals() {
     for raw in records {
         for update in [false, true] {
             let new = if update {
-                ReceiverAvcConfigParser::new_update
+                AvcRecordParser::new_update
             } else {
-                ReceiverAvcConfigParser::new
+                AvcRecordParser::new
             };
             let mut parser = new(&pool, avc_source(), bytes(&pool, &raw), avc_limits()).unwrap();
             assert_eq!(parser.source_bytes().as_ref(), raw);
@@ -1506,7 +1494,7 @@ fn strict_and_observed_configurations_keep_distinct_typed_refusals() {
                 assert_eq!(r.source_error(), Error::Truncated);
                 assert_eq!(r.strict_source_refusal(), parser.strict_source_refusal());
                 #[cfg(feature = "reference-trace")]
-                assert_eq!(r.native_receive_result(), -1_094_995_529);
+                assert_eq!(r.filter_result_code(), -1_094_995_529);
             }
             // A rejection is produced at most once.
             assert!(parser.take_update_rejection().is_none());

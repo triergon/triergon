@@ -207,28 +207,26 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
     let raw = Bytes::copy_from_slice(&pool, record).unwrap();
     let config = match codec {
         Codec::Avc => {
-            let mut p =
-                ReceiverAvcConfigParser::new(&pool, avc_source(20), raw, avc_limits()).unwrap();
+            let mut p = AvcRecordParser::new(&pool, avc_source(20), raw, avc_limits()).unwrap();
             loop {
                 let mut w = WorkBudget::new(q);
                 let r = p.step(&mut w, &NO);
                 step(&mut run, &pool, "avc", &w, &r);
                 match r {
-                    Ok(BuildStep::Ready(v)) => break NalPacketConfiguration::ReceiverAvc(v),
+                    Ok(BuildStep::Ready(v)) => break NalPacketConfiguration::AvcRecord(v),
                     Ok(BuildStep::Yield) => (),
                     _ => return run,
                 }
             }
         }
         Codec::Hevc => {
-            let mut p =
-                ReceiverHevcConfigParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
+            let mut p = HevcRecordParser::new(&pool, hvc_source(), raw, hvc_limits()).unwrap();
             loop {
                 let mut w = WorkBudget::new(q);
                 let r = p.step(&mut w, &NO);
                 step(&mut run, &pool, "hevc", &w, &r);
                 match r {
-                    Ok(BuildStep::Ready(v)) => break NalPacketConfiguration::ReceiverHevc(v),
+                    Ok(BuildStep::Ready(v)) => break NalPacketConfiguration::HevcRecord(v),
                     Ok(BuildStep::Yield) => (),
                     _ => return run,
                 }
@@ -276,13 +274,9 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
             .map(|e| Bytes::copy_from_slice(&pool, e).unwrap());
         let update = match (codec, &extra) {
             (Codec::Avc, Some(e)) if !e.is_empty() => {
-                let mut p = ReceiverAvcConfigParser::new_update(
-                    &pool,
-                    avc_source(900),
-                    e.clone(),
-                    avc_limits(),
-                )
-                .unwrap();
+                let mut p =
+                    AvcRecordParser::new_update(&pool, avc_source(900), e.clone(), avc_limits())
+                        .unwrap();
                 let parsed = loop {
                     let mut w = WorkBudget::new(q);
                     let r = p.step(&mut w, &NO);
@@ -294,7 +288,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                             let r = p.take_update_rejection();
                             #[cfg(feature = "reference-trace")]
                             if let Some(r) = &r {
-                                assert_eq!(r.native_receive_result(), -1_094_995_529);
+                                assert_eq!(r.filter_result_code(), -1_094_995_529);
                             }
                             run.push(format!(
                                 "update-rejection {:?}",
@@ -328,7 +322,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
             },
             new_extradata: extra,
         };
-        let mut job = match session.receiver_packet(source, update) {
+        let mut job = match session.packet_with_filter_acceptance(source, update) {
             Ok(job) => job,
             Err(e) => {
                 run.push(format!("begin {e:?}"));

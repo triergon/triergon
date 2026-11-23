@@ -4,8 +4,8 @@
 //! can compare them with recorded reference output. They are not behaviour a consumer
 //! selects outside a comparison, and they are absent from default builds. With the
 //! feature enabled,
-//! [`NalPacketRejection::native_receive_result`](crate::compat::nal::NalPacketRejection::native_receive_result),
-//! [`ReceiverAvcUpdateRejection::native_receive_result`](crate::compat::nal::ReceiverAvcUpdateRejection::native_receive_result)
+//! [`NalPacketRejection::filter_result_code`](crate::compat::nal::NalPacketRejection::filter_result_code),
+//! [`AvcUpdateRejection::filter_result_code`](crate::compat::nal::AvcUpdateRejection::filter_result_code)
 //! and
 //! [`NalPacketConfigRejection::native_initialize_result`](crate::compat::nal::NalPacketConfigRejection::native_initialize_result)
 //! are also available; their reference revision is the one named on
