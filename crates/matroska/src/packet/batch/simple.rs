@@ -43,7 +43,6 @@ pub(crate) struct SimplePacketJob {
     payload: Range<usize>,
     track: usize,
     staged: Option<Packet>,
-    ready: Option<SharedBytes>,
     failed: bool,
 }
 impl SimplePacketJob {
@@ -97,7 +96,6 @@ impl SimplePacketJob {
             payload: 0..0,
             track: 0,
             staged: None,
-            ready: None,
             failed: false,
         }
     }
@@ -154,7 +152,7 @@ impl SimplePacketJob {
             frame: 0,
             publish: 0,
             restore: None,
-            ready: self.ready.take(),
+            ready: None,
             decoded_capacity: 0,
             failed: self.failed,
         }
@@ -260,7 +258,7 @@ impl SimplePacketJob {
             if !work.try_charge(1) {
                 return Ok(SimpleProgress::Yield);
             }
-            self.ready = Some(std::mem::take(&mut self.source).into_slice(self.payload.clone())?);
+            self.source = std::mem::take(&mut self.source).into_slice(self.payload.clone())?;
             self.phase = SimplePhase::Store;
         }
         if matches!(self.phase, SimplePhase::Store) {
@@ -269,7 +267,6 @@ impl SimplePacketJob {
                 return Ok(SimpleProgress::Yield);
             }
             let track = &self.configuration(borrowed)?.tracks()[self.track];
-            let _storage = self.ready.as_ref().required("missing restored frame")?;
             validate_decoded_capacity(0, self.block_bytes)?;
             let fields = FrameParameters {
                 cluster_ticks: self.cluster_ticks,
@@ -283,14 +280,13 @@ impl SimplePacketJob {
             if self.staged.is_some() {
                 return Err(Error::Invalid("single packet already staged"));
             }
-            let storage = self.ready.take().required("missing restored frame")?;
+            let storage = std::mem::take(&mut self.source);
             let range = 0..storage.len();
             self.staged = Some(fields.finish(PacketData { storage, range }));
             self.phase = SimplePhase::CompleteFrames;
         }
         if matches!(self.phase, SimplePhase::CompleteFrames) {
             check(cancel)?;
-            self.source = SharedBytes::default();
             self.phase = SimplePhase::Publish;
         }
         if matches!(self.phase, SimplePhase::Publish) {
@@ -407,8 +403,7 @@ impl SimplePacketJob {
 crate::storage::usage::storage!(SimplePacketJob, |s| [
     s.source,
     s.configuration,
-    crate::storage::usage::Packets(std::slice::from_ref(&s.staged)),
-    s.ready
+    crate::storage::usage::Packets(std::slice::from_ref(&s.staged))
 ]);
 
 const _: () = assert!(size_of::<SimplePacketJob>() <= 768);
