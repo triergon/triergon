@@ -24,9 +24,10 @@ use triergon_core::{
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
 }
-/// Reads roots from the current input generation with a metadata cap in bytes.
-/// Recovery mode admits a terminal `mdat` that extends past the known source length.
-#[doc(hidden)]
+/// A [`BoxReader`] at the cursor's position that reads root boxes of at most
+/// `metadata_bytes` into memory, as [`MovieOpen`] reads them: for the roots a caller
+/// reads itself after an open that stopped at the first media box. With `recovery` a
+/// terminal `mdat` may declare more bytes than the known source length holds.
 pub fn box_reader(input: &InputCursor, metadata_bytes: usize, recovery: bool) -> Result<BoxReader> {
     if recovery {
         BoxReader::new_recovery(input, metadata_bytes)
@@ -307,20 +308,18 @@ pub struct MovieTrack {
     pub(crate) next_ordinal: u64,
 }
 
-/// Maximum retained payload bytes for backward reads on a forward-only source.
-#[doc(hidden)]
+/// Most payload bytes of `mdat` boxes that precede `moov` an open keeps
+/// ([`Movie::media_cache`]) when its source cannot go back to them.
 pub const RETAINED_MEDIA_BYTES: usize = 32 * 1024;
 
-/// A retained segment of media from a forward-only source.
-#[doc(hidden)]
+/// The payload of one `mdat` kept in memory, because its source cannot be read again.
 #[derive(Clone, Debug)]
 pub struct CachedMedia {
     pub(crate) start: u64,
     pub(crate) bytes: Bytes,
 }
 
-/// A bounded media segment being copied from the input cursor.
-#[doc(hidden)]
+/// A [`CachedMedia`] being read from the input cursor.
 #[derive(Debug)]
 pub struct PendingMedia {
     start: u64,
@@ -459,13 +458,12 @@ impl Movie {
     pub fn trex(&self) -> &[Trex] {
         self.trex.as_slice()
     }
-    /// Retained media segments from a forward-only source, in file order.
-    #[doc(hidden)]
+    /// The `mdat` payloads kept in memory, in file order: those that preceded `moov` on
+    /// a source without random access, within [`RETAINED_MEDIA_BYTES`] in all.
     pub fn media_cache(&self) -> &[CachedMedia] {
         self.media_cache.as_slice()
     }
-    /// Budget shared by retained metadata and media segments.
-    #[doc(hidden)]
+    /// The budget the movie's boxes, indexes and kept media are charged to.
     pub fn pool(&self) -> &Budget {
         &self.pool
     }

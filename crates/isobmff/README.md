@@ -178,7 +178,7 @@ of all tracks in file order through `PhysicalSampleCursor`.
 | Recovery groups | `sample_groups::{RecoveryDescriptions, RecoveryMappings, RecoveryLookup}` (`sgpd`, `sbgp`) |
 | Codec configuration | `SampleDescription::extensions`, `config::{AacConfigurationJob, ObjectTypeScan, check_dts_core_description}` |
 | QuickTime sound | `quicktime::{SoundDescriptionV0, PcmSampleReader}` |
-| Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations |
+| Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations. On a source without random access `new` keeps up to 32 KiB of media that precedes `moov` (`Movie::media_cache`, `open::CachedMedia`); `open::box_reader` and `open::PendingMedia` read the later root boxes and such media for a caller that continues after the open |
 | Neutral reader | `Reader`, `ReaderLimits`, `Track`, `Packet`, `ReaderEvent` |
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
 | FFmpeg-compatible seek | `compat::mov::seek::{IndexCursor, SeekJob, GlobalSeekJob}` |
