@@ -829,7 +829,7 @@ fn budgets_and_limits_refuse_without_panicking() {
         "{error:?}"
     );
     let limits = Limits {
-        header_bytes: 10,
+        opening_bytes: 10,
         ..Limits::default()
     };
     let (reader, events, error) = read_with(&file, 1 << 16, 1 << 20, false, limits);

@@ -29,8 +29,9 @@ pub struct Limits {
     /// Largest packet. Ogg allows any size; 16 MiB holds any audio packet and a
     /// comment header with cover art.
     pub packet_bytes: usize,
-    /// Largest configuration of one track, its comment header included.
-    pub header_bytes: usize,
+    /// Largest configuration of one track, its comment header included. Also the
+    /// queued packet payload threshold at which blocking open returns.
+    pub opening_bytes: usize,
     /// Logical streams in one link.
     pub streams: usize,
     /// Tracks across every link of a chained source.
@@ -49,7 +50,7 @@ impl Default for Limits {
         Limits {
             live_storage_bytes: 64 << 20,
             packet_bytes: 16 << 20,
-            header_bytes: 16 << 20,
+            opening_bytes: 16 << 20,
             streams: 64,
             tracks: 1024,
             sync_scan_bytes: 2 * MAX_PAGE as u64,
@@ -649,7 +650,7 @@ impl Reader {
         }
         let pool = self.input.budget();
         let (config, error) =
-            match Configuration::first(pool, mapping, first, self.limits.header_bytes) {
+            match Configuration::first(pool, mapping, first, self.limits.opening_bytes) {
                 Ok(config) => (config, None),
                 Err(error @ Error::Backpressure { .. }) => return Err(error),
                 Err(error) => (Configuration::opaque(pool, 0), Some(error)),

@@ -82,8 +82,8 @@ impl<R: Read> BlockingReader<R> {
         }
     }
 
-    /// Read until the first packet after every stream of the first link has read its
-    /// headers, queueing at most `limits.header_bytes` of packets meanwhile.
+    /// Read through the first packet after the first link's headers, or through the
+    /// packet that takes the queue above `limits.opening_bytes`.
     fn start(driver: Blocking<Reader, R>, pool: &Budget, limits: Limits) -> Result<Self> {
         let mut blocking = BlockingReader {
             driver,
@@ -102,7 +102,7 @@ impl<R: Read> BlockingReader<R> {
             blocking.queued.push(event)?;
             if let Some(len) = packet {
                 queued_bytes = queued_bytes.saturating_add(len);
-                if blocking.reader().headers_read() || queued_bytes > limits.header_bytes {
+                if blocking.reader().headers_read() || queued_bytes > limits.opening_bytes {
                     break;
                 }
             }
@@ -111,7 +111,7 @@ impl<R: Read> BlockingReader<R> {
     }
 
     /// Tracks seen so far; every track of the first link, configured unless its headers
-    /// are broken or still missing after `Limits::header_bytes` of other packets, once
+    /// are broken or still missing after `Limits::opening_bytes` of other packets, once
     /// open returns.
     pub fn tracks(&self) -> &[Track] {
         self.reader().tracks()

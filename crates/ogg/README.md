@@ -28,8 +28,9 @@ while let Some(packet) = reader.next_packet(&cancel)? {
 ```
 
 `BlockingReader::open` takes a sequential `Read`. Use `open_seekable` with
-`Read + Seek` to enable seeking. Both return once every stream of the first link has read its headers
-(or after `Limits::header_bytes` of other packets), so its tracks are configured.
+`Read + Seek` to enable seeking. Both read through the first packet after the first
+link's headers, or through the packet that takes the queued payload above
+`Limits::opening_bytes`.
 `Reader` is the push reader: it performs no I/O, accepts windows of any size down to one
 byte, steps under a `WorkBudget` and a cancellation flag, and charges its storage to the
 caller's `Budget`. `read_packets` reads every packet of a whole file in memory,
@@ -105,7 +106,8 @@ starts at the first media packet.
 ## Behaviour and limits
 
 `Limits::default()`: packets of up to 16 MiB gathered across pages, 16 MiB of headers per
-track (cover art in a comment header), 64 logical streams per link, 1024 tracks, and
+track (cover art in a comment header), a 16 MiB queued-payload threshold during
+blocking open, 64 logical streams per link, 1024 tracks, and
 two maximum pages (`page::MAX_PAGE`, 65,307 bytes) of skipped bytes in a row, four per
 seek probe and two for the end scan, in a 64 MiB pool. Charged to the budget: gathered
 packets and split pages, track configurations, and the track, stream and link tables.

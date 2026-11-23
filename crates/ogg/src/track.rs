@@ -113,10 +113,10 @@ impl Track {
 
     /// Why a header packet could not be read. A packet that is not the header its mapping
     /// requires there makes the stream invalid: the track stays unconfigured and delivers
-    /// no packets. A header that does not parse or exceeds [`Limits::header_bytes`]
+    /// no packets. A header that does not parse or exceeds [`Limits::opening_bytes`]
     /// leaves the track configured from the headers before it.
     ///
-    /// [`Limits::header_bytes`]: crate::Limits::header_bytes
+    /// [`Limits::opening_bytes`]: crate::Limits::opening_bytes
     pub fn header_error(&self) -> Option<Error> {
         match self.headers {
             HeaderState::Opening { error, .. } | HeaderState::Ready { error, .. } => error,
