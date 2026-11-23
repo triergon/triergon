@@ -114,8 +114,9 @@ impl Stream {
         }
     }
 
-    fn configured(&self) -> bool {
-        self.track.is_some() && self.headers == Headers::Done
+    /// Whether the stream's headers are read, or ended in an invalid one.
+    fn headers_read(&self) -> bool {
+        self.track.is_some() && matches!(self.headers, Headers::Done | Headers::Invalid)
     }
 }
 
@@ -438,10 +439,17 @@ impl Reader {
         };
         let headers = self.streams[stream].headers;
         if headers != Headers::Done {
+            if headers == Headers::Invalid {
+                return Ok(());
+            }
             let step = headers.classify(&payload);
             let configuring = !self.tracks[track].configured;
             match step {
-                Ok(HeaderStep::Media) => {}
+                // The headers ended before this media packet (FLAC without a count).
+                Ok(HeaderStep::Media) => {
+                    self.streams[stream].headers = Headers::Done;
+                    self.configured(stream, track)?;
+                }
                 Ok(step) => {
                     if configuring && self.tracks[track].header_error.is_none() {
                         match self.tracks[track].config.header(headers, &payload) {
@@ -461,14 +469,17 @@ impl Reader {
                     }
                     return Ok(());
                 }
+                // Not the header the mapping requires here: the stream is invalid (RFC
+                // 7845 section 5, Vorbis I section 4.2.1, Theora I section 6.1). The
+                // track keeps its identification and the error; no packet follows.
                 Err(error) => {
                     if configuring {
                         self.tracks[track].header_error = Some(error);
                     }
+                    self.streams[stream].headers = Headers::Invalid;
+                    return Ok(());
                 }
             }
-            self.streams[stream].headers = Headers::Done;
-            self.configured(stream, track)?;
         }
         let s = &mut self.streams[stream];
         let durations = self.tracks[track]
@@ -676,10 +687,9 @@ impl Reader {
                 again = true;
             }
         }
-        let configured = self.streams.iter().all(Stream::configured);
         if let Some(link) = self.links.get_mut(self.link)
             && link.data.is_none()
-            && configured
+            && self.streams.iter().all(Stream::headers_read)
         {
             link.data = Some(page.offset + page.bytes.len() as u64);
             self.start_end_scan()?;
@@ -839,6 +849,10 @@ impl Reader {
                 }
                 let mut stream = Stream::new(self.input.budget(), track.serial, &self.limits);
                 stream.track = Some(index);
+                if !track.configured {
+                    // Its headers broke: the stream stays invalid.
+                    stream.headers = Headers::Invalid;
+                }
                 stream.previous = Previous::Unknown;
                 stream.reference = ReferenceClock::resumed(track.reference_shift);
                 self.streams.try_push(stream).map_err(|e| e.error)?;

@@ -82,7 +82,12 @@ impl Track {
         self.configured
     }
 
-    /// Why the header packets could not be read; the track's packets then carry no time.
+    /// Why a header packet could not be read. A packet that is not the header its mapping
+    /// requires there makes the stream invalid: the track stays unconfigured and delivers
+    /// no packets. A header that does not parse or exceeds [`Limits::header_bytes`]
+    /// leaves the track configured from the headers before it.
+    ///
+    /// [`Limits::header_bytes`]: crate::Limits::header_bytes
     pub fn header_error(&self) -> Option<Error> {
         self.header_error
     }

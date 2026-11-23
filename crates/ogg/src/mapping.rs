@@ -315,6 +315,8 @@ pub(crate) enum Headers {
     /// Speex extra headers still to come.
     SpeexExtra(u32),
     Done,
+    /// A packet was not the header the mapping requires there: the stream is invalid.
+    Invalid,
 }
 
 /// Whether a packet is a header.
@@ -472,7 +474,7 @@ impl Configuration {
                 }
                 self.configuration = 0..self.bytes.len();
             }
-            Headers::SpeexExtra(_) | Headers::Done => {}
+            Headers::SpeexExtra(_) | Headers::Done | Headers::Invalid => {}
         }
         Ok(())
     }
@@ -566,10 +568,12 @@ impl Headers {
                 })
             }
             Headers::OpusTags => {
-                if !packet.starts_with(b"OpusTags") {
-                    return Err(Error::Invalid("Opus comment header"));
+                // RFC 7845 section 5.2: a comment header too short for its comment list
+                // makes the stream invalid.
+                match packet.strip_prefix(b"OpusTags") {
+                    Some(list) if comment_list_fits(list) => Ok(HeaderStep::Last),
+                    _ => Err(Error::Invalid("Opus comment header")),
                 }
-                Ok(HeaderStep::Last)
             }
             Headers::Flac(remaining) => {
                 // A frame starts with its sync code; a metadata block never has type 127.
@@ -611,7 +615,7 @@ impl Headers {
             } else {
                 HeaderStep::More
             }),
-            Headers::Done => Ok(HeaderStep::Media),
+            Headers::Done | Headers::Invalid => Ok(HeaderStep::Media),
         }
     }
 
@@ -627,6 +631,27 @@ impl Headers {
             _ => Headers::Done,
         }
     }
+}
+
+/// Whether a comment list fits in `list`: a vendor string and a count of comments, each
+/// after its 32-bit little-endian length (RFC 7845 section 5.2, Vorbis I section 5.2.1).
+/// Bytes after the list are allowed.
+fn comment_list_fits(list: &[u8]) -> bool {
+    fn take(rest: &mut &[u8]) -> Option<()> {
+        let (field, tail) = rest.split_first_chunk::<4>()?;
+        *rest = tail.get(usize::try_from(u32::from_le_bytes(*field)).ok()?..)?;
+        Some(())
+    }
+    let mut rest = list;
+    if take(&mut rest).is_none() {
+        return false;
+    }
+    let Some((count, tail)) = rest.split_first_chunk::<4>() else {
+        return false;
+    };
+    rest = tail;
+    // Each comment takes at least its four length bytes, so a false count stops early.
+    (0..u32::from_le_bytes(*count)).all(|_| take(&mut rest).is_some())
 }
 
 /// What the Theora identification header (Theora I section 6.2) says about timing.

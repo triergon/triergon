@@ -58,8 +58,11 @@ whole file in memory, headers included.
   | anything else | its known magic (Daala, VP8, Skeleton, ...) or first 8 bytes | the first packet |
 
   Header packets are never delivered as packets (Speex: the header, the comment header
-  and as many more as its `extra_headers` says). Other mappings are `CodecId::Other`;
-  their packets carry no time.
+  and as many more as its `extra_headers` says). A packet that is not the header its
+  mapping requires there (an Opus comment header too short for its comment list, RFC
+  7845 section 5.2) makes the stream invalid: its track keeps the identification and
+  `Track::header_error`, stays unconfigured and delivers no packets. Other mappings are
+  `CodecId::Other`; their packets carry no time.
 
 ## Timing
 

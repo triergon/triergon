@@ -1188,3 +1188,30 @@ fn open_stream_configures_opus_without_an_end_scan() {
     }
     assert_eq!(count, 4);
 }
+
+#[test]
+fn a_packet_that_is_not_the_opus_comment_header_makes_the_stream_invalid() {
+    // A second packet without the OpusTags magic, and one too short for its vendor string.
+    for comment in [&b"not-a-tag"[..], b"OpusTags\x64\0\0\0abcd"] {
+        let mut file = Vec::new();
+        let mut muxer = Muxer::new(5);
+        muxer.packet(&opus_head(312), 0, &mut file);
+        muxer.flush(false, &mut file);
+        muxer.packet(comment, 0, &mut file);
+        muxer.flush(false, &mut file);
+        for n in 0..4 {
+            muxer.packet(&opus_packet(n, 20), 960 * (n as i64 + 1), &mut file);
+        }
+        muxer.flush(true, &mut file);
+        let (reader, events, error) = read_with(&file, 1 << 16, 1 << 20, true, Limits::default());
+        assert_eq!(error, None);
+        let track = &reader.tracks()[0];
+        assert_eq!(
+            track.header_error(),
+            Some(Error::Invalid("Opus comment header"))
+        );
+        assert!(!track.is_configured());
+        assert_eq!(track.configuration(), opus_head(312));
+        assert!(packets(&events).is_empty());
+    }
+}
