@@ -712,7 +712,7 @@ impl Lane {
     // Borrowing the copied fragment through publication measured +0.063684% on one transport workload.
     #[expect(
         clippy::expect_used,
-        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
+        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions"
     )]
     pub(super) fn step(
         &mut self,

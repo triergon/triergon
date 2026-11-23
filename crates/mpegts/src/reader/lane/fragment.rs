@@ -172,7 +172,7 @@ impl Incomplete {
     // Matching the audit and buffer together measured +0.155353% on one transport workload.
     #[expect(
         clippy::expect_used,
-        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
+        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions"
     )]
     fn prepare(
         &mut self,
@@ -220,7 +220,7 @@ impl Incomplete {
     // Keeping audit cursors and the buffer live across copying measured +0.137280% on one transport workload.
     #[expect(
         clippy::expect_used,
-        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions (lane notes)"
+        reason = "typing the fragment copy measured +0.04 to +0.26% more instructions"
     )]
     pub(super) fn copy(
         &mut self,
