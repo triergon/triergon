@@ -342,9 +342,7 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    // Freezing in the matched arm needs an empty vector for the phase (+0.66%), an
-                    // owned output slot (+0.29%) or an out-of-line freeze (+0.39%) on the
-                    // configuration workloads; moving the phase out costs none of them.
+                    // Freezing in place measured +0.66% with an empty vector, +0.29% with a slot, and +0.39% out of line.
                     let Phase::Write { output, .. } =
                         std::mem::replace(&mut self.phase, Phase::Complete)
                     else {
