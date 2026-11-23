@@ -123,11 +123,7 @@ impl PhysicalRead {
     /// [`UnavailablePhysicalStart`](DescriptionRead::UnavailablePhysicalStart) packet of 1
     /// byte to 16 MiB that starts exactly where this one ends. Any other `next`, such as a
     /// later chunk inside the file, gives false; it is neither dropped nor treated as a seek.
-    pub fn modeled_following_eof(
-        &self,
-        next: &DescriptionEvent,
-        _profile: PhysicalReadProfile,
-    ) -> bool {
+    pub fn following_eof(&self, next: &DescriptionEvent, _profile: PhysicalReadProfile) -> bool {
         if !self.short_at_physical_end || next.read != DescriptionRead::UnavailablePhysicalStart {
             return false;
         }

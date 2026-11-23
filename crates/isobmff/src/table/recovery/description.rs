@@ -870,7 +870,7 @@ impl DescriptionPacketCursor<'_> {
 
 /// An entry of FFmpeg's index for a recovered track, as FFmpeg reports it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct NativeIndexEntry {
+pub struct DescriptionIndexEntry {
     /// 0-based position in the index.
     pub ordinal: u64,
     /// Absolute file offset of the packet's first byte.
@@ -892,7 +892,7 @@ pub struct DescriptionIndexEvent {
     /// The packet cursor's event for the declared sample.
     pub source_event: DescriptionEvent,
     /// The index entry for the packet; `None` when FFmpeg reports no packet.
-    pub demux_entry: Option<NativeIndexEntry>,
+    pub demux_entry: Option<DescriptionIndexEntry>,
 }
 /// FFmpeg's index of a [`DescriptionRecoveryTable`], one declared sample at a time.
 #[derive(Debug)]

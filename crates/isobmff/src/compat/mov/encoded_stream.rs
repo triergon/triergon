@@ -73,7 +73,7 @@ pub struct EncodedStream {
     encoder: Option<Bytes>,
     kind: EncodedEntryKind,
     raw_headers: [BoxView; 3],
-    receiver_source: Option<crate::compat::mov::encoded_metadata::EncodedSource>,
+    source: Option<crate::compat::mov::encoded_metadata::EncodedSource>,
     wave_source: Option<crate::compat::mov::encoded_contexts::WaveObservation>,
 }
 impl EncodedStream {
@@ -109,8 +109,8 @@ impl EncodedStream {
     /// The `mdhd` language, `hdlr` name and QuickTime sound fields the stream was derived
     /// from; `None` for streams from [`EncodedStreamJob::new`] and
     /// [`EncodedStreamJob::new_description`].
-    pub fn receiver_source(&self) -> Option<&crate::compat::mov::encoded_metadata::EncodedSource> {
-        self.receiver_source.as_ref()
+    pub fn source(&self) -> Option<&crate::compat::mov::encoded_metadata::EncodedSource> {
+        self.source.as_ref()
     }
     /// The track's `tkhd`, `mdhd` and `hdlr` boxes, in that order.
     pub fn raw_headers(&self) -> &[BoxView; 3] {
@@ -818,7 +818,7 @@ impl<'a> EncodedStreamJob<'a> {
                 ));
             }
         }
-        let (mut demux, encoder, receiver_source) = metadata(
+        let (mut demux, encoder, source) = metadata(
             self.header,
             &self.entry,
             self.kind,
@@ -826,7 +826,7 @@ impl<'a> EncodedStreamJob<'a> {
             self.view,
             self.major,
         )?;
-        let receiver_source = receiver_source.map(|mut source| {
+        let source = source.map(|mut source| {
             source.sound.clone_from(&self.sound_source);
             source.wave = self.wave_fields.as_ref().map(|w| w.raw.clone());
             source
@@ -847,7 +847,7 @@ impl<'a> EncodedStreamJob<'a> {
             dts,
             encoder,
             kind: self.kind,
-            receiver_source,
+            source,
             wave_source: self.wave_source.take(),
             raw_headers: [
                 self.header.raw_tkhd.clone(),

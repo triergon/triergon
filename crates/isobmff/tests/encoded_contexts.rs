@@ -291,7 +291,7 @@ macro_rules! wave_case {
 }
 macro_rules! recovery_case {($name:ident,$file:literal)=>{#[test]fn $name(){
  let s=Source::new(include_bytes!(concat!("fixtures/encoded-recovery/",$file,".mp4")));assert!(strict_plan(&s).is_err(),"original source/default strict profile remains refused");let plan=s.plan(1).unwrap();let report=plan.recovery_observation().expect("owned source recovery result");assert!(report.ignored_group_boxes()>0);assert_eq!(report.raw_source_table().header(),s.table.raw().header());
- match report.source_result(){Ok(_facts)=>{#[cfg(feature = "reference-trace")]assert_eq!(_facts.receiver_cause(),triergon_isobmff::reference_trace::mov::encoded::RecoveryReceiverCause::RollProlNotAppliedByOpenIndex);},Err(fault)=>{assert!(matches!(fault.error,Error::Invalid(_)|Error::Unsupported(_)|Error::Truncated));assert!(matches!(&fault.raw.header().kind,b"sgpd"|b"sbgp"));assert!(fault.raw.bytes().belongs_to(&s.pool));}}
+ match report.source_result(){Ok(_facts)=>{#[cfg(feature = "reference-trace")]assert_eq!(_facts.cause(),triergon_isobmff::reference_trace::mov::encoded::RecoveryReceiverCause::RollProlNotAppliedByOpenIndex);},Err(fault)=>{assert!(matches!(fault.error,Error::Invalid(_)|Error::Unsupported(_)|Error::Truncated));assert!(matches!(&fault.raw.header().kind,b"sgpd"|b"sbgp"));assert!(fault.raw.bytes().belongs_to(&s.pool));}}
  let packets=rows(&s,Some(plan));assert_eq!(packets.len(),2);assert_eq!((packets[0].demux.pts,packets[1].demux.pts),(Some(0),Some(40)));assert_eq!((packets[0].demux.flags,packets[1].demux.flags),(1,0));for p in packets{assert_eq!(p.demux.source_range,p.source.range);}
 }};}
 wave_case!(wave_duplicate_frma, "qt-v1-duplicate-frma");

@@ -184,7 +184,7 @@ impl EncodedEditPlan {
     /// The exclusive end of the edit on the source timeline, in ticks of the media
     /// timescale: where its presentation starts (the media time for audio, the first
     /// presentation time at or after it for video) plus its duration.
-    pub fn selected_end_ticks(&self) -> i128 {
+    pub fn end_ticks(&self) -> i128 {
         self.end
     }
     /// End of the Opus presentation on the edited timeline: the earlier of the edit's

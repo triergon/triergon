@@ -99,7 +99,7 @@ fn wave_v1_retains_words_and_full_backing_without_retyping_audio_v0() {
     let mut i = s.input();
     let before = s.pool.used();
     let result = finish(&mut s.job(&i).unwrap(), &mut i, 1).unwrap();
-    let source = result.receiver_source().unwrap();
+    let source = result.source().unwrap();
     let sound = source.sound.as_ref().unwrap();
     assert_eq!(
         (
@@ -141,7 +141,7 @@ fn unknown_wave_child_is_retained_and_work_one_matches_bulk() {
     let mut b = s.input();
     let bulk = finish(&mut s.job(&b).unwrap(), &mut b, 4096).unwrap();
     let raw = one
-        .receiver_source()
+        .source()
         .unwrap()
         .wave
         .as_ref()
@@ -151,7 +151,7 @@ fn unknown_wave_child_is_retained_and_work_one_matches_bulk() {
     assert!(raw.windows(8).any(|x| x == b"original"));
     assert_eq!(
         raw,
-        bulk.receiver_source()
+        bulk.source()
             .unwrap()
             .wave
             .as_ref()
@@ -301,7 +301,7 @@ fn empty_iso_handler_is_source_owned_but_receiver_tag_is_absent() {
     )
     .unwrap();
     let r = finish(&mut j, &mut i, 1).unwrap();
-    let source = r.receiver_source().unwrap();
+    let source = r.source().unwrap();
     assert!(source.handler.demux.is_none());
     assert!(!source.handler.source_pascal);
     assert_eq!(source.handler.raw().payload().len(), 25);

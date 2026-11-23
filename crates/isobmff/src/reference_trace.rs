@@ -9,7 +9,7 @@
 //! [`DescriptionRecoveryTable`](crate::compat::mov::recovery::DescriptionRecoveryTable)'s
 //! transport cursors,
 //! [`DescriptionEvent::modeled_transport_read`](crate::compat::mov::recovery::DescriptionEvent::modeled_transport_read)
-//! and [`RecoveryFacts::receiver_cause`](crate::compat::mov::encoded::RecoveryFacts::receiver_cause)
+//! and [`RecoveryFacts::cause`](crate::compat::mov::encoded::RecoveryFacts::cause)
 //! are also available.
 
 pub mod mov {
@@ -108,7 +108,7 @@ pub mod mov {
 
     pub mod encoded {
         //! The cause that
-        //! [`receiver_cause`](crate::compat::mov::encoded::RecoveryFacts::receiver_cause)
+        //! [`cause`](crate::compat::mov::encoded::RecoveryFacts::cause)
         //! reports for an encoded track's recovery groups.
         pub use crate::compat::mov::encoded_recovery::RecoveryReceiverCause;
     }

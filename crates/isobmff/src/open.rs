@@ -27,12 +27,8 @@ fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
 /// Reads roots from the current input generation with a metadata cap in bytes.
 /// Recovery mode admits a terminal `mdat` that extends past the known source length.
 #[doc(hidden)]
-pub fn box_reader(
-    input: &InputCursor,
-    metadata_bytes: usize,
-    native_recovery: bool,
-) -> Result<BoxReader> {
-    if native_recovery {
+pub fn box_reader(input: &InputCursor, metadata_bytes: usize, recovery: bool) -> Result<BoxReader> {
+    if recovery {
         BoxReader::new_recovery(
             input,
             metadata_bytes,
@@ -401,7 +397,7 @@ impl PendingMedia {
 #[derive(Debug)]
 pub struct Movie {
     pub(crate) read_scope: MetadataReadScope,
-    pub(crate) native_recovery: bool,
+    pub(crate) recovery: bool,
     pub(crate) source: triergon_core::SourceId,
     pub(crate) generation: u64,
     pub(crate) source_length: Option<u64>,
@@ -456,8 +452,8 @@ impl Movie {
         self.source_length
     }
     /// Whether the recovery opener produced this movie.
-    pub fn native_recovery(&self) -> bool {
-        self.native_recovery
+    pub fn recovery(&self) -> bool {
+        self.recovery
     }
     /// Payload extents of the `mdat` boxes, in source order.
     pub fn media(&self) -> &[Range<u64>] {
@@ -563,7 +559,7 @@ enum TrafStage {
 #[derive(Debug)]
 pub struct MovieOpen {
     reader: BoxReader,
-    native_recovery: bool,
+    recovery: bool,
     timing_policy: TimingRunPolicy,
     prefer_front: bool,
     limits: OpenLimits,
@@ -618,7 +614,7 @@ impl MovieOpen {
     fn new_inner(
         input: &InputCursor,
         limits: OpenLimits,
-        native_recovery: bool,
+        recovery: bool,
         prefer_front: bool,
     ) -> Result<Self> {
         if limits.tracks == 0
@@ -630,10 +626,10 @@ impl MovieOpen {
             return Err(Error::Invalid("MP4 adapter open limits"));
         }
         let pool = input.budget().clone();
-        let reader = box_reader(input, limits.metadata_bytes, native_recovery)?;
+        let reader = box_reader(input, limits.metadata_bytes, recovery)?;
         Ok(Self {
             reader,
-            native_recovery,
+            recovery,
             timing_policy: TimingRunPolicy::default(),
             prefer_front,
             limits,
@@ -691,8 +687,7 @@ impl MovieOpen {
                     push(&mut self.media_cache, cached)?;
                     self.pending_media = None;
                     // The cursor is at the next top-level header after the retained MDAT.
-                    self.reader =
-                        box_reader(input, self.limits.metadata_bytes, self.native_recovery)?;
+                    self.reader = box_reader(input, self.limits.metadata_bytes, self.recovery)?;
                     Ok(OpenStep::Yield)
                 }
                 Step::NeedInput(r) => Ok(OpenStep::NeedInput(r)),
@@ -712,7 +707,7 @@ impl MovieOpen {
                         &self.pool,
                         self.limits,
                         self.brand,
-                        self.native_recovery,
+                        self.recovery,
                     )?;
                     self.walk = Some(walk);
                     Ok(OpenStep::Yield)
@@ -768,7 +763,7 @@ impl MovieOpen {
                 self.limits.format,
                 self.timing_policy,
             )?;
-            if self.native_recovery {
+            if self.recovery {
                 builder.allow_legacy_dependency_flags();
             }
             let dref = p
@@ -847,7 +842,7 @@ impl MovieOpen {
         let tkhd = p.tkhd.as_ref().ok_or(Error::Invalid("missing tkhd"))?;
         let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
         let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
-        let header = if self.native_recovery {
+        let header = if self.recovery {
             crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(
                 tkhd,
                 mdhd,
@@ -965,16 +960,14 @@ impl MovieOpen {
             }
             let front =
                 (self.prefer_front || !input.capabilities().random_access) && self.moov.is_some();
-            let file_end = if self.native_recovery
-                && input.capabilities().random_access
-                && self.moov.is_some()
-            {
-                h.end()?
-                    .zip(input.capabilities().length)
-                    .and_then(|(declared, physical)| (declared > physical).then_some(physical))
-            } else {
-                None
-            };
+            let file_end =
+                if self.recovery && input.capabilities().random_access && self.moov.is_some() {
+                    h.end()?
+                        .zip(input.capabilities().length)
+                        .and_then(|(declared, physical)| (declared > physical).then_some(physical))
+                } else {
+                    None
+                };
             let terminal = if h.size.is_none() {
                 if !front || !self.media.is_empty() {
                     return Err(Error::Unsupported(
@@ -992,7 +985,7 @@ impl MovieOpen {
                     &self.pool,
                     self.limits,
                     self.brand,
-                    self.native_recovery,
+                    self.recovery,
                 )?)
             } else {
                 None
@@ -1021,7 +1014,7 @@ impl MovieOpen {
                 // The checked declaration extends past the physical entity.
                 // Still obtain a matching End before completing the open.
                 input.request_range(end)?;
-                self.reader = box_reader(input, self.limits.metadata_bytes, self.native_recovery)?;
+                self.reader = box_reader(input, self.limits.metadata_bytes, self.recovery)?;
             } else {
                 self.reader.skip(input)?;
             }
@@ -1089,7 +1082,7 @@ impl MovieOpen {
                         description_count: u32::try_from(t.table.descriptions().len())
                             .map_err(|_| Error::Overflow)?,
                     };
-                    let build = if self.native_recovery {
+                    let build = if self.recovery {
                         FragmentBuilder::new_header_open
                     } else {
                         FragmentBuilder::new_with_inherited_decode_end
@@ -1145,7 +1138,7 @@ impl MovieOpen {
         let walk = self.walk.take().ok_or(Error::Invalid("walk missing"))?;
         Ok(Movie {
             read_scope: self.read_scope,
-            native_recovery: self.native_recovery,
+            recovery: self.recovery,
             source: input.source(),
             generation: input.generation(),
             source_length: input.capabilities().length,

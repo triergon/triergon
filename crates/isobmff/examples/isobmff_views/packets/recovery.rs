@@ -293,7 +293,7 @@ impl RecoveryPayload<'_, '_> {
     fn event(&mut self, event: DescriptionEvent, out: &mut Output<'_, '_>) -> Result<bool> {
         if event.read != DescriptionRead::Available {
             if self.previous.as_ref().is_some_and(|previous| {
-                previous.modeled_following_eof(&event, PhysicalReadProfile)
+                previous.following_eof(&event, PhysicalReadProfile)
                     || (event.read == DescriptionRead::UnavailablePhysicalStart
                         && previous.requested().end == previous.physical_length()
                         && event.packet.as_ref().is_some_and(|packet| {

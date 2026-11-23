@@ -805,7 +805,7 @@ fn range_playback_uses_the_opus_edit_and_keeps_variable_packet_durations() {
     );
     let plan = range_plan(&source, *b"isom").unwrap();
     assert_eq!(plan.anchor_ticks(), 720);
-    assert_eq!(plan.selected_end_ticks(), 5040);
+    assert_eq!(plan.end_ticks(), 5040);
     let packets = rows(&source, plan);
     assert_eq!(packets.len(), OPUS_DURATIONS.len());
     for (i, ((packet, skip), (duration, pts))) in packets
@@ -1290,7 +1290,7 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
     let source = Source::new(&raw, b"soun");
     let plan = range_plan(&source, *b"isom").unwrap();
     assert_eq!(plan.anchor_ticks(), -204);
-    assert_eq!(plan.selected_end_ticks(), 8736);
+    assert_eq!(plan.end_ticks(), 8736);
     let packets = rows(&source, plan.clone());
     assert_eq!(packets.len(), 6);
     for (i, (packet, skip)) in packets.iter().enumerate() {
@@ -1437,7 +1437,7 @@ fn range_playback_requires_an_exact_dolby_edit_end() {
             let source = Source::new(&raw, b"soun");
             let plan = range_plan(&source, *b"isom");
             if duration == 17_920 {
-                assert_eq!(plan.unwrap().selected_end_ticks(), 9216);
+                assert_eq!(plan.unwrap().end_ticks(), 9216);
             } else {
                 assert!(plan.is_err(), "range playback admitted duration {duration}");
             }
@@ -1562,7 +1562,7 @@ fn plan_work1_and_bulk_are_identical_and_keep_literal_elst() {
     let a = p.plan(1).unwrap();
     let b = p.plan(4096).unwrap();
     assert_eq!(a.anchor_ticks(), b.anchor_ticks());
-    assert_eq!(a.selected_end_ticks(), b.selected_end_ticks());
+    assert_eq!(a.end_ticks(), b.end_ticks());
     assert_eq!(
         a.source_edit().bytes().as_ref(),
         p.edits.raw().bytes().as_ref()

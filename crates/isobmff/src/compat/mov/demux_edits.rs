@@ -91,8 +91,7 @@ impl<'a> DemuxEditsJob<'a> {
     /// A job over `movie`, which must be a complete source opened without recovery.
     /// `Error::Unsupported` otherwise.
     pub fn new(movie: &'a Movie) -> Result<Self> {
-        if movie.native_recovery()
-            || movie.read_scope() != crate::open::MetadataReadScope::CompleteEntity
+        if movie.recovery() || movie.read_scope() != crate::open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
                 "encoded edits require a complete source opened without recovery",

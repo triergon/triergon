@@ -491,7 +491,7 @@ impl<'a> Mp4IndexJob<'a> {
     /// their packets and seeks as on [`Self::encoded_range`].
     pub(crate) fn demux(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
         let mut job = Self::new_inner(movie, PlanView::Demux, limits, false, None, None)?;
-        if !movie.native_recovery()
+        if !movie.recovery()
             && movie.read_scope() == crate::mp4::open::MetadataReadScope::CompleteEntity
             && movie
                 .tracks()
@@ -513,7 +513,7 @@ impl<'a> Mp4IndexJob<'a> {
         if plans.len() != movie.tracks().len() {
             return Err(Error::Invalid("encoded edit track coverage"));
         }
-        if movie.native_recovery()
+        if movie.recovery()
             || !matches!(
                 movie.read_scope(),
                 crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
@@ -538,7 +538,7 @@ impl<'a> Mp4IndexJob<'a> {
         plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
         limits: PlanLimits,
     ) -> Result<Self> {
-        if movie.native_recovery()
+        if movie.recovery()
             || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
@@ -554,7 +554,7 @@ impl<'a> Mp4IndexJob<'a> {
         limits: PlanLimits,
         media_tracks_only: bool,
     ) -> Result<Self> {
-        if movie.native_recovery()
+        if movie.recovery()
             || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
         {
             return Err(Error::Unsupported(
@@ -591,7 +591,7 @@ impl<'a> Mp4IndexJob<'a> {
         encoded_edits: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
         range_duration: Option<RangeDuration>,
     ) -> Result<Self> {
-        if movie.native_recovery() && view == PlanView::Source {
+        if movie.recovery() && view == PlanView::Source {
             return Err(Error::Invalid(
                 "MP4 opened with recovery requires a demux packet plan",
             ));
@@ -626,7 +626,7 @@ impl<'a> Mp4IndexJob<'a> {
         let mut demux_tracks = BudgetVec::new(b);
         let mut zero_scale_clock = None;
         for t in movie.tracks() {
-            let media_base = if t.header().timescale == 0 && movie.native_recovery() {
+            let media_base = if t.header().timescale == 0 && movie.recovery() {
                 if !movie.trex().is_empty()
                     || !t.fragments().is_empty()
                     || t.edits().is_some()
@@ -674,7 +674,7 @@ impl<'a> Mp4IndexJob<'a> {
             crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(h)
                 if movie.terminal_mdat().is_none()
                     && movie.media().len() == 1
-                    && (!movie.native_recovery()
+                    && (!movie.recovery()
                         || movie
                             .source_length()
                             .is_none_or(|length| movie.media()[0].end <= length))
@@ -827,7 +827,7 @@ impl<'a> Mp4IndexJob<'a> {
             movie,
             plan: Some(PreparedMp4 {
                 read_scope: movie.read_scope(),
-                demux_recovery: movie.native_recovery(),
+                demux_recovery: movie.recovery(),
                 unavailable_first: None,
                 source: movie.source(),
                 opening_generation: movie.generation(),

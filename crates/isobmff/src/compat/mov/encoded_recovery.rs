@@ -119,7 +119,7 @@ impl RecoveryFacts {
     }
     /// Why the demuxer does not apply the groups, for trace comparison.
     #[cfg(feature = "reference-trace")]
-    pub fn receiver_cause(&self) -> RecoveryReceiverCause {
+    pub fn cause(&self) -> RecoveryReceiverCause {
         RecoveryReceiverCause::RollProlNotAppliedByOpenIndex
     }
 }

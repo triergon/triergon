@@ -481,17 +481,17 @@ fn short_prefix_does_not_discard_a_later_in_source_chunk_or_guess_a_far_seek() {
     let mut next = first.clone();
     next.read = DescriptionRead::UnavailablePhysicalStart;
     next.packet.as_mut().unwrap().source_range = 758..770;
-    assert!(plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(plan.following_eof(&next, PhysicalReadProfile));
     next.read = DescriptionRead::Available;
     next.packet.as_mut().unwrap().source_range = 699..711;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next, PhysicalReadProfile));
     next.read = DescriptionRead::UnavailablePhysicalStart;
     next.packet.as_mut().unwrap().source_range = 759..771;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next, PhysicalReadProfile));
     next.packet.as_mut().unwrap().source_range = 33516..33528;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next, PhysicalReadProfile));
     next.packet.as_mut().unwrap().source_range = 747..747;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next, PhysicalReadProfile));
 }
 
 #[test]

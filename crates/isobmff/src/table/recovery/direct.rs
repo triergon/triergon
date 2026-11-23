@@ -279,7 +279,7 @@ pub(super) fn native_index_entry(
     distance: u64,
     flags_error: &'static str,
     position_error: &'static str,
-) -> Result<NativeIndexEntry> {
+) -> Result<DescriptionIndexEntry> {
     let size = packet
         .source_range
         .end
@@ -289,7 +289,7 @@ pub(super) fn native_index_entry(
     if packet.flags & !1 != 0 {
         return Err(Error::Unsupported(flags_error));
     }
-    Ok(NativeIndexEntry {
+    Ok(DescriptionIndexEntry {
         ordinal,
         position: i64::try_from(packet.source_range.start)
             .map_err(|_| Error::Unsupported(position_error))?,
@@ -485,7 +485,7 @@ impl DirectPacketCursor<'_> {
 #[derive(Clone, Debug)]
 pub struct DirectIndexEntry {
     /// The index entry FFmpeg reports.
-    pub entry: NativeIndexEntry,
+    pub entry: DescriptionIndexEntry,
     /// The sample as the table declares it.
     pub declaration: Sample,
     /// How the entry's packet relates to `declaration`.
@@ -537,7 +537,7 @@ impl DirectIndexCursor<'_> {
                 CursorStatus::Ready => {
                     let e = c.take_entry()?;
                     self.latch.ready = Some(DirectIndexEntry {
-                        entry: NativeIndexEntry {
+                        entry: DescriptionIndexEntry {
                             ordinal: e.ordinal,
                             position: e.position,
                             timestamp: e.timestamp,
