@@ -4,10 +4,7 @@
 //! The constructor seals the exact immutable span after validation, without a
 //! second whole-span scan. `SharedText::as_str` is the safe view.
 use super::{SharedBytes, SharedText};
-use crate::{
-    Error, Result,
-    step::{ParseStep, Required},
-};
+use crate::{Error, Result, step::ParseStep};
 use std::{
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
@@ -190,7 +187,9 @@ impl TextJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<TextValue>> {
-        if self.result.is_none() {
+        let value = if let Some(value) = &self.result {
+            value
+        } else {
             let range = match self.check.step(&self.source, work, cancel)? {
                 ParseStep::Event(range) => range,
                 other => return crate::step::pending(other),
@@ -203,14 +202,12 @@ impl TextJob {
                     constant: None,
                 }
             };
-            self.result = Some(TextValue { text, range });
-        }
+            self.result.insert(TextValue { text, range })
+        };
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        Ok(ParseStep::Event(
-            self.result.clone().required("missing text result")?,
-        ))
+        Ok(ParseStep::Event(value.clone()))
     }
 }
 
