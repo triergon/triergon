@@ -46,39 +46,80 @@ pub(crate) struct RestoredEpoch {
     pub scanned_bytes: u64,
     pub cluster_time: Option<u64>,
 }
+/// The bytes of the Block a CodecState may come with.
 #[derive(Debug)]
+enum Source {
+    Group(BlockGroupSource),
+    /// A SimpleBlock, which carries no CodecState but whose track matters at the
+    /// referenced block.
+    Simple(SharedBytes),
+}
+/// Which track the Block being examined belongs to.
+#[derive(Clone, Copy, Debug)]
+enum Lookup {
+    /// Reading its track number.
+    Number,
+    /// Comparing that number with the track at index `at`.
+    Track { number: u64, at: usize },
+}
+/// The jobs that take a BlockGroup's CodecState into the configuration.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one job at a time, inline in the reconstruction; boxing it would allocate per group"
+)]
+#[derive(Debug)]
+enum StateJob {
+    /// Checking the group's additions against the track's mappings.
+    Mapping(TrackExtensionsJob),
+    Copy(StateCopyJob),
+    Change(StateChangeJob),
+}
+/// Where the reconstruction stands. A phase owns what it reads: the Block being
+/// examined, the jobs that take its CodecState, the configuration at the boundary.
+// An explicit tag byte: in a niche of a job, the envelope loop decodes it on
+// every element.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one phase at a time, inline in the reconstruction; boxing it would allocate per group"
+)]
+#[derive(Debug)]
+#[repr(u8)]
 enum Phase {
     Begin,
+    /// Elements from the anchor up to the boundary.
     Envelope,
-    Group,
-    Header,
-    Track,
-    Mapping,
-    Copy,
-    Change,
-    Replay,
+    /// The Block of a BlockGroup or of the referenced SimpleBlock.
+    Block {
+        header: ElementHeader,
+        source: Source,
+        lookup: Lookup,
+    },
+    /// A BlockGroup of the track at index `track` whose additions or CodecState
+    /// change the configuration.
+    State {
+        header: ElementHeader,
+        group: BlockGroupSource,
+        track: usize,
+        job: StateJob,
+    },
+    /// Positioning the input at the boundary, with the configuration there.
+    Replay(Configuration),
     Done,
 }
 #[derive(Debug)]
 pub(crate) struct EpochRestoreJob {
     target: EpochTarget,
     configuration: Configuration,
+    // The configuration at the boundary once reading has passed it.
     boundary: Option<Configuration>,
     limits: Limits,
     pool: Budget,
     remaining: u64,
     phase: Phase,
-    header: Option<ElementHeader>,
-    group_job: Option<GroupJob>,
-    group: Option<BlockGroupSource>,
-    simple: Option<SharedBytes>,
-    mapping: Option<TrackExtensionsJob>,
-    copy: Option<StateCopyJob>,
-    change: Option<StateChangeJob>,
-    track_number: u64,
-    track: usize,
+    /// The parser of a BlockGroup and its header; it finishes before the phase
+    /// goes on.
+    group: Option<(ElementHeader, GroupJob)>,
     reference_checked: bool,
-    result: Option<RestoredEpoch>,
     failed: bool,
 }
 impl EpochRestoreJob {
@@ -114,17 +155,8 @@ impl EpochRestoreJob {
             pool: pool.clone(),
             remaining,
             phase: Phase::Begin,
-            header: None,
-            group_job: None,
             group: None,
-            simple: None,
-            mapping: None,
-            copy: None,
-            change: None,
-            track_number: 0,
-            track: 0,
             reference_checked: false,
-            result: None,
             failed: false,
         })
     }
@@ -144,8 +176,17 @@ impl EpochRestoreJob {
             self.target.replay.block_offset()
         }
     }
-    fn ready(&self) -> bool {
-        self.boundary.is_some() && (self.target.reference.is_none() || self.reference_checked)
+    /// Goes on to the replay from the boundary once reading has passed it and the
+    /// referenced block, if any, is checked; reports whether it did.
+    fn replay(&mut self) -> bool {
+        if self.target.reference.is_some() && !self.reference_checked {
+            return false;
+        }
+        let Some(configuration) = self.boundary.take() else {
+            return false;
+        };
+        self.phase = Phase::Replay(configuration);
+        true
     }
     fn check_reference(&mut self, header: ElementHeader) -> Result<()> {
         let Some(reference) = self.target.reference else {
@@ -174,33 +215,12 @@ impl EpochRestoreJob {
         self.reference_checked = true;
         Ok(())
     }
-    fn after_group(&mut self) -> Result<()> {
-        let header = self.header.required("missing state source header")?;
+    /// The Block with this header is examined: on to the replay, or back to the
+    /// envelope.
+    fn after_block(&mut self, header: ElementHeader) -> Result<()> {
         self.check_reference(header)?;
-        self.group = None;
-        self.simple = None;
-        self.header = None;
-        self.phase = if self.ready() {
-            Phase::Replay
-        } else {
-            Phase::Envelope
-        };
-        Ok(())
-    }
-    fn start_copy(&mut self) -> Result<()> {
-        if let Some(group) = self
-            .group
-            .as_ref()
-            .filter(|group| group.codec_state().is_some())
-        {
-            self.copy = Some(StateCopyJob::new(
-                group,
-                self.limits.block_bytes,
-                &self.pool,
-            )?);
-            self.phase = Phase::Copy;
-        } else {
-            self.after_group()?;
+        if !self.replay() {
+            self.phase = Phase::Envelope;
         }
         Ok(())
     }
@@ -268,9 +288,8 @@ impl EpochRestoreJob {
         #[cfg(test)]
         OWNED_PREFIX_HITS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.remaining -= found.consumed;
-        self.boundary = Some(self.configuration.clone());
         self.reference_checked = reference.is_some();
-        self.phase = Phase::Replay;
+        self.phase = Phase::Replay(self.configuration.clone());
         Ok(true)
     }
     pub(crate) fn step(
@@ -318,276 +337,283 @@ impl EpochRestoreJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<RestoredEpoch>> {
-        loop {
-            check(cancel)?;
-            match self.phase {
-                Phase::Begin => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    reader.begin_internal_cluster_range(
-                        &self.target.anchor,
-                        self.target.anchor.offset(),
-                    )?;
-                    self.phase = Phase::Envelope;
-                }
-                Phase::Envelope => {
-                    let admission = EpochAdmission {
-                        keep: [
-                            (!self.target.whole_cluster).then(|| self.boundary_offset()),
-                            self.target.reference.map(|reference| reference.block),
-                        ],
-                    };
-                    let step = match reader.step_typed_seek_operation(
-                        &mut self.remaining,
-                        Some(admission),
-                        work,
-                        cancel,
-                    )? {
-                        EnvelopeProgress::Header(header) => {
-                            if !work.try_charge(1) {
-                                return Ok(ParseStep::Yield);
-                            }
-                            let replay_boundary = !self.target.whole_cluster
-                                && header.start == self.boundary_offset();
-                            let reference = self
-                                .target
-                                .reference
-                                .is_some_and(|reference| reference.block == header.start);
-                            // CodecState is a BlockGroup child. An unrelated
-                            // SimpleBlock was never decoded by this job; consume
-                            // its real bytes without collecting a useless owner.
-                            let skip = header.id == SIMPLE_BLOCK && !replay_boundary && !reference;
-                            reader.admit_typed_leaf(header, None, skip)?;
-                            continue;
-                        }
-                        EnvelopeProgress::Step(step) => step,
-                    };
-                    match step {
-                        ParseStep::Event(ElementEvent::Start(header)) => {
-                            if self.target.whole_cluster
-                                && header.id == 0x1f43b675
-                                && header.start == self.boundary_offset()
-                            {
-                                self.boundary = Some(self.configuration.clone());
-                                if let Some(reference) = self.target.reference.filter(|reference| {
-                                    reference.unchanged_cluster_prefix == Some(header.start)
-                                }) {
-                                    let end = header
-                                        .size
-                                        .map(|size| {
-                                            header.data.checked_add(size).ok_or(Error::Overflow)
-                                        })
-                                        .transpose()?;
-                                    if reference.block < header.data
-                                        || end.is_some_and(|end| reference.block >= end)
-                                    {
-                                        return Err(Error::Invalid(
-                                            "validated state prefix outside Cluster",
-                                        ));
-                                    }
-                                    self.check_reference_state(reference)?;
-                                }
-                                if self.ready() {
-                                    self.phase = Phase::Replay;
-                                }
-                            }
-                        }
-                        ParseStep::Event(ElementEvent::Leaf { header, data }) => {
-                            if !self.target.whole_cluster && header.start == self.boundary_offset()
-                            {
-                                self.boundary = Some(self.configuration.clone());
-                                if self.ready() {
-                                    self.phase = Phase::Replay;
-                                    continue;
-                                }
-                            }
-                            match header.id {
-                                BLOCK_GROUP => {
-                                    self.header = Some(header);
-                                    self.group_job = Some(GroupJob::new(
-                                        data,
-                                        u64::MAX,
-                                        Some(GroupLocation {
-                                            source: reader.request().source,
-                                            segment_data: self.target.segment_data,
-                                            header: header.start,
-                                            data: header.data,
-                                        }),
-                                        self.limits,
-                                        &self.pool,
-                                    )?);
-                                    self.phase = Phase::Group;
-                                }
-                                // A SimpleBlock cannot carry CodecState. Its Track
-                                // membership still matters at the referenced RAP.
-                                SIMPLE_BLOCK
-                                    if self.target.reference.is_some_and(|reference| {
-                                        reference.block == header.start
-                                    }) =>
-                                {
-                                    self.header = Some(header);
-                                    self.simple = Some(data);
-                                    self.group = None;
-                                    self.phase = Phase::Header;
-                                }
-                                _ => (),
-                            }
-                        }
-                        ParseStep::Event(ElementEvent::End { .. } | ElementEvent::Skipped(_)) => (),
-                        ParseStep::Finished => {
-                            return Err(Error::Invalid("state replay boundary absent from source"));
-                        }
-                        other => return crate::step::pending(other),
-                    }
-                }
-                Phase::Group => match self
-                    .group_job
-                    .as_mut()
-                    .required("missing state group parser")?
-                    .step(work, cancel)?
-                {
+        'epoch: loop {
+            if let Some((header, job)) = &mut self.group {
+                check(cancel)?;
+                match job.step(work, cancel)? {
                     ParseStep::Event(group) => {
                         // The group parser consumed syntax/CRC work; parsing the
                         // fixed Block header is another retained bounded phase.
-                        self.group = Some(group);
-                        self.group_job = None;
-                        self.phase = Phase::Header;
+                        self.phase = Phase::Block {
+                            header: *header,
+                            source: Source::Group(group),
+                            lookup: Lookup::Number,
+                        };
+                        self.group = None;
                     }
                     other => return crate::step::pending(other),
-                },
-                Phase::Header => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let block = match &self.group {
-                        Some(group) => &group.raw_body()[group.block()],
-                        None => self
-                            .simple
-                            .as_ref()
-                            .required("missing state source Block")?
-                            .as_ref(),
-                    };
-                    let (number, width, _) = ebml::vint(block, false)?;
-                    block.get(width..width + 3).ok_or(Error::Truncated)?;
-                    self.track_number = number;
-                    self.track = 0;
-                    self.phase = Phase::Track;
                 }
-                Phase::Track => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let track = self
-                        .configuration
-                        .tracks()
-                        .get(self.track)
-                        .required("unregistered state block track")?;
-                    if track.number != self.track_number {
-                        self.track += 1;
-                        continue;
-                    }
-                    let header = self.header.required("missing state source header")?;
-                    if self.target.reference.is_some_and(|reference| {
-                        reference.block == header.start && reference.track != self.track
-                    }) {
-                        return Err(Error::Invalid("cue state reference block track"));
-                    }
-                    if self
-                        .group
-                        .as_ref()
-                        .is_some_and(|group| group.max_addition_id() != 0)
-                    {
-                        self.mapping = Some(
-                            self.configuration
-                                .track_extensions_job(self.track, self.limits)?,
-                        );
-                        self.phase = Phase::Mapping;
-                    } else {
-                        self.start_copy()?;
-                    }
-                }
-                Phase::Mapping => match self
-                    .mapping
-                    .as_mut()
-                    .required("missing state track extension job")?
-                    .step_job(work, cancel)?
-                {
-                    ParseStep::Event(mapping) => {
-                        self.configuration.validate_additions(
-                            self.track,
-                            self.group.as_ref().required("missing state source group")?,
-                            &mapping,
-                        )?;
-                        self.mapping = None;
-                        self.start_copy()?;
-                    }
-                    other => return crate::step::pending(other),
-                },
-                Phase::Copy => match self
-                    .copy
-                    .as_mut()
-                    .required("missing reconstructed state copy")?
-                    .step(work, cancel)?
-                {
-                    ParseStep::Event(state) => {
-                        self.change = Some(StateChangeJob::new(
-                            self.configuration.clone(),
-                            self.track,
-                            Some(state),
-                            &self.pool,
-                        )?);
-                        self.copy = None;
-                        self.phase = Phase::Change;
-                    }
-                    other => return crate::step::pending(other),
-                },
-                Phase::Change => match self
-                    .change
-                    .as_mut()
-                    .required("missing reconstructed state transaction")?
-                    .step(work, cancel)?
-                {
-                    ParseStep::Event(configuration) => {
-                        self.configuration = configuration;
-                        self.change = None;
-                        self.after_group()?;
-                    }
-                    other => return crate::step::pending(other),
-                },
-                Phase::Replay => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let configuration = self
-                        .boundary
-                        .as_ref()
-                        .required("missing state boundary snapshot")?
-                        .clone();
-                    let cluster_time = if self.target.whole_cluster {
+            }
+            loop {
+                check(cancel)?;
+                match &mut self.phase {
+                    Phase::Begin => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
                         reader.begin_internal_cluster_range(
-                            self.target.replay.checkpoint(),
-                            self.target.replay.cluster_offset(),
+                            &self.target.anchor,
+                            self.target.anchor.offset(),
                         )?;
-                        None
-                    } else {
-                        reader.restore_internal_block(&self.target.replay)?;
-                        self.target.replay.cluster_time
-                    };
-                    self.result = Some(RestoredEpoch {
-                        configuration,
-                        scanned_bytes: self.target.remaining - self.remaining,
-                        cluster_time,
-                    });
-                    self.phase = Phase::Done;
-                }
-                Phase::Done => {
-                    return Ok(ParseStep::Event(
-                        self.result
-                            .as_ref()
-                            .required("missing restored epoch")?
-                            .clone(),
-                    ));
+                        self.phase = Phase::Envelope;
+                    }
+                    Phase::Envelope => {
+                        let admission = EpochAdmission {
+                            keep: [
+                                (!self.target.whole_cluster).then(|| self.boundary_offset()),
+                                self.target.reference.map(|reference| reference.block),
+                            ],
+                        };
+                        let step = match reader.step_typed_seek_operation(
+                            &mut self.remaining,
+                            Some(admission),
+                            work,
+                            cancel,
+                        )? {
+                            EnvelopeProgress::Header(header) => {
+                                if !work.try_charge(1) {
+                                    return Ok(ParseStep::Yield);
+                                }
+                                let replay_boundary = !self.target.whole_cluster
+                                    && header.start == self.boundary_offset();
+                                let reference = self
+                                    .target
+                                    .reference
+                                    .is_some_and(|reference| reference.block == header.start);
+                                // CodecState is a BlockGroup child. An unrelated
+                                // SimpleBlock was never decoded by this job; consume
+                                // its real bytes without collecting a useless owner.
+                                let skip =
+                                    header.id == SIMPLE_BLOCK && !replay_boundary && !reference;
+                                reader.admit_typed_leaf(header, None, skip)?;
+                                continue;
+                            }
+                            EnvelopeProgress::Step(step) => step,
+                        };
+                        match step {
+                            ParseStep::Event(ElementEvent::Start(header)) => {
+                                if self.target.whole_cluster
+                                    && header.id == 0x1f43b675
+                                    && header.start == self.boundary_offset()
+                                {
+                                    self.boundary = Some(self.configuration.clone());
+                                    if let Some(reference) =
+                                        self.target.reference.filter(|reference| {
+                                            reference.unchanged_cluster_prefix == Some(header.start)
+                                        })
+                                    {
+                                        let end = header
+                                            .size
+                                            .map(|size| {
+                                                header.data.checked_add(size).ok_or(Error::Overflow)
+                                            })
+                                            .transpose()?;
+                                        if reference.block < header.data
+                                            || end.is_some_and(|end| reference.block >= end)
+                                        {
+                                            return Err(Error::Invalid(
+                                                "validated state prefix outside Cluster",
+                                            ));
+                                        }
+                                        self.check_reference_state(reference)?;
+                                    }
+                                    self.replay();
+                                }
+                            }
+                            ParseStep::Event(ElementEvent::Leaf { header, data }) => {
+                                if !self.target.whole_cluster
+                                    && header.start == self.boundary_offset()
+                                {
+                                    self.boundary = Some(self.configuration.clone());
+                                    if self.replay() {
+                                        continue;
+                                    }
+                                }
+                                match header.id {
+                                    BLOCK_GROUP => {
+                                        let job = GroupJob::new(
+                                            data,
+                                            u64::MAX,
+                                            Some(GroupLocation {
+                                                source: reader.request().source,
+                                                segment_data: self.target.segment_data,
+                                                header: header.start,
+                                                data: header.data,
+                                            }),
+                                            self.limits,
+                                            &self.pool,
+                                        )?;
+                                        self.group = Some((header, job));
+                                        continue 'epoch;
+                                    }
+                                    // A SimpleBlock cannot carry CodecState. Its Track
+                                    // membership still matters at the referenced RAP.
+                                    SIMPLE_BLOCK
+                                        if self.target.reference.is_some_and(|reference| {
+                                            reference.block == header.start
+                                        }) =>
+                                    {
+                                        self.phase = Phase::Block {
+                                            header,
+                                            source: Source::Simple(data),
+                                            lookup: Lookup::Number,
+                                        };
+                                    }
+                                    _ => (),
+                                }
+                            }
+                            ParseStep::Event(
+                                ElementEvent::End { .. } | ElementEvent::Skipped(_),
+                            ) => (),
+                            ParseStep::Finished => {
+                                return Err(Error::Invalid(
+                                    "state replay boundary absent from source",
+                                ));
+                            }
+                            other => return crate::step::pending(other),
+                        }
+                    }
+                    Phase::Block {
+                        header,
+                        source,
+                        lookup,
+                    } => match *lookup {
+                        Lookup::Number => {
+                            if !work.try_charge(1) {
+                                return Ok(ParseStep::Yield);
+                            }
+                            let block: &[u8] = match &*source {
+                                Source::Group(group) => &group.raw_body()[group.block()],
+                                Source::Simple(data) => data,
+                            };
+                            let (number, width, _) = ebml::vint(block, false)?;
+                            block.get(width..width + 3).ok_or(Error::Truncated)?;
+                            *lookup = Lookup::Track { number, at: 0 };
+                        }
+                        Lookup::Track { number, at } => {
+                            if !work.try_charge(1) {
+                                return Ok(ParseStep::Yield);
+                            }
+                            let track = self
+                                .configuration
+                                .tracks()
+                                .get(at)
+                                .required("unregistered state block track")?;
+                            if track.number != number {
+                                *lookup = Lookup::Track { number, at: at + 1 };
+                                continue;
+                            }
+                            let header = *header;
+                            if self.target.reference.is_some_and(|reference| {
+                                reference.block == header.start && reference.track != at
+                            }) {
+                                return Err(Error::Invalid("cue state reference block track"));
+                            }
+                            let (group, job) = match source {
+                                Source::Group(group) if group.max_addition_id() != 0 => (
+                                    group.clone(),
+                                    StateJob::Mapping(
+                                        self.configuration.track_extensions_job(at, self.limits)?,
+                                    ),
+                                ),
+                                Source::Group(group) if group.codec_state().is_some() => (
+                                    group.clone(),
+                                    StateJob::Copy(StateCopyJob::new(
+                                        group,
+                                        self.limits.block_bytes,
+                                        &self.pool,
+                                    )?),
+                                ),
+                                _ => {
+                                    self.after_block(header)?;
+                                    continue;
+                                }
+                            };
+                            self.phase = Phase::State {
+                                header,
+                                group,
+                                track: at,
+                                job,
+                            };
+                        }
+                    },
+                    Phase::State {
+                        header,
+                        group,
+                        track,
+                        job,
+                    } => {
+                        let (header, track) = (*header, *track);
+                        match job {
+                            StateJob::Mapping(mapping) => match mapping.step_job(work, cancel)? {
+                                ParseStep::Event(mapping) => {
+                                    self.configuration
+                                        .validate_additions(track, group, &mapping)?;
+                                    if group.codec_state().is_some() {
+                                        *job = StateJob::Copy(StateCopyJob::new(
+                                            group,
+                                            self.limits.block_bytes,
+                                            &self.pool,
+                                        )?);
+                                    } else {
+                                        self.after_block(header)?;
+                                    }
+                                }
+                                other => return crate::step::pending(other),
+                            },
+                            StateJob::Copy(copy) => match copy.step(work, cancel)? {
+                                ParseStep::Event(state) => {
+                                    *job = StateJob::Change(StateChangeJob::new(
+                                        self.configuration.clone(),
+                                        track,
+                                        Some(state),
+                                        &self.pool,
+                                    )?);
+                                }
+                                other => return crate::step::pending(other),
+                            },
+                            StateJob::Change(change) => match change.step(work, cancel)? {
+                                ParseStep::Event(configuration) => {
+                                    self.configuration = configuration;
+                                    self.after_block(header)?;
+                                }
+                                other => return crate::step::pending(other),
+                            },
+                        }
+                    }
+                    Phase::Replay(configuration) => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let configuration = configuration.clone();
+                        let cluster_time = if self.target.whole_cluster {
+                            reader.begin_internal_cluster_range(
+                                self.target.replay.checkpoint(),
+                                self.target.replay.cluster_offset(),
+                            )?;
+                            None
+                        } else {
+                            reader.restore_internal_block(&self.target.replay)?;
+                            self.target.replay.cluster_time
+                        };
+                        self.phase = Phase::Done;
+                        return Ok(ParseStep::Event(RestoredEpoch {
+                            configuration,
+                            scanned_bytes: self.target.remaining - self.remaining,
+                            cluster_time,
+                        }));
+                    }
+                    Phase::Done => return Ok(ParseStep::Finished),
                 }
             }
         }
@@ -597,14 +623,40 @@ crate::storage::usage::storage!(RestoredEpoch, |s| [s.configuration]);
 crate::storage::usage::storage!(EpochRestoreJob, |s| [
     s.configuration,
     s.boundary,
-    s.group_job,
-    s.group,
-    s.simple,
-    s.mapping,
-    s.copy,
-    s.change,
-    s.result
+    s.group.as_ref().map(|(_, job)| job),
+    s.phase
 ]);
+/// The storage a phase holds, in the order the jobs it runs were listed.
+impl crate::storage::usage::Storage for Phase {
+    fn storage_slots(&self) -> Result<usize> {
+        crate::storage::usage::slots(&self.parts())
+    }
+    fn storage_owner(&self, index: usize) -> Result<Option<crate::storage::usage::Owner>> {
+        crate::storage::usage::owner(&self.parts(), index)
+    }
+}
+impl Phase {
+    fn parts(&self) -> [&dyn crate::storage::usage::Storage; 3] {
+        const NONE: Option<SharedBytes> = None;
+        match self {
+            Self::Block { source, .. } => match source {
+                Source::Group(group) => [group, &NONE, &NONE],
+                Source::Simple(data) => [data, &NONE, &NONE],
+            },
+            Self::State { group, job, .. } => [
+                group,
+                match job {
+                    StateJob::Mapping(job) => job,
+                    StateJob::Copy(job) => job,
+                    StateJob::Change(job) => job,
+                },
+                &NONE,
+            ],
+            Self::Replay(configuration) => [configuration, &NONE, &NONE],
+            Self::Begin | Self::Envelope | Self::Done => [&NONE, &NONE, &NONE],
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests;
