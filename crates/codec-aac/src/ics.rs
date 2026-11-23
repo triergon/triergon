@@ -4,7 +4,7 @@
 use crate::error::{DecodeError, Feature, Result};
 use crate::huffman::{FAST_BITS, SpectralBook, books, fast_field};
 use crate::tables::*;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_bitstream::CachedBitReader;
 
 /// The window_sequence of ics_info(): the windows and transform lengths of a frame. The
@@ -188,18 +188,19 @@ pub(crate) struct CoreCfg {
 }
 
 fn pow43_table() -> &'static [f32] {
-    static T: OnceLock<Vec<f32>> = OnceLock::new();
-    T.get_or_init(|| {
+    static T: LazyLock<Vec<f32>> = LazyLock::new(|| {
         (0..8192)
             .map(|i| (i as f64).powf(4.0 / 3.0) as f32)
             .collect()
-    })
+    });
+    &T
 }
 
 /// 2^((i - 300) / 4) for i in 0..600: covers scalefactors, noise energies and IS positions.
 fn pow2_quarter_table() -> &'static [f32; 600] {
-    static T: OnceLock<[f32; 600]> = OnceLock::new();
-    T.get_or_init(|| std::array::from_fn(|i| 2f64.powf((i as f64 - 300.0) / 4.0) as f32))
+    static T: LazyLock<[f32; 600]> =
+        LazyLock::new(|| std::array::from_fn(|i| 2f64.powf((i as f64 - 300.0) / 4.0) as f32));
+    &T
 }
 
 /// 2^(i / 4), clamped to the table.
@@ -554,11 +555,11 @@ fn read_signs_i32(br: &mut CachedBitReader<'_>, v: &mut [i32]) {
 
 /// sign(v) |v|^(4/3) for v in -16..=16 (index v + 16).
 fn pow43_signed() -> &'static [f32; 33] {
-    static T: OnceLock<[f32; 33]> = OnceLock::new();
-    T.get_or_init(|| {
+    static T: LazyLock<[f32; 33]> = LazyLock::new(|| {
         let p = pow43_table();
         std::array::from_fn(|i| if i < 16 { -p[16 - i] } else { p[i - 16] })
-    })
+    });
+    &T
 }
 
 /// One band of an N-tuple codebook without escapes, decoded and inverse quantised.

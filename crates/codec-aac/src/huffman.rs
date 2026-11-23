@@ -2,7 +2,7 @@
 
 use crate::huffman_probed as probed;
 use crate::huffman_tables as t;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_bitstream::CachedBitReader;
 
 /// Two-level lookup table. Primary table indexed by the next `PRIMARY` bits.
@@ -261,8 +261,7 @@ fn fast_table(codes: &[(u32, u8)], values: &[[i8; 4]], unsigned: bool, n: usize)
 }
 
 pub(crate) fn books() -> &'static Books {
-    static BOOKS: OnceLock<Books> = OnceLock::new();
-    BOOKS.get_or_init(|| Books {
+    static BOOKS: LazyLock<Books> = LazyLock::new(|| Books {
         scalefactor: vlc!(t::SCALEFACTOR, 9),
         spectral: [
             spectral_book(1),
@@ -301,7 +300,8 @@ pub(crate) fn books() -> &'static Books {
             vlc!(probed::OPD_DF, 5),
             vlc!(probed::OPD_DT, 5),
         ],
-    })
+    });
+    &BOOKS
 }
 
 #[cfg(test)]

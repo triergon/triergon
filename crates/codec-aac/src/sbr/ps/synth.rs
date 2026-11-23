@@ -21,7 +21,7 @@
 use super::tables as t;
 use crate::error::Result;
 use crate::fft::Cpx;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_codec::{Budget, BudgetVec};
 
 #[cfg(test)]
@@ -201,8 +201,8 @@ fn layout(big: bool) -> Layout {
 
 /// The layouts of the 20- and 34-band configurations.
 pub(super) fn layouts() -> &'static [Layout; 2] {
-    static L: OnceLock<[Layout; 2]> = OnceLock::new();
-    L.get_or_init(|| [layout(false), layout(true)])
+    static L: LazyLock<[Layout; 2]> = LazyLock::new(|| [layout(false), layout(true)]);
+    &L
 }
 
 /// Per-slot mixing matrices of one frame, per parameter band: h11, h12, h21, h22 real parts,

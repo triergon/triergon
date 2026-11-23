@@ -80,7 +80,7 @@ use crate::compat::ffmpeg::extensions::Policy;
 use crate::error::Result;
 use crate::fft::Cpx;
 use crate::huffman::books;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{Budget, BudgetVec};
 
@@ -194,8 +194,7 @@ enum Fault {
 
 /// Mixing matrices per (procedure, grid, IID index + 15, ICC index): h11, h12, h21, h22.
 fn matrices() -> &'static MatrixTable {
-    static M: OnceLock<MatrixTable> = OnceLock::new();
-    M.get_or_init(|| {
+    static M: LazyLock<MatrixTable> = LazyLock::new(|| {
         let sq2 = std::f64::consts::SQRT_2;
         std::array::from_fn(|second| {
             std::array::from_fn(|fine| {
@@ -248,7 +247,8 @@ fn matrices() -> &'static MatrixTable {
                 })
             })
         })
-    })
+    });
+    &M
 }
 
 /// Unit phasors of the IPD/OPD indices (steps of pi/4).

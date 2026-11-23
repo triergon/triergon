@@ -23,7 +23,7 @@
 use super::kernels;
 use super::tables::QMF_WINDOW;
 use crate::fft::{Cpx, Dct4};
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_codec::{Budget, BudgetVec, Error};
 
 /// Prototype window c[n], n < 640, of the analysis (c[2n]) and synthesis (c[n]) banks:
@@ -51,8 +51,7 @@ pub(crate) struct Tables {
 }
 
 fn tables() -> &'static Tables {
-    static T: OnceLock<Tables> = OnceLock::new();
-    T.get_or_init(|| {
+    static T: LazyLock<Tables> = LazyLock::new(|| {
         let rotation = |k: usize| {
             let phi = 3.0 * std::f64::consts::PI * (2 * k + 1) as f64 / 256.0;
             let sign = if k.is_multiple_of(2) { 1.0 } else { -1.0 };
@@ -70,7 +69,8 @@ fn tables() -> &'static Tables {
                 }
             }),
         }
-    })
+    });
+    &T
 }
 
 #[derive(Debug)]
