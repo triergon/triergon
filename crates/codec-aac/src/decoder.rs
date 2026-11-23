@@ -1,7 +1,7 @@
 //! raw_data_block() decoding: element parsing, channel mapping, per-channel state and
 //! output assembly.
 
-use crate::compat::layout::Policy;
+use crate::compat::ffmpeg::layout::Policy;
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
 use crate::ics::*;
@@ -214,7 +214,7 @@ pub(crate) struct Core {
     output_charge: Reservation,
     /// Output samples (per channel) still to be dropped (FFmpeg skip_samples behaviour).
     pub skip_samples: usize,
-    pub priming_policy: crate::compat::priming::Policy,
+    pub priming_policy: crate::compat::ffmpeg::priming::Policy,
     /// Frames output since the last (re)configuration.
     pub frames_out: u64,
 }
@@ -241,7 +241,7 @@ impl Core {
             budget: budget.clone(),
             output_charge: Reservation::empty(budget),
             skip_samples: 0,
-            priming_policy: crate::compat::priming::Policy::default(),
+            priming_policy: crate::compat::ffmpeg::priming::Policy::default(),
             frames_out: 0,
         }
     }
@@ -701,7 +701,7 @@ impl Core {
         if !RAW
             && ext == 0
             && bits >= 13 + 7 * 8
-            && self.priming_policy == crate::compat::priming::Policy::EncoderSignature
+            && self.priming_policy == crate::compat::ffmpeg::priming::Policy::EncoderSignature
             && has_libfaac_signature(br, bits)
         {
             self.skip_samples = 1024;

@@ -121,8 +121,8 @@ fn an_explicit_container_edit_supersedes_the_adts_delay_signature() {
     Decoder::new().decode(&packet, &mut pcm).unwrap();
     assert_eq!(pcm.samples_per_channel, 0);
 
-    let mut decoder =
-        Decoder::new().with_priming_policy(triergon_codec_aac::compat::priming::Policy::Container);
+    let mut decoder = Decoder::new()
+        .with_priming_policy(triergon_codec_aac::compat::ffmpeg::priming::Policy::Container);
     decoder.decode(&packet, &mut pcm).unwrap();
     assert_eq!((pcm.sample_rate, pcm.samples_per_channel), (48_000, 1024));
     decoder.reset();

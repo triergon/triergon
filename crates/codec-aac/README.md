@@ -37,7 +37,7 @@ per channel, configured from a checked AudioSpecificConfig. `new_in` takes the i
 core rate and fixed channel configuration 1–7, 11, 12 or 14, whose audible elements
 follow Table 1.19, including the distinct 7.1 Front, Back and Top layouts
 ([ISO/IEC 14496-3:2009/Amd.4](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)).
-`with_layout_in` with `compat::layout::Policy::ConventionalSurround` gives FFmpeg's
+`with_layout_in` with `compat::ffmpeg::layout::Policy::ConventionalSurround` gives FFmpeg's
 default mapping instead: a back pair in configurations 5, 6, 11 and 14, and
 configuration 7 as 7.1 Back. `with_program_config_in` takes the byte-aligned PCE of
 channel configuration zero: up to eight channels with distinct speaker positions, coded
@@ -102,7 +102,7 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
 - FFmpeg-compatible behaviour: the PNS noise generator (LCG, seed `0x1f2e3d4c`); two SCEs
   in configuration 2 map to FL then FR; a CPE in configuration 1 switches to stereo;
   the libfaac fill-element signature skips the first 1024 samples by default.
-  Select `compat::priming::Policy::Container` with `Decoder::with_priming_policy`
+  Select `compat::ffmpeg::priming::Policy::Container` with `Decoder::with_priming_policy`
   to leave that discard to an explicit container edit.
 
 ## Known differences from FFmpeg

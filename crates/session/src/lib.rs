@@ -16,8 +16,8 @@ pub mod compat {
     //! Optional decoder policies.
     /// Channel mapping and priming policies for AAC.
     pub mod aac {
-        pub use triergon_codec_aac::compat::layout::Policy;
-        pub use triergon_codec_aac::compat::priming::Policy as PrimingPolicy;
+        pub use triergon_codec_aac::compat::ffmpeg::layout::Policy;
+        pub use triergon_codec_aac::compat::ffmpeg::priming::Policy as PrimingPolicy;
 
         /// Create an ADTS decoder with the selected source of priming discard.
         pub fn adts_decoder(policy: PrimingPolicy) -> Box<crate::DynAudioDecoder> {

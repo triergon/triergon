@@ -12,6 +12,7 @@
 )]
 pub mod adts;
 mod cce;
+pub mod compat;
 mod decoder;
 mod error;
 mod fft;
@@ -34,39 +35,6 @@ pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioDecoder, DownmixLevels};
-
-/// Optional AAC decoding policies.
-pub mod compat {
-    /// Handling of in-band delay signatures when a container provides priming.
-    pub mod priming {
-        /// Source of leading PCM discard for ADTS.
-        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-        pub enum Policy {
-            /// Apply the default delay signalled by a recognised encoder signature.
-            #[default]
-            EncoderSignature,
-            /// Leave leading discard to the caller's container edit.
-            Container,
-        }
-    }
-
-    /// Channel mappings for fixed AAC-LC access units.
-    ///
-    /// `ConventionalSurround` reproduces the default AAC decoder of FFmpeg 9.0.2
-    /// when it receives an AudioSpecificConfig and the original packets.
-    pub mod layout {
-        /// How to interpret the fixed channel configuration of a raw access unit.
-        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-        pub enum Policy {
-            /// Speaker assignments in ISO/IEC 14496-3 Table 1.19.
-            #[default]
-            Specification,
-            /// Use the back pair in configurations 5, 6, 11 and 14. Interpret
-            /// configuration 7 as the conventional 7.1 back layout.
-            ConventionalSurround,
-        }
-    }
-}
 
 /// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -125,15 +93,20 @@ impl Decoder {
     /// Configure how this ADTS decoder handles an encoder delay signature.
     /// The policy persists across discontinuities.
     #[must_use]
-    pub fn with_priming_policy(mut self, policy: compat::priming::Policy) -> Self {
+    pub fn with_priming_policy(mut self, policy: compat::ffmpeg::priming::Policy) -> Self {
         self.core.priming_policy = policy;
         self.core.skip_samples = 0;
         self
     }
 
-    /// Decode exactly one ADTS frame (header included). `out` is cleared and refilled with
-    /// this frame's output (1024 or, with SBR, 2048 samples per raw_data_block). On error
-    /// `out` is left empty; the decoder stays usable for the next frame.
+    /// Decodes one ADTS frame including its header, yielding 1024 samples per raw data
+    /// block or 2048 with spectral band replication.
+    /// Replaces `out`, leaving `samples_per_channel == 0` on refusal.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed, truncated or unsupported input and storage charges the pool
+    /// cannot cover. The decoder stays usable for the next frame.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         decode_with::<false>(&mut self.core, out, |core, out| decode_adts(core, au, out))
     }
@@ -191,7 +164,7 @@ impl RawLcDecoder {
         Self::with_layout_in(
             frequency_index,
             channel_configuration,
-            compat::layout::Policy::Specification,
+            compat::ffmpeg::layout::Policy::Specification,
             budget,
         )
     }
@@ -200,7 +173,7 @@ impl RawLcDecoder {
     pub fn with_layout_in(
         frequency_index: u8,
         channel_configuration: u8,
-        layout: compat::layout::Policy,
+        layout: compat::ffmpeg::layout::Policy,
         budget: &Budget,
     ) -> Result<Self, DecodeError> {
         if !matches!(channel_configuration, 1..=7 | 11 | 12 | 14) {
@@ -233,7 +206,13 @@ impl RawLcDecoder {
         Ok(Self { core })
     }
 
-    /// Decode one complete raw data block from the container sample.
+    /// Decodes one complete raw data block from a container sample.
+    /// Replaces `out`, leaving `samples_per_channel == 0` on refusal.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed or unsupported raw blocks and blocks exceeding the byte or
+    /// storage limits.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         decode_with::<true>(&mut self.core, out, |core, out| {
             if au.len() > Self::MAX_ACCESS_UNIT_BYTES {

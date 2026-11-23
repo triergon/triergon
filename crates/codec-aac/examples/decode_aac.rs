@@ -3,7 +3,7 @@
 //!
 //! usage: decode IN.aac OUT.f32 [--priming encoder-signature|container]
 use std::io::Write;
-use triergon_codec_aac::compat::priming::Policy;
+use triergon_codec_aac::compat::ffmpeg::priming::Policy;
 use triergon_codec_aac::{AudioFrame, Decoder, adts};
 
 fn main() {
