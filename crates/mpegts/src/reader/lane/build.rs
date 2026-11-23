@@ -20,12 +20,21 @@ pub(super) enum BuildOrigins {
     Ready(PayloadSources),
 }
 
+/// The piece of a NAL unit the coalescing copy is writing.
+#[derive(Clone, Copy)]
+pub(super) enum Part {
+    LeadingZeros,
+    StartCode,
+    Body,
+    TrailingZeros,
+}
+
 pub(super) struct Build {
     pub(super) unit: BuildUnit,
     pub(super) buffer: Option<BudgetVec<u8>>,
     pub(super) bytes: Option<Bytes>,
     pub(super) nal: usize,
-    pub(super) part: u8,
+    pub(super) part: Part,
     pub(super) copied: usize,
     pub(super) origins: BuildOrigins,
     pub(super) origin: usize,
@@ -61,7 +70,7 @@ impl Build {
             buffer,
             bytes,
             nal: 0,
-            part: 0,
+            part: Part::LeadingZeros,
             copied: 0,
             origins: BuildOrigins::Ready(origins),
             origin: 0,
@@ -96,23 +105,26 @@ impl Build {
             }
             let facts = nal.facts();
             let (bytes, total, zeros): (&[u8], usize, bool) = match self.part {
-                0 => (&ZEROS, facts.framing.leading_zero_bytes, true),
-                1 if facts.framing.start_code_bytes == 4 => (&[0, 0, 0, 1], 4, false),
-                1 => (&[0, 0, 1], 3, false),
-                2 => (nal.bytes().as_ref(), nal.bytes().len(), false),
-                3 => (&ZEROS, facts.trailing_zero_bytes, true),
-                _ => unreachable!(),
+                Part::LeadingZeros => (&ZEROS, facts.framing.leading_zero_bytes, true),
+                Part::StartCode if facts.framing.start_code_bytes == 4 => (&[0, 0, 0, 1], 4, false),
+                Part::StartCode => (&[0, 0, 1], 3, false),
+                Part::Body => (nal.bytes().as_ref(), nal.bytes().len(), false),
+                Part::TrailingZeros => (&ZEROS, facts.trailing_zero_bytes, true),
             };
             if self.copied == total {
                 if !work.try_charge(1) {
                     return Ok(false);
                 }
                 self.copied = 0;
-                self.part += 1;
-                if self.part == 4 {
-                    self.part = 0;
-                    self.nal += 1;
-                }
+                self.part = match self.part {
+                    Part::LeadingZeros => Part::StartCode,
+                    Part::StartCode => Part::Body,
+                    Part::Body => Part::TrailingZeros,
+                    Part::TrailingZeros => {
+                        self.nal += 1;
+                        Part::LeadingZeros
+                    }
+                };
                 continue;
             }
             let count = (total - self.copied).min(if zeros { ZEROS.len() } else { total });
