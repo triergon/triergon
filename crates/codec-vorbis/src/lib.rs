@@ -355,7 +355,7 @@ fn decode_residues(
     spectra: &mut Spectra,
     scratch: &mut residue::Scratch,
 ) -> usize {
-    let mut coded = [false; 256];
+    let mut coded = [false; ChannelLayout::CAPACITY];
     for (coded, floor) in coded.iter_mut().zip(floors) {
         *coded = !matches!(floor.curve, Curve::Unused);
     }
@@ -367,8 +367,8 @@ fn decode_residues(
         }
     }
     let mut coded_lines = 0;
+    let mut members = [Member::default(); ChannelLayout::CAPACITY];
     for (number, submap) in mapping.submaps.iter().enumerate() {
-        let mut members = [Member::default(); 256];
         let mut count = 0;
         for (channel, _) in mapping
             .mux
