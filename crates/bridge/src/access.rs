@@ -1,6 +1,8 @@
 //! Frames container packets for decoders using [`TrackInfo`] and [`PacketInfo`].
-//! AVC and HEVC become Annex B, AAC with a configuration record becomes ADTS,
-//! and other codecs pass through. Work and storage use the caller's budgets.
+//! AVC and HEVC become Annex B, AAC with a configuration record becomes ADTS (the
+//! first frame carrying the record's program config element when it has one), and
+//! other codecs pass through. Work and storage use the caller's budgets.
+use crate::aac::{opening_block, raw_block_program};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim};
 use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, TimeBase, WorkBudget};
@@ -56,7 +58,22 @@ impl Default for AccessUnitLimits {
 enum Framing {
     Nal(NalPacketSession),
     Adts(AacAdtsParameters),
+    /// ADTS whose next published frame opens its raw data block with `program`,
+    /// the configuration's program config element.
+    AdtsProgram {
+        parameters: AacAdtsParameters,
+        program: Bytes,
+    },
     Packet,
+}
+
+impl Framing {
+    /// Plain ADTS from now on, once a frame has carried the program config element.
+    fn program_sent(&mut self) {
+        if let Self::AdtsProgram { parameters, .. } = *self {
+            *self = Self::Adts(parameters);
+        }
+    }
 }
 
 /// The framing of one track's packets for its decoder.
@@ -173,6 +190,11 @@ impl AccessUnits {
     }
 
     /// Starts framing a packet of the track. Oversized packets fail with `Limit`.
+    ///
+    /// For AAC with channel configuration 0, the first frame published opens its
+    /// raw data block with the configuration's program config element, unless the
+    /// packet's block opens with one; a job dropped before it publishes leaves the
+    /// element to the next.
     pub fn packet<'a, P: PacketInfo>(&'a mut self, packet: &'a P) -> Result<AccessUnitJob<'a, P>> {
         let payload = packet.payload();
         if payload.len() > self.limits.packet_bytes {
@@ -181,7 +203,8 @@ impl AccessUnits {
                 maximum: self.limits.packet_bytes,
             });
         }
-        let job = match &mut self.framing {
+        let framing = &mut self.framing;
+        let job = match framing {
             Framing::Nal(session) => Job::Nal(session.packet(
                 NalPacket {
                     bytes: Bytes::copy_from_slice(&self.pool, payload)?,
@@ -202,10 +225,41 @@ impl AccessUnits {
                 *parameters,
                 self.limits.unit_bytes,
             )?),
+            Framing::AdtsProgram {
+                parameters,
+                program,
+            } => {
+                let writer = program_writer(
+                    &self.pool,
+                    *parameters,
+                    program,
+                    payload,
+                    self.limits.unit_bytes,
+                )?;
+                Job::AdtsProgram(writer, framing)
+            }
             Framing::Packet => Job::Packet { done: false },
         };
         Ok(AccessUnitJob { packet, job })
     }
+}
+
+/// The writer of the frame that carries `program` ahead of `payload`, out of the
+/// per-packet path: it runs once per framing unless a job is dropped.
+#[cold]
+#[inline(never)]
+fn program_writer(
+    pool: &Budget,
+    parameters: AacAdtsParameters,
+    program: &[u8],
+    payload: &[u8],
+    unit_bytes: usize,
+) -> Result<AacAdtsWriter> {
+    let block = match opening_block(pool, program, payload)? {
+        Some(block) => block,
+        None => Bytes::copy_from_slice(pool, payload)?,
+    };
+    AacAdtsWriter::new(pool, AAC_SOURCE, block, parameters, unit_bytes)
 }
 
 impl AccessUnitsSetup {
@@ -241,7 +295,14 @@ impl AccessUnitsSetup {
             },
             Setup::Aac(parser) => match parser.step(work, cancel)? {
                 BuildStep::Ready(record) => {
-                    Framing::Adts(AacAdtsParameters::from_asc(record.facts())?)
+                    let parameters = AacAdtsParameters::from_asc(record.facts())?;
+                    match record.program_config() {
+                        Some(program) => Framing::AdtsProgram {
+                            parameters,
+                            program: raw_block_program(&self.pool, record.source_bytes(), program)?,
+                        },
+                        None => Framing::Adts(parameters),
+                    }
                 }
                 BuildStep::Yield => return Ok(BuildStep::Yield),
                 BuildStep::Complete => return Ok(BuildStep::Complete),
@@ -264,7 +325,11 @@ impl AccessUnitsSetup {
 enum Job<'a> {
     Nal(NalPacketJob<'a, ()>),
     Adts(AacAdtsWriter),
-    Packet { done: bool },
+    /// The frame that carries the program config element of the track's framing.
+    AdtsProgram(AacAdtsWriter, &'a mut Framing),
+    Packet {
+        done: bool,
+    },
 }
 
 /// The framing of one packet, stepped within a work budget.
@@ -289,6 +354,14 @@ impl<'a, P: PacketInfo> AccessUnitJob<'a, P> {
             },
             Job::Adts(writer) => match writer.step(work, cancel)? {
                 BuildStep::Ready(output) => Unit::Framed(output.bytes().clone()),
+                BuildStep::Yield => return Ok(BuildStep::Yield),
+                BuildStep::Complete => return Ok(BuildStep::Complete),
+            },
+            Job::AdtsProgram(writer, framing) => match writer.step(work, cancel)? {
+                BuildStep::Ready(output) => {
+                    framing.program_sent();
+                    Unit::Framed(output.bytes().clone())
+                }
                 BuildStep::Yield => return Ok(BuildStep::Yield),
                 BuildStep::Complete => return Ok(BuildStep::Complete),
             },

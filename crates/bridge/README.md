@@ -34,6 +34,13 @@ contiguous input, join a sliced unit through `contiguous_feed` or `segments`.
 `AccessUnits::for_track` refuses Matroska AAC without CodecPrivate.
 `AccessUnits::with_record` accepts a caller-supplied AudioSpecificConfig.
 
+**ADTS program configuration.** An ADTS header has no room for an
+AudioSpecificConfig. For channel configuration 0, `AccessUnits` and `AacBridge`
+open the raw data block of the first frame they publish with the configuration's
+program config element, as ISO/IEC 14496-3 1.A.4.3 asks, unless the packet's
+block already opens with one. A job dropped before it publishes leaves the element
+to the next; a framing made afresh, after a seek for example, sends it again.
+
 **Legacy Matroska AAC.** Discovery and `MatroskaFeedSetup` accept
 `A_AAC/MPEG2/LC` and `A_AAC/MPEG4/LC`. When a track has no initialization
 record, the feed derives ADTS parameters from the Audio element's indexed

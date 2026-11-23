@@ -1,5 +1,6 @@
 //! Integration tests of the packet and subtitle bridges.
 #![forbid(unsafe_code)]
+mod aac_program;
 mod access;
 mod dvb_ts;
 mod framing;

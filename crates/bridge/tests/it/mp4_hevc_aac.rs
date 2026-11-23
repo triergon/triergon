@@ -155,7 +155,7 @@ fn real_aac_mp4_adts_bridge_uses_source_asc_and_keeps_whole_raw_packet() {
         }
     };
     let core = record.facts().core_frequency.hz;
-    let bridge =
+    let mut bridge =
         aac_bridge::AacBridge::new(&b, ID, cfg.track.track_id, cfg.revision, record, 8191).unwrap();
     for packet in packets {
         let sample = packet.source.sample.clone();
@@ -209,7 +209,7 @@ fn aac_bridge_refuses_configuration_change_before_packet_conversion() {
             break x;
         }
     };
-    let bridge =
+    let mut bridge =
         aac_bridge::AacBridge::new(&b, ID, cfg.track.track_id, cfg.revision, record, 8191).unwrap();
     p.configuration.revision += 1;
     assert!(matches!(bridge.packet(p), Err(C::Invalid(_))));
@@ -266,7 +266,7 @@ fn mp4_playback_feeds_real_simulator_decoders_across_clock_and_seek() {
         )
         .unwrap();
         let asc_record = ready(|work| aac_setup.step(work, &cancel).unwrap());
-        let aac_bridge = aac_bridge::AacBridge::new(
+        let mut aac_bridge = aac_bridge::AacBridge::new(
             &pool,
             ID,
             aac.track.track_id,

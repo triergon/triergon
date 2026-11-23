@@ -584,7 +584,7 @@ fn frame(
                 {
                     aac_bridge = Some((revision, aac(pool, packet)?));
                 }
-                let bridge = &aac_bridge.as_ref().ok_or("missing AAC bridge")?.1;
+                let bridge = &mut aac_bridge.as_mut().ok_or("missing AAC bridge")?.1;
                 let mut job = bridge.packet(packet.clone())?;
                 let unit = ready(|w| job.step(w, CANCEL))?;
                 rows.record(1, &[cfg.stream as u64], Some(unit.adts.bytes()));
