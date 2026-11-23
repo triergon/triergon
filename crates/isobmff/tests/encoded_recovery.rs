@@ -331,12 +331,14 @@ fn duplicate_context_does_not_silently_replace_prior_backing() {
 }
 #[test]
 fn unknown_group_semantics_do_not_get_roll_fallback() {
-    assert_eq!(
-        Source::new(fixture("unknown-group-unadmitted"))
-            .plan(1)
-            .unwrap_err(),
-        Error::Unsupported("encoded other sample-group semantics")
+    let source = Source::new(fixture("unknown-group-unadmitted"));
+    let plan = source.plan(1).unwrap();
+    assert!(
+        selection(&plan, RecoveryKind::Roll, 2)
+            .description
+            .is_none()
     );
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn old_actual_membership_refusal_is_unchanged() {

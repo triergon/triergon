@@ -182,6 +182,12 @@ impl RecoveryWalk {
     pub(crate) fn error_backing(&self) -> Option<&crate::boxes::BoxView> {
         self.error_backing.as_ref()
     }
+    pub(crate) fn take_facts(&mut self) -> RecoveryFacts {
+        RecoveryFacts {
+            groups: std::mem::take(&mut self.facts.groups),
+            samples: self.facts.samples,
+        }
+    }
     pub(crate) fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -309,10 +315,7 @@ impl RecoveryWalk {
                             return Err(Error::Invalid("encoded unresolved recovery description"));
                         }
                     }
-                    return Ok(Some(RecoveryFacts {
-                        groups: std::mem::take(&mut self.facts.groups),
-                        samples: self.facts.samples,
-                    }));
+                    return Ok(Some(self.take_facts()));
                 }
                 Next::Item(raw) => {
                     let description = match raw.header().kind {
@@ -328,13 +331,16 @@ impl RecoveryWalk {
                     let slot = match kind {
                         x if x == *b"roll" => 0,
                         x if x == *b"prol" => 1,
-                        _ => {
+                        x if x == *b"sync" || (!description && x == *b"rap ") => {
                             return source_result(
-                                Err(Error::Unsupported("encoded other sample-group semantics")),
+                                Err(Error::Unsupported(
+                                    "encoded sample group that changes key frames",
+                                )),
                                 &raw,
                                 &mut self.error_backing,
                             );
                         }
+                        _ => continue,
                     };
                     let bit = 1u8 << (slot + if description { 0 } else { 2 });
                     if self.seen & bit != 0 {

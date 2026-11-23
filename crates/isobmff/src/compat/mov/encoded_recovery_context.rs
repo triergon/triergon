@@ -32,8 +32,7 @@ impl RecoveryObservation {
         self.groups
     }
     /// The checked groups, or the fault that stopped the check: an `Error::Invalid`,
-    /// `Error::Unsupported` or `Error::Truncated` with its `sgpd` or `sbgp` box. A group
-    /// of a type other than `roll` or `prol` is such a fault.
+    /// `Error::Unsupported` or `Error::Truncated` with its `sgpd` or `sbgp` box.
     pub fn source_result(&self) -> std::result::Result<&RecoveryFacts, &SourceProfileFault> {
         self.outcome.as_ref()
     }
@@ -43,6 +42,7 @@ impl RecoveryObservation {
 pub(crate) struct RecoveryContextReceiver {
     raw: BoxView,
     groups: u32,
+    has_recovery_groups: bool,
     scan: Option<BoxChildren>,
     strict: RecoveryWalk,
 }
@@ -51,6 +51,7 @@ impl RecoveryContextReceiver {
         Ok(Self {
             raw: table.raw().clone(),
             groups: 0,
+            has_recovery_groups: false,
             scan: Some(table.raw().children(0, Limits::default())?),
             strict: RecoveryWalk::new_with_recovery_contexts(table, maximum)?,
         })
@@ -77,13 +78,19 @@ impl RecoveryContextReceiver {
                                     "encoded sample group that changes key frames",
                                 ));
                             }
+                            self.has_recovery_groups |= matches!(&kind, b"roll" | b"prol");
                             self.groups = self.groups.checked_add(1).ok_or(Error::Overflow)?;
                         }
                     }
                 }
                 continue;
             }
-            let outcome = match self.strict.poll(work, cancel) {
+            let facts = if self.has_recovery_groups {
+                self.strict.poll(work, cancel)
+            } else {
+                Ok(Some(self.strict.take_facts()))
+            };
+            let outcome = match facts {
                 Ok(None) => return Ok(None),
                 Ok(Some(facts)) => Ok(facts),
                 Err(error) => {

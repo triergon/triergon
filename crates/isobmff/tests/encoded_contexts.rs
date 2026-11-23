@@ -381,7 +381,8 @@ recovery_case!(
 recovery_case!(recovery_duplicate_description, "duplicate-description");
 recovery_case!(
     recovery_unknown_group_unadmitted,
-    "unknown-group-unadmitted"
+    "unknown-group-unadmitted",
+    false
 );
 
 #[test]

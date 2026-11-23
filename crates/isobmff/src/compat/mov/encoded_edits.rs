@@ -540,8 +540,8 @@ impl<'a> EncodedEditJob<'a> {
     /// Like [`new_with_dependency_table`](Self::new_with_dependency_table), but accepts
     /// `roll` and `prol` groups and the reserved `sdtp` value. The groups are checked and
     /// kept in [`EncodedEditPlan::recovery_facts`] but not applied, as FFmpeg's MOV
-    /// demuxer does not apply them; a fault in them or a group of another type fails the
-    /// job.
+    /// demuxer does not apply them. A fault in either group fails the job. Other grouping
+    /// types are skipped unless they can change the demuxer's key-frame flags.
     pub fn new_with_recovery_groups(
         context: EncodedEditContext<'a>,
         configs: &[EncodedStream],
