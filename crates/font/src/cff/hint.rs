@@ -57,20 +57,35 @@ const fn int_to_fixed(v: i64) -> Fixed {
 }
 
 /// The kinds and states of a hint edge.
-mod flag {
-    pub(super) const GHOST_BOTTOM: u8 = 0x1;
-    pub(super) const GHOST_TOP: u8 = 0x2;
-    pub(super) const PAIR_BOTTOM: u8 = 0x4;
-    pub(super) const PAIR_TOP: u8 = 0x8;
-    pub(super) const LOCKED: u8 = 0x10;
-    pub(super) const SYNTHETIC: u8 = 0x20;
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default)]
+struct EdgeFlags(u8);
+
+impl EdgeFlags {
+    const EMPTY: Self = Self(0);
+    const GHOST_BOTTOM: Self = Self(0x1);
+    const GHOST_TOP: Self = Self(0x2);
+    const PAIR_BOTTOM: Self = Self(0x4);
+    const PAIR_TOP: Self = Self(0x8);
+    const LOCKED: Self = Self(0x10);
+    const SYNTHETIC: Self = Self(0x20);
+
+    #[inline]
+    const fn intersects(self, flags: Self) -> bool {
+        self.0 & flags.0 != 0
+    }
+
+    #[inline]
+    const fn with(self, flags: Self) -> Self {
+        Self(self.0 | flags.0)
+    }
 }
 
 /// A hint edge: a character space coordinate, its device space position and
 /// the scale from it to the next edge. No flags marks an edge that is absent.
 #[derive(Clone, Copy, Debug, Default)]
 struct Edge {
-    flags: u8,
+    flags: EdgeFlags,
     /// The stem hint the edge comes from.
     index: u8,
     cs: Fixed,
@@ -83,18 +98,17 @@ impl Edge {
     /// offset `origin`. A stem placed by an earlier hint map keeps its place,
     /// locked.
     fn new(stem: Stem, index: usize, origin: Fixed, scale: Fixed, bottom: bool) -> Self {
-        use flag::{GHOST_BOTTOM, GHOST_TOP, PAIR_BOTTOM, PAIR_TOP};
         let width = stem.max.wrapping_sub(stem.min);
         // Widths of -21 and -20 mark ghost edges (TN 5177 4.3); other negative
         // widths are inverted pairs, which are turned round.
         let (flags, cs) = match (width, bottom) {
-            (-0x15_0000, true) => (GHOST_BOTTOM, stem.max),
-            (-0x15_0000, false) | (-0x14_0000, true) => (0, 0),
-            (-0x14_0000, false) => (GHOST_TOP, stem.min),
-            (..0, true) => (PAIR_BOTTOM, stem.max),
-            (..0, false) => (PAIR_TOP, stem.min),
-            (_, true) => (PAIR_BOTTOM, stem.min),
-            (_, false) => (PAIR_TOP, stem.max),
+            (-0x15_0000, true) => (EdgeFlags::GHOST_BOTTOM, stem.max),
+            (-0x15_0000, false) | (-0x14_0000, true) => (EdgeFlags::EMPTY, 0),
+            (-0x14_0000, false) => (EdgeFlags::GHOST_TOP, stem.min),
+            (..0, true) => (EdgeFlags::PAIR_BOTTOM, stem.max),
+            (..0, false) => (EdgeFlags::PAIR_TOP, stem.min),
+            (_, true) => (EdgeFlags::PAIR_BOTTOM, stem.min),
+            (_, false) => (EdgeFlags::PAIR_TOP, stem.max),
         };
         let mut edge = Self {
             flags,
@@ -104,13 +118,13 @@ impl Edge {
             ds: 0,
             scale,
         };
-        if flags != 0 && stem.used {
+        if edge.is_valid() && stem.used {
             edge.ds = if edge.is_top() {
                 stem.max_ds
             } else {
                 stem.min_ds
             };
-            edge.flags |= flag::LOCKED;
+            edge.flags = edge.flags.with(EdgeFlags::LOCKED);
         } else {
             edge.ds = mul(edge.cs, scale);
         }
@@ -118,37 +132,40 @@ impl Edge {
     }
 
     const fn is_valid(self) -> bool {
-        self.flags != 0
+        self.flags.0 != 0
     }
 
     const fn is_pair(self) -> bool {
-        self.flags & (flag::PAIR_BOTTOM | flag::PAIR_TOP) != 0
+        self.flags
+            .intersects(EdgeFlags::PAIR_BOTTOM.with(EdgeFlags::PAIR_TOP))
     }
 
     const fn is_pair_top(self) -> bool {
-        self.flags & flag::PAIR_TOP != 0
+        self.flags.intersects(EdgeFlags::PAIR_TOP)
     }
 
     const fn is_top(self) -> bool {
-        self.flags & (flag::PAIR_TOP | flag::GHOST_TOP) != 0
+        self.flags
+            .intersects(EdgeFlags::PAIR_TOP.with(EdgeFlags::GHOST_TOP))
     }
 
     const fn is_bottom(self) -> bool {
-        self.flags & (flag::PAIR_BOTTOM | flag::GHOST_BOTTOM) != 0
+        self.flags
+            .intersects(EdgeFlags::PAIR_BOTTOM.with(EdgeFlags::GHOST_BOTTOM))
     }
 
     const fn is_locked(self) -> bool {
-        self.flags & flag::LOCKED != 0
+        self.flags.intersects(EdgeFlags::LOCKED)
     }
 
     const fn is_synthetic(self) -> bool {
-        self.flags & flag::SYNTHETIC != 0
+        self.flags.intersects(EdgeFlags::SYNTHETIC)
     }
 
     /// A locked, synthetic ghost edge (the em box's and the baseline's).
-    const fn synthetic(ghost: u8, cs: Fixed, ds: Fixed, scale: Fixed) -> Self {
+    const fn synthetic(ghost: EdgeFlags, cs: Fixed, ds: Fixed, scale: Fixed) -> Self {
         Self {
-            flags: ghost | flag::LOCKED | flag::SYNTHETIC,
+            flags: ghost.with(EdgeFlags::LOCKED).with(EdgeFlags::SYNTHETIC),
             index: 0,
             cs,
             ds,
@@ -351,13 +368,13 @@ impl Blues {
             let (bottom, top) = (EM_BOX_BOTTOM - 1, EM_BOX_TOP + 1);
             blues.em_box = Some([
                 Edge::synthetic(
-                    flag::GHOST_BOTTOM,
+                    EdgeFlags::GHOST_BOTTOM,
                     bottom,
                     round(mul(bottom, scale)).wrapping_sub(MIN_COUNTER),
                     scale,
                 ),
                 Edge::synthetic(
-                    flag::GHOST_TOP,
+                    EdgeFlags::GHOST_TOP,
                     top,
                     round(mul(top, scale)).wrapping_add(MIN_COUNTER),
                     scale,
@@ -490,7 +507,7 @@ impl Blues {
         for edge in [bottom, top] {
             if edge.is_valid() {
                 edge.ds = edge.ds.wrapping_add(moved);
-                edge.flags |= flag::LOCKED;
+                edge.flags = edge.flags.with(EdgeFlags::LOCKED);
             }
         }
         true
@@ -510,7 +527,7 @@ impl HintMap {
     const fn new() -> Self {
         Self {
             edges: [Edge {
-                flags: 0,
+                flags: EdgeFlags::EMPTY,
                 index: 0,
                 cs: 0,
                 ds: 0,
@@ -754,7 +771,7 @@ impl Hinted<'_> {
             }
         } else if map.count == 0 || map.edges[0].cs > 0 || map.edges[map.count - 1].cs < 0 {
             // Locks the baseline of glyphs without hints there.
-            let zero = Edge::synthetic(flag::GHOST_BOTTOM, 0, 0, scale);
+            let zero = Edge::synthetic(EdgeFlags::GHOST_BOTTOM, 0, 0, scale);
             map.insert(zero, Edge::default(), initial, scale, work)?;
         }
         map.adjust(work)?;
