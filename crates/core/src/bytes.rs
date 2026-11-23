@@ -725,11 +725,11 @@ impl<T> BudgetVecIntoIter<T> {
     /// so a consumer that has used a vector up can hand it back for the next
     /// one to fill without allocating. [`Bytes::try_reclaim`] is the same
     /// operation for frozen bytes.
-    pub fn reclaim(self) -> BudgetVec<T> {
-        let mut data = Vec::from(self.items);
-        data.clear();
+    pub fn reclaim(mut self) -> BudgetVec<T> {
+        // Emptied first, so that the conversion moves no element.
+        self.items.clear();
         BudgetVec {
-            data,
+            data: Vec::from(self.items),
             charge: self.charge,
         }
     }
