@@ -136,7 +136,7 @@ impl ByteSource {
 impl Source for ByteSource {
     fn poll(
         &mut self,
-        r: &InputRequest,
+        request: &InputRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<SourceReply> {
@@ -144,30 +144,32 @@ impl Source for ByteSource {
             return Err(Error::Cancelled);
         }
         if self.closed {
-            return Err(Error::Invalid("closed source"));
+            return Err(Error::Closed);
         }
-        if r.source != self.source {
+        if request.source != self.source {
             return Err(Error::SourceMismatch);
         }
         if !work.try_charge(1) {
             return Ok(SourceReply::Pending);
         }
-        let at = usize::try_from(r.offset).map_err(|_| Error::Overflow)?;
+        let at = usize::try_from(request.offset).map_err(|_| Error::Overflow)?;
         if at > self.bytes.len() {
             return Err(Error::Invalid("range beyond source"));
         }
         if at == self.bytes.len() {
             return Ok(SourceReply::End {
-                source: r.source,
-                token: r.token.clone(),
+                source: request.source,
+                token: request.token.clone(),
             });
         }
-        let count = (self.bytes.len() - at).min(self.quantum).min(r.maximum);
+        let count = (self.bytes.len() - at)
+            .min(self.quantum)
+            .min(request.maximum);
         let bytes = self.bytes.slice(at..at + count)?;
         Ok(SourceReply::Data(InputWindow::new(
-            r.source,
-            r.token.clone(),
-            r.offset,
+            request.source,
+            request.token.clone(),
+            request.offset,
             bytes,
         )?))
     }
@@ -214,24 +216,24 @@ impl<S: Source> SourceOwner<S> {
             s.invalidate();
         }
     }
-    /// Polls the source: `Pending` without work left, `Cancelled` when `c` is set, and
-    /// `Invalid` after `close`.
+    /// Polls the source: `Pending` without work left, `Cancelled` when `cancel` is
+    /// set, and `Closed` after `close` when there is work to do.
     pub fn poll(
         &mut self,
-        r: &InputRequest,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
+        request: &InputRequest,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
     ) -> Result<SourceReply> {
-        if c.load(Ordering::Relaxed) {
+        if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if w.remaining() == 0 {
+        if work.remaining() == 0 {
             return Ok(SourceReply::Pending);
         }
         self.source
             .as_mut()
-            .ok_or(Error::Invalid("source closed"))?
-            .poll(r, w, c)
+            .ok_or(Error::Closed)?
+            .poll(request, work, cancel)
     }
     /// Aborts the source, once.
     pub fn abort(&mut self) {
