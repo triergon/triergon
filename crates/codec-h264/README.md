@@ -31,7 +31,9 @@ assert!(pictures > 0);
 ```
 
 `send_nals` accepts Annex B data without an implied access-unit boundary; `send_nal`
-takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
+takes one NAL unit without start code. `send` and `send_nals` stop at the first refused
+NAL unit. Pictures completed before the refusal can still be drained.
+`reset` drops the DPB and keeps parameter sets.
 `examples/decode_h264.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
 
 ## Features

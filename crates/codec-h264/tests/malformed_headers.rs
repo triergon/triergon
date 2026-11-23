@@ -1,7 +1,24 @@
 //! Malformed parameter sets and slice headers return errors in every build, including
 //! the debug builds that check arithmetic.
 
-use triergon_codec_h264::Decoder;
+use triergon_codec_h264::{DecodeError, Decoder};
+
+#[test]
+fn a_refused_nal_leaves_the_rest_of_the_buffer_unread() {
+    let mut data = vec![0, 0, 1, 0x62, 0x80]; // data partition A
+    data.extend_from_slice(include_bytes!(
+        "../../playback/tests/fixtures/raw-video/avc-80x48.h264"
+    ));
+    let mut decoder = Decoder::new();
+    assert_eq!(
+        decoder.send_nals(&data, None),
+        Err(DecodeError::Unsupported(
+            "data partitioning (Extended profile)"
+        ))
+    );
+    decoder.flush();
+    assert!(decoder.receive().is_none());
+}
 
 fn noise(mut seed: u64) -> impl FnMut() -> u64 {
     move || {

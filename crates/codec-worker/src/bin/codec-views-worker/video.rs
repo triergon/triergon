@@ -338,8 +338,7 @@ fn send_avc_chunks(
     unit: &RawAccessUnit,
     ordinal: i64,
     seed: &mut u32,
-    error: &mut Option<Error>,
-) {
+) -> Result<(), h264::DecodeError> {
     let mut start = unit.range.start as usize;
     let mut arrived = start;
     let end = unit.range.end as usize;
@@ -367,13 +366,11 @@ fn send_avc_chunks(
             chunk_end = end;
         }
         if chunk_end > start {
-            record_first_error(
-                error,
-                decoder.send_nals(&input[start..chunk_end], chunk_pts),
-            );
+            decoder.send_nals(&input[start..chunk_end], chunk_pts)?;
             start = chunk_end;
         }
     }
+    Ok(())
 }
 
 fn record_first_error(first: &mut Option<Error>, result: Result<(), impl Into<Error>>) {
@@ -396,27 +393,26 @@ fn decode(
         let mut decoder = h264::Decoder::new();
         let mut seed = 0x7769_6e64_u32;
         let framing = units(input, codec, |unit| {
+            if error.is_some() {
+                return Ok(());
+            }
             let data = &input[unit.range.start as usize..unit.range.end as usize];
-            match feed {
-                Feed::AccessUnit => record_first_error(&mut error, decoder.send(data, Some(pts))),
+            let result = match feed {
+                Feed::AccessUnit => decoder.send(data, Some(pts)),
                 Feed::Nal => {
                     let mut timestamp = Some(pts);
-                    for nal in unit.nals() {
+                    unit.nals().iter().try_for_each(|nal| {
                         let nal_pts = if avc_slice(nal) {
                             timestamp.take()
                         } else {
                             None
                         };
-                        record_first_error(
-                            &mut error,
-                            decoder.send_nal(nal.bytes().as_ref(), nal_pts),
-                        );
-                    }
+                        decoder.send_nal(nal.bytes().as_ref(), nal_pts)
+                    })
                 }
-                Feed::Split => {
-                    send_avc_chunks(&mut decoder, input, &unit, pts, &mut seed, &mut error);
-                }
-            }
+                Feed::Split => send_avc_chunks(&mut decoder, input, &unit, pts, &mut seed),
+            };
+            error = result.err().map(Into::into);
             pts += 1;
             drain(&mut decoder, &mut output)
         })?;

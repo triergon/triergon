@@ -464,28 +464,30 @@ impl Decoder {
         }
     }
 
-    /// Feed one Annex-B access unit with its caller timestamp. The picture carried by the
-    /// access unit is completed before returning.
+    /// Decodes one Annex B access unit with its caller timestamp and completes the
+    /// picture before returning.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first NAL unit error and leaves the remaining units unread.
     pub fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         let r = self.send_nals(au, pts);
         self.finish_picture();
         r
     }
 
-    /// Feed Annex-B data without implying an access unit boundary at the end (picture
-    /// boundaries are detected from slice headers, clause 7.4.1.2.4).
+    /// Decodes Annex B data with picture boundaries from slice headers (clause
+    /// 7.4.1.2.4). The end of the buffer does not imply a picture boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first NAL unit error and leaves the remaining units unread.
     pub fn send_nals(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         self.pending_pts = pts;
-        let mut first_err = None;
         for nal in AnnexBUnits::new(data) {
-            if let Err(e) = self.decode_nal(nal) {
-                first_err.get_or_insert(e);
-            }
+            self.decode_nal(nal)?;
         }
-        match first_err {
-            Some(e) => Err(e),
-            None => Ok(()),
-        }
+        Ok(())
     }
 
     /// Feed a single NAL unit (without start code prefix).
