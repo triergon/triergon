@@ -12,7 +12,7 @@ metadata. It does not downmix or resample.
 use triergon_codec_ac3::{AudioFrame, DecodeError, Decoder, access_unit_len};
 
 fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
-    let mut dec = Decoder::new(); // DecoderOptions::default(): Compat::Reference
+    let mut dec = Decoder::new();
     let mut frame = AudioFrame::default();
     let mut pos = 0;
     while pos < stream.len() {
@@ -29,7 +29,7 @@ fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
 pool and `Decoder::new_in(&budget)` charges a caller's `Budget`.
 `.with_options(DecoderOptions { crc, noise, compat })` selects the CRC policy
 (`CrcPolicy::Report` or `Reject`), the noise mode (`NoiseMode::Normal` or `Off`) and the
-output conventions (`Compat::Reference`, the default, or `Compat::Specification`).
+output conventions (`compat::ffmpeg::Policy`).
 `examples/decode_ac3.rs` writes interleaved f32le.
 
 ## Features
@@ -59,7 +59,7 @@ Further independent programs are skipped.
 - Planes follow the triergon-codec [channel order](../codec/README.md#channel-order); 7.1
   is FL FR FC LFE BL BR SL SR.
 - Refused with `Unsupported(Feature)`: bsid > 16, reserved fscod2 and stream type 3, and
-  (with `Compat::Reference`) E-AC-3 reduced sample rates. Enhanced coupling conceals the
+  (with `Policy::Reference`) E-AC-3 reduced sample rates. Enhanced coupling conceals the
   frame and reports `Feature::EnhancedCoupling` in `FrameInfo::concealed`; FFmpeg does
   the same.
 - Concealment (A/52 7.10 block repeat): a damaged block repeats the previous block for
@@ -76,24 +76,24 @@ Further independent programs are skipped.
   decoder sizes are charged to its budget first (`Limits::live_storage_bytes`, 4 MiB by
   default); a refused charge is `DecodeError::Budget` and the decoder stays usable.
 
-### FFmpeg compatibility (`Compat::Reference`, the default)
+### Reference compatibility
 
-`Compat::Reference` reproduces FFmpeg 9.0.2 conventions that A/52 leaves open or that
-differ from the text:
+The default, `Policy::Reference`, follows these conventions where A/52 leaves a choice
+or specifies a different result.
 
 - Noise: bap-0 dither, AHT zero-bin fill and SPX blending noise use FFmpeg's seed-zero
   noise stream (additive lagged generator, lags 24 and 55) in the same draw order, so
   dithered output matches sample for sample. AHT zero bins are filled regardless of
-  dithflag; LFE is never dithered. With `Compat::Specification` a private xorshift
+  dithflag; LFE is never dithered. With `Policy::Specification` a private xorshift
   generator is used; `NoiseMode::Off` replaces all noise with zero.
 - The first block of a stream that mixes transform lengths rewrites the delay lines as
   FFmpeg does.
 - hebap 4 vector quantization (Table E4.4) decodes index `i` with row `i + 1` and index 31
   as zero.
 - A dependent substream whose rate or block count differs from the core is dropped and
-  the core is output alone (`Invalid` with `Compat::Specification`).
-- Reading past the frame end yields zero bits (an error with `Compat::Specification`).
-- E-AC-3 reduced sample rates are refused (decoded with `Compat::Specification`).
+  the core is output alone (`Invalid` with `Policy::Specification`).
+- Reading past the frame end yields zero bits (an error with `Policy::Specification`).
+- E-AC-3 reduced sample rates are refused (decoded with `Policy::Specification`).
 
 In both modes: coupling delta bit-allocation offsets count from the first coupling band
 (A/52 5.4.3.51); AC-3 bsid 9/10 shifts sdecay/fdecay right by `bsid − 8` and indexes the
@@ -116,7 +116,7 @@ under `CrcPolicy::Reject` with FFmpeg under `crccheck+explode`. Results are in
 
 - Not compared with FFmpeg: dual mono, 2/3-block E-AC-3 frames, `blkswe`, AHT on
   coupling and LFE channels, dependents without channel map, and E-AC-3 reduced sample
-  rates with `Compat::Specification` (its hearing-threshold column is a guess). bsid 9/10
+  rates with `Policy::Specification` (its hearing-threshold column is a guess). bsid 9/10
   has been compared on self-authored probe streams only.
 - Error concealment on corrupt mono/stereo/2.1 input can differ from FFmpeg in a few
   frames.

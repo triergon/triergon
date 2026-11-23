@@ -365,7 +365,7 @@ impl Substream {
         groups: &GroupTables,
         sink: &mut BlockSink<'_>,
         trace: &mut Trace,
-        quirk_armed: &mut bool,
+        mixed_transform_pending: &mut bool,
     ) -> Result<(), (usize, E)> {
         let mut br = BitReader::at(buf, 16);
         let eac3 = buf[5] >> 3 > 10;
@@ -410,9 +410,11 @@ impl Substream {
                 }
             }
             self.reconstruct(rng, noise);
-            if *quirk_armed && (1..self.nfchans).any(|ch| self.blksw[ch] != self.blksw[0]) {
-                *quirk_armed = false;
-                self.ffmpeg_first_mixed_transform_quirk();
+            if *mixed_transform_pending
+                && (1..self.nfchans).any(|ch| self.blksw[ch] != self.blksw[0])
+            {
+                *mixed_transform_pending = false;
+                self.remap_mixed_transform_overlap();
             }
             self.synthesize(blk, imdct, sink);
         }

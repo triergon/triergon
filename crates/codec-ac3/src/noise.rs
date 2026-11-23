@@ -1,6 +1,6 @@
-//! Session noise for the A/52 path and the pinned decoder compatibility path.
+//! Xorshift and additive lagged generators for dither and extension noise.
 
-const LEGACY_SEED: u32 = 0x2545_f491;
+const XORSHIFT_SEED: u32 = 0x2545_f491;
 const SIGNED_UNIT: f32 = 1.0 / 2_147_483_648.0;
 
 /// FFmpeg 9.0.2 seed-zero state.
@@ -43,14 +43,14 @@ impl LaggedNoise {
 
 #[derive(Debug)]
 pub(crate) struct Rng {
-    legacy: u32,
+    xorshift: u32,
     lagged: Option<LaggedNoise>,
 }
 
 impl Rng {
     pub(crate) fn new(compatible: bool) -> Self {
         Self {
-            legacy: LEGACY_SEED,
+            xorshift: XORSHIFT_SEED,
             lagged: compatible.then(LaggedNoise::new),
         }
     }
@@ -71,11 +71,11 @@ impl Rng {
         if let Some(lagged) = &mut self.lagged {
             return lagged.draw();
         }
-        let mut x = self.legacy;
+        let mut x = self.xorshift;
         x ^= x << 13;
         x ^= x >> 17;
         x ^= x << 5;
-        self.legacy = x;
+        self.xorshift = x;
         x
     }
 

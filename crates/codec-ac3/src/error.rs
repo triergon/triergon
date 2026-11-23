@@ -11,7 +11,7 @@ pub enum Feature {
     /// bsid values that A/52:2018 says a decoder shall mute on (bsid > 16).
     BitstreamId(u8),
     /// E-AC-3 reduced sample rates (fscod = 3, Annex E Table E2.3). Decoded only with
-    /// `Compat::Specification`: FFmpeg 9.0.2 refuses them ("Reduced sampling rate is not
+    /// [`Policy::Specification`](crate::compat::ffmpeg::Policy::Specification): FFmpeg 9.0.2 refuses them ("Reduced sampling rate is not
     /// implemented") and A/52:2018 gives no hearing-threshold column for them.
     Eac3ReducedSampleRate,
     /// fscod2 = 3 (reserved reduced sample rate).

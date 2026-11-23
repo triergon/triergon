@@ -2,9 +2,10 @@
 //! typed errors. The frames are built bit by bit from the A/52:2018 syntax tables.
 
 use triergon_codec::{Budget, Error};
+use triergon_codec_ac3::compat::ffmpeg::Policy;
 use triergon_codec_ac3::{
-    AudioFrame, Compat, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, Limits,
-    NoiseMode, Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
+    AudioFrame, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, Limits, NoiseMode,
+    Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
 };
 
 #[derive(Default)]
@@ -204,7 +205,7 @@ fn compatible_reset_replays_the_first_dithered_frame() {
 #[test]
 fn noise_off_keeps_bap_zero_silent_with_either_compatibility_setting() {
     let frame = mono_frame_with_dither(0, true);
-    for compat in [Compat::Specification, Compat::Reference] {
+    for compat in [Policy::Specification, Policy::Reference] {
         let mut decoder = Decoder::new().with_options(DecoderOptions {
             compat,
             noise: NoiseMode::Off,

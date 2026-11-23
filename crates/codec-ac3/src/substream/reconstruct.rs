@@ -193,12 +193,9 @@ impl Substream {
         m
     }
 
-    /// FFmpeg 9.0.2 compatibility (observed black-box): the first audio
-    /// block in which the full-bandwidth channels use different transform lengths
-    /// rewrites the overlap delay lines of the coded channels before the inverse
-    /// transform as if a previously down-mixed delay had to be up-mixed. A/52 does not
-    /// do this; it is applied only when `DecoderOptions::compat` is `Compat::Reference`.
-    pub(super) fn ffmpeg_first_mixed_transform_quirk(&mut self) {
+    /// Remaps the overlap delay lines before the first block that mixes transform
+    /// lengths, as if a previous downmix needed to be expanded to the coded channels.
+    pub(super) fn remap_mixed_transform_overlap(&mut self) {
         let d = &mut self.delay;
         match self.acmod {
             0 | 2 => d[1] = d[0],

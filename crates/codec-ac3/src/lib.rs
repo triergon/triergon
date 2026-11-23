@@ -10,6 +10,7 @@
     clippy::expect_used
 )]
 mod bitalloc;
+pub mod compat;
 mod downmix;
 mod error;
 mod header;
@@ -32,6 +33,7 @@ pub use trace::{BlockTrace, FrameTrace, Trace};
 pub use triergon_bitstream::crc::crc16_a52 as crc16;
 pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
+use compat::ffmpeg::Policy;
 use downmix::downmix_info;
 use header::{check_crc, peek_chanmap};
 use quant::GroupTables;
@@ -67,7 +69,7 @@ pub struct DecoderOptions {
     /// Whether dither, AHT zero-bin and spectral extension noise is generated.
     pub noise: NoiseMode,
     /// Which output conventions to follow where A/52 leaves a choice.
-    pub compat: Compat,
+    pub compat: Policy,
 }
 
 /// Storage limits of one decoder.
@@ -85,20 +87,6 @@ impl Default for Limits {
             live_storage_bytes: 4 << 20,
         }
     }
-}
-
-/// Output conventions the decoder reproduces where A/52 leaves a choice or the
-/// pinned reference decoder deviates from it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Compat {
-    /// The pinned reference decoder (FFmpeg 9.0.2): its seed-zero dither noise
-    /// stream, its E-AC-3 HEBAP-4 VQ table offset and its first-frame conventions;
-    /// E-AC-3 reduced sample rates are refused as it refuses them. Output is compared
-    /// with the reference decoder, so this is the default.
-    #[default]
-    Reference,
-    /// A/52:2018 only; also decodes E-AC-3 reduced sample rates.
-    Specification,
 }
 
 /// Summary of one decoded access unit.
@@ -191,7 +179,7 @@ pub struct Decoder {
     last_layout: Option<(ChannelLayout, bool)>,
     scratch: Box<[f32; 256]>,
     trace: Trace,
-    quirk_armed: bool,
+    mixed_transform_pending: bool,
     last_downmix: Option<DownmixInfo>,
 }
 
@@ -204,7 +192,7 @@ impl Default for Decoder {
 impl DecoderOptions {
     /// Noise follows the reference decoder's seed-zero stream.
     fn reference_noise(self) -> bool {
-        self.compat == Compat::Reference && self.noise == NoiseMode::Normal
+        self.compat == Policy::Reference && self.noise == NoiseMode::Normal
     }
 }
 
@@ -241,7 +229,7 @@ impl Decoder {
             last_layout: None,
             scratch: Box::new([0.0; 256]),
             trace: Trace::default(),
-            quirk_armed: opts.compat == Compat::Reference,
+            mixed_transform_pending: opts.compat == Policy::Reference,
             last_downmix: None,
         }
     }
@@ -251,7 +239,7 @@ impl Decoder {
     pub fn with_options(mut self, opts: DecoderOptions) -> Self {
         self.opts = opts;
         self.rng = noise::Rng::new(opts.reference_noise());
-        self.quirk_armed = opts.compat == Compat::Reference;
+        self.mixed_transform_pending = opts.compat == Policy::Reference;
         self
     }
 
@@ -266,7 +254,7 @@ impl Decoder {
             b.fill(0.0);
         }
         self.last_layout = None;
-        self.quirk_armed = self.opts.compat == Compat::Reference;
+        self.mixed_transform_pending = self.opts.compat == Policy::Reference;
     }
 
     /// Size `out` for `len` samples per channel of `layout`, charging it first.
@@ -369,7 +357,7 @@ impl Decoder {
             } else {
                 dependent(&mut self.deps, &self.budget, h.substream_id as usize)?
             };
-            sub.reference_compat = self.opts.compat == Compat::Reference;
+            sub.reference_compat = self.opts.compat == Policy::Reference;
             let mut sink = BlockSink {
                 planes: &mut out.planes,
                 map,
@@ -385,7 +373,7 @@ impl Decoder {
                 &self.groups,
                 &mut sink,
                 &mut self.trace,
-                &mut self.quirk_armed,
+                &mut self.mixed_transform_pending,
             );
             if let Some(t) = self.trace.frames.get_mut(ntrace) {
                 t.offset = f.offset;
@@ -456,7 +444,7 @@ impl Decoder {
                 break;
             }
             if h.num_blocks != first.num_blocks || h.sample_rate != first.sample_rate {
-                if self.opts.compat != Compat::Reference {
+                if self.opts.compat != Policy::Reference {
                     return Err(DecodeError::Invalid(
                         "dependent substream block count/rate mismatch",
                     ));
@@ -480,7 +468,7 @@ impl Decoder {
         }
         // FFmpeg 9.0.2 refuses E-AC-3 reduced sample rates (fscod2) in any substream it would
         // decode and outputs nothing for the access unit (black-box).
-        if self.opts.compat == Compat::Reference
+        if self.opts.compat == Policy::Reference
             && program
                 .frames()
                 .iter()
