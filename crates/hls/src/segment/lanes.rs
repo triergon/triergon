@@ -1,6 +1,6 @@
 use super::HlsSegmentLimits;
 use crate::{
-    aac::{HlsAac, HlsAacFrame},
+    aac::{HlsAac, HlsAacFrame, MAXIMUM_ADTS_BYTES},
     avc::{AvcRaster, AvcTsAccessUnit, AvcTsClock, AvcTsReader, AvcTsStep},
     dolby::HlsDolby,
     hevc::{HlsHevc, HlsHevcPicture},
@@ -90,7 +90,7 @@ impl LaneAssembler for HlsAac {
     type Unit = HlsAacFrame;
 
     fn bind(pool: &Budget, config: AdmittedCarriage, _: HlsSegmentLimits) -> Result<Self> {
-        Self::new(pool, config, 8191)
+        Self::new(pool, config, MAXIMUM_ADTS_BYTES)
     }
 
     fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {

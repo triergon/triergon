@@ -1,6 +1,6 @@
 //! Aligned Dolby syncframes for one selected independent HLS TS segment.
 use crate::{
-    pes::{clock_describes, lane_track, pes_time},
+    pes::{PES_CORRUPT, clock_describes, lane_track, pes_time},
     segment::HlsMediaAudioUnit,
 };
 use std::sync::atomic::AtomicBool;
@@ -15,11 +15,12 @@ use triergon_mpegts::{
         DemuxBoundary, DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView,
         PrivateAudioCarriage,
     },
+    pes::stream_id,
+    transport::pid,
 };
 use triergon_playback::{TrackKey, pes_feed::PesInput};
 use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 
-const PES_CORRUPT: u32 = 2;
 const MAXIMUM_SYNCFRAME_BYTES: usize = 4096;
 const TS_PAYLOAD_BYTES: usize = 184;
 
@@ -64,7 +65,8 @@ impl HlsDolby {
                 ));
             }
         };
-        if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && pid <= 0x1ffe) {
+        if !matches!(config.track, TrackKey::Ts { program, pid: selected } if program != 0 && selected < pid::NULL)
+        {
             return Err(Error::Invalid("HLS Dolby track"));
         }
         let reader = Ac3FrameReader::new(
@@ -116,7 +118,7 @@ impl HlsDolby {
         };
         let facts = packet.facts();
         if !lane_track(self.config.track, self.config.configuration_epoch, &facts)
-            || packet.stream_id != 0xbd
+            || packet.stream_id != stream_id::PRIVATE_STREAM_1
             || packet.source_header.stream_id != packet.stream_id
         {
             return Err(Error::Invalid("HLS Dolby PES track or configuration"));
@@ -289,6 +291,7 @@ mod tests {
         compat::pes::{
             DemuxClock, DemuxObserver, DemuxScope, PrivateAudioDescriptors, SourceContext,
         },
+        psi::stream_type,
     };
 
     const SOURCE: SourceId = SourceId(5);
@@ -313,7 +316,7 @@ mod tests {
                     program: 1,
                     pid: 257,
                     stream_type,
-                    stream_id: 0xbd,
+                    stream_id: stream_id::PRIVATE_STREAM_1,
                     entity: SOURCE,
                     epochs: EPOCHS,
                 },
@@ -462,7 +465,10 @@ mod tests {
 
     #[test]
     fn split_syncframe_keeps_its_anchor_and_next_start_uses_current_pes() {
-        let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType87Eac3, 0x87);
+        let mut fixture = PesFixture::new(
+            PrivateAudioCarriage::PrivateType87Eac3,
+            stream_type::ATSC_EAC3,
+        );
         let first = eac3(0, 0, 0x40);
         let second = eac3(0, 0, 0x20);
         let third = eac3(2, 0, 0xb0);
@@ -502,7 +508,10 @@ mod tests {
 
     #[test]
     fn ac3_across_ts_spans_retries_after_pool_pressure() {
-        let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType81Ac3, 0x81);
+        let mut fixture = PesFixture::new(
+            PrivateAudioCarriage::PrivateType81Ac3,
+            stream_type::ATSC_AC3,
+        );
         let mut frame = [0; 192];
         frame[..8].copy_from_slice(&[0x0b, 0x77, 0, 0, 4, 0x40, 0x40, 0x1f]);
         let (mut packet, clock) = fixture.packet(&frame, 90_000, None);
@@ -550,7 +559,10 @@ mod tests {
                 Error::Unsupported("HLS E-AC-3 additional substream"),
             ),
         ] {
-            let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType87Eac3, 0x87);
+            let mut fixture = PesFixture::new(
+                PrivateAudioCarriage::PrivateType87Eac3,
+                stream_type::ATSC_EAC3,
+            );
             let (mut packet, clock) = fixture.packet(bytes, 90_000, None);
             assert!(fixture.reader.push(&mut packet, clock).unwrap());
             fixture.reader.finish();
@@ -569,7 +581,10 @@ mod tests {
 
     #[test]
     fn rejects_damaged_and_stale_pes_without_taking_the_mailbox() {
-        let mut fixture = PesFixture::new(PrivateAudioCarriage::PrivateType87Eac3, 0x87);
+        let mut fixture = PesFixture::new(
+            PrivateAudioCarriage::PrivateType87Eac3,
+            stream_type::ATSC_EAC3,
+        );
         let bytes = eac3(0, 0, 0);
         let (mut packet, clock) = fixture.packet(&bytes[..7], 90_000, None);
         assert!(fixture.reader.push(&mut packet, clock).unwrap());

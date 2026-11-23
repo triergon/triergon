@@ -16,5 +16,6 @@ mod dolby;
 mod hevc;
 pub mod packet;
 mod pes;
+mod pmt;
 pub mod progressive;
 pub mod segment;

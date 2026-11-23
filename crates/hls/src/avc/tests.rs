@@ -1,4 +1,5 @@
 use super::*;
+use triergon_mpegts::psi::stream_type;
 use triergon_mpegts::transport::parse_transport;
 use triergon_mpegts::{
     AssemblyStep, PacketFormat, ParseLimits, SourceEpochs,
@@ -51,8 +52,8 @@ fn push_span(reader: &mut AvcTsReader, bytes: &[u8]) {
         DemuxScope {
             program: 31,
             pid: 256,
-            stream_type: 0x1b,
-            stream_id: 0xe0,
+            stream_type: stream_type::H264,
+            stream_id: stream_id::VIDEO_FIRST,
             entity: SOURCE,
             epochs: EPOCHS,
         },

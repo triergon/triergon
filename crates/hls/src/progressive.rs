@@ -1,13 +1,14 @@
 //! Sequential TS188 feed for AVC and ADTS AAC.
 
 use crate::{
-    aac::{HlsAac, HlsAacFrame},
+    aac::{HlsAac, HlsAacFrame, MAXIMUM_ADTS_BYTES},
     avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     packet::UnitPacket,
+    pmt::select_pid,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, InputCursor, InputRequest, Result, Time, WorkBudget};
-use triergon_mpegts::psi::{PatTable, ProgramMap};
+use triergon_mpegts::psi::{PatTable, ProgramMap, stream_type};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::transport::ContinuityOutcome;
 use triergon_mpegts::{AssemblyStep, ParseLimits};
@@ -84,12 +85,34 @@ struct PatBinding {
     pmt_pid: u16,
 }
 
+/// The AVC and AAC tracks of the active PMT, on PIDs of `program`.
 #[derive(Debug)]
 struct Tracks {
-    video: TrackKey,
-    audio: TrackKey,
+    program: u16,
+    video: u16,
+    audio: u16,
     pcr_pid: u16,
     epoch: u64,
+}
+
+impl Tracks {
+    /// Whether `track` is the AVC track.
+    fn is_video(&self, track: TrackKey) -> bool {
+        track
+            == (TrackKey::Ts {
+                program: self.program,
+                pid: self.video,
+            })
+    }
+
+    /// Whether `track` is the AAC track.
+    fn is_audio(&self, track: TrackKey) -> bool {
+        track
+            == (TrackKey::Ts {
+                program: self.program,
+                pid: self.audio,
+            })
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -427,7 +450,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 if self
                     .tracks
                     .as_ref()
-                    .is_some_and(|t| track == t.video || track == t.audio) =>
+                    .is_some_and(|tracks| tracks.is_video(track) || tracks.is_audio(track)) =>
             {
                 return Err(error);
             }
@@ -453,10 +476,10 @@ impl<S: Source> TsProgressiveReader<S> {
             .engine
             .input()
             .budget();
-        if config.track == tracks.video {
+        if tracks.is_video(config.track) {
             self.video = Some(AvcTsReader::new_progressive(pool, config, self.limits.avc)?);
-        } else if config.track == tracks.audio {
-            self.audio = Some(HlsAac::new(pool, config, 0x1fff)?);
+        } else if tracks.is_audio(config.track) {
+            self.audio = Some(HlsAac::new(pool, config, MAXIMUM_ADTS_BYTES)?);
         }
         Ok(())
     }
@@ -502,7 +525,7 @@ impl<S: Source> TsProgressiveReader<S> {
             program: facts.program,
             pid: facts.pid,
         };
-        if track == tracks.video {
+        if tracks.is_video(track) {
             let video = self
                 .video
                 .as_mut()
@@ -511,7 +534,7 @@ impl<S: Source> TsProgressiveReader<S> {
                 return Err(Error::Invalid("progressive AVC mailbox is busy"));
             }
             self.phase = Phase::Video;
-        } else if track == tracks.audio {
+        } else if tracks.is_audio(track) {
             let audio = self
                 .audio
                 .as_mut()
@@ -544,8 +567,9 @@ impl<S: Source> TsProgressiveReader<S> {
                     return Err(Error::Unsupported("progressive TS changes active PMT"));
                 }
                 self.tracks = Some(Tracks {
-                    video: select_track(&map, 0x1b)?,
-                    audio: select_track(&map, 0x0f)?,
+                    program: map.header.extension,
+                    video: select_track(&map, stream_type::H264)?,
+                    audio: select_track(&map, stream_type::AAC_ADTS)?,
                     pcr_pid: map.pcr_pid,
                     epoch: configuration_epoch,
                 });
@@ -580,16 +604,12 @@ impl<S: Source> TsProgressiveReader<S> {
             .tracks
             .as_ref()
             .ok_or(Error::Invalid("missing TS PMT"))?;
-        let pid = |track| match track {
-            TrackKey::Ts { pid, .. } => Ok(pid),
-            _ => Err(Error::Invalid("progressive TS track")),
-        };
         match unit {
-            TsProgressiveUnit::Video(unit) => UnitPacket::video(pid(tracks.video)?, unit),
+            TsProgressiveUnit::Video(unit) => UnitPacket::video(tracks.video, unit),
             TsProgressiveUnit::Audio {
                 frame,
                 presentation,
-            } => UnitPacket::audio(pid(tracks.audio)?, frame, *presentation, frame.dts),
+            } => UnitPacket::audio(tracks.audio, frame, *presentation, frame.dts),
         }
     }
 
@@ -603,15 +623,13 @@ impl<S: Source> TsProgressiveReader<S> {
 
     /// The observer of a track allocates nothing for its next PES when it gets
     /// back the lists of the one a reader has just consumed.
-    fn reuse_pes_lists(&mut self, track: impl Fn(&Tracks) -> TrackKey, lists: SpentLists) {
+    fn reuse_pes_lists(&mut self, pid: impl Fn(&Tracks) -> u16, lists: SpentLists) {
         #[cfg(test)]
         if !tests::RETURN_PES_LISTS.get() {
             return;
         }
-        if let (Some(transport), Some(tracks)) = (self.transport.as_mut(), self.tracks.as_ref())
-            && let TrackKey::Ts { pid, .. } = track(tracks)
-        {
-            transport.engine.reuse_pes_lists(pid, lists);
+        if let (Some(transport), Some(tracks)) = (self.transport.as_mut(), self.tracks.as_ref()) {
+            transport.engine.reuse_pes_lists(pid(tracks), lists);
         }
     }
 
@@ -619,10 +637,7 @@ impl<S: Source> TsProgressiveReader<S> {
         pid == 0
             || self.pat.is_some_and(|pat| pat.pmt_pid == pid)
             || self.tracks.as_ref().is_some_and(|tracks| {
-                tracks.pcr_pid == pid
-                    || [tracks.video, tracks.audio]
-                        .iter()
-                        .any(|track| matches!(*track, TrackKey::Ts { pid: selected, .. } if selected == pid))
+                tracks.pcr_pid == pid || tracks.video == pid || tracks.audio == pid
             })
     }
 
@@ -728,22 +743,16 @@ fn pat_binding(table: &PatTable) -> Result<PatBinding> {
     })
 }
 
-fn select_track(map: &ProgramMap, stream_type: u8) -> Result<TrackKey> {
-    let mut streams = map
-        .streams
-        .as_slice()
-        .iter()
-        .filter(|stream| stream.stream_type == stream_type);
-    let stream = streams.next().ok_or(Error::Unsupported(
+fn select_track(map: &ProgramMap, kind: u8) -> Result<u16> {
+    select_pid(
+        map,
+        None,
+        |stream| Ok(stream.stream_type == kind),
+        "ambiguous progressive TS track",
+    )?
+    .ok_or(Error::Unsupported(
         "progressive TS requires AVC and ADTS AAC",
-    ))?;
-    if streams.next().is_some() {
-        return Err(Error::Unsupported("ambiguous progressive TS track"));
-    }
-    Ok(TrackKey::Ts {
-        program: map.header.extension,
-        pid: stream.pid,
-    })
+    ))
 }
 
 #[cfg(test)]

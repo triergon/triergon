@@ -5,13 +5,14 @@ use crate::{
     avc::{AvcRaster, AvcTsAccessUnit, AvcTsLimits, AvcTsReader},
     clock::{HlsAacClock, HlsAudioClockNs, ns_aac_clocks, ns_audio_clocks, resolve_hls_aac_clocks},
     packet::UnitPacket,
+    pmt::select_pid,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Error, InputCursor, InputRequest, Result, WorkBudget};
-use triergon_mpegts::psi::{ElementaryStream, ProgramMap};
+use triergon_mpegts::psi::{ElementaryStream, ProgramMap, descriptor_tag, stream_type};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::{
-    AssemblyStep, ParseLimits,
+    AssemblyStep, PacketFormat, ParseLimits,
     compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors},
 };
 use triergon_playback::{
@@ -412,7 +413,7 @@ where
             source,
             maximum: limits.maximum_source_bytes,
         });
-        if limits.maximum_source_bytes < 188
+        if limits.maximum_source_bytes < PacketFormat::Ts188.bytes()
             || limits.maximum_feed_bytes == 0
             || limits.maximum_access_units == 0
         {
@@ -826,10 +827,14 @@ fn select_tracks(
     let (video, audio) = match selection {
         TrackSelection::AvcAac(tracks) => {
             let video = find_track(map, tracks.video_pid, |stream| {
-                Ok(stream.stream_type == 0x1b)
+                Ok(stream.stream_type == stream_type::H264)
             })?
             .ok_or(Error::Unsupported("HLS segment has no selected AVC track"))?;
-            let find_aac = |pid| find_track(map, pid, |stream| Ok(stream.stream_type == 0x0f));
+            let find_aac = |pid| {
+                find_track(map, pid, |stream| {
+                    Ok(stream.stream_type == stream_type::AAC_ADTS)
+                })
+            };
             let audio = match tracks.audio {
                 HlsSegmentAudio::Disabled => None,
                 HlsSegmentAudio::Optional => find_aac(None)?,
@@ -846,8 +851,8 @@ fn select_tracks(
         }
         TrackSelection::Media(profile) => {
             let video_type = match profile.video {
-                HlsVideoCodec::Avc => 0x1b,
-                HlsVideoCodec::Hevc => 0x24,
+                HlsVideoCodec::Avc => stream_type::H264,
+                HlsVideoCodec::Hevc => stream_type::HEVC,
             };
             let video = find_track(map, None, |stream| Ok(stream.stream_type == video_type))?
                 .ok_or(Error::Unsupported(
@@ -876,22 +881,16 @@ fn find_track(
     pid: Option<u16>,
     accepts: impl Fn(&ElementaryStream) -> Result<bool>,
 ) -> Result<Option<TrackKey>> {
-    let mut selected = None;
-    for stream in map.streams.as_slice() {
-        if pid.is_some_and(|pid| stream.pid != pid) || !accepts(stream)? {
-            continue;
-        }
-        let track = TrackKey::Ts {
-            program: map.header.extension,
-            pid: stream.pid,
-        };
-        if selected.replace(track).is_some() {
-            return Err(Error::Unsupported(
-                "HLS segment requires explicit PID selection",
-            ));
-        }
-    }
-    Ok(selected)
+    let pid = select_pid(
+        map,
+        pid,
+        accepts,
+        "HLS segment requires explicit PID selection",
+    )?;
+    Ok(pid.map(|pid| TrackKey::Ts {
+        program: map.header.extension,
+        pid,
+    }))
 }
 
 fn media_audio_matches(
@@ -902,14 +901,20 @@ fn media_audio_matches(
 ) -> Result<bool> {
     use PrivateAudioCarriage as Dolby;
     if codec == HlsAudioCodec::Aac {
-        return Ok(stream.stream_type == 0x0f);
+        return Ok(stream.stream_type == stream_type::AAC_ADTS);
     }
     match stream.stream_type {
-        0x81 if codec == HlsAudioCodec::Ac3 => {}
-        0x87 if codec == HlsAudioCodec::Eac3 => {}
-        0x06 if stream
-            .descriptors()
-            .any(|entry| entry.is_ok_and(|descriptor| matches!(descriptor.tag, 0x6a | 0x7a))) => {}
+        stream_type::ATSC_AC3 if codec == HlsAudioCodec::Ac3 => {}
+        stream_type::ATSC_EAC3 if codec == HlsAudioCodec::Eac3 => {}
+        stream_type::PES_PRIVATE_DATA
+            if stream.descriptors().any(|entry| {
+                entry.is_ok_and(|descriptor| {
+                    matches!(
+                        descriptor.tag,
+                        descriptor_tag::DVB_AC3 | descriptor_tag::DVB_EAC3
+                    )
+                })
+            }) => {}
         _ => return Ok(false),
     }
     let carriage = Dolby::from_hls_pmt(

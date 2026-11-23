@@ -4,7 +4,7 @@
 
 use crate::{
     avc::{AvcRaster, AvcTsClock, AvcTsLimits},
-    pes::{clock_describes, lane_track},
+    pes::{PES_CORRUPT, clock_describes, lane_track},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -17,6 +17,8 @@ use triergon_framing::nal::{
 use triergon_mpegts::{
     AssemblyStep,
     compat::pes::{DemuxPacket, DemuxPayloadKind, DemuxSpan, DemuxTimeView, RegisteredCarriage},
+    pes::stream_id,
+    transport::pid,
 };
 use triergon_playback::{TrackKey, pes_feed::PesInput};
 use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
@@ -144,7 +146,7 @@ impl HlsHevc {
         if config.carriage != Carriage::Registered(RegisteredCarriage::Hevc) {
             return Err(Error::Unsupported("HLS HEVC needs selected HEVC carriage"));
         }
-        if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && (1..0x1fff).contains(&pid))
+        if !matches!(config.track, TrackKey::Ts { program, pid: selected } if program != 0 && (1..pid::NULL).contains(&selected))
         {
             return Err(Error::Invalid("HLS HEVC track"));
         }
@@ -252,12 +254,12 @@ impl Active {
         };
         let facts = packet.facts();
         if !lane_track(self.config.track, self.config.configuration_epoch, &facts)
-            || packet.stream_id & 0xf0 != 0xe0
+            || packet.stream_id & 0xf0 != stream_id::VIDEO_FIRST
             || packet.source_header.stream_id != packet.stream_id
         {
             return Err(Error::Invalid("HLS HEVC PES track or configuration"));
         }
-        if packet.flags & 2 != 0
+        if packet.flags & PES_CORRUPT != 0
             || packet.payload_kind == DemuxPayloadKind::DeclaredIncomplete
             || packet.payload_len == 0
             || packet.spans.is_empty()
@@ -506,6 +508,7 @@ mod tests {
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
         compat::pes::{DemuxClock, DemuxObserver, DemuxScope, SourceContext},
+        psi::stream_type,
     };
 
     static NO: AtomicBool = AtomicBool::new(false);
@@ -541,8 +544,8 @@ mod tests {
                 DemuxScope {
                     program: 1,
                     pid: 257,
-                    stream_type: 0x24,
-                    stream_id: 0xe0,
+                    stream_type: stream_type::HEVC,
+                    stream_id: stream_id::VIDEO_FIRST,
                     entity: SOURCE,
                     epochs: EPOCHS,
                 },

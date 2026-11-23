@@ -3,6 +3,9 @@ use triergon_core::{Error, Result, Time};
 use triergon_mpegts::compat::pes::DemuxTimeView;
 use triergon_playback::{TrackKey, pes_feed::PesFacts};
 
+/// The demux packet flag of a PES whose payload the demuxer marks corrupt.
+pub(crate) const PES_CORRUPT: u32 = 2;
+
 /// Whether a PES belongs to an HLS lane's track and configuration epoch.
 pub(crate) fn lane_track(track: TrackKey, configuration_epoch: u64, packet: &PesFacts<'_>) -> bool {
     track

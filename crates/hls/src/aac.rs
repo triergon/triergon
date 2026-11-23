@@ -1,6 +1,6 @@
 //! Access units for explicitly selected TS AAC ADTS carriage (PMT stream type
 //! 0x0f). PES boundaries are transport boundaries, even inside an ADTS header.
-use crate::pes::{clock_describes, lane_track, pes_time};
+use crate::pes::{PES_CORRUPT, clock_describes, lane_track, pes_time};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 use triergon_framing::aac::{self, AacAdtsHeader};
@@ -10,6 +10,8 @@ use triergon_mpegts::{
         CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
         RegisteredCarriage,
     },
+    pes::stream_id,
+    transport::pid,
 };
 use triergon_playback::{
     TrackKey,
@@ -18,8 +20,8 @@ use triergon_playback::{
 use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 
 const PREFIX_BYTES: usize = 7;
-const MAXIMUM_ADTS_BYTES: usize = 0x1fff;
-const PES_CORRUPT: u32 = 2;
+/// The largest ADTS frame: its 13-bit `frame_length`.
+pub(crate) const MAXIMUM_ADTS_BYTES: usize = 0x1fff;
 
 /// One ADTS AAC frame with the timestamps of the PES it starts in.
 #[derive(Debug)]
@@ -184,7 +186,7 @@ impl HlsAac {
         if config.carriage != Carriage::Registered(RegisteredCarriage::AacAdts) {
             return Err(Error::Unsupported("HLS AAC needs selected ADTS carriage"));
         }
-        if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && pid <= 0x1ffe)
+        if !matches!(config.track, TrackKey::Ts { program, pid: selected } if program != 0 && selected < pid::NULL)
             || !(PREFIX_BYTES + 1..=MAXIMUM_ADTS_BYTES).contains(&maximum_frame_bytes)
         {
             return Err(Error::Invalid("HLS AAC track or frame limit"));
@@ -247,7 +249,7 @@ impl HlsAac {
         };
         let packet = packet.facts();
         if !lane_track(self.config.track, self.config.configuration_epoch, &packet)
-            || packet.stream_id != 0xc0
+            || packet.stream_id != stream_id::AUDIO_FIRST
             || packet.source_header.stream_id != packet.stream_id
         {
             return Err(Error::Invalid("HLS AAC PES track or configuration"));
@@ -548,6 +550,7 @@ mod tests {
     use triergon_mpegts::{
         PacketFormat, ParseLimits, SourceEpochs,
         compat::pes::{DemuxClock, DemuxObserver, DemuxScope, SourceContext},
+        psi::stream_type,
     };
 
     const TRACK: TrackKey = TrackKey::Ts {
@@ -579,8 +582,8 @@ mod tests {
                 DemuxScope {
                     program: 1,
                     pid: 257,
-                    stream_type: 0x0f,
-                    stream_id: 0xc0,
+                    stream_type: stream_type::AAC_ADTS,
+                    stream_id: stream_id::AUDIO_FIRST,
                     entity: SOURCE,
                     epochs: EPOCHS,
                 },

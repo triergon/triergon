@@ -2,7 +2,7 @@
 //! H.222.0 §2.14.1 supplies the delimiter contract. Annex B and the RBSP
 //! prefixes used for active SPS/PPS resolution follow H.264 §7.3 and Annex B.
 
-use crate::pes::{clock_describes, lane_track};
+use crate::pes::{PES_CORRUPT, clock_describes, lane_track};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, WorkBudget};
 use triergon_framing::{
@@ -13,6 +13,7 @@ use triergon_mpegts::compat::pes::{
     CompactDemuxPacket, DemuxPacket, DemuxPayloadKind, DemuxTimeView, PayloadCursor,
     RegisteredCarriage,
 };
+use triergon_mpegts::{pes::stream_id, transport::pid};
 use triergon_playback::{
     TrackKey,
     pes_feed::{PesInput, SpentLists},
@@ -279,7 +280,7 @@ impl AvcTsReader {
         if config.carriage != Carriage::Registered(RegisteredCarriage::Avc) {
             return Err(Error::Unsupported("HLS AVC needs selected AVC carriage"));
         }
-        if !matches!(config.track, TrackKey::Ts { program, pid } if program != 0 && (1..0x1fff).contains(&pid))
+        if !matches!(config.track, TrackKey::Ts { program, pid: selected } if program != 0 && (1..pid::NULL).contains(&selected))
             || limits.maximum_access_unit_bytes == 0
             || limits.maximum_parameter_set_bytes == 0
         {
@@ -367,11 +368,11 @@ impl AvcTsReader {
         };
         let packet = packet.facts();
         if !lane_track(self.config.track, self.config.configuration_epoch, &packet)
-            || packet.source_header.stream_id & 0xf0 != 0xe0
+            || packet.source_header.stream_id & 0xf0 != stream_id::VIDEO_FIRST
         {
             return Err(Error::Invalid("AVC TS PES track or configuration"));
         }
-        if packet.flags & 2 != 0
+        if packet.flags & PES_CORRUPT != 0
             || packet.payload_kind == DemuxPayloadKind::DeclaredIncomplete
             || packet.empty
             || packet.payload_len == 0
