@@ -13,7 +13,7 @@
 //! The digest is the ordered fold of a little-endian byte transcript.
 //!
 //! Each operation is a function of its own ([`session`] once for each codec,
-//! and [`document`]), called from the measured loop and never inlined into
+//! and [`document()`]), called from the measured loop and never inlined into
 //! it: a change to one decoder's code then leaves the code, and so the
 //! instruction counts, of the other operations as they were. A session's
 //! decoder is built where it is used and never moved.
