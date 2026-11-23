@@ -474,6 +474,22 @@ fn fold_continuity<const TRACE: bool>(
     Ok(totals)
 }
 
+/// The replay that proves again the unframed run `event` reports, when a recoverable source
+/// fault ended that run.
+#[cold]
+#[inline(never)]
+fn replay_of_ended_run(event: &ReaderEvent) -> Option<au_recovery::Trigger> {
+    let ended_by = match event {
+        ReaderEvent::IncompleteVideo(video) => video.ended_by(),
+        ReaderEvent::UnframedAudio(audio) => audio.ended_by(),
+        _ => None,
+    }?;
+    match ended_by.event() {
+        TraceEvent::Diagnostic(fault) => au_recovery::Trigger::from_fault(fault),
+        _ => None,
+    }
+}
+
 // One function on purpose: the timed loop of every access-unit workload; a split is a hot-path change not yet measured.
 fn operation<const TRACE: bool, const EXPLAIN: bool>(
     pool: &Budget,
@@ -620,6 +636,16 @@ fn operation<const TRACE: bool, const EXPLAIN: bool>(
                 event @ (ReaderEvent::IncompleteVideo(_) | ReaderEvent::UnframedAudio(_)),
             ))) => {
                 observed_media = true;
+                // The replay proves a run that a recoverable fault ended again, with the
+                // bytes the fault cut. Should it fail, the rerun folds the run as it is.
+                if !EXPLAIN
+                    && single_entity
+                    && request.format == PacketFormat::Ts188
+                    && totals.packets == 0
+                    && let Some(trigger) = replay_of_ended_run(&event)
+                {
+                    break (SourceProof::ObservedRecovery(trigger), totals);
+                }
                 let (id, projection) = match &event {
                     ReaderEvent::IncompleteVideo(video) => (video.track_info().id(), video.into()),
                     ReaderEvent::UnframedAudio(audio) => (audio.track_info().id(), audio.into()),
@@ -1195,13 +1221,17 @@ mod tests {
         assert_eq!(totals.digest, 16_203_249_262_521_375_477);
 
         let mut raw = input.to_vec();
-        // Put a start code across the retained PES and its headerless continuation.
+        // Put a start code across the last two carriers of the finite PES. The source view
+        // delivers that PES before it reports the surplus, so the reader refuses its bytes.
         let next_carrier = 4 * 188;
         let continuation = next_carrier + 5 + usize::from(raw[next_carrier + 4]);
         raw[next_carrier - 2..next_carrier].fill(0);
         raw[continuation..continuation + 2].copy_from_slice(&[1, 0x65]);
         let totals = fold_single(&raw);
         assert_eq!(totals.packets, 0);
-        assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Pes");
+        assert_eq!(
+            totals.refusal.unwrap().reason,
+            "invalid data: Annex B leading bytes"
+        );
     }
 }

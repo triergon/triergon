@@ -161,14 +161,16 @@ fn borrowed_carriers_keep_the_owned_events_in_source_order() {
 
 #[test]
 fn continuity_residue_keeps_original_carriers_and_events_with_unit_work() {
-    for (raw, strict_bytes, residue_bytes) in [(THIRD, 27, 81), (TIMELINE, 30, 30)] {
+    for (raw, strict_runs, residue_bytes) in [(THIRD, &[27][..], 81), (TIMELINE, &[27, 3][..], 30)]
+    {
         let pool = Budget::new(8 << 20).unwrap();
         let mut reader = reader(&pool);
         let mut original = Vec::new();
         let mut reported = None;
         let mut eof = None;
         let mut strict_pes_bytes = 0;
-        let mut pending = 0;
+        // The reader's own report of each run the fault or the clock epoch ended.
+        let mut runs = Vec::new();
         let mut saw_inline_continuity = false;
         let mut ended = false;
         for _ in 0..500_000 {
@@ -232,8 +234,10 @@ fn continuity_residue_keeps_original_carriers_and_events_with_unit_work() {
                             saw_inline_continuity = true;
                             original.push(event);
                         }
-                        ReaderEvent::Interrupted { .. } => pending += 1,
-                        ReaderEvent::IncompleteVideo(_) => (),
+                        ReaderEvent::IncompleteVideo(video) => {
+                            assert!(reported.is_none());
+                            runs.push(video.bytes().len());
+                        }
                         other => panic!("unexpected source event {other:?}"),
                     },
                 },
@@ -248,8 +252,8 @@ fn continuity_residue_keeps_original_carriers_and_events_with_unit_work() {
         }
         assert!(ended);
         assert!(saw_inline_continuity);
-        assert_eq!(strict_pes_bytes, strict_bytes);
-        assert_eq!(pending, 1);
+        assert_eq!(strict_pes_bytes, strict_runs.iter().sum::<usize>());
+        assert_eq!(runs, strict_runs);
         reader.reset().unwrap();
         assert!(matches!(
             reader.finish(ID, eof.unwrap()),
@@ -341,20 +345,19 @@ fn buffered_diagnostic(reader: &mut ContinuityReader, pool: &Budget) -> InputReq
     for _ in 0..50_000 {
         match reader.step(&mut WorkBudget::new(1), &OFF).unwrap() {
             Step::NeedInput(request) => provide(reader, pool, THIRD, request),
-            Step::Ready(Event::Other(ContinuityEvent::Pending(ReaderEvent::Interrupted {
-                cause,
-                ..
-            }))) => {
-                let TraceEvent::Diagnostic(fault) = cause.event() else {
-                    panic!("missing continuity diagnostic");
-                };
-                assert_eq!(fault.error, Error::Invalid("TS excess duplicate"));
-                // The inner reader publishes that diagnostic with the next unit.
-                // The continuity proof still needs another grant to process it.
-                assert!(matches!(
-                    reader.step(&mut WorkBudget::new(1), &OFF).unwrap(),
-                    Step::Yield
-                ));
+            Step::Ready(Event::Other(ContinuityEvent::Source(ReaderEvent::IncompleteVideo(
+                video,
+            )))) => {
+                // The run the excess duplicate ends comes first. The inner reader then
+                // restarts the lane with one unit and publishes the diagnostic with the
+                // next; the continuity proof still needs another grant to process it.
+                assert_eq!(video.bytes().len(), 27);
+                for _ in 0..2 {
+                    assert!(matches!(
+                        reader.step(&mut WorkBudget::new(1), &OFF).unwrap(),
+                        Step::Yield
+                    ));
+                }
                 return reader.request().unwrap();
             }
             Step::Yield | Step::Ready(Event::Other(_)) => (),

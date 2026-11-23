@@ -686,52 +686,68 @@ pub(super) struct UnframedData {
     pub epochs: SourceEpochs,
 }
 
-/// A validated AVC or HEVC PES byte run with invalid leading bytes and no
-/// Annex B start code. Its original payload and first source anchor are
-/// retained at logical EOF. Clones share the charged storage.
+/// A run of validated AVC or HEVC PES payload with invalid leading bytes and no
+/// Annex B start code: every complete PES of the track between two ends of its byte
+/// run. It is reported when the source ends the run, with its original payload and
+/// first source anchor. Clones share the charged storage.
 #[derive(Clone, Debug)]
-pub struct IncompleteVideo(pub(super) Shared<UnframedData>);
+pub struct IncompleteVideo {
+    pub(super) data: Shared<UnframedData>,
+    pub(super) ended_by: Option<SourceEvent>,
+}
 
 impl IncompleteVideo {
     /// The retained track configuration at the start of the unframed video run.
     pub fn track_info(&self) -> &Track {
-        &self.0.track
+        &self.data.track
     }
     /// Half-open byte range of the run in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
-        self.0.range.clone()
+        self.data.range.clone()
     }
     /// Original AVC or HEVC PES payload bytes, including the invalid leading bytes.
     pub fn bytes(&self) -> &Bytes {
-        &self.0.bytes
+        &self.data.bytes
     }
     /// Intersections with original PES payloads, ordered by elementary byte offset.
     pub fn sources(&self) -> &[PayloadSource] {
-        self.0.sources.as_slice()
+        self.data.sources.as_slice()
     }
     /// The applicable PES anchor at the start of the run, when available.
     pub fn clock(&self) -> Option<&PacketClock> {
-        self.0.clock.as_ref()
+        self.data.clock.as_ref()
     }
     /// The clock and configuration epochs in force for the run.
     pub fn epochs(&self) -> SourceEpochs {
-        self.0.epochs
+        self.data.epochs
+    }
+    /// The source event that ended the run: a fault, a signalled discontinuity, a new
+    /// clock epoch, a table change or the first PES of another byte run. `None` for a run
+    /// that reached the logical end of the source.
+    pub fn ended_by(&self) -> Option<&SourceEvent> {
+        self.ended_by.as_ref()
     }
 }
 
-/// A validated private PES whose payload has no AC-3 or E-AC-3 syncword.
-/// The source track, PES and clock are retained at logical EOF. Clones share
-/// the charged storage.
+/// A validated private PES whose payload has no AC-3 or E-AC-3 syncword. It is
+/// reported when the source ends its byte run, with the source track, PES and clock.
+/// Clones share the charged storage.
 #[derive(Clone, Debug)]
 pub struct UnframedAudio {
     pub(super) data: Shared<UnframedData>,
     pub(super) carriage: PrivateAudioCarriage,
+    pub(super) ended_by: Option<SourceEvent>,
 }
 
 impl UnframedAudio {
     /// The private AC-3 or E-AC-3 carriage admitted from the PMT’s signalling.
     pub fn carriage(&self) -> PrivateAudioCarriage {
         self.carriage
+    }
+    /// The source event that ended the PES's byte run, as for [`IncompleteVideo::ended_by`];
+    /// `None` at the logical end of the source.
+    pub fn ended_by(&self) -> Option<&SourceEvent> {
+        self.ended_by.as_ref()
     }
     /// Track configuration retained from the PMT that admitted the private PES.
     pub fn track_info(&self) -> &Track {
@@ -794,9 +810,10 @@ pub enum ReaderEvent {
         /// The refusal returned when the track’s signalling was tested for framing support.
         error: Error,
     },
-    /// A PMT, clock or byte-run boundary interrupted unpublished elementary
-    /// bytes. Their original PES events were delivered unchanged. A loss
-    /// boundary is not logical EOF and never certifies a partial AU.
+    /// A PMT, clock or byte-run boundary, or a discontinuity the caller declared,
+    /// interrupted unpublished elementary bytes. Their original PES events were
+    /// delivered unchanged. A loss boundary is not logical EOF and never certifies a
+    /// partial AU.
     Interrupted {
         /// The track whose bytes were interrupted.
         track: Track,
@@ -821,9 +838,10 @@ pub enum ReaderEvent {
     LatmPes(crate::compat::latm::PesPacket),
     /// A proven segment prefix with an unfinished final segment in the source PES.
     DvbSubtitlePrefix(Packet),
-    /// The final unframed video run under the explicit EOF reporting policy.
+    /// An unframed video run that the source ended, under the explicit reporting policy.
     IncompleteVideo(IncompleteVideo),
-    /// One opaque private-audio PES admitted by the explicit EOF reporting policy.
+    /// One opaque private-audio PES whose byte run the source ended, under the explicit
+    /// reporting policy.
     UnframedAudio(UnframedAudio),
 }
 

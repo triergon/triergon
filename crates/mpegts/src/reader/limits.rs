@@ -66,7 +66,7 @@ pub struct ReaderLimits {
     pub latm_packet_policy: latm::PacketPolicy,
     /// Reporting of an overlong final DVB subtitle segment.
     pub dvb_subtitle_tail_policy: DvbSubtitleTailPolicy,
-    /// Reporting of an unframed AVC or HEVC run at logical source EOF.
+    /// Reporting of an unframed AVC or HEVC byte run when the source ends it.
     pub video_eof_policy: VideoEofPolicy,
     /// Nonzero cap on units a track can publish before its lane is reset. An additional
     /// unit returns `Limit`. Codec-specific framing limits also apply.

@@ -16,8 +16,8 @@ mod storage;
 use super::model::{ClockContext, PacketData, PayloadSources, Shared, UnframedData};
 use super::seek::{PictureDelivery, SeekProbe};
 use super::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame, IncompleteVideo,
-    LoasFrame, Packet, PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track, UnframedAudio,
+    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame, LoasFrame, Packet,
+    PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track,
 };
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
@@ -410,9 +410,11 @@ enum Prepared {
 pub(super) enum LaneStep {
     Packet(Packet),
     PictureProbe(SeekProbe),
-    IncompleteVideo(IncompleteVideo),
+    /// An unframed video run, copied and ready to report.
+    IncompleteVideo(Shared<UnframedData>),
     LatmPes(latm::PesPacket),
-    UnframedAudio(UnframedAudio),
+    /// The opaque PES of a private-audio carriage, copied and ready to report.
+    UnframedAudio(Shared<UnframedData>, PrivateAudioCarriage),
     NeedPayload,
     Yield,
     End,
@@ -546,12 +548,46 @@ impl Lane {
     pub(super) fn has_incomplete(&self) -> bool {
         self.incomplete.is_some()
     }
+    /// Whether the lane holds an unframed run that the end of its byte run publishes: PES
+    /// payload no framer accepted, scanned or on its way out as a fragment.
+    pub(super) fn holds_unframed_run(&self) -> bool {
+        (self.residue.is_some() && !self.pieces.is_empty())
+            || matches!(
+                self.incomplete,
+                Some(Incomplete {
+                    kind: FragmentKind::Unframed(_),
+                    ..
+                })
+            )
+            || matches!(
+                self.build,
+                Some(Build {
+                    unit: BuildUnit::Unframed(..),
+                    ..
+                })
+            )
+    }
     pub(super) fn set_reader_storage(&mut self, bytes: usize) -> Result<()> {
         let Some(incomplete) = &mut self.incomplete else {
             return Err(Error::Truncated);
         };
         incomplete.reader_storage = Some(bytes);
         Ok(())
+    }
+    /// Stops treating what the lane holds as an unframed run to publish.
+    pub(super) fn abandon_unframed_run(&mut self) {
+        self.residue = None;
+        self.incomplete = None;
+        self.build = None;
+    }
+    /// Lets the fragment of a run that ends inside the stream be copied without an audit.
+    /// The open transport's storage cannot be counted as a released one's is at the end of
+    /// the source, so only a pool that cannot hold the fragment itself is `Limit`; other
+    /// pressure is `Backpressure`, as for every access unit published inside a stream.
+    pub(super) fn copy_fragment_unaudited(&mut self) {
+        if let Some(incomplete) = &mut self.incomplete {
+            incomplete.reader_storage = Some(0);
+        }
     }
     /// Admits the PES of `source`: `Ok(None)` once admitted or ignored, `Ok(Some(source))` when
     /// the work grant is spent; a refusal returns the source with the error.

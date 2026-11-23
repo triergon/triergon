@@ -182,7 +182,8 @@ PMT event that publishes them. Other events a caller handles:
 | `InterruptedPes` | a completed PES whose header predates a program boundary |
 | `VideoHeaders` | an Annex B group without an admitted picture |
 | `Unsupported` | no framer for this stream |
-| `IncompleteAudio`, `IncompleteVideo`, `DvbSubtitlePrefix`, `UnframedAudio` | EOF reports, only under the opt-in policies below |
+| `IncompleteAudio`, `DvbSubtitlePrefix` | EOF reports, only under the opt-in policies below |
+| `IncompleteVideo`, `UnframedAudio` | an unframed byte run that the source ended, only under the opt-in policies below |
 | `AdtsFragment`, `RecoveredAdts`, `LatmPes` | FFmpeg-compatible packet boundaries, only under the opt-in policies below |
 
 Logical EOF drains the framers before the original `Finished` event and the final
@@ -256,9 +257,9 @@ records its clocks, source positions and packet digest.
 | `ReaderLimits` field | Non-default choice |
 | --- | --- |
 | `audio_eof_policy` | `ReportIncomplete`: unfinished audio at logical EOF becomes `IncompleteAudio` instead of `Truncated` |
-| `video_eof_policy` | `ReportUnframed`: a final AVC/HEVC run without an Annex B start code becomes `IncompleteVideo` |
+| `video_eof_policy` | `ReportUnframed`: an AVC/HEVC byte run without an Annex B start code becomes `IncompleteVideo` when the source ends it, at logical EOF or at a fault, signalled discontinuity, clock epoch or table change (`IncompleteVideo::ended_by`) |
 | `dvb_subtitle_tail_policy` | `ReportCompletePrefix`: a PES with an unfinished final segment yields its complete segments as `DvbSubtitlePrefix` |
-| `unframed_audio_policy` | `ReportAtEof`: one opaque private-audio PES without a syncword becomes `UnframedAudio` |
+| `unframed_audio_policy` | `ReportAtEof`: one opaque private-audio PES without a syncword becomes `UnframedAudio` when the source ends its byte run |
 | `adts_packet_policy` | `ReportFragments`: FFmpeg's parser framing, with opaque bytes as `AdtsFragment` |
 | `adts_pes_policy` | `ReportUnbounded`: assemble zero-length ADTS PES (a H.222.0 §2.4.3.7 violation) |
 | `latm_packet_policy` | `PreservePes`: one `LatmPes` per validated PES |
@@ -411,9 +412,21 @@ and a PES is not one. Bytes of a track's elementary run that a fault, a clock
 epoch or a table change cuts before they complete an access unit are reported as
 `ReaderEvent::Interrupted` with their extent in the track's concatenated payload;
 the PES that carried them are still delivered as source events. Without the
-opt-in policies below, a PES whose payload is not the track's framing syntax
+opt-in policies above, a PES whose payload is not the track's framing syntax
 (for example AVC bytes before the first start code) fails the reader with
 `Invalid`.
+
+With `VideoEofPolicy::ReportUnframed`, a run of complete PES that holds no start
+code at all is not a cut access unit. The reader reports it whole as
+`IncompleteVideo` before the event that ends the run, which `ended_by` names: a
+fault on the PID or on the carrier grid, a signalled discontinuity, a new clock
+epoch, a table change, or the first PES of another byte run. Only what the
+source view delivered as complete PES is in it; the faulted carrier and a
+partial PES are not. A discontinuity the caller declares
+(`EntityTransition::Discontinuity`) is a flush: it reports what the reader held
+as `Interrupted`. A run that ends inside the stream is copied without the
+storage audit made at the end of the source, so a full pool is `Backpressure`
+and the run follows once the caller has released storage.
 
 The FFmpeg-compatible `DemuxObserver` cuts what the demuxer cuts and refuses what
 its profile does not cover: a carrier with a transport error or scrambling returns

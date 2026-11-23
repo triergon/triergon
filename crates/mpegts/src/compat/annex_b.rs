@@ -1,4 +1,5 @@
-//! Unframed AVC and HEVC observations through logical source EOF.
+//! Unframed AVC and HEVC observations: the reader's policy and the proof through
+//! continuity changes to logical source EOF.
 
 mod continuity;
 
@@ -15,14 +16,17 @@ use triergon_core::{
 
 pub use continuity::{ContinuityEvidence, ContinuityResidue};
 
-/// Reporting of an unframed AVC or HEVC run at logical source EOF.
+/// Reporting of an unframed AVC or HEVC byte run when the source ends it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum VideoEofPolicy {
     /// Keep the video framer's leading-byte error.
     #[default]
     RejectUnframed,
     /// Report a nonempty run of validated PES payload with invalid leading bytes
-    /// and no Annex B start code anywhere in the run.
+    /// and no Annex B start code anywhere in the run, as
+    /// [`ReaderEvent::IncompleteVideo`]: at logical EOF, and before a fault, signalled
+    /// discontinuity, clock epoch or table change that ends the run. A discontinuity
+    /// the caller declares discards the run and reports its extent as `Interrupted`.
     ReportUnframed,
 }
 
@@ -43,7 +47,9 @@ pub enum ContinuityEvent {
 /// cursor, transport carriers and clock transitions. Neutral packets and source
 /// events remain those of that reader.
 ///
-/// The source reader uses [VideoEofPolicy::ReportUnframed]. A continuity
+/// The source reader uses [VideoEofPolicy::ReportUnframed], so the run before each
+/// continuity change arrives as its own `IncompleteVideo`; the residue at EOF holds
+/// their bytes in order, with those the demuxer merges across the changes. A continuity
 /// difference must be observed within the first 16 selected carriers. A later
 /// start code, an unsupported source change, or unavailable proof storage
 /// retires the optional proof. Source backpressure still comes from the reader.

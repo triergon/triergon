@@ -75,7 +75,8 @@ pub enum PcrPolicy {
     IgnoreReservedBits,
 }
 
-/// Reporting of unframed payload in a private-audio carriage at logical EOF.
+/// Reporting of unframed payload in a private-audio carriage when the source ends its
+/// byte run, at logical EOF or before a fault or boundary.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum UnframedAudioPolicy {
     /// Require the source namespace before admitting a private-audio framer.

@@ -2,8 +2,8 @@
 use super::lane::{Lane, LaneStep, PesRun, StorageScan};
 use super::model::{ClockContext, Shared};
 use super::{
-    AccessUnit, EntityTransition, Packet, Reader, ReaderEvent, SourceEvent, Stream, Track,
-    Transport, seek,
+    AccessUnit, EntityTransition, IncompleteVideo, Packet, Reader, ReaderEvent, SourceEvent,
+    Stream, Track, Transport, UnframedAudio, seek,
 };
 use crate::clock::ClockKey;
 use crate::compat::adts;
@@ -46,8 +46,9 @@ pub(super) enum RawStep {
 pub(super) enum Admission {
     /// Choose how the event is admitted.
     Begin,
-    /// Keep or interrupt each lane from `index` on before a boundary, or drain them for
-    /// `Finished`; then build lanes from `rebuild`.
+    /// Keep or interrupt each lane from `index` on before a boundary, after publishing an
+    /// unframed run the boundary ends, or drain them for `Finished`; then build lanes from
+    /// `rebuild`.
     DrainAll {
         index: usize,
         /// Lanes kept so far; they are moved to the front.
@@ -58,9 +59,10 @@ pub(super) enum Admission {
     },
     /// Build or reuse the lane of stream `index` of `map`.
     Build { index: usize, map: SourceEvent },
-    /// Restart lane `index` for a new PES run, then feed it the PES.
+    /// Publish an unframed run of lane `index` and restart the lane for a new PES run, then
+    /// feed it the PES.
     DrainLane(usize),
-    /// Restart lane `index` after a fault on its PID.
+    /// Publish an unframed run of lane `index` and restart the lane after a fault on its PID.
     FaultLane(usize),
     /// Queue the PES for lane `index`.
     Feed(usize),
@@ -267,11 +269,20 @@ impl Reader {
                 LaneStep::Packet(packet) => {
                     return Ok(LaneOutput::Ready(Step::Ready(Self::output(packet))));
                 }
-                LaneStep::IncompleteVideo(video) => {
-                    return ready(ReaderEvent::IncompleteVideo(video));
+                LaneStep::IncompleteVideo(data) => {
+                    return ready(ReaderEvent::IncompleteVideo(IncompleteVideo {
+                        data,
+                        ended_by: None,
+                    }));
                 }
                 LaneStep::LatmPes(packet) => return ready(ReaderEvent::LatmPes(packet)),
-                LaneStep::UnframedAudio(audio) => return ready(ReaderEvent::UnframedAudio(audio)),
+                LaneStep::UnframedAudio(data, carriage) => {
+                    return ready(ReaderEvent::UnframedAudio(UnframedAudio {
+                        data,
+                        carriage,
+                        ended_by: None,
+                    }));
+                }
                 LaneStep::Yield => return Ok(LaneOutput::Ready(Step::Yield)),
                 LaneStep::DeferredFragment => return Ok(LaneOutput::Deferred),
                 LaneStep::End | LaneStep::NeedPayload => return Ok(LaneOutput::Done),
@@ -526,6 +537,9 @@ impl Reader {
                             LaneOutput::Done => (),
                         }
                     } else {
+                        if self.ends_unframed_run(*index, source) {
+                            return self.publish_unframed_run(*index, source, work, cancel);
+                        }
                         if !work.try_charge(1) {
                             return yielded();
                         }
@@ -575,6 +589,9 @@ impl Reader {
             Admission::DrainLane(index) | Admission::FaultLane(index) => {
                 let index = *index;
                 let fault = matches!(step, Admission::FaultLane(_));
+                if self.ends_unframed_run(index, source) {
+                    return self.publish_unframed_run(index, source, work, cancel);
+                }
                 if !work.try_charge(1) {
                     return yielded();
                 }
@@ -839,6 +856,56 @@ impl Reader {
         }
         self.lanes.as_mut_slice()[index] = lane;
         Ok(interrupted)
+    }
+
+    /// Whether `cause` ends an unframed run that lane `index` holds, so that the run is
+    /// published before the lane restarts. A discontinuity the caller declares flushes the
+    /// lane instead, and a program map that keeps the lane continues its run.
+    // Out of line and small: a test written into the arms of `admission`, or a call that
+    // returns the step, measured +0.05% to +0.2% on access-unit workloads without a fault.
+    #[cold]
+    #[inline(never)]
+    fn ends_unframed_run(&self, index: usize, cause: &SourceEvent) -> bool {
+        self.lanes.as_slice()[index].holds_unframed_run()
+            && !matches!(cause.event(), TraceEvent::Discontinuity { .. })
+            && !self.keeps_lane(index, cause)
+    }
+
+    /// Runs lane `index` as at the end of the source until its unframed run is copied and
+    /// returned, with `cause` as what ended it. The event stays in flight meanwhile.
+    #[cold]
+    #[inline(never)]
+    fn publish_unframed_run(
+        &mut self,
+        index: usize,
+        cause: &SourceEvent,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Admitted> {
+        Ok(Admitted::Kept(
+            match self.lane_step(index, true, work, cancel)? {
+                LaneOutput::Ready(mut step) => {
+                    if let Step::Ready(Event::Other(
+                        ReaderEvent::IncompleteVideo(IncompleteVideo { ended_by, .. })
+                        | ReaderEvent::UnframedAudio(UnframedAudio { ended_by, .. }),
+                    )) = &mut step
+                    {
+                        *ended_by = Some(cause.clone());
+                    }
+                    Flow::Return(step)
+                }
+                LaneOutput::Deferred => {
+                    self.lanes.as_mut_slice()[index].copy_fragment_unaudited();
+                    Flow::Continue
+                }
+                // The lane has nothing to return for the run: leave what it holds to the
+                // restart, which reports it as interrupted.
+                LaneOutput::Done => {
+                    self.lanes.as_mut_slice()[index].abandon_unframed_run();
+                    Flow::Continue
+                }
+            },
+        ))
     }
 
     /// Audits the storage the unfinished tail of lane `index` may use; `false` when the audit

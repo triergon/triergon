@@ -462,10 +462,8 @@ impl Lane {
                     charge,
                 );
                 Ok(match kind {
-                    UnframedKind::Video => LaneStep::IncompleteVideo(IncompleteVideo(data)),
-                    UnframedKind::Audio(carriage) => {
-                        LaneStep::UnframedAudio(UnframedAudio { data, carriage })
-                    }
+                    UnframedKind::Video => LaneStep::IncompleteVideo(data),
+                    UnframedKind::Audio(carriage) => LaneStep::UnframedAudio(data, carriage),
                 })
             }
         }
