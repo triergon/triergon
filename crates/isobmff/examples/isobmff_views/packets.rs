@@ -215,6 +215,11 @@ pub(super) fn operation<'a>(
     bytes: &'a [u8],
     arguments: &[OsString],
 ) -> Result<Operation<'a>, String> {
+    // A registered refusal asks the worker to name the unsupported feature it met.
+    let (report_refusal, arguments) = match arguments.split_last() {
+        Some((last, rest)) if last == "--report-refusal" => (true, rest),
+        _ => (false, arguments),
+    };
     let [window, quantum, extra @ ..] = arguments else {
         return Err("expected window, work quantum and operation profile".into());
     };
@@ -268,6 +273,9 @@ pub(super) fn operation<'a>(
                 Err(error @ (Error::Invalid(_) | Error::Unsupported(_) | Error::Truncated)) => {
                     if out.trace.is_some() {
                         eprintln!("{error:?}");
+                    }
+                    if let (true, Error::Unsupported(detail)) = (report_refusal, error) {
+                        out.work.unsupported = Some(detail);
                     }
                     out.row(8, &[], &[]).map_err(|e| format!("{e:?}"))
                 }
