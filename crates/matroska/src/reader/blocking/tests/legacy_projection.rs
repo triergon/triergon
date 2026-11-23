@@ -119,7 +119,7 @@ fn open(
         fail_at,
     };
     (
-        BlockingReader::open_seekable(source, Limits::default()).unwrap(),
+        BlockingReader::open(source, Limits::default()).unwrap(),
         calls,
     )
 }
@@ -284,7 +284,7 @@ fn legacy_projection_mixed_methods_preserve_retained_all_track_snapshot_after_re
     let pool = Budget::new(1024 * 1024).unwrap();
     let baseline = pool.used();
     let mut reader =
-        BlockingReader::open_seekable_in(Cursor::new(plain()), Limits::default(), &pool).unwrap();
+        BlockingReader::open_in(Cursor::new(plain()), Limits::default(), &pool).unwrap();
     let cancel = AtomicBool::new(false);
     assert_eq!(
         reader.next_packet(&cancel).unwrap().unwrap().data.as_ref(),

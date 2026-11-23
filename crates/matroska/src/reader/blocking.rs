@@ -1,13 +1,68 @@
 use super::*;
 use crate::reader::input_feeder::{FeedStep, InputFeeder};
-use std::io::{Read, Seek};
-use triergon_core::InputCursor;
+use crate::storage::PayloadOwnership;
+use std::io::{Cursor, Read, Seek};
+use triergon_core::{InputCursor, OwnedInputBytes};
 
 type Reposition<R> = fn(&mut R, u64) -> std::io::Result<u64>;
 type Position<R> =
     fn(&mut InputFeeder<R>, &mut InputCursor, &InputRequest, &AtomicBool) -> Result<()>;
 /// How a seekable source repositions and resynchronizes its cursor.
 type Seeking<R> = (Reposition<R>, Position<R>);
+
+type OpenOwned<R> = fn(R, Limits, &Budget, PayloadOwnership, bool) -> Result<BlockingReader<R>>;
+
+/// Source access and payload ownership for a [BlockingReader].
+///
+/// Seekable sources convert through [From]. Use [Self::stream] for forward-only
+/// input and [Self::owned] for immutable input already charged to the pool.
+#[derive(Debug)]
+pub struct BlockingSource<R: Read> {
+    source: R,
+    seek: Option<Seeking<R>>,
+    owned: Option<OpenOwned<R>>,
+    payload: PayloadOwnership,
+}
+
+impl<R: Read> BlockingSource<R> {
+    /// Read forward from the source's current position.
+    pub fn stream(source: R) -> Self {
+        Self {
+            source,
+            seek: None,
+            owned: None,
+            payload: PayloadOwnership::OwnedExact,
+        }
+    }
+
+    /// Set how packets retain their payloads. The default is
+    /// [PayloadOwnership::OwnedExact].
+    #[must_use]
+    pub fn with_payload_ownership(mut self, payload: PayloadOwnership) -> Self {
+        self.payload = payload;
+        self
+    }
+}
+
+impl<R: Read + Seek> From<R> for BlockingSource<R> {
+    fn from(source: R) -> Self {
+        Self {
+            seek: Some(BlockingReader::<R>::SEEK),
+            ..Self::stream(source)
+        }
+    }
+}
+
+impl BlockingSource<Cursor<OwnedInputBytes>> {
+    /// Read charged, immutable input without copying its windows. Opening
+    /// returns [Error::ForeignPool] if the input uses another pool.
+    pub fn owned(source: OwnedInputBytes) -> Self {
+        Self {
+            owned: Some(BlockingReader::open_owned),
+            ..Self::from(Cursor::new(source))
+        }
+    }
+}
 
 /// The one source a blocking reader reads.
 const SOURCE: SourceId = SourceId(1);
@@ -70,41 +125,47 @@ pub fn seek_initial_trim<R: Read>(
 }
 
 impl<R: Read> BlockingReader<R> {
-    /// Opens a sequential source in a new pool of `limits.live_storage_bytes` and
-    /// reads until Tracks and the first Cluster are known; the metadata must precede
-    /// that Cluster. Fails with [`Error::Limit`] for a pool too small to create,
-    /// [`Error::Truncated`] when the source ends first, [`Error::Transport`] for an
-    /// I/O error, and with the parse error of malformed or refused metadata.
-    pub fn open(source: R, limits: Limits) -> Result<Self> {
+    /// Open a seekable source or one described by [BlockingSource] in a new
+    /// pool bounded by [Limits::live_storage_bytes]. Fails on I/O errors or
+    /// refused metadata.
+    pub fn open(source: impl Into<BlockingSource<R>>, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_in(source, limits, &pool)
     }
-    /// [`open`](Self::open), charging all storage to the caller's `pool`.
-    pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
-        let policy = crate::storage::PayloadOwnership::OwnedExact;
-        Self::open_in_with_payload_ownership(source, limits, pool, policy)
-    }
-    /// [`open`](Self::open) with the block-payload policy `policy`.
-    pub fn open_with_payload_ownership(
-        source: R,
-        limits: Limits,
-        policy: crate::storage::PayloadOwnership,
-    ) -> Result<Self> {
-        let pool = Budget::new(limits.live_storage_bytes)?;
-        Self::open_in_with_payload_ownership(source, limits, &pool, policy)
-    }
-    /// [`open_in`](Self::open_in) with the block-payload policy `policy`.
-    pub fn open_in_with_payload_ownership(
-        source: R,
+
+    /// Open a source and charge its storage to the caller's pool. A seekable
+    /// source can follow SeekHead links to late metadata.
+    pub fn open_in(
+        source: impl Into<BlockingSource<R>>,
         limits: Limits,
         pool: &Budget,
-        policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
-        let reader = Reader::new(pool, SOURCE, capabilities(false), limits, WINDOW)?;
-        Self::construct(reader, InputFeeder::new(source, WINDOW)?, None, policy)
+        Self::open_source(source.into(), limits, pool, false)
     }
+
+    #[inline(always)]
+    fn open_source(
+        source: BlockingSource<R>,
+        limits: Limits,
+        pool: &Budget,
+        webm_vp9_t35: bool,
+    ) -> Result<Self> {
+        if let Some(open) = source.owned {
+            return open(source.source, limits, pool, source.payload, webm_vp9_t35);
+        }
+        let reader = Reader::new(
+            pool,
+            SOURCE,
+            capabilities(source.seek.is_some()),
+            limits,
+            WINDOW,
+        )?;
+        let input = InputFeeder::new(source.source, WINDOW)?;
+        Self::construct(reader, input, source.seek, source.payload)
+    }
+
     /// The block-payload policy this reader was opened with.
-    pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
+    pub fn payload_ownership(&self) -> PayloadOwnership {
         self.reader.payload_ownership()
     }
     fn reposition(&self) -> Option<Reposition<R>> {
@@ -114,7 +175,7 @@ impl<R: Read> BlockingReader<R> {
         mut reader: Reader,
         input: InputFeeder<R>,
         seek: Option<Seeking<R>>,
-        policy: crate::storage::PayloadOwnership,
+        policy: PayloadOwnership,
     ) -> Result<Self> {
         reader.stream.envelope.set_payload_ownership(policy);
         Self::initialize(Self {
@@ -404,42 +465,6 @@ impl<R: Read + Seek> BlockingReader<R> {
         |reader, offset| Seek::seek(reader, std::io::SeekFrom::Start(offset)),
         |feed, cursor, request, cancel| feed.synchronize_seekable_position(cursor, request, cancel),
     );
-    /// Opens a seekable source in a new pool of `limits.live_storage_bytes`, following
-    /// SeekHead chains to load late Tracks, Cues and segment metadata; the reader can
-    /// then seek. Fails as [`open`](Self::open) does.
-    pub fn open_seekable(source: R, limits: Limits) -> Result<Self> {
-        let pool = Budget::new(limits.live_storage_bytes)?;
-        Self::open_seekable_in(source, limits, &pool)
-    }
-    /// [`open_seekable`](Self::open_seekable), charging all storage to the caller's `pool`.
-    pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
-        let policy = crate::storage::PayloadOwnership::OwnedExact;
-        Self::open_seekable_in_with_payload_ownership(source, limits, pool, policy)
-    }
-    /// [`open_seekable`](Self::open_seekable) with the block-payload policy `policy`.
-    pub fn open_seekable_with_payload_ownership(
-        source: R,
-        limits: Limits,
-        policy: crate::storage::PayloadOwnership,
-    ) -> Result<Self> {
-        let pool = Budget::new(limits.live_storage_bytes)?;
-        Self::open_seekable_in_with_payload_ownership(source, limits, &pool, policy)
-    }
-    /// [`open_seekable_in`](Self::open_seekable_in) with the block-payload policy `policy`.
-    pub fn open_seekable_in_with_payload_ownership(
-        source: R,
-        limits: Limits,
-        pool: &Budget,
-        policy: crate::storage::PayloadOwnership,
-    ) -> Result<Self> {
-        let reader = Reader::new(pool, SOURCE, capabilities(true), limits, WINDOW)?;
-        Self::construct(
-            reader,
-            InputFeeder::new(source, WINDOW)?,
-            Some(Self::SEEK),
-            policy,
-        )
-    }
 }
 
 fn capabilities(random_access: bool) -> SourceCapabilities {
@@ -449,28 +474,15 @@ fn capabilities(random_access: bool) -> SourceCapabilities {
     }
 }
 
-impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
-    /// Explicit immutable-input operation. The complete caller-supplied input capability
-    /// owner must already belong to this pool; windows and packet views retain
-    /// that full charge. No source is buffered here; the generic Read/Seek
-    /// constructors keep the default OwnedExact payload policy.
-    pub fn open_owned_seekable_in(
-        source: triergon_core::OwnedInputBytes,
+impl BlockingReader<Cursor<OwnedInputBytes>> {
+    fn open_owned(
+        source: Cursor<OwnedInputBytes>,
         limits: Limits,
         pool: &Budget,
-        policy: crate::storage::PayloadOwnership,
-    ) -> Result<Self> {
-        Self::open_owned_with_profile(source, limits, pool, policy, false)
-    }
-
-    fn open_owned_with_profile(
-        source: triergon_core::OwnedInputBytes,
-        limits: Limits,
-        pool: &Budget,
-        policy: crate::storage::PayloadOwnership,
+        policy: PayloadOwnership,
         webm_vp9_t35: bool,
     ) -> Result<Self> {
-        if !source.as_bytes().belongs_to(pool) {
+        if !source.get_ref().as_bytes().belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
         let reader = if webm_vp9_t35 {
@@ -478,21 +490,24 @@ impl BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>> {
         } else {
             Reader::new(pool, SOURCE, capabilities(true), limits, WINDOW)?
         };
-        let input = InputFeeder::from_owned(std::io::Cursor::new(source), WINDOW)?;
+        let input = InputFeeder::from_owned(source, WINDOW)?;
         Self::construct(reader, input, Some(Self::SEEK), policy)
     }
 }
 
-/// [`BlockingReader::open_owned_seekable_in`] with WebM VP9's implicit ITU-T T.35
-/// addition admitted, as [`new_reader`](super::new_reader) does. Documented on
-/// [`compat::block_additions`](crate::compat::block_additions).
+/// Open immutable input with WebM VP9's implicit ITU-T T.35 addition admitted.
 pub fn open_owned_seekable_in(
-    source: triergon_core::OwnedInputBytes,
+    source: OwnedInputBytes,
     limits: Limits,
     pool: &Budget,
-    policy: crate::storage::PayloadOwnership,
-) -> Result<BlockingReader<std::io::Cursor<triergon_core::OwnedInputBytes>>> {
-    BlockingReader::open_owned_with_profile(source, limits, pool, policy, true)
+    policy: PayloadOwnership,
+) -> Result<BlockingReader<Cursor<OwnedInputBytes>>> {
+    BlockingReader::open_source(
+        BlockingSource::owned(source).with_payload_ownership(policy),
+        limits,
+        pool,
+        true,
+    )
 }
 
 #[cfg(test)]

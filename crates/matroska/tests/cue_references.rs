@@ -7,6 +7,7 @@ use std::{
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
+use triergon_matroska::BlockingSource;
 #[path = "support/reader.rs"]
 mod reader_kit;
 use triergon_core::Step;
@@ -44,13 +45,13 @@ impl Seek for Chunks {
     }
 }
 fn blocking(name: &str, policy: PayloadOwnership, maximum: usize) -> BlockingReader<Chunks> {
-    BlockingReader::open_seekable_with_payload_ownership(
-        Chunks {
+    BlockingReader::open(
+        BlockingSource::from(Chunks {
             input: Cursor::new(raw(name)),
             maximum,
-        },
+        })
+        .with_payload_ownership(policy),
         Limits::default(),
-        policy,
     )
     .unwrap()
 }
@@ -371,14 +372,13 @@ fn default_or_owned(name: &str, explicit: bool, maximum: usize) -> BlockingReade
         maximum,
     };
     let r = if explicit {
-        BlockingReader::open_seekable_with_payload_ownership(
-            source,
+        BlockingReader::open(
+            BlockingSource::from(source).with_payload_ownership(PayloadOwnership::OwnedExact),
             Limits::default(),
-            PayloadOwnership::OwnedExact,
         )
         .unwrap()
     } else {
-        BlockingReader::open_seekable(source, Limits::default()).unwrap()
+        BlockingReader::open(source, Limits::default()).unwrap()
     };
     assert_eq!(r.payload_ownership(), PayloadOwnership::OwnedExact);
     r

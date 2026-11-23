@@ -23,8 +23,7 @@ fn block_start_seek_accepts_positive_sub_hz_audio_rate() {
     );
     let tracks = element(0x1654ae6b, &[track(1, 1, &[]), audio].concat());
     let raw = mkv(&[tracks, cluster(1, simple(1, 0, 0x80, b"keyframe"))].concat());
-    let mut reader =
-        BlockingReader::open_seekable(Cursor::new(raw), crate::Limits::default()).unwrap();
+    let mut reader = BlockingReader::open(Cursor::new(raw), crate::Limits::default()).unwrap();
     let mut audio = reader.tracks()[1].clone();
     let recovery = RecoveryAudio::BlockStart;
     assert_eq!(recovery.delay_ns(&audio, 1_000_000).unwrap(), 0);

@@ -25,7 +25,7 @@ fn chapter_edition_and_tag_flags_use_their_schema_defaults() {
             cluster(0, simple(1, 0, 0x80, b"frame")),
         ]
         .concat());
-        let reader = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
+        let reader = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
         let documents = reader.metadata_documents();
         let edition = documents
             .iter()
@@ -67,7 +67,7 @@ fn writing_app_and_attachment_description_preserve_presence() {
             cluster(0, simple(1, 0, 0x80, b"frame")),
         ]
         .concat());
-        let reader = BlockingReader::open_seekable(Cursor::new(bytes), Limits::default()).unwrap();
+        let reader = BlockingReader::open(Cursor::new(bytes), Limits::default()).unwrap();
         let docs = reader.metadata_documents();
         let info = docs.iter().find_map(|doc| doc.info()).unwrap();
         let attached = docs

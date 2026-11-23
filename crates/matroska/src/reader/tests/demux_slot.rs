@@ -407,7 +407,7 @@ fn demux_slot_blocking_packet_and_receipt_boundaries_remain_complete() {
     for kind in [0, 1, 2, 3] {
         let raw = fixture(kind);
         let mut reader =
-            BlockingReader::open_seekable(std::io::Cursor::new(raw), Limits::default()).unwrap();
+            BlockingReader::open(std::io::Cursor::new(raw), Limits::default()).unwrap();
         if kind == 3 {
             let receipt = reader
                 .seek_for_playback(0, 80_000_000, &AtomicBool::new(false))

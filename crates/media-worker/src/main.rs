@@ -15,6 +15,7 @@ use triergon_harness_protocol::{
     hex, quoted,
 };
 use triergon_harness_runner::{BenchLine, Boundary, Timer, command};
+use triergon_matroska::BlockingSource;
 use triergon_matroska::compat::seek::at_block_start;
 use triergon_matroska::reference_trace::seek_initial_trim;
 use triergon_matroska::timing::ExactTime;
@@ -27,10 +28,10 @@ type Outcome = Result<(), Error>;
 /// A reader whose packets share their input windows (`SharedBounded`); the library
 /// default is `OwnedExact`.
 fn open_shared<R: Read>(source: R, limits: Limits) -> triergon_matroska::Result<Demuxer<R>> {
-    Demuxer::open_with_payload_ownership(
-        source,
+    Demuxer::open(
+        BlockingSource::stream(source)
+            .with_payload_ownership(triergon_matroska::PayloadOwnership::SharedBounded),
         limits,
-        triergon_matroska::PayloadOwnership::SharedBounded,
     )
 }
 
@@ -43,11 +44,11 @@ fn open_owned(
     let pool = triergon_core::Budget::new(limits.live_storage_bytes)?;
     let source =
         triergon_core::OwnedInputBytes::try_from_vec(&pool, data).map_err(|error| error.error)?;
-    Demuxer::open_owned_seekable_in(
-        source,
+    Demuxer::open_in(
+        BlockingSource::owned(source)
+            .with_payload_ownership(triergon_matroska::PayloadOwnership::SharedBounded),
         limits,
         &pool,
-        triergon_matroska::PayloadOwnership::SharedBounded,
     )
 }
 

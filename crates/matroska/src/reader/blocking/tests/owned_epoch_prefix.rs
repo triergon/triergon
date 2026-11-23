@@ -1,6 +1,7 @@
 //! The immutable-source state-history shortcut must be indistinguishable from
 //! the ordinary scan: identical receipts (including scanned bytes), packets and
 //! errors for every seek fixture, target and truncation.
+use crate::BlockingSource;
 use crate::reader::blocking::*;
 use crate::storage::PayloadOwnership;
 use std::{io::Cursor, sync::atomic::AtomicBool};
@@ -86,11 +87,10 @@ fn owned(raw: &[u8], track: usize, target: i64, playback: bool) -> Vec<String> {
     let pool = Budget::new(limits.live_storage_bytes).unwrap();
     let source = OwnedInputBytes::try_from_vec(&pool, raw.to_vec()).unwrap();
     session(
-        BlockingReader::open_owned_seekable_in(
-            source,
+        BlockingReader::open_in(
+            BlockingSource::owned(source).with_payload_ownership(PayloadOwnership::SharedBounded),
             limits,
             &pool,
-            PayloadOwnership::SharedBounded,
         ),
         track,
         target,
@@ -100,10 +100,10 @@ fn owned(raw: &[u8], track: usize, target: i64, playback: bool) -> Vec<String> {
 
 fn ordinary(raw: &[u8], track: usize, target: i64, playback: bool) -> Vec<String> {
     session(
-        BlockingReader::open_seekable_with_payload_ownership(
-            Cursor::new(raw.to_vec()),
+        BlockingReader::open(
+            BlockingSource::from(Cursor::new(raw.to_vec()))
+                .with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
-            PayloadOwnership::SharedBounded,
         ),
         track,
         target,
@@ -121,7 +121,11 @@ fn owned_with(
     let pool = Budget::new(limits.live_storage_bytes).unwrap();
     let source = OwnedInputBytes::try_from_vec(&pool, raw.to_vec()).unwrap();
     session(
-        BlockingReader::open_owned_seekable_in(source, limits, &pool, policy),
+        BlockingReader::open_in(
+            BlockingSource::owned(source).with_payload_ownership(policy),
+            limits,
+            &pool,
+        ),
         0,
         target,
         playback,
@@ -136,10 +140,9 @@ fn ordinary_with(
     playback: bool,
 ) -> Vec<String> {
     session(
-        BlockingReader::open_seekable_with_payload_ownership(
-            Cursor::new(raw.to_vec()),
+        BlockingReader::open(
+            BlockingSource::from(Cursor::new(raw.to_vec())).with_payload_ownership(policy),
             limits,
-            policy,
         ),
         0,
         target,

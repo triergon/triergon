@@ -1,5 +1,6 @@
 //! Seek windows and scan projection that need the adapter's private state:
 //! pressure retries, the epoch certificate and the public work trace.
+use crate::BlockingSource;
 use crate::reader::blocking::*;
 use crate::seek_window_kit::{facts, fixture, policy_cases, source};
 use std::sync::Arc;
@@ -12,11 +13,10 @@ fn seek_window_pressure_retry_and_truncation_keep_source_and_owner_facts() {
         let base = pool.used();
         let cancel = Arc::new(AtomicBool::new(false));
         let (input, log, _) = source(fixture(), 7, &pool, &cancel);
-        let mut reader = BlockingReader::open_seekable_in_with_payload_ownership(
-            input,
+        let mut reader = BlockingReader::open_in(
+            BlockingSource::from(input).with_payload_ownership(policy),
             Limits::default(),
             &pool,
-            policy,
         )
         .unwrap();
         let held = reader.next_typed_packet(&cancel).unwrap().unwrap();
@@ -45,11 +45,10 @@ fn seek_window_pressure_retry_and_truncation_keep_source_and_owner_facts() {
         raw.pop();
         let cancel = Arc::new(AtomicBool::new(false));
         let (input, log, _) = source(raw, 1, &pool, &cancel);
-        let mut reader = BlockingReader::open_seekable_in_with_payload_ownership(
-            input,
+        let mut reader = BlockingReader::open_in(
+            BlockingSource::from(input).with_payload_ownership(policy),
             Limits::default(),
             &pool,
-            policy,
         )
         .unwrap();
         let mut packets = Vec::new();
@@ -279,11 +278,10 @@ fn scan_projection_pressure_retry_keeps_both_caller_aliases_and_configuration() 
         let base = pool.used();
         let cancel = Arc::new(AtomicBool::new(false));
         let (input, log, _) = source(fixture(), 7, &pool, &cancel);
-        let mut reader = BlockingReader::open_seekable_in_with_payload_ownership(
-            input,
+        let mut reader = BlockingReader::open_in(
+            BlockingSource::from(input).with_payload_ownership(policy),
             Limits::default(),
             &pool,
-            policy,
         )
         .unwrap();
         let held = reader.next_typed_packet(&cancel).unwrap().unwrap();

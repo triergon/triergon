@@ -6,6 +6,7 @@ use ebml_kit::element;
 use std::io::{Cursor, Read};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, OwnedInputBytes};
+use triergon_matroska::BlockingSource;
 use triergon_matroska::{BlockingReader, Error, Limits, PayloadOwnership, Result};
 
 fn source() -> Vec<u8> {
@@ -44,8 +45,12 @@ fn open(policy: PayloadOwnership) -> (Budget, Bytes, BlockingReader<Cursor<Owned
     let pool = Budget::new(Limits::default().live_storage_bytes).unwrap();
     let input = OwnedInputBytes::try_from_vec(&pool, source()).unwrap();
     let root = input.as_bytes().clone();
-    let reader =
-        BlockingReader::open_owned_seekable_in(input, Limits::default(), &pool, policy).unwrap();
+    let reader = BlockingReader::open_in(
+        BlockingSource::owned(input).with_payload_ownership(policy),
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     (pool, root, reader)
 }
 
@@ -126,11 +131,10 @@ fn an_unrelated_pool_cannot_admit_a_charged_source_as_operation_storage() {
     let alias = root.as_bytes().clone();
     let before = (first.used(), second.used());
     assert!(matches!(
-        BlockingReader::open_owned_seekable_in(
-            root,
+        BlockingReader::open_in(
+            BlockingSource::owned(root).with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
-            &second,
-            PayloadOwnership::SharedBounded
+            &second
         ),
         Err(Error::ForeignPool)
     ));
@@ -174,18 +178,17 @@ fn every_physical_prefix_keeps_the_existing_error_or_complete_packet_outcome() {
         }
     }
     for end in 0..=raw.len() {
-        let before = drain(BlockingReader::open_seekable_with_payload_ownership(
-            Cursor::new(&raw[..end]),
+        let before = drain(BlockingReader::open(
+            BlockingSource::from(Cursor::new(&raw[..end]))
+                .with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
-            PayloadOwnership::SharedBounded,
         ));
         let pool = Budget::new(Limits::default().live_storage_bytes).unwrap();
         let root = OwnedInputBytes::try_from_vec(&pool, raw[..end].to_vec()).unwrap();
-        let after = drain(BlockingReader::open_owned_seekable_in(
-            root,
+        let after = drain(BlockingReader::open_in(
+            BlockingSource::owned(root).with_payload_ownership(PayloadOwnership::SharedBounded),
             Limits::default(),
             &pool,
-            PayloadOwnership::SharedBounded,
         ));
         assert_eq!(after, before, "physical prefix {end}");
     }

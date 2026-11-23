@@ -10,6 +10,7 @@ use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::{
     Budget, BudgetVec, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
+use triergon_matroska::BlockingSource;
 use triergon_matroska::{BlockingReader, Error, Event, Limits, Reader};
 
 #[test]
@@ -17,7 +18,7 @@ fn packet_track_and_catalogue_aliases_keep_one_live_pool_after_reader_drop() {
     let pool = Budget::new(1024 * 1024).unwrap();
     let baseline = pool.used();
     let mut demux = BlockingReader::open_in(
-        Cursor::new(ebml_kit::avc_file_with_attachment()),
+        BlockingSource::stream(Cursor::new(ebml_kit::avc_file_with_attachment())),
         Limits::default(),
         &pool,
     )
@@ -55,7 +56,7 @@ fn packet_track_and_catalogue_aliases_keep_one_live_pool_after_reader_drop() {
 fn packet_output_backpressure_retries_the_same_event_without_reading_ahead() {
     let pool = Budget::new(1024 * 1024).unwrap();
     let mut demux = BlockingReader::open_in(
-        Cursor::new(ebml_kit::avc_file_with_attachment()),
+        BlockingSource::stream(Cursor::new(ebml_kit::avc_file_with_attachment())),
         Limits::default(),
         &pool,
     )
@@ -75,7 +76,7 @@ fn packet_output_backpressure_retries_the_same_event_without_reading_ahead() {
 fn earlier_packets_remain_charged_through_seek_and_cross_thread_release() {
     let pool = Budget::new(1024 * 1024).unwrap();
     let baseline = pool.used();
-    let mut demux = BlockingReader::open_seekable_in(
+    let mut demux = BlockingReader::open_in(
         Cursor::new(ebml_kit::avc_file_with_attachment()),
         Limits::default(),
         &pool,
@@ -123,7 +124,7 @@ fn small_stored_zlib_laces_keep_the_existing_decoded_capacity_policy() {
     let cluster = e(0x1f43b675, &[e(0xe7, &[0]), e(0xa3, &block)].concat());
     let bytes = mkv(&[e(0x1654ae6b, &e(0xae, &track)), cluster].concat());
     let mut reader = BlockingReader::open(
-        Cursor::new(bytes),
+        BlockingSource::stream(Cursor::new(bytes)),
         Limits {
             block_bytes: 33,
             ..Limits::default()
@@ -167,7 +168,8 @@ fn direct_destination_reads_handle_short_reads_and_interruptions_without_zero_pa
         bytes: Cursor::new(ebml_kit::avc_file_with_attachment()),
         calls: 0,
     };
-    let mut reader = BlockingReader::open(source, Limits::default()).unwrap();
+    let mut reader =
+        BlockingReader::open(BlockingSource::stream(source), Limits::default()).unwrap();
     let mut payloads = Vec::new();
     while let Some(packet) = reader.next_packet(&AtomicBool::new(false)).unwrap() {
         payloads.push(packet.data.as_ref().to_vec());
@@ -183,7 +185,7 @@ fn opaque_document_handles_keep_the_charge_through_cross_thread_last_release() {
     let baseline = pool.used();
     for _ in 0..16 {
         let demux = BlockingReader::open_in(
-            Cursor::new(ebml_kit::avc_file_with_attachment()),
+            BlockingSource::stream(Cursor::new(ebml_kit::avc_file_with_attachment())),
             Limits::default(),
             &pool,
         )
@@ -233,7 +235,11 @@ fn fixture() -> Vec<u8> {
     mkv(&[e(0x1654ae6b, &e(0xae, &track)), e(0x1f43b675, &[])].concat())
 }
 fn tracks() -> (triergon_matroska::Track, triergon_matroska::Track) {
-    let reader = BlockingReader::open(Cursor::new(fixture()), Limits::default()).unwrap();
+    let reader = BlockingReader::open(
+        BlockingSource::stream(Cursor::new(fixture())),
+        Limits::default(),
+    )
+    .unwrap();
     let a = reader.tracks()[0].clone();
     let b = a.clone();
     drop(reader);
@@ -329,7 +335,12 @@ fn sibling_source_views_keep_one_charged_tracks_owner_after_teardown() {
     let bytes = mkv(&[e(0x1654ae6b, &raw), e(0x1f43b675, &[])].concat());
     let pool = Budget::new(64 * 1024).unwrap();
     let baseline = pool.used();
-    let reader = BlockingReader::open_in(Cursor::new(bytes), Limits::default(), &pool).unwrap();
+    let reader = BlockingReader::open_in(
+        BlockingSource::stream(Cursor::new(bytes)),
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let a = reader.tracks()[0].clone();
     let b = reader.tracks()[1].clone();
     assert_eq!(a.source_metadata.as_ref(), first.as_slice());

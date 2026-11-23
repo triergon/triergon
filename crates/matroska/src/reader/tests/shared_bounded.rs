@@ -1,5 +1,6 @@
 //! The shared-bounded payload policy: borrowed input parents, retention, the pool
 //! graph, generations, cancellation and transport.
+use crate::BlockingSource;
 use crate::reader::*;
 use crate::storage::PayloadOwnership;
 use std::io::Cursor;
@@ -586,10 +587,9 @@ fn shared_bounded_partial_commit_transport_stays_before_cancel_and_final_unit() 
 struct Fact(usize, Option<i64>, Option<u64>, bool, i64, Vec<u8>);
 
 fn facts(policy: PayloadOwnership) -> Vec<Fact> {
-    let mut reader = BlockingReader::open_seekable_with_payload_ownership(
-        Cursor::new(RAW),
+    let mut reader = BlockingReader::open(
+        BlockingSource::from(Cursor::new(RAW)).with_payload_ownership(policy),
         Limits::default(),
-        policy,
     )
     .unwrap();
     let mut facts = Vec::new();

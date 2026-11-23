@@ -25,7 +25,7 @@ use triergon_matroska::{BlockingReader, Limits};
 
 # let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/seek/cues-front.mkv");
 let cancel = AtomicBool::new(false);
-let mut reader = BlockingReader::open_seekable(File::open(path)?, Limits::default())?;
+let mut reader = BlockingReader::open(File::open(path)?, Limits::default())?;
 for track in reader.tracks() { /* number, kind, codec, codec_private, colour, languages … */ }
 let video = reader.tracks().iter().position(|t| t.kind == 1).ok_or("no video track")?;
 let receipt = reader.seek_for_playback(video, 1_000_000_000, &cancel)?; // SeekReceipt
@@ -36,9 +36,11 @@ while let Some(p) = reader.next_typed_packet(&cancel)? {
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
-`open`/`open_in` accept any `Read` (sequential, no seeking); `open_seekable*`
-need `Read + Seek`; `open_owned_seekable_in` reads an `OwnedInputBytes` and lets
-packets alias the input allocation. The `*_in` variants share a caller `Budget`.
+Pass a `Read + Seek` source directly to `BlockingReader::open`, or pass
+`BlockingSource::stream(source)` for forward-only input. Use
+`BlockingSource::owned(input)` with `BlockingReader::open_in` to read and seek
+within an already charged `OwnedInputBytes`. A `BlockingSource` also selects
+the payload ownership policy. `open_in` uses the caller's `Budget`.
 `next_packet` returns the plain `Packet` and refuses packets that carry block
 additions or CodecState; use `next_typed_packet` for those. Typed configurations
 expose their allocation accounting through `Configuration::budget()`.

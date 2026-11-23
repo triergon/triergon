@@ -14,7 +14,7 @@ const NATIVE: &str = include_str!(concat!(
 ));
 
 fn reader() -> BlockingReader<Cursor<&'static [u8]>> {
-    BlockingReader::open_seekable(Cursor::new(INPUT), Limits::default()).unwrap()
+    BlockingReader::open(Cursor::new(INPUT), Limits::default()).unwrap()
 }
 
 fn signed(value: &str) -> Option<i64> {
@@ -119,7 +119,7 @@ fn seek_subtitle_recovery_previous_rap_operation_keeps_its_existing_boundary() {
 #[test]
 fn subtitle_recovery_repeated_and_after_eof_replay_keep_the_same_whole_source_sequence() {
     let cancel = AtomicBool::new(false);
-    let mut reader = BlockingReader::open_seekable(Cursor::new(INPUT), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open(Cursor::new(INPUT), Limits::default()).unwrap();
     let mut previous = None;
     for _ in 0..3 {
         let receipt = reader.seek_for_playback(0, 8_000_000_000, &cancel).unwrap();
@@ -155,7 +155,7 @@ fn subtitle_recovery_repeated_and_after_eof_replay_keep_the_same_whole_source_se
 // The source duration is never rewritten.
 fn known_default_duration_recovery(input: &[u8], duration: u64) {
     let cancel = AtomicBool::new(false);
-    let mut reader = BlockingReader::open_seekable(Cursor::new(input), Limits::default()).unwrap();
+    let mut reader = BlockingReader::open(Cursor::new(input), Limits::default()).unwrap();
     let receipt = reader.seek_for_playback(0, 8_000_000_000, &cancel).unwrap();
     assert_eq!(receipt.actual_ns, 8_000_000_000);
     let first = reader.next_typed_packet(&cancel).unwrap().unwrap();
