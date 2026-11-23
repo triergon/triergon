@@ -20,12 +20,11 @@ that documentation of software using FreeType code credit it. Software that incl
 > Portions of this software are copyright © 2026 The FreeType Project
 > (https://freetype.org). All rights reserved.
 
-Code is written from specifications, with every reference treated as a black box, and
-nothing more is translated (see [CONTRIBUTING.md](../CONTRIBUTING.md)). The modules below
-are the translations in the tree, kept under their notices, and each names its source in
-its documentation; each may be rewritten from its specification, and a rewrite removes it
-from this list. Modules not listed are written
-from the specifications and compared with the references only through their output.
+“Translated” identifies code derived from a project’s source under its notice, and
+“following” identifies an independent implementation of documented or observed behaviour.
+Each translated module names its source in its documentation. Implementations outside
+the translated modules and generated tables use specifications, public documentation
+and reference output (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
 ## triergon-font
 

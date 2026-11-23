@@ -117,7 +117,8 @@ impl<'a> Reader<'a> {
     }
 }
 
-/// The big-endian `u16` at `at`, if `data` holds it.
+/// Reads two bytes at byte offset `at` as an unsigned big-endian integer.
+/// Returns `None` if either byte lies outside `data`.
 pub fn u16_at(data: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
@@ -128,7 +129,8 @@ pub(crate) fn u24_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes([0, a, b, c]))
 }
 
-/// The big-endian `u32` at `at`, if `data` holds it.
+/// Reads four bytes at byte offset `at` as an unsigned big-endian integer.
+/// Returns `None` if any byte lies outside `data`.
 pub fn u32_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
@@ -136,8 +138,9 @@ pub fn u32_at(data: &[u8], at: usize) -> Option<u32> {
 /// A binary search over `count` items, where `compare(i)` orders item `i`
 /// against the key (`Greater` for an item after it): an index whose item
 /// compares `Equal`. It probes the middle `(min + max) / 2` of the closed
-/// range still open, as HarfBuzz 14.6.0's search does, so on unsorted items
-/// both find the same one; on sorted items it agrees with any binary search.
+/// range still open. This probe order also defines the result for unsorted
+/// items. Returns `None` if no probe matches or `count` exceeds
+/// [`isize::MAX`].
 pub fn bsearch(count: usize, compare: impl Fn(usize) -> std::cmp::Ordering) -> Option<usize> {
     use std::cmp::Ordering;
     let (mut min, mut max) = (0_isize, isize::try_from(count).ok()? - 1);

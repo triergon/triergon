@@ -107,11 +107,10 @@ units, y up, as FreeType loads it with `FT_LOAD_NO_SCALE`, with its advance:
 header box as stored, or the box of every point a charstring draws, control
 points included, in unrounded 16.16 before the FontMatrix.
 
-**At a size.** `Font::at_size` takes a 26.6 pixel height and sets up the face as
-libass requests the size from FreeType (`ass_face_set_size`: `FT_Request_Size`,
-REAL_DIM), with FreeType's
-fixed-point rounding. A `SizedFont` is a small copyable view that allocates
-nothing. It gives:
+**At a size.** `Font::at_height` takes a 26.6 pixel height and the face metrics
+whose ascender-to-descender span it scales to that height. Use
+`compat::libass::at_size` to request the size with libass's choice of face
+metrics. A `SizedFont` is a copyable view that allocates nothing. It gives:
 
 - `outline_into`: the outline libass draws with hinting off
   (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`), in an `Outline` of 26.6 points,
@@ -185,6 +184,15 @@ the least recently used values that only the store holds are dropped.
 - `text_lookup` is `Unsupported` for charmaps whose codes libass converts
   (Windows encodings 2 to 6 through iconv, and a Symbol charmap under a legacy
   Arabic character set).
+
+Glyph positions and advances use signed 32-bit coordinates in font units or
+26.6 pixels, depending on the load. The signed 16.16 size scales and whole-face
+26.6 metrics use 64 bits to cover large sizes at small units per em. The
+linear vertical advance also uses 64-bit storage for its sign-extended result.
+The translated hinters carry 32-bit values in integers and apply wrapping at
+the arithmetic boundaries. Fixed-point types belong in an independent
+implementation of those hinters, where each value's unit and rounding can be
+specified together.
 
 Known differences from FreeType: a face without a usable `glyf` or CFF table is
 `Error::Invalid`, where FreeType opens it and fails each glyph; a CFF2 face whose

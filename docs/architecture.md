@@ -108,6 +108,10 @@ choice deliberately and document it. A crate keeps three kinds of API apart:
   `required-features = ["reference-trace"]` or gate the individual assertion; workers
   enable the feature on their dependency.
 
+The text stack exposes each layer’s reference-compatible operations at its crate root.
+Its `compat` modules hold the choices a caller makes when composing the layers, such as
+the face metrics used to request a size or the transforms used to composite glyphs.
+
 A rename keeps every value that reaches a trace (profile strings, error texts)
 unchanged, so worker traces stay byte-identical.
 

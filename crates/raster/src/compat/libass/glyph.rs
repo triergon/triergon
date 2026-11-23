@@ -329,6 +329,7 @@ impl BorderStroke {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Run {
     offset: RunOffset,
+    // An optional origin set when adding the first bitmap cost up to 0.086% more instructions.
     drawn: bool,
 }
 
