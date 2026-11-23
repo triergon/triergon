@@ -1003,7 +1003,10 @@ fn media_audio_matches(
 fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> Result<()> {
     let needed = list.len().checked_add(1).ok_or(Error::Overflow)?;
     if needed > maximum {
-        return Err(Error::Policy("HLS access unit count"));
+        return Err(Error::Limit {
+            requested: needed,
+            maximum,
+        });
     }
     if needed > list.capacity() {
         let target = list.capacity().saturating_mul(2).max(4).min(maximum);

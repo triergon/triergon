@@ -64,7 +64,10 @@ pub fn resolve_hls_aac_clocks(
         return Err(Error::Cancelled);
     }
     if frames.len() > maximum_frames {
-        return Err(Error::Policy("HLS AAC clock frame count"));
+        return Err(Error::Limit {
+            requested: frames.len(),
+            maximum: maximum_frames,
+        });
     }
     let mut clocks = BudgetVec::new(pool);
     let tick = TimeBase::HZ_90000;
