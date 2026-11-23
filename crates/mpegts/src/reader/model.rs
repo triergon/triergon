@@ -174,8 +174,8 @@ impl PayloadSources {
         }
     }
 
-    // Cloning both sources into a reserved table measured +0.109%: `BudgetVec::try_push` leaves
-    // the lane step. The infallible push into reserved capacity this needs is not in core.
+    // Cloning both sources into a reserved table measured +0.069 to +0.109%: `BudgetVec::try_push`
+    // leaves the lane step. The infallible push into reserved capacity this needs is not in core.
     #[expect(
         clippy::expect_used,
         reason = "pushing the two sources one by one measured +0.08% (BudgetVec::try_push out of line)"
