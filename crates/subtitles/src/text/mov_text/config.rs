@@ -3,7 +3,7 @@
 //! a sample description is [`crate::text::tx3g_config`].
 use super::{
     Funding, Limits, Options,
-    write::{Fixed, Writer},
+    write::{Fixed, freeze},
 };
 use crate::text::unicode::cancelled;
 use std::{ffi::CStr, fmt::Write, ops::Range, sync::atomic::AtomicBool};
@@ -61,7 +61,8 @@ pub(super) struct Configuration {
     at: usize,
     count: usize,
     read: usize,
-    writer: Writer<HEADER_BYTES>,
+    /// The header's bytes until they are frozen into `header`.
+    output: BudgetVec<u8>,
 }
 impl Configuration {
     pub(super) fn new(
@@ -95,7 +96,7 @@ impl Configuration {
             at: 40,
             count: 0,
             read: 0,
-            writer: Writer::new(pool),
+            output: BudgetVec::new(pool),
         })
     }
     /// The index of the first font table entry with font ID `id` or a higher
@@ -249,26 +250,29 @@ impl Configuration {
                     funding.commit();
                 }
                 Phase::Header => {
-                    // A fixed bounded header construction is fully funded before
-                    // formatting; its later charged byte copies remain resumable.
+                    // The bounded header is funded whole before it is formatted,
+                    // on the stack, and stored; its bytes are charged next.
                     if !funding.pay(HEADER_BYTES, caller)? {
                         return Ok(false);
                     }
-                    self.writer.pending = self.make_header()?;
+                    let header = self.make_header()?;
+                    self.output.try_reserve(header.as_bytes().len())?;
+                    self.output.try_extend_from_slice(header.as_bytes())?;
                     funding.commit();
                     self.phase = Phase::Copy;
                 }
                 Phase::Copy => {
-                    if !self.writer.drain(HEADER_BYTES, funding, caller)? {
+                    if !funding.pay(self.output.len(), caller)? {
                         return Ok(false);
                     }
+                    funding.commit();
                     self.phase = Phase::Freeze;
                 }
                 Phase::Freeze => {
-                    if !self.writer.freeze(funding, caller)? {
+                    let Some(header) = freeze(&mut self.output, funding, caller)? else {
                         return Ok(false);
-                    }
-                    self.header = self.writer.frozen.take();
+                    };
+                    self.header = Some(header);
                     self.phase = Phase::Ready;
                 }
             }
