@@ -11,7 +11,7 @@
 //!
 //! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
-use super::super::hints::{Dimension, GlyphHints, edge, point};
+use super::super::hints::{Dimension, EdgeFlags, GlyphHints, point};
 use super::super::tables::ADJUSTMENTS;
 use super::{Blue, Metrics, analysis, blue};
 use crate::fixed::wrap32::{self, mul_fix, pix_round, wrap};
@@ -142,13 +142,13 @@ pub(super) fn prepare(
         if has(ignore_top) {
             let limit = wrap(top.shoot.cur + height / 7 + 16);
             for e in axis.edges.iter_mut().filter(|e| e.pos > limit) {
-                e.flags |= edge::NO_BLUE;
+                e.flags.insert(EdgeFlags::NO_BLUE);
             }
         }
         if has(ignore_bottom) {
             let limit = wrap(bottom.shoot.cur - height / 7 - 16);
             for e in axis.edges.iter_mut().filter(|e| e.pos < limit) {
-                e.flags |= edge::NO_BLUE;
+                e.flags.insert(EdgeFlags::NO_BLUE);
             }
         }
     }

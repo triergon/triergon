@@ -5,7 +5,7 @@
 //! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{
-    AxisHints, Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point,
+    AxisHints, Dimension, Edge, EdgeFlags, GlyphHints, Segment, Width, direction, point,
 };
 use super::{Axis, Metrics, blue, constant};
 use crate::fixed::wrap32::{abs, div_fix, mul_fix, wrap};
@@ -51,7 +51,7 @@ impl Extent {
         segment.pos = ((self.min_pos + self.max_pos) >> 1) as i16;
         segment.delta = ((self.max_pos - self.min_pos) >> 1) as i16;
         if self.round(flat_threshold) {
-            segment.flags |= edge::ROUND;
+            segment.flags.insert(EdgeFlags::ROUND);
         }
         segment.min_coord = self.min_coord as i16;
         segment.max_coord = self.max_coord as i16;
@@ -217,7 +217,7 @@ pub(in super::super) fn compute_segments(
                     let segment = &mut segments[index];
                     segment.pos = p.u as i16;
                     if p.flags & point::CONTROL != 0 {
-                        segment.flags |= edge::ROUND;
+                        segment.flags.insert(EdgeFlags::ROUND);
                     }
                     segment.min_coord = p.v as i16;
                     segment.max_coord = p.v as i16;
@@ -283,7 +283,7 @@ fn merge_segments(
         extent.max_on_coord = old.max_on_coord.max(new.max_on_coord);
         let segment = &mut segments[previous];
         segment.last = point;
-        segment.flags &= !edge::ROUND;
+        segment.flags.remove(EdgeFlags::ROUND);
         extent.close(segment, flat_threshold);
     } else if (old.max_coord - old.min_coord).abs() > (new.max_coord - new.min_coord).abs() {
         // Keep the previous segment.
@@ -479,7 +479,7 @@ pub(in super::super) fn edge_properties(
         let mut s = edges[e].first;
         loop {
             let segment = segments[s];
-            if segment.flags & edge::ROUND != 0 {
+            if segment.flags.contains(EdgeFlags::ROUND) {
                 round += 1;
             } else {
                 straight += 1;
@@ -514,7 +514,7 @@ pub(in super::super) fn edge_properties(
                 if serif.is_some() {
                     edges[e].serif = target;
                     if let Some(target) = target {
-                        edges[target].flags |= edge::SERIF;
+                        edges[target].flags.insert(EdgeFlags::SERIF);
                     }
                 } else {
                     edges[e].link = target;
@@ -526,9 +526,9 @@ pub(in super::super) fn edge_properties(
             }
         }
         edges[e].flags = if round > 0 && round >= straight {
-            edge::ROUND
+            EdgeFlags::ROUND
         } else {
-            0
+            EdgeFlags::EMPTY
         };
         // Serifs give way to links.
         if edges[e].serif.is_some() && edges[e].link.is_some() {
@@ -598,7 +598,7 @@ pub(super) fn compute_blue_edges(
     let major_dir = axis.major_dir;
     charge(work, axis.edges.len() * (latin.blue_count + 1))?;
     for edge in axis.edges.iter_mut() {
-        if edge.flags & edge::NO_BLUE != 0 {
+        if edge.flags.contains(EdgeFlags::NO_BLUE) {
             continue;
         }
         let mut best_dist = mul_fix(i64::from(metrics.units_per_em / 40), scale).min(64 / 2);
@@ -620,7 +620,7 @@ pub(super) fn compute_blue_edges(
                 best = Some((zone.reference.fit, neutral));
             }
             // The overshoot, for a round edge beyond the reference.
-            if edge.flags & edge::ROUND != 0 && dist != 0 && !neutral {
+            if edge.flags.contains(EdgeFlags::ROUND) && dist != 0 && !neutral {
                 let under = fpos < zone.reference.org;
                 if top != under {
                     let dist = mul_fix(abs(fpos - zone.shoot.org), scale);
@@ -634,7 +634,7 @@ pub(super) fn compute_blue_edges(
         if let Some((fit, neutral)) = best {
             edge.blue_edge = Some(fit);
             if neutral {
-                edge.flags |= edge::NEUTRAL;
+                edge.flags.insert(EdgeFlags::NEUTRAL);
             }
         }
     }

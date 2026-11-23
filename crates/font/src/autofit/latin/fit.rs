@@ -5,7 +5,7 @@
 //!
 //! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
-use super::super::hints::{Dimension, Edge, GlyphHints, Point, Segment, edge};
+use super::super::hints::{Dimension, Edge, EdgeFlags, GlyphHints, Point, Segment};
 use super::super::style::NONBASE;
 use super::super::tables::{SCRIPTS, STYLES};
 use super::adjust;
@@ -120,16 +120,16 @@ fn stem_width(
     ppem: u16,
     width: i64,
     base_delta: i64,
-    base_flags: u8,
-    stem_flags: u8,
+    base_flags: EdgeFlags,
+    stem_flags: EdgeFlags,
 ) -> i64 {
     if axis.extra_light {
         return width;
     }
     let vertical = dim == Dimension::Vertical;
     let mut dist = abs(width);
-    if !(stem_flags & edge::SERIF != 0 && vertical && dist < 3 * 64) {
-        if base_flags & edge::ROUND != 0 {
+    if !(stem_flags.contains(EdgeFlags::SERIF) && vertical && dist < 3 * 64) {
+        if base_flags.contains(EdgeFlags::ROUND) {
             if dist < 80 {
                 dist = 64;
             }
@@ -270,7 +270,7 @@ fn hint_edges(
 
     if dim == Dimension::Vertical {
         for e in 0..count {
-            if fit.edges[e].flags & edge::DONE != 0 {
+            if fit.edges[e].flags.contains(EdgeFlags::DONE) {
                 continue;
             }
             let mut link = fit.edges[e].link;
@@ -280,12 +280,12 @@ fn hint_edges(
                 && fit.edges[e].blue_edge.is_some()
                 && fit.edges[l].blue_edge.is_some()
             {
-                if fit.edges[l].flags & edge::NEUTRAL != 0 {
+                if fit.edges[l].flags.contains(EdgeFlags::NEUTRAL) {
                     fit.edges[l].blue_edge = None;
-                    fit.edges[l].flags &= !edge::NEUTRAL;
-                } else if fit.edges[e].flags & edge::NEUTRAL != 0 {
+                    fit.edges[l].flags.remove(EdgeFlags::NEUTRAL);
+                } else if fit.edges[e].flags.contains(EdgeFlags::NEUTRAL) {
                     fit.edges[e].blue_edge = None;
-                    fit.edges[e].flags &= !edge::NEUTRAL;
+                    fit.edges[e].flags.remove(EdgeFlags::NEUTRAL);
                 }
             }
             let (blued, blue) = if let Some(blue) = fit.edges[e].blue_edge {
@@ -300,12 +300,12 @@ fn hint_edges(
                 continue;
             };
             fit.edges[blued].pos = blue;
-            fit.edges[blued].flags |= edge::DONE;
+            fit.edges[blued].flags.insert(EdgeFlags::DONE);
             if let Some(other) = link
                 && fit.edges[other].blue_edge.is_none()
             {
                 fit.align_linked(blued, other);
-                fit.edges[other].flags |= edge::DONE;
+                fit.edges[other].flags.insert(EdgeFlags::DONE);
             }
             if anchor.is_none() {
                 anchor = Some(e);
@@ -315,7 +315,7 @@ fn hint_edges(
 
     // The other stems, in order.
     for e in 0..count {
-        if fit.edges[e].flags & edge::DONE != 0 {
+        if fit.edges[e].flags.contains(EdgeFlags::DONE) {
             continue;
         }
         let Some(link) = fit.edges[e].link else {
@@ -325,7 +325,7 @@ fn hint_edges(
         if fit.edges[link].blue_edge.is_some() {
             // FreeType does not expect this.
             fit.align_linked(link, e);
-            fit.edges[e].flags |= edge::DONE;
+            fit.edges[e].flags.insert(EdgeFlags::DONE);
             continue;
         }
         let (edge, other) = (fit.edges[e], fit.edges[link]);
@@ -354,14 +354,14 @@ fn hint_edges(
                 fit.edges[e].pos = pix_round(edge.opos);
             }
             anchor = Some(e);
-            fit.edges[e].flags |= edge::DONE;
+            fit.edges[e].flags.insert(EdgeFlags::DONE);
             fit.align_linked(e, link);
             continue;
         };
         let anchor_edge = fit.edges[a];
         let org_pos = wrap(anchor_edge.pos + (edge.opos - anchor_edge.opos));
         let org_center = wrap(org_pos + (org_len >> 1));
-        if other.flags & edge::DONE != 0 {
+        if other.flags.contains(EdgeFlags::DONE) {
             fit.edges[e].pos = wrap(other.pos - cur_len);
         } else if cur_len < 96 {
             let center = centred(org_center);
@@ -376,8 +376,8 @@ fn hint_edges(
             fit.edges[e].pos = if delta1 < delta2 { pos1 } else { pos2 };
             fit.edges[link].pos = wrap(fit.edges[e].pos + cur_len);
         }
-        fit.edges[e].flags |= edge::DONE;
-        fit.edges[link].flags |= edge::DONE;
+        fit.edges[e].flags.insert(EdgeFlags::DONE);
+        fit.edges[link].flags.insert(EdgeFlags::DONE);
         if e > 0 && before(fit.edges[e].pos, fit.edges[e - 1].pos) {
             // Unless the stem would (almost, by 1/4 pixel) disappear.
             let previous = fit.edges[e - 1].pos;
@@ -405,9 +405,9 @@ fn hint_edges(
                 shift(&mut fit.edges[8]);
                 shift(&mut fit.edges[11]);
             }
-            fit.edges[e3].flags |= edge::DONE;
+            fit.edges[e3].flags.insert(EdgeFlags::DONE);
             if let Some(link) = fit.edges[e3].link {
-                fit.edges[link].flags |= edge::DONE;
+                fit.edges[link].flags.insert(EdgeFlags::DONE);
             }
         }
     }
@@ -416,7 +416,7 @@ fn hint_edges(
         // Serifs and single edges. None of them has a link, so FreeType's
         // checks against crossing a neighbour never apply here.
         for e in 0..count {
-            if fit.edges[e].flags & edge::DONE != 0 {
+            if fit.edges[e].flags.contains(EdgeFlags::DONE) {
                 continue;
             }
             let mut delta = 1000;
@@ -450,7 +450,7 @@ fn hint_edges(
                 let base = fit.edges[fit.edges[e].serif.unwrap_or(e)];
                 fit.edges[e].pos = wrap(base.pos + (opos - base.opos));
             } else if let Some(a) = anchor {
-                let done = |i: &usize| fit.edges[*i].flags & edge::DONE != 0;
+                let done = |i: &usize| fit.edges[*i].flags.contains(EdgeFlags::DONE);
                 let previous = (0..e).rev().find(done);
                 let next = (e + 1..count).find(done);
                 fit.edges[e].pos = wrap(if let (Some(b), Some(n)) = (previous, next) {
@@ -470,7 +470,7 @@ fn hint_edges(
                 fit.edges[e].pos = pix_round(opos);
                 anchor = Some(e);
             }
-            fit.edges[e].flags |= edge::DONE;
+            fit.edges[e].flags.insert(EdgeFlags::DONE);
         }
     }
     Ok(())
@@ -478,7 +478,7 @@ fn hint_edges(
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::hints::{Dimension, Width, edge};
+    use super::super::super::hints::{Dimension, EdgeFlags, Width};
     use super::super::Axis;
     use super::stem_width;
 
@@ -501,26 +501,87 @@ mod tests {
         let h = Dimension::Horizontal;
         let standard = axis(Some(100), false);
         // Near the standard width: snapped to it.
-        assert_eq!(stem_width(&standard, h, 20, 120, 0, 0, 0), 100);
-        assert_eq!(stem_width(&standard, h, 20, -120, 0, 0, 0), -100);
+        assert_eq!(
+            stem_width(&standard, h, 20, 120, 0, EdgeFlags::EMPTY, EdgeFlags::EMPTY),
+            100
+        );
+        assert_eq!(
+            stem_width(
+                &standard,
+                h,
+                20,
+                -120,
+                0,
+                EdgeFlags::EMPTY,
+                EdgeFlags::EMPTY
+            ),
+            -100
+        );
         // Under three pixels: whole pixels plus small fractions.
-        assert_eq!(stem_width(&standard, h, 20, 150, 0, 0, 0), 128 + 10);
-        assert_eq!(stem_width(&standard, h, 20, 170, 0, 0, 0), 128 + 54);
+        assert_eq!(
+            stem_width(&standard, h, 20, 150, 0, EdgeFlags::EMPTY, EdgeFlags::EMPTY),
+            128 + 10
+        );
+        assert_eq!(
+            stem_width(&standard, h, 20, 170, 0, EdgeFlags::EMPTY, EdgeFlags::EMPTY),
+            128 + 54
+        );
         // Above: rounded, less part of the base edge's move at 20 ppem.
         assert_eq!(
-            stem_width(&standard, h, 20, 300, 40, 0, 0),
+            stem_width(
+                &standard,
+                h,
+                20,
+                300,
+                40,
+                EdgeFlags::EMPTY,
+                EdgeFlags::EMPTY
+            ),
             (300 - 20 + 32) & !63
         );
         // Without standard widths only the minimum applies.
         assert_eq!(
-            stem_width(&axis(None, false), h, 20, 30, 0, edge::ROUND, 0),
+            stem_width(
+                &axis(None, false),
+                h,
+                20,
+                30,
+                0,
+                EdgeFlags::ROUND,
+                EdgeFlags::EMPTY
+            ),
             64
         );
-        assert_eq!(stem_width(&axis(None, false), h, 20, 30, 0, 0, 0), 56);
+        assert_eq!(
+            stem_width(
+                &axis(None, false),
+                h,
+                20,
+                30,
+                0,
+                EdgeFlags::EMPTY,
+                EdgeFlags::EMPTY
+            ),
+            56
+        );
         // Extra light axes and short vertical serifs keep their widths.
-        assert_eq!(stem_width(&axis(Some(100), true), h, 20, 30, 0, 0, 0), 30);
+        assert_eq!(
+            stem_width(
+                &axis(Some(100), true),
+                h,
+                20,
+                30,
+                0,
+                EdgeFlags::EMPTY,
+                EdgeFlags::EMPTY
+            ),
+            30
+        );
         let v = Dimension::Vertical;
-        assert_eq!(stem_width(&standard, v, 20, 30, 0, 0, edge::SERIF), 30);
+        assert_eq!(
+            stem_width(&standard, v, 20, 30, 0, EdgeFlags::EMPTY, EdgeFlags::SERIF),
+            30
+        );
     }
 
     #[test]
@@ -529,6 +590,17 @@ mod tests {
         // pixel minimum, which then applies: -56, where 64 bits keep the width.
         let width = i64::from(i32::MIN);
         let h = Dimension::Horizontal;
-        assert_eq!(stem_width(&axis(None, false), h, 20, width, 0, 0, 0), -56);
+        assert_eq!(
+            stem_width(
+                &axis(None, false),
+                h,
+                20,
+                width,
+                0,
+                EdgeFlags::EMPTY,
+                EdgeFlags::EMPTY
+            ),
+            -56
+        );
     }
 }

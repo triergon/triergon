@@ -59,15 +59,35 @@ pub(super) mod point {
     pub(in super::super) const IGNORE: u16 = 1 << 6;
 }
 
-/// Edge and segment flags.
-pub(super) mod edge {
-    pub(in super::super) const ROUND: u8 = 1 << 0;
-    pub(in super::super) const SERIF: u8 = 1 << 1;
-    pub(in super::super) const DONE: u8 = 1 << 2;
+/// Properties shared by an edge and the segments that form it.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct EdgeFlags(u8);
+
+impl EdgeFlags {
+    pub(in super::super) const EMPTY: Self = Self(0);
+    pub(in super::super) const ROUND: Self = Self(1 << 0);
+    pub(in super::super) const SERIF: Self = Self(1 << 1);
+    pub(in super::super) const DONE: Self = Self(1 << 2);
     /// Aligned to a neutral blue zone.
-    pub(in super::super) const NEUTRAL: u8 = 1 << 3;
+    pub(in super::super) const NEUTRAL: Self = Self(1 << 3);
     /// Not to be aligned to a blue zone.
-    pub(in super::super) const NO_BLUE: u8 = 1 << 4;
+    pub(in super::super) const NO_BLUE: Self = Self(1 << 4);
+
+    #[inline]
+    pub(in super::super) const fn contains(self, flag: Self) -> bool {
+        self.0 & flag.0 != 0
+    }
+
+    #[inline]
+    pub(in super::super) fn insert(&mut self, flag: Self) {
+        self.0 |= flag.0;
+    }
+
+    #[inline]
+    pub(in super::super) fn remove(&mut self, flag: Self) {
+        self.0 &= !flag.0;
+    }
 }
 
 /// The direction of a vector, or none when its arms do not differ enough
@@ -174,7 +194,7 @@ pub(super) struct Point {
 /// A segment: consecutive points about aligned along a dimension.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Segment {
-    pub(super) flags: u8,
+    pub(super) flags: EdgeFlags,
     pub(super) dir: i8,
     /// The position across the segment, in font units.
     pub(super) pos: i16,
@@ -201,7 +221,7 @@ pub(super) struct Segment {
 impl Segment {
     /// A new segment: unlinked, with the score a link has to beat.
     pub(super) const NEW: Self = Self {
-        flags: 0,
+        flags: EdgeFlags::EMPTY,
         dir: 0,
         pos: 0,
         delta: 0,
@@ -260,7 +280,7 @@ pub(super) struct Edge {
     pub(super) opos: i64,
     /// The hinted position.
     pub(super) pos: i64,
-    pub(super) flags: u8,
+    pub(super) flags: EdgeFlags,
     pub(super) dir: i8,
     /// The scale to the next edge, computed when first needed.
     pub(super) scale: EdgeScale,

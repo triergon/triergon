@@ -3,7 +3,7 @@
 //! standard widths and without the light, monochrome and LCD modes'
 //! variations. Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
-use super::super::hints::{Dimension, Edge, GlyphHints, edge, point};
+use super::super::hints::{Dimension, Edge, EdgeFlags, GlyphHints, point};
 use super::{Axis, Metrics, analysis};
 use crate::fixed::wrap32::{abs, mul_div, wrap};
 use crate::work::charge;
@@ -176,7 +176,7 @@ fn hint_edges(
         edges: axis_hints.edges.as_mut_slice(),
         axis,
     };
-    let done = |fitted: &Edge| fitted.flags & edge::DONE != 0;
+    let done = |fitted: &Edge| fitted.flags.contains(EdgeFlags::DONE);
     // Whether an edge was fitted yet.
     let mut anchored = false;
     let mut delta = 0;
@@ -199,12 +199,12 @@ fn hint_edges(
             continue;
         };
         fit.edges[blued].pos = blue;
-        fit.edges[blued].flags |= edge::DONE;
+        fit.edges[blued].flags.insert(EdgeFlags::DONE);
         if let Some(other) = link
             && fit.edges[other].blue_edge.is_none()
         {
             fit.align_linked(blued, other);
-            fit.edges[other].flags |= edge::DONE;
+            fit.edges[other].flags.insert(EdgeFlags::DONE);
         }
         anchored = true;
     }
@@ -230,12 +230,12 @@ fn hint_edges(
         if fit.edges[link].blue_edge.is_some() {
             // The linked edge sits on a blue zone: this one follows it.
             fit.align_linked(link, e);
-            fit.edges[e].flags |= edge::DONE;
+            fit.edges[e].flags.insert(EdgeFlags::DONE);
             continue;
         }
         if link < e {
             fit.align_linked(link, e);
-            fit.edges[e].flags |= edge::DONE;
+            fit.edges[e].flags.insert(EdgeFlags::DONE);
             last_stem = Some(fit.edges[e].pos);
             continue;
         }
@@ -245,8 +245,8 @@ fn hint_edges(
             fit.normal_stem(e, link, delta);
         }
         anchored = true;
-        fit.edges[e].flags |= edge::DONE;
-        fit.edges[link].flags |= edge::DONE;
+        fit.edges[e].flags.insert(EdgeFlags::DONE);
+        fit.edges[link].flags.insert(EdgeFlags::DONE);
         last_stem = Some(fit.edges[link].pos);
     }
 
@@ -268,8 +268,8 @@ fn hint_edges(
                 shift(8);
                 shift(11);
             }
-            fit.edges[e3].flags |= edge::DONE;
-            fit.edges[e3 + 1].flags |= edge::DONE;
+            fit.edges[e3].flags.insert(EdgeFlags::DONE);
+            fit.edges[e3 + 1].flags.insert(EdgeFlags::DONE);
         }
     }
     if skipped == 0 {
@@ -283,7 +283,7 @@ fn hint_edges(
         }
         if let Some(serif) = fit.edges[e].serif {
             fit.align_serif(serif, e);
-            fit.edges[e].flags |= edge::DONE;
+            fit.edges[e].flags.insert(EdgeFlags::DONE);
             skipped -= 1;
         }
     }
