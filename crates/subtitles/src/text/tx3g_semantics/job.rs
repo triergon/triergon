@@ -1,6 +1,7 @@
 use super::super::{
-    Encoding, Extractor, Format, Input, Status,
+    Encoding, Extractor, Format, Input,
     charset::{Charset, CharsetJob, CharsetStatus},
+    session::Session,
     tx3g_config::{ConfigJob, ConfigLayout, ConfigStatus},
     unicode::{Cursor, Poll},
 };
@@ -28,7 +29,8 @@ pub struct SemanticJob {
 enum State {
     /// Reading the sample; its description, if any, is parsed after it.
     Source {
-        extractor: Extractor,
+        input: Input,
+        session: Session,
         description: Option<ConfigJob>,
         context: ValidationContext,
     },
@@ -223,8 +225,7 @@ impl SemanticJob {
         if track_timescale == Some(0) {
             return Err(Error::Invalid("zero tx3g track timescale"));
         }
-        let mut extractor = Extractor::tx3g_iso_boxes(pool, limits.text, generation);
-        extractor.provide(input.clone()).map_err(|e| e.error)?;
+        Extractor::tx3g_iso_boxes(pool, limits.text, generation).check_input(input)?;
         let description = match layout {
             Some(layout) => Some(ConfigJob::new_unicode_fonts(
                 input
@@ -242,7 +243,8 @@ impl SemanticJob {
             pool: pool.clone(),
             limits,
             state: State::Source {
-                extractor,
+                input: input.clone(),
+                session: Session::new(input, true),
                 description,
                 context: ValidationContext {
                     description_parsed: false,
@@ -293,28 +295,27 @@ impl SemanticJob {
                 State::Failed(error) => return Err(*error),
                 _ if work.remaining() == 0 => return Ok(SemanticStatus::Pending),
                 State::Source {
-                    extractor,
+                    input,
+                    session,
                     description,
                     context,
                 } => {
-                    match extractor.step(work, cancel)? {
-                        Status::Yield => return Ok(SemanticStatus::Pending),
-                        Status::NeedOutput => return Ok(SemanticStatus::NeedOutput),
-                        Status::Ready(cue) => {
-                            let phase = match description.take() {
-                                Some(job) => Phase::Description(job),
-                                None => Phase::Fonts(Fonts {
-                                    at: 0,
-                                    font: FontStep::Open,
-                                }),
-                            };
-                            self.state = State::Resolving(Resolution {
-                                found: Found::new(cue, *context, &self.pool),
-                                phase,
-                            });
-                        }
-                        _ => return Err(Error::Invalid("unexpected tx3g source state")),
-                    }
+                    let Some(cue) =
+                        session.step(input, &self.pool, self.limits.text, work, cancel)?
+                    else {
+                        return Ok(SemanticStatus::Pending);
+                    };
+                    let phase = match description.take() {
+                        Some(job) => Phase::Description(job),
+                        None => Phase::Fonts(Fonts {
+                            at: 0,
+                            font: FontStep::Open,
+                        }),
+                    };
+                    self.state = State::Resolving(Resolution {
+                        found: Found::new(cue, *context, &self.pool),
+                        phase,
+                    });
                     continue;
                 }
                 State::Resolving(resolution) => resolution,

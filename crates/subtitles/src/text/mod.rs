@@ -27,7 +27,7 @@ pub use self::model::{
     Addition, Cue, Encoding, Field, FieldOwner, Format, Input, Limits, Modifier, RawClock, Timing,
 };
 
-use self::session::{Action, Session};
+use self::session::Session;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, Refused, Result, WorkBudget};
 
@@ -202,18 +202,10 @@ impl Extractor {
             return Ok(Status::Yield);
         }
         match session.step(&pending.input, &self.pool, self.limits, work, cancel) {
-            Ok(Action::Yield) => Ok(Status::Yield),
-            Ok(Action::Cue(cue)) => {
+            Ok(None) => Ok(Status::Yield),
+            Ok(Some(cue)) => {
                 self.pending = None;
                 Ok(Status::Ready(cue))
-            }
-            Ok(Action::Complete) => {
-                self.pending = None;
-                Ok(if self.finished {
-                    Status::End
-                } else {
-                    Status::NeedInput
-                })
             }
             Err(Error::Backpressure { .. }) => Ok(Status::NeedOutput),
             Err(Error::Cancelled) => Err(Error::Cancelled),

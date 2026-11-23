@@ -46,19 +46,6 @@ enum Phase {
 }
 
 #[derive(Debug)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "Exclusive step outcomes transfer the owned event inline without a second allocation; guarded at 688 bytes."
-)]
-pub(crate) enum Action {
-    Yield,
-    Cue(Cue),
-    Complete,
-}
-
-const _: () = assert!(size_of::<Action>() <= 688);
-
-#[derive(Debug)]
 pub(crate) struct Session {
     phase: Phase,
     iso_tx3g: bool,
@@ -111,14 +98,14 @@ impl Session {
         limits: Limits,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Action> {
+    ) -> Result<Option<Cue>> {
         let payload = input.payload.as_ref();
         loop {
             cancelled(cancel)?;
             match &mut self.phase {
                 Phase::Init => {
                     if !work.try_charge(1) {
-                        return Ok(Action::Yield);
+                        return Ok(None);
                     }
                     self.phase = match input.format {
                         Format::OpaqueAss => {
@@ -145,21 +132,21 @@ impl Session {
                 }
                 Phase::Length(length) => {
                     let Some(range) = length.poll(payload, work, cancel)? else {
-                        return Ok(Action::Yield);
+                        return Ok(None);
                     };
                     self.text_range = range.clone();
                     self.phase = Phase::Probe(Probe::new(range, Encoding::Tx3gInBand), Next::Boxes);
                 }
                 Phase::Probe(probe, next) => {
                     let Some((encoding, range)) = probe.poll(payload, work, cancel)? else {
-                        return Ok(Action::Yield);
+                        return Ok(None);
                     };
                     self.encoding = encoding;
                     self.decode_range = range.clone();
                     self.phase = Phase::Validate(Cursor::new(range, encoding), *next);
                 }
                 Phase::Validate(validator, next) => match validator.poll(payload, work, cancel)? {
-                    Poll::Yield => return Ok(Action::Yield),
+                    Poll::Yield => return Ok(None),
                     Poll::Ready(_) => {}
                     Poll::End => {
                         self.decoded_len = validator.decoded_len();
@@ -180,25 +167,25 @@ impl Session {
                 },
                 Phase::Boxes(boxes) => {
                     if !boxes.poll(payload, limits, work, cancel)? {
-                        return Ok(Action::Yield);
+                        return Ok(None);
                     }
                     let modifiers = boxes.take_modifiers(pool);
                     self.phase = self.emit(input, pool, Fields::default(), modifiers)?;
                 }
                 Phase::Addition(addition) => {
                     let Some(fields) = addition.poll(work, cancel)? else {
-                        return Ok(Action::Yield);
+                        return Ok(None);
                     };
                     self.phase = self.emit(input, pool, fields, BudgetVec::new(pool))?;
                 }
                 Phase::Emit(emitter) => {
                     let Some(cue) = emitter.poll(input, pool, limits, work, cancel)? else {
-                        return Ok(Action::Yield);
+                        return Ok(None);
                     };
                     self.phase = Phase::Done;
-                    return Ok(Action::Cue(cue));
+                    return Ok(Some(cue));
                 }
-                Phase::Done => return Ok(Action::Complete),
+                Phase::Done => return Ok(None),
             }
         }
     }
