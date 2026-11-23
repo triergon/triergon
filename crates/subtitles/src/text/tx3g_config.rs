@@ -105,15 +105,64 @@ pub enum ConfigStatus {
     /// The description is parsed; take it with [`ConfigJob::take_output`].
     Ready,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The decoder of a font name: its encoding selector first, where names may
+/// be UTF-16, then its characters.
+#[derive(Debug)]
+enum Name {
+    Probe(Probe),
+    Scalars(Cursor),
+}
+
+#[derive(Debug)]
 enum Phase {
-    Fixed,
-    Header,
-    BoxCommit,
-    FontCount,
-    FontHeader,
-    FontName,
-    FontCommit,
+    /// The fixed fields read so far: 38 bytes of a sample entry body, 30 of a
+    /// defaults record.
+    Fixed {
+        bytes: [u8; 38],
+        read: usize,
+    },
+    /// The header of the child box at `start`, read so far: 8 bytes, or 16
+    /// when its size field is 1.
+    Header {
+        start: usize,
+        bytes: [u8; 16],
+        read: usize,
+    },
+    /// Storing the box of `kind` over `range`, whose header is `header`
+    /// bytes long; whether the store's unit is paid.
+    BoxCommit {
+        kind: [u8; 4],
+        range: Range<usize>,
+        header: usize,
+        paid: bool,
+    },
+    /// The entry count of the `ftab` that ends at `end`.
+    FontCount {
+        end: usize,
+        bytes: [u8; 2],
+        read: usize,
+    },
+    /// The identifier and name length of the next of `left` entries.
+    FontHeader {
+        end: usize,
+        left: usize,
+        bytes: [u8; 3],
+        read: usize,
+    },
+    /// Checking the name of `font`.
+    FontName {
+        end: usize,
+        left: usize,
+        font: FontRecord,
+        name: Name,
+    },
+    /// Storing `font`; whether the store's unit is paid.
+    FontCommit {
+        end: usize,
+        left: usize,
+        font: FontRecord,
+        paid: bool,
+    },
     Ready,
     Taken,
 }
@@ -125,27 +174,14 @@ pub struct ConfigJob {
     layout: ConfigLayout,
     budget: Budget,
     limits: ConfigLimits,
-    fixed: [u8; 38],
-    fixed_read: usize,
+    /// The fixed fields, once read.
     defaults: Option<Defaults>,
+    /// The next byte to read.
     at: usize,
-    header: [u8; 16],
-    header_read: usize,
-    header_size: usize,
-    box_start: usize,
-    box_end: usize,
     boxes: BudgetVec<Modifier>,
     fonts: BudgetVec<FontRecord>,
     ftab_seen: bool,
-    font_count: usize,
-    font_index: usize,
-    font_header: [u8; 3],
-    font_read: usize,
-    font_pending: Option<FontRecord>,
-    name_cursor: Option<Cursor>,
-    name_probe: Option<Probe>,
     unicode_font_names: bool,
-    paid: bool,
     phase: Phase,
     failed: Option<Error>,
 }
@@ -185,44 +221,33 @@ impl ConfigJob {
             layout,
             budget: budget.clone(),
             limits,
-            fixed: [0; 38],
-            fixed_read: 0,
             defaults: None,
             at: 0,
-            header: [0; 16],
-            header_read: 0,
-            header_size: 8,
-            box_start: 0,
-            box_end: 0,
             boxes: BudgetVec::new(budget),
             fonts: BudgetVec::new(budget),
             ftab_seen: false,
-            font_count: 0,
-            font_index: 0,
-            font_header: [0; 3],
-            font_read: 0,
-            font_pending: None,
-            name_cursor: None,
-            name_probe: None,
             unicode_font_names: false,
-            paid: false,
-            phase: Phase::Fixed,
+            phase: Phase::Fixed {
+                bytes: [0; 38],
+                read: 0,
+            },
             failed: None,
         })
     }
     fn u16(bytes: &[u8], at: usize) -> u16 {
         u16::from_be_bytes([bytes[at], bytes[at + 1]])
     }
-    fn defaults(&self) -> Result<Defaults> {
-        let offset = if self.layout == ConfigLayout::SampleEntryBody {
+    /// The fixed fields of `layout` in `fixed`.
+    fn defaults(layout: ConfigLayout, fixed: &[u8; 38]) -> Result<Defaults> {
+        let offset = if layout == ConfigLayout::SampleEntryBody {
             8
         } else {
             0
         };
-        if offset == 8 && self.fixed[..6] != [0; 6] {
+        if offset == 8 && fixed[..6] != [0; 6] {
             return Err(Error::Invalid("tx3g SampleEntry reserved bytes"));
         }
-        let b = &self.fixed[offset..offset + 30];
+        let b = &fixed[offset..offset + 30];
         let style = StyleRecord {
             start: Self::u16(b, 18),
             end: Self::u16(b, 20),
@@ -240,7 +265,7 @@ impl ConfigJob {
             return Err(Error::Invalid("tx3g justification"));
         }
         Ok(Defaults {
-            data_reference_index: (offset == 8).then(|| Self::u16(&self.fixed, 6)),
+            data_reference_index: (offset == 8).then(|| Self::u16(fixed, 6)),
             display_flags: u32::from_be_bytes(b[..4].try_into().map_err(|_| Error::Truncated)?),
             horizontal,
             vertical,
@@ -282,236 +307,260 @@ impl ConfigJob {
     fn inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ConfigStatus> {
         loop {
             cancelled(cancel)?;
-            if self.phase == Phase::Ready {
-                return Ok(ConfigStatus::Ready);
-            }
-            if self.phase == Phase::Taken {
-                return Err(Error::Invalid("tx3g config already taken"));
+            match self.phase {
+                Phase::Ready => return Ok(ConfigStatus::Ready),
+                Phase::Taken => return Err(Error::Invalid("tx3g config already taken")),
+                _ => {}
             }
             if work.remaining() == 0 {
                 return Ok(ConfigStatus::Pending);
             }
-            match self.phase {
-                Phase::Fixed => {
+            let raw = self.raw.as_ref();
+            match &mut self.phase {
+                Phase::Fixed { bytes, read } => {
                     let count = if self.layout == ConfigLayout::SampleEntryBody {
                         38
                     } else {
                         30
                     };
-                    if self.fixed_read < count {
-                        let byte = *self
-                            .raw
-                            .as_ref()
-                            .get(self.fixed_read)
-                            .ok_or(Error::Truncated)?;
+                    if *read < count {
+                        let byte = *raw.get(*read).ok_or(Error::Truncated)?;
                         if !work.try_charge(1) {
                             return Ok(ConfigStatus::Pending);
                         }
-                        self.fixed[self.fixed_read] = byte;
-                        self.fixed_read += 1;
+                        bytes[*read] = byte;
+                        *read += 1;
                     } else {
-                        self.defaults = Some(self.defaults()?);
+                        self.defaults = Some(Self::defaults(self.layout, bytes)?);
                         self.at = count;
-                        self.phase = Phase::Header;
+                        self.phase = Phase::Header {
+                            start: count,
+                            bytes: [0; 16],
+                            read: 0,
+                        };
                     }
                 }
-                Phase::Header => {
-                    if self.at == self.raw.len() && self.header_read == 0 {
+                Phase::Header { start, bytes, read } => {
+                    if self.at == raw.len() && *read == 0 {
                         if !self.ftab_seen {
                             return Err(Error::Invalid("tx3g font table absent"));
                         }
                         self.phase = Phase::Ready;
                         continue;
                     }
-                    if self.header_read == 0 {
-                        self.box_start = self.at;
+                    if *read == 0 {
+                        *start = self.at;
                     }
-                    if self.header_read < self.header_size {
-                        let offset = self
-                            .box_start
-                            .checked_add(self.header_read)
-                            .ok_or(Error::Overflow)?;
-                        let byte = *self.raw.as_ref().get(offset).ok_or(Error::Truncated)?;
-                        if !work.try_charge(1) {
-                            return Ok(ConfigStatus::Pending);
-                        }
-                        self.header[self.header_read] = byte;
-                        self.header_read += 1;
-                    } else if self.header_size == 8 && self.header[..4] == [0, 0, 0, 1] {
-                        self.header_size = 16;
+                    // A size field of 1 is followed by a 64-bit size.
+                    let header = if *read >= 8 && bytes[..4] == [0, 0, 0, 1] {
+                        16
                     } else {
-                        let short = u32::from_be_bytes(
-                            self.header[..4].try_into().map_err(|_| Error::Truncated)?,
-                        );
-                        let size = match short {
-                            0 => self.raw.len() - self.box_start,
-                            1 => usize::try_from(u64::from_be_bytes(
-                                self.header[8..16]
-                                    .try_into()
-                                    .map_err(|_| Error::Truncated)?,
-                            ))
-                            .map_err(|_| Error::Overflow)?,
-                            n => n as usize,
-                        };
-                        let minimum =
-                            self.header_size + if self.header[4..8] == *b"uuid" { 16 } else { 0 };
-                        if size < minimum {
-                            return Err(Error::Invalid("tx3g config box size"));
-                        }
-                        self.box_end = self.box_start.checked_add(size).ok_or(Error::Overflow)?;
-                        if self.box_end > self.raw.len() {
-                            return Err(Error::Truncated);
-                        }
-                        if self.boxes.len() >= self.limits.maximum_boxes {
-                            return Err(Error::Limit {
-                                requested: self.boxes.len() + 1,
-                                maximum: self.limits.maximum_boxes,
-                            });
-                        }
-                        self.phase = Phase::BoxCommit;
-                        self.paid = false;
-                    }
-                }
-                Phase::BoxCommit => {
-                    if !self.paid {
+                        8
+                    };
+                    if *read < header {
+                        let offset = start.checked_add(*read).ok_or(Error::Overflow)?;
+                        let byte = *raw.get(offset).ok_or(Error::Truncated)?;
                         if !work.try_charge(1) {
                             return Ok(ConfigStatus::Pending);
                         }
-                        self.paid = true;
+                        bytes[*read] = byte;
+                        *read += 1;
+                        continue;
+                    }
+                    let [a, b, c, d, kind @ .., e, f, g, h, i, j, k, l] = *bytes;
+                    let size = match u32::from_be_bytes([a, b, c, d]) {
+                        0 => raw.len() - *start,
+                        1 => usize::try_from(u64::from_be_bytes([e, f, g, h, i, j, k, l]))
+                            .map_err(|_| Error::Overflow)?,
+                        n => n as usize,
+                    };
+                    let minimum = header + if kind == *b"uuid" { 16 } else { 0 };
+                    if size < minimum {
+                        return Err(Error::Invalid("tx3g config box size"));
+                    }
+                    let end = start.checked_add(size).ok_or(Error::Overflow)?;
+                    if end > raw.len() {
+                        return Err(Error::Truncated);
+                    }
+                    if self.boxes.len() >= self.limits.maximum_boxes {
+                        return Err(Error::Limit {
+                            requested: self.boxes.len() + 1,
+                            maximum: self.limits.maximum_boxes,
+                        });
+                    }
+                    self.phase = Phase::BoxCommit {
+                        kind,
+                        range: *start..end,
+                        header,
+                        paid: false,
+                    };
+                }
+                Phase::BoxCommit {
+                    kind,
+                    range,
+                    header,
+                    paid,
+                } => {
+                    if !*paid {
+                        if !work.try_charge(1) {
+                            return Ok(ConfigStatus::Pending);
+                        }
+                        *paid = true;
                     }
                     self.boxes
                         .try_push(Modifier {
-                            kind: self.header[4..8].try_into().map_err(|_| Error::Truncated)?,
-                            range: self.box_start..self.box_end,
+                            kind: *kind,
+                            range: range.clone(),
                         })
                         .map_err(|e| e.error)?;
-                    self.at = self.box_start + self.header_size;
-                    let font = self.header[4..8] == *b"ftab";
-                    self.header_read = 0;
-                    self.header_size = 8;
-                    self.paid = false;
-                    if font {
+                    if *kind == *b"ftab" {
                         if self.ftab_seen {
                             return Err(Error::Invalid("duplicate tx3g font table"));
                         }
                         self.ftab_seen = true;
-                        self.font_read = 0;
-                        self.phase = Phase::FontCount;
+                        self.at = range.start + *header;
+                        self.phase = Phase::FontCount {
+                            end: range.end,
+                            bytes: [0; 2],
+                            read: 0,
+                        };
                     } else {
-                        self.at = self.box_end;
-                        self.phase = Phase::Header;
+                        self.at = range.end;
+                        self.phase = Phase::Header {
+                            start: range.end,
+                            bytes: [0; 16],
+                            read: 0,
+                        };
                     }
                 }
-                Phase::FontCount => {
-                    if self.font_read < 2 {
-                        if self.at >= self.box_end {
+                Phase::FontCount { end, bytes, read } => {
+                    if *read < 2 {
+                        if self.at >= *end {
                             return Err(Error::Truncated);
                         }
                         if !work.try_charge(1) {
                             return Ok(ConfigStatus::Pending);
                         }
-                        self.font_header[self.font_read] = self.raw.as_ref()[self.at];
+                        bytes[*read] = raw[self.at];
                         self.at += 1;
-                        self.font_read += 1;
+                        *read += 1;
                     } else {
-                        self.font_count = usize::from(Self::u16(&self.font_header, 0));
-                        self.font_index = 0;
-                        self.font_read = 0;
-                        if self.font_count > self.limits.maximum_fonts {
+                        let left = usize::from(u16::from_be_bytes(*bytes));
+                        if left > self.limits.maximum_fonts {
                             return Err(Error::Limit {
-                                requested: self.font_count,
+                                requested: left,
                                 maximum: self.limits.maximum_fonts,
                             });
                         }
-                        self.phase = Phase::FontHeader;
+                        self.phase = Phase::FontHeader {
+                            end: *end,
+                            left,
+                            bytes: [0; 3],
+                            read: 0,
+                        };
                     }
                 }
-                Phase::FontHeader => {
-                    if self.font_index == self.font_count {
-                        if self.at != self.box_end {
+                Phase::FontHeader {
+                    end,
+                    left,
+                    bytes,
+                    read,
+                } => {
+                    if *left == 0 {
+                        if self.at != *end {
                             return Err(Error::Invalid("tx3g font table trailing bytes"));
                         }
-                        self.phase = Phase::Header;
+                        self.phase = Phase::Header {
+                            start: self.at,
+                            bytes: [0; 16],
+                            read: 0,
+                        };
                         continue;
                     }
-                    if self.font_read < 3 {
-                        if self.at >= self.box_end {
+                    if *read < 3 {
+                        if self.at >= *end {
                             return Err(Error::Truncated);
                         }
                         if !work.try_charge(1) {
                             return Ok(ConfigStatus::Pending);
                         }
-                        self.font_header[self.font_read] = self.raw.as_ref()[self.at];
+                        bytes[*read] = raw[self.at];
                         self.at += 1;
-                        self.font_read += 1;
+                        *read += 1;
                     } else {
-                        let end = self
+                        let [id_high, id_low, length] = *bytes;
+                        let name_end = self
                             .at
-                            .checked_add(usize::from(self.font_header[2]))
+                            .checked_add(usize::from(length))
                             .ok_or(Error::Overflow)?;
-                        if end > self.box_end {
+                        if name_end > *end {
                             return Err(Error::Truncated);
                         }
-                        self.font_pending = Some(FontRecord {
-                            id: Self::u16(&self.font_header, 0),
-                            name_range: self.at..end,
-                        });
-                        if self.unicode_font_names {
-                            self.name_probe = Some(Probe::new(self.at..end, Encoding::Tx3gInBand));
+                        let name = self.at..name_end;
+                        let decoder = if self.unicode_font_names {
+                            Name::Probe(Probe::new(name.clone(), Encoding::Tx3gInBand))
                         } else {
-                            self.name_cursor = Some(Cursor::new(self.at..end, Encoding::Utf8));
-                        }
-                        self.at = end;
-                        self.phase = Phase::FontName;
+                            Name::Scalars(Cursor::new(name.clone(), Encoding::Utf8))
+                        };
+                        self.at = name.end;
+                        self.phase = Phase::FontName {
+                            end: *end,
+                            left: *left,
+                            font: FontRecord {
+                                id: u16::from_be_bytes([id_high, id_low]),
+                                name_range: name,
+                            },
+                            name: decoder,
+                        };
                     }
                 }
-                Phase::FontName => {
-                    if let Some(probe) = self.name_probe.as_mut() {
-                        let Some((encoding, range)) =
-                            probe.poll(self.raw.as_ref(), work, cancel)?
-                        else {
+                Phase::FontName {
+                    end,
+                    left,
+                    font,
+                    name,
+                } => match name {
+                    Name::Probe(probe) => {
+                        let Some((encoding, range)) = probe.poll(raw, work, cancel)? else {
                             return Ok(ConfigStatus::Pending);
                         };
-                        self.name_cursor = Some(Cursor::new(range, encoding));
-                        self.name_probe = None;
-                        continue;
+                        *name = Name::Scalars(Cursor::new(range, encoding));
                     }
-                    match self
-                        .name_cursor
-                        .as_mut()
-                        .ok_or(Error::Invalid("tx3g font cursor absent"))?
-                        .poll(self.raw.as_ref(), work, cancel)?
-                    {
+                    Name::Scalars(cursor) => match cursor.poll(raw, work, cancel)? {
                         Poll::Yield => return Ok(ConfigStatus::Pending),
                         Poll::Ready(_) => {}
                         Poll::End => {
-                            self.phase = Phase::FontCommit;
-                            self.paid = false;
+                            self.phase = Phase::FontCommit {
+                                end: *end,
+                                left: *left,
+                                font: font.clone(),
+                                paid: false,
+                            };
                         }
-                    }
-                }
-                Phase::FontCommit => {
-                    if !self.paid {
+                    },
+                },
+                Phase::FontCommit {
+                    end,
+                    left,
+                    font,
+                    paid,
+                } => {
+                    if !*paid {
                         if !work.try_charge(1) {
                             return Ok(ConfigStatus::Pending);
                         }
-                        self.paid = true;
+                        *paid = true;
                     }
-                    let font = self
-                        .font_pending
-                        .as_ref()
-                        .ok_or(Error::Invalid("tx3g font absent"))?
-                        .clone();
-                    self.fonts.try_push(font).map_err(|e| e.error)?;
-                    self.font_pending = None;
-                    self.name_cursor = None;
-                    self.font_read = 0;
-                    self.font_index += 1;
-                    self.paid = false;
-                    self.phase = Phase::FontHeader;
+                    self.fonts.try_push(font.clone()).map_err(|e| e.error)?;
+                    self.phase = Phase::FontHeader {
+                        end: *end,
+                        left: *left - 1,
+                        bytes: [0; 3],
+                        read: 0,
+                    };
                 }
                 // The loop's head returns in these phases.
-                Phase::Ready | Phase::Taken => continue,
+                Phase::Ready | Phase::Taken => {}
             }
         }
     }
@@ -523,15 +572,13 @@ impl ConfigJob {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        if self.phase != Phase::Ready {
+        let (Phase::Ready, Some(defaults)) = (&self.phase, self.defaults) else {
             return Err(Error::Invalid("tx3g config not ready"));
-        }
+        };
         let result = Configuration {
             raw: self.raw.clone(),
             layout: self.layout,
-            defaults: self
-                .defaults
-                .ok_or(Error::Invalid("tx3g defaults absent"))?,
+            defaults,
             fonts: std::mem::replace(&mut self.fonts, BudgetVec::new(&self.budget)),
             boxes: std::mem::replace(&mut self.boxes, BudgetVec::new(&self.budget)),
         };
