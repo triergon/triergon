@@ -4,8 +4,7 @@
 //! cargo run -p triergon-matroska --example matroska_packets -- FILE
 //! ```
 //!
-//! Timestamps are nanoseconds with CodecDelay applied. Matroska carries no
-//! decode timestamps, so `dts` is always `-`.
+//! Timestamps are nanoseconds with CodecDelay applied.
 
 use std::{env, fs::File, io::BufReader, sync::atomic::AtomicBool};
 use triergon_matroska::{BlockingReader, Limits};
@@ -36,9 +35,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     while let Some(packet) = reader.next_typed_packet(&cancel)? {
         let packet = packet.packet;
         println!(
-            "track {} dts {} pts {} size {} key {}",
+            "track {} pts {} size {} key {}",
             reader.tracks()[packet.track].number,
-            optional(packet.dts_ns),
             optional(packet.pts_ns),
             packet.data.len(),
             packet.keyframe

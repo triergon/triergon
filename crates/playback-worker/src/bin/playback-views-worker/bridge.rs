@@ -731,7 +731,8 @@ fn replay_row(rows: &mut Records, packet: &TypedPacket, payload: &[u8]) {
     let mut words = Vec::with_capacity(5);
     words.push(packet.packet.track as u64);
     push_optional(&mut words, packet.packet.pts_ns);
-    push_optional(&mut words, packet.packet.dts_ns);
+    // Matroska carries no decode time.
+    push_optional(&mut words, None);
     words.push(u64::from(packet.packet.keyframe));
     rows.record(1, &words, Some(payload));
 }
@@ -914,7 +915,6 @@ fn compact_replay(
                 packet.configuration.generation(),
                 packet.configuration.revision(),
                 packet.packet.pts_ns,
-                packet.packet.dts_ns,
                 packet.packet.duration_ns,
                 packet.packet.keyframe,
                 packet.packet.data.as_ptr(),

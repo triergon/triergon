@@ -371,10 +371,8 @@ fn mkv_dvb(
     records: &mut Records,
 ) -> Result<()> {
     if records.trace {
-        println!(
-            "# Matroska DVB source DTS {:?}",
-            packet.source.packet.packet.dts_ns
-        );
+        // Matroska carries no decode time.
+        println!("# Matroska DVB source DTS None");
     }
     loop {
         match packet.decode(decoder, &mut WorkBudget::new(GRANT), &CANCEL)? {

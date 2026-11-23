@@ -16,7 +16,6 @@ pub(crate) const INPUT: &[u8] = include_bytes!(concat!(
 pub(crate) fn assert_prefix(packet: &TypedPacket) {
     assert_eq!(packet.packet.track, 2);
     assert_eq!(packet.packet.pts_ns, Some(7_200_000_000));
-    assert_eq!(packet.packet.dts_ns, None);
     assert_eq!(packet.packet.duration_ns, None);
     assert_eq!(packet.packet.data.as_ref(), b"Compiler sample 9");
     assert!(packet.packet.timing.source().unwrap().duration.is_none());

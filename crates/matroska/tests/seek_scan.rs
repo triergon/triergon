@@ -84,7 +84,6 @@ fn assert_origin(run: &Run, fixture: &Fixture, count: usize) {
     for (index, packet) in run.packets.iter().enumerate() {
         assert_eq!(packet.track, 0);
         assert_eq!(packet.pts, Some(index as i64 * 1_000_000));
-        assert_eq!(packet.dts, None);
         assert_eq!(packet.duration, None);
         assert!(packet.key);
         assert_eq!(packet.padding, 0);
@@ -701,7 +700,7 @@ fn scan_prefix_real_subtitle_recovery_prefix_preserves_all_native_suffix_rows() 
         };
         assert_eq!(packet.track, fields[0].parse::<usize>().unwrap());
         assert_eq!(packet.pts, signed(fields[1]));
-        assert_eq!(packet.dts, signed(fields[2]));
+        assert_eq!(signed(fields[2]), None);
         assert_eq!(packet.duration, unsigned(fields[3]));
         assert_eq!(packet.key, fields[4] == "true");
         assert_eq!(packet.padding, fields[6].parse::<i64>().unwrap());

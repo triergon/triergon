@@ -517,7 +517,6 @@ fn state_revisions_are_track_local_and_do_not_change_parser_generation_or_clocks
     for event in &events {
         if let Event::Packet(packet) = event {
             assert_eq!(packet.packet.pts_ns, Some(7_000_000));
-            assert!(packet.packet.dts_ns.is_none());
         }
     }
 }

@@ -58,7 +58,6 @@ fn negative_relative_time_and_unknown_decode_time_are_preserved() {
     let bytes = fixture(cluster(10, block(-14, true)), false);
     let packets = collect(&bytes, Limits::default()).unwrap();
     assert_eq!(packets[0].pts_ns, Some(-4_000_000));
-    assert_eq!(packets[0].dts_ns, None);
     assert_eq!(packets[0].data.as_ref(), [1, 2, 3]);
 }
 
@@ -982,7 +981,6 @@ fn packets_equal(a: &Packet, b: &Packet) {
         (
             a.track,
             a.pts_ns,
-            a.dts_ns,
             a.duration_ns,
             a.keyframe,
             a.discard_padding_ns
@@ -990,7 +988,6 @@ fn packets_equal(a: &Packet, b: &Packet) {
         (
             b.track,
             b.pts_ns,
-            b.dts_ns,
             b.duration_ns,
             b.keyframe,
             b.discard_padding_ns
@@ -1304,18 +1301,8 @@ fn header_refill_default_matches_canonical_io_packets_and_output_capacity() {
         assert_eq!(a.packet.data.as_ref(), b"xy");
         assert_eq!(a.packet.pts_ns, Some(at as i64 * 1_000_000));
         assert_eq!(
-            (
-                a.packet.pts_ns,
-                a.packet.dts_ns,
-                a.packet.duration_ns,
-                a.packet.keyframe
-            ),
-            (
-                b.packet.pts_ns,
-                b.packet.dts_ns,
-                b.packet.duration_ns,
-                b.packet.keyframe
-            )
+            (a.packet.pts_ns, a.packet.duration_ns, a.packet.keyframe),
+            (b.packet.pts_ns, b.packet.duration_ns, b.packet.keyframe)
         );
         assert_eq!(
             a.packet.data.retained_capacity(),

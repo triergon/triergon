@@ -155,7 +155,7 @@ and attachments; it never scans media to build an index.
 CodecDelay subtracted (RFC 9559 §11.2); later laced frames get a PTS only when a
 duration is known, and fractional lace durations and negative PTS are kept.
 `pts_ns`/`duration_ns` are that value rounded once to the nearest nanosecond.
-`dts_ns` is not derived. `compat::clock::packet_timing` is an opt-in view in
+Matroska carries no decode time and a packet has none. `compat::clock::packet_timing` is an opt-in view in
 Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
 
 **Content encoding.** Encodings apply in descending `ContentEncodingOrder`, and each

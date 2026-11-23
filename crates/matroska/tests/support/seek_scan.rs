@@ -106,7 +106,6 @@ pub(crate) struct TrackView {
 pub(crate) struct PacketView {
     pub(crate) track: usize,
     pub(crate) pts: Option<i64>,
-    pub(crate) dts: Option<i64>,
     pub(crate) duration: Option<u64>,
     pub(crate) key: bool,
     pub(crate) padding: i64,
@@ -140,7 +139,6 @@ pub(crate) fn view(value: TypedPacket) -> PacketView {
     PacketView {
         track: packet.track,
         pts: packet.pts_ns,
-        dts: packet.dts_ns,
         duration: packet.duration_ns,
         key: packet.keyframe,
         padding: packet.discard_padding_ns,

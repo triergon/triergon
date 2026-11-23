@@ -638,7 +638,6 @@ fn matroska_native_video_clocks_preserve_unknown_and_source_timing() {
         .filter(|event| event.event().track().is_some());
     for (expected, event) in expected_dts.into_iter().zip(packets) {
         let original = frame(&feed, event);
-        assert_eq!(original.source.packet.dts_ns, None);
         assert!(clock.observe(&frame(&foreign_feed, event)).is_err());
         let native = clock.observe(&original).unwrap();
         assert_eq!(native.dts_ns, expected);
@@ -661,7 +660,6 @@ fn matroska_native_video_clocks_preserve_unknown_and_source_timing() {
         .filter(|event| event.event().track().is_some());
     for (expected, event) in expected_dts.into_iter().zip(packets) {
         let original = hevc_dolby_frame(&feed, event);
-        assert_eq!(original.source.packet.dts_ns, None);
         assert_eq!(original.source.packet.duration_ns, None);
         let native = clock.observe(&original).unwrap();
         assert_eq!(native.dts_ns, expected);
@@ -1533,7 +1531,6 @@ fn matroska_dolby_clock_matches_pinned_startup_and_forward_lace_timestamps() {
         for (ordinal, output) in packets.by_ref().take(count).enumerate() {
             let packet = hevc_dolby_frame(&feed, output);
             assert_eq!(probe.push(&packet).unwrap(), ordinal);
-            assert_eq!(packet.source.packet.dts_ns, None);
             assert_eq!(&packet.source.configuration.tracks()[0].codec, "A_EAC3");
         }
         let prefix = probe.finish();
@@ -1589,7 +1586,6 @@ fn matroska_aac_clock_matches_pinned_mixed_rates_from_probe_through_eof() {
         let mut probe = feed.demux_aac_clock_probe(&pool, 2).unwrap().unwrap();
         for (ordinal, output) in packets.by_ref().take(2).enumerate() {
             let packet = frame(&feed, output);
-            assert_eq!(packet.source.packet.dts_ns, None);
             assert_eq!(probe.push(&packet).unwrap(), ordinal);
         }
         let next = frame(&feed, packets.clone().next().unwrap());
@@ -1653,7 +1649,6 @@ fn matroska_dolby_source_clock_preserves_damaged_ac3_before_decoder_admission() 
     };
     assert_eq!(prefix.timing(0).unwrap(), expected(-5_000_000));
     assert_eq!(source.packet.data.as_ref(), raw);
-    assert_eq!(source.packet.dts_ns, None);
     let mut live = prefix.into_live();
     for ((_, packet), pts_ns) in packets.zip([27_000_000, 59_000_000, 91_000_000]) {
         assert_eq!(live.observe_source(packet).unwrap(), expected(pts_ns));

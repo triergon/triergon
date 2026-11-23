@@ -40,7 +40,7 @@ impl PacketInfo for Packet {
     }
     #[inline]
     fn dts(&self) -> Option<i64> {
-        self.packet.dts_ns
+        None
     }
     #[inline]
     fn duration(&self) -> Option<i64> {

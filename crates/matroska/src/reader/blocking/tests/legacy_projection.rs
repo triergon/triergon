@@ -58,7 +58,6 @@ fn additions() -> Vec<u8> {
 struct PacketView {
     track: usize,
     pts: Option<i64>,
-    dts: Option<i64>,
     duration: Option<u64>,
     key: bool,
     padding: i64,
@@ -70,7 +69,6 @@ fn view(p: crate::packet::Packet) -> PacketView {
     PacketView {
         track: p.track,
         pts: p.pts_ns,
-        dts: p.dts_ns,
         duration: p.duration_ns,
         key: p.keyframe,
         padding: p.discard_padding_ns,

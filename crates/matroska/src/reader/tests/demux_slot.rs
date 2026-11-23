@@ -170,11 +170,10 @@ fn event_facts(event: &Event) -> String {
         ),
         Event::Document(document) => format!("document:{}:{:?}", document.kind(), document.raw()),
         Event::Packet(packet) => format!(
-            "packet:{:?}:{}:{:?}:{:?}:{:?}:{}:{}:{:?}:{}:{}:{:?}",
+            "packet:{:?}:{}:{:?}:{:?}:{}:{}:{:?}:{}:{}:{:?}",
             packet.packet.timing,
             packet.packet.track,
             packet.packet.pts_ns,
-            packet.packet.dts_ns,
             packet.packet.duration_ns,
             packet.packet.keyframe,
             packet.packet.discard_padding_ns,

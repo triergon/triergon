@@ -81,7 +81,6 @@ fn check_plain(name: &str, expected: usize) {
                 assert_eq!(packets.last().unwrap().packet.pts_ns, Some(2_000_000_000));
                 for p in packets {
                     assert_eq!(p.packet.data.as_ref(), video());
-                    assert_eq!(p.packet.dts_ns, None);
                     assert!(p.packet.keyframe);
                 }
                 assert_eq!(
@@ -148,7 +147,6 @@ fn codec_state_in_the_validated_prefix_is_kept_for_a_later_rap() {
         state.data(),
         p.configuration.tracks()[0].codec_private.as_ref()
     );
-    assert_eq!(p.packet.dts_ns, None);
 }
 #[test]
 fn contradictory_reference_fields_remain_a_strict_error() {
@@ -257,7 +255,6 @@ fn work_zero_then_work_one_has_the_same_literal_landing_and_packets() {
                 .iter()
                 .any(|e| matches!(e, Event::Seek(s) if s.used_index && s.actual_ns==1_000_000_000))
         );
-        assert!(packets.iter().all(|p| p.packet.dts_ns.is_none()));
     }
 }
 #[test]
@@ -412,8 +409,6 @@ fn integration_default_and_explicit_owned_exact_replay_identical_retained_packet
                             b.packet.data.retained_capacity()
                         );
                         assert_eq!(a.packet.timing, b.packet.timing);
-                        assert_eq!(a.packet.dts_ns, None);
-                        assert_eq!(b.packet.dts_ns, None);
                         assert_eq!(a.configuration.revision(), b.configuration.revision());
                         assert_eq!(a.configuration.generation(), b.configuration.generation());
                     }
@@ -438,7 +433,6 @@ fn integration_explicit_shared_reader_does_not_change_another_readers_default_po
         assert!(receipt.used_index);
         let mut count = 0;
         while let Some(p) = r.next_typed_packet(&cancel).unwrap() {
-            assert_eq!(p.packet.dts_ns, None);
             assert_eq!(p.packet.data.as_ref(), video());
             count += 1;
         }

@@ -575,15 +575,7 @@ fn shared_bounded_partial_commit_transport_stays_before_cancel_and_final_unit() 
 }
 
 #[derive(Debug, PartialEq)]
-struct Fact(
-    usize,
-    Option<i64>,
-    Option<i64>,
-    Option<u64>,
-    bool,
-    i64,
-    Vec<u8>,
-);
+struct Fact(usize, Option<i64>, Option<u64>, bool, i64, Vec<u8>);
 
 fn facts(policy: PayloadOwnership) -> Vec<Fact> {
     let mut reader = BlockingReader::open_seekable_with_payload_ownership(
@@ -598,7 +590,6 @@ fn facts(policy: PayloadOwnership) -> Vec<Fact> {
         facts.push(Fact(
             p.track,
             p.pts_ns,
-            p.dts_ns,
             p.duration_ns,
             p.keyframe,
             p.discard_padding_ns,

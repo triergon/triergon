@@ -299,14 +299,13 @@ fn trace<R: Read>(mut d: Demuxer<R>, initial_trim: bool, view: View) -> Outcome 
         seen[p.track] = true;
         write!(
             out,
-            "{{\"track\":{},\"pts_ns\":{},\"dts_ns\":{},\"duration_ns\":{},\"key\":{},\"trim_start_samples\":{},\"trim_end_samples\":{},\"payload\":{}}}",
+            "{{\"track\":{},\"pts_ns\":{},\"dts_ns\":null,\"duration_ns\":{},\"key\":{},\"trim_start_samples\":{},\"trim_end_samples\":{},\"payload\":{}}}",
             p.track,
             clock
                 .pts
                 .map(ExactTime::rounded_ns)
                 .transpose()?
                 .map_or("null".into(), |v| v.to_string()),
-            p.dts_ns.map_or("null".into(), |v| v.to_string()),
             clock
                 .duration
                 .map(ExactTime::rounded_duration_ns)

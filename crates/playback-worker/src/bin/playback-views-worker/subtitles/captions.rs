@@ -285,7 +285,7 @@ fn mkv(
                 CaptionUnit {
                     data: Bytes::copy_from_slice(pool, packet.packet.data.as_ref())?,
                     pts: packet.packet.pts_ns,
-                    dts: packet.packet.dts_ns,
+                    dts: None,
                     duration: packet.packet.duration_ns.map(i64::try_from).transpose()?,
                 },
                 records,

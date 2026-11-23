@@ -60,8 +60,6 @@ pub struct Packet {
     /// `None` for a later laced frame when neither BlockDuration nor DefaultDuration
     /// gives the frames' duration.
     pub pts_ns: Option<i64>,
-    /// Always `None`: Matroska carries presentation times, not decode times.
-    pub dts_ns: Option<i64>,
     /// Frame duration in nanoseconds, rounded once from the exact source duration;
     /// `None` when neither BlockDuration nor DefaultDuration is known.
     pub duration_ns: Option<u64>,
@@ -133,7 +131,6 @@ impl PacketFields {
             timing: self.timing,
             track: self.track,
             pts_ns: self.pts_ns,
-            dts_ns: None,
             duration_ns: self.duration_ns,
             keyframe: self.keyframe,
             discard_padding_ns: self.discard_padding_ns,

@@ -49,7 +49,7 @@ fn seek_subtitle_recovery_observed_unknown_end_prefix_and_entire_native_suffix()
             "row {ordinal} track"
         );
         assert_eq!(packet.pts_ns, signed(expected[1]), "row {ordinal} PTS");
-        assert_eq!(packet.dts_ns, signed(expected[2]), "row {ordinal} DTS");
+        assert_eq!(signed(expected[2]), None, "row {ordinal} DTS");
         assert_eq!(
             packet.duration_ns,
             unsigned(expected[3]),
@@ -136,7 +136,6 @@ fn subtitle_recovery_repeated_and_after_eof_replay_keep_the_same_whole_source_se
             rows.push((
                 packet.track,
                 packet.pts_ns,
-                packet.dts_ns,
                 packet.duration_ns,
                 packet.keyframe,
                 packet.discard_padding_ns,
@@ -162,7 +161,6 @@ fn known_default_duration_recovery(input: &[u8], duration: u64) {
     let first = reader.next_typed_packet(&cancel).unwrap().unwrap();
     assert_eq!(first.packet.track, 2);
     assert_eq!(first.packet.pts_ns, Some(7_200_000_000));
-    assert_eq!(first.packet.dts_ns, None);
     assert_eq!(first.packet.duration_ns, Some(duration));
     assert_eq!(
         first.configuration.tracks()[2].default_duration_ns,
