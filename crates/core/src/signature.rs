@@ -94,6 +94,9 @@ pub struct Policy {
     pub opening_boxes: &'static [[u8; 4]],
     /// Whether an Ogg page selects [`Container::Ogg`].
     pub ogg: bool,
+    /// Whether a four-byte `fLaC` prefix asks for one more byte before testing
+    /// box signatures. Format selection for FLAC stays with the caller.
+    pub flac_prefix: bool,
     /// How a prefix that fits both transport spacings is resolved.
     pub transport_tie: TransportTie,
 }
@@ -122,6 +125,11 @@ pub enum Selection {
 pub fn select(prefix: &[u8], policy: &Policy) -> Selection {
     if ebml(prefix) {
         return Selection::Container(Container::Matroska);
+    }
+    if prefix.len() == 4
+        && ((policy.ogg && prefix == b"OggS") || (policy.flac_prefix && prefix == b"fLaC"))
+    {
+        return Selection::Need(5);
     }
     if opening_box(prefix).is_some_and(|kind| policy.opening_boxes.contains(kind)) {
         match u32::from_be_bytes([prefix[0], prefix[1], prefix[2], prefix[3]]) {
@@ -208,17 +216,21 @@ mod tests {
     const FIRST: Policy = Policy {
         opening_boxes: &[*b"ftyp", *b"moof"],
         ogg: true,
+        flac_prefix: true,
         transport_tie: TransportTie::Ts188,
     };
     const REFUSING: Policy = Policy {
         opening_boxes: &[*b"ftyp", *b"wide"],
         ogg: false,
+        flac_prefix: false,
         transport_tie: TransportTie::Refuse,
     };
 
     #[test]
     fn a_policy_decides_boxes_ogg_and_a_prefix_both_transport_spacings_fit() {
         let isobmff = Selection::Container(Container::Isobmff);
+        assert_eq!(select(b"OggS", &FIRST), Selection::Need(5));
+        assert_eq!(select(b"fLaC", &FIRST), Selection::Need(5));
         assert_eq!(select(b"\0\0\0\x10moof", &FIRST), isobmff);
         assert_eq!(select(b"\0\0\0\x10wide", &REFUSING), isobmff);
         assert_eq!(select(b"\0\0\0\x10wide", &FIRST), Selection::Unrecognised);

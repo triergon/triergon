@@ -221,6 +221,7 @@ pub const CONTAINER_SIGNATURE_BYTES: usize = M2ts192.prefix_len();
 pub const SELECTION: signature::Policy = signature::Policy {
     opening_boxes: &[*b"ftyp", *b"styp", *b"moov", *b"free", *b"wide", *b"mdat"],
     ogg: false,
+    flac_prefix: false,
     transport_tie: TransportTie::Refuse,
 };
 

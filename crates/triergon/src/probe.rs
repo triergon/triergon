@@ -48,7 +48,7 @@ pub enum Probed {
 /// and the facade's openers look for one in the first 64 KiB, so a shorter prefix that
 /// holds none yet is [`Probed::Need`] of 64 KiB.
 pub fn probe(prefix: &[u8]) -> Probed {
-    match select(prefix) {
+    match signature::select(prefix, &POLICY) {
         Selection::Container(kind) => Probed::Format(container(kind)),
         Selection::Need(end) => Probed::Need(end),
         Selection::Unrecognised | Selection::Ambiguous => match elementary(prefix) {
@@ -76,24 +76,14 @@ pub fn probe_whole(source: &[u8]) -> Option<SourceFormat> {
 /// prefix that fits both transport spacings. `triergon-playback` selects for a
 /// player instead (`triergon_playback::probe::SELECTION`): no `moof`, `sidx` or `skip`,
 /// no Ogg, and no packet size for such a prefix.
-const POLICY: signature::Policy = signature::Policy {
+pub(crate) const POLICY: signature::Policy = signature::Policy {
     opening_boxes: &[
         *b"ftyp", *b"styp", *b"moov", *b"moof", *b"mdat", *b"free", *b"skip", *b"sidx", *b"wide",
     ],
     ogg: true,
+    flac_prefix: true,
     transport_tie: TransportTie::Ts188,
 };
-
-/// The container `prefix` starts under [`POLICY`].
-pub(crate) fn select(prefix: &[u8]) -> Selection {
-    // Shared Ogg/FLAC prefix tests measured up to +0.0508% on PGS, within observed count variation.
-    // One more byte settles an Ogg page, and tells a FLAC marker from the size of an
-    // opening box, where a box type would ask for four.
-    if prefix.len() == 4 && (prefix == b"OggS" || prefix == b"fLaC") {
-        return Selection::Need(5);
-    }
-    signature::select(prefix, &POLICY)
-}
 
 /// Whether the elementary stream readers are built in.
 pub(crate) const ELEMENTARY: bool = cfg!(feature = "elementary");

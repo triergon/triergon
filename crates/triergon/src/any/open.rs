@@ -1,9 +1,9 @@
 //! The blocking openers: probe a `std::io` source, then hand it to its reader.
 use super::AnyReader;
-use crate::probe::{ELEMENTARY, LIMIT, SourceFormat, container, elementary, probe_whole, select};
+use crate::probe::{ELEMENTARY, LIMIT, POLICY, SourceFormat, container, elementary, probe_whole};
 use std::io::{ErrorKind, Read, Seek};
 use triergon_core::blocking::Blocking;
-use triergon_core::signature::{Selection, TransportSync::M2ts192};
+use triergon_core::signature::{Selection, TransportSync::M2ts192, select};
 use triergon_core::{Budget, Error, Reservation, Result, SourceCapabilities, SourceId};
 
 /// Probe up to 64 KiB of a seekable source, then feed its reader from the start. The
@@ -146,7 +146,7 @@ impl ProbeBuffer {
     ) -> Result<Option<SourceFormat>> {
         loop {
             let bytes = &self.header[..self.used];
-            match select(bytes) {
+            match select(bytes, &POLICY) {
                 Selection::Container(kind) => return Ok(Some(container(kind))),
                 Selection::Need(end) => {
                     let count = read(source, &mut self.header[self.used..end])?;
