@@ -101,20 +101,6 @@
    ]
   },
   {
-   "name": "open-index/origin18-first-absent-second-contiguous",
-   "sha256": "1516bc21f13255b3e78fc1826cf325fd4f4acaff44b936d296e9a47b980c4408",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "b6a171b38bc77e28944029d17ddcd2e774326ec2f69867156119bedca5acc400",
-   "differences": [
-    [1, 0, 0, "pts", null, 0, "fragment-without-tfdt"],
-    [1, 0, 0, "dts", null, 0, "fragment-without-tfdt"],
-    [1, 1, 1, "pts", null, 1000, "fragment-without-tfdt"],
-    [1, 1, 1, "dts", null, 1000, "fragment-without-tfdt"],
-    [1, 2, 2, "pts", null, 2000, "fragment-without-tfdt"],
-    [1, 2, 2, "dts", null, 2000, "fragment-without-tfdt"]
-   ]
-  },
-  {
    "name": "open-index/bad-stss-out-of-range",
    "sha256": "168ed6abfde272164f75e10d908ff17fa826a2c29123b523aa81495e6fe973d4",
    "dispositions": ["inconsistent-sample-table"],
@@ -203,15 +189,12 @@
   {
    "name": "open-index/origin18-signed-first-absent",
    "sha256": "248158d27d9ae2f98b6415ae6078740c6b18bbb9cc27d3806c13fbd2d01f9b1d",
-   "dispositions": ["fragment-negative-offset-pts-shift", "fragment-without-tfdt"],
-   "difference_sha256": "f2039852c36a9cf2093686dd6553808b1e618ad8a5de04e14594950bf45ea7bc",
+   "dispositions": ["fragment-negative-offset-pts-shift"],
+   "difference_sha256": "e43db56e749139030cfb4be161651d6a9a6df075c1bdde722fa62891fca0119b",
    "differences": [
-    [1, 0, 0, "pts", null, 1000, "fragment-without-tfdt"],
-    [1, 0, 0, "dts", null, 0, "fragment-without-tfdt"],
-    [1, 1, 1, "pts", null, 4000, "fragment-without-tfdt"],
-    [1, 1, 1, "dts", null, 1000, "fragment-without-tfdt"],
-    [1, 2, 2, "pts", null, 2000, "fragment-without-tfdt"],
-    [1, 2, 2, "dts", null, 2000, "fragment-without-tfdt"],
+    [1, 0, 0, "pts", 0, 1000, "fragment-negative-offset-pts-shift"],
+    [1, 1, 1, "pts", 3000, 4000, "fragment-negative-offset-pts-shift"],
+    [1, 2, 2, "pts", 1000, 2000, "fragment-negative-offset-pts-shift"],
     [1, 3, 3, "pts", 2000, 3000, "fragment-negative-offset-pts-shift"],
     [1, 4, 4, "pts", 5000, 6000, "fragment-negative-offset-pts-shift"],
     [1, 5, 5, "pts", 4000, 5000, "fragment-negative-offset-pts-shift"]
@@ -928,26 +911,6 @@
    ]
   },
   {
-   "name": "open-index/origin18-all-absent",
-   "sha256": "b149894e7e186d9a9d8cd8834c0097bae263b06ee2dc51e8637663918d80f774",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "fe2afcf44ca93ea8001fa87d4dfff16558436976cafad4b507e0d2d128874137",
-   "differences": [
-    [1, 0, 0, "pts", null, 0, "fragment-without-tfdt"],
-    [1, 0, 0, "dts", null, 0, "fragment-without-tfdt"],
-    [1, 1, 1, "pts", null, 1000, "fragment-without-tfdt"],
-    [1, 1, 1, "dts", null, 1000, "fragment-without-tfdt"],
-    [1, 2, 2, "pts", null, 2000, "fragment-without-tfdt"],
-    [1, 2, 2, "dts", null, 2000, "fragment-without-tfdt"],
-    [1, 3, 3, "pts", null, 3000, "fragment-without-tfdt"],
-    [1, 3, 3, "dts", null, 3000, "fragment-without-tfdt"],
-    [1, 4, 4, "pts", null, 4000, "fragment-without-tfdt"],
-    [1, 4, 4, "dts", null, 4000, "fragment-without-tfdt"],
-    [1, 5, 5, "pts", null, 5000, "fragment-without-tfdt"],
-    [1, 5, 5, "dts", null, 5000, "fragment-without-tfdt"]
-   ]
-  },
-  {
    "name": "open-index/order-header-231",
    "sha256": "b4d444463120e8199100308815b926f26e3935fe93e16040dc31c95f4d3a9ce8",
    "dispositions": ["cross-track-order"],
@@ -1029,20 +992,6 @@
    "difference_sha256": "a41e5e1a2f785b5e7db7e0faa43fbdd876273daa4023b3233ecf75c66a8868cf",
    "differences": [
     [null, 8, 8, "order", 1, 2, "cross-track-order"]
-   ]
-  },
-  {
-   "name": "open-index/origin18-first-absent-second-gap",
-   "sha256": "c5c490523cd2f7e14ce6b0bd79b1aa7d564d6c915976cd22f24a4b1213c06aea",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "b6a171b38bc77e28944029d17ddcd2e774326ec2f69867156119bedca5acc400",
-   "differences": [
-    [1, 0, 0, "pts", null, 0, "fragment-without-tfdt"],
-    [1, 0, 0, "dts", null, 0, "fragment-without-tfdt"],
-    [1, 1, 1, "pts", null, 1000, "fragment-without-tfdt"],
-    [1, 1, 1, "dts", null, 1000, "fragment-without-tfdt"],
-    [1, 2, 2, "pts", null, 2000, "fragment-without-tfdt"],
-    [1, 2, 2, "dts", null, 2000, "fragment-without-tfdt"]
    ]
   },
   {
@@ -4552,20 +4501,6 @@
     [1, null, null, "packets", 9, 0, "ffmpeg-refuses-header"],
     [null, null, null, "streams", [1], [], "ffmpeg-refuses-header"],
     [null, null, null, "end", "eof", "error", "ffmpeg-refuses-header"]
-   ]
-  },
-  {
-   "name": "playback/native-terminal-controls/first-source-clock-unknown.mp4",
-   "sha256": "b2b9ae54e4f1c667c66099bc5e399ddc1c716924cea674051cb6298a6e87b967",
-   "dispositions": ["fragment-without-tfdt"],
-   "difference_sha256": "b6a171b38bc77e28944029d17ddcd2e774326ec2f69867156119bedca5acc400",
-   "differences": [
-    [1, 0, 0, "pts", null, 0, "fragment-without-tfdt"],
-    [1, 0, 0, "dts", null, 0, "fragment-without-tfdt"],
-    [1, 1, 1, "pts", null, 1000, "fragment-without-tfdt"],
-    [1, 1, 1, "dts", null, 1000, "fragment-without-tfdt"],
-    [1, 2, 2, "pts", null, 2000, "fragment-without-tfdt"],
-    [1, 2, 2, "dts", null, 2000, "fragment-without-tfdt"]
    ]
   },
   {

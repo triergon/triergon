@@ -141,7 +141,7 @@
         "isobmff-3"
       ],
       "parity": {
-        "aarch64-unknown-linux-gnu": "255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies); the neutral `Reader` against the formats `ffprobe` (`cargo xtask codecs isobmff-reader`): 648 cases, 522 inputs read through and 126 seeks, 343 identical, 3 refused by both, 302 differing only by 17 reviewed dispositions, 12 of them FFmpeg behaviours and 5 the reader's own documented refusals of inputs that break ISO/IEC 14496-12 ([rules](../harness/features/isobmff-reader/rules.json), [frozen differences](../harness/features/isobmff-reader/differences.json))"
+        "aarch64-unknown-linux-gnu": "255 inputs, 1,020 open and index comparisons (972 matching outputs and 48 matching refusal outcomes with compatibility policies); the neutral `Reader` against the formats `ffprobe` (`cargo xtask codecs isobmff-reader`): 648 cases, 522 inputs read through and 126 seeks, 347 identical, 3 refused by both, 298 differing only by 16 reviewed dispositions, 11 of them FFmpeg behaviours and 5 the reader's own documented refusals of inputs that break ISO/IEC 14496-12 ([rules](../harness/features/isobmff-reader/rules.json), [frozen differences](../harness/features/isobmff-reader/differences.json))"
       }
     },
     {
