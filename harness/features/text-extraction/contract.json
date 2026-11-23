@@ -688,31 +688,28 @@
   ],
   "open_deviations": [
     {
-      "reading": "A zero-byte ASS Block is retained as opaque source data",
-      "clause": "RFC 9559 \u00a710.1 and Matroska codec mapping draft \u00a7\u00a73.5.7 and 5.3: Block framing and ASS event syntax are separate",
-      "candidate": "projects one opaque zero-byte cue",
-      "reference": "ends with no admitted packet or cue",
-      "compat": "compat::matroska::omit_empty_ass_blocks",
+      "reading": "A zero-byte ASS Block is a packet",
+      "clause": "RFC 9559 section 10 frames each Block's data by the element size and sets no minimum frame size.",
+      "candidate": "Projects one opaque zero-byte cue.",
+      "reference": "Ends with no packet and no cue.",
       "cases": [
         "ass-empty-not-clear"
       ]
     },
     {
-      "reading": "The source view preserves a signed Matroska presentation time",
-      "clause": "RFC 9559 \u00a711.2, the signed Block timestamp and Cluster timestamp determine the presentation time; a negative result is discouraged",
-      "candidate": "keeps the calculated PTS of -715 ms",
-      "reference": "reports PTS zero",
-      "compat": "compat::matroska::clamp_negative_block_pts",
+      "reading": "A negative Matroska Block time is kept",
+      "clause": "RFC 9559 section 11.2: the Block timestamp is signed, it SHOULD NOT be negative, and a frame with a negative timestamp MUST be decoded but not played.",
+      "candidate": "Keeps PTS -715 ms.",
+      "reference": "Reports PTS 0 with inferred timestamps enabled.",
       "cases": [
         "utf8-packet-negative-start"
       ]
     },
     {
-      "reading": "The source view preserves an unsigned stts delta of 4294967295",
-      "clause": "ISO/IEC 14496-12:2015 \u00a78.6.1.2, stts sample_delta is unsigned 32-bit",
-      "candidate": "retains the full 4294967295-tick duration",
-      "reference": "emits a one-tick packet",
-      "compat": "compat::mov::large_sample_delta_recovery",
+      "reading": "The unsigned stts delta of 4294967295 ticks is kept",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2.2 and 8.6.1.2.3: sample_delta is an unsigned 32-bit count.",
+      "candidate": "Keeps the 4294967295-tick duration.",
+      "reference": "Returns a one-tick packet.",
       "cases": [
         "capsule-mov-text-overflow-clock"
       ]

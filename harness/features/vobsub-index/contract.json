@@ -674,26 +674,32 @@
   ],
   "open_deviations": [
     {
-      "reading": "Preserve the written language when a recovered declaration has no index",
-      "clause": "Matroska codec mapping draft \u00a73.5.13 uses the id line for track language; triergon_subtitles::dvd::vobsub::Line::Track preserves the written language and records a missing index",
-      "candidate": "keeps en or invalid from the source declaration while admitting the packets on recovered track zero",
-      "reference": "publishes und on track zero with the same packet sequence",
-      "compat": "compat::dvd::default_incomplete_vobsub_declaration",
+      "reading": "A VobSub id line without an index keeps its language (a reading of the de-facto format)",
+      "clause": "VobSub .idx has no published specification; its writer (VobSub, VSFilter) writes 'id: xx, index: n' and 'timestamp: HH:MM:SS:mmm, filepos: ...' lines; Matroska codec mappings draft 21 section 3.5.13 maps the id line to the track language. triergon_subtitles::dvd::vobsub::Line::Track keeps the written language and records the missing index.",
+      "candidate": "Publishes language en on track 0 with the packets.",
+      "reference": "Publishes und on track 0 with the same packets.",
       "cases": [
         "vobsub-idx-no-index",
-        "missing-index",
-        "malformed-id"
+        "missing-index"
       ]
     },
     {
-      "reading": "Leading zeroes in a VobSub time field do not change its value",
-      "clause": "Matroska codec mapping draft \u00a73.5.13 uses each timestamp and filepos line; triergon_subtitles::dvd::vobsub::Line::Timestamp allows any digit width within the numeric range",
-      "candidate": "publishes one packet at 1000 ms and file position zero",
-      "reference": "refuses the index with the 17-digit leading-zero time field",
-      "compat": "compat::dvd::limit_vobsub_timestamp_field_width",
+      "reading": "A VobSub time field with leading zeroes is read by its value (a leniency of ours)",
+      "clause": "VobSub .idx has no published specification; its writer (VobSub, VSFilter) writes 'id: xx, index: n' and 'timestamp: HH:MM:SS:mmm, filepos: ...' lines, and no description fixes the width of a field; triergon_subtitles::dvd::vobsub::Line::Timestamp accepts any digit count within the numeric range.",
+      "candidate": "Reads the 17-digit hour field as 0 and publishes one packet at 1000 ms and file position 0.",
+      "reference": "Refuses the index (unable to parse the timestamp line).",
       "cases": [
         "long-timestamp"
       ]
+    }
+  ],
+  "pending_module_requirements": [
+    "Publish a VobSub track's language only when its id line names an ISO 639 language: an id line such as 'id: invalid' gives no language (und), as Matroska codec mappings draft 21 section 3.5.13 maps the id line to the track's Language element."
+  ],
+  "open_cases": [
+    {
+      "id": "malformed-id",
+      "requirement": "Publish a VobSub track's language only when its id line names an ISO 639 language: an id line such as 'id: invalid' gives no language (und), as Matroska codec mappings draft 21 section 3.5.13 maps the id line to the track's Language element."
     }
   ]
 }

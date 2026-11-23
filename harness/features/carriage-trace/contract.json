@@ -880,30 +880,28 @@
   ],
   "open_deviations": [
     {
-      "reading": "A zero-byte ASS Block is retained as opaque source data",
-      "clause": "RFC 9559 \u00a710.1 and Matroska codec mapping draft \u00a7\u00a73.5.7 and 5.3: Block framing and ASS event syntax are separate",
-      "candidate": "returns a packet at offset 121 with zero bytes and a key flag",
-      "reference": "ends after opening the ASS stream without publishing the packet",
-      "compat": "compat::matroska::omit_empty_ass_blocks",
+      "reading": "A zero-byte ASS Block is a packet",
+      "clause": "RFC 9559 section 10 frames each Block's data by the element size and sets no minimum frame size.",
+      "candidate": "Returns a key packet at offset 121 with zero bytes.",
+      "reference": "Ends after opening the ASS stream without returning the packet.",
       "cases": [
         "ass-empty-not-clear"
       ]
     },
     {
-      "reading": "Preserve a signed Matroska Block timestamp",
-      "clause": "RFC 9559 \u00a711.2: the signed Block timestamp and Cluster timestamp determine PTS; a negative result is discouraged",
-      "candidate": "reports -715 ms with an absent DTS",
-      "reference": "reports no PTS or DTS when inferred timestamps are disabled",
-      "compat": "compat::matroska::suppress_negative_block_pts",
+      "reading": "A negative Matroska Block time is kept",
+      "clause": "RFC 9559 section 11.2: the Block timestamp is signed, it SHOULD NOT be negative, and a frame with a negative timestamp MUST be decoded but not played.",
+      "candidate": "Reports PTS -715 ms and no DTS.",
+      "reference": "Reports no PTS and no DTS, with inferred timestamps disabled.",
       "cases": [
         "utf8-packet-negative-start"
       ]
     },
     {
-      "reading": "Recognize S_TEXT/WEBVTT as WebVTT",
-      "clause": "Matroska codec mapping draft \u00a7\u00a73.5.12 and 5.4.1: S_TEXT/WEBVTT identifies WebVTT, with global blocks in CodecPrivate",
-      "candidate": "reports WebVTT, preserving the exact private bytes, packets and exported type-1 additions",
-      "reference": "reports an unknown codec while returning the same private bytes, packets and exported type-1 additions",
+      "reading": "S_TEXT/WEBVTT identifies WebVTT",
+      "clause": "Matroska codec mappings draft 21 sections 3.5.12 and 5.4.1 register S_TEXT/WEBVTT for WebVTT, with its global blocks in CodecPrivate.",
+      "candidate": "Reports codec 94226 (WebVTT) with the private bytes, packets and type-1 additions.",
+      "reference": "Reports an unknown codec (0) with the same private bytes, packets and type-1 additions.",
       "cases": [
         "mkv-vtt-no-addition",
         "mkv-vtt-settings-id-comments",
@@ -914,11 +912,10 @@
       ]
     },
     {
-      "reading": "An unsigned stts sample delta of 4294967295",
-      "clause": "ISO/IEC 14496-12:2015 \u00a78.6.1.2, stts sample_delta is unsigned 32-bit",
-      "candidate": "returns the coded duration 4294967295",
-      "reference": "returns a duration of one tick",
-      "compat": "compat::mov::large_sample_delta_recovery",
+      "reading": "The unsigned stts delta of 4294967295 ticks is kept",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2.2 and 8.6.1.2.3: sample_delta is an unsigned 32-bit count.",
+      "candidate": "Returns the coded duration 4294967295.",
+      "reference": "Returns a duration of one tick.",
       "cases": [
         "capsule-mov-text-overflow-clock"
       ]

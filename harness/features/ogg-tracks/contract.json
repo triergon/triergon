@@ -206,31 +206,19 @@
   ],
   "open_deviations": [
     {
-      "reading": "Chapter comments are still source comments",
-      "clause": "Xiph Vorbis I section 5.2 and Xiph VorbisComment chapter extension define the textual comment field and the CHAPTERxxx names.",
-      "candidate": "retains the chapter keys and values alongside the ordinary fields",
-      "reference": "exports chapters separately and omits the keys from the stream dictionary",
-      "compat": "compat::ogg::chapter_comments",
-      "cases": [
-        "vorbis-chapter-extension-demo.ogg"
-      ]
-    },
-    {
-      "reading": "Use the last Opus granule and pre-skip for the source end",
-      "clause": "RFC 3533 section 6 and RFC 7845 sections 4.2–4.4 define the page granule and conversion to PCM samples by subtracting pre-skip, including at EOS.",
-      "candidate": "publishes 59232 ticks from the EOS granule 59544 less 312 samples of pre-skip",
-      "reference": "reports duration corresponding to 64032 ticks after a CRC failure",
-      "compat": "compat::ogg::estimated_duration",
+      "reading": "Opus end is the last granule less pre-skip",
+      "clause": "RFC 7845 sections 4.3 and 4.4: the PCM sample position of a page is its granule position less pre-skip, at end of stream too; RFC 3533 section 6 gives the page granule.",
+      "candidate": "Publishes 59232 ticks: the EOS granule 59544 less 312 samples of pre-skip.",
+      "reference": "Reports a duration of 64032 ticks, one page more, after the CRC failure of the first audio page.",
       "cases": [
         "crc-bad.opus"
       ]
     },
     {
-      "reading": "Preserve the Speex final source granule",
-      "clause": "RFC 3533 section 6 assigns granule_position to the logical stream. Xiph Speex manual, Formats and standards, Speex in Ogg, gives the mapping’s sample clock and packet framing.",
-      "candidate": "reports the EOS granules 9872, 9600 and 28800 samples",
-      "reference": "publishes durations of 9920, 10560 and 29149 ticks from the demux stream",
-      "compat": "compat::ogg::estimated_duration",
+      "reading": "Speex end is the end-of-stream granule",
+      "clause": "RFC 3533 section 6 assigns granule_position to the logical stream; the Speex manual's Ogg mapping counts it in samples.",
+      "candidate": "Reports the EOS granules 9872, 9600 and 28800 samples.",
+      "reference": "Reports 9920, 10560 and 29149 ticks, estimated from the packet count.",
       "cases": [
         "speex-nb.spx",
         "speex-wb.spx",
@@ -238,53 +226,59 @@
       ]
     },
     {
-      "reading": "Retain the Skeleton identification packet as opaque configuration",
-      "clause": "RFC 3533 section 3 and the Xiph Ogg Skeleton Metadata Bitstream, Identifying the Ogg Skeleton, define the BOS identification packet. Track::configuration retains the first packet of an opaque mapping.",
-      "candidate": "publishes the fishead signature and its original configuration bytes",
-      "reference": "publishes the stream without configuration bytes",
-      "cases": [
-        "speex-skeleton.spx"
-      ]
-    },
-    {
-      "reading": "An empty text value is present in the comment packet",
-      "clause": "Xiph Vorbis I section 5.2 defines length-delimited UTF-8 name=value fields and specifies no minimum value length.",
-      "candidate": "reports the present TITLE with a zero-byte value",
-      "reference": "omits the empty TITLE from the dictionary",
-      "compat": "compat::ogg::omit_empty_comments",
+      "reading": "An empty comment value is a comment",
+      "clause": "Xiph Vorbis I section 5.2: comments are length-delimited UTF-8 name=value fields with no minimum value length.",
+      "candidate": "Reports TITLE with a zero-byte value among three pairs.",
+      "reference": "Omits the empty TITLE from its dictionary (two pairs).",
       "cases": [
         "comment-fields"
       ]
     },
     {
-      "reading": "Expose a valid Opus identification with the error in the following header",
-      "clause": "RFC 7845 sections 5.1 and 5.2 require the identification and comment packets and allow refusal of a short comment. Track::header_error exposes a failed header without losing source identification.",
-      "candidate": "retains the OpusHead and reports a second-header error",
-      "reference": "refuses the demux open",
-      "cases": [
-        "bad-comment"
-      ]
-    },
-    {
-      "reading": "A zero Theora frame-rate denominator has no frame clock",
-      "clause": "Theora I section 6.2 requires a positive FRN and FRD; Annex A.2.3 derives the granule clock from the coded frame period.",
-      "candidate": "reports a header error with no frame rate",
-      "reference": "publishes a 25 Hz frame clock",
-      "compat": "compat::ogg::theora_rate_fallback",
+      "reading": "A zero Theora frame-rate fraction gives no frame clock",
+      "clause": "Theora I section 6.2: FRN and FRD are both nonzero; Track::header_error documents that a header which does not parse leaves the track configured from the headers before it.",
+      "candidate": "Reports a header error, no frame rate, no end and no configuration bytes (no header precedes the identification header).",
+      "reference": "Publishes a 25 Hz frame clock, end 157 and the identification, setup and comment headers.",
       "cases": [
         "theora-0-0"
       ]
     },
     {
-      "reading": "The first track retains the first link’s own end",
-      "clause": "RFC 3533 sections 4 and 6 separate chained logical streams and their granules. RFC 7845 sections 4.2–4.4, Xiph Vorbis I section A.2 and the Xiph Speex Ogg mapping supply the codec granule clocks.",
-      "candidate": "publishes the first link’s own end at 59232 Opus ticks, 54464 Vorbis ticks or 9872 Speex ticks, including when a later link repeats the serial",
-      "reference": "publishes 28800 Opus ticks, 26496 Vorbis ticks or 4848 Speex ticks from demux timing across the chain",
-      "compat": "compat::ogg::estimated_duration",
+      "reading": "Each link of a chain keeps its own end",
+      "clause": "RFC 3533 sections 4 and 6 separate chained logical streams and their granules; RFC 7845 sections 4.3 and 4.4, Xiph Vorbis I section A.2 and the Speex Ogg mapping give the codec clocks.",
+      "candidate": "Publishes the first link's own end: 59232 Opus, 54464 Vorbis and 9872 Speex ticks, including when a later link repeats the serial.",
+      "reference": "Models the chain as one stream and publishes 28800, 26496 and 4848 ticks, the last link's own end (for Opus its granule 29112 less 312 of pre-skip), which is the end of neither the first link nor the chain.",
       "cases": [
         "chain-opus.opus",
         "chain-vorbis.ogg",
         "chain-speex.spx"
+      ]
+    },
+    {
+      "reading": "CHAPTERxxx comments stay comments (a representation choice)",
+      "clause": "Xiph Vorbis I section 5.2 defines comment fields, and the VorbisComment chapter extension names the CHAPTERxxx and CHAPTERxxxNAME fields; neither asks a reader to move them out of the comments.",
+      "candidate": "Keeps the eight chapter fields among its twelve comment pairs.",
+      "reference": "Moves them into its chapter list, which this comparison does not fold, and keeps four pairs.",
+      "cases": [
+        "vorbis-chapter-extension-demo.ogg"
+      ]
+    },
+    {
+      "reading": "The Skeleton identification packet is the configuration of its opaque track (a representation choice)",
+      "clause": "RFC 3533 section 3 and the Ogg Skeleton document define the fishead BOS packet; Track::configuration keeps the first packet of a mapping it does not decode.",
+      "candidate": "Publishes the Skeleton track configured with its 64-byte fishead packet; the Speex track agrees.",
+      "reference": "Publishes the Skeleton stream unconfigured, without configuration bytes.",
+      "cases": [
+        "speex-skeleton.spx"
+      ]
+    },
+    {
+      "reading": "A short Opus comment header makes its stream invalid; the source still opens (policy)",
+      "clause": "RFC 7845 section 5.2: implementations SHOULD treat a stream as invalid if its comment header lacks enough data for its fields; Track::header_error reports this per stream.",
+      "candidate": "Opens the source and lists the Opus stream with its OpusHead and a header error, unconfigured, with an empty comment view.",
+      "reference": "Refuses the whole open.",
+      "cases": [
+        "bad-comment"
       ]
     }
   ]

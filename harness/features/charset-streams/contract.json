@@ -341,11 +341,11 @@
   ],
   "open_deviations": [
     {
-      "reading": "Big5 uses the historical Unicode mapping and refuses unmapped positions",
-      "clause": "Unicode historical BIG5.TXT Table 2.0, kept in crates/subtitles/tests/multibyte-mapping-data, entries 80, A145, A15A and C6A1",
-      "candidate": "refuses 80 and A15A, maps A145 to U+2022 and C6A1 to U+30FE",
-      "reference": "accepts 80 as U+0080 and A15A as U+2574, maps A145 to U+2027 and C6A1 to U+F6B1",
-      "compat": "compat::charset::glibc_big5",
+      "reading": "The strict big5 profile follows Unicode's historical BIG5.TXT (a profile choice; no normative Big5 mapping exists)",
+      "clause": "Big5 has no normative Unicode mapping: Unicode's BIG5.TXT, which the strict profile follows, is marked obsolete; glibc, Microsoft CP950, HKSCS and the WHATWG Encoding Standard differ among themselves. The WHATWG decoder, like the strict profile, refuses byte 80, and its index maps A145 to U+2027 as glibc does.",
+      "candidate": "Refuses byte 80 and pairs BIG5.TXT leaves unmapped such as A15A; maps A145 to U+2022 and C6A1 to U+30FE.",
+      "reference": "glibc 2.39 iconv decodes 80 as U+0080 and A15A as U+2574, and maps A145 to U+2027 and C6A1 to U+F6B1.",
+      "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "big5-bytes",
         "big5-pairs",
@@ -355,11 +355,10 @@
       ]
     },
     {
-      "reading": "The declared CP950 mapping has no C1 byte 80 or private-use C6A1",
-      "clause": "Microsoft CP950.TXT Table 2.01, single-byte and double-byte entries",
-      "candidate": "refuses 80 and unmapped pairs such as C6A1",
-      "reference": "maps 80 to U+0080 and C6A1 to U+F6B1",
-      "compat": "compat::charset::glibc_cp950",
+      "reading": "The strict windows-950 profile follows Microsoft's published CP950.TXT (a profile choice)",
+      "clause": "Microsoft CP950.TXT 2.01 lists the code page's assigned characters and omits byte 80 and the user-defined areas; Windows' own conversion maps the user-defined areas to private use, as glibc does.",
+      "candidate": "Refuses byte 80 and the pairs CP950.TXT omits, such as C6A1.",
+      "reference": "glibc 2.39 iconv maps 80 to U+0080 and the user-defined pairs to private use, C6A1 to U+F6B1.",
       "cases": [
         "cp950-bytes",
         "cp950-pairs",
@@ -369,52 +368,21 @@
       ]
     },
     {
-      "reading": "The historical Shift-JIS mapping for 815F",
-      "clause": "Unicode historical SHIFTJIS.TXT Table 2.0, entry 815F",
-      "candidate": "decodes U+005C",
-      "reference": "decodes U+FF3C",
-      "compat": "compat::charset::glibc_shift_jis",
-      "cases": [
-        "shift_jis-pairs"
-      ]
-    },
-    {
-      "reading": "The strict 932 mapping leaves user-defined positions unmapped",
-      "clause": "Microsoft CP932.TXT Table 2.01, double-byte entries, F040\u2013F9FC are absent",
-      "candidate": "refuses 1,880 user-defined positions",
-      "reference": "maps them to U+E000\u2013U+E757",
-      "compat": "compat::charset::windows932_private_use",
-      "cases": [
-        "cp932-pairs"
-      ]
-    },
-    {
-      "reading": "The strict EUC-KR profile uses ASCII and the A1\u2013FE subset of CP949",
-      "clause": "Microsoft CP949.TXT Table 2.01, subset and single-byte mapping documented by MultibyteCharset::EucKr",
-      "candidate": "refuses C1 bytes and the unmapped A2E8",
-      "reference": "decodes C1 controls and maps A2E8 to U+327E",
-      "compat": "compat::charset::glibc_euc_kr",
+      "reading": "The strict euc-kr profile refuses bytes 80 to 9F (a profile choice)",
+      "clause": "EUC-KR (RFC 1557, KS X 2901) codes ASCII and KS X 1001 in A1 to FE; ISO/IEC 2022 and ISO/IEC 4873 let an EUC carry C1 controls in 80 to 9F, which glibc decodes, while the strict profile and the WHATWG decoder leave them undefined.",
+      "candidate": "Refuses every byte 80 to 9F, alone or in a pair.",
+      "reference": "glibc 2.39 iconv decodes them as the C1 controls U+0080 to U+009F.",
+      "compat": "triergon_subtitles::compat::charset::receiver_charset, whose big5 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "euc-kr-bytes",
         "euc-kr-pairs"
       ]
     },
     {
-      "reading": "The EUC-KR C1-only extension leaves pair A2E8 unmapped",
-      "clause": "Microsoft CP949.TXT Table 2.01, A2E8 absent; the C1-only profile documents only a single-byte extension",
-      "candidate": "refuses the pair at byte zero",
-      "reference": "maps the pair to U+327E",
-      "compat": "compat::charset::glibc_euc_kr",
-      "cases": [
-        "kr-c1-pairs"
-      ]
-    },
-    {
-      "reading": "An unmapped CP949 pair is refused at the start of that pair",
-      "clause": "Microsoft CP949.TXT Table 2.01, A2E8 absent; iconv input-error cursor points to the start of the invalid sequence",
-      "candidate": "refuses A2E8 at byte zero",
-      "reference": "refuses A2E8 at byte two",
-      "compat": "compat::charset::glibc_cp949_error_offset",
+      "reading": "An unmapped CP949 pair is refused at the start of the pair",
+      "clause": "POSIX iconv(): on an invalid input sequence the input position points to the beginning of that sequence; Microsoft CP949.TXT 2.01 has no A2E8.",
+      "candidate": "Refuses A2E8 at byte 0.",
+      "reference": "Refuses A2E8 at byte 2.",
       "cases": [
         "cp949-pairs"
       ]
