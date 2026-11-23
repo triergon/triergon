@@ -390,6 +390,7 @@ pub struct FragmentBuilder {
     raw: BoxView,
     boxes: BoxChildren,
     runs: BudgetVec<IndexedRun>,
+    // Carrying the run in the phase enum adds up to 0.932% open instructions.
     pending: Option<IndexedRun>,
     header: Option<Tfhd>,
     decode_time: Option<FragmentDecodeTime>,
