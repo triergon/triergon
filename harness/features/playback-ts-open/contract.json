@@ -210,27 +210,78 @@
       "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
     }
   ],
-  "open_deviations": [
+  "open_refusals": [
     {
-      "reading": "Finite startup entity exceeds the borrowed bootstrap bound",
-      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.2 defines packet framing. Startup::new and InputBootstrap::MAX_BORROWED_BYTES specify whole-entity admission and its 16 KiB bound.",
-      "candidate": "Refuses M2TS entities that exceed the finite input bound before emitting a PES.",
-      "reference": "Demuxes the same inputs incrementally and returns 9 to 24 selected PES packets.",
+      "reason": "Finite startup borrows the entity whole, up to the public bound triergon_mpegts::compat::input::InputBootstrap::MAX_BORROWED_BYTES (16 KiB); the reference demuxes incrementally",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2; the bound is a resource limit of the finite startup API, not a syntax rule",
+      "detail": "capacity request 33216 exceeds policy 16384",
       "cases": [
-        "m2ts-replay-avc-aac-00-video",
-        "m2ts-replay-avc-aac-00-audio",
-        "m2ts-replay-hevc-aac-00-video",
-        "m2ts-entry-hevc-aac-44100-01-video"
+        {
+          "id": "m2ts-replay-avc-aac-00-video",
+          "sha256": "c259510f2149db3bb931c3238897e1acf45d62f5bce4b5c3cbd397473cb8f609",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 248
+          }
+        },
+        {
+          "id": "m2ts-replay-avc-aac-00-audio",
+          "sha256": "c259510f2149db3bb931c3238897e1acf45d62f5bce4b5c3cbd397473cb8f609",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 248
+          }
+        }
       ]
     },
     {
-      "reading": "Finite startup ends inside a carrier",
-      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.2 defines the complete transport packet. Startup::new requires a complete finite entity.",
-      "candidate": "Refuses the incomplete final carrier before handing out a startup context.",
-      "reference": "Returns the earlier complete 27-byte PES at PTS and DTS 90000 and ends.",
-      "compat": "compat::pes::recover_complete_pes_before_incomplete_carrier for callers that need the intact prefix.",
+      "reason": "Finite startup borrows the entity whole, up to the public bound triergon_mpegts::compat::input::InputBootstrap::MAX_BORROWED_BYTES (16 KiB); the reference demuxes incrementally",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2; the bound is a resource limit of the finite startup API, not a syntax rule",
+      "detail": "capacity request 34368 exceeds policy 16384",
       "cases": [
-        "startup-transport-partial-final-packet"
+        {
+          "id": "m2ts-replay-hevc-aac-00-video",
+          "sha256": "92bcbc9665074e78d5dbbd7e84ace5c8beb8bfcdc277f5c3ad0ca9f2965a5c54",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 248
+          }
+        }
+      ]
+    },
+    {
+      "reason": "Finite startup borrows the entity whole, up to the public bound triergon_mpegts::compat::input::InputBootstrap::MAX_BORROWED_BYTES (16 KiB); the reference demuxes incrementally",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2; the bound is a resource limit of the finite startup API, not a syntax rule",
+      "detail": "capacity request 36288 exceeds policy 16384",
+      "cases": [
+        {
+          "id": "m2ts-entry-hevc-aac-44100-01-video",
+          "sha256": "2a723565db7523bf01498ceb8e316b82dfb9d99347caf06080c6755979b36c77",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 248
+          }
+        }
+      ]
+    },
+    {
+      "reason": "Startup::new admits a finite entity only as whole transport packets",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 fixes the 188-byte transport packet; the finite startup binding requires every carrier complete",
+      "detail": "finite PES startup needs a nonempty entity with whole transport packets",
+      "cases": [
+        {
+          "id": "startup-transport-partial-final-packet",
+          "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 248
+          }
+        }
       ]
     }
   ]

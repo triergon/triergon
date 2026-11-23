@@ -97,23 +97,30 @@
   ],
   "open_deviations": [
     {
-      "reading": "An exact repeat of a payload-bearing transport packet",
-      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.3 permits two consecutive same-PID packets with the same continuity counter and adaptation_field_control 01 or 11 when their bytes match apart from a valid PCR.",
+      "reading": "A legal duplicate transport packet carries no new payload",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 permits two consecutive same-PID packets with one continuity_counter and adaptation_field_control 01 or 11 when their bytes match apart from a valid PCR.",
       "candidate": "Returns 36 compact-input AAC and AVC access-unit records with 5573 source bytes, matching the nonduplicated control.",
-      "reference": "Reports a PES size mismatch, marks the AAC packet corrupt and yields a single refusal record.",
-      "compat": "compat::pes::reject_corrupt_duplicate_carrier for a consumer reproducing the reference demux corruption decision.",
+      "reference": "Reports a PES size mismatch, marks the AAC packet corrupt and ends with a refusal record.",
       "cases": [
         "legal-duplicate-44100"
       ]
-    },
+    }
+  ],
+  "open_refusals": [
     {
-      "reading": "A transport AVC access unit opens with SEI instead of an access-unit delimiter",
-      "clause": "ITU-T H.222.0 (08/2023) section 2.14.1 requires an AUD in every carried AVC access unit. H.264 (08/2024) section 7.4.1.2.3 puts it first.",
-      "candidate": "Returns Unsupported with AVC TS access unit has no initial delimiter before publishing a unit.",
-      "reference": "Accepts the first 3640-byte unit starting with SEI at PTS 133500 and DTS 126000 and continues to the end.",
-      "compat": "compat::avc::recover_missing_delimiter for a consumer accepting delimiterless transport AVC.",
+      "reason": "The standalone compact AVC assembler refuses a stream whose first access unit has no access unit delimiter; the segment and progressive views of the same input accept it",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.14.1 requires an access unit delimiter in every AVC access unit; ITU-T H.264 (08/2024) \u00a77.4.1.2.3 places it first",
+      "detail": "AVC TS access unit has no initial delimiter",
       "cases": [
-        "reordered-48000"
+        {
+          "id": "reordered-48000",
+          "sha256": "ccc8b45b5138dc0d33c72513db7f0aed0a20a9b1546ddd7253b7577674b1f076",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     }
   ]

@@ -1,4 +1,4 @@
-use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
+use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals};
 use std::io::{self, Write};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{PacketInfo, RandomAccess};
@@ -8,6 +8,7 @@ use triergon_core::{
 };
 use triergon_framing::aac::inspect_adts_header;
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+use triergon_harness_runner::{Outcome, measure_outcome};
 use triergon_hls::aac::{HlsAac, HlsAacFrame};
 use triergon_hls::avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep};
 use triergon_hls::clock::{HlsAacClock, HlsAacPtsOrigin, resolve_hls_aac_clocks};
@@ -116,6 +117,11 @@ impl Case {
 }
 
 pub(super) fn run(args: &[String]) -> Result<()> {
+    // A registered refusal case asks the worker to name its typed unsupported detail.
+    let (report_refusal, args) = match args.split_last() {
+        Some((last, rest)) if last == "--report-refusal" => (true, rest),
+        _ => (false, args),
+    };
     let invocation = Invocation::parse(
         args,
         "hls-views-",
@@ -128,10 +134,10 @@ pub(super) fn run(args: &[String]) -> Result<()> {
     let raw =
         Bytes::try_from_vec(&pool, invocation.input(MAX_INPUT)?).map_err(|error| error.error)?;
     let trace = invocation.mode == Mode::Trace;
-    measure(&invocation, case.view.operation(), Some(&pool), || {
+    measure_outcome(&invocation, case.view.operation(), Some(&pool), || {
         let cancel = AtomicBool::new(false);
         if raw.is_empty() || !raw.len().is_multiple_of(188) {
-            return refusal(trace);
+            return refusal(trace, None);
         }
         let input = InputCursor::new(
             &pool,
@@ -164,17 +170,28 @@ pub(super) fn run(args: &[String]) -> Result<()> {
                 if trace {
                     eprintln!("{error}");
                 }
-                refusal(trace)
+                let detail = match error.downcast_ref::<Error>() {
+                    Some(Error::Unsupported(detail)) if report_refusal => Some(*detail),
+                    _ => None,
+                };
+                refusal(trace, detail)
             }
-            result => result,
+            result => result.map(|totals| Outcome {
+                totals,
+                unsupported: None,
+            }),
         }
     })
 }
 
-fn refusal(trace: bool) -> Result<Totals> {
+/// One kind 8 record; `detail` names the unsupported feature of a registered refusal.
+fn refusal(trace: bool, detail: Option<&'static str>) -> Result<Outcome> {
     let mut output = Records::new(trace);
     output.record(8, &[], std::iter::empty())?;
-    Ok(output.total)
+    Ok(Outcome {
+        totals: output.total,
+        unsupported: detail,
+    })
 }
 
 struct Records<'a> {

@@ -10,7 +10,7 @@ pub(super) fn run(_: &[String]) -> playback_worker::runner::Result<()> {
 #[cfg(not(test))]
 mod worker {
     use playback_worker::packet_fold::{Packet, Work};
-    use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
+    use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals};
     use std::{path::Path, sync::atomic::AtomicBool};
     use triergon_core::{
         Budget, BudgetVec, Bytes, Error, InputCursor, Rounding, SourceCapabilities, SourceId, Time,
@@ -18,6 +18,7 @@ mod worker {
         container::{MediaKind, PacketInfo, RandomAccess, TrackInfo},
     };
     use triergon_harness_protocol::digest::{fold, signed};
+    use triergon_harness_runner::{Outcome, measure_outcome};
     use triergon_isobmff::{
         CursorStatus,
         compat::mov::{
@@ -274,6 +275,15 @@ mod worker {
                 digest: self.work.digest,
                 refusal: None,
             }
+        }
+    }
+
+    /// The detail a registered refusal names: an unsupported feature's own detail,
+    /// otherwise the refusal's text.
+    fn refusal_detail(error: &Error) -> &'static str {
+        match error {
+            Error::Unsupported(detail) => detail,
+            other => Box::leak(other.to_string().into_boxed_str()),
         }
     }
 
@@ -1375,6 +1385,11 @@ mod worker {
     }
 
     pub(in super::super) fn run(args: &[String]) -> Result<()> {
+        // A registered refusal case asks the worker to name its typed refusal.
+        let (report_refusal, args) = match args.split_last() {
+            Some((last, rest)) if last == "--report-refusal" => (true, rest),
+            _ => (false, args),
+        };
         let (prefix, name) = [
             ("mp4-seek-", "playback-mp4-seek"),
             ("catalogue-", "playback-catalogue-replacement"),
@@ -1398,7 +1413,7 @@ mod worker {
                 op,
                 Operation::DeliveryMp4(_, Index::ForwardEncoded | Index::Recovery, _)
             );
-        measure(&invocation, name, Some(&pool), || {
+        measure_outcome(&invocation, name, Some(&pool), || {
             let mut rows = Rows {
                 work: Work::default(),
                 trace,
@@ -1441,6 +1456,7 @@ mod worker {
                     ts_open(&pool, &bytes, *mode, *format, pids, &cancel, &mut rows)
                 }
             };
+            let mut detail = None;
             match result {
                 Ok(()) => rows.field(7, 0),
                 Err(error)
@@ -1458,11 +1474,17 @@ mod worker {
                     if trace {
                         eprintln!("player refusal: {error}");
                     }
+                    if report_refusal {
+                        detail = error.downcast_ref::<Error>().map(refusal_detail);
+                    }
                     rows.field(8, 0);
                 }
                 Err(error) => return Err(error),
             }
-            Ok(rows.totals())
+            Ok(Outcome {
+                totals: rows.totals(),
+                unsupported: detail,
+            })
         })
     }
 }
