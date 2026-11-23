@@ -21,9 +21,10 @@ mod tables;
 mod window;
 
 use triergon_bitstream::LsbReader;
-use triergon_codec::{native_order, vorbis_order};
 use triergon_codec::mdct::Imdct;
-use triergon_codec::{AudioDecoder, BudgetVec, DownmixLevels, Reservation};
+use triergon_codec::{
+    AudioDecoder, BudgetVec, DownmixLevels, Reservation, native_order, vorbis_order,
+};
 pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
 use triergon_framing::vorbis::{VorbisHeaders, VorbisIdentification};
 

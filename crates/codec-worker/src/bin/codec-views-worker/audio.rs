@@ -6,8 +6,7 @@ use triergon::{
     Budget, Bytes, ContainerReader, InputWindow, MediaKind, PacketInfo, SourceCapabilities,
     SourceId, Step, WorkBudget, open_sequential,
 };
-use triergon_codec::{native_order, vorbis_order};
-use triergon_codec::{AudioFrame, DownmixLevels, SurroundEncoding};
+use triergon_codec::{AudioFrame, DownmixLevels, SurroundEncoding, native_order, vorbis_order};
 use triergon_codec_ac3::{self as ac3, DownmixInfo, DownmixType, FrameInfo, Syntax};
 use triergon_session::TrackDecoder;
 

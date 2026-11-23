@@ -2,8 +2,7 @@
 //! channel takes, the output layout, and the header's output gain.
 
 use crate::DecodeError;
-use triergon_codec::{native_order, vorbis_order};
-use triergon_codec::{BudgetVec, ChannelLayout};
+use triergon_codec::{BudgetVec, ChannelLayout, native_order, vorbis_order};
 use triergon_framing::opus::OpusHead;
 
 /// No stream feeds this channel: it is silent.
