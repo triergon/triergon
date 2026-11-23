@@ -6,12 +6,10 @@
 //! the existing real-scope observer; it can never select an empty fallback.
 use crate::compat::pes::observer::SourceContext;
 use crate::pes::START_CODE_PREFIX;
-use crate::psi::{PatReader, PatSection, Section, SectionAssembler, TableStep};
+use crate::psi::{PatReader, Section, SectionAssembler, TableStep};
 use crate::stream::entity::{ObservedTrace, TraceOrigin};
-use crate::stream::{CompactTraceEvent, FaultKind, MediaEntityEnd, TraceEvent, TraceFault};
-use crate::transport::{
-    NullCarrierRun, TransportInspection, TransportInspector, TransportPacket, pid,
-};
+use crate::stream::{FaultKind, MediaEntityEnd, TraceEvent};
+use crate::transport::{TransportInspection, TransportInspector, TransportPacket, pid};
 use crate::{AssemblyStep, PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -19,76 +17,12 @@ use triergon_core::{
     WorkBudget,
 };
 
-/// How [`PacketCompletion`] classified one physical carrier.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ControlCarrierKind {
-    /// A carrier on the PAT PID 0x0000.
-    PatPid,
-    /// A carrier on a PMT PID that a PAT declared; its sections must be valid PMTs of that program.
-    PmtSection {
-        /// Index into [`PacketCompletion::raw_pat_facts`] of the PAT that declared the PID.
-        association: usize,
-    },
-    /// A null packet without a unit start.
-    NullPid,
-    /// A carrier without payload.
-    NoPayload,
-    /// A payload carrier of any other kind; it needs a scoped packet observer and prevents a
-    /// no-media confirmation.
-    RequiresScopedPacketObserver,
-}
-/// One physical carrier admitted by [`PacketCompletion`], with its classification.
+/// One physical carrier admitted by [`PacketCompletion`]: the PSI sections it carries are
+/// checked against its bytes.
 #[derive(Debug)]
-pub struct PhysicalCarrier {
+struct PhysicalCarrier {
     packet: TransportPacket,
     context: SourceContext,
-    kind: ControlCarrierKind,
-}
-impl PhysicalCarrier {
-    /// The original carrier, including the physical offset, header and charged payload.
-    pub fn packet(&self) -> &TransportPacket {
-        &self.packet
-    }
-    /// The source event ordinal and epochs attached to this carrier.
-    pub fn context(&self) -> SourceContext {
-        self.context
-    }
-    /// The control-only classification, or the requirement for a scoped media observer.
-    pub fn kind(&self) -> ControlCarrierKind {
-        self.kind
-    }
-}
-/// Physical carrier evidence compacted by the opt-in source poll.
-#[derive(Debug)]
-pub struct PhysicalNullRun {
-    run: NullCarrierRun,
-    first_context: SourceContext,
-}
-impl PhysicalNullRun {
-    /// A compact range of consecutive null carriers with the original width and backing.
-    pub fn run(&self) -> &NullCarrierRun {
-        &self.run
-    }
-    /// The source context of the run's first carrier.
-    pub fn first_context(&self) -> SourceContext {
-        self.first_context
-    }
-}
-/// One PAT section admitted by [`PacketCompletion`]; a raw fact, not an accepted table.
-#[derive(Debug)]
-pub struct ControlPatFact {
-    section: PatSection,
-    context: SourceContext,
-}
-impl ControlPatFact {
-    /// The CRC-validated PAT section and its ordered entries as admitted from the source.
-    pub fn section(&self) -> &PatSection {
-        &self.section
-    }
-    /// The source event ordinal and epochs at publication of this PAT section.
-    pub fn context(&self) -> SourceContext {
-        self.context
-    }
 }
 #[derive(Debug)]
 struct ControlRoute {
@@ -106,8 +40,6 @@ pub struct NoMediaConfirmation {
     source: SourceId,
     source_bytes: u64,
     physical_carriers: usize,
-    pat_facts: usize,
-    pmt_sections: usize,
     source_finished: SourceContext,
 }
 impl NoMediaConfirmation {
@@ -122,14 +54,6 @@ impl NoMediaConfirmation {
     /// Number of physical carriers, null runs counted per carrier.
     pub fn physical_carriers(self) -> usize {
         self.physical_carriers
-    }
-    /// Number of PAT sections admitted.
-    pub fn pat_facts(self) -> usize {
-        self.pat_facts
-    }
-    /// Number of PMT sections assembled on the PAT's PMT PIDs.
-    pub fn pmt_sections(self) -> usize {
-        self.pmt_sections
     }
     /// Event ordinal and epochs at the parser's confirmed logical EOF.
     pub fn source_finished(self) -> SourceContext {
@@ -149,11 +73,10 @@ pub struct PacketCompletion {
     next_offset: u64,
     last_context: Option<SourceContext>,
     carriers: BudgetVec<PhysicalCarrier>,
-    null_runs: BudgetVec<PhysicalNullRun>,
-    compact_carrier_count: usize,
-    pats: BudgetVec<ControlPatFact>,
+    /// PAT sections admitted; a route's association is the count when its PAT arrived.
+    pat_facts: usize,
     routes: BudgetVec<ControlRoute>,
-    diagnostics: BudgetVec<(TraceFault, SourceContext)>,
+    diagnostics: usize,
     no_media_blocker: Option<Error>,
     fault: Option<Error>,
     physical_end: Option<MediaEntityEnd>,
@@ -180,11 +103,9 @@ impl PacketCompletion {
         limits.validate()?;
         Ok(Self {
             carriers: BudgetVec::new(&budget),
-            null_runs: BudgetVec::new(&budget),
-            compact_carrier_count: 0,
-            pats: BudgetVec::new(&budget),
+            pat_facts: 0,
             routes: BudgetVec::new(&budget),
-            diagnostics: BudgetVec::new(&budget),
+            diagnostics: 0,
             budget,
             limits,
             program,
@@ -201,27 +122,6 @@ impl PacketCompletion {
             pat_pid_seen: false,
         })
     }
-    /// Individually admitted carriers. With compact polling, merge these
-    /// with physical_null_runs by source offset for the complete evidence.
-    pub fn physical_carriers(&self) -> &[PhysicalCarrier] {
-        self.carriers.as_slice()
-    }
-    /// Null carrier runs admitted compactly, in source order.
-    pub fn physical_null_runs(&self) -> &[PhysicalNullRun] {
-        self.null_runs.as_slice()
-    }
-    /// Number of physical carriers admitted, individually and within null runs.
-    fn physical_carrier_count(&self) -> usize {
-        self.carriers.len() + self.compact_carrier_count
-    }
-    /// Every PAT section admitted, in source order.
-    pub fn raw_pat_facts(&self) -> &[ControlPatFact] {
-        self.pats.as_slice()
-    }
-    /// The source faults observed, with their contexts, in source order.
-    pub fn source_diagnostics(&self) -> &[(TraceFault, SourceContext)] {
-        self.diagnostics.as_slice()
-    }
     #[cfg(test)]
     fn confirmation(&self) -> Option<NoMediaConfirmation> {
         self.confirmation
@@ -237,10 +137,6 @@ impl PacketCompletion {
         let mut value = Self::new(budget, limits, program)?;
         value.format = format;
         Ok(value)
-    }
-    /// The error that stopped the completion; every later call returns it.
-    pub fn fault(&self) -> Option<Error> {
-        self.fault
     }
     #[cfg(test)]
     fn empty_refusal(&self) -> Option<Error> {
@@ -305,7 +201,7 @@ impl PacketCompletion {
                 "packet completion transport after physical End",
             ));
         }
-        if self.physical_carrier_count() >= self.limits.source_spans {
+        if self.carriers.len() >= self.limits.source_spans {
             return Err(Error::Unsupported(
                 "packet completion physical-carrier limit",
             ));
@@ -369,7 +265,10 @@ impl PacketCompletion {
             .source_offset
             .checked_add(self.format.bytes() as u64)
             .ok_or(Error::Overflow)?;
-        let kind = if actual.pid == pid::PAT {
+        // PAT, null and no-payload carriers are control traffic; a PMT PID's carriers must
+        // assemble into that program's PMT sections; any other payload needs a scoped media
+        // observer and prevents a no-media confirmation.
+        if actual.pid == pid::PAT {
             self.pat_pid_seen = true;
             // A PES start at the control payload start is not silently ignored.
             if actual.payload_unit_start
@@ -382,11 +281,10 @@ impl PacketCompletion {
                     "packet completion ambiguous PES start on PAT PID",
                 ));
             }
-            ControlCarrierKind::PatPid
-        } else if actual.pid == pid::NULL && !actual.payload_unit_start {
-            ControlCarrierKind::NullPid
-        } else if actual.payload.is_none() {
-            ControlCarrierKind::NoPayload
+        } else if actual.payload.is_none()
+            || (actual.pid == pid::NULL && !actual.payload_unit_start)
+        {
+            // Null and no-payload carriers.
         } else if let Some(index) = self
             .routes
             .as_slice()
@@ -444,20 +342,15 @@ impl PacketCompletion {
                     }
                 }
             }
-            ControlCarrierKind::PmtSection {
-                association: route.association,
-            }
         } else {
             self.block_empty(Error::Unsupported(
                 "packet completion physical payload needs validated PES observer",
             ));
-            ControlCarrierKind::RequiresScopedPacketObserver
-        };
+        }
         self.carriers
             .try_push(PhysicalCarrier {
                 packet: actual,
                 context,
-                kind,
             })
             .map_err(|e| e.error)?;
         Ok(())
@@ -531,7 +424,7 @@ impl PacketCompletion {
             return Ok(());
         }
         self.literal_section(section, context)?;
-        if self.pats.len() >= self.limits.source_spans {
+        if self.pat_facts >= self.limits.source_spans {
             return Err(Error::Unsupported("packet completion PAT-fact limit"));
         }
         let mut reader = PatReader::new(section, &self.budget, self.limits)?;
@@ -540,7 +433,7 @@ impl PacketCompletion {
                 "packet completion reserved PAT work exhausted",
             ));
         };
-        let association = self.pats.len();
+        let association = self.pat_facts;
         for entry in decoded.programs.as_slice() {
             check_cancel(cancel)?;
             if entry.is_network_pid() {
@@ -577,14 +470,9 @@ impl PacketCompletion {
                     .map_err(|e| e.error)?;
             }
         }
-        // current_next/section numbers are retained literally; this is a raw
-        // association fact, including inactive/incomplete tables, never a scope.
-        self.pats
-            .try_push(ControlPatFact {
-                section: decoded,
-                context,
-            })
-            .map_err(|e| e.error)?;
+        // An inactive or incomplete PAT associates its PMT PIDs too: a raw association
+        // fact, never a scope.
+        self.pat_facts += 1;
         Ok(())
     }
     fn observe_inner(
@@ -619,7 +507,7 @@ impl PacketCompletion {
                         ));
                     }
                 }
-                if self.diagnostics.len() >= self.limits.source_spans {
+                if self.diagnostics >= self.limits.source_spans {
                     return Err(Error::Unsupported("packet completion diagnostic limit"));
                 }
                 if fault.kind != FaultKind::Psi && fault.kind != FaultKind::Continuity {
@@ -627,9 +515,7 @@ impl PacketCompletion {
                         "packet completion source failure/transport/media uncertainty",
                     ));
                 }
-                self.diagnostics
-                    .try_push((fault.clone(), context))
-                    .map_err(|e| e.error)?;
+                self.diagnostics += 1;
             }
             TraceEvent::Discontinuity { .. } => {
                 return Err(Error::Unsupported(
@@ -695,30 +581,6 @@ impl PacketCompletion {
         Ok(consumed)
     }
 
-    /// Admit one source-bound event or compact null run. The work and extent limits
-    /// count each carrier. Source identity, cancellation and admission rules are those
-    /// of [`Self::observe_issued`].
-    pub fn observe_compact(
-        &mut self,
-        event: &ObservedTrace<CompactTraceEvent>,
-        context: SourceContext,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<bool> {
-        check_cancel(cancel)?;
-        self.check_origin(&event.origin, context)?;
-        let consumed = match &event.event {
-            CompactTraceEvent::Event(trace) => {
-                self.observe(trace, event.origin.source, context, work, cancel)?
-            }
-            CompactTraceEvent::NullRun(run) => self.observe_null_run(run, context, work, cancel)?,
-        };
-        if consumed && self.origin.is_none() {
-            self.origin = Some(event.origin.clone());
-        }
-        Ok(consumed)
-    }
-
     // Errors after admission are sticky. An exhausted grant leaves the event pending.
     fn observe(
         &mut self,
@@ -743,76 +605,6 @@ impl PacketCompletion {
                 Err(e)
             }
         }
-    }
-    /// Admit one sealed run at its first literal source-event ordinal. The
-    /// capacity limit still counts physical carriers, even in the compact view.
-    fn observe_null_run(
-        &mut self,
-        run: &NullCarrierRun,
-        context: SourceContext,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<bool> {
-        check_cancel(cancel)?;
-        if let Some(error) = self.fault {
-            return Err(error);
-        }
-        if !work.try_charge(1) {
-            return Ok(false);
-        }
-        let result = self.admit_null_run(run, context);
-        if let Err(error) = result {
-            self.fault = Some(error);
-            return Err(error);
-        }
-        Ok(true)
-    }
-    fn admit_null_run(&mut self, run: &NullCarrierRun, context: SourceContext) -> Result<()> {
-        let location = run.start();
-        self.check_context(location.source, context)?;
-        if !run.bytes().belongs_to(&self.budget) {
-            return Err(Error::ForeignPool);
-        }
-        if run.format() != self.format || self.physical_end.is_some() {
-            return Err(Error::Invalid("packet completion null run format or End"));
-        }
-        if run.len() > self.limits.source_spans - self.physical_carrier_count() {
-            return Err(Error::Unsupported(
-                "packet completion physical-carrier limit",
-            ));
-        }
-        if location.offset < self.next_offset {
-            return Err(Error::Invalid(
-                "packet completion duplicate/reversed physical carrier",
-            ));
-        }
-        let end = location
-            .offset
-            .checked_add(run.bytes().len() as u64)
-            .ok_or(Error::Overflow)?;
-        let last_ordinal = context
-            .source_event_ordinal
-            .checked_add((run.len() - 1) as u64)
-            .ok_or(Error::Overflow)?;
-        self.null_runs
-            .try_push(PhysicalNullRun {
-                run: run.clone(),
-                first_context: context,
-            })
-            .map_err(|failure| failure.error)?;
-        if location.offset != self.next_offset {
-            self.block_empty(Error::Unsupported(
-                "packet completion physical coverage gap/order",
-            ));
-        }
-        self.source = Some(location.source);
-        self.next_offset = end;
-        self.last_context = Some(SourceContext {
-            source_event_ordinal: last_ordinal,
-            ..context
-        });
-        self.compact_carrier_count += run.len();
-        Ok(())
     }
     /// Work units that [`seal_physical_end`](Self::seal_physical_end) and
     /// [`confirm_no_media`](Self::confirm_no_media) each charge.
@@ -970,11 +762,7 @@ impl PacketCompletion {
         let confirmation = NoMediaConfirmation {
             source: end.location.source,
             source_bytes: end.location.offset,
-            physical_carriers: self.physical_carrier_count(),
-            pat_facts: self.pats.len(),
-            pmt_sections: self.routes.as_slice().iter().try_fold(0usize, |n, r| {
-                n.checked_add(r.sections).ok_or(Error::Overflow)
-            })?,
+            physical_carriers: self.carriers.len(),
             source_finished: self
                 .source_finished
                 .ok_or(Error::Invalid("packet completion lost Finished"))?,

@@ -565,36 +565,20 @@ fn plain_catalogue_rejects_m2ts_end_witness() {
     assert!(!v.is_ended());
 }
 #[test]
-fn explicit_packet_format_charges_physical_192_and_retains_prefix() {
-    let b = Budget::new(8 * 1024 * 1024).unwrap();
-    let run = parsed(M2TS, &b, PacketFormat::M2ts192, 7);
-    let (e, c) = &run.events[0];
-    let mut v =
-        PacketCompletion::new_for_format(b, ParseLimits::default(), 1, PacketFormat::M2ts192)
-            .unwrap();
-    let n = v.required_work(e.event()).unwrap();
-    assert_eq!(n, 192 * 512 + 16384);
-    assert!(
-        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
-            .unwrap()
-    );
-    assert_eq!(
-        v.physical_carriers()[0].packet().source.as_ref(),
-        &M2TS[..192]
-    );
-}
-#[test]
 fn old_packet_completion_rejects_192_carrier() {
     let b = Budget::new(8 * 1024 * 1024).unwrap();
     let run = parsed(M2TS, &b, PacketFormat::M2ts192, 7);
     let (e, c) = &run.events[0];
     let mut v = PacketCompletion::new(b, ParseLimits::default(), 1).unwrap();
     let n = v.required_work(e.event()).unwrap();
-    assert!(
-        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
-            .is_err()
+    let refusal = v
+        .observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
+        .unwrap_err();
+    // The refusal stops the completion: the carrier is not admitted on a retry.
+    assert_eq!(
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false)),
+        Err(refusal)
     );
-    assert!(v.physical_carriers().is_empty());
 }
 #[test]
 fn work_pressure_and_cancel_leave_carrier_retryable() {
@@ -611,8 +595,6 @@ fn work_pressure_and_cancel_leave_carrier_retryable() {
             !v.observe_issued(e, *c, &mut WorkBudget::new(grant), &cancel)
                 .unwrap()
         );
-        assert!(v.physical_carriers().is_empty());
-        assert!(v.fault().is_none());
     }
     cancel.store(true, Ordering::Relaxed);
     assert_eq!(
@@ -620,6 +602,7 @@ fn work_pressure_and_cancel_leave_carrier_retryable() {
         Err(Error::Cancelled)
     );
     cancel.store(false, Ordering::Relaxed);
+    // Admitted once: a carrier kept by an earlier attempt would now be a duplicate.
     assert!(
         v.observe_issued(e, *c, &mut WorkBudget::new(n), &cancel)
             .unwrap()
@@ -643,31 +626,6 @@ fn foreign_pool_carrier_is_not_retained() {
         v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false)),
         Err(Error::ForeignPool)
     );
-    assert!(v.physical_carriers().is_empty());
-}
-#[test]
-fn caller_alias_keeps_full_charge_after_view_and_source_drop() {
-    let b = Budget::new(8 * 1024 * 1024).unwrap();
-    let baseline = b.used();
-    let run = parsed(M2TS, &b, PacketFormat::M2ts192, 7);
-    let (e, c) = &run.events[0];
-    let mut v = PacketCompletion::new_for_format(
-        b.clone(),
-        ParseLimits::default(),
-        1,
-        PacketFormat::M2ts192,
-    )
-    .unwrap();
-    let n = v.required_work(e.event()).unwrap();
-    v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
-        .unwrap();
-    let held = v.physical_carriers()[0].packet().source.clone();
-    drop(v);
-    drop(run);
-    assert!(b.used() >= baseline + held.retained_capacity());
-    assert_eq!(held.as_ref(), &M2TS[..192]);
-    drop(held);
-    assert_eq!(b.used(), baseline);
 }
 #[test]
 fn resource_pressure_drops_failed_growth_without_budget_escape() {
@@ -680,11 +638,13 @@ fn resource_pressure_drops_failed_growth_without_budget_escape() {
         PacketCompletion::new_for_format(b.clone(), ParseLimits::default(), 1, PacketFormat::Ts188)
             .unwrap();
     let n = v.required_work(e.event()).unwrap();
-    assert!(
-        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
-            .is_err()
+    let refusal = v
+        .observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false))
+        .unwrap_err();
+    assert_eq!(
+        v.observe_issued(e, *c, &mut WorkBudget::new(n), &AtomicBool::new(false)),
+        Err(refusal)
     );
-    assert!(v.fault().is_some());
     drop(v);
     drop(held);
     drop(run);

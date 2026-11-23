@@ -40,13 +40,7 @@ pub(crate) mod observer;
 pub use clock::{
     ClockOrigin, DemuxClock, DemuxTimeView, DiagnosticTimeView, EncodedTimeView, TimestampOrigin,
 };
-/// Control-only completion from complete physical carrier coverage and
-/// actual source EOF. The confirmation never creates a validated PES scope
-/// or accepts media from a rejected carrier.
-pub use completion::{
-    ControlCarrierKind, ControlPatFact, NoMediaConfirmation, PacketCompletion, PhysicalCarrier,
-    PhysicalNullRun,
-};
+pub use completion::{NoMediaConfirmation, PacketCompletion};
 pub use cutter::{CutPes, PesCutter, pcr_bounded_pts};
 pub use fault::{
     MalformedInputCompletion, MalformedInputFact, MalformedInputKind, MalformedSourceDisposition,

@@ -125,165 +125,16 @@ fn finish(
     let work = v.required_end_work()?;
     v.confirm_no_media(input, &mut WorkBudget::new(work), &AtomicBool::new(false))
 }
+/// PMT sections assembled on the PAT's PMT PIDs.
+fn pmt_sections(v: &PacketCompletion) -> usize {
+    v.routes.as_slice().iter().map(|route| route.sections).sum()
+}
 fn first(run: &Run) -> (&TransportPacket, SourceContext) {
     match &run.items[0] {
         Item::Event(TraceEvent::Transport(p), c, _) => (p, *c),
         _ => panic!("first carrier fixture"),
     }
 }
-#[test]
-fn compact_null_runs_keep_physical_bytes_order_and_completion() {
-    use crate::stream::CompactTraceEvent;
-
-    let mut data = BAD_CRC.to_vec();
-    for cc in 0..19 {
-        let mut carrier = [cc; 188];
-        carrier[..6].copy_from_slice(&[0x47, 0x1f, 0xff, 0x30 | (cc & 15), 1, 0]);
-        data.extend(carrier);
-    }
-
-    for window in [97, 1013, 4096] {
-        let budget = Budget::new(8 * 1024 * 1024).unwrap();
-        let literal = source(&data, &budget);
-        let mut expected = literal.items.iter().filter_map(|item| match item {
-            Item::Event(TraceEvent::Transport(packet), context, _) => Some((packet, context)),
-            _ => None,
-        });
-        let mut input = InputCursor::new(
-            &budget,
-            SourceId(1),
-            SourceCapabilities {
-                length: None,
-                random_access: false,
-            },
-            window,
-        )
-        .unwrap();
-        let mut stream = TransportStream::new(
-            budget.clone(),
-            PacketFormat::Ts188,
-            ParseLimits::default(),
-            1,
-        )
-        .unwrap();
-        let mut completion = view(&budget);
-        let cancel = AtomicBool::new(false);
-        let mut ordinal = 0;
-        for _ in 0..10_000 {
-            match stream
-                .poll_compact_observed(&mut input, &mut WorkBudget::new(4096), &cancel)
-                .unwrap()
-            {
-                Step::Ready(observed) => match observed.event() {
-                    CompactTraceEvent::Event(event) => {
-                        let context = SourceContext {
-                            source_event_ordinal: ordinal,
-                            epochs: stream.source_epochs(),
-                            byte_run_epoch: None,
-                        };
-                        ordinal += 1;
-                        if let TraceEvent::Transport(packet) = event {
-                            let (want, want_context) = expected.next().unwrap();
-                            assert_eq!(
-                                (packet.source_offset, packet.source.as_ref(), &context),
-                                (want.source_offset, want.source.as_ref(), want_context)
-                            );
-                        }
-                        let done = matches!(event, TraceEvent::Finished);
-                        let work = completion.required_work(event).unwrap();
-                        assert!(
-                            completion
-                                .observe_compact(
-                                    &observed,
-                                    context,
-                                    &mut WorkBudget::new(work),
-                                    &cancel
-                                )
-                                .unwrap()
-                        );
-                        if done {
-                            break;
-                        }
-                    }
-                    CompactTraceEvent::NullRun(run) => {
-                        let context = SourceContext {
-                            source_event_ordinal: ordinal,
-                            epochs: stream.source_epochs(),
-                            byte_run_epoch: None,
-                        };
-                        assert!(
-                            !completion
-                                .observe_compact(
-                                    &observed,
-                                    context,
-                                    &mut WorkBudget::new(0),
-                                    &cancel
-                                )
-                                .unwrap()
-                        );
-                        assert!(
-                            completion
-                                .observe_compact(
-                                    &observed,
-                                    context,
-                                    &mut WorkBudget::new(1),
-                                    &cancel
-                                )
-                                .unwrap()
-                        );
-                        for index in 0..run.len() {
-                            let packet = run.packet(index).unwrap();
-                            let (want, want_context) = expected.next().unwrap();
-                            assert_eq!(
-                                (
-                                    packet.source_offset,
-                                    packet.source.as_ref(),
-                                    packet.source_id
-                                ),
-                                (want.source_offset, want.source.as_ref(), want.source_id)
-                            );
-                            assert_eq!(want_context.source_event_ordinal, ordinal);
-                            ordinal += 1;
-                        }
-                    }
-                },
-                Step::NeedInput(r) => {
-                    let at = r.offset as usize;
-                    if at == data.len() {
-                        input.finish(r.source, r.token).unwrap();
-                    } else {
-                        let end = data.len().min(at + r.maximum);
-                        input
-                            .provide_owned(
-                                InputWindow::new(
-                                    r.source,
-                                    r.token,
-                                    r.offset,
-                                    Bytes::copy_from_slice(&budget, &data[at..end]).unwrap(),
-                                )
-                                .unwrap(),
-                            )
-                            .unwrap();
-                    }
-                }
-                Step::End(_) => {
-                    let end = stream
-                        .media_entity_end(&mut input, &mut WorkBudget::new(1), &cancel)
-                        .unwrap()
-                        .unwrap();
-                    assert!(feed(&mut completion, &Item::End(end), &mut input).unwrap());
-                    stream.end_of_source().unwrap();
-                }
-                Step::Yield => {}
-            }
-        }
-        let confirmation = finish(&mut completion, &mut input).unwrap().unwrap();
-        assert!(expected.next().is_none());
-        assert_eq!(confirmation.physical_carriers(), data.len() / 188);
-        assert_eq!(completion.physical_null_runs().is_empty(), window < 188);
-    }
-}
-
 #[test]
 fn control_completion_requires_the_same_cursor_and_parser_at_end() {
     let budget = Budget::new(8 * 1024 * 1024).unwrap();
@@ -398,15 +249,11 @@ fn original_control_only_bytes_complete_without_a_pes_scope() {
         let confirmation = finish(&mut v, &mut run.input).unwrap().unwrap();
         assert_eq!(confirmation.source_bytes(), data.len() as u64);
         assert_eq!(confirmation.physical_carriers(), data.len() / 188);
-        for evidence in v.physical_carriers() {
-            let p = evidence.packet();
+        for evidence in v.carriers.as_slice() {
+            let p = &evidence.packet;
             assert_eq!(
                 p.source.as_ref(),
                 &data[p.source_offset as usize..p.source_offset as usize + 188]
-            );
-            assert_ne!(
-                evidence.kind(),
-                ControlCarrierKind::RequiresScopedPacketObserver
             );
         }
     }
@@ -424,22 +271,8 @@ fn atomic_pat_sections_prove_control_only_without_creating_a_scope() {
     all(&mut completion, &mut run).unwrap();
     let confirmation = finish(&mut completion, &mut run.input).unwrap().unwrap();
     assert_eq!(confirmation.physical_carriers(), 3);
-    assert_eq!(confirmation.pat_facts(), 2);
-    assert_eq!(confirmation.pmt_sections(), 1);
-    assert_eq!(
-        completion.raw_pat_facts()[0]
-            .section()
-            .header
-            .section_number,
-        0
-    );
-    assert_eq!(
-        completion.raw_pat_facts()[1]
-            .section()
-            .header
-            .section_number,
-        1
-    );
+    assert_eq!(completion.pat_facts, 2);
+    assert_eq!(pmt_sections(&completion), 1);
 }
 
 #[test]
@@ -469,8 +302,8 @@ fn pmt_version_wrap_and_retyping_are_control_facts_without_media() {
     all(&mut completion, &mut run).unwrap();
     let confirmation = finish(&mut completion, &mut run.input).unwrap().unwrap();
     assert_eq!(confirmation.physical_carriers(), 3);
-    assert_eq!(confirmation.pmt_sections(), 2);
-    assert!(completion.source_diagnostics().is_empty());
+    assert_eq!(pmt_sections(&completion), 2);
+    assert_eq!(completion.diagnostics, 0);
 }
 
 #[test]
@@ -485,12 +318,12 @@ fn opaque_pmt_descriptors_remain_original_control_bytes() {
     all(&mut completion, &mut run).unwrap();
     let confirmation = finish(&mut completion, &mut run.input).unwrap().unwrap();
     assert_eq!(confirmation.physical_carriers(), 2);
-    assert_eq!(confirmation.pmt_sections(), 1);
+    assert_eq!(pmt_sections(&completion), 1);
     assert_eq!(
-        completion.physical_carriers()[1].packet().source.as_ref(),
+        completion.carriers.as_slice()[1].packet.source.as_ref(),
         &data[188..]
     );
-    assert!(completion.source_diagnostics().is_empty());
+    assert_eq!(completion.diagnostics, 0);
 }
 
 #[test]
@@ -549,7 +382,7 @@ fn storage_pressure_cannot_become_a_no_media_confirmation() {
     ));
     assert!(completion.confirmation().is_none());
     drop(pressure);
-    assert!(completion.fault().is_some());
+    assert!(completion.fault.is_some());
     assert!(
         completion
             .observe(
@@ -571,15 +404,10 @@ fn inactive_pat_association_stays_inactive_and_raw() {
     let mut v = view(&b);
     all(&mut v, &mut run).unwrap();
     finish(&mut v, &mut run.input).unwrap().unwrap();
-    assert!(!v.raw_pat_facts()[0].section().header.current_next);
-    assert_eq!(
-        v.physical_carriers()[1].kind(),
-        ControlCarrierKind::PmtSection { association: 0 }
-    );
-    assert_eq!(
-        v.raw_pat_facts()[0].section().source.as_ref(),
-        &INACTIVE[172..188]
-    );
+    // The PAT is not current, and its PMT PID still has a route from it.
+    assert_eq!(v.pat_facts, 1);
+    assert_eq!(v.routes.as_slice()[0].association, 0);
+    assert_eq!(pmt_sections(&v), 1);
 }
 #[test]
 fn zero_event_work_is_unconsumed_and_retryable() {
@@ -599,7 +427,7 @@ fn zero_event_work_is_unconsumed_and_retryable() {
         )
         .unwrap()
     );
-    assert!(v.physical_carriers().is_empty());
+    assert!(v.carriers.is_empty());
     let cost = v.required_work(e).unwrap();
     assert!(
         v.observe(
@@ -632,7 +460,7 @@ fn cancellation_before_event_cannot_allocate_or_consume() {
         Err(Error::Cancelled)
     );
     assert_eq!(b.used(), before);
-    assert!(v.physical_carriers().is_empty());
+    assert!(v.carriers.is_empty());
 }
 #[test]
 fn foreign_pool_carrier_cannot_be_a_source_witness() {
@@ -699,7 +527,7 @@ fn repeated_source_ordinal_is_sticky() {
     let mut v = view(&b);
     feed(&mut v, &run.items[0], &mut run.input).unwrap();
     assert!(feed(&mut v, &run.items[0], &mut run.input).is_err());
-    assert!(v.fault().is_some());
+    assert!(v.fault.is_some());
 }
 #[test]
 fn foreign_entity_is_not_the_original_source() {
@@ -1288,7 +1116,7 @@ fn changed_prefix_cannot_replace_original_physical_source() {
             )
             .is_err()
     );
-    assert!(completion.physical_carriers().is_empty());
+    assert!(completion.carriers.is_empty());
 }
 
 #[test]
@@ -1321,4 +1149,62 @@ fn rejected_carrier_from_foreign_pool_cannot_escape_backing() {
         ),
         Err(Error::ForeignPool)
     );
+}
+
+const M2TS: &[u8] = include_bytes!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/data/m2ts192-opaque-prefix.m2ts"
+));
+
+/// The first M2TS carrier of `data` observed by a fresh M2TS completion.
+fn observe_first_m2ts(budget: &Budget, run: &Run) -> PacketCompletion {
+    let mut v = PacketCompletion::new_for_format(
+        budget.clone(),
+        ParseLimits::default(),
+        1,
+        PacketFormat::M2ts192,
+    )
+    .unwrap();
+    let Item::Event(e, c, origin) = &run.items[0] else {
+        panic!("first carrier fixture");
+    };
+    let n = v.required_work(e).unwrap();
+    assert_eq!(n, 192 * 512 + 16384);
+    assert!(
+        v.observe_traced(
+            e,
+            origin,
+            *c,
+            &mut WorkBudget::new(n),
+            &AtomicBool::new(false)
+        )
+        .unwrap()
+    );
+    v
+}
+
+#[test]
+fn explicit_packet_format_charges_physical_192_and_retains_prefix() {
+    let b = Budget::new(8 * 1024 * 1024).unwrap();
+    let run = source_in_format(M2TS, &b, PacketFormat::M2ts192);
+    let v = observe_first_m2ts(&b, &run);
+    assert_eq!(
+        v.carriers.as_slice()[0].packet.source.as_ref(),
+        &M2TS[..192]
+    );
+}
+
+#[test]
+fn caller_alias_keeps_full_charge_after_view_and_source_drop() {
+    let b = Budget::new(8 * 1024 * 1024).unwrap();
+    let baseline = b.used();
+    let run = source_in_format(M2TS, &b, PacketFormat::M2ts192);
+    let v = observe_first_m2ts(&b, &run);
+    let held = v.carriers.as_slice()[0].packet.source.clone();
+    drop(v);
+    drop(run);
+    assert!(b.used() >= baseline + held.retained_capacity());
+    assert_eq!(held.as_ref(), &M2TS[..192]);
+    drop(held);
+    assert_eq!(b.used(), baseline);
 }
