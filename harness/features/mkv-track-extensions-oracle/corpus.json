@@ -38,7 +38,7 @@
         "source"
       ],
       "expected": {
-        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+        "trace_sha256": "a4c2210428499d3975ab4160b269a8fc9e06fc7cc493b0b901f2fe9e0e431443"
       }
     },
     {

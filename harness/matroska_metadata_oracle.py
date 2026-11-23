@@ -150,8 +150,6 @@ def extension_rows(data, tracks):
         for mapping_index, mapping in enumerate(matching(data, entry, 0x41E4)):
             value = field(data, mapping, 0x41F0)
             value_num = number(data, mapping, 0x41F0, 0)
-            if value is not None and value_num < 2:
-                raise ValueError("BlockAddIDValue below two")
             kind = field(data, mapping, 0x41E7)
             kind_num = number(data, mapping, 0x41E7, 0)
             raw = data[mapping[1]:mapping[3]]
@@ -175,13 +173,10 @@ def extensions(path, mode):
         raise ValueError("expected source view")
     data, _, roots = segment(path)
     tracks = next(doc for doc in roots if doc[0] == 0x1654AE6B)
-    # The track extension job must finish before the candidate emits the track row.
-    try:
-        return list(extension_rows(data, tracks))
-    except ValueError as error:
-        if str(error) == "BlockAddIDValue below two":
-            return ["8"]
-        raise
+    # A mapping is reported as written: RFC 9559 section 5.1.4.1.17.1 gives
+    # BlockAddIDValue the range 2 and above, and a smaller value describes no
+    # BlockAddID, but no rule tells a reader to refuse the track for it.
+    return list(extension_rows(data, tracks))
 
 
 def codec_state(path):
