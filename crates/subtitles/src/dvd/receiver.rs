@@ -164,7 +164,10 @@ fn checked_canvas([width, height]: [i32; 2]) -> Result<[u32; 2]> {
 }
 
 /// The colour table of the first program chain of a DVD-Video title set IFO
-/// (`DVDVIDEO-VTS`), converted to RGB as the reference does.
+/// (`DVDVIDEO-VTS`), converted to RGB as the reference does. The program
+/// chain table's sector is turned into a byte offset in 32 bits, as the
+/// reference does: a sector of 2²¹ or more wraps to an offset in the file.
+/// `None` when the table or its colours lie past the end of the file.
 pub fn ifo_palette(ifo: &[u8]) -> Option<[u32; 16]> {
     if ifo.get(..12)? != b"DVDVIDEO-VTS" {
         return None;
@@ -174,7 +177,7 @@ pub fn ifo_palette(ifo: &[u8]) -> Option<[u32; 16]> {
             ifo.get(at..at.checked_add(4)?)?.try_into().ok()?,
         ))
     };
-    let table = usize::try_from(word(0xcc)?).ok()?.checked_mul(0x800)?;
+    let table = usize::try_from(word(0xcc)?.wrapping_mul(0x800)).ok()?;
     let first = table.checked_add(usize::try_from(word(table.checked_add(12)?)?).ok()?)?;
     let clut = ifo.get(first.checked_add(0xa4)?..first.checked_add(0xe4)?)?;
     let mut colours = [0; 16];

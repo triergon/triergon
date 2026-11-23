@@ -149,7 +149,9 @@ bytes are errors; nothing is replaced with U+FFFD.
 
 The [DVD gate](../../harness/features/subtitle-dvd/contract.json) compares the
 palette selected from the first program chain and the fallback used when its
-sector or table offset falls outside the IFO.
+sector or table offset falls outside the IFO; the sector's byte offset is
+computed in 32 bits, as the reference computes it, so a sector of 2²¹ or more
+wraps to an offset inside the file.
 The [DVD text-field comparison](../../harness/features/subtitle-dvd-host/contract.json)
 checks palette saturation, oversized canvas refusal and delay saturation. These
 fields have fixed 32-bit bounds across targets.

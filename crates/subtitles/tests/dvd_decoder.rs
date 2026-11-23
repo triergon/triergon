@@ -626,6 +626,26 @@ fn ifo_colour_tables_convert_with_nearest_rounding() {
 }
 
 #[test]
+fn an_ifo_table_sector_wraps_to_its_32_bit_byte_offset() {
+    // Sector 2^21 + 1 is byte 2^32 + 2048 in full, 2048 in 32 bits: the
+    // reference reads the table of sector 1 (case
+    // `vobsub-ifo-palette-sector-overflow`).
+    let mut ifo = vec![0; 4096];
+    ifo[..12].copy_from_slice(b"DVDVIDEO-VTS");
+    ifo[0xcc..0xd0].copy_from_slice(&0x0020_0001_u32.to_be_bytes());
+    ifo[0x80c..0x810].copy_from_slice(&16_u32.to_be_bytes());
+    let at = 0x810 + 0xa4;
+    ifo[at..at + 4].copy_from_slice(&[0, 200, 114, 128]);
+    assert_eq!(ifo_palette(&ifo).unwrap()[0], 0xc0e2d6);
+    // Sector 2^21 wraps to the start of the file, whose header then holds the
+    // table's fields.
+    ifo[0xcc..0xd0].copy_from_slice(&0x0020_0000_u32.to_be_bytes());
+    ifo[12..16].copy_from_slice(&0x40_u32.to_be_bytes());
+    ifo[0x40 + 0xa4..0x40 + 0xa8].copy_from_slice(&[0, 144, 125, 5]);
+    assert_eq!(ifo_palette(&ifo).unwrap()[0], 0x90c800);
+}
+
+#[test]
 fn work_is_charged_and_an_exhausted_budget_consumes_nothing() {
     let a = unit(
         &glyphs(16, 6, 1, 1),
