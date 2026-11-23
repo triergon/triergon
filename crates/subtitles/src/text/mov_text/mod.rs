@@ -308,13 +308,10 @@ impl Decoder {
     /// [`Status::OutputReady`]; `Error::Invalid` before then.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<Output> {
         cancelled(cancel)?;
-        if !self.job.as_ref().is_some_and(PacketJob::ready) {
-            return Err(Error::Invalid("native mov_text output not ready"));
+        match self.job.take_if(|job| job.ready()) {
+            Some(job) => job.take_output(self.options),
+            None => Err(Error::Invalid("native mov_text output not ready")),
         }
-        self.job
-            .take()
-            .ok_or(Error::Invalid("native mov_text missing job"))?
-            .take_output(self.options)
     }
     /// Ends input: once no packet is pending, [`poll`](Self::poll) returns
     /// [`Status::Finished`].
@@ -365,9 +362,7 @@ impl Funding {
                 maximum: self.maximum,
             });
         }
-        if !caller.try_charge(paid as u64) {
-            return Err(Error::Invalid("native mov_text funding"));
-        }
+        caller.take(paid as u64);
         self.spent = total;
         self.credit += paid;
         Ok(self.credit == cost)

@@ -59,7 +59,13 @@ enum Phase {
     Prefix,
     Render,
     Freeze,
-    Ready,
+    /// Ended: an empty sample, which gives no subtitle.
+    Empty,
+    /// Ended: refused. `true` when its text, or a font name it would write,
+    /// was refused: the call then still takes a read order.
+    Refused(bool),
+    /// Ended: the event is written.
+    Written,
 }
 /// The emission stages at a character where a style or the highlight starts or
 /// ends, in the order the reference writes them; each is one unit of work.
@@ -80,8 +86,6 @@ pub(super) struct PacketJob {
     input: Input,
     clock: Clock,
     phase: Phase,
-    refused: bool,
-    advance: bool,
     text_end: usize,
     visible_end: usize,
     at: usize,
@@ -105,8 +109,6 @@ impl PacketJob {
             input,
             clock,
             phase: Phase::Begin,
-            refused: false,
-            advance: false,
             text_end: 0,
             visible_end: 0,
             at: 0,
@@ -126,18 +128,16 @@ impl PacketJob {
         }
     }
     pub(super) fn ready(&self) -> bool {
-        matches!(self.phase, Phase::Ready)
+        matches!(
+            self.phase,
+            Phase::Empty | Phase::Refused(_) | Phase::Written
+        )
     }
     pub(super) fn advances_read_order(&self) -> bool {
-        self.advance
+        matches!(self.phase, Phase::Refused(true) | Phase::Written)
     }
     fn bytes(&self) -> &[u8] {
         self.input.payload.as_ref()
-    }
-    fn refuse(&mut self, advance: bool) {
-        self.refused = true;
-        self.advance = advance;
-        self.phase = Phase::Ready;
     }
     fn validation(&mut self) {
         self.at = 2;
@@ -162,25 +162,25 @@ impl PacketJob {
         loop {
             cancelled(cancel)?;
             match self.phase {
-                Phase::Ready => return Ok(true),
+                Phase::Empty | Phase::Refused(_) | Phase::Written => return Ok(true),
                 Phase::Begin => {
                     let size = self.bytes().len();
                     if !funding.pay(size.clamp(1, 2), caller)? {
                         return Ok(false);
                     }
                     if size == 0 {
-                        self.phase = Phase::Ready;
+                        self.phase = Phase::Empty;
                     } else if size < 2 {
-                        self.refuse(false);
+                        self.phase = Phase::Refused(false);
                     } else {
                         let length =
                             usize::from(u16::from_be_bytes([self.bytes()[0], self.bytes()[1]]));
                         if size == 2 {
-                            if length == 0 {
-                                self.phase = Phase::Ready;
+                            self.phase = if length == 0 {
+                                Phase::Empty
                             } else {
-                                self.refuse(false);
-                            }
+                                Phase::Refused(false)
+                            };
                         } else {
                             self.text_end = (length + 2).min(size);
                             self.at = self.text_end;
@@ -227,7 +227,7 @@ impl PacketJob {
                     };
                     if size < header as u64 {
                         funding.commit();
-                        self.refuse(false);
+                        self.phase = Phase::Refused(false);
                         continue;
                     }
                     if size > remaining as u64 {
@@ -357,10 +357,9 @@ impl PacketJob {
                     let visible = until_nul(text);
                     if is_valid_text(visible) {
                         self.visible_end = self.at + visible.len();
-                        self.advance = true;
                         self.phase = Phase::Prefix;
                     } else {
-                        self.refuse(true);
+                        self.phase = Phase::Refused(true);
                     }
                 }
                 Phase::Prefix => {
@@ -416,7 +415,7 @@ impl PacketJob {
                     if !self.writer.freeze(funding, caller)? {
                         return Ok(false);
                     }
-                    self.phase = Phase::Ready;
+                    self.phase = Phase::Written;
                 }
             }
         }
@@ -618,7 +617,7 @@ impl PacketJob {
             }
             if name.is_some_and(|name| !is_valid_text(name)) {
                 funding.commit();
-                self.refuse(true);
+                self.phase = Phase::Refused(true);
                 return Ok(true);
             }
             self.writer.push_parts(&parts, limits.maximum_ass_bytes)?;
@@ -665,20 +664,13 @@ impl PacketJob {
             }
         }
     }
-    /// The output: refused, or a subtitle once the text passed validation
-    /// (which takes a read order), or nothing for an empty sample.
+    /// The output: the subtitle of the written event, a refusal, or nothing
+    /// for an empty sample.
     pub(super) fn take_output(mut self, options: Options) -> Result<Output> {
-        let decoded = if self.refused {
-            Decoded::Refused
-        } else if self.advance {
-            let ass = self
-                .writer
-                .frozen
-                .take()
-                .ok_or(Error::Invalid("mov_text event not written"))?;
-            Decoded::Subtitle(Subtitle::at(ass, self.clock, options.packet_timebase)?)
-        } else {
-            Decoded::Nothing
+        let decoded = match self.writer.frozen.take() {
+            Some(ass) => Decoded::Subtitle(Subtitle::at(ass, self.clock, options.packet_timebase)?),
+            None if matches!(self.phase, Phase::Refused(_)) => Decoded::Refused,
+            None => Decoded::Nothing,
         };
         Ok(Output {
             input: self.input,
