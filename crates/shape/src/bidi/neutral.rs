@@ -49,8 +49,7 @@ const SHARED_SLOTS: usize = SHARED_ROW * (SHARED_DEPTHS - 1) + MAX_OPEN_BRACKETS
 struct Depth {
     /// How many opening brackets it holds.
     open: u8,
-    /// The level of the last character seen at this depth, `u8::MAX` where a
-    /// shallower character came after it.
+    /// The last level at this depth until a shallower character follows.
     level: u8,
     /// Where its stack starts in [`Storage::slots`], [`NONE`] until it is used.
     start: u32,
@@ -60,12 +59,22 @@ struct Depth {
 }
 
 impl Depth {
+    const NO_LEVEL: u8 = u8::MAX;
+
     const UNUSED: Self = Self {
         open: 0,
-        level: u8::MAX,
+        level: Self::NO_LEVEL,
         start: NONE,
         paragraph: 0,
     };
+
+    fn forget_level(&mut self) {
+        self.level = Self::NO_LEVEL;
+    }
+
+    fn has_level(&self) -> bool {
+        self.level != Self::NO_LEVEL
+    }
 }
 
 /// Storage for pairing brackets, kept between paragraphs.
@@ -226,14 +235,17 @@ fn pair(
         if last != Some((depth, levels[at].0)) {
             last = Some((depth, levels[at].0));
             for deeper in depth + 1..deepest.max(depth + 1) {
-                storage.depth(deeper).level = u8::MAX;
+                storage.depth(deeper).forget_level();
             }
             deepest = depth + 1;
             let state = storage.depth(depth);
             if state.level != levels[at].0 {
                 let closes_isolate = paragraph.classes[at] == BidiClass::Pdi
-                    && paragraph.partner.get(at).is_some_and(|&p| p != NONE);
-                if state.level != u8::MAX && !closes_isolate {
+                    && paragraph
+                        .partner
+                        .get(at)
+                        .is_some_and(|&p| p != NONE);
+                if state.has_level() && !closes_isolate {
                     state.open = 0;
                 }
                 state.level = levels[at].0;
