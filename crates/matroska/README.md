@@ -178,7 +178,9 @@ keyframes. The `SeekReceipt` reports `actual_ns`, `used_index`, `scanned_bytes`,
 with `missing timed audio duration` if a timed packet has no duration. After any failure
 or cancellation the caller must seek or `reset` before reading more packets.
 
-**Colour.** `Track::colour` keeps every source field: bit depth, both chroma and Cb
+**Colour.** The neutral `TrackInfo::colour` view reports which values came from
+the source and which are schema defaults. `Track::colour` keeps every source
+field: bit depth, both chroma and Cb
 subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
 exact `f64`. Zero-length numbers take the schema default. Values are reported as written:
 RFC 9559 gives chromaticity the range [0, 1] and luminance a lower bound of 0, but

@@ -6,13 +6,15 @@
 use crate::colour::{
     COLOUR, Colour,
     parse::{
-        CHROMA_SITING_HORZ, MATRIX_COEFFICIENTS, MAX_FALL, PRIMARIES, RANGE,
+        CHROMA_SITING_HORZ, CHROMA_SITING_VERT, MATRIX_COEFFICIENTS, MAX_FALL, PRIMARIES, RANGE,
         TRANSFER_CHARACTERISTICS,
     },
 };
+use crate::ebml::ChildCursor;
 use crate::packet::batch::TypedPacket as Packet;
 use crate::reader::{Event, Reader};
 use crate::seek::SeekReceipt as MatroskaSeek;
+use crate::step::ParseStep;
 use crate::track::{LegacyAacProfile, Track, parse::VIDEO};
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
@@ -138,52 +140,61 @@ fn codec_id(codec: &str) -> CodecId {
     }
 }
 
-/// Which Colour children (bit `id - 0x55B1`) the retained TrackEntry payload
-/// carries. Read on demand from the source bytes the track already keeps, so
-/// packet-path tracks carry no extra field. A malformed tail ends the walk.
-fn colour_presence(entry: &[u8]) -> u16 {
-    fn child(data: &[u8], id: u64) -> Option<&[u8]> {
-        let mut rest = data;
-        while !rest.is_empty() {
-            let head = crate::ebml::header(rest).ok()?;
-            let start = head.len;
-            let end = start.checked_add(usize::try_from(head.size?).ok()?)?;
-            if end > rest.len() {
-                return None;
-            }
-            if head.id == id {
-                return Some(&rest[start..end]);
-            }
-            rest = &rest[end..];
-        }
-        None
+#[derive(Clone, Copy, Default)]
+struct ColourPresence(u16);
+
+impl ColourPresence {
+    fn includes(self, id: u64) -> bool {
+        self.0 & (1 << (id - MATRIX_COEFFICIENTS)) != 0
     }
-    let Some(colour) = child(entry, VIDEO).and_then(|video| child(video, COLOUR)) else {
-        return 0;
-    };
-    (MATRIX_COEFFICIENTS..=MAX_FALL).fold(0, |present, id| {
-        present | (u16::from(child(colour, id).is_some()) << (id - MATRIX_COEFFICIENTS))
-    })
+
+    fn origin(self, id: u64) -> Origin {
+        if self.includes(id) {
+            Origin::Container
+        } else {
+            Origin::SpecificationDefault
+        }
+    }
+}
+
+/// Read Colour presence from the retained TrackEntry. Each child consumes at
+/// least one byte, so the retained length bounds the walk without another slot
+/// on every track.
+fn colour_presence(entry: &[u8]) -> ColourPresence {
+    fn children(bytes: &[u8]) -> impl Iterator<Item = (u64, &[u8])> {
+        let mut cursor = ChildCursor::new(0..bytes.len());
+        let mut work = WorkBudget::new(bytes.len() as u64);
+        let cancel = AtomicBool::new(false);
+        std::iter::from_fn(move || {
+            let Ok(ParseStep::Event(Some(child))) = cursor.step(bytes, &mut work, &cancel) else {
+                return None;
+            };
+            Some((child.id, &bytes[child.payload]))
+        })
+    }
+
+    let colour = children(entry)
+        .find(|&(id, _)| id == VIDEO)
+        .and_then(|(_, video)| children(video).find(|&(id, _)| id == COLOUR));
+    let mut present = ColourPresence::default();
+    if let Some((_, colour)) = colour {
+        for (id, _) in children(colour) {
+            if (MATRIX_COEFFICIENTS..=MAX_FALL).contains(&id) {
+                present.0 |= 1 << (id - MATRIX_COEFFICIENTS);
+            }
+        }
+    }
+    present
 }
 
 impl Colour {
-    /// The neutral H.273 description. `present` has bit `id - 0x55B1` set for
-    /// each Colour child the source carried; omitted fields carry the Matroska
-    /// schema default with [`Origin::SpecificationDefault`].
-    pub fn description(&self, present: u16) -> ColourDescription {
-        let origin = |id: u64| {
-            if present & (1 << (id - MATRIX_COEFFICIENTS)) != 0 {
-                Origin::Container
-            } else {
-                Origin::SpecificationDefault
-            }
-        };
+    fn description(&self, present: ColourPresence) -> ColourDescription {
         let range = match self.range {
             1 => ColourRange::Limited,
             2 => ColourRange::Full,
             _ => ColourRange::Unspecified,
         };
-        let siting = present & (0b11 << (CHROMA_SITING_HORZ - MATRIX_COEFFICIENTS)) != 0;
+        let siting = present.includes(CHROMA_SITING_HORZ) || present.includes(CHROMA_SITING_VERT);
         let mastering = self.mastering.and_then(|m| {
             let [rx, ry, gx, gy, bx, by, wx, wy] = m.chromaticity;
             Some(MasteringDisplay {
@@ -194,13 +205,16 @@ impl Colour {
             })
         });
         ColourDescription {
-            primaries: Sourced::new(self.primaries, origin(PRIMARIES)),
+            primaries: Sourced::new(self.primaries, present.origin(PRIMARIES)),
             transfer: Sourced::new(
                 self.transfer_characteristics,
-                origin(TRANSFER_CHARACTERISTICS),
+                present.origin(TRANSFER_CHARACTERISTICS),
             ),
-            matrix: Sourced::new(self.matrix_coefficients, origin(MATRIX_COEFFICIENTS)),
-            range: Sourced::new(range, origin(RANGE)),
+            matrix: Sourced::new(
+                self.matrix_coefficients,
+                present.origin(MATRIX_COEFFICIENTS),
+            ),
+            range: Sourced::new(range, present.origin(RANGE)),
             chroma_siting: siting.then_some(self.chroma_siting),
             mastering,
             content_light: self
