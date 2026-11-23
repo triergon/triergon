@@ -24,7 +24,7 @@ use triergon_mpegts::{AssemblyStep, ParseLimits, compat::pes::RegisteredCarriage
 use triergon_playback::{
     Source, SourceReply,
     compat::pes::Carriage,
-    pes_feed::{FeedPacket, FeedStep, TsEngine},
+    pes_feed::{FeedPacket, FeedStep, ProgressiveFeed},
 };
 
 const SOURCE: SourceId = SourceId(1);
@@ -586,12 +586,12 @@ fn progressive(input: InputCursor, read: &ReadBody<'_>, view: View, trace: bool)
 
 fn compact(input: InputCursor, read: &ReadBody<'_>, trace: bool) -> Result<Totals> {
     let pool = input.budget().clone();
-    let mut engine = TsEngine::progressive(input, ParseLimits::default())?;
+    let mut engine = ProgressiveFeed::new(input, ParseLimits::default())?;
     let (mut avc, mut aac) = (None, None);
     let (mut pictures, mut frames) = (BudgetVec::new(&pool), BudgetVec::new(&pool));
     loop {
         let mut work = WorkBudget::new(1 << 18);
-        match engine.poll_progressive_payload(&mut work, read.cancel)? {
+        match engine.poll(&mut work, read.cancel)? {
             FeedStep::Configuration(config) => match config.carriage {
                 Carriage::Registered(RegisteredCarriage::Avc) => {
                     avc = Some((

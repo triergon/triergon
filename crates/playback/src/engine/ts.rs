@@ -354,7 +354,40 @@ impl TsEngine {
         })
     }
 
+    /// The engine of a [`ProgressiveFeed`](crate::pes_feed::ProgressiveFeed), built
+    /// straight into it: [`Self::segment`] and a move into the feed doubled the
+    /// engine-sized temporaries of its caller (+0.66% of the instructions of a short
+    /// compact feed). Out of line, as `segment` is: inlined into the progressive
+    /// worker's operation it cost the reordered progressive input +0.074%.
+    #[inline(never)]
+    pub(crate) fn progressive(
+        input: InputCursor,
+        limits: ts::ParseLimits,
+    ) -> Result<crate::pes_feed::ProgressiveFeed> {
+        let namespace = DescriptorNamespace::Unspecified;
+        let stream = TransportStream::new_single_program_progressive_feed(
+            input.budget().clone(),
+            limits,
+            namespace,
+        )?;
+        let engine = Self::from_stream(
+            input,
+            ts::PacketFormat::Ts188,
+            limits,
+            SourceTimePolicy::Unanchored,
+            namespace,
+            stream,
+        )?;
+        Ok(crate::pes_feed::ProgressiveFeed(Self {
+            delivery: Delivery::Progressive,
+            ..engine
+        }))
+    }
+
     /// `delivery` is one of the modes that discover their tracks.
+    // Out of line, as it is with three callers: inlined into the segment feed's
+    // opener it cost HLS segments up to +0.157% of their instructions.
+    #[inline(never)]
     pub(crate) fn segment(
         input: InputCursor,
         limits: ts::ParseLimits,
@@ -384,49 +417,18 @@ impl TsEngine {
         })
     }
 
-    /// A progressive PES feed of a single-program TS188 source: the PES of the tracks
-    /// found in its PMT, those of a registered carriage (AVC, HEVC, AAC) as compact
-    /// payloads. Poll it with [`Self::poll_progressive_payload`].
-    pub fn progressive(input: InputCursor, limits: ts::ParseLimits) -> Result<Self> {
-        Self::segment(
-            input,
-            limits,
-            SourceTimePolicy::Unanchored,
-            DescriptorNamespace::Unspecified,
-            Delivery::Progressive,
-        )
-    }
-
-    /// The input cursor the feed reads.
-    #[inline]
-    pub fn input(&self) -> &InputCursor {
-        &self.input
-    }
-
     /// Hands a source reply to the input; true when it was accepted.
-    pub fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
+    pub(crate) fn provide(&mut self, reply: &SourceReply) -> Result<bool> {
         reply.provide_to(&mut self.input)
     }
 
-    /// The next step of a feed made by [`Self::progressive`].
-    pub fn poll_progressive_payload(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<FeedStep> {
-        if !self.delivery.is_progressive() {
-            return Err(Error::Invalid("compact TS payload selection required"));
-        }
-        self.poll::<FeedStep>(work, cancel)
-    }
-
     /// Source events the feed consumed without delivering since the last call.
-    pub fn take_suppressed_events(&mut self) -> u64 {
+    pub(crate) fn take_suppressed_events(&mut self) -> u64 {
         std::mem::take(&mut self.suppressed_events)
     }
 
     /// Hands a consumed PES's lists back to the observer of `pid` for its next PES.
-    pub fn reuse_pes_lists(&mut self, pid: u16, lists: feed::SpentLists) {
+    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: feed::SpentLists) {
         let Some(index) = self.pes_tracks.index(pid) else {
             return;
         };
@@ -656,7 +658,7 @@ impl TsEngine {
     }
 
     // One function on purpose: the measured per-carrier loop, compiled once for a
-    // player (`EngineStep`) and once for a progressive reader (`FeedStep`, in which
+    // player (`EngineStep`) and once for a `ProgressiveFeed` (`FeedStep`, in which
     // `T::PROGRESSIVE` folds the mode tests). Its rare parts are the cold functions
     // around it.
     pub(crate) fn poll<T: TsStepProjection>(

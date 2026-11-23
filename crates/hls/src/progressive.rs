@@ -16,7 +16,7 @@ use triergon_mpegts::{AssemblyStep, ParseLimits};
 use triergon_playback::compat::pes::AdmittedCarriage;
 use triergon_playback::{
     Source, SourceOwner, SourceReply, TrackKey,
-    pes_feed::{FeedPacket, FeedStep, PesInput, SpentLists, TsEngine},
+    pes_feed::{FeedPacket, FeedStep, PesInput, ProgressiveFeed, SpentLists},
 };
 
 /// Bounds of a [`TsProgressiveReader`].
@@ -122,7 +122,7 @@ enum NextAudioTime {
 
 #[derive(Debug)]
 struct Transport<S: Source> {
-    engine: TsEngine,
+    engine: ProgressiveFeed,
     request: Option<InputRequest>,
     pending: Option<FeedStep>,
     source: SourceOwner<S>,
@@ -207,7 +207,7 @@ impl<S: Source> Transport<S> {
                 continue;
             }
             let before = work.remaining();
-            let step = self.engine.poll_progressive_payload(work, cancel);
+            let step = self.engine.poll(work, cancel);
             self.engine.take_suppressed_events();
             let step = step?;
             if let Some(bytes) = step.payload_bytes() {
@@ -286,7 +286,7 @@ impl<S: Source> TsProgressiveReader<S> {
         }
         Ok(Self {
             transport: Some(Transport {
-                engine: TsEngine::progressive(input, limits.transport)?,
+                engine: ProgressiveFeed::new(input, limits.transport)?,
                 request: None,
                 pending: None,
                 source,
@@ -789,7 +789,7 @@ mod tests {
         };
         let error = Error::Unsupported("test carriage");
         let mut transport = Transport {
-            engine: TsEngine::progressive(input, ParseLimits::default()).unwrap(),
+            engine: ProgressiveFeed::new(input, ParseLimits::default()).unwrap(),
             request: None,
             pending: Some(FeedStep::Refusal {
                 track,
@@ -908,7 +908,7 @@ mod tests {
             )
             .unwrap();
             Transport {
-                engine: TsEngine::progressive(input, ParseLimits::default()).unwrap(),
+                engine: ProgressiveFeed::new(input, ParseLimits::default()).unwrap(),
                 request: None,
                 pending: None,
                 source: SourceOwner::new(Waiting(seen.clone())),

@@ -363,13 +363,15 @@ impl Engine {
             Self::Matroska(r) => reply.provide_to(r),
         }
     }
-    /// Demuxes within `w`. Fails with `Invalid` for a compact progressive TS engine,
-    /// which only its reader polls.
+    /// Demuxes within `w`.
     pub(crate) fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<EngineStep> {
         match self {
             Self::Matroska(r) => Ok(EngineStep::from_matroska(r.step(w, c)?)),
             Self::Mp4(r) => r.poll(w, c, None),
             Self::Ts(r) => {
+                // A progressive engine exists only inside a `ProgressiveFeed`, so this
+                // never refuses; it tells the poll inlined here that the progressive
+                // tests are false (without it, TS program input +0.19% instructions).
                 if r.delivery == TsDelivery::Progressive {
                     return Err(Error::Invalid("compact TS payload polling required"));
                 }

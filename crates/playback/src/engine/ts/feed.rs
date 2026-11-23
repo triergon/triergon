@@ -190,8 +190,9 @@ impl FeedStep {
 
 // Each poller keeps the return layout of its consumer.
 pub(crate) trait TsStepProjection: Sized {
-    /// Whether only progressive feeds poll through this projection, so that
-    /// their polling holds no code of the other engines.
+    /// Whether this is the projection of a
+    /// [`ProgressiveFeed`](crate::pes_feed::ProgressiveFeed), the one poller of a
+    /// progressive engine.
     const PROGRESSIVE: bool;
 
     fn project(step: FeedStep) -> Result<Self>;
@@ -232,7 +233,7 @@ impl TsStepProjection for EngineStep {
 }
 
 impl TsStepProjection for FeedStep {
-    // `poll_progressive_payload` admits progressive engines alone.
+    // Only a `ProgressiveFeed` polls through this projection.
     const PROGRESSIVE: bool = true;
 
     #[inline]
