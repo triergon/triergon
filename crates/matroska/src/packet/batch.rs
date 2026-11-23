@@ -567,7 +567,7 @@ impl PacketBatchJob {
                     let BatchWork::Extensions(job) = &mut self.job else {
                         return Err(Error::Invalid("missing track extension job"));
                     };
-                    match job.step(work, cancel)? {
+                    match job.step_job(work, cancel)? {
                         ParseStep::Event(extensions) => {
                             self.live_configuration()?.validate_additions(
                                 self.track,

@@ -4,13 +4,13 @@
 //! [`compat::block_additions`](crate::compat::block_additions).
 use crate::hdr10_plus::{Hdr10Plus, MAX_BODY, T35_HEADER};
 use crate::packet::{batch::TypedPacket, block_group::BlockGroupSource};
-use crate::step::{ParseStep, check};
+use crate::step::check;
 use crate::track::extensions::TrackExtensions;
 use crate::{Error, Result};
 
 pub use crate::reader::{blocking::open_owned_seekable_in, new_reader};
 use std::{mem::discriminant, sync::atomic::AtomicBool};
-use triergon_core::WorkBudget;
+use triergon_core::{Step, WorkBudget};
 
 /// The container family named by the source DocType, which decides whether a
 /// BlockAddID without a BlockAdditionMapping is exported.
@@ -118,10 +118,10 @@ pub fn hdr10_plus<'a>(
     container: BlockAdditionContainer,
     work: &mut WorkBudget,
     cancel: &AtomicBool,
-) -> Result<ParseStep<Option<Hdr10Plus<'a>>>> {
+) -> Result<Step<Option<Hdr10Plus<'a>>>> {
     check(cancel)?;
     let Some(group) = packet.addition_group(extensions)? else {
-        return Ok(ParseStep::Event(None));
+        return Ok(Step::Ready(None));
     };
     let mut required = mapping_work(group, extensions)?;
     for addition in group.additions() {
@@ -133,7 +133,7 @@ pub fn hdr10_plus<'a>(
         }
     }
     if !work.try_charge(required) {
-        return Ok(ParseStep::Yield);
+        return Ok(Step::Yield);
     }
     let mut output = None;
     for addition in group.additions() {
@@ -146,7 +146,7 @@ pub fn hdr10_plus<'a>(
             output = Some(Hdr10Plus::decode(raw, cancel)?);
         }
     }
-    Ok(ParseStep::Event(output))
+    Ok(Step::Ready(output))
 }
 
 /// Project opaque and LCEVC packet side data using the extensions parsed from
@@ -167,14 +167,14 @@ pub fn packet_side_data<'a>(
     container: BlockAdditionContainer,
     work: &mut WorkBudget,
     cancel: &AtomicBool,
-) -> Result<ParseStep<[Option<PacketSideData<'a>>; 2]>> {
+) -> Result<Step<[Option<PacketSideData<'a>>; 2]>> {
     check(cancel)?;
     let mut result = [None, None];
     let Some(group) = packet.addition_group(extensions)? else {
-        return Ok(ParseStep::Event(result));
+        return Ok(Step::Ready(result));
     };
     if !work.try_charge(mapping_work(group, extensions)?) {
-        return Ok(ParseStep::Yield);
+        return Ok(Step::Yield);
     }
     for addition in group.additions() {
         check(cancel)?;
@@ -199,5 +199,5 @@ pub fn packet_side_data<'a>(
             .ok_or(Error::Invalid("packet addition projection capacity"))?;
         *slot = Some(value);
     }
-    Ok(ParseStep::Event(result))
+    Ok(Step::Ready(result))
 }

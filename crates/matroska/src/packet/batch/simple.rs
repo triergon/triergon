@@ -19,7 +19,7 @@ enum SimplePhase {
     Promote,
 }
 /// This job owns a complete admitted leaf: it cannot request more input.
-/// Keep private progress scalar; the public Reader still returns ParseStep.
+/// Its progress is a scalar; the reader makes its own step from it.
 #[derive(Debug)]
 pub(crate) enum SimpleProgress {
     Yield,

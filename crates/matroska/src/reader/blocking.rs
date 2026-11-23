@@ -127,23 +127,20 @@ impl<R: Read> BlockingReader<R> {
         let cancel = AtomicBool::new(false);
         while !result.reader.is_ready() {
             match result.poll(&cancel)? {
-                ParseStep::Event(Event::Packet(_)) => {
+                Step::Ready(Event::Packet(_)) => {
                     return Err(Error::Invalid("packet before stream initialization"));
                 }
-                ParseStep::Finished => return Err(Error::Truncated),
+                Step::End(_) => return Err(Error::Truncated),
                 _ => (),
             }
         }
         result.synchronize(&cancel)?;
         Ok(result)
     }
-    fn poll(&mut self, cancel: &AtomicBool) -> Result<ParseStep<Event>> {
+    fn poll(&mut self, cancel: &AtomicBool) -> ReaderStep<Event> {
         self.poll_projected::<TypedProjection>(cancel)
     }
-    fn poll_projected<D: PacketProjection>(
-        &mut self,
-        cancel: &AtomicBool,
-    ) -> Result<ParseStep<D::Event>> {
+    fn poll_projected<D: PacketProjection>(&mut self, cancel: &AtomicBool) -> ReaderStep<D::Event> {
         if self.input.has_pending_read() {
             self.input.discard_stale(&self.reader.request());
         }
@@ -154,7 +151,7 @@ impl<R: Read> BlockingReader<R> {
             cancel,
             self.input.owned_source_storage(),
         )? {
-            ParseStep::NeedInput(request) => {
+            Step::NeedInput(request) => {
                 let header = self.reader.needs_header_input();
                 // Ordinary canonical refill as the reader asks. The seek engine
                 // can separately certify a whole core-owned input response,
@@ -202,10 +199,10 @@ impl<R: Read> BlockingReader<R> {
                 self.reader
                     .set_adapter_storage(self.input.retained_buffer_bytes());
                 match result {
-                    Ok(FeedStep::Provided | FeedStep::End) => Ok(ParseStep::Yield),
+                    Ok(FeedStep::Provided | FeedStep::End) => Ok(Step::Yield),
                     Ok(FeedStep::Backpressure { requested, .. }) => {
                         self.reader.allocation_blocked(requested);
-                        Ok(ParseStep::Yield)
+                        Ok(Step::Yield)
                     }
                     Err(error) => {
                         if !matches!(error, Error::Backpressure { .. }) {
@@ -215,13 +212,7 @@ impl<R: Read> BlockingReader<R> {
                     }
                 }
             }
-            ParseStep::Backpressure {
-                requested,
-                available,
-            } => Err(Error::Backpressure(Backpressure {
-                requested,
-                available,
-            })),
+            Step::Backpressure(pressure) => Err(Error::Backpressure(pressure)),
             other => Ok(other),
         }
     }
@@ -286,8 +277,8 @@ impl<R: Read> BlockingReader<R> {
         }
         loop {
             match self.poll(cancel)? {
-                ParseStep::Event(Event::Packet(packet)) => return Ok(Some(packet)),
-                ParseStep::Finished => return Ok(None),
+                Step::Ready(Event::Packet(packet)) => return Ok(Some(packet)),
+                Step::End(_) => return Ok(None),
                 _ => (),
             }
         }
@@ -301,8 +292,8 @@ impl<R: Read> BlockingReader<R> {
         }
         loop {
             match self.poll_projected::<LegacyProjection>(cancel)? {
-                ParseStep::Event(LegacyEvent::Packet(packet)) => return Ok(Some(packet)),
-                ParseStep::Event(LegacyEvent::FullPacket(packet)) => {
+                Step::Ready(LegacyEvent::Packet(packet)) => return Ok(Some(packet)),
+                Step::Ready(LegacyEvent::FullPacket(packet)) => {
                     if packet.group.as_ref().is_some_and(|group| {
                         group.additions().len() != 0 || group.codec_state().is_some()
                     }) {
@@ -313,13 +304,13 @@ impl<R: Read> BlockingReader<R> {
                     }
                     return Ok(Some(packet.packet));
                 }
-                ParseStep::Event(LegacyEvent::Envelope(event)) => drop(event),
-                ParseStep::Event(LegacyEvent::Configuration(configuration)) => drop(configuration),
-                ParseStep::Event(LegacyEvent::Document(document)) => drop(document),
-                ParseStep::Event(LegacyEvent::Seek(receipt)) => {
+                Step::Ready(LegacyEvent::Envelope(event)) => drop(event),
+                Step::Ready(LegacyEvent::Configuration(configuration)) => drop(configuration),
+                Step::Ready(LegacyEvent::Document(document)) => drop(document),
+                Step::Ready(LegacyEvent::Seek(receipt)) => {
                     let _ = receipt;
                 }
-                ParseStep::Finished => return Ok(None),
+                Step::End(_) => return Ok(None),
                 _ => (),
             }
         }
@@ -382,14 +373,14 @@ impl<R: Read> BlockingReader<R> {
             let step = self.poll(cancel);
             self.reader.owned_root = None;
             match step? {
-                ParseStep::Event(Event::Seek(receipt)) => {
+                Step::Ready(Event::Seek(receipt)) => {
                     self.synchronize(cancel)?;
                     return Ok(receipt);
                 }
-                ParseStep::Event(Event::Packet(_)) => {
+                Step::Ready(Event::Packet(_)) => {
                     return Err(Error::Invalid("packet before seek receipt"));
                 }
-                ParseStep::Finished => {
+                Step::End(_) => {
                     return Err(Error::Invalid("seek completed without receipt"));
                 }
                 _ => (),

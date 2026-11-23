@@ -12,9 +12,7 @@ use triergon_core::Step;
 use triergon_core::{
     Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
-use triergon_matroska::{
-    BlockingReader, Error, Event, Limits, ParseStep, PayloadOwnership, Reader,
-};
+use triergon_matroska::{BlockingReader, Error, Event, Limits, PayloadOwnership, Reader};
 
 fn stored_laced_source(bad: bool) -> Vec<u8> {
     let block = abc_laces(bad);
@@ -637,11 +635,8 @@ fn header_refill_canonical_short_prefix_observes_actual_zero_one_work_and_cancel
         PayloadOwnership::OwnedExact,
     );
     let cancel = AtomicBool::new(false);
-    let request = match reader
-        .step_parse(&mut WorkBudget::new(64), &cancel)
-        .unwrap()
-    {
-        ParseStep::NeedInput(request) => request,
+    let request = match reader.step(&mut WorkBudget::new(64), &cancel).unwrap() {
+        Step::NeedInput(request) => request,
         other => panic!("initial header: {other:?}"),
     };
     assert_eq!(request.maximum, 4096);
@@ -651,14 +646,14 @@ fn header_refill_canonical_short_prefix_observes_actual_zero_one_work_and_cancel
         .unwrap();
     let mut zero = WorkBudget::new(0);
     assert!(matches!(
-        reader.step_parse(&mut zero, &cancel).unwrap(),
-        ParseStep::Yield
+        reader.step(&mut zero, &cancel).unwrap(),
+        Step::Yield
     ));
     assert_eq!((reader.position(), zero.spent()), (0, 0));
     let mut one = WorkBudget::new(1);
     assert!(matches!(
-        reader.step_parse(&mut one, &cancel).unwrap(),
-        ParseStep::NeedInput(_) | ParseStep::Yield
+        reader.step(&mut one, &cancel).unwrap(),
+        Step::NeedInput(_) | Step::Yield
     ));
     assert_eq!((reader.position(), one.spent()), (1, 1));
     cancel.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -685,11 +680,8 @@ fn ordinary_reader_default_issues_the_same_bounded_header_hint() {
     )
     .unwrap();
     let mut work = WorkBudget::new(64);
-    let request = match reader
-        .step_parse(&mut work, &AtomicBool::new(false))
-        .unwrap()
-    {
-        ParseStep::NeedInput(request) => request,
+    let request = match reader.step(&mut work, &AtomicBool::new(false)).unwrap() {
+        Step::NeedInput(request) => request,
         other => panic!("initial canonical header request: {other:?}"),
     };
     assert_eq!(reader.position(), 0);

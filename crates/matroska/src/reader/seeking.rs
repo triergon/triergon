@@ -746,7 +746,7 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         loop {
             check(cancel)?;
             let request = self
@@ -804,7 +804,7 @@ impl Reader {
                                 }
                             }
                         }
-                        other => return crate::step::pending(other),
+                        other => return other.waiting(),
                     }
                 }
                 SeekStage::Cue(plan) => {
@@ -865,7 +865,7 @@ impl Reader {
                                 )?;
                             }
                         }
-                        other => return crate::step::pending(other),
+                        other => return other.waiting(),
                     }
                 }
                 SeekStage::Scan(_) => return self.advance_scan(request, work, cancel),
@@ -891,29 +891,29 @@ impl Reader {
                             self.cluster_time = epoch.cluster_time;
                             self.state = State::Envelope;
                             self.seek_stage = SeekStage::Receipt(receipt);
-                            return Ok(ParseStep::Event(Event::Configuration(configuration)));
+                            return Ok(Step::Ready(Event::Configuration(configuration)));
                         }
-                        other => return crate::step::pending(other),
+                        other => return other.waiting(),
                     }
                 }
                 SeekStage::InitialConfiguration(receipt) => {
                     self.envelope.healthy_for_job(work, cancel)?;
                     if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                        return Ok(Step::Yield);
                     }
                     let configuration = self
                         .configuration
                         .clone()
                         .required("missing initial replay configuration")?;
                     self.seek_stage = SeekStage::Receipt(*receipt);
-                    return Ok(ParseStep::Event(Event::Configuration(configuration)));
+                    return Ok(Step::Ready(Event::Configuration(configuration)));
                 }
                 SeekStage::Receipt(receipt) => {
                     self.envelope.healthy_for_job(work, cancel)?;
                     let receipt = *receipt;
                     self.pending_seek = None;
                     self.seek_stage = SeekStage::Idle;
-                    return Ok(ParseStep::Event(Event::Seek(receipt)));
+                    return Ok(Step::Ready(Event::Seek(receipt)));
                 }
             }
         }
@@ -923,13 +923,13 @@ impl Reader {
         request: SeekRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         loop {
             check(cancel)?;
             let scan = self.seek_stage.scan_mut()?;
             if !scan.begun {
                 if !work.try_charge(1) {
-                    return Ok(ParseStep::Yield);
+                    return Ok(Step::Yield);
                 }
                 let first = self
                     .first_cluster
@@ -966,7 +966,7 @@ impl Reader {
             }
             if scan.finishing {
                 if !work.try_charge(1) {
-                    return Ok(ParseStep::Yield);
+                    return Ok(Step::Yield);
                 }
                 return self.complete_scan(request, work, cancel);
             }
@@ -1001,7 +1001,7 @@ impl Reader {
                 continue;
             }
             match progress {
-                ParseStep::Event(Event::Packet(packet)) => {
+                Step::Ready(Event::Packet(packet)) => {
                     let location = self
                         .last_location
                         .as_ref()
@@ -1024,7 +1024,7 @@ impl Reader {
                     drop(packet);
                     result?;
                 }
-                ParseStep::Event(Event::Envelope(ElementEvent::Start(header)))
+                Step::Ready(Event::Envelope(ElementEvent::Start(header)))
                     if header.id == CLUSTER =>
                 {
                     scan.cluster_configuration = if scan.prefix_from_initial {
@@ -1039,12 +1039,10 @@ impl Reader {
                     } else {
                         None
                     };
-                    return Ok(ParseStep::Event(Event::Envelope(ElementEvent::Start(
-                        header,
-                    ))));
+                    return Ok(Step::Ready(Event::Envelope(ElementEvent::Start(header))));
                 }
-                ParseStep::Event(Event::Configuration(configuration)) => drop(configuration),
-                ParseStep::Finished => {
+                Step::Ready(Event::Configuration(configuration)) => drop(configuration),
+                Step::End(_) => {
                     if scan.best.is_none() {
                         if scan.policy.allow_first_after_negative_preroll && !scan.retried {
                             scan.policy.target_ns = 0;
@@ -1063,16 +1061,18 @@ impl Reader {
                     }
                     scan.finishing = true;
                 }
-                ParseStep::Event(Event::Envelope(event)) => {
-                    return Ok(ParseStep::Event(Event::Envelope(event)));
+                Step::Ready(Event::Envelope(event)) => {
+                    return Ok(Step::Ready(Event::Envelope(event)));
                 }
-                ParseStep::Event(Event::Document(document)) => {
-                    return Ok(ParseStep::Event(Event::Document(document)));
+                Step::Ready(Event::Document(document)) => {
+                    return Ok(Step::Ready(Event::Document(document)));
                 }
-                ParseStep::Event(Event::Seek(receipt)) => {
-                    return Ok(ParseStep::Event(Event::Seek(receipt)));
+                Step::Ready(Event::Seek(receipt)) => {
+                    return Ok(Step::Ready(Event::Seek(receipt)));
                 }
-                other => return crate::step::pending(other),
+                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::Yield => return Ok(Step::Yield),
+                Step::Backpressure(pressure) => return Ok(Step::Backpressure(pressure)),
             }
         }
     }
@@ -1085,7 +1085,7 @@ impl Reader {
         request: SeekRequest,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         let SeekStage::Scan(mut scan) =
             std::mem::replace(&mut self.seek_stage, SeekStage::Completing)
         else {
@@ -1098,7 +1098,7 @@ impl Reader {
             return Err(error);
         }
         if matches!(self.seek_stage, SeekStage::Scan(_)) {
-            return Ok(ParseStep::Yield);
+            return Ok(Step::Yield);
         }
         self.step_seeking(work, cancel)
     }

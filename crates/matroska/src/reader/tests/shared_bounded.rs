@@ -324,11 +324,8 @@ fn reader(pool: &Budget) -> Reader {
 fn packet(reader: &mut Reader, root: &Bytes) -> TypedPacket {
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
-        match reader
-            .step_parse(&mut WorkBudget::new(8192), &cancel)
-            .unwrap()
-        {
-            ParseStep::NeedInput(request) => {
+        match reader.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+            Step::NeedInput(request) => {
                 let at = request.offset as usize;
                 if at == RAW.len() {
                     reader.finish(request.source, request.token).unwrap();
@@ -348,8 +345,8 @@ fn packet(reader: &mut Reader, root: &Bytes) -> TypedPacket {
                         .unwrap();
                 }
             }
-            ParseStep::Event(Event::Packet(packet)) => return packet,
-            ParseStep::Event(_) | ParseStep::Yield => (),
+            Step::Ready(Event::Packet(packet)) => return packet,
+            Step::Ready(_) | Step::Yield => (),
             other => panic!("real typed source {other:?}"),
         }
     }

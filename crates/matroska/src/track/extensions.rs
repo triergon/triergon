@@ -9,7 +9,7 @@ use std::{
     mem::size_of,
     sync::{Arc, atomic::AtomicBool},
 };
-use triergon_core::{Budget, BudgetVec, Reservation, WorkBudget};
+use triergon_core::{Backpressure, Budget, BudgetVec, Reservation, Step, WorkBudget};
 
 #[derive(Clone, Copy, Debug)]
 struct Mapping {
@@ -240,13 +240,20 @@ impl TrackExtensionsJob {
             failed: false,
         })
     }
-    /// Parses within `work`: [`ParseStep::Yield`] when the budget runs out,
-    /// [`ParseStep::Backpressure`] when the pool is full, then [`ParseStep::Event`]
-    /// with the extensions, repeated on later calls. Fails with [`Error::Invalid`]
-    /// for duplicate or malformed children, [`Error::Policy`] beyond
+    /// Parses within `work`: [`Step::Yield`] when the budget runs out,
+    /// [`Step::Backpressure`] when the pool is full, then [`Step::Ready`] with the
+    /// extensions, repeated on later calls. Fails with [`Error::Invalid`] for
+    /// duplicate or malformed children, [`Error::Policy`] beyond
     /// `Limits::metadata_nodes` mappings and [`Error::Cancelled`]; a failed job only
     /// fails again.
     pub fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<TrackExtensions, Backpressure>> {
+        self.step_job(work, cancel)?.bounded()
+    }
+    pub(crate) fn step_job(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
@@ -270,7 +277,7 @@ impl TrackExtensionsJob {
             }
         }
         match self.advance(work, cancel) {
-            Err(Error::Backpressure(triergon_core::Backpressure {
+            Err(Error::Backpressure(Backpressure {
                 requested,
                 available,
             })) => {

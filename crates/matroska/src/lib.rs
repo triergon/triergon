@@ -42,7 +42,6 @@ pub use packet::block_group::{
 pub use packet::{Packet, PacketData, TypedPacket};
 pub use reader::{BlockingReader, Event, Reader};
 pub use seek::{SeekReceipt, SeekRequest};
-pub use step::ParseStep;
 pub use storage::{PayloadOwnership, SharedBytes, SharedText};
 pub use track::extensions::{MappingExtension, MappingView, TrackExtensions, TrackExtensionsJob};
 pub use track::{LegacyAacProfile, Track};

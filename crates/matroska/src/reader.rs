@@ -35,6 +35,9 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 
+/// The outcome of a reader step that produces `T`.
+type ReaderStep<T> = Result<Step<T, Backpressure>>;
+
 /// What a [`Reader`] step produced.
 #[derive(Clone, Debug)]
 pub enum Event {
@@ -494,34 +497,7 @@ impl Reader {
     /// One bounded unit of work. `End` is the end of the Segment at the
     /// reader's current input position.
     #[inline]
-    pub fn step(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Step<Event, Backpressure>> {
-        Ok(match self.step_parse(work, cancel)? {
-            ParseStep::Event(event) => Step::Ready(event),
-            ParseStep::NeedInput(request) => Step::NeedInput(request),
-            ParseStep::Yield => Step::Yield,
-            ParseStep::Backpressure {
-                requested,
-                available,
-            } => Step::Backpressure(Backpressure {
-                requested,
-                available,
-            }),
-            ParseStep::Finished => Step::End(self.envelope.location()),
-        })
-    }
-    /// [`step`](Self::step) without the mapping to the core [`Step`]: the
-    /// reader's own [`ParseStep`]. Feeds that forward every Matroska event use
-    /// it on their per-packet path.
-    #[inline]
-    pub fn step_parse(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<ParseStep<Event>> {
+    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> ReaderStep<Event> {
         let result = self.step_projected::<TypedProjection>(work, cancel);
         if self.state_coverage_contiguous
             && let Some(index) = &mut self.seek_index
@@ -531,7 +507,7 @@ impl Reader {
                 index.discard();
             } else {
                 match &result {
-                    Ok(ParseStep::Event(Event::Packet(packet))) => {
+                    Ok(Step::Ready(Event::Packet(packet))) => {
                         if packet.configuration.tracks()[packet.packet.track].kind
                             == crate::track::Track::VIDEO
                             && let Some(location) = &self.last_location
@@ -539,7 +515,7 @@ impl Reader {
                             index.observe(packet, location.cluster_offset(), work);
                         }
                     }
-                    Ok(ParseStep::Finished) => index.seal(self.envelope.position()),
+                    Ok(Step::End(location)) => index.seal(location.offset),
                     _ => {}
                 }
             }
@@ -551,7 +527,7 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> ReaderStep<D::Event> {
         self.step_projected_with_source::<D>(work, cancel, None)
     }
     #[inline]
@@ -560,7 +536,7 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         source: Option<&dyn crate::storage::usage::Storage>,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> ReaderStep<D::Event> {
         let result = (|| {
             self.envelope.healthy_for_job(work, cancel)?;
             if self.failed {
@@ -579,20 +555,18 @@ impl Reader {
                 D::progress(self.step_seeking(work, cancel))
             } else {
                 let result = self.step_demux_after_health_check::<D>(work, cancel, None, false);
-                if self.state_coverage_contiguous && matches!(result, Ok(ParseStep::Event(_))) {
+                if self.state_coverage_contiguous && matches!(result, Ok(Step::Ready(_))) {
                     self.state_coverage_end = self.state_coverage_end.max(self.envelope.position());
                 }
                 result
             };
             match result {
                 Err(Error::Backpressure(Backpressure { requested, .. }))
-                | Ok(ParseStep::Backpressure { requested, .. }) => {
+                | Ok(Step::Backpressure(Backpressure { requested, .. })) => {
                     self.allocation_blocked(requested);
                     D::progress(self.step_pressure(work, cancel, source))
                 }
-                Ok(ParseStep::NeedInput(request)) => {
-                    D::progress(self.canonical_input_hint(request))
-                }
+                Ok(Step::NeedInput(request)) => D::progress(self.canonical_input_hint(request)),
                 other => other,
             }
         })();
@@ -620,7 +594,7 @@ impl Reader {
         };
         self.envelope.bounded_header_refill(&exact, 4096)
     }
-    fn canonical_input_hint(&self, request: InputRequest) -> Result<ParseStep<Event>> {
+    fn canonical_input_hint(&self, request: InputRequest) -> ReaderStep<Event> {
         let mut plan = self.ordinary_header_refill()?;
         if plan.is_none() && self.seek_index.is_some() {
             // These windows are checked against the immutable source. Read
@@ -634,12 +608,12 @@ impl Reader {
             };
         }
         let Some(plan) = plan else {
-            return Ok(ParseStep::NeedInput(request));
+            return Ok(Step::NeedInput(request));
         };
         if !plan.matches_exact(&request) {
             return Err(Error::Invalid("canonical refill request identity changed"));
         }
-        Ok(ParseStep::NeedInput(plan.expanded().clone()))
+        Ok(Step::NeedInput(plan.expanded().clone()))
     }
     // This validates an already issued canonical hint; it cannot widen it.
     // The adapter may supply a short prefix under pre-read pressure, exactly
@@ -746,7 +720,7 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         source: Option<&dyn crate::storage::usage::Storage>,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         let mut pressure = self
             .pressure
             .take()
@@ -765,13 +739,31 @@ impl Reader {
             pressure.step(self, &self.pool, work, cancel)
         };
         match result {
-            Ok(ParseStep::Event(())) => Ok(ParseStep::Yield),
+            Ok(ParseStep::Event(())) => Ok(Step::Yield),
             Ok(step) => {
                 self.pressure = Some(pressure);
-                crate::step::pending(step)
+                step.waiting()
             }
             Err(error) => Err(error),
         }
+    }
+    /// The element reader's step that carries no event, as the reader's step: the
+    /// element reader ends where the source does.
+    #[inline(always)]
+    fn stalled<T, U>(&self, step: ParseStep<T>) -> ReaderStep<U> {
+        Ok(match step {
+            ParseStep::Yield => Step::Yield,
+            ParseStep::NeedInput(request) => Step::NeedInput(request),
+            ParseStep::Backpressure {
+                requested,
+                available,
+            } => Step::Backpressure(Backpressure {
+                requested,
+                available,
+            }),
+            ParseStep::Finished => Step::End(self.envelope.location()),
+            ParseStep::Event(_) => return Err(Error::Invalid("unexpected job event")),
+        })
     }
     fn record_demux_read(&mut self, before: u64) -> Result<()> {
         Self::record_demux_bytes(
@@ -982,7 +974,7 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
         stop: Option<u64>,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         self.step_demux_mode(work, cancel, stop, false)
     }
     fn step_demux_mode(
@@ -991,7 +983,7 @@ impl Reader {
         cancel: &AtomicBool,
         stop: Option<u64>,
         scan_prefix: bool,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         self.step_demux_projected::<TypedProjection>(work, cancel, stop, scan_prefix)
     }
     fn step_demux_projected<D: PacketProjection>(
@@ -1000,7 +992,7 @@ impl Reader {
         cancel: &AtomicBool,
         stop: Option<u64>,
         scan_prefix: bool,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> ReaderStep<D::Event> {
         self.envelope.healthy_for_job(work, cancel)?;
         self.step_demux_after_health_check::<D>(work, cancel, stop, scan_prefix)
     }
@@ -1011,7 +1003,7 @@ impl Reader {
         cancel: &AtomicBool,
         stop: Option<u64>,
         scan_prefix: bool,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> ReaderStep<D::Event> {
         // Every metadata commit returns its event before this call continues.
         // Limits are immutable; the remaining metadata allowance is therefore
         // constant across these pure transitions. Input errors also propagate
@@ -1031,7 +1023,7 @@ impl Reader {
             match &mut self.state {
                 State::Envelope => {
                     if stop.is_some_and(|stop| self.position() >= stop) {
-                        return Ok(ParseStep::Finished);
+                        return Ok(Step::End(self.envelope.location()));
                     }
                     if let Some(remaining) = self.scan_remaining {
                         self.envelope.set_scan_remaining(remaining);
@@ -1078,7 +1070,7 @@ impl Reader {
                                     phase: AdmitPhase::Admit { maximum: None },
                                     catalogue: CataloguePrepareJob::new(),
                                 });
-                                return Ok(ParseStep::Yield);
+                                return Ok(Step::Yield);
                             }
                             self.envelope.admit_typed_leaf(header, None, false)?;
                             if scan_prefix
@@ -1118,9 +1110,7 @@ impl Reader {
                                         self.opening = Some(Opening::new());
                                     }
                                 }
-                                return Ok(ParseStep::Event(D::envelope(ElementEvent::Start(
-                                    header,
-                                ))?));
+                                return Ok(Step::Ready(D::envelope(ElementEvent::Start(header))?));
                             }
                             CompactElementEvent::End {
                                 id,
@@ -1130,14 +1120,14 @@ impl Reader {
                                 if id == CLUSTER {
                                     self.cluster_time = None;
                                 }
-                                return Ok(ParseStep::Event(D::envelope(ElementEvent::End {
+                                return Ok(Step::Ready(D::envelope(ElementEvent::End {
                                     id,
                                     offset,
                                     generation,
                                 })?));
                             }
                             CompactElementEvent::Skipped(header) => {
-                                return Ok(ParseStep::Event(D::envelope(ElementEvent::Skipped(
+                                return Ok(Step::Ready(D::envelope(ElementEvent::Skipped(
                                     header,
                                 ))?));
                             }
@@ -1147,7 +1137,7 @@ impl Reader {
                             }
                         },
                         EnvelopeProgress::Step(other) => {
-                            return crate::step::pending(other);
+                            return self.stalled(other);
                         }
                     }
                 }
@@ -1155,7 +1145,12 @@ impl Reader {
                     if let Some(step) =
                         self.step_admission(left, work, cancel, stop, scan_prefix)?
                     {
-                        return crate::step::pending(step);
+                        return Ok(match step {
+                            Step::NeedInput(request) => Step::NeedInput(request),
+                            Step::Yield => Step::Yield,
+                            Step::Backpressure(pressure) => Step::Backpressure(pressure),
+                            Step::End(location) => Step::End(location),
+                        });
                     }
                 }
                 State::Ebml { .. }
@@ -1184,7 +1179,7 @@ impl Reader {
                     if job.completed_fields().is_some() {
                         // advance_scan consumes this scalar completion in this
                         // same call; it is never a public packet/event boundary.
-                        return Ok(ParseStep::Yield);
+                        return Ok(Step::Yield);
                     }
                     if job.draining() {
                         if !job.context_matches(&context) {
@@ -1211,11 +1206,11 @@ impl Reader {
                         let progress = progress?;
                         if self.envelope.finish_scanned_leaf(job.header())? {
                             job.finish();
-                            return Ok(ParseStep::Yield);
+                            return Ok(Step::Yield);
                         }
                         match progress {
                             EnvelopeProgress::Step(step) => {
-                                return crate::step::pending(step);
+                                return self.stalled(step);
                             }
                             EnvelopeProgress::Header(_) => {
                                 return Err(Error::Invalid(
@@ -1237,13 +1232,13 @@ impl Reader {
                                 .resolve_scan_prefix(header, drain, work, cancel)?
                             {
                                 job.finish();
-                                return Ok(ParseStep::Yield);
+                                return Ok(Step::Yield);
                             }
                             if !drain {
                                 self.state = State::Envelope;
                             }
                         }
-                        step => return crate::step::pending(step),
+                        step => return step.waiting(),
                     }
                 }
                 State::Cue(_) | State::Epoch(_) => {
@@ -1263,18 +1258,18 @@ impl Reader {
                             continue;
                         }
                         SimpleProgress::Ready => {
-                            return Ok(ParseStep::Event(D::take_simple(job, configuration)?));
+                            return Ok(Step::Ready(D::take_simple(job, configuration)?));
                         }
                         SimpleProgress::Finished => self.state = State::Envelope,
-                        SimpleProgress::Yield => return Ok(ParseStep::Yield),
+                        SimpleProgress::Yield => return Ok(Step::Yield),
                         SimpleProgress::Backpressure {
                             requested,
                             available,
                         } => {
-                            return Ok(ParseStep::Backpressure {
+                            return Ok(Step::Backpressure(Backpressure {
                                 requested,
                                 available,
-                            });
+                            }));
                         }
                     }
                 }
@@ -1283,7 +1278,7 @@ impl Reader {
                         self.state_seen |= configuration.has_codec_states();
                         self.revision = configuration.revision();
                         self.configuration = Some(configuration.clone());
-                        return Ok(ParseStep::Event(D::configuration(configuration)?));
+                        return Ok(Step::Ready(D::configuration(configuration)?));
                     }
                     let prefix = packet_replay_prefix(
                         &mut self.replay_prefix,
@@ -1293,10 +1288,10 @@ impl Reader {
                     let step = job.step_ready(prefix, work, cancel)?;
                     match step {
                         ParseStep::Event(()) => {
-                            return Ok(ParseStep::Event(D::packet(job.take_ready()?)?));
+                            return Ok(Step::Ready(D::packet(job.take_ready()?)?));
                         }
                         ParseStep::Finished => self.state = State::Envelope,
-                        other => return crate::step::pending(other),
+                        other => return other.waiting(),
                     }
                 }
             }
@@ -1318,7 +1313,7 @@ impl Reader {
         cancel: &AtomicBool,
         stop: Option<u64>,
         scan_prefix: bool,
-    ) -> Result<Option<ParseStep<Infallible>>> {
+    ) -> Result<Option<Step<Infallible, Backpressure>>> {
         let State::Admission(Admission {
             header,
             phase,
@@ -1338,7 +1333,7 @@ impl Reader {
                     return Ok(None);
                 }
                 if !work.try_charge(1) {
-                    return Ok(Some(ParseStep::Yield));
+                    return Ok(Some(Step::Yield));
                 }
                 let (position, id) = self.loaded.as_slice()[*at];
                 *at += 1;
@@ -1365,7 +1360,7 @@ impl Reader {
                         }
                     };
                 }
-                other => return crate::step::pending(other).map(Some),
+                other => return other.waiting().map(Some),
             },
             AdmitPhase::Catalogue { maximum } => {
                 match catalogue.step(&mut self.catalogue, self.limits, work, cancel)? {
@@ -1374,12 +1369,12 @@ impl Reader {
                             maximum: Some((*maximum).min(available)),
                         };
                     }
-                    other => return crate::step::pending(other).map(Some),
+                    other => return other.waiting().map(Some),
                 }
             }
             AdmitPhase::Admit { maximum } => {
                 if !work.try_charge(1) {
-                    return Ok(Some(ParseStep::Yield));
+                    return Ok(Some(Step::Yield));
                 }
                 self.envelope.admit_typed_leaf(*header, *maximum, false)?;
                 // A block touching a finite scan stop keeps the ordinary
@@ -1408,7 +1403,7 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<D::Event>> {
+    ) -> ReaderStep<D::Event> {
         match &mut self.state {
             State::Ebml { header, job } => match job.step(work, cancel)? {
                 ParseStep::Event(doctype) => {
@@ -1419,9 +1414,9 @@ impl Reader {
                         data: job.source().clone(),
                     };
                     self.state = State::Envelope;
-                    Ok(ParseStep::Event(D::envelope(event)?))
+                    Ok(Step::Ready(D::envelope(event)?))
                 }
-                other => crate::step::pending(other),
+                other => other.waiting(),
             },
             State::Tracks { header, job } => match job.step(work, cancel)? {
                 ParseStep::Event(configuration) => {
@@ -1431,9 +1426,9 @@ impl Reader {
                     self.revision = configuration.revision();
                     self.configuration = Some(configuration.clone());
                     self.state = State::Envelope;
-                    Ok(ParseStep::Event(D::configuration(configuration)?))
+                    Ok(Step::Ready(D::configuration(configuration)?))
                 }
-                other => crate::step::pending(other),
+                other => other.waiting(),
             },
             State::Document { header, job } => {
                 match job.step(&mut self.catalogue, work, cancel)? {
@@ -1448,9 +1443,9 @@ impl Reader {
                             self.scale = scale;
                         }
                         self.state = State::Envelope;
-                        Ok(ParseStep::Event(D::document(commit.document)?))
+                        Ok(Step::Ready(D::document(commit.document)?))
                     }
-                    other => crate::step::pending(other),
+                    other => other.waiting(),
                 }
             }
             State::Cues { header, job } => match job.step(work, cancel)? {
@@ -1460,12 +1455,12 @@ impl Reader {
                     self.commit_metadata(h, source.len())?;
                     self.cues = Some(cues.entries);
                     self.state = State::Envelope;
-                    Ok(ParseStep::Event(D::envelope(ElementEvent::Leaf {
+                    Ok(Step::Ready(D::envelope(ElementEvent::Leaf {
                         header: h,
                         data: source,
                     })?))
                 }
-                other => crate::step::pending(other),
+                other => other.waiting(),
             },
             _ => Err(Error::Invalid("metadata step outside a metadata job")),
         }
@@ -1479,7 +1474,7 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Option<ParseStep<D::Event>>> {
+    ) -> Result<Option<Step<D::Event, Backpressure>>> {
         match &mut self.state {
             State::Head { header, job } => match job.step(work, cancel)? {
                 ParseStep::Event(entries) => {
@@ -1493,7 +1488,7 @@ impl Reader {
                         previous_len,
                     };
                 }
-                other => return crate::step::pending(other).map(Some),
+                other => return other.waiting().map(Some),
             },
             State::MergeHead {
                 header,
@@ -1504,20 +1499,20 @@ impl Reader {
             } => {
                 match self.seek_targets.step(work, cancel)? {
                     ParseStep::Event(()) | ParseStep::Finished => (),
-                    other => return crate::step::pending(other).map(Some),
+                    other => return other.waiting().map(Some),
                 }
                 if *at == entries.len() {
                     let h = *header;
                     let source = source.clone();
                     self.commit_metadata(h, source.len())?;
                     self.state = State::Envelope;
-                    return Ok(Some(ParseStep::Event(D::envelope(ElementEvent::Leaf {
+                    return Ok(Some(Step::Ready(D::envelope(ElementEvent::Leaf {
                         header: h,
                         data: source,
                     })?)));
                 }
                 if !work.try_charge(1) {
-                    return Ok(Some(ParseStep::Yield));
+                    return Ok(Some(Step::Yield));
                 }
                 self.seek_targets.push_precharged(entries.as_slice()[*at])?;
                 *at += 1;

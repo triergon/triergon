@@ -1,9 +1,9 @@
 //! Bounded HDR10+ Application 4 syntax carried in a Matroska/WebM ITU-T T.35
 //! addition. Quantized values retain their wire units and source ownership.
-use crate::{Error, Result, step::ParseStep};
+use crate::{Error, Result};
 use std::sync::atomic::AtomicBool;
 use triergon_bitstream::{BitCursor, BitSource};
-use triergon_core::WorkBudget;
+use triergon_core::{Step, WorkBudget};
 
 pub(crate) const T35_HEADER: [u8; 6] = [0xb5, 0, 0x3c, 0, 1, 4];
 // Structural maximum for three windows, both 25 × 25 grids and every
@@ -245,13 +245,13 @@ impl<'a> Hdr10Plus<'a> {
         raw: &'a [u8],
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Self>> {
+    ) -> Result<Step<Self>> {
         crate::step::check(cancel)?;
         let cost = Self::cost(raw)?;
         if !work.try_charge(cost) {
-            return Ok(ParseStep::Yield);
+            return Ok(Step::Yield);
         }
-        Ok(ParseStep::Event(Self::decode(raw, cancel)?))
+        Ok(Step::Ready(Self::decode(raw, cancel)?))
     }
 
     pub(crate) fn cost(raw: &[u8]) -> Result<u64> {

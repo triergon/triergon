@@ -1,13 +1,15 @@
-//! The step vocabulary every resumable job of this crate answers with.
+//! What one call to a resumable job of this crate did. The reader's own steps are
+//! the core [`Step`]; a job has no source location to end at and answers with
+//! [`ParseStep`].
 use crate::{Error, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::InputRequest;
+use triergon_core::{Backpressure, InputRequest, Step};
 
 /// The outcome of one call to a resumable job: its next event, or why it stopped
 /// without one. After any variant but `Event` and `Finished` the same call can
 /// be repeated once the condition is resolved.
 #[derive(Debug)]
-pub enum ParseStep<T> {
+pub(crate) enum ParseStep<T> {
     /// The job's next result.
     Event(T),
     /// The job needs the bytes this request names before it can continue.
@@ -23,6 +25,46 @@ pub enum ParseStep<T> {
     },
     /// The job reached the end of its input range and has no further events.
     Finished,
+}
+
+impl<T> ParseStep<T> {
+    /// This step, which carries no event, as a step of the reader. A job is stepped
+    /// until its event and not again, so it has no end to report.
+    #[inline(always)]
+    pub(crate) fn waiting<U>(self) -> Result<Step<U, Backpressure>> {
+        Ok(match self {
+            Self::Yield => Step::Yield,
+            Self::NeedInput(request) => Step::NeedInput(request),
+            Self::Backpressure {
+                requested,
+                available,
+            } => Step::Backpressure(Backpressure {
+                requested,
+                available,
+            }),
+            Self::Event(_) | Self::Finished => {
+                return Err(Error::Invalid("unexpected job event"));
+            }
+        })
+    }
+    /// The step of a job over bytes it already holds, which neither asks for input
+    /// nor ends.
+    pub(crate) fn bounded(self) -> Result<Step<T, Backpressure>> {
+        Ok(match self {
+            Self::Event(value) => Step::Ready(value),
+            Self::Yield => Step::Yield,
+            Self::Backpressure {
+                requested,
+                available,
+            } => Step::Backpressure(Backpressure {
+                requested,
+                available,
+            }),
+            Self::NeedInput(_) | Self::Finished => {
+                return Err(Error::Invalid("unexpected job event"));
+            }
+        })
+    }
 }
 
 #[inline(always)]

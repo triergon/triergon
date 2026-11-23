@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_matroska::compat::block_additions::{self, BlockAdditionContainer};
-use triergon_matroska::{Error, Event, Hdr10Plus, Hdr10PlusPeakGrid, Limits, ParseStep, Reader};
+use triergon_matroska::{Error, Event, Hdr10Plus, Hdr10PlusPeakGrid, Limits, Reader};
 
 use super::extensions::track_extensions;
 use triergon_harness_runner::{Operation, Totals};
@@ -245,7 +245,7 @@ fn side_data(
         rows.record(1, &[track as u64], &[])?;
         let extensions = &extensions[track];
         let mut work = WorkBudget::new(u64::MAX);
-        let ParseStep::Event(hdr) =
+        let Step::Ready(hdr) =
             block_additions::hdr10_plus(&packet, extensions, container, &mut work, &input.cancel)?
         else {
             return Err(Error::Invalid("HDR10+ projection did not finish"));
@@ -257,7 +257,7 @@ fn side_data(
             &mut work,
             &input.cancel,
         ) {
-            Ok(ParseStep::Event(entries)) => {
+            Ok(Step::Ready(entries)) => {
                 let mut entries = entries.into_iter().flatten().collect::<Vec<_>>();
                 entries.sort_by_key(|entry| entry.wire_parts().0.is_none());
                 for entry in entries {
@@ -278,8 +278,7 @@ fn side_data(
             Ok(_) => return Err(Error::Invalid("side data projection did not finish")),
         }
         if let Some(hdr) = hdr {
-            let ParseStep::Event(direct) =
-                Hdr10Plus::parse_t35(hdr.raw(), &mut work, &input.cancel)?
+            let Step::Ready(direct) = Hdr10Plus::parse_t35(hdr.raw(), &mut work, &input.cancel)?
             else {
                 return Err(Error::Invalid("direct HDR10+ parse did not finish"));
             };

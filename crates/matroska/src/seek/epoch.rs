@@ -511,7 +511,7 @@ impl EpochRestoreJob {
                     .mapping
                     .as_mut()
                     .required("missing state track extension job")?
-                    .step(work, cancel)?
+                    .step_job(work, cancel)?
                 {
                     ParseStep::Event(mapping) => {
                         self.configuration.validate_additions(

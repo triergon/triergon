@@ -28,11 +28,15 @@ pub(super) trait PacketProjection {
     }
     // The generic mapping is fallible and keeps the job's owner/error order.
     // Typed projection returns the progress value directly.
-    fn progress(result: Result<ParseStep<Event>>) -> Result<ParseStep<Self::Event>> {
-        match result? {
-            ParseStep::Event(event) => Ok(ParseStep::Event(Self::event(event)?)),
-            other => crate::step::pending(other),
-        }
+    #[inline(never)]
+    fn progress(result: ReaderStep<Event>) -> ReaderStep<Self::Event> {
+        Ok(match result? {
+            Step::Ready(event) => Step::Ready(Self::event(event)?),
+            Step::NeedInput(request) => Step::NeedInput(request),
+            Step::Yield => Step::Yield,
+            Step::Backpressure(pressure) => Step::Backpressure(pressure),
+            Step::End(location) => Step::End(location),
+        })
     }
     fn simple(
         source: SharedBytes,
@@ -50,7 +54,7 @@ pub(super) trait PacketProjection {
 pub(super) struct TypedProjection;
 impl PacketProjection for TypedProjection {
     type Event = Event;
-    fn progress(result: Result<ParseStep<Event>>) -> Result<ParseStep<Event>> {
+    fn progress(result: ReaderStep<Event>) -> ReaderStep<Event> {
         result
     }
     fn event(event: Event) -> Result<Self::Event> {

@@ -15,7 +15,7 @@ use seek_scan_kit::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Backpressure, Budget, Step, WorkBudget};
 use triergon_matroska::{
-    ElementEvent, Error, Event, InitializationOrigin, Limits, ParseStep, PayloadOwnership, Reader,
+    ElementEvent, Error, Event, InitializationOrigin, Limits, PayloadOwnership, Reader,
     SeekReceipt, SourcePosition, TypedPacket, timing,
 };
 
@@ -460,10 +460,8 @@ fn scan_prefix_zero_work_cancel_reset_and_hidden_owner_lifetime() {
     let used = pool.used();
     let mut zero = WorkBudget::new(0);
     assert!(matches!(
-        reader
-            .step_parse(&mut zero, &AtomicBool::new(false))
-            .unwrap(),
-        ParseStep::Yield
+        reader.step(&mut zero, &AtomicBool::new(false)).unwrap(),
+        Step::Yield
     ));
     assert_eq!(
         (reader.position(), pool.used(), zero.spent()),
@@ -504,10 +502,10 @@ fn scan_prefix_complete_first_span_keeps_zero_and_one_work_boundaries() {
     let mut supplied_body = false;
     for _ in 0..100_000 {
         match reader
-            .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
-            ParseStep::NeedInput(request) => {
+            Step::NeedInput(request) => {
                 let is_body = request.offset == body_start as u64;
                 feed.supply(&mut reader, request).unwrap();
                 if is_body {
@@ -515,7 +513,7 @@ fn scan_prefix_complete_first_span_keeps_zero_and_one_work_boundaries() {
                     break;
                 }
             }
-            ParseStep::Yield | ParseStep::Event(Event::Envelope(_)) => (),
+            Step::Yield | Step::Ready(Event::Envelope(_)) => (),
             other => panic!("reach first actual source span before receipt: {other:?}"),
         }
     }
@@ -523,9 +521,9 @@ fn scan_prefix_complete_first_span_keeps_zero_and_one_work_boundaries() {
     let mut first_span_work = WorkBudget::new(11);
     assert!(matches!(
         reader
-            .step_parse(&mut first_span_work, &AtomicBool::new(false))
+            .step(&mut first_span_work, &AtomicBool::new(false))
             .unwrap(),
-        ParseStep::Yield
+        Step::Yield
     ));
     assert_eq!(first_span_work.spent(), 11);
     assert_eq!(reader.position(), body_start as u64 + 11);
@@ -533,10 +531,8 @@ fn scan_prefix_complete_first_span_keeps_zero_and_one_work_boundaries() {
     let used = pool.used();
     let mut zero = WorkBudget::new(0);
     assert!(matches!(
-        reader
-            .step_parse(&mut zero, &AtomicBool::new(false))
-            .unwrap(),
-        ParseStep::Yield
+        reader.step(&mut zero, &AtomicBool::new(false)).unwrap(),
+        Step::Yield
     ));
     assert_eq!(
         (reader.position(), pool.used(), zero.spent()),
@@ -566,12 +562,9 @@ fn scan_prefix_caller_pressure_can_be_released_without_losing_seek_progress() {
     let mut receipt = None;
     for _ in 0..200_000 {
         let mut work = WorkBudget::new(8192);
-        match reader
-            .step_parse(&mut work, &AtomicBool::new(false))
-            .unwrap()
-        {
-            ParseStep::NeedInput(request) => feed.supply(&mut reader, request).unwrap(),
-            ParseStep::Backpressure { .. } => {
+        match reader.step(&mut work, &AtomicBool::new(false)).unwrap() {
+            Step::NeedInput(request) => feed.supply(&mut reader, request).unwrap(),
+            Step::Backpressure(_) => {
                 assert!(
                     caller.is_some(),
                     "caller-retained pressure must be sufficient to explain rejection"
@@ -579,21 +572,19 @@ fn scan_prefix_caller_pressure_can_be_released_without_losing_seek_progress() {
                 let position = reader.position();
                 let mut zero = WorkBudget::new(0);
                 assert!(matches!(
-                    reader
-                        .step_parse(&mut zero, &AtomicBool::new(false))
-                        .unwrap(),
-                    ParseStep::Yield | ParseStep::Backpressure { .. }
+                    reader.step(&mut zero, &AtomicBool::new(false)).unwrap(),
+                    Step::Yield | Step::Backpressure(_)
                 ));
                 assert_eq!((reader.position(), zero.spent()), (position, 0));
                 drop(caller.take());
             }
-            ParseStep::Event(Event::Seek(value)) => {
+            Step::Ready(Event::Seek(value)) => {
                 receipt = Some(Receipt::from(value));
                 break;
             }
-            ParseStep::Event(Event::Packet(_)) => panic!("no packet before seek completion"),
-            ParseStep::Yield | ParseStep::Event(_) => (),
-            other @ ParseStep::Finished => {
+            Step::Ready(Event::Packet(_)) => panic!("no packet before seek completion"),
+            Step::Yield | Step::Ready(_) => (),
+            other @ Step::End(_) => {
                 panic!("transient pressure cannot become permanent exhaustion: {other:?}")
             }
         }

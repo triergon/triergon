@@ -2,9 +2,10 @@ use std::ffi::OsString;
 use std::sync::atomic::AtomicBool;
 
 use triergon_core::WorkBudget;
-use triergon_matroska::{Configuration, Error, Limits, ParseStep, Presence, TrackExtensions};
+use triergon_matroska::{Configuration, Error, Limits, Presence, TrackExtensions};
 
 use super::side_data::{Input, Rows};
+use triergon_core::Step;
 use triergon_harness_runner::Operation;
 
 const DVCC: u64 = 0x64766343;
@@ -18,7 +19,7 @@ pub(super) fn track_extensions(
 ) -> triergon_matroska::Result<TrackExtensions> {
     let mut job = configuration.track_extensions_job(track, Limits::default())?;
     match job.step(&mut WorkBudget::new(u64::MAX), cancel)? {
-        ParseStep::Event(extensions) => Ok(extensions),
+        Step::Ready(extensions) => Ok(extensions),
         _ => Err(Error::Invalid("track extensions did not finish")),
     }
 }

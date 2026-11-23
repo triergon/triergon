@@ -258,11 +258,11 @@ fn simple_direct_ready_cancel_transport_reset_and_retained_parent() {
                 break;
             }
             match r
-                .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
                 .unwrap()
             {
-                ParseStep::NeedInput(q) => supply(&mut r, q, &raw, 7, &mut aliases),
-                ParseStep::Yield | ParseStep::Event(_) => (),
+                Step::NeedInput(q) => supply(&mut r, q, &raw, 7, &mut aliases),
+                Step::Yield | Step::Ready(_) => (),
                 other => panic!("{other:?}"),
             }
         }
@@ -321,15 +321,15 @@ fn simple_direct_empty_payload_owner_survives_reset_and_reader_drop() {
         let mut output = None;
         for _ in 0..100_000 {
             match r
-                .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
                 .unwrap()
             {
-                ParseStep::NeedInput(q) => supply(&mut r, q, &raw, 1, &mut aliases),
-                ParseStep::Event(Event::Packet(p)) => {
+                Step::NeedInput(q) => supply(&mut r, q, &raw, 1, &mut aliases),
+                Step::Ready(Event::Packet(p)) => {
                     output = Some(p);
                     break;
                 }
-                ParseStep::Yield | ParseStep::Event(_) => (),
+                Step::Yield | Step::Ready(_) => (),
                 other => panic!("{other:?}"),
             }
         }

@@ -7,8 +7,8 @@
 use crate::ebml_kit::{cluster, crc32, element as e, mkv, uint as u};
 use crate::timing::BlockTiming;
 use crate::{
-    Event, InitializationOrigin, Limits, ParseStep, PayloadOwnership, Reader, SeekReceipt,
-    SourcePosition, TypedPacket,
+    Event, InitializationOrigin, Limits, PayloadOwnership, Reader, SeekReceipt, SourcePosition,
+    TypedPacket,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
@@ -235,9 +235,9 @@ pub(crate) fn open(reader: &mut Reader, feed: &mut Feed<'_>) -> Result<()> {
         if reader.is_ready() {
             return Ok(());
         }
-        match reader.step_parse(&mut WorkBudget::new(8192), &AtomicBool::new(false))? {
-            ParseStep::NeedInput(request) => feed.supply(reader, request)?,
-            ParseStep::Yield | ParseStep::Event(_) => (),
+        match reader.step(&mut WorkBudget::new(8192), &AtomicBool::new(false))? {
+            Step::NeedInput(request) => feed.supply(reader, request)?,
+            Step::Yield | Step::Ready(_) => (),
             other => panic!("opening must be bounded: {other:?}"),
         }
     }

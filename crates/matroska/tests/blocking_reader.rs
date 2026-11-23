@@ -16,8 +16,8 @@ use std::{
         atomic::{AtomicBool, Ordering},
     },
 };
-use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
-use triergon_matroska::{BlockingReader, Error, Event, Limits, Packet, ParseStep, Reader};
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_matroska::{BlockingReader, Error, Event, Limits, Packet, Reader};
 
 fn block(relative: i16, key: bool) -> Vec<u8> {
     simple(1, relative, if key { 0x80 } else { 0 }, &[1, 2, 3])
@@ -1247,11 +1247,8 @@ fn header_refill_default_matches_canonical_io_packets_and_output_capacity() {
     let (mut expected_calls, mut canonical_packets) = (Vec::new(), Vec::new());
     let mut finished = false;
     for _ in 0..100_000 {
-        match canonical
-            .step_parse(&mut WorkBudget::new(8192), &cancel)
-            .unwrap()
-        {
-            ParseStep::NeedInput(request) => {
+        match canonical.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+            Step::NeedInput(request) => {
                 let maximum = request.maximum.min(8192);
                 expected_calls.push((request.offset, maximum.max(1)));
                 let at = request.offset as usize;
@@ -1269,13 +1266,13 @@ fn header_refill_default_matches_canonical_io_packets_and_output_capacity() {
                         .unwrap();
                 }
             }
-            ParseStep::Event(Event::Packet(packet)) => canonical_packets.push(packet),
-            ParseStep::Event(_) | ParseStep::Yield => (),
-            ParseStep::Finished => {
+            Step::Ready(Event::Packet(packet)) => canonical_packets.push(packet),
+            Step::Ready(_) | Step::Yield => (),
+            Step::End(_) => {
                 finished = true;
                 break;
             }
-            other @ ParseStep::Backpressure { .. } => {
+            other @ Step::Backpressure(_) => {
                 panic!("canonical complete source: {other:?}")
             }
         }
@@ -1415,11 +1412,8 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
     let mut canonical_packets = 0;
     let mut finished = false;
     for _ in 0..100_000 {
-        match canonical
-            .step_parse(&mut WorkBudget::new(8192), &cancel)
-            .unwrap()
-        {
-            ParseStep::NeedInput(request) => {
+        match canonical.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+            Step::NeedInput(request) => {
                 let maximum = request.maximum.min(8192);
                 expected.push((request.offset, maximum.max(1)));
                 let at = request.offset as usize;
@@ -1436,13 +1430,13 @@ fn performance_blocking_supply_preserves_canonical_exact_read_requests() {
                         .unwrap();
                 }
             }
-            ParseStep::Event(Event::Packet(_)) => canonical_packets += 1,
-            ParseStep::Event(_) | ParseStep::Yield => (),
-            ParseStep::Finished => {
+            Step::Ready(Event::Packet(_)) => canonical_packets += 1,
+            Step::Ready(_) | Step::Yield => (),
+            Step::End(_) => {
                 finished = true;
                 break;
             }
-            other @ ParseStep::Backpressure { .. } => panic!("canonical supply: {other:?}"),
+            other @ Step::Backpressure(_) => panic!("canonical supply: {other:?}"),
         }
     }
     assert!(finished);

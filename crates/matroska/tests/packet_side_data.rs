@@ -7,7 +7,7 @@ use ebml_kit::{element as e, mkv, uint as u};
 use std::{io::Cursor, sync::atomic::AtomicBool};
 use triergon_core::Step;
 use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, WorkBudget};
-use triergon_matroska::{BlockingReader, Error, Event, Limits, ParseStep, Reader};
+use triergon_matroska::{BlockingReader, Error, Event, Limits, Reader};
 
 fn drive(raw: &[u8], known: bool, events: &mut Vec<Event>) -> triergon_matroska::Result<()> {
     let pool = Budget::new(256 * 1024)?;
@@ -138,9 +138,9 @@ fn laces_share_complete_addition_sources_and_mapping_fields_survive_reader_drop(
                 &cancel,
             )
             .unwrap(),
-            ParseStep::Yield
+            Step::Yield
         ));
-        let ParseStep::Event([Some(projected), None]) = packet_side_data(
+        let Step::Ready([Some(projected), None]) = packet_side_data(
             packet,
             &extensions,
             Matroska,
@@ -229,7 +229,7 @@ fn side_data_projection_keeps_lcevc_and_rejects_foreign_mapping_context() {
         Err(Error::Invalid("packet additions TrackEntry mismatch"))
     ));
     let mut work = WorkBudget::new(18);
-    let ParseStep::Event(result) =
+    let Step::Ready(result) =
         packet_side_data(&packet, &extensions, Matroska, &mut work, &cancel).unwrap()
     else {
         panic!("projection has its exact grant");
@@ -286,7 +286,7 @@ fn side_data_projection_keeps_opaque_additions_beside_hdr10_plus() {
             .track_extensions_job(0, Limits::default())
             .unwrap(),
     );
-    let ParseStep::Event(result) = packet_side_data(
+    let Step::Ready(result) = packet_side_data(
         &packet,
         &extensions,
         Matroska,
@@ -529,8 +529,8 @@ fn finish_mapping(
         let result = job.step(&mut work, &AtomicBool::new(false)).unwrap();
         assert!(work.spent() <= 1);
         match result {
-            ParseStep::Event(value) => return value,
-            ParseStep::Yield => (),
+            Step::Ready(value) => return value,
+            Step::Yield => (),
             other => panic!("mapping: {other:?}"),
         }
     }
@@ -1017,9 +1017,9 @@ fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         Hdr10Plus::parse_t35(HDR10_PLUS, &mut WorkBudget::new(0), &cancel).unwrap(),
-        ParseStep::Yield
+        Step::Yield
     ));
-    let ParseStep::Event(metadata) =
+    let Step::Ready(metadata) =
         Hdr10Plus::parse_t35(HDR10_PLUS, &mut WorkBudget::new(4096), &cancel).unwrap()
     else {
         panic!("bounded HDR10+ control");
@@ -1132,7 +1132,7 @@ fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
                 .track_extensions_job(0, Limits::default())
                 .unwrap(),
         );
-        let ParseStep::Event(Some(hdr)) =
+        let Step::Ready(Some(hdr)) =
             block_additions::hdr10_plus(&packet, &map, WebM, &mut WorkBudget::new(4096), &cancel)
                 .unwrap()
         else {

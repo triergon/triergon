@@ -325,11 +325,11 @@ fn reader_reset_drops_unpublished_ready_packet_and_all_configuration_owners() {
             break;
         }
         match reader
-            .step_parse(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
-            ParseStep::NeedInput(request) => supply(&mut reader, request, &raw, false),
-            ParseStep::Yield | ParseStep::Event(_) => (),
+            Step::NeedInput(request) => supply(&mut reader, request, &raw, false),
+            Step::Yield | Step::Ready(_) => (),
             other => panic!("packet before EOF: {other:?}"),
         }
     }

@@ -66,10 +66,10 @@ impl Driver {
     // One real work unit cannot perform both a charged range jump and a byte
     // read. Observe actual cursor deltas in the same request, not a seek receipt
     // counter. Input provision itself never advances the parser cursor.
-    fn step(&mut self, cancel: bool) -> Result<ParseStep<Event>> {
+    fn step(&mut self, cancel: bool) -> ReaderStep<Event> {
         let before = self.reader.request();
         let mut work = WorkBudget::new(1);
-        let result = self.reader.step_parse(&mut work, &AtomicBool::new(cancel));
+        let result = self.reader.step(&mut work, &AtomicBool::new(cancel));
         assert!(work.spent() <= 1);
         let after = self.reader.request();
         if before.token.request() == after.token.request()
@@ -87,8 +87,8 @@ impl Driver {
                 return;
             }
             match self.step(false).unwrap() {
-                ParseStep::NeedInput(_) => self.supply(),
-                ParseStep::Yield | ParseStep::Event(_) => (),
+                Step::NeedInput(_) => self.supply(),
+                Step::Yield | Step::Ready(_) => (),
                 other => panic!("unexpected opening control: {other:?}"),
             }
         }
@@ -104,9 +104,8 @@ impl Driver {
                 return;
             }
             match self.step(false).unwrap() {
-                ParseStep::NeedInput(_) => self.supply(),
-                ParseStep::Yield
-                | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)) => (),
+                Step::NeedInput(_) => self.supply(),
+                Step::Yield | Step::Ready(Event::Envelope(_) | Event::Configuration(_)) => (),
                 other => panic!("packet/receipt before recovery source validation: {other:?}"),
             }
         }
@@ -115,10 +114,9 @@ impl Driver {
     fn seek_receipt(&mut self) -> SeekReceipt {
         for _ in 0..1_000_000 {
             match self.step(false).unwrap() {
-                ParseStep::NeedInput(_) => self.supply(),
-                ParseStep::Yield
-                | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)) => (),
-                ParseStep::Event(Event::Seek(receipt)) => return receipt,
+                Step::NeedInput(_) => self.supply(),
+                Step::Yield | Step::Ready(Event::Envelope(_) | Event::Configuration(_)) => (),
+                Step::Ready(Event::Seek(receipt)) => return receipt,
                 other => panic!("invalid recovery seek publication: {other:?}"),
             }
         }
@@ -127,10 +125,9 @@ impl Driver {
     fn prefix_packet(&mut self) -> TypedPacket {
         for _ in 0..1_000_000 {
             match self.step(false).unwrap() {
-                ParseStep::NeedInput(_) => self.supply(),
-                ParseStep::Yield
-                | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)) => (),
-                ParseStep::Event(Event::Packet(packet)) => return packet,
+                Step::NeedInput(_) => self.supply(),
+                Step::Yield | Step::Ready(Event::Envelope(_) | Event::Configuration(_)) => (),
+                Step::Ready(Event::Packet(packet)) => return packet,
                 other => panic!("actual subtitle prefix absent: {other:?}"),
             }
         }
@@ -153,9 +150,9 @@ fn subtitle_recovery_work_zero_cancel_and_reset_keep_real_cursor_and_source_iden
     assert!(matches!(
         driver
             .reader
-            .step_parse(&mut zero, &AtomicBool::new(false))
+            .step(&mut zero, &AtomicBool::new(false))
             .unwrap(),
-        ParseStep::Yield | ParseStep::NeedInput(_)
+        Step::Yield | Step::NeedInput(_)
     ));
     assert_eq!(zero.spent(), 0);
     assert_eq!(request_fact(&driver.reader), before);
@@ -188,9 +185,9 @@ fn subtitle_recovery_external_pressure_retries_without_consuming_pending_input_o
     let mut blocked = false;
     for _ in 0..100_000 {
         match driver.step(false).unwrap() {
-            ParseStep::NeedInput(_) => driver.supply(),
-            ParseStep::Yield | ParseStep::Event(Event::Envelope(_)) => (),
-            ParseStep::Backpressure { .. } => {
+            Step::NeedInput(_) => driver.supply(),
+            Step::Yield | Step::Ready(Event::Envelope(_)) => (),
+            Step::Backpressure(_) => {
                 blocked = true;
                 break;
             }
@@ -206,9 +203,9 @@ fn subtitle_recovery_external_pressure_retries_without_consuming_pending_input_o
     assert!(matches!(
         driver
             .reader
-            .step_parse(&mut zero, &AtomicBool::new(false))
+            .step(&mut zero, &AtomicBool::new(false))
             .unwrap(),
-        ParseStep::Yield | ParseStep::Backpressure { .. }
+        Step::Yield | Step::Backpressure(_)
     ));
     assert_eq!(zero.spent(), 0);
     assert_eq!(request_fact(&driver.reader), before);
@@ -247,10 +244,8 @@ fn subtitle_recovery_whole_operation_limit_is_not_refilled_for_the_extra_scan() 
     let mut rejected = false;
     for _ in 0..1_000_000 {
         match driver.step(false) {
-            Ok(ParseStep::NeedInput(_)) => driver.supply(),
-            Ok(
-                ParseStep::Yield | ParseStep::Event(Event::Envelope(_) | Event::Configuration(_)),
-            ) => (),
+            Ok(Step::NeedInput(_)) => driver.supply(),
+            Ok(Step::Yield | Step::Ready(Event::Envelope(_) | Event::Configuration(_))) => (),
             Err(Error::Policy("operation read bytes")) => {
                 rejected = true;
                 break;
@@ -274,7 +269,7 @@ fn subtitle_recovery_transport_failure_stays_failure_before_any_receipt_or_packe
     let mut failed = false;
     for _ in 0..100_000 {
         match driver.step(false).unwrap() {
-            ParseStep::NeedInput(request) => {
+            Step::NeedInput(request) => {
                 driver
                     .reader
                     .fail(request.source, request.token, SourceFailure::Transport)
@@ -290,7 +285,7 @@ fn subtitle_recovery_transport_failure_stays_failure_before_any_receipt_or_packe
                 failed = true;
                 break;
             }
-            ParseStep::Yield | ParseStep::Event(Event::Envelope(_)) => (),
+            Step::Yield | Step::Ready(Event::Envelope(_)) => (),
             other => panic!("transport fault escaped recovery boundary: {other:?}"),
         }
     }

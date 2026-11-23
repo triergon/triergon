@@ -21,10 +21,10 @@ fn reader() -> Reader {
 fn header_refill_is_canonical_and_disabled_for_resolver_opening_seek_and_scan() {
     let mut reader = reader();
     let request = match reader
-        .step_parse(&mut WorkBudget::new(64), &AtomicBool::new(false))
+        .step(&mut WorkBudget::new(64), &AtomicBool::new(false))
         .unwrap()
     {
-        ParseStep::NeedInput(request) => request,
+        Step::NeedInput(request) => request,
         other => panic!("initial header: {other:?}"),
     };
     assert_eq!(request.maximum, 4096);
@@ -38,7 +38,7 @@ fn header_refill_is_canonical_and_disabled_for_resolver_opening_seek_and_scan() 
     assert_eq!(exact.maximum, 1);
     let disabled = |r: &Reader| {
         assert!(r.ordinary_header_refill().unwrap().is_none());
-        let ParseStep::NeedInput(hint) = r.canonical_input_hint(exact.clone()).unwrap() else {
+        let Step::NeedInput(hint) = r.canonical_input_hint(exact.clone()).unwrap() else {
             panic!("disabled policy must retain NeedInput");
         };
         assert_eq!(hint.maximum, exact.maximum);

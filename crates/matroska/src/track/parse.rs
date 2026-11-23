@@ -451,7 +451,7 @@ impl TrackJob {
                     .extensions
                     .as_mut()
                     .required("missing TrackEntry extension validation")?
-                    .step(work, cancel)?
+                    .step_job(work, cancel)?
                 {
                     ParseStep::Event(_) => {
                         self.extensions = None;

@@ -83,7 +83,7 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         loop {
             check(cancel)?;
             if self.tracks().is_empty() {
@@ -94,7 +94,7 @@ impl Reader {
                 }
                 self.opening = None;
                 self.resolver = Some(Resolver::new(ResolvePurpose::Opening, &self.pool));
-                return Ok(ParseStep::Yield);
+                return Ok(Step::Yield);
             }
             let opening = self
                 .opening
@@ -104,10 +104,10 @@ impl Reader {
                 || opening.at == self.seek_targets.len()
             {
                 self.opening = None;
-                return Ok(ParseStep::Yield);
+                return Ok(Step::Yield);
             }
             if !work.try_charge(1) {
-                return Ok(ParseStep::Yield);
+                return Ok(Step::Yield);
             }
             let (id, position) = self.seek_targets.as_slice()[opening.at];
             if !matches!(
@@ -124,7 +124,7 @@ impl Reader {
             if opening.loaded == self.loaded.len() {
                 self.opening = None;
                 self.resolver = Some(Resolver::new(ResolvePurpose::Opening, &self.pool));
-                return Ok(ParseStep::Yield);
+                return Ok(Step::Yield);
             }
             if self.loaded.as_slice()[opening.loaded].0 == position {
                 opening.at += 1;
@@ -138,7 +138,7 @@ impl Reader {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         let mut resolver = self
             .resolver
             .take()
@@ -154,7 +154,7 @@ impl Reader {
         resolver: &mut Resolver,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<Event>> {
+    ) -> ReaderStep<Event> {
         loop {
             check(cancel)?;
             match resolver.phase {
@@ -164,7 +164,7 @@ impl Reader {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                        return Ok(Step::Yield);
                     }
                     resolver.target = Some(self.seek_targets.as_slice()[resolver.at]);
                     resolver.lookup = 0;
@@ -178,7 +178,7 @@ impl Reader {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                        return Ok(Step::Yield);
                     }
                     let (old_position, old_id) = self.loaded.as_slice()[resolver.lookup];
                     resolver.lookup += 1;
@@ -198,7 +198,7 @@ impl Reader {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                        return Ok(Step::Yield);
                     }
                     let old = resolver.seen.as_slice()[resolver.seen_at];
                     resolver.seen_at += 1;
@@ -220,7 +220,7 @@ impl Reader {
                             Phase::Reserve
                         };
                     }
-                    other => return crate::step::pending(other),
+                    other => return other.waiting(),
                 },
                 Phase::Reserve => {
                     self.loaded.reserve(1)?;
@@ -252,7 +252,7 @@ impl Reader {
                             resolver.phase = Phase::Begin;
                         }
                     }
-                    other => return crate::step::pending(other),
+                    other => return other.waiting(),
                 },
                 Phase::Catalogue => match resolver
                     .prepare
@@ -265,11 +265,11 @@ impl Reader {
                         resolver.prepare = None;
                         resolver.phase = Phase::Begin;
                     }
-                    other => return crate::step::pending(other),
+                    other => return other.waiting(),
                 },
                 Phase::Begin => {
                     if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                        return Ok(Step::Yield);
                     }
                     let (id, position) = resolver.target.required("missing metadata target")?;
                     resolver.range = Some(if resolver.header_only {
@@ -318,7 +318,7 @@ impl Reader {
                                 resolver.phase = Phase::Metadata;
                             }
                         }
-                        other => return crate::step::pending(other),
+                        other => return other.waiting(),
                     }
                 }
                 Phase::Metadata => {
@@ -336,7 +336,7 @@ impl Reader {
                 }
                 Phase::Finish => {
                     if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                        return Ok(Step::Yield);
                     }
                     match resolver.purpose {
                         ResolvePurpose::Opening => {
@@ -360,7 +360,7 @@ impl Reader {
                         }
                     }
                     resolver.done = true;
-                    return Ok(ParseStep::Yield);
+                    return Ok(Step::Yield);
                 }
             }
         }

@@ -323,7 +323,7 @@ trait WideBaselineSlot {
         stop: Option<u64>,
         scan_prefix: bool,
         ready: &mut Option<D::Event>,
-    ) -> Result<ParseStep<()>>;
+    ) -> ReaderStep<()>;
 }
 impl WideBaselineSlot for Reader {
     fn step_demux_projected_into<D: PacketProjection>(
@@ -333,13 +333,16 @@ impl WideBaselineSlot for Reader {
         stop: Option<u64>,
         scan_prefix: bool,
         ready: &mut Option<D::Event>,
-    ) -> Result<ParseStep<()>> {
+    ) -> ReaderStep<()> {
         match self.step_demux_projected::<D>(work, cancel, stop, scan_prefix)? {
-            ParseStep::Event(event) => {
+            Step::Ready(event) => {
                 *ready = Some(event);
-                Ok(ParseStep::Event(()))
+                Ok(Step::Ready(()))
             }
-            other => crate::step::pending(other),
+            Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+            Step::Yield => Ok(Step::Yield),
+            Step::Backpressure(pressure) => Ok(Step::Backpressure(pressure)),
+            Step::End(location) => Ok(Step::End(location)),
         }
     }
 }
@@ -364,7 +367,7 @@ fn demux_slot_pending_transport_cancel_and_eof_owners_are_empty() {
         let mut zero = WorkBudget::new(0);
         let first = call(&mut reader, &mut zero, &AtomicBool::new(false)).unwrap();
         assert!(
-            matches!(first,ParseStep::NeedInput(request) if request.offset==0 && request.maximum==1)
+            matches!(first,Step::NeedInput(request) if request.offset==0 && request.maximum==1)
         );
         assert_eq!(zero.spent(), 0);
         let stale = reader.request();
@@ -453,19 +456,19 @@ fn demux_slot_real_full_pool_rejection_publishes_no_owner() {
                 )
             };
             match status {
-                Ok(ParseStep::Event(())) => {
+                Ok(Step::Ready(())) => {
                     assert!(ready.take().is_some());
                 }
-                Ok(ParseStep::NeedInput(request)) => {
+                Ok(Step::NeedInput(request)) => {
                     assert!(ready.is_none());
                     supply(&mut reader, request, &bytes);
                 }
-                Ok(ParseStep::Backpressure { .. }) | Err(Error::Backpressure { .. }) => {
+                Ok(Step::Backpressure(_)) | Err(Error::Backpressure { .. }) => {
                     assert!(ready.is_none());
                     blocked = true;
                     break;
                 }
-                Ok(ParseStep::Yield) => assert!(ready.is_none()),
+                Ok(Step::Yield) => assert!(ready.is_none()),
                 other => panic!("unexpected full-pool result {other:?}"),
             }
         }

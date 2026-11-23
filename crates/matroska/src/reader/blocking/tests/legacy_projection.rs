@@ -322,7 +322,7 @@ fn snapshot_slot(job: &SimplePacketJob) -> bool {
 fn quantum<D: PacketProjection>(
     reader: &mut BlockingReader<Recorded>,
     units: u64,
-) -> Result<ParseStep<D::Event>> {
+) -> ReaderStep<D::Event> {
     if reader.input.has_pending_read() {
         reader.input.discard_stale(&reader.reader.request());
     }
@@ -332,7 +332,7 @@ fn quantum<D: PacketProjection>(
     let step = reader
         .reader
         .step_projected::<D>(&mut WorkBudget::new(units), &AtomicBool::new(false))?;
-    if let ParseStep::NeedInput(request) = step {
+    if let Step::NeedInput(request) = step {
         let header = reader.reader.needs_header_input();
         let refill = reader.reader.header_refill_for_request(&request)?;
         let result = if let Some(plan) = refill {
@@ -357,7 +357,7 @@ fn quantum<D: PacketProjection>(
         if let FeedStep::Backpressure { requested, .. } = result {
             reader.reader.allocation_blocked(requested);
         }
-        Ok(ParseStep::Yield)
+        Ok(Step::Yield)
     } else {
         Ok(step)
     }
@@ -397,10 +397,7 @@ fn legacy_projection_switch_during_real_pressure_does_not_change_walk_graph_befo
     reader.reader.allocation_blocked(1);
     for units in [0, 1, 1, 1, 7, 8192] {
         let step = quantum::<TypedProjection>(&mut reader, units).unwrap();
-        assert!(matches!(
-            step,
-            ParseStep::Yield | ParseStep::Backpressure { .. }
-        ));
+        assert!(matches!(step, Step::Yield | Step::Backpressure(_)));
         if let State::Simple(job) = &reader.reader.state {
             assert!(!snapshot_slot(job));
         } else {
@@ -446,7 +443,7 @@ fn legacy_projection_zero_one_work_and_cancel_keep_pending_packet_unpublished() 
     let position = reader.reader.position();
     assert!(matches!(
         quantum::<LegacyProjection>(&mut reader, 0).unwrap(),
-        ParseStep::Yield
+        Step::Yield
     ));
     assert_eq!(reader.reader.position(), position);
     assert!(matches!(

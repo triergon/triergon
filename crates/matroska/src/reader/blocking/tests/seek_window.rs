@@ -97,11 +97,8 @@ fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
             reader.seek_for_playback(0, 7_500_000_000).unwrap();
             sought = true;
         }
-        match reader
-            .step_parse(&mut WorkBudget::new(8192), &cancel)
-            .unwrap()
-        {
-            ParseStep::NeedInput(request) => {
+        match reader.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
+            Step::NeedInput(request) => {
                 if sought
                     && matches!(reader.seek_stage, SeekStage::Epoch(_))
                     && request.offset == reader.first_cluster.as_ref().unwrap().offset()
@@ -116,7 +113,7 @@ fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
                     assert!(plan.expanded().maximum > request.maximum);
                     assert!(plan.expanded().maximum <= 4096);
                     assert!(plan.expanded().offset + plan.expanded().maximum as u64 <= stop);
-                    let ParseStep::NeedInput(public) =
+                    let Step::NeedInput(public) =
                         reader.canonical_input_hint(request.clone()).unwrap()
                     else {
                         panic!("canonical request disappeared")
@@ -151,7 +148,7 @@ fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
                         .unwrap();
                 }
             }
-            ParseStep::Finished => break,
+            Step::End(_) => break,
             _ => (),
         }
     }
