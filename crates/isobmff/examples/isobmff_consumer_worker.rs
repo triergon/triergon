@@ -12,12 +12,13 @@ use protocol::{Retention, Stats};
 use std::{
     env,
     fs::File,
-    io::{self, Cursor, Read, Seek, Write},
+    io::{self, Cursor, Read, Seek},
     path::Path,
     process::ExitCode,
     time::Instant,
 };
 use triergon_core::Error;
+use triergon_harness_runner::Boundary;
 use triergon_isobmff::{
     boxes::MediaDataPolicy,
     table::{SampleTablePolicy, SyncSamplePolicy, TimingRunPolicy},
@@ -265,8 +266,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
         }
         "open-memory" | "open-memory-baseline" | "native-index-memory" | "seek-memory" => {
             // Always close the observed window, including operation failure.
-            io::stdout().write_all(b"TRIERGON_BEGIN_V1\n")?;
-            io::stdout().flush()?;
+            Boundary::Begin.mark(&mut io::stdout())?;
             let result = if mode == "open-memory-baseline" {
                 input
                     .rewind()
@@ -275,8 +275,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
             } else {
                 operation(&mut input, o, op, policy, None)
             };
-            io::stdout().write_all(b"TRIERGON_END_V1\n")?;
-            io::stdout().flush()?;
+            Boundary::End.mark(&mut io::stdout())?;
             output_stats(&result?, 1, 0)?;
         }
         _ => return Err(Error::Invalid("unknown worker mode").into()),
