@@ -373,7 +373,7 @@ recovery_case!(recovery_empty_run, "empty-run", false);
 recovery_case!(recovery_coverage_over, "coverage-over");
 recovery_case!(recovery_coverage_under, "coverage-under", false);
 recovery_case!(recovery_fragment_namespace, "fragment-namespace");
-recovery_case!(recovery_grouping_parameter, "grouping-parameter");
+recovery_case!(recovery_grouping_parameter, "grouping-parameter", false);
 recovery_case!(
     recovery_variable_length_unadmitted,
     "variable-length-unadmitted"

@@ -280,7 +280,8 @@ Limits of the reader:
 The MOV metadata view accepts a QuickTime MPEG-4 audio `wave` with its `esds`
 and no optional `frma` format atom.
 Empty `sbgp` runs associate no samples. Samples beyond the last run use the group
-default when present.
+default when present. The recovery view retains the version-1 grouping type
+parameter with its mapping.
 
 ## Behaviour and limits
 

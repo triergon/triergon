@@ -380,13 +380,6 @@ impl RecoveryWalk {
                             &raw,
                             &mut self.error_backing,
                         )?;
-                        if !self.extended && source.grouping_parameter().is_some_and(|p| p != 0) {
-                            return source_result(
-                                Err(Error::Unsupported("encoded recovery grouping parameter")),
-                                &raw,
-                                &mut self.error_backing,
-                            );
-                        }
                         Pending::Mappings {
                             source,
                             row: 0,

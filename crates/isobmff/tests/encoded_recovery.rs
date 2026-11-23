@@ -303,13 +303,13 @@ fn fragment_namespace_cannot_resolve_as_regular_track_description() {
     );
 }
 #[test]
-fn unknown_grouping_parameter_stays_visible_and_unadmitted() {
-    assert_eq!(
-        Source::new(fixture("grouping-parameter"))
-            .plan(1)
-            .unwrap_err(),
-        Error::Unsupported("encoded recovery grouping parameter")
-    );
+fn version_one_grouping_parameter_is_kept_with_its_mapping() {
+    let source = Source::new(fixture("grouping-parameter"));
+    let plan = source.plan(1).unwrap();
+    let facts = plan.recovery_facts().unwrap();
+    let mappings = facts.source_scope(RecoveryKind::Roll).mappings.unwrap();
+    assert_eq!(mappings.grouping_parameter(), Some(7));
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn variable_lengths_do_not_trigger_repeated_prefix_parsing() {
