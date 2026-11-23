@@ -2717,11 +2717,6 @@
         "packets": 315,
         "bytes": 0,
         "digest": 12013776376403536199
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 248
       }
     }
   ]

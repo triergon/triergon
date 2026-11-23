@@ -12,7 +12,7 @@
     "For asc, fold kind 2 with declared bits, physical bits and whether they are equal. At each extent in order (declared 0, physical 1), fold kind 3 with scope and channel count for an eligible configuration, or kind 8 with scope on refusal. The candidate caps the decoder policy at 64 channels and disables explicitly coded core frequencies, which the reference decoder refuses at open. The reference supplies the byte extent to avcodec_open2, padding a partial final byte with zero bits. The asc-truncated operation first requires a truncation in the authored exact bit scope and then compares that same padded byte representation. Zero bytes supply no ASC. ASC rate and channel reason appear in the candidate trace. The reference has no initialized rate, profile or frame size at open on this corpus.",
     "For asc-mov, put the declared whole-byte ASC length and the full physical buffer in the DecoderSpecificInfo descriptor of an mp4a track. Fold kind 2 with the published extradata length and exact bytes, followed by kind 3 with the signalled sample rate, core channels and core samples per frame. Fold kind 8 on refusal. For asc-frame, provide the named ASC and the first raw access unit of the pinned ADTS stream to the reference decoder. Fold kind 3 with sample rate, channels and samples per channel, or kind 8. The candidate projects those outputs from the ASC's signalled rate, decoder channels and core frame length. For a two-byte AAC-LC ASC, express a dual-rate decoded frame in core samples at the signalled core rate; record the actual decoded rate and sample count in the trace.",
     "For hvcc-written, compare the hvcC prefix from the authored MP4 with the pinned reference's HEVC parser over the first packet. Fold kind 3 with profile, level, and chroma format and two bit depths minus eight from the parser's public pixel format descriptor. The reference inputs are complete movies written by the pinned release muxer.",
-    "For eac3, group each independent syncframe and its following dependent syncframes for comparison with the reference demuxer's decoded packet. Fold kind 1 with group offset and byte size, rate, samples, channels, native AVChannel mask, audio service type and matrix encoding. Fold kind 3 for published downmix side data with preferred mode and five linear gains rounded to 10^-5 in this order: center Lo/Ro, center Lt/Rt, surround Lo/Ro, surround Lt/Rt, LFE. Use the ATSC A/52 Annex E locations and level tables. The public downmix mode values for coded 0, 1, 2 and 3 are 0, 2, 1 and 3. Stereo frames in this corpus can publish matrix encoding. The reference publishes downmix side data on the multichannel inputs. Fold kind 7 with packet count on complete input, or kind 8 with the refusal offset."
+    "For eac3, group each independent syncframe, E-AC-3 or AC-3, and its following dependent syncframes for comparison with the reference demuxer's decoded packet. Fold kind 1 with group offset and byte size, rate, samples, channels, native AVChannel mask, audio service type and matrix encoding. Fold kind 3 for published downmix side data with preferred mode and five linear gains rounded to 10^-5 in this order: center Lo/Ro, center Lt/Rt, surround Lo/Ro, surround Lt/Rt, LFE. Use the ATSC A/52 Annex E locations and level tables. The public downmix mode values for coded 0, 1, 2 and 3 are 0, 2, 1 and 3. Stereo frames in this corpus can publish matrix encoding. The reference publishes downmix side data on the multichannel inputs. Fold kind 7 with packet count on complete input, or kind 8 with the refusal offset."
   ],
   "required_profiles": [
     "asc",
@@ -106,15 +106,6 @@
       "cases": [
         "asc-sync-extent-32"
       ]
-    }
-  ],
-  "pending_module_requirements": [
-    "The E-AC-3 configuration view opens the frame reader with the E-AC-3 only selection and refuses a stream whose access units are an AC-3 syncframe (bsid 6) followed by an E-AC-3 dependent substream. ATSC A/52:2018 Annex E allows that pairing and the reference returns 157 access units of 4608 bytes. The view must read with either family selected and group the dependent substream with its independent AC-3 frame."
-  ],
-  "open_cases": [
-    {
-      "id": "the-great-wall-7-1",
-      "requirement": "The E-AC-3 configuration view opens the frame reader with the E-AC-3 only selection and refuses a stream whose access units are an AC-3 syncframe (bsid 6) followed by an E-AC-3 dependent substream. ATSC A/52:2018 Annex E allows that pairing and the reference returns 157 access units of 4608 bytes. The view must read with either family selected and group the dependent substream with its independent AC-3 frame."
     }
   ],
   "open_unmeasured": [

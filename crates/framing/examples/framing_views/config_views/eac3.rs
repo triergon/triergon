@@ -19,6 +19,7 @@ const BSI_BITS: usize = FRAME_BYTES * 8;
 fn frames(
     input: &[u8],
     pool: &Budget,
+    selection: Ac3StreamSelection,
     mut observe: impl FnMut(Ac3Frame) -> Result<bool, String>,
 ) -> Result<Option<u64>, String> {
     let capabilities = SourceCapabilities {
@@ -29,7 +30,7 @@ fn frames(
         pool,
         SOURCE,
         capabilities,
-        Ac3StreamSelection::Eac3Only,
+        selection,
         Ac3FrameLimits {
             maximum_frame_bytes: FRAME_BYTES,
             maximum_frames: input.len() / 6 + 1,
@@ -96,7 +97,7 @@ pub(super) fn inspect(input: &[u8], bits: usize, bytes: usize) -> Action<'_> {
         let pool = Budget::new(input.len() + 32768).map_err(error)?;
         let mut count = 0;
         let mut refused = false;
-        let failure = frames(input, &pool, |frame| {
+        let failure = frames(input, &pool, Ac3StreamSelection::Eac3Only, |frame| {
             let offset = frame.facts().offset;
             let Some(bsi) = parse(&pool, frame, bits, bytes)? else {
                 refused = true;
@@ -180,35 +181,44 @@ pub(super) fn decoded(input: &[u8]) -> Action<'_> {
         let mut packet: Option<Packet> = None;
         let mut count = 0;
         let mut refused = false;
-        let failure = frames(input, &pool, |frame| {
+        // An access unit is an independent substream, E-AC-3 or AC-3, and the dependent
+        // substreams after it (ATSC A/52:2018 Annex E).
+        let failure = frames(input, &pool, Ac3StreamSelection::Any, |frame| {
             let offset = frame.facts().offset;
             let header = frame.facts().header;
-            let Ac3FrameDetails::Eac3 {
-                stream_type,
-                channel_map,
-                ..
-            } = header.details
-            else {
-                return Err("unexpected non-E-AC-3 frame".into());
-            };
-            if stream_type != 1
-                && let Some(previous) = packet.take()
-            {
+            let dependent = matches!(header.details, Ac3FrameDetails::Eac3 { stream_type: 1, .. });
+            if !dependent && let Some(previous) = packet.take() {
                 previous.emit(work, &mut trace)?;
                 count += 1;
             }
+            let channel_map = match header.details {
+                Ac3FrameDetails::Ac3 {
+                    bsmod,
+                    center_mix,
+                    surround_mix,
+                    surround_mode,
+                    ..
+                } => {
+                    let mix = (center_mix, surround_mix);
+                    packet = Some(Packet::ac3(header, offset, bsmod, surround_mode, mix));
+                    return Ok(true);
+                }
+                Ac3FrameDetails::Eac3 { channel_map, .. } => channel_map,
+            };
             let Some(bsi) = parse(&pool, frame, BSI_BITS, FRAME_BYTES)? else {
                 packet = None;
                 record(work, &mut trace, 8, &[offset], &[])?;
                 refused = true;
                 return Ok(false);
             };
-            if stream_type == 1 {
+            if dependent {
                 let group = packet
                     .as_mut()
                     .ok_or("dependent E-AC-3 frame without a primary frame")?;
                 group.size += header.frame_bytes;
                 group.layout |= channel_map.map_or_else(|| layout(header), custom_layout);
+                // The downmix levels are those of the last syncframe of the unit.
+                group.mix = eac3_mix(&bsi);
             } else {
                 packet = Some(Packet::new(&bsi));
             }
@@ -268,10 +278,48 @@ impl Packet {
                 service
             },
             matrix,
-            mix: facts
-                .mixing_metadata
-                .filter(|_| header.acmod > 2)
-                .map(|range| mix_levels(bsi.frame().bytes(), range, header)),
+            mix: eac3_mix(bsi),
+        }
+    }
+
+    /// The unit an AC-3 syncframe starts: its rate, 1536 samples, its layout, `bsmod` as
+    /// the service and `dsurmod` as the matrix encoding (the Annex D extended fields are
+    /// not read), and the downmix levels of its mix level codes (A/52 Tables 5.9 and 5.10).
+    fn ac3(
+        header: Ac3FrameHeader,
+        offset: u64,
+        bsmod: u8,
+        surround_mode: Option<u8>,
+        (center_mix, surround_mix): (Option<u8>, Option<u8>),
+    ) -> Self {
+        Self {
+            offset,
+            size: header.frame_bytes,
+            rate: header.sample_rate_hz,
+            samples: header.coded_samples(),
+            layout: layout(header),
+            service: if bsmod == 7 && header.acmod > 1 {
+                8
+            } else {
+                bsmod
+            },
+            // Dolby Surround (1) for `dsurmod` 2, else none.
+            matrix: u8::from(surround_mode == Some(2)),
+            mix: (header.acmod > 2).then(|| {
+                // Reserved codes as the intermediate -4.5 and -6 dB; no Lt/Rt levels in the
+                // main syntax, reported as -3 dB.
+                let center = match center_mix {
+                    Some(0) => 4,
+                    Some(2) => 6,
+                    _ => 5,
+                };
+                let surround = match surround_mix {
+                    Some(0) => 4,
+                    Some(2) => 7,
+                    _ => 6,
+                };
+                [0, LEVEL[center], LEVEL[4], LEVEL[surround], LEVEL[4], 0]
+            }),
         }
     }
 
@@ -331,6 +379,19 @@ fn custom_layout(map: u16) -> u64 {
         .fold(0, |layout, (_, mask)| layout | mask)
 }
 
+/// The downmix levels of an E-AC-3 syncframe with more than two front and surround
+/// channels: its mixing metadata, or the defaults where it carries none.
+fn eac3_mix(bsi: &Eac3Bsi) -> Option<[u64; 6]> {
+    let header = bsi.frame().facts().header;
+    (header.acmod > 2).then(|| match bsi.facts().mixing_metadata {
+        Some(range) => mix_levels(bsi.frame().bytes(), range, header),
+        None => [0, LEVEL[5], LEVEL[0], LEVEL[6], LEVEL[0], 0],
+    })
+}
+
+/// The mix level table of A/52 Annex D and E, gains scaled to five decimal places.
+const LEVEL: [u64; 8] = [141421, 118921, 100000, 84090, 70711, 59460, 50000, 0];
+
 fn mix_levels(bytes: &Bytes, range: Eac3BitRange, header: Ac3FrameHeader) -> [u64; 6] {
     let mut bit = range.start_bit() + 1;
     let mut field = |width: usize| {
@@ -359,8 +420,6 @@ fn mix_levels(bytes: &Bytes, range: Eac3BitRange, header: Ac3FrameHeader) -> [u6
     } else {
         0
     };
-    // The E-AC-3 mix-level table, scaled to five decimal places.
-    const LEVEL: [u64; 8] = [141421, 118921, 100000, 84090, 70711, 59460, 50000, 0];
     [
         downmix,
         LEVEL[usize::from(center)],
