@@ -608,21 +608,18 @@ impl Dts14SyncReader {
                     )?;
                     self.frame = Frame::Unpack { facts, unpacker };
                 }
-                Frame::Unpack { facts, unpacker } => match unpacker.step(work, cancel)? {
-                    Step::Ready(payload) => {
-                        if payload.residual_bits() != 0
-                            || payload.canonical_bytes().len() != facts.payload_bytes
-                        {
-                            return Err(Error::Invalid("DTS14 exact-word unpack invariant"));
-                        }
-                        let facts = *facts;
-                        self.frame = Frame::Ready(Dts14SyncFrame { payload, facts });
+                Frame::Unpack { facts, unpacker } => {
+                    let Some(payload) = unpacker.poll(work, cancel)? else {
+                        return Ok(Step::Yield);
+                    };
+                    if payload.residual_bits() != 0
+                        || payload.canonical_bytes().len() != facts.payload_bytes
+                    {
+                        return Err(Error::Invalid("DTS14 exact-word unpack invariant"));
                     }
-                    Step::Yield => return Ok(Step::Yield),
-                    Step::NeedInput(_) | Step::End(_) => {
-                        return Err(Error::Invalid("DTS14 owned unpack progress"));
-                    }
-                },
+                    let facts = *facts;
+                    self.frame = Frame::Ready(Dts14SyncFrame { payload, facts });
+                }
                 Frame::Ready(ready) => {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);

@@ -545,16 +545,11 @@ impl DtsNormalSourceReader {
                 }
                 Frame::Unpack { header, job } => {
                     let header = *header;
-                    match job.step(work, cancel)? {
-                        Step::Ready(payload) => {
-                            let facts = self.measure(header, &payload)?;
-                            self.frame = Frame::Ready(DtsNormalSourceFrame { payload, facts });
-                        }
-                        Step::Yield => return Ok(Step::Yield),
-                        Step::End(_) | Step::NeedInput(_) => {
-                            return Err(Error::Invalid("DTS owned payload progress"));
-                        }
-                    }
+                    let Some(payload) = job.poll(work, cancel)? else {
+                        return Ok(Step::Yield);
+                    };
+                    let facts = self.measure(header, &payload)?;
+                    self.frame = Frame::Ready(DtsNormalSourceFrame { payload, facts });
                 }
                 Frame::Ready(_) => return self.publish(work),
                 Frame::Ended(end) => return Ok(Step::End(*end)),

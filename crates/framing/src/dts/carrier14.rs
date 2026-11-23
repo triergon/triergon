@@ -602,33 +602,29 @@ impl Dts14CarrierReader {
                     )?;
                     self.packet = Packet::Unpack { raw, unpacker };
                 }
-                Packet::Unpack { raw, unpacker } => match unpacker.step(work, cancel)? {
-                    Step::Ready(p) => {
-                        // No tail is discarded and no reading of FSIZE is chosen.
-                        let checked =
-                            probe_core_header(p.canonical_bytes().as_ref()).and_then(|h| {
-                                if p.residual_bits() != 0
-                                    || h.frame_bytes != p.canonical_bytes().len()
-                                {
-                                    Err(Error::Unsupported("DTS carrier unresolved extent/tail"))
-                                } else {
-                                    Ok(h)
-                                }
-                            });
-                        let syntax = match checked {
-                            Ok(h) => Dts14CarrierSyntax::ExactNormal(h),
-                            Err(e) => Dts14CarrierSyntax::Refused(e),
-                        };
-                        let raw = raw.clone();
-                        self.packet = Packet::Ready {
-                            raw,
-                            payload: Some(p),
-                            syntax,
-                        };
-                    }
-                    Step::Yield => return Ok(Step::Yield),
-                    _ => return Err(Error::Invalid("carrier owned unpack progress")),
-                },
+                Packet::Unpack { raw, unpacker } => {
+                    let Some(p) = unpacker.poll(work, cancel)? else {
+                        return Ok(Step::Yield);
+                    };
+                    // No tail is discarded and no reading of FSIZE is chosen.
+                    let checked = probe_core_header(p.canonical_bytes().as_ref()).and_then(|h| {
+                        if p.residual_bits() != 0 || h.frame_bytes != p.canonical_bytes().len() {
+                            Err(Error::Unsupported("DTS carrier unresolved extent/tail"))
+                        } else {
+                            Ok(h)
+                        }
+                    });
+                    let syntax = match checked {
+                        Ok(h) => Dts14CarrierSyntax::ExactNormal(h),
+                        Err(e) => Dts14CarrierSyntax::Refused(e),
+                    };
+                    let raw = raw.clone();
+                    self.packet = Packet::Ready {
+                        raw,
+                        payload: Some(p),
+                        syntax,
+                    };
+                }
                 Packet::Ready { .. } => return self.publish(work),
                 Packet::Ended(end) => return Ok(Step::End(*end)),
             }

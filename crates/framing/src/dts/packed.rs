@@ -364,6 +364,20 @@ impl DtsPackedPayloadJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<DtsPackedPayload>> {
+        let complete = matches!(self.state, State::Complete);
+        Ok(match self.poll(work, cancel)? {
+            Some(payload) => Step::Ready(payload),
+            None if complete => Step::End(self.end),
+            None => Step::Yield,
+        })
+    }
+    /// The payload once it is complete, `None` while the work runs out; the job is not
+    /// polled again after it returned the payload. Fails as [`step`](Self::step) does.
+    pub(super) fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<DtsPackedPayload>> {
         if let State::Failed(error) = self.state {
             return Err(error);
         }
@@ -379,7 +393,7 @@ impl DtsPackedPayloadJob {
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Step<DtsPackedPayload>> {
+    ) -> Result<Option<DtsPackedPayload>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -392,7 +406,7 @@ impl DtsPackedPayloadJob {
                 } => (raw, builder, phase),
                 State::Frozen { raw, storage } => {
                     if !work.try_charge(1) {
-                        return Ok(Step::Yield);
+                        return Ok(None);
                     }
                     let payload = DtsPackedPayload {
                         raw: raw.clone(),
@@ -402,13 +416,14 @@ impl DtsPackedPayloadJob {
                         valid_bits: self.valid_bits,
                     };
                     self.state = State::Complete;
-                    return Ok(Step::Ready(payload));
+                    return Ok(Some(payload));
                 }
-                State::Complete => return Ok(Step::End(self.end)),
+                // Nothing is left; `step` reports the end of the record.
+                State::Complete => return Ok(None),
                 &mut State::Failed(error) => return Err(error),
             };
             if !work.try_charge(1) {
-                return Ok(Step::Yield);
+                return Ok(None);
             }
             match phase {
                 Phase::Reserve => {
