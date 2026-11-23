@@ -420,11 +420,9 @@ pub fn main(name: &str, operations: Operations) {
         Some(DecodeMode::Memory) => {
             // Same observer protocol as the container workers: one whole operation between markers.
             let mut stdout = std::io::stdout().lock();
-            stdout.write_all(Boundary::Begin.line()).expect("stdout");
-            stdout.flush().expect("stdout");
+            Boundary::Begin.mark(&mut stdout).expect("stdout");
             run(op, &data, &mut out);
-            stdout.write_all(Boundary::End.line()).expect("stdout");
-            stdout.flush().expect("stdout");
+            Boundary::End.mark(&mut stdout).expect("stdout");
             // Equal memory work is equal units and bytes; the digest goes to stderr
             // because audio may differ within the graded 1 LSB.
             writeln!(
