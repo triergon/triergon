@@ -176,7 +176,8 @@ fn defines_item(line: &str, name: &str) -> bool {
 /// A feature contract whose deviating cases pin only the reference's fold: its id,
 /// those cases, its deviating cases, and whether its comparison could pin the
 /// candidate's fold (a `cargo xtask report` prefix comparison records it as each
-/// case's `candidate_expected`).
+/// case's `candidate_expected`; a generated manifest's `pins.json` holds it under
+/// `candidate_pins`).
 pub struct OneSided {
     pub id: String,
     pub unpinned: usize,
@@ -219,12 +220,15 @@ pub fn one_sided(data: &[(String, Value)]) -> Vec<OneSided> {
             .and_then(|corpus| corpus.get("cases"))
             .and_then(Value::as_array)
             .unwrap_or_default();
+        let generated = document(&format!("harness/features/{id}/pins.json"));
         let pinned = |case: &str| {
             rows.iter().any(|row| {
                 row.get("id").and_then(Value::as_str) == Some(case)
                     && (row.get("candidate_expected").is_some()
                         || row.get("candidate_expected_by_target").is_some())
-            })
+            }) || generated
+                .and_then(|pins| pins.get("candidate_pins"))
+                .is_some_and(|pins| pins.get(case).is_some())
         };
         let unpinned = ids.iter().filter(|case| !pinned(case)).count();
         if unpinned > 0 {
@@ -232,9 +236,10 @@ pub fn one_sided(data: &[(String, Value)]) -> Vec<OneSided> {
                 id: id.to_owned(),
                 unpinned,
                 cases: ids.len(),
-                comparison_pins: contract.get("runner").and_then(Value::as_str)
-                    == Some("cargo xtask report")
-                    && contract.get("worker_operation").is_some(),
+                comparison_pins: generated.is_some()
+                    || (contract.get("runner").and_then(Value::as_str)
+                        == Some("cargo xtask report")
+                        && contract.get("worker_operation").is_some()),
             });
         }
     }

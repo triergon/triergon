@@ -147,8 +147,10 @@ pub(super) fn command(root: &Path, args: &[String], family: &str) -> Result<(), 
         _ => return Err(usage()),
     };
     let candidate = format!("{family}-worker");
-    let contracts: Vec<PathBuf> = if let Some(path) = id.filter(|id| id.ends_with("/contract.json"))
-    {
+    // A contract named by its path may use any prefix worker: the recorder serves the
+    // contracts whose workers have no family command of their own.
+    let named = id.filter(|id| id.ends_with("/contract.json"));
+    let contracts: Vec<PathBuf> = if let Some(path) = named {
         vec![root.join(path)]
     } else {
         features::discover(root)?
@@ -164,7 +166,9 @@ pub(super) fn command(root: &Path, args: &[String], family: &str) -> Result<(), 
     }
     for path in contracts {
         let contract = json::read(&path)?;
-        if contract.get("candidate").and_then(Value::as_str) != Some(candidate.as_str()) {
+        if named.is_none()
+            && contract.get("candidate").and_then(Value::as_str) != Some(candidate.as_str())
+        {
             return Err(format!("{} does not use {candidate}", path.display()));
         }
         let corpus_path = path.with_file_name("corpus.json");
@@ -217,7 +221,10 @@ fn directory(root: &Path, contract: &Value, listing: &Value) -> Option<PathBuf> 
 /// lists as open on this target (`open_cases` and `open_deviations`), the
 /// candidate's fold as `candidate_expected`, so that a listed case pins both outputs
 /// of its difference and not only that one exists. A case that is not listed keeps
-/// no candidate pin.
+/// no candidate pin. A contract pinned per target records this host's entries of
+/// `expected_by_target` and `candidate_expected_by_target` and keeps the other
+/// targets'; a reference fold that went through a step C leaves to the target keeps
+/// its flag.
 fn reference_pins(
     root: &Path,
     contract_path: &Path,
@@ -226,19 +233,18 @@ fn reference_pins(
     listing: &mut Value,
     selected: &[String],
 ) -> Result<(), String> {
-    if crate::generators::pinned_per_target(contract) {
-        return Err("per-target folds need a feature-specific recorder".into());
-    }
+    let target = report::gate_target()?;
+    let per_target = crate::generators::pinned_per_target(contract).then_some(target.as_str());
     let directory = directory(root, contract, listing);
     let feature =
         report::PrefixFeature::load(root, contract_path, manifest_path, directory.as_deref())?;
     let identity = json::read(&root.join("target/harness/identity.json"))?;
     let reference = feature.reference_worker(root, &identity)?;
-    let open = report::open_cases(contract, listing, &report::gate_target()?)?;
+    let open = report::open_cases(contract, listing, &target)?;
     let candidate = if open.is_empty() {
         None
     } else {
-        Some(crate::harness::validation::candidate_worker(
+        Some(crate::generators::built_candidate(
             root,
             &identity,
             &feature.candidate,
@@ -284,7 +290,16 @@ fn reference_pins(
                 worker.display()
             ));
         }
-        crate::harness::comparison::work_summary(&observed, &feature.work_fields)
+        let mut summary =
+            crate::harness::comparison::work_summary(&observed, &feature.work_fields)?;
+        if per_target.is_some() && crate::generators::host_dependent(&observed) {
+            crate::harness::validation::put(
+                &mut summary,
+                crate::generators::HOST_DEPENDENT,
+                Value::Bool(true),
+            )?;
+        }
+        Ok(summary)
     };
     let reference_prefix = feature
         .reference_prefix
@@ -309,19 +324,47 @@ fn reference_pins(
                 "{id}: listed as open, but the candidate's fold equals the reference's"
             ));
         }
-        crate::harness::validation::put(&mut case, "expected", expected)?;
-        if let Value::Object(fields) = &mut case {
-            fields.retain(|(key, _)| key != "candidate_expected");
-        }
-        if let Some(observed) = observed {
-            crate::harness::validation::put(&mut case, "candidate_expected", observed)?;
-        }
+        let (reference_key, candidate_key) = match per_target {
+            Some(_) => (
+                crate::generators::EXPECTED_BY_TARGET,
+                "candidate_expected_by_target",
+            ),
+            None => ("expected", "candidate_expected"),
+        };
+        set_pin(&mut case, reference_key, per_target, Some(expected))?;
+        set_pin(&mut case, candidate_key, per_target, observed)?;
         cases.push(case);
     }
     if !pending.is_empty() {
         return Err(format!("unknown selected case IDs: {pending:?}"));
     }
     crate::harness::validation::put(listing, "cases", Value::Array(cases))
+}
+
+/// Sets `case`'s `key` to `fold`, or removes it for `None`; with a target, sets or
+/// removes that target's entry of `key` and keeps the other targets'.
+fn set_pin(case: &mut Value, key: &str, target: Option<&str>, fold: Option<Value>) -> Result<()> {
+    let Value::Object(fields) = case else {
+        return Err("a case is not an object".into());
+    };
+    let Some(target) = target else {
+        fields.retain(|(name, _)| name != key);
+        fields.extend(fold.map(|fold| (key.to_owned(), fold)));
+        return Ok(());
+    };
+    let mut targets = match fields.iter().find(|(name, _)| name == key) {
+        Some((_, Value::Object(targets))) => targets.clone(),
+        Some(_) => return Err(format!("{key} is not keyed by target")),
+        None => Vec::new(),
+    };
+    targets.retain(|(name, _)| name != target);
+    targets.extend(fold.map(|fold| (target.to_owned(), fold)));
+    targets.sort_by(|a, b| a.0.cmp(&b.0));
+    fields.retain(|(name, _)| name != key);
+    if !targets.is_empty() {
+        fields.push((key.to_owned(), Value::Object(targets)));
+    }
+    Ok(())
 }
 
 type Result<T, E = String> = std::result::Result<T, E>;

@@ -158,7 +158,7 @@ fn a_contract_without_a_known_gate_fails_the_check() {
 fn alternate_references_get_their_own_pin_note() {
     let generator = &crate::fonts::GENERATOR;
     let contract = Value::Object(Vec::new());
-    let pins = generator.pin_file("alternate-font-reference", &contract, vec![]);
+    let pins = generator.pin_file("alternate-font-reference", &contract, vec![], vec![]);
     assert_eq!(
         pins.get("reference").and_then(Value::as_str),
         Some("alternate-font-reference")
@@ -185,13 +185,19 @@ fn recording_resolves_each_reference_before_writing_any_pins() {
         .unwrap();
     }
     let mut requested = Vec::new();
-    let result = crate::fonts::GENERATOR.record_with(&root, "test-target", false, |name| {
-        requested.push(name.to_owned());
-        if name == "reference-two" {
-            return Err("missing worker".into());
-        }
-        Ok(root.join("first-worker"))
-    });
+    let result = crate::fonts::GENERATOR.record_with(
+        &root,
+        "test-target",
+        false,
+        || Ok(None),
+        |name| {
+            requested.push(name.to_owned());
+            if name == "reference-two" {
+                return Err("missing worker".into());
+            }
+            Ok(root.join("first-worker"))
+        },
+    );
     assert_eq!(requested, ["reference-one", "reference-two"]);
     assert_eq!(result.unwrap_err(), "missing worker");
     assert!(!features.join("font-one/pins.json").exists());
@@ -216,5 +222,69 @@ fn compare_passes_report_options_through() {
             "out/shape-text",
             "--memory",
         ])
+    );
+}
+
+#[test]
+fn candidate_pins_follow_the_listed_cases_per_target() {
+    const HERE: &str = "aarch64-unknown-linux-gnu";
+    const OTHER: &str = "thumbv7neon-unknown-linux-gnueabihf";
+    let fold =
+        |digest| json::parse(&format!(r#"{{"packets":1,"bytes":2,"digest":{digest}}}"#)).unwrap();
+    let rows: Vec<Value> = ["listed", "closed"]
+        .iter()
+        .map(|id| Value::object([("id", Value::str(*id))]))
+        .collect();
+    let by_target =
+        |pairs: &[(&str, Value)]| Value::object(pairs.iter().map(|(t, v)| (*t, v.clone())));
+    let pinned = vec![
+        (
+            "listed".to_owned(),
+            by_target(&[(HERE, fold(1)), (OTHER, fold(1))]),
+        ),
+        (
+            "closed".to_owned(),
+            by_target(&[(HERE, fold(3)), (OTHER, fold(3))]),
+        ),
+    ];
+    let earlier = vec![
+        ("listed".to_owned(), by_target(&[(OTHER, fold(7))])),
+        ("closed".to_owned(), by_target(&[(HERE, fold(8))])),
+    ];
+    let listed = vec![rows[0].clone()];
+    // This target's fold joins the other target's; the closed case loses its entry.
+    let recorded = candidate_folds(
+        &rows,
+        (&pinned, Some(HERE)),
+        (&listed, &[fold(2)], true),
+        earlier.clone(),
+    )
+    .unwrap();
+    assert_eq!(
+        recorded,
+        vec![(
+            "listed".to_owned(),
+            by_target(&[(HERE, fold(2)), (OTHER, fold(7))])
+        )]
+    );
+    // Without a candidate run, this target's earlier pins stay.
+    let kept = candidate_folds(
+        &rows,
+        (&pinned, Some(HERE)),
+        (&listed, &[], false),
+        earlier.clone(),
+    )
+    .unwrap();
+    assert_eq!(kept, earlier);
+    // A listed case whose candidate fold equals the reference's must leave the list.
+    assert!(
+        candidate_folds(
+            &rows,
+            (&pinned, Some(HERE)),
+            (&listed, &[fold(1)], true),
+            earlier
+        )
+        .unwrap_err()
+        .contains("listed as open")
     );
 }
