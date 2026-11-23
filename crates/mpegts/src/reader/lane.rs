@@ -386,6 +386,9 @@ impl Framer {
 }
 
 /// A byte-stream call on a framer that takes whole PES, which [`Lane::step`] serves first.
+// The byte-stream framers in an enum of their own measured +0.95% with the tag in a niche (each
+// framer copied through `memcpy` when built) and +0.28% built in place (the ADTS carrier reader
+// and `finish` leave the step).
 const WHOLE_PES: &str = "MPEG-TS framer takes whole PES";
 
 struct Piece {
