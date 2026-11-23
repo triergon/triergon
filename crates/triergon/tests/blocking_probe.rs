@@ -207,16 +207,13 @@ fn short_eof_and_transport_errors_remain_distinct() {
     let pool = Budget::new(1 << 20).unwrap();
     for bytes in [&b""[..], b"\x1a\x45\xdf", b"OggS", b"ID3"] {
         check_openers(bytes, None, bytes.len(), None);
-        for kind in [ErrorKind::WouldBlock, ErrorKind::UnexpectedEof] {
+        for (kind, error) in [
+            (ErrorKind::WouldBlock, Error::Io(ErrorKind::WouldBlock)),
+            (ErrorKind::UnexpectedEof, Error::Truncated),
+        ] {
             let mut source = Fragmented::new(bytes, 1, Some(kind));
-            assert_eq!(
-                open_sequential(&mut source, &pool).err(),
-                Some(Error::Io(kind))
-            );
-            assert_eq!(
-                open_blocking(&mut source, &pool).err(),
-                Some(Error::Io(kind))
-            );
+            assert_eq!(open_sequential(&mut source, &pool).err(), Some(error));
+            assert_eq!(open_blocking(&mut source, &pool).err(), Some(error));
         }
     }
 }

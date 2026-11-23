@@ -17,7 +17,7 @@ pub fn open_blocking<S: Read + Seek>(
 ) -> Result<Blocking<AnyReader, S>> {
     let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
     let format = ProbeBuffer::new(pool).identify(&mut source, capabilities.length);
-    source.rewind().map_err(|e| Error::Io(e.kind()))?;
+    source.rewind()?;
     let reader = AnyReader::of(format?, pool, SourceId(1), capabilities)?;
     Ok(Blocking::seekable(reader, source, pool))
 }
@@ -228,7 +228,7 @@ fn read(source: &mut impl Read, out: &mut [u8]) -> Result<usize> {
     loop {
         match source.read(out) {
             Err(error) if error.kind() == ErrorKind::Interrupted => continue,
-            result => return result.map_err(|error| Error::Io(error.kind())),
+            result => return Ok(result?),
         }
     }
 }
