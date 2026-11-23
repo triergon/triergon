@@ -70,7 +70,7 @@ pub fn resolve_hls_aac_clocks(
         });
     }
     let mut clocks = BudgetVec::new(pool);
-    let tick = TimeBase::new(1, 90_000)?;
+    let tick = TimeBase::HZ_90000;
     let mut prefix_duration = Time::new(0, 1)?;
     let mut first_anchor = None;
     for (index, frame) in frames.iter().enumerate() {

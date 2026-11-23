@@ -3,6 +3,9 @@ use triergon_core::{Error, Result, Time};
 use triergon_mpegts::compat::pes::DemuxTimeView;
 use triergon_playback::{TrackKey, pes_feed::PesFacts};
 
+/// Ticks per second of PES timestamps: the rate of [`triergon_core::TimeBase::HZ_90000`].
+pub(crate) const PES_CLOCK_HZ: u32 = 90_000;
+
 /// The demux packet flag of a PES whose payload the demuxer marks corrupt.
 pub(crate) const PES_CORRUPT: u32 = 2;
 
@@ -43,5 +46,5 @@ pub(crate) fn pes_time(
     let ticks = ticks
         .filter(|value| value.rem_euclid(1 << 33) == i128::from(raw))
         .ok_or(Error::Invalid(mismatch))?;
-    Ok(Some(Time::new(ticks, 90_000)?))
+    Ok(Some(Time::new(ticks, u128::from(PES_CLOCK_HZ))?))
 }

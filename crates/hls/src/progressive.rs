@@ -4,6 +4,7 @@ use crate::{
     aac::{HlsAac, HlsAacFrame, MAXIMUM_ADTS_BYTES},
     avc::{AvcTsAccessUnit, AvcTsLimits, AvcTsReader, AvcTsStep},
     packet::UnitPacket,
+    pes::PES_CLOCK_HZ,
     pmt::select_pid,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -17,8 +18,6 @@ use triergon_playback::{
     Source, SourceOwner, SourceReply, TrackKey,
     pes_feed::{FeedPacket, FeedStep, PesInput, SpentLists, TsEngine},
 };
-
-const TS_CLOCK_RATE: u32 = 90_000;
 
 /// Bounds of a [`TsProgressiveReader`].
 #[derive(Clone, Copy, Debug, Default)]
@@ -699,7 +698,7 @@ fn audio_presentation(
         // The positive ADTS duration already makes the carried time monotone.
         match times.map(|(_, next)| next) {
             Some(NextAudioTime::Ticks90(ticks)) => (
-                Time::new(i128::from(ticks), u128::from(TS_CLOCK_RATE))?,
+                Time::new(i128::from(ticks), u128::from(PES_CLOCK_HZ))?,
                 Some(ticks),
             ),
             Some(NextAudioTime::Exact(next)) => (next, None),
@@ -720,12 +719,12 @@ fn audio_presentation(
 
 fn exact_ticks90(time: Time) -> Option<i64> {
     let denominator = u32::try_from(time.denominator()).ok()?;
-    if !TS_CLOCK_RATE.is_multiple_of(denominator) {
+    if !PES_CLOCK_HZ.is_multiple_of(denominator) {
         return None;
     }
     i64::try_from(time.numerator())
         .ok()?
-        .checked_mul(i64::from(TS_CLOCK_RATE / denominator))
+        .checked_mul(i64::from(PES_CLOCK_HZ / denominator))
 }
 
 fn pat_binding(table: &PatTable) -> Result<PatBinding> {

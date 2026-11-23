@@ -3,11 +3,9 @@
 //!
 //! An HEVC picture of a media segment is several slices of the reader's input and has
 //! no single payload slice, so it has no packet view; its `contiguous_feed` copies it.
-use crate::{aac::HlsAacFrame, avc::AvcTsAccessUnit};
+use crate::{aac::HlsAacFrame, avc::AvcTsAccessUnit, pes::PES_CLOCK_HZ};
 use triergon_core::container::{PacketInfo, RandomAccess, TrackId};
 use triergon_core::{Error, Result, Rounding, Time, TimeBase};
-
-const TS_CLOCK_RATE: u64 = 90_000;
 
 /// One AVC access unit or AAC frame with its track and times, borrowed from the unit.
 /// AVC uses 90 kHz ticks. AAC uses the lowest tick rate that represents both
@@ -31,7 +29,7 @@ impl<'a> UnitPacket<'a> {
         Ok(Self {
             track: TrackId(u64::from(pid)),
             payload: unit.source_bytes().as_ref(),
-            time_base: TimeBase::new(1, TS_CLOCK_RATE)?,
+            time_base: TimeBase::HZ_90000,
             pts: unit.clock.and_then(|clock| clock.pts90),
             dts: unit.clock.and_then(|clock| clock.dts90),
             duration: None,
@@ -51,8 +49,11 @@ impl<'a> UnitPacket<'a> {
         dts: Option<Time>,
     ) -> Result<Self> {
         let samples = u64::try_from(frame.duration.denominator()).map_err(|_| Error::Overflow)?;
-        let lcm = TS_CLOCK_RATE
-            .checked_mul(samples / gcd(TS_CLOCK_RATE, samples))
+        // The least common multiple of the two rates: reducing `samples / 90,000` leaves
+        // 90,000 divided by their greatest common divisor as the denominator.
+        let lcm = TimeBase::new(samples, u64::from(PES_CLOCK_HZ))?
+            .denominator()
+            .checked_mul(samples)
             .ok_or(Error::Overflow)?;
         let time_base = TimeBase::new(1, lcm)?;
         let ticks = |time: Time| time.to_i64_ticks(time_base, Rounding::Floor);
@@ -66,13 +67,6 @@ impl<'a> UnitPacket<'a> {
             random_access: RandomAccess::Unknown,
         })
     }
-}
-
-fn gcd(mut a: u64, mut b: u64) -> u64 {
-    while b != 0 {
-        (a, b) = (b, a % b);
-    }
-    a
 }
 
 impl PacketInfo for UnitPacket<'_> {
