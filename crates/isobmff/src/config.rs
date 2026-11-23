@@ -308,6 +308,7 @@ pub(crate) enum AudioDescriptionStep {
     Other,
 }
 
+#[derive(Debug)]
 pub(crate) struct AudioDescription(EsdsDescriptionWalk);
 
 impl AudioDescription {

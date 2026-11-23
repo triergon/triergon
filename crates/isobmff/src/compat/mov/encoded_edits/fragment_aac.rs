@@ -12,6 +12,7 @@ use triergon_framing::{
     aac::{AacAscParser, AacConfigLimits, AacSource},
 };
 
+#[derive(Debug)]
 enum Phase {
     Description(AudioDescription),
     Audio(AacAscParser),
@@ -20,7 +21,7 @@ enum Phase {
 /// Reads the leading decoder trim of the first AAC packet of a fragmented track whose
 /// edit list is one open-ended (zero-duration) rate-one edit with a positive media
 /// time. Source sample and fragment decode times stay in the media timescale.
-#[allow(missing_debug_implementations)] // The AAC parser has no Debug implementation.
+#[derive(Debug)]
 pub struct FragmentAacTrimJob {
     phase: Phase,
     pool: Budget,

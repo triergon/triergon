@@ -432,7 +432,7 @@ fn skip_side_data(start: u32, end: u32) -> Option<[u8; 10]> {
 /// sample groups, configuration and samples once and returns an [`EncodedEditPlan`].
 /// The constructor chooses the view; poll the job with the input cursor the sample
 /// table was read from.
-#[allow(missing_debug_implementations)] // Holds a framing parser that has no `Debug`.
+#[derive(Debug)]
 pub struct EncodedEditJob<'a> {
     context: EncodedEditContext<'a>,
     cursor: SampleCursor<'a>,
@@ -476,7 +476,7 @@ pub struct EncodedEditJob<'a> {
     recovery_observation: Option<crate::compat::mov::encoded_recovery_context::RecoveryObservation>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct LeadingVideoEdit {
     gap: i64,
     prefix: u64,
