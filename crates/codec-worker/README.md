@@ -29,6 +29,8 @@ codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 `audio-flac`, `audio-mp3`, `audio-vorbis` or `audio-opus`. The nightly-only `hevc-simd`
 and `aac-simd` features enable the HEVC and AAC decoders' SIMD kernels; HEVC output is
 identical. Decode errors are printed to stderr and decoding continues.
+The `audio-aac-raw` command accepts `--extensions reference` after the output path
+to reproduce reference SBR and PS recovery.
 
 The `audio-aac-access-units` inputs, made by `cargo xtask codecs aac-access-units --out
 DIR`, start with four little-endian 32-bit words (sample rate, channel count, packet

@@ -204,7 +204,7 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
 }
 
 fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
-    let mut decoder: Box<dyn AudioDecoder<Error = Refusal>> = match codec {
+    let decoder: Box<dyn AudioDecoder<Error = Refusal>> = match codec {
         AudioCodec::Ac3 | AudioCodec::Eac3 => triergon_codec_ac3::Decoder::new().boxed(),
         AudioCodec::Aac => triergon_codec_aac::Decoder::new().boxed(),
         AudioCodec::Dts => triergon_codec_dca::Decoder::new().boxed(),
@@ -212,6 +212,16 @@ fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
             unreachable!("file-format lanes read through their container")
         }
     };
+    decode_audio_units(codec, data, out, decoder);
+}
+
+#[inline(always)]
+fn decode_audio_units(
+    codec: AudioCodec,
+    data: &[u8],
+    out: &mut Output,
+    mut decoder: Box<dyn AudioDecoder<Error = Refusal>>,
+) {
     let mut frame = AudioFrame::default();
     let mut downmix = Downmix::default();
     let mut pcm = Vec::new();
@@ -357,7 +367,7 @@ pub fn main(name: &str, operations: Operations) {
         Some(DecodeMode::Bench) => bench(op, &data, args.get(3)),
         Some(DecodeMode::Memory) => memory(op, &data),
         Some(DecodeMode::Fold) => fold(op, &data),
-        Some(DecodeMode::Raw) => raw(op, &data, args.get(3)),
+        Some(DecodeMode::Raw) => raw(op, &data, args.get(3), args.get(4..).unwrap_or_default()),
         None => {
             eprintln!("unknown mode {kind}");
             std::process::exit(2);
@@ -458,14 +468,27 @@ fn fold(op: &str, data: &[u8]) {
     );
 }
 
-fn raw(op: &str, data: &[u8], path: Option<&String>) {
+fn raw(op: &str, data: &[u8], path: Option<&String>, options: &[String]) {
     let mut out = Output {
         raw: Some(std::io::BufWriter::new(
             std::fs::File::create(path.expect("output")).expect("raw output"),
         )),
         ..Output::default()
     };
-    run(op, data, &mut out);
+    match options {
+        [] => run(op, data, &mut out),
+        [flag, policy] if op == "audio-aac" && flag == "--extensions" && policy == "reference" => {
+            use triergon_codec_aac::compat::ffmpeg::extensions::Policy;
+            let decoder = triergon_codec_aac::Decoder::new()
+                .with_extension_policy(Policy::Reference)
+                .boxed();
+            decode_audio_units(AudioCodec::Aac, data, &mut out, decoder);
+        }
+        _ => {
+            eprintln!("unknown raw output options");
+            std::process::exit(2);
+        }
+    }
     out.raw.take().expect("raw").flush().expect("raw flush");
     print!(
         "{{\"packets\":{},\"bytes\":{},\"digest\":{}",
