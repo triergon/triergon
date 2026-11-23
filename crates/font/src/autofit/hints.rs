@@ -219,6 +219,38 @@ impl Segment {
     };
 }
 
+/// A 26.6 pixel delta that wraps when applied to an edge position.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug)]
+struct PixelDelta(i32);
+
+impl PixelDelta {
+    #[inline]
+    fn from_edge(self, edge: &Edge) -> i64 {
+        i64::from((edge.pos as i32).wrapping_add(self.0))
+    }
+}
+
+/// The 16.16 scale from a font-unit delta to a 26.6 pixel delta.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct EdgeScale(i64);
+
+impl EdgeScale {
+    #[inline]
+    fn between(first: &Edge, last: &Edge) -> Self {
+        Self(div_fix(
+            last.pos - first.pos,
+            i64::from(last.fpos) - i64::from(first.fpos),
+        ))
+    }
+
+    #[inline]
+    fn apply(self, font_units: i64) -> PixelDelta {
+        PixelDelta(mul_fix(font_units, self.0) as i32)
+    }
+}
+
 /// An edge: segments at about the same position.
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct Edge {
@@ -231,7 +263,7 @@ pub(super) struct Edge {
     pub(super) flags: u8,
     pub(super) dir: i8,
     /// The scale to the next edge, computed when first needed.
-    pub(super) scale: i64,
+    pub(super) scale: EdgeScale,
     /// The fitted position of the blue zone edge it aligns to.
     pub(super) blue_edge: Option<i64>,
     pub(super) link: Option<usize>,
@@ -597,13 +629,13 @@ impl GlyphHints {
                         // after it.
                         let after = after.clamp(1, edges.len() - 1);
                         let (next, before) = (edges[after], &mut edges[after - 1]);
-                        if before.scale == 0 {
-                            before.scale = div_fix(
-                                next.pos - before.pos,
-                                i64::from(next.fpos) - i64::from(before.fpos),
-                            );
+                        if before.scale.0 == 0 {
+                            before.scale = EdgeScale::between(before, &next);
                         }
-                        wrap(before.pos + mul_fix(u - i64::from(before.fpos), before.scale))
+                        before
+                            .scale
+                            .apply(u - i64::from(before.fpos))
+                            .from_edge(before)
                     }
                 }
             };
