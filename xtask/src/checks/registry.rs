@@ -94,11 +94,20 @@ fn compat_roots(root: &Path) -> Vec<(PathBuf, PathBuf)> {
             [src.join("compat.rs"), directory.join("mod.rs")]
                 .into_iter()
                 .find(|file| file.is_file())
+                // A crate may also write its `compat` module inline in its root.
+                .or_else(|| Some(src.join("lib.rs")).filter(|lib| inline_module(lib, "compat")))
                 .map(|file| (file, directory))
         })
         .collect();
     roots.sort();
     roots
+}
+
+/// Whether `file` opens the module `name` inline (`mod name {`).
+fn inline_module(file: &Path, name: &str) -> bool {
+    read(file)
+        .lines()
+        .any(|line| words(line).windows(2).any(|pair| pair == ["mod", name]) && line.contains('{'))
 }
 
 /// Whether the module `(file, directory)` holds `path` (`compat::` and then its
@@ -114,12 +123,7 @@ fn defines((file, directory): &(PathBuf, PathBuf), path: &str) -> bool {
         ]
         .into_iter()
         .find(|file| file.is_file());
-        let inline = files.iter().any(|file| {
-            read(file).lines().any(|line| {
-                let words = words(line);
-                words.windows(2).any(|pair| pair == ["mod", segment]) && line.contains('{')
-            })
-        });
+        let inline = files.iter().any(|file| inline_module(file, segment));
         if submodule.is_some() || inline {
             // An inline module's items are in the file that holds it.
             if let Some(file) = submodule {
@@ -336,6 +340,36 @@ mod tests {
                 "harness/features/f/contract.json: compat names what no crate's compat module \
               defines (name an existing policy, or describe one not built without a path): \
               compat::clock::unsigned_epoch, compat::dts"
+            ]
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_compat_module_written_inline_in_the_crate_root_is_found() {
+        let root = files::scratch("registry-compat-inline");
+        fs::create_dir_all(root.join("crates/demo/src")).unwrap();
+        fs::write(
+            root.join("crates/demo/src/lib.rs"),
+            "pub mod compat {\n    pub mod layout {\n        pub enum Policy {\n            \
+             Specification,\n            ConventionalSurround,\n        }\n    }\n}\n",
+        )
+        .unwrap();
+        let data = [(
+            "harness/features/f/contract.json".to_owned(),
+            parse(
+                r#"{"open_deviations": [
+                    {"compat": "demo::compat::layout::Policy::ConventionalSurround"},
+                    {"compat": "compat::layout::Downmix"}]}"#,
+            )
+            .unwrap(),
+        )];
+        assert_eq!(
+            compat_errors(&root, &data),
+            [
+                "harness/features/f/contract.json: compat names what no crate's compat module \
+              defines (name an existing policy, or describe one not built without a path): \
+              compat::layout::Downmix"
             ]
         );
         fs::remove_dir_all(root).unwrap();

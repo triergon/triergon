@@ -821,7 +821,8 @@ fn verify_membership(path: &Path, expected: &Value) -> Result<()> {
     {
         for case in cases {
             if let Value::Object(fields) = case {
-                fields.retain(|(key, _)| key != "expected");
+                // The recorder's pins are not part of the membership.
+                fields.retain(|(key, _)| key != "expected" && key != "candidate_expected");
             }
         }
     }
