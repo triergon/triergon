@@ -289,11 +289,6 @@ impl FreeFormat {
         Err(crate::limit(self.scan, maximum))
     }
 
-    // Returning the discovered spacing immediately measured +0.000648738% across the transport workloads.
-    #[expect(
-        clippy::expect_used,
-        reason = "error returns here measured +0.04% on MPEG-1 layer 1 and 2 workloads"
-    )]
     fn step(
         &mut self,
         input: &mut InputCursor,
@@ -328,7 +323,10 @@ impl FreeFormat {
         let header = self
             .header(0)
             .ok_or(Error::Invalid("free-format MPEG audio header changed"))?;
-        let size = free_size(header, self.base.expect("confirmed free-format spacing"))?;
+        let Some(base) = self.base else {
+            return Err(Error::Invalid("free-format MPEG audio spacing"));
+        };
+        let size = free_size(header, base)?;
         if size > maximum {
             return Err(crate::limit(size, maximum));
         }
