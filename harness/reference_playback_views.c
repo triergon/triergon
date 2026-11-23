@@ -341,17 +341,28 @@ static int facade_ts_run(const ViewCase *input, ViewWork *work)
         const size_t width = (size_t)atoi(input->argv[0]);
         if (work->packets)
             return 2;
-        uint64_t reason;
-        if (input->size < 3 * width && !playback_probe_width(input->data, input->size))
-            reason = 1;
+        /* The sync bytes (H.222.0 §2.4.3.2) of the first three carriers the input holds:
+         * three on the grid decide a prefix; a complete input that ends before its third
+         * sync byte, with the first two on the grid, is a transport stream as it is. */
+        const size_t prefix = width - 188;
+        int present = 0, synced = 0;
+        for (size_t at = prefix; at < input->size && present < 3; at += width, ++present)
+            synced += input->data[at] == 0x47;
+        uint64_t words[2];
+        if (present == 2 && synced == 2)
+            words[0] = 0;
+        else if (input->size < 3 * width && !playback_probe_width(input->data, input->size))
+            words[0] = 1;
         else if (playback_probe_width(input->data, input->size) == width &&
                  facade_ts_pat_programs(input, width) > 1)
-            reason = 2;
+            words[0] = 2;
         else
             return 2;
-        view_record(work, 9, &reason, 1, NULL, 0);
+        /* The same bytes as a prefix: decided, more bytes needed, or no sync grid. */
+        words[1] = synced < present ? 2 : present == 3 ? 0 : 1;
+        view_record(work, 9, words, 2, NULL, 0);
         if (work->trace)
-            printf("9 %" PRIu64 "\n", reason);
+            printf("9 %" PRIu64 " %" PRIu64 "\n", words[0], words[1]);
     }
     return 0;
 }

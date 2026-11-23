@@ -145,16 +145,23 @@ fn ts_admission(
             let mut driver = Blocking::seekable(reader, Cursor::new(input), pool);
             match driver.next_packet() {
                 Err(Error::Unsupported("segment PAT has multiple media programs")) => 2,
-                // Admitted: the source ends without a packet and without a refusal.
+                // Admitted: the complete source ends without a packet and without a refusal.
                 Ok(None) => 0,
                 other => return Err(format!("unexpected program admission: {other:?}")),
             }
         }
         other => return Err(format!("unexpected transport admission: {other:?}")),
     };
-    work.record(9, &[reason], &[]);
+    // The same bytes as a prefix that more bytes may follow: decided, undecided (more
+    // bytes are needed) or unrecognised.
+    let prefix = match triergon::probe(input) {
+        triergon::Probed::Format(_) => 0,
+        triergon::Probed::Need(_) => 1,
+        triergon::Probed::Unrecognised => 2,
+    };
+    work.record(9, &[reason, prefix], &[]);
     if let Some(trace) = trace {
-        writeln!(trace, "9 {reason}").map_err(|error| error.to_string())?;
+        writeln!(trace, "9 {reason} {prefix}").map_err(|error| error.to_string())?;
     }
     Ok(())
 }

@@ -11,7 +11,7 @@
     "Open every single-entity default-limits case selected from mpegts-access-units through AnyReader::open. The sole media program is discovered by the facade.",
     "Compare the strict AnyReader access-unit stream with the formats-profile MPEG-TS parser. Fold source PTS, DTS and duration, PES stream ID, position and payload bytes in the MPEG-TS access-unit fold. The reference packet is projected as the source-poll comparison projects it: PTS and DTS as coded 33-bit values, DTS only where the PES header at the packet's carrier codes it, and the position of that carrier; where the demuxer reports no duration, the duration the coded ADTS or MPEG audio frame header gives in 90 kHz ticks.",
     "TS188 and M2TS192 positions refer to the start of the source carrier. The strict path folds no opaque continuity or unsupported PES fallback. Refusals and any difference from the compatibility stream remain explicit cases.",
-    "Admission controls compare a typed format or program refusal. The reference checks the carrier grid or the complete CRC-valid PAT and verifies that forced demux produces no selected packets through EOF.",
+    "Admission controls fold the facade's admission of the complete input (0: opened, ending without a packet or a refusal; 1: no recognised format; 2: several media programs) and the probe verdict for the same bytes as a prefix (0: decided; 1: more bytes needed; 2: unrecognised). The reference classifies the complete input by its sync bytes (H.222.0 \u00a72.4.3.2): a complete input whose first two carriers start on the TS grid and that ends before the third is a transport stream, and three sync bytes decide a prefix; or by the complete CRC-valid PAT; and it verifies that forced demux produces no selected packets through EOF.",
     "LOAS and fractional MPEG-1 Layer I controls compare coded access units across PES boundaries. The reference verifies all demuxed PES bytes and their source anchors, then frames the elementary stream with the coded headers. For Layer I append the exact reduced duration in 90 kHz ticks to each access-unit row.",
     "A library refusal ends the candidate's fold with one kind 8 record; a failed check of the worker's own ends the worker with an error, which no registry entry admits."
   ],
@@ -645,34 +645,9 @@
     }
   ],
   "pending_module_requirements": [
-    "Deliver a finite PES whose PES_packet_length is complete in its carriers and report payload that follows its declared extent as a separate source fault, instead of discarding the complete PES (H.222.0 \u00a72.4.3.7).",
-    "Decide the facade's admission of a whole TS shorter than three packets: AnyReader::open now selects it by its first two sync bytes and ends without a packet or a refusal, where these admission controls expect Unsupported (source format not recognised) as the three-sync rule of the reference projection gives; keep the refusal, or move the controls and that projection to the new rule."
+    "Deliver a finite PES whose PES_packet_length is complete in its carriers and report payload that follows its declared extent as a separate source fault, instead of discarding the complete PES (H.222.0 \u00a72.4.3.7)."
   ],
   "open_cases": [
-    {
-      "id": "psi-pending-not-current",
-      "requirement": "Decide the facade's admission of a whole TS shorter than three packets: AnyReader::open now selects it by its first two sync bytes and ends without a packet or a refusal, where these admission controls expect Unsupported (source format not recognised) as the three-sync rule of the reference projection gives; keep the refusal, or move the controls and that projection to the new rule."
-    },
-    {
-      "id": "pat-incomplete-version",
-      "requirement": "Decide the facade's admission of a whole TS shorter than three packets: AnyReader::open now selects it by its first two sync bytes and ends without a packet or a refusal, where these admission controls expect Unsupported (source format not recognised) as the three-sync rule of the reference projection gives; keep the refusal, or move the controls and that projection to the new rule."
-    },
-    {
-      "id": "psi-pointer-finishes-old-starts-new",
-      "requirement": "Decide the facade's admission of a whole TS shorter than three packets: AnyReader::open now selects it by its first two sync bytes and ends without a packet or a refusal, where these admission controls expect Unsupported (source format not recognised) as the three-sync rule of the reference projection gives; keep the refusal, or move the controls and that projection to the new rule."
-    },
-    {
-      "id": "pmt-opaque-language-descriptors",
-      "requirement": "Decide the facade's admission of a whole TS shorter than three packets: AnyReader::open now selects it by its first two sync bytes and ends without a packet or a refusal, where these admission controls expect Unsupported (source format not recognised) as the three-sync rule of the reference projection gives; keep the refusal, or move the controls and that projection to the new rule."
-    },
-    {
-      "id": "pmt-descriptor-overrun",
-      "requirement": "Decide the facade's admission of a whole TS shorter than three packets: AnyReader::open now selects it by its first two sync bytes and ends without a packet or a refusal, where these admission controls expect Unsupported (source format not recognised) as the three-sync rule of the reference projection gives; keep the refusal, or move the controls and that projection to the new rule."
-    },
-    {
-      "id": "pmt-multi-section-forbidden",
-      "requirement": "Decide the facade's admission of a whole TS shorter than three packets: AnyReader::open now selects it by its first two sync bytes and ends without a packet or a refusal, where these admission controls expect Unsupported (source format not recognised) as the three-sync rule of the reference projection gives; keep the refusal, or move the controls and that projection to the new rule."
-    },
     {
       "id": "pes-finite-extra-payload",
       "requirement": "Deliver a finite PES whose PES_packet_length is complete in its carriers and report payload that follows its declared extent as a separate source fault, instead of discarding the complete PES (H.222.0 \u00a72.4.3.7)."
