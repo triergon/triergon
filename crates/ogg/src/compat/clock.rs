@@ -26,9 +26,33 @@
 //! Reference: the `ogg` demuxer of FFmpeg 9.0.2, observed through `ffprobe
 //! -show_packets` on the FATE Vorbis and Theora samples and on generated Vorbis, Opus,
 //! FLAC and Speex files (`cargo xtask codecs readers`).
-use crate::Packet;
 use crate::mapping::Timeline;
 use crate::timing::Slot;
+use crate::{BlockingReader, Limits, Packet, Reader};
+use std::io::{Read, Seek};
+use triergon_core::{Budget, Result, SourceCapabilities, SourceId};
+
+/// Construct a push reader with both the granule clock and the compatibility clock.
+pub fn reader(
+    pool: &Budget,
+    source: SourceId,
+    capabilities: SourceCapabilities,
+    limits: Limits,
+    window: usize,
+) -> Result<Reader> {
+    Ok(Reader::new(pool, source, capabilities, limits, window)?.with_reference_clock())
+}
+
+/// Open a sequential source with both the granule clock and the compatibility clock.
+pub fn open<R: Read>(source: R, limits: Limits) -> Result<BlockingReader<R>> {
+    BlockingReader::open_stream_with(source, limits, true)
+}
+
+/// Open a seekable source with both the granule clock and the compatibility clock.
+pub fn open_seekable<R: Read + Seek>(source: R, limits: Limits) -> Result<BlockingReader<R>> {
+    let pool = Budget::new(limits.live_storage_bytes)?;
+    BlockingReader::open_seekable_with(source, limits, &pool, true)
+}
 
 /// A packet's time as FFmpeg's Ogg demuxer reports it, in the track time base.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -43,8 +67,8 @@ pub struct ReferenceTiming {
     pub discard_padding: u32,
 }
 
-/// FFmpeg's time for `packet`.
-pub fn packet_timing(packet: &Packet) -> ReferenceTiming {
+/// The compatibility clock of `packet`, if its reader was opened with this policy.
+pub fn packet_timing(packet: &Packet) -> Option<ReferenceTiming> {
     packet.reference
 }
 
@@ -183,12 +207,12 @@ impl ReferenceClock {
                     self.shift = shift;
                 }
             }
-            slot.reference = ReferenceTiming {
+            slot.reference = Some(ReferenceTiming {
                 pts: pts.and_then(|pts| pts.checked_add(self.shift)),
                 duration,
                 skip_samples: skip,
                 discard_padding: padding,
-            };
+            });
         }
         if granule.is_some() {
             self.anchor = granule;

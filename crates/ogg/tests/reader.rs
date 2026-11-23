@@ -9,7 +9,7 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_framing::{flac, vorbis::VorbisHeaders};
-use triergon_ogg::compat::clock::{ReferenceTiming, packet_timing};
+use triergon_ogg::compat::clock::{self, ReferenceTiming, packet_timing};
 use triergon_ogg::page::{BEGIN_OF_STREAM, CONTINUED, END_OF_STREAM, write_page};
 use triergon_ogg::{Limits, Packet, PageHeader, Reader, ReaderEvent};
 
@@ -141,7 +141,7 @@ fn read_with(
         length: random_access.then_some(file.len() as u64),
         random_access,
     };
-    let mut reader = Reader::new(&pool, SourceId(1), capabilities, limits, window).unwrap();
+    let mut reader = clock::reader(&pool, SourceId(1), capabilities, limits, window).unwrap();
     let mut events = Vec::new();
     let error = drive(&mut reader, &pool, file, work, &mut events, None).err();
     (reader, events, error)
@@ -225,7 +225,7 @@ fn summary(events: &[Event<Packet, ReaderEvent>]) -> Vec<Summary> {
                 p.pts(),
                 p.duration(),
                 p.trim(),
-                packet_timing(p),
+                packet_timing(p).unwrap(),
             )
         })
         .collect()
@@ -272,9 +272,9 @@ fn opus_packets_are_timed_from_granules_with_pre_skip_and_end_trim() {
             end: Some(100)
         }
     );
-    assert_eq!(packet_timing(packets[0]).skip_samples, 312);
-    assert_eq!(packet_timing(packets[22]).discard_padding, 100);
-    assert_eq!(packet_timing(packets[22]).duration, Some(860));
+    assert_eq!(packet_timing(packets[0]).unwrap().skip_samples, 312);
+    assert_eq!(packet_timing(packets[22]).unwrap().discard_padding, 100);
+    assert_eq!(packet_timing(packets[22]).unwrap().duration, Some(860));
 }
 
 #[test]
@@ -528,7 +528,7 @@ fn chained_links_follow_each_other() {
     assert_eq!(link[0].pts(), Some(end - 312));
     assert_eq!(link[0].trim().start, Some(312));
     // FFmpeg continues at the previous link's last packet end, ignoring pre-skip.
-    assert_eq!(packet_timing(link[0]).pts, Some(9600 - 312 - 200));
+    assert_eq!(packet_timing(link[0]).unwrap().pts, Some(9600 - 312 - 200));
 }
 
 /// A Vorbis setup header with two modes, short (0) and long (1).
@@ -606,10 +606,10 @@ fn vorbis_durations_follow_the_block_sizes() {
     // FFmpeg's clock: the first packet states 128, the short block after a long one 128.
     let reference: Vec<_> = packets
         .iter()
-        .map(|p| packet_timing(p).duration.unwrap())
+        .map(|p| packet_timing(p).unwrap().duration.unwrap())
         .collect();
     assert_eq!(reference, [128, 576, 1024, 128, 128, 576]);
-    assert_eq!(packet_timing(packets[0]).pts, Some(-128));
+    assert_eq!(packet_timing(packets[0]).unwrap().pts, Some(-128));
 }
 
 /// A FLAC frame header for `block` samples at frame number `n`.
@@ -685,7 +685,7 @@ fn seeks_land_before_the_target_and_resume_the_linear_packets() {
                 random_access,
             };
             let mut reader =
-                Reader::new(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
+                clock::reader(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
             let mut events = Vec::new();
             drive(&mut reader, &pool, &file, 1 << 20, &mut events, Some(30)).unwrap();
             let track = reader.tracks()[0].id();
@@ -905,7 +905,7 @@ fn seek_after(
         random_access,
     };
     let mut reader =
-        Reader::new(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
+        clock::reader(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
     let mut events = Vec::new();
     drive(&mut reader, &pool, file, 1 << 20, &mut events, prefix).unwrap();
     let track = reader.tracks()[track].id();
@@ -1183,7 +1183,8 @@ fn open_stream_configures_opus_without_an_end_scan() {
     assert_eq!(track.end(), None);
     let cancel = AtomicBool::new(false);
     let mut count = 0;
-    while reader.next_packet(&cancel).unwrap().is_some() {
+    while let Some(packet) = reader.next_packet(&cancel).unwrap() {
+        assert_eq!(packet_timing(&packet), None);
         count += 1;
     }
     assert_eq!(count, 4);

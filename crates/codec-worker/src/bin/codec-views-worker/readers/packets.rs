@@ -47,7 +47,8 @@ fn ogg_event(event: &Event<ogg::Packet, ogg::ReaderEvent>, out: &mut impl Write)
             if let Some(granule) = packet.granule() {
                 field(&mut extra, "granule", &granule.to_string());
             }
-            let compat = ogg::compat::clock::packet_timing(packet);
+            let compat = ogg::compat::clock::packet_timing(packet)
+                .ok_or_else(|| io::Error::other("missing compatibility timing"))?;
             let _ = write!(
                 extra,
                 ",\"compat\":{{\"pts\":{},\"duration\":{},\"skip_samples\":{},\"discard_padding\":{}}}",
@@ -117,7 +118,7 @@ fn elementary_tracks<F: Format>(reader: &elementary::Reader<F>) -> Vec<String> {
 pub(super) fn stream(input: &[u8]) -> io::Result<()> {
     // Slice implements Read without implementing Seek.
     let mut out = BufWriter::new(io::stdout().lock());
-    let mut reader = match ogg::BlockingReader::open_stream(input, ogg::Limits::default()) {
+    let mut reader = match ogg::compat::clock::open(input, ogg::Limits::default()) {
         Ok(reader) => reader,
         Err(error) => return finish(&mut out, &[], Err(error)),
     };
@@ -247,8 +248,13 @@ fn ogg_push(
     counts: &mut Drive,
     out: &mut Vec<u8>,
 ) -> io::Result<triergon::Result<()>> {
-    let mut reader = match ogg::Reader::new(pool, SourceId(1), caps, ogg::Limits::default(), 65536)
-    {
+    let mut reader = match ogg::compat::clock::reader(
+        pool,
+        SourceId(1),
+        caps,
+        ogg::Limits::default(),
+        65536,
+    ) {
         Ok(reader) => reader,
         Err(error) => return Ok(Err(error)),
     };

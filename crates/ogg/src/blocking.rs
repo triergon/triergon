@@ -26,9 +26,18 @@ impl<R: Read + Seek> BlockingReader<R> {
     }
 
     /// [`BlockingReader::open`] charging a caller's pool.
-    pub fn open_in(mut source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+    pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        Self::open_seekable_with(source, limits, pool, false)
+    }
+
+    pub(crate) fn open_seekable_with(
+        mut source: R,
+        limits: Limits,
+        pool: &Budget,
+        reference_clock: bool,
+    ) -> Result<Self> {
         let capabilities = seekable_capabilities(&mut source)?;
-        let reader = Reader::new(pool, SourceId(1), capabilities, limits, WINDOW)?;
+        let reader = Self::make_reader(pool, capabilities, limits, reference_clock)?;
         Self::start(Blocking::seekable(reader, source, pool), pool, limits)
     }
 }
@@ -36,13 +45,34 @@ impl<R: Read + Seek> BlockingReader<R> {
 impl<R: Read> BlockingReader<R> {
     /// Open a sequential source; it cannot seek.
     pub fn open_stream(source: R, limits: Limits) -> Result<Self> {
+        Self::open_stream_with(source, limits, false)
+    }
+
+    pub(crate) fn open_stream_with(
+        source: R,
+        limits: Limits,
+        reference_clock: bool,
+    ) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         let capabilities = SourceCapabilities {
             length: None,
             random_access: false,
         };
-        let reader = Reader::new(&pool, SourceId(1), capabilities, limits, WINDOW)?;
+        let reader = Self::make_reader(&pool, capabilities, limits, reference_clock)?;
         Self::start(Blocking::sequential(reader, source, &pool), &pool, limits)
+    }
+
+    fn make_reader(
+        pool: &Budget,
+        capabilities: SourceCapabilities,
+        limits: Limits,
+        reference_clock: bool,
+    ) -> Result<Reader> {
+        if reference_clock {
+            crate::compat::clock::reader(pool, SourceId(1), capabilities, limits, WINDOW)
+        } else {
+            Reader::new(pool, SourceId(1), capabilities, limits, WINDOW)
+        }
     }
 
     /// Read until the first packet after every stream of the first link has read its

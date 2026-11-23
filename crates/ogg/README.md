@@ -83,8 +83,10 @@ point; of Theora, the intra frames. DTS equals PTS.
 `Track::end` holds the last granule position, found by reading at most
 `Limits::end_scan_bytes` at the end of a seekable source of known length.
 
-`compat::clock::packet_timing` reports FFmpeg's clock instead (skip samples, discard
-padding and FFmpeg's Vorbis durations); its documentation lists the differences.
+`compat::clock::reader`, `open` and `open_seekable` also compute FFmpeg's clock
+(skip samples, discard padding and FFmpeg's Vorbis durations).
+`compat::clock::packet_timing` reads that clock from their packets. The standard
+constructors compute the granule clock alone.
 
 ## Seeking
 

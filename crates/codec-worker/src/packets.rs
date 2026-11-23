@@ -219,7 +219,7 @@ fn receipt_line(receipt: &SeekReceipt) -> String {
 
 fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io::Result<()> {
     let cancel = AtomicBool::new(false);
-    let mut reader = match ogg::BlockingReader::open(BufReader::new(file), ogg::Limits::default()) {
+    let mut reader = match clock::open_seekable(BufReader::new(file), ogg::Limits::default()) {
         Ok(reader) => reader,
         Err(error) => return finish(out, &[], Err(error)),
     };
@@ -245,7 +245,7 @@ fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io
         match reader.next_event(&cancel) {
             Ok(Some(Event::Packet(packet))) => {
                 let mut row = Row::of(&packet, packet.track_index(), packet.page_offset(), true);
-                row.compat = Some(clock::packet_timing(&packet));
+                row.compat = clock::packet_timing(&packet);
                 row.granule = packet.granule();
                 row.write(out)?;
             }

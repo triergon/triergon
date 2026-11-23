@@ -178,7 +178,12 @@ impl Durations {
 const OPUS_PREROLL: i64 = 3840;
 
 impl Timeline {
-    pub(crate) fn durations(&self, packet: &[u8], previous: &mut Previous) -> Durations {
+    pub(crate) fn durations(
+        &self,
+        packet: &[u8],
+        previous: &mut Previous,
+        reference: bool,
+    ) -> Durations {
         match *self {
             Timeline::Vorbis { blocksize, modes } => {
                 let Ok(block) = modes.block(packet) else {
@@ -187,27 +192,23 @@ impl Timeline {
                 };
                 let size = block.size(blocksize);
                 let flagged = block.previous_long.map(|long| blocksize[usize::from(long)]);
-                let standalone = block.samples_after(flagged.unwrap_or(blocksize[0]), blocksize);
                 let after = |previous: u16| block.samples_after(previous, blocksize);
-                let durations = match *previous {
-                    Previous::Start => Durations {
-                        exact: Some(0),
-                        standalone: Some(standalone),
-                        carried: Some(standalone),
-                    },
-                    Previous::Unknown => Durations {
-                        exact: flagged.map(after),
-                        standalone: Some(standalone),
-                        carried: Some(standalone),
-                    },
-                    Previous::Block(last) => Durations {
-                        exact: Some(after(last)),
-                        standalone: Some(standalone),
-                        carried: Some(after(last)),
-                    },
+                let exact = match *previous {
+                    Previous::Start => Some(0),
+                    Previous::Unknown => flagged.map(after),
+                    Previous::Block(last) => Some(after(last)),
+                };
+                let standalone = reference.then(|| after(flagged.unwrap_or(blocksize[0])));
+                let carried = match *previous {
+                    Previous::Start | Previous::Unknown => standalone,
+                    Previous::Block(_) => exact,
                 };
                 *previous = Previous::Block(size);
-                durations
+                Durations {
+                    exact,
+                    standalone,
+                    carried,
+                }
             }
             Timeline::Opus { .. } => Durations::uniform(opus::packet_samples(packet).ok()),
             Timeline::Flac => {
@@ -867,7 +868,10 @@ mod tests {
         assert_eq!(timeline.random_access(&[0x40, 1]), RandomAccess::NotSync);
         assert_eq!(timeline.random_access(&[]), RandomAccess::NotSync);
         let mut previous = Previous::Start;
-        assert_eq!(timeline.durations(&[0x40], &mut previous).exact, Some(1));
+        assert_eq!(
+            timeline.durations(&[0x40], &mut previous, false).exact,
+            Some(1)
+        );
         // Bitstream 3.2.0 counts frame indices: the first frame is 0|0.
         let old = Configuration::first(
             &budget,
@@ -912,7 +916,10 @@ mod tests {
         assert_eq!(&config.bytes[config.configuration.clone()], &first[..]);
         let mut previous = Previous::Start;
         assert_eq!(
-            config.timeline.durations(b"any", &mut previous).exact,
+            config
+                .timeline
+                .durations(b"any", &mut previous, false)
+                .exact,
             Some(640)
         );
         assert!(config.timeline.trims());

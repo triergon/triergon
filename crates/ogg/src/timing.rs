@@ -19,7 +19,7 @@ pub(crate) struct Slot {
     pub pts: Option<i64>,
     pub trim: Trim,
     /// The time FFmpeg reports, from [`crate::compat`].
-    pub reference: ReferenceTiming,
+    pub reference: Option<ReferenceTiming>,
 }
 
 /// What a page says about the packets it completes.

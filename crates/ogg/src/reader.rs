@@ -198,6 +198,7 @@ pub struct Reader {
     phase: Phase,
     landing: Option<Landing>,
     end_scanned: bool,
+    reference_clock: bool,
     failed: Option<Error>,
 }
 
@@ -229,8 +230,14 @@ impl Reader {
             phase: Phase::Pages,
             landing: None,
             end_scanned: false,
+            reference_clock: false,
             failed: None,
         })
+    }
+
+    pub(crate) fn with_reference_clock(mut self) -> Self {
+        self.reference_clock = true;
+        self
     }
 
     /// Every track seen so far, in the order their logical streams began.
@@ -416,7 +423,9 @@ impl Reader {
         for stream in self.streams.iter() {
             let Some(index) = stream.track else { continue };
             let track = &mut self.tracks[index];
-            track.reference_end = stream.reference.end();
+            if self.reference_clock {
+                track.reference_end = stream.reference.end();
+            }
             let ticks = stream
                 .clock
                 .end()
@@ -487,9 +496,11 @@ impl Reader {
             }
         }
         let s = &mut self.streams[stream];
-        let durations = self.tracks[track]
-            .timeline()
-            .durations(&payload, &mut s.previous);
+        let durations = self.tracks[track].timeline().durations(
+            &payload,
+            &mut s.previous,
+            self.reference_clock,
+        );
         self.link_media = true;
         self.media.push(Media {
             payload,
@@ -516,14 +527,19 @@ impl Reader {
             None => self.new_track(serial, link, mapping, tag, first)?,
         };
         let track = &self.tracks[index];
-        let chain_end = link
-            .checked_sub(1)
-            .and_then(|previous| {
-                self.tracks
-                    .iter()
-                    .find(|t| t.link == previous && t.position == track.position)
-            })
-            .and_then(|previous| previous.reference_end);
+        let reference = if self.reference_clock {
+            let chain_end = link
+                .checked_sub(1)
+                .and_then(|previous| {
+                    self.tracks
+                        .iter()
+                        .find(|t| t.link == previous && t.position == track.position)
+                })
+                .and_then(|previous| previous.reference_end);
+            ReferenceClock::new(chain_end)
+        } else {
+            ReferenceClock::default()
+        };
         let headers = if track.header_error.is_some() {
             Headers::Done
         } else {
@@ -532,7 +548,7 @@ impl Reader {
         let s = &mut self.streams[stream];
         s.track = Some(index);
         s.headers = headers;
-        s.reference = ReferenceClock::new(chain_end);
+        s.reference = reference;
         if headers == Headers::Done {
             self.configured(stream, index)?;
         }
@@ -630,16 +646,20 @@ impl Reader {
             };
             if self.media.is_empty() {
                 s.clock.pass(clock);
-                s.reference.header_page(granule);
+                if self.reference_clock {
+                    s.reference.header_page(granule);
+                }
             } else {
                 s.clock.page(&timeline, clock, &mut self.media);
-                s.reference.page(
-                    &timeline,
-                    granule,
-                    header.granule == 0,
-                    eos,
-                    &mut self.media,
-                );
+                if self.reference_clock {
+                    s.reference.page(
+                        &timeline,
+                        granule,
+                        header.granule == 0,
+                        eos,
+                        &mut self.media,
+                    );
+                }
                 let offset = track.offset;
                 // Only Theora's random access depends on the packet.
                 let keyed = timeline.keyframes();
@@ -680,9 +700,10 @@ impl Reader {
         }
         self.media.clear();
         if let Some(index) = self.streams[stream].track {
-            self.tracks[index].reference_shift = self.streams[stream].reference.shift();
-            // A landing followed into this link searches it once the track's first page
-            // of media has fixed where its reference clock starts.
+            if self.reference_clock {
+                self.tracks[index].reference_shift = self.streams[stream].reference.shift();
+            }
+            // A landing followed into this link searches it after its first media page.
             if delivered
                 && let Some(landing) = self.landing.as_mut()
                 && landing.followed
@@ -864,7 +885,9 @@ impl Reader {
                     stream.headers = Headers::Invalid;
                 }
                 stream.previous = Previous::Unknown;
-                stream.reference = ReferenceClock::resumed(track.reference_shift);
+                if self.reference_clock {
+                    stream.reference = ReferenceClock::resumed(track.reference_shift);
+                }
                 self.streams.try_push(stream).map_err(|e| e.error)?;
             }
             self.link_media = true;

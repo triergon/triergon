@@ -178,7 +178,7 @@ pub struct Packet {
     pub(crate) granule: Option<i64>,
     pub(crate) page: u64,
     pub(crate) random_access: RandomAccess,
-    pub(crate) reference: ReferenceTiming,
+    pub(crate) reference: Option<ReferenceTiming>,
 }
 
 impl Packet {
