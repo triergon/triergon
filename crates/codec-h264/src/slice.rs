@@ -76,6 +76,8 @@ pub(crate) struct WeightEntry {
     pub(crate) chroma: [Option<(i32, i32)>; 2],
 }
 
+type PredictionWeights = Box<[[WeightEntry; 32]; 2]>;
+
 #[derive(Clone, Debug)]
 pub(crate) struct SliceHeader {
     pub(crate) nal: NalHeader,
@@ -95,7 +97,7 @@ pub(crate) struct SliceHeader {
     pub(crate) ref_mods: [Vec<ListModification>; 2],
     pub(crate) luma_log2_wd: u32,
     pub(crate) chroma_log2_wd: u32,
-    pub(crate) weights: Option<Box<[[WeightEntry; 32]; 2]>>,
+    pub(crate) weights: Option<PredictionWeights>,
     pub(crate) no_output_of_prior_pics: bool,
     pub(crate) long_term_reference_flag: bool,
     pub(crate) adaptive_ref_pic_marking: bool,
@@ -246,73 +248,16 @@ pub(crate) fn parse_slice_header(
     if matches!(nal.nal_unit_type, 20 | 21) {
         return Err(DecodeError::Unsupported("MVC/SVC slice extension"));
     }
-    let mut ref_mods: [Vec<ListModification>; 2] = [Vec::new(), Vec::new()];
-    for list in 0..2 {
-        let present = if list == 0 {
-            !slice_type.is_intra()
-        } else {
-            slice_type == SliceType::B
-        };
-        if present && r.bit() {
-            loop {
-                let idc = r.ue();
-                if idc == 3 {
-                    break;
-                }
-                if ref_mods[list].len() > 64 || r.overrun() {
-                    return Err(inval("modification_of_pic_nums_idc"));
-                }
-                ref_mods[list].push(match idc {
-                    0 => ListModification::Subtract(r.ue()),
-                    1 => ListModification::Add(r.ue()),
-                    2 => ListModification::LongTerm(r.ue()),
-                    _ => return Err(inval("modification_of_pic_nums_idc")),
-                });
-            }
-        }
-    }
+    let ref_mods = read_ref_list_modifications(r, slice_type)?;
     let mut luma_log2_wd = 0;
     let mut chroma_log2_wd = 0;
     let mut weights = None;
     if (pps.weighted_pred && matches!(slice_type, SliceType::P | SliceType::SP))
         || (pps.weighted_bipred_idc == 1 && slice_type == SliceType::B)
     {
-        luma_log2_wd = r.ue();
-        if luma_log2_wd > 7 {
-            return Err(inval("luma_log2_weight_denom"));
-        }
-        let chroma = sps.chroma_array_type() != 0;
-        if chroma {
-            chroma_log2_wd = r.ue();
-            if chroma_log2_wd > 7 {
-                return Err(inval("chroma_log2_weight_denom"));
-            }
-        }
-        let mut w = Box::new([[WeightEntry::default(); 32]; 2]);
-        let nlists = if slice_type == SliceType::B { 2 } else { 1 };
-        for list in 0..nlists {
-            for entry in w[list].iter_mut().take(num_ref_idx_active[list] as usize) {
-                if r.bit() {
-                    let lw = r.se();
-                    let lo = r.se();
-                    if !(-128..=127).contains(&lw) || !(-128..=127).contains(&lo) {
-                        return Err(inval("luma weight"));
-                    }
-                    entry.luma = Some((lw, lo));
-                }
-                if chroma && r.bit() {
-                    for c in &mut entry.chroma {
-                        let cw = r.se();
-                        let co = r.se();
-                        if !(-128..=127).contains(&cw) || !(-128..=127).contains(&co) {
-                            return Err(inval("chroma weight"));
-                        }
-                        *c = Some((cw, co));
-                    }
-                }
-            }
-        }
-        weights = Some(w);
+        let (luma, chroma, table) =
+            read_prediction_weights(r, sps, slice_type, num_ref_idx_active)?;
+        (luma_log2_wd, chroma_log2_wd, weights) = (luma, chroma, Some(table));
     }
     let mut no_output_of_prior_pics = false;
     let mut long_term_reference_flag = false;
@@ -425,4 +370,83 @@ pub(crate) fn parse_slice_header(
         mbaff,
         data_bit_pos: r.position(),
     })
+}
+
+/// Reference list modification (7.3.3.1).
+fn read_ref_list_modifications(
+    r: &mut BitReader<'_>,
+    slice_type: SliceType,
+) -> R<[Vec<ListModification>; 2]> {
+    let mut ref_mods: [Vec<ListModification>; 2] = [Vec::new(), Vec::new()];
+    for list in 0..2 {
+        let present = if list == 0 {
+            !slice_type.is_intra()
+        } else {
+            slice_type == SliceType::B
+        };
+        if present && r.bit() {
+            loop {
+                let idc = r.ue();
+                if idc == 3 {
+                    break;
+                }
+                if ref_mods[list].len() > 64 || r.overrun() {
+                    return Err(inval("modification_of_pic_nums_idc"));
+                }
+                ref_mods[list].push(match idc {
+                    0 => ListModification::Subtract(r.ue()),
+                    1 => ListModification::Add(r.ue()),
+                    2 => ListModification::LongTerm(r.ue()),
+                    _ => return Err(inval("modification_of_pic_nums_idc")),
+                });
+            }
+        }
+    }
+    Ok(ref_mods)
+}
+
+/// Prediction weight table (7.3.3.2).
+fn read_prediction_weights(
+    r: &mut BitReader<'_>,
+    sps: &Sps,
+    slice_type: SliceType,
+    num_ref_idx_active: [u32; 2],
+) -> R<(u32, u32, PredictionWeights)> {
+    let luma_log2_wd = r.ue();
+    if luma_log2_wd > 7 {
+        return Err(inval("luma_log2_weight_denom"));
+    }
+    let chroma = sps.chroma_array_type() != 0;
+    let mut chroma_log2_wd = 0;
+    if chroma {
+        chroma_log2_wd = r.ue();
+        if chroma_log2_wd > 7 {
+            return Err(inval("chroma_log2_weight_denom"));
+        }
+    }
+    let mut w = Box::new([[WeightEntry::default(); 32]; 2]);
+    let nlists = if slice_type == SliceType::B { 2 } else { 1 };
+    for list in 0..nlists {
+        for entry in w[list].iter_mut().take(num_ref_idx_active[list] as usize) {
+            if r.bit() {
+                let lw = r.se();
+                let lo = r.se();
+                if !(-128..=127).contains(&lw) || !(-128..=127).contains(&lo) {
+                    return Err(inval("luma weight"));
+                }
+                entry.luma = Some((lw, lo));
+            }
+            if chroma && r.bit() {
+                for c in &mut entry.chroma {
+                    let cw = r.se();
+                    let co = r.se();
+                    if !(-128..=127).contains(&cw) || !(-128..=127).contains(&co) {
+                        return Err(inval("chroma weight"));
+                    }
+                    *c = Some((cw, co));
+                }
+            }
+        }
+    }
+    Ok((luma_log2_wd, chroma_log2_wd, w))
 }
