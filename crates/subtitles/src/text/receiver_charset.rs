@@ -12,6 +12,19 @@ use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
+/// A multibyte repertoire of the subtitle receiver.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Profile {
+    /// CP936 with the single-byte euro and no GB18030 four-byte codes.
+    Gbk,
+    /// GNU Big5 charmap 0.92, used for the `big5` and `cp950` labels.
+    Big5,
+    /// Historical Shift-JIS with yen at 0x5C and overline at 0x7E.
+    ShiftJis,
+    /// KS X 1001:2002 with C1 controls at 0x80–0x9F.
+    EucKr,
+}
+
 /// The charset FFmpeg with Linux/glibc `iconv` converts for `label`, matched
 /// ASCII case-insensitively: gbk, cp936, windows-936, big5, big-5,
 /// shift_jis, shift-jis, sjis, euc-kr, cp932, cp949, cp950, latin1,
@@ -20,12 +33,12 @@ use triergon_core::{Budget, Error, Result, WorkBudget};
 /// [`Charset::from_label`] and
 /// [`MultibyteCharset::from_label`](M::from_label): gbk, cp936, windows-936,
 /// big5, big-5, shift_jis, shift-jis, sjis, cp950 and euc-kr resolve to the
-/// `Receiver` profiles.
+/// receiver [`Profile`]s.
 #[inline]
 pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
     // The decoders open with euc-kr most; its test is inlined into them.
     if label.eq_ignore_ascii_case(b"euc-kr") {
-        return Ok(Charset::Multibyte(M::ReceiverEucKrC1));
+        return Ok(Charset::Multibyte(Profile::EucKr.multibyte()));
     }
     other_receiver_charset(label)
 }
@@ -40,18 +53,18 @@ fn other_receiver_charset(label: &[u8]) -> Result<Charset> {
     }
     let is = |name: &[u8]| label.eq_ignore_ascii_case(name);
     let profile = if is(b"gbk") || is(b"cp936") || is(b"windows-936") {
-        M::ReceiverGbk
+        Profile::Gbk.multibyte()
     } else if is(b"big5") || is(b"big-5") {
-        M::ReceiverBig5
+        Profile::Big5.multibyte()
     } else if is(b"shift_jis") || is(b"shift-jis") || is(b"sjis") {
-        M::ReceiverShiftJis
+        Profile::ShiftJis.multibyte()
     } else if is(b"cp932") {
-        M::Windows932
+        M::WINDOWS_932
     } else if is(b"cp949") {
-        M::Windows949
+        M::WINDOWS_949
     } else if is(b"cp950") {
         // glibc converts cp950 with its Big5 charmap.
-        M::ReceiverBig5
+        Profile::Big5.multibyte()
     } else if is(b"latin1") || is(b"iso-8859-1") {
         // Latin-1 keeps 0x80 to 0x9F as the C1 controls; the Windows code
         // pages below refuse the bytes their tables leave undefined.

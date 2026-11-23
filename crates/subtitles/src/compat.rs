@@ -84,7 +84,7 @@ pub mod charset {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::text::receiver_charset::{
-        AssPacketJob, Outcome, PacketStatus, PacketView, receiver_charset,
+        AssPacketJob, Outcome, PacketStatus, PacketView, Profile, receiver_charset,
     };
 }
 

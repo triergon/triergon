@@ -13,12 +13,12 @@ glyphs, scale or composite bitmaps, or schedule presentation; those belong to th
 
 ## Usage
 
-Every operation follows the same cooperative model. Memory is charged to a
-shared `Budget`, each `step`/`poll` spends a caller `WorkBudget` and checks an
-`AtomicBool` for cancellation, and output is immutable `Bytes` that stay valid
-after the decoder is reset or dropped. Starvation (`NeedInput`),
-work exhaustion (`Yield`) and output pressure (`NeedOutput`) are distinct,
-resumable states. Rejected input is handed back unchanged.
+Decoders charge storage to a shared `Budget` and spend a caller `WorkBudget` as
+they advance. Cooperative text and PGS calls take a cancellation flag. Owned
+`Bytes` stay valid after the decoder is reset or dropped. Borrowed views stay
+tied to the decoder. `NeedInput`, `Yield` and `NeedOutput` request more input,
+more work or more room for output respectively. `Ready` reports a completed
+result and `End` reports that the operation has finished.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -139,7 +139,8 @@ current definition of its charset does: `big5`, `shift_jis`, `euc-kr` and `gbk` 
 decoders of the WHATWG Encoding Standard (with the Hong Kong supplement, Windows-31J,
 UHC and the four-byte codes of GB18030), and a Windows code page (`cp932`, `cp949`,
 `cp950`) as Windows converts it, its user-defined areas included.
-`compat::charset::receiver_charset` converts as the C library of the reference build
+`compat::charset::Profile` selects a receiver repertoire for explicit multibyte
+conversion. `compat::charset::receiver_charset` resolves labels as the C library of the reference build
 does (glibc 2.39 `iconv`), and whatever a comparison pins of the reference's conversion
 runs through it: there `big5` and `cp950` are both glibc's Big5 charmap, `gbk` is CP936
 without four-byte codes, `shift_jis` the historical Shift-JIS with yen and overline,

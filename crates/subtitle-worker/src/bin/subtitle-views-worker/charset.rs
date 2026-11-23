@@ -2,7 +2,7 @@ use std::ffi::OsString;
 use std::sync::atomic::AtomicBool;
 
 use triergon_core::{Budget, Bytes, WorkBudget};
-use triergon_subtitles::compat::charset::{AssPacketJob, PacketStatus};
+use triergon_subtitles::compat::charset::{AssPacketJob, PacketStatus, Profile};
 use triergon_subtitles::text::charset::multibyte::{
     DecodeStep, MultibyteCharset, MultibyteDecoder,
 };
@@ -46,13 +46,11 @@ pub(super) fn operation<'a>(
         });
     }
     let profile = match profile.to_str() {
-        Some("big5-receiver" | "cp950-receiver") => {
-            Charset::Multibyte(MultibyteCharset::ReceiverBig5)
-        }
-        Some("kr-c1" | "kr-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverEucKrC1),
-        Some("cp932-receiver") => Charset::Multibyte(MultibyteCharset::Windows932),
-        Some("gbk-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverGbk),
-        Some("shift_jis-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverShiftJis),
+        Some("big5-receiver" | "cp950-receiver") => Charset::Multibyte(Profile::Big5.multibyte()),
+        Some("kr-c1" | "kr-receiver") => Charset::Multibyte(Profile::EucKr.multibyte()),
+        Some("cp932-receiver") => Charset::Multibyte(MultibyteCharset::WINDOWS_932),
+        Some("gbk-receiver") => Charset::Multibyte(Profile::Gbk.multibyte()),
+        Some("shift_jis-receiver") => Charset::Multibyte(Profile::ShiftJis.multibyte()),
         Some(profile) => Charset::from_label(profile.as_bytes())
             .or_else(|_| MultibyteCharset::from_label(profile.as_bytes()).map(Charset::Multibyte))
             .map_err(|error| error.to_string())?,
