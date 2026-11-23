@@ -1273,17 +1273,18 @@ fn predictor(sums: &Covariance) -> (Cpx, Cpx) {
     (a0, a1)
 }
 
-/// HF adjustment (4.6.18.7): mapping, gains, limiter, smoothing, noise and sinusoids.
-fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
+/// Maps envelope energy, noise and sinusoids to QMF bands (4.6.18.7.2).
+#[inline]
+fn map_envelopes(
+    c: &Chan,
+    ft: &FreqTables,
+    e_orig_m: &mut [[f32; 64]; 5],
+    q_m: &mut [[f32; 64]; 5],
+    s_idx: &mut [[bool; 64]; 5],
+    s_map: &mut [[bool; 64]; 5],
+) {
     let kx = ft.kx;
-    let m = ft.m;
     let ne = c.num_env;
-    let mut e_orig_m = [[0f32; 64]; 5];
-    let mut q_m = [[0f32; 64]; 5];
-    let mut s_idx = [[false; 64]; 5];
-    let mut s_map = [[false; 64]; 5];
-    let mut e_curr = [[0f32; 64]; 5];
-    // mapping (4.6.18.7.2)
     for e in 0..ne {
         let table: &[usize] = if c.freq_res[e] { &ft.high } else { &ft.low };
         let n = table.len() - 1;
@@ -1312,11 +1313,23 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
             }
         }
     }
-    // current energies (4.6.18.7.3)
+}
+
+/// Estimates the energy of the generated HF bands (4.6.18.7.3).
+#[inline]
+fn estimate_envelope_energies(
+    c: &Chan,
+    ft: &FreqTables,
+    interpolate: bool,
+    e_curr: &mut [[f32; 64]; 5],
+) {
+    let kx = ft.kx;
+    let m = ft.m;
+    let ne = c.num_env;
     for e in 0..ne {
         let lb = 2 * c.t_env[e] + T_HFADJ;
         let ub = 2 * c.t_env[e + 1] + T_HFADJ;
-        if hdr.interpol_freq {
+        if interpolate {
             let inv = 1.0 / (ub - lb) as f32;
             for mm in 0..m {
                 let s: f32 = c.xh[mm + kx][lb..ub]
@@ -1341,6 +1354,20 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
             }
         }
     }
+}
+
+/// HF adjustment (4.6.18.7): mapping, gains, limiter, smoothing, noise and sinusoids.
+fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
+    let kx = ft.kx;
+    let m = ft.m;
+    let ne = c.num_env;
+    let mut e_orig_m = [[0f32; 64]; 5];
+    let mut q_m = [[0f32; 64]; 5];
+    let mut s_idx = [[false; 64]; 5];
+    let mut s_map = [[false; 64]; 5];
+    let mut e_curr = [[0f32; 64]; 5];
+    map_envelopes(c, ft, &mut e_orig_m, &mut q_m, &mut s_idx, &mut s_map);
+    estimate_envelope_energies(c, ft, hdr.interpol_freq, &mut e_curr);
     // gains (4.6.18.7.4) and limiter (4.6.18.7.5)
     let mut gain = [[0f32; 64]; 5];
     let mut qm = [[0f32; 64]; 5];
