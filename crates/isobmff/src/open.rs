@@ -663,10 +663,7 @@ impl MoofWalk {
 
 #[derive(Debug)]
 #[repr(u8)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "Keep the builder inline without a per-fragment allocation"
-)]
+#[allow(clippy::large_enum_variant)] // Keep the builder inline without a per-fragment allocation.
 enum TrafStage {
     Next,
     Scan {
@@ -682,34 +679,35 @@ enum TrafStage {
 /// The resumable opener over a caller-driven [`InputCursor`]: it walks the root
 /// boxes, the movie and every fragment, and validates each track.
 #[derive(Debug)]
+#[repr(C)]
 pub struct MovieOpen {
     reader: BoxReader,
-    recovery: bool,
-    timing_policy: TimingRunPolicy,
-    prefer_front: bool,
-    limits: OpenLimits,
-    pool: Budget,
+    pending_header: Option<BoxHeader>,
+    read_scope: MetadataReadScope,
+    track_build: Option<TrackBuild>,
+    fragment_walk: Option<MoofWalk>,
+    // The walk of moov after the root boxes are read.
+    walk: Option<Walk>,
+    terminal_mdat: Option<TerminalMdat>,
+    pending_metadata: Option<BoxView>,
+    moov: Option<BoxView>,
     roots: BudgetVec<BoxView>,
     media: BudgetVec<Range<u64>>,
     media_cache: BudgetVec<CachedMedia>,
-    pending_media: Option<PendingMedia>,
-    remaining_cache_bytes: usize,
-    terminal_mdat: Option<TerminalMdat>,
-    pending_header: Option<BoxHeader>,
-    pending_metadata: Option<BoxView>,
     moofs: BudgetVec<BoxView>,
-    moov: Option<BoxView>,
-    brand: Option<[u8; 4]>,
-    read_scope: MetadataReadScope,
-    top_count: usize,
-    /// The walk of `moov`, once the root boxes are read.
-    walk: Option<Walk>,
     tracks: BudgetVec<MovieTrack>,
-    track_at: usize,
-    track_build: Option<TrackBuild>,
     references: BudgetVec<bool>,
+    pending_media: Option<PendingMedia>,
+    pool: Budget,
+    limits: OpenLimits,
+    remaining_cache_bytes: usize,
+    top_count: usize,
+    track_at: usize,
     fragment_moof: usize,
-    fragment_walk: Option<MoofWalk>,
+    recovery: bool,
+    timing_policy: TimingRunPolicy,
+    prefer_front: bool,
+    brand: Option<[u8; 4]>,
     ready: bool,
 }
 impl MovieOpen {
