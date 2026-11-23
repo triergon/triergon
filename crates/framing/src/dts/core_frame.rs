@@ -587,50 +587,7 @@ impl DtsCoreFrameReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    self.frame = match part {
-                        HeaderPart::Sync
-                            if self.completed != 0
-                                && self.prefix[..4] == EXTENSION_SYNC.to_be_bytes() =>
-                        {
-                            Frame::Header(HeaderPart::ExtensionKind)
-                        }
-                        HeaderPart::Sync => {
-                            check_sync(&self.prefix[..4])?;
-                            if self.completed >= self.limits.maximum_frames {
-                                return Err(Error::Limit {
-                                    requested: self
-                                        .completed
-                                        .checked_add(1)
-                                        .ok_or(Error::Overflow)?,
-                                    maximum: self.limits.maximum_frames,
-                                });
-                            }
-                            Frame::Header(HeaderPart::Kind)
-                        }
-                        HeaderPart::Kind => {
-                            Frame::Header(HeaderPart::Whole(if self.prefix[4] & 2 == 0 {
-                                13
-                            } else {
-                                15
-                            }))
-                        }
-                        HeaderPart::Whole(_) => self.probe()?,
-                        HeaderPart::ExtensionKind => {
-                            let end = if self.prefix[5] & 0x20 == 0 { 9 } else { 10 };
-                            Frame::Header(HeaderPart::ExtensionSizes(end))
-                        }
-                        HeaderPart::ExtensionSizes(end) => {
-                            let maximum = self.limits.maximum_frame_bytes;
-                            let extent = probe_extension_substream_extent(
-                                &self.prefix[..end],
-                                DtsFrameExtentLimits {
-                                    maximum_header_bytes: maximum,
-                                    maximum_frame_bytes: maximum,
-                                },
-                            )?;
-                            Frame::ExtensionBody(extent.frame_bytes - end)
-                        }
-                    };
+                    self.check_header(part)?;
                 }
                 Frame::Body {
                     header,
@@ -758,6 +715,49 @@ impl DtsCoreFrameReader {
             }
         }
     }
+    #[inline]
+    fn check_header(&mut self, part: HeaderPart) -> Result<()> {
+        self.frame = match part {
+            HeaderPart::Sync
+                if self.completed != 0 && self.prefix[..4] == EXTENSION_SYNC.to_be_bytes() =>
+            {
+                Frame::Header(HeaderPart::ExtensionKind)
+            }
+            HeaderPart::Sync => {
+                check_sync(&self.prefix[..4])?;
+                if self.completed >= self.limits.maximum_frames {
+                    return Err(Error::Limit {
+                        requested: self.completed.checked_add(1).ok_or(Error::Overflow)?,
+                        maximum: self.limits.maximum_frames,
+                    });
+                }
+                Frame::Header(HeaderPart::Kind)
+            }
+            HeaderPart::Kind => Frame::Header(HeaderPart::Whole(if self.prefix[4] & 2 == 0 {
+                13
+            } else {
+                15
+            })),
+            HeaderPart::Whole(_) => self.probe()?,
+            HeaderPart::ExtensionKind => {
+                let end = if self.prefix[5] & 0x20 == 0 { 9 } else { 10 };
+                Frame::Header(HeaderPart::ExtensionSizes(end))
+            }
+            HeaderPart::ExtensionSizes(end) => {
+                let maximum = self.limits.maximum_frame_bytes;
+                let extent = probe_extension_substream_extent(
+                    &self.prefix[..end],
+                    DtsFrameExtentLimits {
+                        maximum_header_bytes: maximum,
+                        maximum_frame_bytes: maximum,
+                    },
+                )?;
+                Frame::ExtensionBody(extent.frame_bytes - end)
+            }
+        };
+        Ok(())
+    }
+
     /// Reads the prefix on to the end of `part`. `None` once it is there;
     /// otherwise the step to return.
     fn read_header(
