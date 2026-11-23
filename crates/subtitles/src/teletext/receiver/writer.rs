@@ -35,16 +35,16 @@ impl Writer {
         }
     }
 
-    /// Writes `page` as `ReadOrder,0,Style,,0,0,0,,Text`; `false` when it is
-    /// empty and nothing was written. `presentations` are the X/28 and M/29
-    /// packets it is presented with and `subtitle` its classification.
+    /// Writes `page` as `ReadOrder,0,Style,,0,0,0,,Text`, or nothing when it
+    /// is empty. `presentations` are the X/28 and M/29 packets it is presented
+    /// with and `subtitle` its classification.
     pub(super) fn write(
         &mut self,
         page: &Page,
         presentations: &Presentations,
         subtitle: bool,
         out: &mut Out<'_>,
-    ) -> Result<bool> {
+    ) -> Result<()> {
         let settings = Settings::of(presentations);
         let designations = settings.designations;
         let national = page.header.control.national_option;
@@ -89,7 +89,7 @@ impl Writer {
         } else {
             out.0.clear();
         }
-        Ok(written)
+        Ok(())
     }
 
     fn style(&self, subtitle: bool) -> &'static str {
