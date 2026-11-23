@@ -124,6 +124,7 @@ struct Admission {
     catalogue: CataloguePrepareJob,
 }
 
+// Reporting byte counts at admission costs up to 0.132% more instructions on late-metadata views.
 /// The payload bytes a level-one leaf `id` may hold: the unused metadata allowance
 /// `left`, and for Attachments also the unused attachment payload allowance.
 #[inline(always)]
@@ -1533,6 +1534,7 @@ impl Stream {
             return Err(Error::Invalid("admission outside its state"));
         };
         match phase {
+            // Checking singleton IDs here and during SeekHead lookup costs up to 0.266% more instructions.
             AdmitPhase::Lookup { at } => {
                 if *at == self.loaded.len() {
                     let maximum = leaf_allowance(&self.limits, &self.catalogue, header.id, left)?;
