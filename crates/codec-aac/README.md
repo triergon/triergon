@@ -89,8 +89,8 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
   `compat::ffmpeg::extensions::Policy::Reference` to retain the reference's differential
   history, phase enable state and carried envelope border.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
-  `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
-  `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.
+  `Unsupported(Feature)`, `Invalid(&str)` naming the syntax element,
+  `Policy(&str)`, `Truncated`, `Budget(Error)`.
 - Storage that depends on the stream is charged to the decoder's budget before it is
   allocated. In-band reconfiguration (a PCE, a CPE in a mono stream, the start of SBR or
   PS, a coupling channel) builds its whole state, and the larger frame it needs, first.
