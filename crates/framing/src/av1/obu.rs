@@ -1,7 +1,7 @@
 //! Open bitstream units of AV1 v1.0.0 with Errata 1 (§5.3): headers, sizes and
 //! payload spans. Payloads stay unread: no operating point is selected, no
 //! trailing bits are removed and no frame is assembled.
-use crate::{freeze_started, retryable, started};
+use crate::{ReaderInput, freeze_started, retryable, started};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, InputWindow, Result,
@@ -253,7 +253,7 @@ enum Phase {
 /// issues, reserved types, trailing bits and metadata bytes are kept as coded.
 #[derive(Debug)]
 pub struct Av1ObuReader {
-    cursor: InputCursor,
+    input: ReaderInput,
     framing: Av1ObuFraming,
     limits: Av1ObuLimits,
     phase: Phase,
@@ -268,7 +268,6 @@ pub struct Av1ObuReader {
     external_length: Option<u64>,
     output: Option<BudgetVec<u8>>,
     completed: usize,
-    failure: Option<Error>,
 }
 
 impl Av1ObuReader {
@@ -305,7 +304,7 @@ impl Av1ObuReader {
             }
         }
         Ok(Self {
-            cursor,
+            input: ReaderInput::Open(cursor),
             framing,
             limits,
             phase: Phase::Header,
@@ -320,7 +319,6 @@ impl Av1ObuReader {
             external_length: None,
             output: None,
             completed: 0,
-            failure: None,
         })
     }
 
@@ -332,34 +330,31 @@ impl Av1ObuReader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<usize>> {
-        self.cursor.read_into(output, work, cancel)
+        self.input.cursor()?.read_into(output, work, cancel)
     }
 
     /// The request for the bytes at [`position`](Self::position).
     pub fn request(&self) -> InputRequest {
-        self.cursor.request()
+        self.input.request()
     }
     /// The token an answer to the current request must carry.
     pub fn token(&self) -> InputToken {
-        self.cursor.token()
+        self.input.token()
     }
     /// The generation of the reader's input, which the facts of each OBU carry.
     pub fn generation(&self) -> u64 {
-        self.cursor.generation()
+        self.input.generation()
     }
     /// Offset in the source of the next byte the reader takes.
     pub fn position(&self) -> u64 {
-        self.cursor.position()
+        self.input.position()
     }
 
     /// Answers the current request with `window`, as
     /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
     /// window changes nothing. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        if let Some(error) = self.failure {
-            return Err(error);
-        }
-        self.cursor.provide(window)
+        self.input.cursor()?.provide(window)
     }
 
     /// Answers the current request with the end of the source, as
@@ -367,10 +362,7 @@ impl Av1ObuReader {
     /// ends before its known length fails the reader with [`Error::Truncated`]. An end
     /// inside an OBU makes the next [`step`](Self::step) fail as truncated.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        if let Some(error) = self.failure {
-            return Err(error);
-        }
-        let result = self.cursor.finish(source, token);
+        let result = self.input.cursor()?.finish(source, token);
         if matches!(result, Err(Error::Truncated)) {
             self.stop(Error::Truncated);
         }
@@ -386,10 +378,7 @@ impl Av1ObuReader {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        if let Some(error) = self.failure {
-            return Err(error);
-        }
-        self.cursor.fail(source, token, failure)?;
+        self.input.cursor()?.fail(source, token, failure)?;
         self.stop(match failure {
             SourceFailure::Transport => Error::Transport,
             SourceFailure::Cancelled => Error::Cancelled,
@@ -398,14 +387,7 @@ impl Av1ObuReader {
     }
 
     fn stop(&mut self, error: Error) {
-        if error == Error::Cancelled {
-            let _ = self.cursor.fail(
-                self.cursor.source(),
-                self.cursor.token(),
-                SourceFailure::Cancelled,
-            );
-        }
-        self.failure = Some(error);
+        self.input.cancel_and_fail_with(error);
         self.output = None;
     }
 
@@ -423,7 +405,7 @@ impl Av1ObuReader {
     /// call returns the same error. A pool that refuses the OBU's storage returns
     /// backpressure or an allocation error, after which the call may be repeated.
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Step<Av1Obu>> {
-        if let Some(error) = self.failure {
+        if let Some(error) = self.input.failure() {
             return Err(error);
         }
         if cancel.load(Ordering::Relaxed) {
@@ -452,8 +434,8 @@ impl Av1ObuReader {
         }
     }
 
-    fn buffer(&mut self) -> &mut BudgetVec<u8> {
-        started(&mut self.output, self.cursor.budget())
+    fn buffer(&mut self) -> Result<&mut BudgetVec<u8>> {
+        Ok(started(&mut self.output, self.input.cursor()?.budget()))
     }
 
     // One loop over every phase, as the NAL and AC-3 readers keep theirs.
@@ -464,9 +446,9 @@ impl Av1ObuReader {
             }
             match self.phase {
                 Phase::Header => {
-                    self.offset = self.cursor.position();
+                    self.offset = self.input.cursor()?.position();
                     let mut byte = [0];
-                    match self.cursor.read_into(&mut byte, work, cancel)? {
+                    match self.input.cursor()?.read_into(&mut byte, work, cancel)? {
                         Step::Ready(_) => {
                             if self.completed >= self.limits.maximum_obus {
                                 return Err(Error::Limit {
@@ -500,7 +482,7 @@ impl Av1ObuReader {
                 }
                 Phase::Extension | Phase::Size => {
                     let mut byte = [0];
-                    match self.cursor.read_into(&mut byte, work, cancel)? {
+                    match self.input.cursor()?.read_into(&mut byte, work, cancel)? {
                         Step::Ready(_) => {
                             if self.prefix_len >= self.prefix.len() {
                                 return Err(Error::Invalid("AV1 prefix too long"));
@@ -533,7 +515,8 @@ impl Av1ObuReader {
                     self.external_length = match self.framing {
                         Av1ObuFraming::LowOverhead => None,
                         Av1ObuFraming::OneObu => Some(
-                            self.cursor
+                            self.input
+                                .cursor()?
                                 .capabilities()
                                 .length
                                 .ok_or(Error::Unsupported("unknown external OBU length"))?
@@ -572,7 +555,8 @@ impl Av1ObuReader {
                     }
                     let end = self.offset.checked_add(wire).ok_or(Error::Overflow)?;
                     if self
-                        .cursor
+                        .input
+                        .cursor()?
                         .capabilities()
                         .length
                         .is_some_and(|length| end > length)
@@ -586,7 +570,8 @@ impl Av1ObuReader {
                         return Ok(Step::Yield);
                     }
                     let count = self.wire_length;
-                    started(&mut self.output, self.cursor.budget()).try_reserve_exact(count)?;
+                    started(&mut self.output, self.input.cursor()?.budget())
+                        .try_reserve_exact(count)?;
                     self.phase = Phase::Prefix;
                 }
                 Phase::Prefix => {
@@ -607,12 +592,12 @@ impl Av1ObuReader {
                     }
                     let start = self.prefix_copied;
                     let end = start.checked_add(count).ok_or(Error::Overflow)?;
-                    started(&mut self.output, self.cursor.budget())
+                    started(&mut self.output, self.input.cursor()?.budget())
                         .try_extend_from_slice(&self.prefix[start..end])?;
                     self.prefix_copied = end;
                 }
                 Phase::Payload => {
-                    let length = self.buffer().len();
+                    let length = self.buffer()?.len();
                     let remaining = self
                         .wire_length
                         .checked_sub(length)
@@ -621,9 +606,13 @@ impl Av1ObuReader {
                         self.phase = Phase::Freeze;
                         continue;
                     }
-                    match self.cursor.read_span(remaining.min(4096), work, cancel)? {
+                    match self
+                        .input
+                        .cursor()?
+                        .read_span(remaining.min(4096), work, cancel)?
+                    {
                         Step::Ready(bytes) => {
-                            self.buffer().try_extend_from_slice(bytes.as_ref())?;
+                            self.buffer()?.try_extend_from_slice(bytes.as_ref())?;
                         }
                         Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                         Step::Yield => return Ok(Step::Yield),
@@ -652,10 +641,10 @@ impl Av1ObuReader {
                         .offset
                         .checked_add(u64::try_from(self.prefix_len).map_err(|_| Error::Overflow)?)
                         .ok_or(Error::Overflow)?;
-                    let wire = freeze_started(&mut self.output, self.cursor.budget())?;
+                    let wire = freeze_started(&mut self.output, self.input.cursor()?.budget())?;
                     let facts = Av1ObuFacts {
-                        source: self.cursor.source(),
-                        generation: self.cursor.generation(),
+                        source: self.input.cursor()?.source(),
+                        generation: self.input.cursor()?.generation(),
                         offset: self.offset,
                         payload_offset,
                         payload_length: self.payload_length,
@@ -674,7 +663,7 @@ impl Av1ObuReader {
                 }
                 Phase::AwaitEnd => {
                     let mut byte = [0];
-                    match self.cursor.read_into(&mut byte, work, cancel)? {
+                    match self.input.cursor()?.read_into(&mut byte, work, cancel)? {
                         Step::Ready(_) => {
                             return Err(Error::Invalid("extra bytes after one AV1 OBU"));
                         }
@@ -688,8 +677,8 @@ impl Av1ObuReader {
                 }
                 Phase::End => {
                     return Ok(Step::End(SourceLocation {
-                        source: self.cursor.source(),
-                        offset: self.cursor.position(),
+                        source: self.input.cursor()?.source(),
+                        offset: self.input.cursor()?.position(),
                     }));
                 }
             }

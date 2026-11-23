@@ -31,7 +31,10 @@ mod canonical;
 mod inline_storage;
 mod record_input;
 
-use triergon_core::{Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, Result, SourceId};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, Result, SourceFailure,
+    SourceId,
+};
 
 /// Whether a job may be stepped again after `error`: the pool refused storage it
 /// can grant once the caller frees some.
@@ -87,6 +90,7 @@ pub(crate) fn freeze_started(slot: &mut Option<BudgetVec<u8>>, pool: &Budget) ->
 
 /// A reader's input: an [`InputCursor`] until the reader fails, then the request it
 /// had open and the error it returns from then on.
+#[derive(Debug)]
 pub(crate) enum ReaderInput {
     Open(InputCursor),
     Failed { request: InputRequest, error: Error },
@@ -135,10 +139,25 @@ impl ReaderInput {
             Self::Failed { error, .. } => Err(*error),
         }
     }
+    /// The token of the open request; once failed, of the request that was open then.
+    pub(crate) fn token(&self) -> InputToken {
+        match self {
+            Self::Open(cursor) => cursor.token(),
+            Self::Failed { request, .. } => request.token.clone(),
+        }
+    }
     /// Ends the input with `error`, keeping the request that is open.
     pub(crate) fn fail_with(&mut self, error: Error) {
         let request = self.request();
         *self = Self::Failed { request, error };
+    }
+    /// [`fail_with`](Self::fail_with), failing the cursor with
+    /// [`SourceFailure::Cancelled`] first when `error` is [`Error::Cancelled`].
+    pub(crate) fn cancel_and_fail_with(&mut self, error: Error) {
+        if let (Error::Cancelled, Self::Open(cursor)) = (error, &mut *self) {
+            let _ = cursor.fail(cursor.source(), cursor.token(), SourceFailure::Cancelled);
+        }
+        self.fail_with(error);
     }
 }
 
