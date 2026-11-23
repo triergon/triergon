@@ -251,15 +251,18 @@ fn keeps_compatibility(program: &[u8]) -> bool {
     let mut i = 0;
     let mut last: Option<i32> = None;
     while let Some(&op) = program.get(i) {
-        let pushed = |count: usize, words: bool, at: usize| -> Option<(usize, i32)> {
+        let pushed = |count: usize, words: bool, at: usize| {
             let size = if words { 2 } else { 1 };
-            let bytes = program.get(at..at + count * size)?;
-            let top = match bytes.len().checked_sub(size) {
-                Some(t) if words => i32::from(i16::from_be_bytes([bytes[t], bytes[t + 1]])),
-                Some(t) => i32::from(bytes[t]),
-                None => return Some((at + count * size, i32::MIN)),
-            };
-            Some((at + count * size, top))
+            let end = at + count * size;
+            let bytes = program.get(at..end)?;
+            let top = bytes.len().checked_sub(size).map(|t| {
+                if words {
+                    i32::from(i16::from_be_bytes([bytes[t], bytes[t + 1]]))
+                } else {
+                    i32::from(bytes[t])
+                }
+            });
+            Some((end, top))
         };
         let step = match op {
             0x40 | 0x41 => program
@@ -268,13 +271,13 @@ fn keeps_compatibility(program: &[u8]) -> bool {
             0xB0..=0xB7 => pushed(usize::from(op - 0xAF), false, i + 1),
             0xB8..=0xBF => pushed(usize::from(op - 0xB7), true, i + 1),
             0x8E if !matches!(last, Some(1 | 2)) => return false,
-            _ => Some((i + 1, i32::MIN)),
+            _ => Some((i + 1, None)),
         };
         let Some((next, top)) = step else {
             // A push running off the end: the program stops there.
             return true;
         };
-        last = (top != i32::MIN).then_some(top);
+        last = top;
         i = next;
     }
     true
