@@ -1,6 +1,7 @@
 //! raw_data_block() decoding: element parsing, channel mapping, per-channel state and
 //! output assembly.
 
+use crate::cce::CouplingPoint;
 use crate::compat::ffmpeg::{extensions::Policy as ExtensionPolicy, layout::Policy};
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
@@ -594,7 +595,7 @@ impl Core {
             e.ch_decoded = [false; 2];
         }
         for c in &mut self.cce {
-            c.decoded = false;
+            c.point = None;
         }
         let cfg = CoreCfg {
             aot: self.aot,
@@ -1046,9 +1047,9 @@ pub(crate) fn process_channel(
     if let Prediction::Ltp(l) = &mut st.prediction {
         ltp::apply(l, fb, cd, st.prev_shape, cfg);
     }
-    crate::cce::apply_spectral(cce, kind, tag, ch_in_elem, cd, false);
+    crate::cce::apply_spectral(cce, kind, tag, ch_in_elem, cd, CouplingPoint::BeforeTns);
     apply_tns(cd, cfg);
-    crate::cce::apply_spectral(cce, kind, tag, ch_in_elem, cd, true);
+    crate::cce::apply_spectral(cce, kind, tag, ch_in_elem, cd, CouplingPoint::AfterTns);
     let info = cd.info;
     fb.synth(
         &cd.coef,
