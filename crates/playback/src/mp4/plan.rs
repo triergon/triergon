@@ -154,6 +154,10 @@ pub struct PlanTrack {
     pub(crate) decode_end: Option<i64>,
     pub(crate) fragment_aac_trim: u32,
 }
+
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(size_of::<PlanTrack>() <= 176);
+
 impl PlanTrack {
     fn first_description(&self) -> Option<&SampleDescription> {
         self.descriptions.as_slice().first()
@@ -261,6 +265,10 @@ pub struct PreparedMp4 {
     /// while a forward source is read, so not part of the view.
     pub(crate) demux_order_replay: bool,
 }
+
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(size_of::<PreparedMp4>() <= 672);
+
 impl PreparedMp4 {
     pub(crate) fn cached_payload(&self, range: &Range<u64>) -> Result<Option<Bytes>> {
         let cache = self.media_cache.as_slice();
@@ -638,8 +646,7 @@ impl<'a> Mp4IndexJob<'a> {
                         "zero-timescale recovery requires regular raw video with samples, one description and no edits",
                     ));
                 }
-                let clock =
-                    MediaClock::for_zero_scale()?;
+                let clock = MediaClock::for_zero_scale()?;
                 zero_scale_clock = Some(clock);
                 clock.demux_base
             } else {
@@ -961,11 +968,7 @@ impl<'a> Mp4IndexJob<'a> {
                 let (base, demux_stream) = if h.timescale == 0 {
                     (
                         SourceTimeBase::UNAVAILABLE,
-                        StreamView::for_zero_scale_source(
-                            h,
-                            t.table(),
-                            self.movie.major_brand(),
-                        ),
+                        StreamView::for_zero_scale_source(h, t.table(), self.movie.major_brand()),
                     )
                 } else {
                     (

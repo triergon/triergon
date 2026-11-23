@@ -154,6 +154,9 @@ pub struct TsEngine {
     pub(crate) delivery: Delivery,
 }
 
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(size_of::<TsEngine>() <= 5_440);
+
 impl TsEngine {
     pub(super) fn start_draining(&mut self) {
         self.life = Life::Draining(Completion::Pending);

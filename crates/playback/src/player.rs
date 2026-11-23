@@ -416,6 +416,9 @@ struct PendingEvent {
     source: triergon_core::SourceId,
 }
 
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(size_of::<PendingEvent>() <= 768);
+
 /// Drives an engine over its source and admits events into a bounded FIFO.
 #[derive(Debug)]
 pub struct Player<S: Source> {

@@ -86,6 +86,9 @@ pub struct Mp4Engine {
     pub(crate) ended_short: bool,
 }
 
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(size_of::<Mp4Engine>() <= 7_344);
+
 impl Mp4Engine {
     /// An engine over `plan`, which must have been indexed from `input`'s source,
     /// pool, generation and length; packets of at most `maximum_packet` bytes.
@@ -228,6 +231,7 @@ impl Mp4Engine {
     }
 
     fn packet_config(&self, at_track: usize, description: u32) -> Result<Mp4Configuration> {
+        // The configuration event installs the revision before delivering its first sample.
         let revision = self.configs[at_track]
             .ok_or(Error::Invalid("configuration missing"))?
             .revision;
@@ -362,6 +366,7 @@ impl Mp4Engine {
         c: &AtomicBool,
         cursor: Option<&mut PacketCursor<'_>>,
     ) -> Result<EngineStep> {
+        // The sample reader stays parked here while it waits for input or work.
         let (at_track, reader) = self
             .packet
             .as_mut()
@@ -622,12 +627,7 @@ impl Mp4Engine {
             return Err(Error::Invalid("sample has no source mdat"));
         };
         let packet = if self.plan.demux_recovery && self.plan.demux_row(self.row).is_some() {
-            SampleReader::new_recovery(
-                &mut self.input,
-                row.sample,
-                media,
-                self.maximum_packet,
-            )?
+            SampleReader::new_recovery(&mut self.input, row.sample, media, self.maximum_packet)?
         } else {
             match media {
                 RecoverySampleExtent::Finite(extent) => {
