@@ -19,3 +19,6 @@ mod pes;
 mod pmt;
 pub mod progressive;
 pub mod segment;
+
+// Identity of the elementary bytes assembled from PES payloads.
+const ELEMENTARY_SOURCE: triergon_core::SourceId = triergon_core::SourceId(0);

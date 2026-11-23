@@ -3,6 +3,7 @@
 //! synthetic byte offsets below count only PES payload, in transport order.
 
 use crate::{
+    ELEMENTARY_SOURCE,
     avc::{AvcRaster, AvcTsClock, AvcTsLimits},
     pes::{PES_CORRUPT, clock_describes, lane_track},
 };
@@ -23,8 +24,6 @@ use triergon_mpegts::{
 use triergon_playback::{TrackKey, pes_feed::PesInput};
 use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
 use triergon_raw_video::RawVideoConfigTracker;
-
-const ELEMENTARY: SourceId = SourceId(0);
 
 #[derive(Debug)]
 pub(crate) struct HlsHevcPicture {
@@ -162,7 +161,7 @@ impl HlsHevc {
         let reader = RawAnnexBReader::new(
             pool,
             Codec::Hevc,
-            ELEMENTARY,
+            ELEMENTARY_SOURCE,
             SourceCapabilities {
                 length: None,
                 random_access: false,

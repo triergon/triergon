@@ -1,5 +1,6 @@
 //! Aligned Dolby syncframes for one selected independent HLS TS segment.
 use crate::{
+    ELEMENTARY_SOURCE,
     pes::{PES_CORRUPT, clock_describes, lane_track, pes_time},
     segment::HlsMediaAudioUnit,
 };
@@ -71,8 +72,7 @@ impl HlsDolby {
         }
         let reader = Ac3FrameReader::new(
             pool,
-            // This cursor indexes the concatenated elementary payload only.
-            SourceId(0),
+            ELEMENTARY_SOURCE,
             SourceCapabilities {
                 length: None,
                 random_access: false,
