@@ -17,3 +17,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     Ok(())
 }
+#![forbid(unsafe_code)]
+
