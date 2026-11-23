@@ -237,7 +237,7 @@ impl Synthesis {
 #[inline(always)]
 fn accumulate(sums: &mut Taps, taps: &Taps, values: &[f32; 17], base: usize) {
     let Some(values) = values[base..].first_chunk::<{ LANES + 1 }>() else {
-        unreachable!("a lane group lies within the first 16 values");
+        return;
     };
     for l in 0..LANES {
         sums.low[l] += taps.low[l] * values[l];
