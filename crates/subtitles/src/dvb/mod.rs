@@ -4,7 +4,7 @@
 //! `CodecPrivate` or an MPEG-TS subtitling descriptor and binds each packet to
 //! it ([`DvbPacket`]) with its raw clock values. The receiver that decodes
 //! the packets as the reference does is
-//! [`compat::dvb::ReceiverDecoder`](crate::compat::dvb::ReceiverDecoder).
+//! [`compat::dvb::Decoder`](crate::compat::dvb::Decoder).
 mod boundary;
 mod model;
 pub(crate) mod pes_parser;

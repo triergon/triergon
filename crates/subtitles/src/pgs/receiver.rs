@@ -1,6 +1,6 @@
 //! The PGS receiver: FFmpeg's `pgssub` decoder as one bounded packet loop.
 //!
-//! Each packet runs once through [`ReceiverDecoder::poll`]: segments in order
+//! Each packet runs once through [`Decoder::poll`]: segments in order
 //! (PCS, PDS and ODS update the [`state::Receiver`], END builds a display),
 //! work paid before each step, and every allocation made before the state it
 //! feeds changes, so a pressure error can be retried without repeating work.
@@ -28,7 +28,7 @@ const END: u8 = 0x80;
 
 /// A packet's timestamps in its stream's time base.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PacketClock {
+pub struct Clock {
     /// Presentation time in `timebase` ticks; `None`, or `i64::MIN`, when
     /// unknown.
     pub pts: Option<i64>,
@@ -38,7 +38,7 @@ pub struct PacketClock {
     pub timebase: TimeBase,
 }
 
-impl PacketClock {
+impl Clock {
     /// The PTS in microseconds, rounded to nearest with ties away from zero.
     fn receiver_microseconds(self) -> Result<Option<i64>> {
         self.pts
@@ -51,7 +51,7 @@ impl PacketClock {
 }
 
 /// Bounds on what one decoder holds and does. Exceeding one fails the
-/// decoder with `Error::Limit` until [`ReceiverDecoder::reset`], except where
+/// decoder with `Error::Limit` until [`Decoder::reset`], except where
 /// a field says otherwise.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
@@ -72,7 +72,7 @@ pub struct Limits {
     /// Most composition objects a PCS may declare, at most 255. The receiver
     /// presents the first two.
     pub max_references: usize,
-    /// Largest packet [`ReceiverDecoder::push`] accepts, in bytes; a larger
+    /// Largest packet [`Decoder::push`] accepts, in bytes; a larger
     /// one is refused with `Error::Limit` and the decoder carries on.
     pub max_packet_bytes: usize,
     /// Work units the decoder spends in all until reset; work, not wall time.
@@ -233,10 +233,10 @@ impl Subtitle {
 /// One decoded packet. Segments after its first display still update the
 /// decoder's caches and `canvas`.
 #[derive(Debug)]
-pub struct ReceiverPacket {
+pub struct DecodedPacket {
     raw: Bytes,
     /// The clock the packet was pushed with.
-    pub clock: PacketClock,
+    pub clock: Clock,
     event: Option<Subtitle>,
     refusal: Option<Refusal>,
     /// Canvas width and height after the packet: the size of the latest PCS
@@ -245,7 +245,7 @@ pub struct ReceiverPacket {
     pub canvas: [u16; 2],
 }
 
-impl ReceiverPacket {
+impl DecodedPacket {
     /// The packet as pushed, unchanged.
     pub fn raw_packet(&self) -> &Bytes {
         &self.raw
@@ -260,18 +260,18 @@ impl ReceiverPacket {
     }
 }
 
-/// What [`ReceiverDecoder::poll`] reached.
+/// What [`Decoder::poll`] reached.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     /// No packet is active: push the next one, or finish the input.
-    NeedPacket,
+    NeedInput,
     /// The work budget ran out; poll again with more.
     Yield,
     /// The packet is decoded; take it with
-    /// [`take_output`](ReceiverDecoder::take_output).
-    OutputReady,
+    /// [`take_output`](Decoder::take_output).
+    Ready,
     /// The input has ended and nothing more is output.
-    Ended,
+    End,
 }
 
 /// What the decoder is doing.
@@ -316,7 +316,7 @@ impl State {
 #[derive(Debug)]
 struct Packet {
     raw: Bytes,
-    clock: PacketClock,
+    clock: Clock,
     /// Where the next segment starts.
     at: usize,
     /// The PTS of the subtitle this packet returns, as the reference fills it:
@@ -436,26 +436,26 @@ struct Core {
 /// charged to the supplied pool; work is cumulative until reset and every
 /// operation receives caller cancellation.
 #[derive(Debug)]
-pub struct ReceiverDecoder {
+pub struct Decoder {
     core: Core,
     state: State,
 }
 
-impl ReceiverDecoder {
-    /// A decoder charging `budget`, with no stream state.
+impl Decoder {
+    /// A decoder charging `pool`, with no stream state.
     ///
     /// # Errors
     ///
     /// `Error::Limit` when `limits` allows more than 64 objects, 8 palettes
     /// or 255 composition objects.
-    pub fn new(budget: &Budget, limits: Limits, options: Options) -> Result<Self> {
+    pub fn new(pool: &Budget, options: Options, limits: Limits) -> Result<Self> {
         limits.validate()?;
         Ok(Self {
             core: Core {
-                budget: budget.clone(),
+                budget: pool.clone(),
                 limits,
                 options,
-                receiver: Receiver::new(budget),
+                receiver: Receiver::new(pool),
                 credit: 0,
                 spent: 0,
                 planes: Planes::None,
@@ -479,7 +479,7 @@ impl ReceiverDecoder {
     pub fn push(
         &mut self,
         packet: Bytes,
-        clock: &PacketClock,
+        clock: &Clock,
         cancel: &AtomicBool,
     ) -> std::result::Result<(), Refused<Bytes>> {
         if let State::Failed(error) = self.state {
@@ -553,9 +553,9 @@ impl ReceiverDecoder {
         match &self.state {
             State::Packet(Packet {
                 step: Step::Ready, ..
-            }) => return Ok(Status::OutputReady),
-            State::Idle => return Ok(Status::NeedPacket),
-            State::End { polled: true } => return Ok(Status::Ended),
+            }) => return Ok(Status::Ready),
+            State::Idle => return Ok(Status::NeedInput),
+            State::End { polled: true } => return Ok(Status::End),
             _ if work.remaining() == 0 => return Ok(Status::Yield),
             _ => {}
         }
@@ -588,10 +588,10 @@ impl ReceiverDecoder {
                         }
                         done
                     }
-                    Step::Ready => return Ok(Status::OutputReady),
+                    Step::Ready => return Ok(Status::Ready),
                 },
                 // The receiver holds no delayed subtitle: the end outputs nothing.
-                State::End { polled: true } => return Ok(Status::Ended),
+                State::End { polled: true } => return Ok(Status::End),
                 State::End { polled } => {
                     let done = core.pay(work, cancel, 1)?;
                     if done {
@@ -599,7 +599,7 @@ impl ReceiverDecoder {
                     }
                     done
                 }
-                State::Idle => return Ok(Status::NeedPacket),
+                State::Idle => return Ok(Status::NeedInput),
                 State::Failed(error) => return Err(*error),
             };
             if !done {
@@ -610,14 +610,14 @@ impl ReceiverDecoder {
     }
 
     /// The decoded packet, once [`poll`](Self::poll) has returned
-    /// `OutputReady`; the decoder then needs the next packet.
+    /// `Ready`; the decoder then needs the next packet.
     ///
     /// # Errors
     ///
     /// `Error::Invalid` before the output is ready; `Error::Cancelled` when
     /// `cancel` is set, which fails the decoder; a failed decoder returns its
     /// failure.
-    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<ReceiverPacket> {
+    pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<DecodedPacket> {
         if let State::Failed(error) = self.state {
             return Err(error);
         }
@@ -628,7 +628,7 @@ impl ReceiverDecoder {
             return Err(Error::Invalid("PGS output not ready"));
         };
         self.core.credit = 0;
-        Ok(ReceiverPacket {
+        Ok(DecodedPacket {
             raw: packet.raw,
             clock: packet.clock,
             event: match packet.display {
@@ -640,7 +640,7 @@ impl ReceiverDecoder {
         })
     }
 
-    /// Ends the input; [`poll`](Self::poll) then reaches `Ended`.
+    /// Ends the input; [`poll`](Self::poll) then reaches `End`.
     ///
     /// # Errors
     ///

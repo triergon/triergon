@@ -4,8 +4,8 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, ReceiverPacket, Status};
-use triergon_subtitles::pgs::PacketClock;
+use triergon_subtitles::compat::pgs::{DecodedPacket, Decoder, Limits, Options, Status};
+use triergon_subtitles::pgs::Clock;
 
 fn segment(out: &mut Vec<u8>, kind: u8, body: &[u8]) {
     out.push(kind);
@@ -43,37 +43,37 @@ fn picture() -> Vec<u8> {
     out
 }
 
-fn clock() -> PacketClock {
-    PacketClock {
+fn clock() -> Clock {
+    Clock {
         pts: Some(90_000),
         dts: Some(89_000),
         timebase: TimeBase::new(1, 90_000).unwrap(),
     }
 }
 
-fn decoder(b: &Budget, forced: bool) -> ReceiverDecoder {
-    ReceiverDecoder::new(
+fn decoder(b: &Budget, forced: bool) -> Decoder {
+    Decoder::new(
         b,
-        Limits::default(),
         Options {
             forced_only: forced,
         },
+        Limits::default(),
     )
     .unwrap()
 }
 
-fn push(d: &mut ReceiverDecoder, b: &Budget, raw: &[u8]) {
+fn push(d: &mut Decoder, b: &Budget, raw: &[u8]) {
     let owned = Bytes::copy_from_slice(b, raw).unwrap();
     d.push(owned, &clock(), &AtomicBool::new(false)).unwrap();
 }
 
-fn ready(d: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
+fn ready(d: &mut Decoder, quantum: u64) -> DecodedPacket {
     let cancel = AtomicBool::new(false);
     for _ in 0..1_000_000 {
         let mut work = WorkBudget::new(quantum);
         let status = d.poll(&mut work, &cancel).unwrap();
         assert!(work.spent() <= quantum);
-        if status == Status::OutputReady {
+        if status == Status::Ready {
             return d.take_output(&cancel).unwrap();
         }
         assert_eq!(status, Status::Yield);
@@ -81,7 +81,7 @@ fn ready(d: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
     panic!("the receiver did not finish bounded input");
 }
 
-fn assert_picture(out: &ReceiverPacket, forced: bool) {
+fn assert_picture(out: &DecodedPacket, forced: bool) {
     assert_eq!(out.canvas, [16, 1]);
     assert_eq!(out.clock, clock());
     let event = out.subtitle().unwrap();
@@ -140,7 +140,7 @@ fn constructor_refuses_limits_above_the_format_ceilings() {
         },
     ] {
         assert!(matches!(
-            ReceiverDecoder::new(&b, limits, Options::default()),
+            Decoder::new(&b, Options::default(), limits),
             Err(Error::Limit { .. })
         ));
         assert_eq!(b.used(), baseline);
@@ -251,13 +251,13 @@ fn rejected_foreign_busy_and_oversized_input_preserve_the_exact_caller_owner() {
     assert!(matches!(refused.error, Error::Invalid(_)));
     assert!(refused.value.shares_storage_with(&held));
     drop(ready(&mut d, 4096));
-    let mut limited = ReceiverDecoder::new(
+    let mut limited = Decoder::new(
         &b,
+        Options::default(),
         Limits {
             max_packet_bytes: 1,
             ..Limits::default()
         },
-        Options::default(),
     )
     .unwrap();
     let refused = limited.push(refused.value, &clock(), &c).unwrap_err();
@@ -303,7 +303,7 @@ fn cancelled_push_preserves_input_and_cancelled_take_discards_unpublished_output
     d.push(refused.value, &clock(), &c).unwrap();
     let mut ready = false;
     for _ in 0..1_000_000 {
-        if d.poll(&mut WorkBudget::new(4096), &c).unwrap() == Status::OutputReady {
+        if d.poll(&mut WorkBudget::new(4096), &c).unwrap() == Status::Ready {
             ready = true;
             break;
         }
@@ -320,13 +320,13 @@ fn cumulative_work_limit_poison_cannot_be_bypassed_by_small_quanta_or_reset_retr
     for quantum in [1, 4096] {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let baseline = b.used();
-        let mut d = ReceiverDecoder::new(
+        let mut d = Decoder::new(
             &b,
+            Options::default(),
             Limits {
                 max_work: 1,
                 ..Limits::default()
             },
-            Options::default(),
         )
         .unwrap();
         push(&mut d, &b, &picture());
@@ -396,7 +396,7 @@ fn end_of_input_presents_nothing_pending() {
     assert_eq!(final_work.spent(), 1);
     assert_eq!(d.work_spent(), before + 1);
     let mut zero = WorkBudget::new(0);
-    assert_eq!(d.poll(&mut zero, &c).unwrap(), Status::Ended);
+    assert_eq!(d.poll(&mut zero, &c).unwrap(), Status::End);
     assert_eq!(zero.spent(), 0);
     assert_eq!(d.work_spent(), before + 1);
     assert!(d.take_output(&c).is_err());
@@ -409,7 +409,7 @@ fn end_of_input_presents_nothing_pending() {
 fn unknown_pts_retains_raw_dts_without_a_presentation_time() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let mut d = decoder(&b, false);
-    let raw_clock = PacketClock {
+    let raw_clock = Clock {
         pts: None,
         ..clock()
     };
@@ -446,7 +446,7 @@ fn display(objects: &[(u16, u16, u16, &[u8])]) -> Vec<u8> {
 type Rect = (u16, u16, u16, Vec<u8>);
 
 /// Each rectangle's geometry and pixels.
-fn rects(out: &ReceiverPacket) -> Vec<Rect> {
+fn rects(out: &DecodedPacket) -> Vec<Rect> {
     out.subtitle()
         .unwrap()
         .rectangles()

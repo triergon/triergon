@@ -300,7 +300,7 @@ impl SemanticJob {
                     match extractor.step(work, cancel)? {
                         Status::Yield => return Ok(SemanticStatus::Pending),
                         Status::NeedOutput => return Ok(SemanticStatus::NeedOutput),
-                        Status::Cue(cue) => {
+                        Status::Ready(cue) => {
                             let phase = match description.take() {
                                 Some(job) => Phase::Description(job),
                                 None => Phase::Fonts(Fonts {

@@ -213,7 +213,7 @@ pub(super) fn extract(pool: &Budget, input: Input, limits: Limits) -> triergon::
     extractor.provide(input).map_err(|refused| refused.error)?;
     loop {
         match extractor.step(&mut WorkBudget::new(4096), &cancel)? {
-            Status::Cue(cue) => return Ok(cue),
+            Status::Ready(cue) => return Ok(cue),
             Status::Yield => {}
             _ => return Err(Error::Invalid("extractor did not publish a cue")),
         }

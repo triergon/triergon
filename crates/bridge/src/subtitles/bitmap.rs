@@ -32,7 +32,7 @@ pub struct BitmapInput<M> {
     /// The packet payload.
     pub raw: Bytes,
     /// The packet's timestamps.
-    pub clock: pgs::PacketClock,
+    pub clock: pgs::Clock,
     /// The packet's duration in ticks of `clock.timebase`, where known.
     pub duration: Option<i64>,
     /// Caller data kept with the packet.
@@ -90,7 +90,7 @@ fn check<M>(pool: &Budget, scope: BitmapScope, input: &BitmapInput<M>) -> Result
     Ok(())
 }
 
-fn packet_queue_start_ns(clock: pgs::PacketClock) -> Result<i64> {
+fn packet_queue_start_ns(clock: pgs::Clock) -> Result<i64> {
     // A packet clock marks a missing time with the signed minimum.
     let known = |tick: &i64| *tick != i64::MIN;
     let start = match clock.pts.filter(known).or_else(|| clock.dts.filter(known)) {
@@ -161,7 +161,7 @@ fn allocate_owner<M>(
 pub struct PgsBridge<M> {
     pool: Budget,
     scope: BitmapScope,
-    decoder: compat::pgs::ReceiverDecoder,
+    decoder: compat::pgs::Decoder,
     pending: Option<BitmapOwner<M>>,
     pushed: bool,
     finished: bool,
@@ -173,7 +173,7 @@ pub struct PgsOutput<M> {
     /// The packet, owned until the output is dropped.
     pub packet: BitmapOwner<M>,
     /// The receiver's output for it.
-    pub decoded: compat::pgs::ReceiverPacket,
+    pub decoded: compat::pgs::DecodedPacket,
 }
 
 /// What a packet-clock bitmap queue does for one PGS output.
@@ -262,7 +262,7 @@ impl<M> PgsBridge<M> {
         limits: compat::pgs::Limits,
         config: compat::pgs::Options,
     ) -> Result<Self> {
-        let decoder = compat::pgs::ReceiverDecoder::new(pool, limits, config)?;
+        let decoder = compat::pgs::Decoder::new(pool, config, limits)?;
         Ok(Self {
             pool: pool.clone(),
             scope,
@@ -366,13 +366,13 @@ impl<M> PgsBridge<M> {
         }
         match self.decoder.poll(w, c)? {
             compat::pgs::Status::Yield => Ok(PgsStep::Yield),
-            compat::pgs::Status::Ended => Ok(PgsStep::Finished),
-            compat::pgs::Status::NeedPacket => {
+            compat::pgs::Status::End => Ok(PgsStep::Finished),
+            compat::pgs::Status::NeedInput => {
                 self.pending = None;
                 self.pushed = false;
                 Ok(PgsStep::NeedPacket)
             }
-            compat::pgs::Status::OutputReady => Ok(PgsStep::Output(PgsOutput {
+            compat::pgs::Status::Ready => Ok(PgsStep::Output(PgsOutput {
                 packet: self
                     .pending
                     .as_ref()
@@ -388,7 +388,7 @@ impl<M> PgsBridge<M> {
 pub struct DvdBridgeConfig {
     /// The palette, canvas and forced-only choice, usually read from the track's
     /// VobSub configuration text.
-    pub settings: compat::dvd::Settings,
+    pub settings: compat::dvd::Options,
     /// The largest subpicture unit in bytes and decoded area in pixels.
     pub limits: compat::dvd::Limits,
 }
@@ -678,7 +678,7 @@ impl<M> DvdReceiver<M> {
                 return Ok(DvdReceiverStep::Yield);
             }
             Ok(compat::dvd::Status::Nothing) => None,
-            Ok(compat::dvd::Status::Subtitle(subtitle)) => match DvdPicture::copy(
+            Ok(compat::dvd::Status::Ready(subtitle)) => match DvdPicture::copy(
                 &self.pool,
                 match packet_milliseconds(packet.input()) {
                     Some(ms) => subtitle.ending_with_packet(ms),
@@ -749,7 +749,7 @@ mod arc_layout_regression {
             },
             sequence: 11,
             raw,
-            clock: pgs::PacketClock {
+            clock: pgs::Clock {
                 pts: None,
                 dts: None,
                 timebase: TimeBase::new(1, 90_000).unwrap(),

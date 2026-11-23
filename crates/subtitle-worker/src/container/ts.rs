@@ -225,9 +225,9 @@ impl Selected {
         let cancel = AtomicBool::new(false);
         let packet = loop {
             match parser.step(&mut WorkBudget::new(u64::MAX), &cancel)? {
-                PesProgress::Packet(packet) => break packet,
+                PesProgress::Ready(packet) => break packet,
                 PesProgress::Yield => {}
-                PesProgress::NeedPacket => return Err("dvb: PES parser stalled".into()),
+                PesProgress::NeedInput => return Err("dvb: PES parser stalled".into()),
             }
         };
         let pts = packet.codec_pts().map(i64::try_from).transpose()?;

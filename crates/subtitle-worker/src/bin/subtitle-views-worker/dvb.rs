@@ -126,9 +126,9 @@ fn ts_source(input: &[u8]) -> triergon::Result<Source> {
         parser.provide(&packet.data, pts)?;
         let unit = loop {
             match parser.step(&mut WorkBudget::new(1 << 20), &cancel)? {
-                PesProgress::Packet(unit) => break unit,
+                PesProgress::Ready(unit) => break unit,
                 PesProgress::Yield => {}
-                PesProgress::NeedPacket => return Err(Error::Invalid("DVB PES parser stalled")),
+                PesProgress::NeedInput => return Err(Error::Invalid("DVB PES parser stalled")),
             }
         };
         // DTS only where the PES header codes one (the demux clock places a PTS-only

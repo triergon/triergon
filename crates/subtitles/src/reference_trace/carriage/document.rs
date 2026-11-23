@@ -87,8 +87,8 @@ impl Document {
                 Some(cue) => cue,
                 None => match self.reader.poll(work, cancel)? {
                     Status::Yield => return Ok(false),
-                    Status::Finished => return Ok(true),
-                    Status::Cue(cue) => cue,
+                    Status::End => return Ok(true),
+                    Status::Ready(cue) => cue,
                 },
             };
             if let Err(error) = self.push(&cue, payload) {

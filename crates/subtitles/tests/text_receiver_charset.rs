@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, SourceId, WorkBudget};
+use triergon_subtitles::compat::charset::Profile;
 use triergon_subtitles::compat::charset::{AssPacketJob, Outcome, PacketStatus, receiver_charset};
 use triergon_subtitles::text::charset::{
     Charset, CharsetJob, CharsetStatus, multibyte::MultibyteCharset as M,
@@ -59,12 +60,12 @@ fn the_receiver_big5_maps_the_codes_the_historical_table_leaves_out() {
         (&[0xa2, 0xce], "卅"),
         (&[0xa1, 0x45, 0xa1, 0x4e, 0xa1, 0xc2], "‧﹑¯"),
     ] {
-        assert_eq!(decode(&p, raw, M::ReceiverBig5).unwrap(), text.as_bytes());
+        assert_eq!(decode(&p, raw, RECEIVER_BIG5).unwrap(), text.as_bytes());
     }
     // The Encoding Standard's Big5 maps A1 5A as the receiver does, and A1 4E
     // and A1 C2 too; neither is the reference's table.
     assert_eq!(
-        decode(&p, &[0xa1, 0x5a, 0xa1, 0x4e, 0xa1, 0xc2], M::Big5).unwrap(),
+        decode(&p, &[0xa1, 0x5a, 0xa1, 0x4e, 0xa1, 0xc2], M::BIG5).unwrap(),
         "╴﹑¯".as_bytes()
     );
 }
@@ -73,13 +74,13 @@ fn euc_c1_controls_are_explicit_not_cp949_alias() {
     let p = Budget::new(1 << 20).unwrap();
     for b in 0x80..=0x9f {
         assert_eq!(
-            decode(&p, &[b, b'A'], M::ReceiverEucKrC1).unwrap(),
+            decode(&p, &[b, b'A'], RECEIVER_EUC_KR).unwrap(),
             format!("{}A", char::from(b)).as_bytes()
         );
     }
     // The receiver's EUC-KR has no UHC pairs; the Encoding Standard's has.
-    assert!(decode(&p, &[0xa1, 0x41], M::ReceiverEucKrC1).is_err());
-    for profile in [M::EucKr, M::Windows949] {
+    assert!(decode(&p, &[0xa1, 0x41], RECEIVER_EUC_KR).is_err());
+    for profile in [M::EUC_KR, M::WINDOWS_949] {
         assert_eq!(decode(&p, &[0x81, 0x41], profile).unwrap(), "갂".as_bytes());
     }
 }
@@ -91,7 +92,7 @@ fn cp932_user_defined_area_maps_all_1880_codes_to_private_use() {
         for trail in (0x40..=0x7e).chain(0x80..=0xfc) {
             let ch = char::from_u32(0xe000 + n).unwrap();
             assert_eq!(
-                decode(&p, &[lead, trail], M::Windows932).unwrap(),
+                decode(&p, &[lead, trail], M::WINDOWS_932).unwrap(),
                 ch.to_string().as_bytes()
             );
             n += 1;
@@ -111,10 +112,10 @@ fn receiver_labels_have_no_aliases_beyond_the_reference_set() {
     ] {
         assert!(receiver_charset(l).is_err());
     }
-    assert_eq!(M::from_label(b"euc_kr").unwrap(), M::EucKr);
+    assert_eq!(M::from_label(b"euc_kr").unwrap(), M::EUC_KR);
     assert_eq!(
         receiver_charset(b"BIG-5").unwrap(),
-        Charset::Multibyte(M::ReceiverBig5)
+        Charset::Multibyte(RECEIVER_BIG5)
     );
 }
 #[test]
@@ -196,7 +197,7 @@ fn work_zero_does_not_advance_and_cancel_resumes() {
     for _ in 0..10 {
         assert_eq!(
             j.poll(&mut WorkBudget::new(0), &c).unwrap(),
-            PacketStatus::Pending
+            PacketStatus::Yield
         );
         assert_eq!(p.used(), used);
     }
@@ -290,6 +291,8 @@ fn absent_separators_and_embedded_commas_are_literal() {
     let v = run(&p, input(&p, b"gbk", b"a,b,c"), 1);
     assert_eq!(v.text(), Some(b"a,b,c".as_slice()));
 }
+const RECEIVER_BIG5: M = Profile::Big5.multibyte();
+const RECEIVER_EUC_KR: M = Profile::EucKr.multibyte();
 
 #[test]
 fn whole_free_big5_charmap_is_checked_independently() {
@@ -316,7 +319,7 @@ fn whole_free_big5_charmap_is_checked_independently() {
             let mut j = CharsetJob::new(
                 &bytes,
                 None,
-                Charset::Multibyte(M::ReceiverBig5),
+                Charset::Multibyte(RECEIVER_BIG5),
                 &p,
                 Limits::default(),
             )
@@ -355,7 +358,7 @@ fn euc_extension_preserves_every_original_cp949_restricted_record() {
         }
         let scalar = u32::from_str_radix(fields[1].trim_start_matches("0x"), 16).unwrap();
         assert_eq!(
-            decode(&p, &wire.to_be_bytes(), M::ReceiverEucKrC1).unwrap(),
+            decode(&p, &wire.to_be_bytes(), RECEIVER_EUC_KR).unwrap(),
             char::from_u32(scalar).unwrap().to_string().as_bytes()
         );
         count += 1;
@@ -377,7 +380,7 @@ fn pressure_retry_never_consumes_unbudgeted_work_or_discards_source() {
                 pressure = true;
                 break;
             }
-            Ok(PacketStatus::Pending) => {}
+            Ok(PacketStatus::Yield) => {}
             other => panic!("{other:?}"),
         }
     }
@@ -385,7 +388,7 @@ fn pressure_retry_never_consumes_unbudgeted_work_or_discards_source() {
     let used = p.used();
     for _ in 0..10 {
         let mut work = WorkBudget::new(0);
-        assert_eq!(j.poll(&mut work, &c).unwrap(), PacketStatus::Pending);
+        assert_eq!(j.poll(&mut work, &c).unwrap(), PacketStatus::Yield);
         assert_eq!(work.remaining(), 0);
         assert_eq!(p.used(), used);
     }
@@ -475,21 +478,21 @@ fn absent_receiver_declaration_remains_unknown_while_source_is_retained() {
 fn the_receiver_euc_kr_maps_a2e8_as_ks_x_1001_2002_does() {
     let p = Budget::new(1 << 20).unwrap();
     assert_eq!(
-        decode(&p, &[0xa2, 0xe8], M::ReceiverEucKrC1).unwrap(),
+        decode(&p, &[0xa2, 0xe8], RECEIVER_EUC_KR).unwrap(),
         "\u{327e}".as_bytes()
     );
     // The Encoding Standard's index, as Windows' CP949 table, leaves it
     // unmapped.
-    for profile in [M::EucKr, M::Windows949] {
+    for profile in [M::EUC_KR, M::WINDOWS_949] {
         assert!(decode(&p, &[0xa2, 0xe8], profile).is_err());
     }
     assert_eq!(
         receiver_charset(b"euc-kr").unwrap(),
-        Charset::Multibyte(M::ReceiverEucKrC1)
+        Charset::Multibyte(RECEIVER_EUC_KR)
     );
     assert_eq!(
         receiver_charset(b"EUC-KR").unwrap(),
-        Charset::Multibyte(M::ReceiverEucKrC1)
+        Charset::Multibyte(RECEIVER_EUC_KR)
     );
     for label in [
         b"euc_kr".as_slice(),
@@ -549,7 +552,7 @@ fn an_euc_kr_truncated_tail_work_zero_and_cancel_keep_the_source() {
     let used = p.used();
     assert_eq!(
         j.poll(&mut WorkBudget::new(0), &c).unwrap(),
-        PacketStatus::Pending
+        PacketStatus::Yield
     );
     assert_eq!(p.used(), used);
     c.store(true, Ordering::Relaxed);
@@ -598,15 +601,15 @@ fn euc_kr_c1_maps_all_8387_primary_records_and_refuses_their_neighbours() {
             wire.to_be_bytes().to_vec()
         };
         assert_eq!(
-            decode(&p, &raw, M::ReceiverEucKrC1).unwrap(),
+            decode(&p, &raw, RECEIVER_EUC_KR).unwrap(),
             ch.to_string().as_bytes(),
             "{wire:04x}"
         );
     }
     assert!(matches!(
-        decode(&p, &[0xa2], M::ReceiverEucKrC1),
+        decode(&p, &[0xa2], RECEIVER_EUC_KR),
         Err(Error::Truncated)
     ));
-    assert!(decode(&p, &[0xa2, 0x20], M::ReceiverEucKrC1).is_err());
-    assert!(decode(&p, &[0xa2, 0xe9], M::ReceiverEucKrC1).is_err());
+    assert!(decode(&p, &[0xa2, 0x20], RECEIVER_EUC_KR).is_err());
+    assert!(decode(&p, &[0xa2, 0xe9], RECEIVER_EUC_KR).is_err());
 }

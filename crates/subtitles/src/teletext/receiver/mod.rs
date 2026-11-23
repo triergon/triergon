@@ -103,7 +103,7 @@ pub enum Refusal {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Decoded<'a> {
     /// The oldest queued subtitle, now out of the queue.
-    Subtitle(Subtitle<'a>),
+    Ready(Subtitle<'a>),
     /// No subtitle is queued.
     Nothing,
     /// The packet was refused; no subtitle is returned.
@@ -228,7 +228,7 @@ impl Decoder {
         }
         let end_display = self.end_display;
         Ok(match self.queue.pop_front() {
-            Some(slot) => Decoded::Subtitle(Subtitle {
+            Some(slot) => Decoded::Ready(Subtitle {
                 pts: slot.pts,
                 end_display,
                 ass: std::str::from_utf8(slot.text.as_slice())

@@ -17,7 +17,7 @@ use std::path::Path;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, BudgetVec, WorkBudget};
 use triergon_subtitles::compat::dvd::{
-    Decoder, Limits, Settings, Status, SubpictureParser, SubpictureStreams, VobSubIndex,
+    Decoder, Limits, Options as DecoderOptions, Status, SubpictureParser, SubpictureStreams, VobSubIndex,
     mp4_configuration,
 };
 use triergon_subtitles::dvd::program_stream::{Pes, Unit, Units};
@@ -41,8 +41,8 @@ struct Options {
 impl Options {
     /// The receiver's settings, as opening the reference decoder makes them:
     /// the configuration's palette, then the IFO file's, then the option's.
-    fn settings(&self, configuration: &[u8]) -> Result<Settings> {
-        let mut settings = Settings::from_configuration(configuration)?;
+    fn settings(&self, configuration: &[u8]) -> Result<DecoderOptions> {
+        let mut settings = DecoderOptions::from_configuration(configuration)?;
         if let Some(path) = &self.ifo_palette {
             settings.apply_ifo(std::fs::read(path).ok().as_deref());
         }
@@ -95,7 +95,7 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
 
 impl Prepared for Dvd {
     fn run(&self, sink: &mut Sink<'_>) -> Result<()> {
-        // Settings the reference's decoder refuses to open with, such as a
+        // Options the reference's decoder refuses to open with, such as a
         // `size:` it cannot allocate, end the operation with that result.
         let Ok(settings) = self.options.settings(&self.track.configuration) else {
             return Ok(sink.refused_open(self.track.packets.len())?);
@@ -111,7 +111,7 @@ impl Prepared for Dvd {
                     .resume(&mut WorkBudget::new(crate::WORK_SLICE))
                     .at(index)?;
             }
-            let Status::Subtitle(subtitle) = status else {
+            let Status::Ready(subtitle) = status else {
                 continue;
             };
             let subtitle = match packet.duration {

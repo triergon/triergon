@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
+use triergon_subtitles::compat::dvb::{Decoder, Options};
 
 struct Case {
     id: &'static str,
@@ -25,7 +25,7 @@ fn check(at: usize) {
     let case = &cases::CASES[at];
     let pool = Budget::new(4 << 20).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x10], Options::default());
+    let mut decoder = Decoder::new(&pool, &[0, 1, 0, 2, 0x10], Options::default());
     let mut work = WorkBudget::new(u64::MAX);
     let subtitle = decoder
         .decode(

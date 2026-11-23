@@ -29,7 +29,7 @@ fn decode(pool: usize, packets: &[Vec<u8>], refused: &[(usize, &[u8])]) -> Vec<C
         let mut work = WorkBudget::new(Decoder::MAX_PACKET_WORK);
         calls.push(
             match decoder.decode(packet, pts, &mut work).expect("decode") {
-                Decoded::Subtitle(s) => (s.pts, Ok(s.ass.map(str::to_owned))),
+                Decoded::Ready(s) => (s.pts, Ok(s.ass.map(str::to_owned))),
                 Decoded::Refused(refusal) => (None, Err(refusal)),
                 Decoded::Nothing => (None, Ok(None)),
             },

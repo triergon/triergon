@@ -12,12 +12,12 @@ fn project(parser: &mut PesParser, raw: &Bytes, pts: Option<i128>, quantum: u64)
     for _ in 0..200_000 {
         match parser.step(&mut WorkBudget::new(quantum), &cancel).unwrap() {
             PesProgress::Yield => {}
-            PesProgress::Packet(packet) => {
+            PesProgress::Ready(packet) => {
                 assert!(packet.pes().shares_storage_with(raw));
                 assert_eq!(packet.source_pts(), pts);
                 return packet;
             }
-            PesProgress::NeedPacket => panic!("pending DVB packet disappeared"),
+            PesProgress::NeedInput => panic!("pending DVB packet disappeared"),
         }
     }
     panic!("DVB parser stalled");
@@ -92,7 +92,7 @@ fn restart_disposes_prior_tail_and_allocation_pressure_preserves_the_pending_joi
     ));
     assert!(parser.provide(&next, Some(8)).is_err());
     drop(pressure);
-    let PesProgress::Packet(output) = parser.step(&mut WorkBudget::new(100), &cancel).unwrap()
+    let PesProgress::Ready(output) = parser.step(&mut WorkBudget::new(100), &cancel).unwrap()
     else {
         panic!("the pending join did not resume");
     };
@@ -173,7 +173,7 @@ fn byte_fragmented_segment_copies_each_input_byte_once() {
     for index in 0..4096 {
         parser.provide(&body_byte, None).unwrap();
         let mut work = WorkBudget::new(65_536);
-        let PesProgress::Packet(packet) = parser.step(&mut work, &cancel).unwrap() else {
+        let PesProgress::Ready(packet) = parser.step(&mut work, &cancel).unwrap() else {
             panic!("funded DVB fragment stalled");
         };
         charged += 65_536 - work.remaining();

@@ -289,7 +289,7 @@ impl Receiver for mov_text::Decoder {
         .ok()?;
         for _ in 0..MAX_POLLS {
             match decoder.poll(&mut work.budget(), cancel).ok()? {
-                mov_text::Status::Pending => {}
+                mov_text::Status::Yield => {}
                 mov_text::Status::NeedInput => return Some(decoder),
                 _ => return None,
             }
@@ -329,8 +329,8 @@ impl Receiver for mov_text::Decoder {
         self.provide(sample, packet.clock).map_err(drop)?;
         for _ in 0..MAX_POLLS {
             match self.poll(&mut work.budget(), cancel).map_err(drop)? {
-                mov_text::Status::Pending => {}
-                mov_text::Status::OutputReady => {
+                mov_text::Status::Yield => {}
+                mov_text::Status::Ready => {
                     let output = self.take_output(cancel).map_err(drop)?;
                     // The decode call returns the packet size for a subtitle.
                     let returned = match &output.decoded {
@@ -409,13 +409,13 @@ impl Receiver for ass::Decoder {
         self.provide(&packet.payload, packet.clock).map_err(drop)?;
         for _ in 0..MAX_POLLS {
             match self.poll(&mut work.budget(), cancel).map_err(drop)? {
-                ass::Status::Pending => {}
+                ass::Status::Yield => {}
                 ass::Status::NeedInput => return Err(()),
-                ass::Status::Decoded(None) => {
+                ass::Status::Ready(None) => {
                     work.byte(0);
                     return Ok(());
                 }
-                ass::Status::Decoded(Some(subtitle)) => {
+                ass::Status::Ready(Some(subtitle)) => {
                     work.byte(1);
                     fold_clock(work, &subtitle);
                     work.text(subtitle.ass.as_ref());
@@ -513,8 +513,8 @@ fn document(
         loop {
             match reader.poll(&mut work.budget(), cancel)? {
                 document::Status::Yield => {}
-                document::Status::Cue(cue) => fold_cue(&mut work, &cue, syntax),
-                document::Status::Finished => return Ok(()),
+                document::Status::Ready(cue) => fold_cue(&mut work, &cue, syntax),
+                document::Status::End => return Ok(()),
             }
         }
     });

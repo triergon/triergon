@@ -16,7 +16,7 @@ glyphs, scale or composite bitmaps, or schedule presentation; those belong to th
 Every operation follows the same cooperative model. Memory is charged to a
 shared `Budget`, each `step`/`poll` spends a caller `WorkBudget` and checks an
 `AtomicBool` for cancellation, and output is immutable `Bytes` that stay valid
-after the decoder is reset or dropped. Starvation (`NeedInput`/`NeedPacket`),
+after the decoder is reset or dropped. Starvation (`NeedInput`),
 work exhaustion (`Yield`) and output pressure (`NeedOutput`) are distinct,
 resumable states. Rejected input is handed back unchanged.
 
@@ -32,9 +32,9 @@ let mut reader = Reader::new(&pool, srt, Syntax::SubRip, Limits::default())?;
 let mut cues = Vec::new();
 loop {
     match reader.poll(&mut WorkBudget::new(4096), &cancel)? {
-        Status::Cue(cue) => cues.push(cue),
+        Status::Ready(cue) => cues.push(cue),
         Status::Yield => {}
-        Status::Finished => break,
+        Status::End => break,
     }
 }
 assert_eq!(cues.len(), 1);
@@ -45,8 +45,8 @@ assert_eq!(cues[0].text.as_ref(), b"Hello");
 
 The FFmpeg-compatible receivers in `compat` take one codec packet per call and
 return the subtitle FFmpeg's decoder returns for it, if any:
-`compat::dvb::ReceiverDecoder::decode`, `compat::dvd::Decoder`,
-`compat::pgs::ReceiverDecoder`, `compat::cc::Decoder::decode` (fed by
+`compat::dvb::Decoder::decode`, `compat::dvd::Decoder`,
+`compat::pgs::Decoder`, `compat::cc::Decoder::decode` (fed by
 `compat::cc::CaptionExtractor` from video access units) and
 `compat::teletext::Decoder::decode`. The DVB and DVD receivers charge their work
 before doing it and return `Status::Yield` when the budget runs out; the caller
@@ -60,19 +60,19 @@ FFmpeg reports it, and `colours`, the colour of every pixel value. With
 palette is computed when the region is first presented and kept until a new epoch. The
 PGS receiver takes ownership with `push(packet, &clock, &cancel)`. A refusal
 returns the original bytes in `Refused<Bytes>`. After admission, call `poll`
-until `OutputReady`, then `take_output`.
+until `Ready`, then `take_output`.
 
 | Module | Entry points |
 | --- | --- |
 | `text` | `Extractor` (packets), `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
 | `dvb` | `SourceConfiguration`, `DvbPacket`: a service's configuration and its packets with their original clocks |
-| `pgs` | `SegmentIter`: segments of a packet or SUP stream; `PacketClock`, the clock a bitmap receiver takes each packet with |
+| `pgs` | `SegmentIter`: segments of a packet or SUP stream; `Clock`, the clock a bitmap receiver takes each packet with |
 | `dvd` | `vobsub` (`.idx` text), `program_stream` (MPEG-2 program streams) |
 | `cc` | `video::nal::{Codec, Framing}`: how a video stream carries its NAL units, for `compat::cc::VideoCoding` |
 | `context` | `Builder`: track header, metadata and attachment bytes handed to a renderer |
-| `compat::dvb` | `ReceiverDecoder`, `Status`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
-| `compat::pgs` | `ReceiverDecoder`, `Status`, `ReceiverPacket`, `Subtitle`, `Rect`, `Refusal`, `Limits`, `Options` |
-| `compat::dvd` | `Decoder`, `Settings`, `ifo_palette`, `VobSubIndex`, `SubpictureParser`, `mp4_configuration` |
+| `compat::dvb` | `Decoder`, `Status`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
+| `compat::pgs` | `Decoder`, `Status`, `DecodedPacket`, `Subtitle`, `Rect`, `Refusal`, `Limits`, `Options` |
+| `compat::dvd` | `Decoder`, `Options`, `ifo_palette`, `VobSubIndex`, `SubpictureParser`, `mp4_configuration` |
 | `compat::cc` | `Decoder`, `Options`, `CaptionExtractor`, `SccPackets` |
 | `compat::teletext` | `Decoder`, `Options`, `Format`, `PageSelection` |
 | `compat::charset` | `AssPacketJob`, `receiver_charset` |

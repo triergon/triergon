@@ -83,7 +83,7 @@ pub enum Outcome {
 pub enum PacketStatus {
     /// The work budget ran out, or the pool could not hold the cue; poll
     /// again.
-    Pending,
+    Yield,
     /// The view is ready; take it with
     /// [`take_output`](AssPacketJob::take_output).
     Ready,
@@ -197,13 +197,13 @@ impl AssPacketJob {
             State::Extract(_) | State::Packet(..) => {}
         }
         if work.remaining() == 0 {
-            return Ok(PacketStatus::Pending);
+            return Ok(PacketStatus::Yield);
         }
         let outcome = loop {
             match &mut self.state {
                 State::Extract(extractor) => match extractor.step(work, cancel)? {
-                    Status::Cue(cue) => self.state = State::Packet(cue, Step::Label),
-                    Status::Yield | Status::NeedOutput => return Ok(PacketStatus::Pending),
+                    Status::Ready(cue) => self.state = State::Packet(cue, Step::Label),
+                    Status::Yield | Status::NeedOutput => return Ok(PacketStatus::Yield),
                     _ => return Err(Error::Invalid("receiver expected opaque cue")),
                 },
                 State::Packet(source, step) => {
@@ -213,7 +213,7 @@ impl AssPacketJob {
                     };
                     match step.advance(source, label, work, cancel)? {
                         Some(outcome) => break outcome,
-                        None => return Ok(PacketStatus::Pending),
+                        None => return Ok(PacketStatus::Yield),
                     }
                 }
                 State::Ready(_) => return Ok(PacketStatus::Ready),

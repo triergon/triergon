@@ -23,7 +23,9 @@ mod model;
 mod sample;
 mod session;
 mod unicode;
-pub use self::model::*;
+pub use self::model::{
+    Addition, Cue, Encoding, Field, FieldOwner, Format, Input, Limits, Modifier, RawClock, Timing,
+};
 
 use self::session::{Action, Session};
 use std::sync::atomic::AtomicBool;
@@ -46,11 +48,11 @@ pub enum Status {
     /// The work budget ran out; step again.
     Yield,
     /// The pending input's cue; the extractor takes the next input.
-    Cue(Cue),
+    Ready(Cue),
     /// The pool could not hold the output; step again once memory is free.
     NeedOutput,
     /// Input is finished and none is pending.
-    Finished,
+    End,
 }
 
 const _: () = assert!(size_of::<Status>() <= 672);
@@ -167,7 +169,7 @@ impl Extractor {
     }
 
     /// Ends input: once no input is pending, [`step`](Self::step) returns
-    /// [`Status::Finished`].
+    /// [`Status::End`].
     pub fn finish_input(&mut self) {
         self.finished = true;
     }
@@ -187,7 +189,7 @@ impl Extractor {
         crate::cancelled(cancel)?;
         let Some(pending) = self.pending.as_mut() else {
             return Ok(if self.finished {
-                Status::Finished
+                Status::End
             } else {
                 Status::NeedInput
             });
@@ -203,12 +205,12 @@ impl Extractor {
             Ok(Action::Yield) => Ok(Status::Yield),
             Ok(Action::Cue(cue)) => {
                 self.pending = None;
-                Ok(Status::Cue(cue))
+                Ok(Status::Ready(cue))
             }
             Ok(Action::Complete) => {
                 self.pending = None;
                 Ok(if self.finished {
-                    Status::Finished
+                    Status::End
                 } else {
                     Status::NeedInput
                 })

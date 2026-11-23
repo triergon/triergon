@@ -244,7 +244,7 @@ fn bitmap_input(b: &Budget, raw: &[u8]) -> bitmap_bridge::BitmapInput<&'static s
         scope: bitmap_scope(),
         sequence: 11,
         raw: Bytes::copy_from_slice(b, raw).unwrap(),
-        clock: triergon_subtitles::pgs::PacketClock {
+        clock: triergon_subtitles::pgs::Clock {
             pts: None,
             dts: None,
             timebase: triergon_core::TimeBase::new(1, 90_000).unwrap(),

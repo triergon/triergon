@@ -12,7 +12,7 @@
 pub mod dvb {
     //! The DVB receiver: FFmpeg's `dvbsub` decoder.
     //!
-    //! [`ReceiverDecoder`] decodes the codec packets of one stream and outputs
+    //! [`Decoder`] decodes the codec packets of one stream and outputs
     //! the subtitles FFmpeg's decoder outputs for them: when a display set is
     //! presented, its rectangles in the receiver's order, their palettes
     //! (including the [`AutomaticPalette`]) and index planes, and the
@@ -25,14 +25,14 @@ pub mod dvb {
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::dvb::pes_parser::{PesFraming, PesPacket, PesParser, PesProgress};
     pub use crate::dvb::receiver_decoder::{
-        AutomaticPalette, Options, ReceiverDecoder, Rect, Status, Subtitle,
+        AutomaticPalette, Decoder, Options, Rect, Status, Subtitle,
     };
 }
 
 pub mod pgs {
     //! The PGS receiver: FFmpeg's `pgssub` decoder.
     //!
-    //! [`ReceiverDecoder`] returns what the reference returns for every packet
+    //! [`Decoder`] returns what the reference returns for every packet
     //! it decodes, malformed ones included: the first display of each packet
     //! as a [`Subtitle`], with its presentation PTS and its [`Rect`]s
     //! (palettes, pixels, forced flags and the `forced_subs_only` palette). A
@@ -42,7 +42,7 @@ pub mod pgs {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::pgs::receiver::{
-        Limits, Options, ReceiverDecoder, ReceiverPacket, Rect, Refusal, Status, Subtitle,
+        DecodedPacket, Decoder, Limits, Options, Rect, Refusal, Status, Subtitle,
     };
 }
 pub mod dvd {
@@ -51,7 +51,7 @@ pub mod dvd {
     //! [`Decoder`] is the `dvdsub` decoder over packets: reassembly, control
     //! sequences, 2-bit and 8-bit pixels, colours carried between units,
     //! transparent-border crop and `forced_subs_only`, configured by
-    //! [`Settings`] from the stream configuration and the `palette` and
+    //! [`Options`] from the stream configuration and the `palette` and
     //! `ifo_palette` options ([`ifo_palette`]). The configuration's `size:`
     //! line sets the canvas the subpictures are placed on. Its packets come from
     //! [`VobSubIndex`] (the `vobsub` demuxer's `.idx`/`.sub` reading), from
@@ -70,7 +70,7 @@ pub mod dvd {
         mp4_configuration,
     };
     pub use crate::dvd::receiver::{
-        Bitmap, Decoder, Limits, Settings, Status, Subtitle, ifo_palette,
+        Bitmap, Decoder, Limits, Options, Status, Subtitle, ifo_palette,
     };
 }
 

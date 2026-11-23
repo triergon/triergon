@@ -32,9 +32,9 @@ pub struct Options {
 #[derive(Debug)]
 pub enum Status {
     /// The work budget ran out; poll again.
-    Pending,
+    Yield,
     /// The packet is decoded, to a subtitle or to none.
-    Decoded(Option<Subtitle>),
+    Ready(Option<Subtitle>),
     /// No packet is being decoded.
     NeedInput,
 }
@@ -116,11 +116,11 @@ impl Decoder {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         cancelled(cancel)?;
         if std::mem::take(&mut self.nothing) {
-            return Ok(Status::Decoded(None));
+            return Ok(Status::Ready(None));
         }
         if let Some(converter) = self.converter.as_mut() {
             match converter.poll(work, cancel) {
-                Ok(CharsetStatus::Pending) => return Ok(Status::Pending),
+                Ok(CharsetStatus::Pending) => return Ok(Status::Yield),
                 Ok(CharsetStatus::Ready) => {
                     self.check = Some((converter.take_output(cancel)?.utf8, 0));
                     self.converter = None;
@@ -130,7 +130,7 @@ impl Decoder {
                     self.converter = None;
                     return match error {
                         // The charset refuses the packet.
-                        Error::Invalid(_) | Error::Truncated => Ok(Status::Decoded(None)),
+                        Error::Invalid(_) | Error::Truncated => Ok(Status::Ready(None)),
                         error => Err(error),
                     };
                 }
@@ -142,7 +142,7 @@ impl Decoder {
         *paid +=
             usize::try_from(work.take((text.len() - *paid) as u64)).map_err(|_| Error::Overflow)?;
         if *paid < text.len() {
-            return Ok(Status::Pending);
+            return Ok(Status::Yield);
         }
         let Some((text, _)) = self.check.take() else {
             return Ok(Status::NeedInput);
@@ -154,7 +154,7 @@ impl Decoder {
             .unwrap_or(text.len());
         let valid =
             std::str::from_utf8(&text.as_ref()[..end]).is_ok_and(|text| !text.contains('\u{fffe}'));
-        Ok(Status::Decoded(if valid {
+        Ok(Status::Ready(if valid {
             Some(Subtitle::at(
                 text.slice(0..end)?,
                 self.clock,

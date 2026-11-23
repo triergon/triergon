@@ -5,17 +5,17 @@ mod support;
 
 use support::{Cmd, SHOW, field, glyphs, raw_unit, unit};
 use triergon_core::{Budget, BudgetVec, Error, WorkBudget};
-use triergon_subtitles::compat::dvd::{Decoder, Limits, Settings, Status, Subtitle, ifo_palette};
+use triergon_subtitles::compat::dvd::{Decoder, Limits, Options, Status, Subtitle, ifo_palette};
 
 const PALETTE: [u32; 16] = [
     0x000000, 0xf0f0f0, 0xcccccc, 0x999999, 0x3333fa, 0x1111bb, 0xfa3333, 0xbb1111, 0x33fa33,
     0x11bb11, 0xfafa33, 0xbbbb11, 0xfa33fa, 0xbb11bb, 0x33fafa, 0x11bbbb,
 ];
 
-fn settings() -> Settings {
-    Settings {
+fn settings() -> Options {
+    Options {
         palette: Some(PALETTE),
-        ..Settings::default()
+        ..Options::default()
     }
 }
 
@@ -48,14 +48,14 @@ impl From<Subtitle<'_>> for Shown {
 }
 
 /// Decode each packet; one entry per packet.
-fn decode_all(settings: Settings, packets: &[&[u8]]) -> Vec<Option<Shown>> {
+fn decode_all(settings: Options, packets: &[&[u8]]) -> Vec<Option<Shown>> {
     let budget = Budget::new(1 << 26).unwrap();
     let mut decoder = Decoder::new(&budget, settings, Limits::default());
     packets
         .iter()
         .map(
             |p| match decoder.decode(p, &mut WorkBudget::new(u64::MAX)).unwrap() {
-                Status::Subtitle(s) => Some(s.into()),
+                Status::Ready(s) => Some(s.into()),
                 Status::Nothing => None,
                 Status::Yield => panic!("unbounded work yielded"),
             },
@@ -63,7 +63,7 @@ fn decode_all(settings: Settings, packets: &[&[u8]]) -> Vec<Option<Shown>> {
         .collect()
 }
 
-fn decode(settings: Settings, packet: &[u8]) -> Option<Shown> {
+fn decode(settings: Options, packet: &[u8]) -> Option<Shown> {
     decode_all(settings, &[packet]).pop().unwrap()
 }
 
@@ -129,7 +129,7 @@ fn a_subtitle_without_an_end_ends_with_its_packet() {
     let budget = Budget::new(1 << 20).unwrap();
     let mut decoder = Decoder::new(&budget, settings(), Limits::default());
     let packet = unit(&image, 0, 0, &[(0, &SHOW)]);
-    let Status::Subtitle(s) = decoder
+    let Status::Ready(s) = decoder
         .decode(&packet, &mut WorkBudget::new(u64::MAX))
         .unwrap()
     else {
@@ -137,7 +137,7 @@ fn a_subtitle_without_an_end_ends_with_its_packet() {
     };
     assert_eq!(s.ending_with_packet(2500).end_ms, 2500);
     let packet = unit(&image, 0, 0, &[(0, &SHOW), (90, &[Cmd::Stop])]);
-    let Status::Subtitle(s) = decoder
+    let Status::Ready(s) = decoder
         .decode(&packet, &mut WorkBudget::new(u64::MAX))
         .unwrap()
     else {
@@ -445,7 +445,7 @@ fn the_automatic_palette_ranks_opaque_selectors() {
             Cmd::Offsets,
             Cmd::Start,
         ];
-        decode(Settings::default(), &unit(&image, 0, 0, &[(0, &cmds)])).map(|s| s.palette)
+        decode(Options::default(), &unit(&image, 0, 0, &[(0, &cmds)])).map(|s| s.palette)
     };
     assert_eq!(
         automatic([3, 2, 1, 0], [15, 8, 15, 15]),
@@ -460,7 +460,7 @@ fn the_automatic_palette_ranks_opaque_selectors() {
 #[test]
 fn forced_only_drops_ordinary_subtitles() {
     let image = glyphs(16, 6, 1, 0);
-    let only = Settings {
+    let only = Options {
         forced_only: true,
         ..settings()
     };
@@ -484,7 +484,7 @@ fn forced_only_drops_ordinary_subtitles() {
 
 #[test]
 fn configuration_and_options_select_the_palette() {
-    let read = |text: &[u8]| Settings::from_configuration(text).unwrap();
+    let read = |text: &[u8]| Options::from_configuration(text).unwrap();
     let text = b"size: 720x480\npalette: 111111, 222222\nPalette: 333333\n  palette: 444444\n";
     assert_eq!(read(text).palette.unwrap()[..3], [0x111111, 0x222222, 0]);
     let last = read(b"palette: 1, 2, 3, 4\r\npalette: 5\n");
@@ -501,7 +501,7 @@ fn configuration_and_options_select_the_palette() {
         .unwrap();
     assert_eq!(tolerant[..9], [1, 2, 3, 4, 0xffffff, 5, 6, 0, 0]);
 
-    let mut options = Settings::default();
+    let mut options = Options::default();
     options
         .apply_palette_option(b"112233,445566,778899,aabbcc,0xddeeff,AbCdEf, 102030 ,1122334455");
     assert_eq!(
@@ -522,7 +522,7 @@ fn configuration_and_options_select_the_palette() {
 /// minus negates modulo 2³².
 #[test]
 fn palette_numbers_are_read_with_a_32_bit_unsigned_long() {
-    let mut options = Settings::default();
+    let mut options = Options::default();
     options.apply_palette_option(
         b"1122334455,100000000,ffffffff,-1,-100000000,-ffffffff,80000000,-80000001,\
           8000000000000000,10000000000000000,0x1122334455,00000000000000001122334455",
@@ -540,7 +540,7 @@ fn palette_numbers_are_read_with_a_32_bit_unsigned_long() {
         [0xffffff, 0xffffff, 0xffffff, 0xdcba98, 0x234568, 0, 1]
     );
     // The configuration's `palette:` line is read the same way.
-    let read = Settings::from_configuration(b"palette: 1122334455, 100000000, -100000000\n");
+    let read = Options::from_configuration(b"palette: 1122334455, 100000000, -100000000\n");
     assert_eq!(read.unwrap().palette.unwrap()[..3], [0xffffff; 3]);
 }
 
@@ -548,7 +548,7 @@ fn palette_numbers_are_read_with_a_32_bit_unsigned_long() {
 /// where the reference cannot open its decoder.
 #[test]
 fn the_size_line_sets_the_canvas() {
-    let canvas = |text: &[u8]| Settings::from_configuration(text).map(|s| s.canvas);
+    let canvas = |text: &[u8]| Options::from_configuration(text).map(|s| s.canvas);
     assert_eq!(canvas(b"size: 720x480\n"), Ok(Some([720, 480])));
     assert_eq!(canvas(b"size: 720x576\r\n"), Ok(Some([720, 576])));
     assert_eq!(
@@ -677,7 +677,7 @@ fn work_is_charged_and_an_exhausted_budget_consumes_nothing() {
     let mut work = WorkBudget::new(need);
     assert!(matches!(
         decoder.resume(&mut work).unwrap(),
-        Status::Subtitle(_)
+        Status::Ready(_)
     ));
     assert_eq!(work.spent(), 1);
     // Any quantum makes progress, and the slices pay the unit's work once.
@@ -687,7 +687,7 @@ fn work_is_charged_and_an_exhausted_budget_consumes_nothing() {
         attempts += 1;
         status = decoder.resume(&mut WorkBudget::new(7)).unwrap();
     }
-    assert!(matches!(status, Status::Subtitle(_)));
+    assert!(matches!(status, Status::Ready(_)));
     assert_eq!(attempts, need.div_ceil(7) - 1);
     // An abandoned unit leaves the decoder as it was.
     assert_eq!(
@@ -701,11 +701,11 @@ fn work_is_charged_and_an_exhausted_budget_consumes_nothing() {
     ));
     // A decode can be undone and repeated, colours included.
     let first = decoder.decode(&a, &mut WorkBudget::new(u64::MAX)).unwrap();
-    assert!(matches!(first, Status::Subtitle(_)));
+    assert!(matches!(first, Status::Ready(_)));
     decoder.rewind().unwrap();
     assert!(matches!(
         decoder.decode(&a, &mut WorkBudget::new(u64::MAX)).unwrap(),
-        Status::Subtitle(_)
+        Status::Ready(_)
     ));
 
     let limits = Limits {
@@ -866,7 +866,7 @@ fn refusal_changes_nothing(
             decoder
                 .decode(packet, &mut WorkBudget::new(u64::MAX))
                 .map(|status| match status {
-                    Status::Subtitle(s) => Some(Shown::from(s)),
+                    Status::Ready(s) => Some(Shown::from(s)),
                     Status::Nothing => None,
                     Status::Yield => panic!("unbounded work yielded"),
                 })
@@ -883,7 +883,7 @@ fn refusal_changes_nothing(
             .iter()
             .map(
                 |packet| match decoder.decode(packet, &mut WorkBudget::new(u64::MAX)) {
-                    Ok(Status::Subtitle(s)) => Some(Shown::from(s)),
+                    Ok(Status::Ready(s)) => Some(Shown::from(s)),
                     Ok(Status::Nothing) => None,
                     other => panic!("{other:?}"),
                 },
@@ -1058,7 +1058,7 @@ fn decode_sliced(packets: &[&[u8]], quantum: u64) -> Vec<Option<Shown>> {
                 status = decoder.resume(&mut WorkBudget::new(quantum)).unwrap();
             }
             match status {
-                Status::Subtitle(s) => Some(s.into()),
+                Status::Ready(s) => Some(s.into()),
                 Status::Nothing => None,
                 Status::Yield => unreachable!(),
             }
@@ -1140,7 +1140,7 @@ fn the_copy_of_a_yielded_unit_is_refused_whole_and_freed() {
         .iter()
         .map(
             |packet| match decoder.decode(packet, &mut WorkBudget::new(u64::MAX)) {
-                Ok(Status::Subtitle(s)) => Some(Shown::from(s)),
+                Ok(Status::Ready(s)) => Some(Shown::from(s)),
                 other => panic!("{other:?}"),
             },
         )

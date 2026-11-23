@@ -63,33 +63,33 @@ pub struct Options {
     pub service: Option<usize>,
 }
 
-/// What a [`ReceiverDecoder::decode`] call did.
+/// What a [`Decoder::decode`] call did.
 #[derive(Clone, Copy, Debug)]
 pub enum Status<'a> {
     /// The packet is decoded and presented this subtitle.
-    Subtitle(Subtitle<'a>),
+    Ready(Subtitle<'a>),
     /// The packet is decoded and presented nothing.
     Nothing,
     /// The work budget ran out before the packet's next segment, which is
     /// not decoded yet. The decoder keeps the packet, and the work left over
     /// counts towards its next segment:
-    /// [`resume`](ReceiverDecoder::resume) or
-    /// [`abandon`](ReceiverDecoder::abandon) it.
+    /// [`resume`](Decoder::resume) or
+    /// [`abandon`](Decoder::abandon) it.
     Yield,
     /// The pool refused memory a segment needed after the packet's check
     /// admitted it: another user of the pool took it in between. The segments
     /// before it stay decoded and the decoder keeps the packet from that
     /// segment on, as for [`Yield`](Self::Yield): resume it once the pool has
     /// room, or abandon it.
-    Stalled(Error),
+    NeedOutput(Error),
 }
 
 impl<'a> Status<'a> {
     /// The presented subtitle, if any.
     pub fn subtitle(self) -> Option<Subtitle<'a>> {
         match self {
-            Self::Subtitle(subtitle) => Some(subtitle),
-            Self::Nothing | Self::Yield | Self::Stalled(_) => None,
+            Self::Ready(subtitle) => Some(subtitle),
+            Self::Nothing | Self::Yield | Self::NeedOutput(_) => None,
         }
     }
 }
@@ -216,7 +216,7 @@ impl Pages {
 }
 
 /// A packet whose decoding stopped before a segment, to continue there. Its
-/// bytes are in [`ReceiverDecoder::held_packet`].
+/// bytes are in [`Decoder::held_packet`].
 #[derive(Clone, Copy, Debug)]
 struct Suspended {
     pts: Option<i64>,
@@ -330,7 +330,7 @@ impl Held {
 
 /// The decoder. Memory is charged to the budget it was created with.
 #[derive(Debug)]
-pub struct ReceiverDecoder {
+pub struct Decoder {
     options: Options,
     pages: Pages,
     epoch: Epoch,
@@ -359,35 +359,35 @@ pub struct ReceiverDecoder {
     budget: Budget,
 }
 
-impl ReceiverDecoder {
+impl Decoder {
     /// `configuration` is the stream's codec configuration (the services'
     /// page ids), read when [`Options::service`] selects one.
-    pub fn new(budget: &Budget, configuration: &[u8], options: Options) -> Self {
+    pub fn new(pool: &Budget, configuration: &[u8], options: Options) -> Self {
         Self {
             options,
             pages: Pages::select(configuration, options.service),
             epoch: Epoch::new(
-                budget,
+                pool,
                 options.automatic_palette == AutomaticPalette::WithoutClutOnce,
             ),
             page: Page {
                 version: None,
                 timeout: 0,
-                placements: BudgetVec::new(budget),
+                placements: BudgetVec::new(pool),
                 display: None,
             },
             previous_pts: None,
             display_size: None,
             held: Held::default(),
-            census: Census::new(budget),
-            slots: BudgetVec::new(budget),
+            census: Census::new(pool),
+            slots: BudgetVec::new(pool),
             presented: None,
             suspended: None,
-            held_packet: BudgetVec::new(budget),
-            planned: BudgetVec::new(budget),
+            held_packet: BudgetVec::new(pool),
+            planned: BudgetVec::new(pool),
             credit: 0,
             owed: 0,
-            budget: budget.clone(),
+            budget: pool.clone(),
         }
     }
 
@@ -409,7 +409,7 @@ impl ReceiverDecoder {
     /// over counts towards the next segment, or [`abandon`](Self::abandon) it.
     /// Cancellation is checked before each segment and each object placement,
     /// and a cancelled packet is kept the same way, as is one whose memory
-    /// another user of the pool took after the check ([`Status::Stalled`]).
+    /// another user of the pool took after the check ([`Status::NeedOutput`]).
     /// `decode` refuses another packet while one is kept.
     ///
     /// The leftover work of a yielded call is banked whole, and a segment is
@@ -536,7 +536,7 @@ impl ReceiverDecoder {
         match why {
             Halt::Yield => Ok(Status::Yield),
             Halt::Cancelled => Err(Error::Cancelled),
-            Halt::Refused(error) => Ok(Status::Stalled(error)),
+            Halt::Refused(error) => Ok(Status::NeedOutput(error)),
         }
     }
 
@@ -559,7 +559,7 @@ impl ReceiverDecoder {
     /// What the packet presented, once it is decoded.
     fn status(&self) -> Status<'_> {
         match self.presented {
-            Some(p) if p.output => Status::Subtitle(Subtitle {
+            Some(p) if p.output => Status::Ready(Subtitle {
                 pts: p.pts,
                 start_display_ms: 0,
                 end_display_ms: p.end_display_ms,
@@ -985,7 +985,7 @@ mod tests {
         ] {
             let pool = Budget::new(1 << 22).unwrap();
             let cancel = AtomicBool::new(false);
-            let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+            let mut decoder = Decoder::new(&pool, &[], options);
             for (i, packet) in packets.iter().enumerate() {
                 let mut work = WorkBudget::new(u64::MAX);
                 decoder
@@ -1002,7 +1002,7 @@ mod tests {
     fn palettes(options: Options, packets: &[Vec<u8>]) -> Vec<Vec<u32>> {
         let pool = Budget::new(1 << 22).unwrap();
         let cancel = AtomicBool::new(false);
-        let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+        let mut decoder = Decoder::new(&pool, &[], options);
         packets
             .iter()
             .enumerate()

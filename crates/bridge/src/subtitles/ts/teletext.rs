@@ -216,7 +216,7 @@ impl TeletextTsBridge {
                 });
             }
             Decoded::Refused(refusal) => return Ok(TeletextStep::Refused(refusal)),
-            Decoded::Subtitle(subtitle) => subtitle,
+            Decoded::Ready(subtitle) => subtitle,
         };
         let Some(line) = subtitle.ass else {
             let at = subtitle

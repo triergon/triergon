@@ -1,5 +1,5 @@
 //! DVB subtitle delivery: the bitmap queue's actions from FFmpeg's `dvbsub`
-//! decoder ([`ReceiverDecoder`]).
+//! decoder ([`Decoder`]).
 //!
 //! [`DvbTsBridge`] takes the strict PES of one selected service of an active
 //! PMT, cuts each into the codec packet FFmpeg's demuxer hands its decoder
@@ -11,7 +11,7 @@ use triergon_core::{Budget, Bytes, Error, Result, Rounding, TimeBase, WorkBudget
 use triergon_mpegts::psi::{CodecIdentification, ElementaryStream, descriptor_tag};
 use triergon_playback::Output;
 use triergon_subtitles::compat::dvb::{
-    Options, PesPacket, PesParser, PesProgress, ReceiverDecoder, Rect, Status, Subtitle,
+    Options, PesPacket, PesParser, PesProgress, Decoder, Rect, Status, Subtitle,
 };
 use triergon_subtitles::dvb::{PacketEnvelope, Size, SourceConfiguration};
 
@@ -25,7 +25,7 @@ pub struct DvbTsBridge {
     binding: PesBinding,
     configuration: SourceConfiguration,
     parser: PesParser,
-    decoder: ReceiverDecoder,
+    decoder: Decoder,
     pending: Option<Pending>,
     /// Whether the last PES time was on the player's timeline, so that
     /// subtitles have a time.
@@ -198,7 +198,7 @@ impl DvbTsBridge {
             service: Some(0),
             ..Options::default()
         };
-        let decoder = ReceiverDecoder::new(pool, &configuration.service_private_view(), options);
+        let decoder = Decoder::new(pool, &configuration.service_private_view(), options);
         Ok(Self {
             configuration,
             parser: PesParser::new(pool),
@@ -305,7 +305,7 @@ impl DvbTsBridge {
             self.decoder.decode(codec.codec(), pts, work, cancel)
         };
         match status {
-            Ok(Status::Subtitle(subtitle)) => {
+            Ok(Status::Ready(subtitle)) => {
                 self.pending = None;
                 Ok(DvbStep::Action(DvbQueueAction::from_subtitle(subtitle)))
             }
@@ -321,7 +321,7 @@ impl DvbTsBridge {
             // The decoder keeps the packet, or refused all of it for want of
             // memory: either way the next poll tries it again. A cancelled
             // packet is dropped by the poll that sees the cancellation.
-            Ok(Status::Stalled(error))
+            Ok(Status::NeedOutput(error))
             | Err(error @ (Error::Backpressure { .. } | Error::Cancelled)) => Err(error),
             Err(error) => {
                 self.pending = None;
@@ -396,9 +396,9 @@ impl PesWork {
         }
         match parser.step(work, cancel)? {
             PesProgress::Yield => Ok(None),
-            PesProgress::Packet(packet) => Ok(Some(self.codec.insert(packet))),
+            PesProgress::Ready(packet) => Ok(Some(self.codec.insert(packet))),
             // The parser has this PES until it reports completion.
-            PesProgress::NeedPacket => Err(Error::Invalid("DVB parser input disappeared")),
+            PesProgress::NeedInput => Err(Error::Invalid("DVB parser input disappeared")),
         }
     }
 }

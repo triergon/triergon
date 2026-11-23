@@ -98,16 +98,16 @@ pub enum Decoded {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
     /// The work budget ran out; poll again.
-    Pending,
+    Yield,
     /// The pool could not hold the output; poll again once memory is free.
     NeedOutput,
     /// No packet is being decoded; provide the next.
     NeedInput,
     /// The packet is decoded; take it with
     /// [`take_output`](Decoder::take_output).
-    OutputReady,
+    Ready,
     /// Input is finished and no packet is pending.
-    Finished,
+    End,
 }
 
 /// FFmpeg's `mov_text` decoder over tx3g samples. The extradata is the codec
@@ -259,10 +259,10 @@ impl Decoder {
             return Err(error);
         }
         if self.job.as_ref().is_some_and(PacketJob::ready) {
-            return Ok(Status::OutputReady);
+            return Ok(Status::Ready);
         }
         if caller.remaining() == 0 {
-            return Ok(Status::Pending);
+            return Ok(Status::Yield);
         }
         let result = self.inner(caller, cancel);
         match result {
@@ -281,11 +281,11 @@ impl Decoder {
             .configuration
             .poll(&self.pool, self.limits, &mut self.work, caller, cancel)?
         {
-            return Ok(Status::Pending);
+            return Ok(Status::Yield);
         }
         let Some(job) = self.job.as_mut() else {
             return Ok(if self.finished {
-                Status::Finished
+                Status::End
             } else {
                 Status::NeedInput
             });
@@ -302,13 +302,13 @@ impl Decoder {
             if job.advances_read_order() {
                 self.read_order = self.read_order.checked_add(1).ok_or(Error::Overflow)?;
             }
-            Ok(Status::OutputReady)
+            Ok(Status::Ready)
         } else {
-            Ok(Status::Pending)
+            Ok(Status::Yield)
         }
     }
     /// The decoded packet, once [`poll`](Self::poll) reported
-    /// [`Status::OutputReady`]; `Error::Invalid` before then.
+    /// [`Status::Ready`]; `Error::Invalid` before then.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<Output> {
         cancelled(cancel)?;
         match self.job.take_if(|job| job.ready()) {
@@ -317,7 +317,7 @@ impl Decoder {
         }
     }
     /// Ends input: once no packet is pending, [`poll`](Self::poll) returns
-    /// [`Status::Finished`].
+    /// [`Status::End`].
     pub fn finish_input(&mut self, cancel: &AtomicBool) -> Result<()> {
         cancelled(cancel)?;
         self.finished = true;

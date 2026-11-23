@@ -96,9 +96,9 @@ pub enum Status {
     /// The work budget ran out; poll again.
     Yield,
     /// The next cue.
-    Cue(Cue),
+    Ready(Cue),
     /// Every cue has been published.
-    Finished,
+    End,
 }
 
 /// A cue found in the document, with its byte ranges in the reader's text.
@@ -366,9 +366,9 @@ impl Reader {
                         #[cfg(feature = "reference-trace")]
                         offset: entry.offset,
                     };
-                    return Ok(Status::Cue(cue));
+                    return Ok(Status::Ready(cue));
                 }
-                Phase::Finished => return Ok(Status::Finished),
+                Phase::Finished => return Ok(Status::End),
             }
         }
     }

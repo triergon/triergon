@@ -2,7 +2,7 @@
 use std::io::{Cursor, Read};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
+use triergon_subtitles::compat::dvb::{Decoder, Options};
 
 /// One recorded frame: its packet and the reference decoder's output.
 struct Frame {
@@ -66,7 +66,7 @@ fn check(data: &[u8]) {
     let case = case(data);
     let pool = Budget::new(4 << 20).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x10], Options::default());
+    let mut decoder = Decoder::new(&pool, &[0, 1, 0, 2, 0x10], Options::default());
     for frame in &case.frames {
         let mut work = WorkBudget::new(u64::MAX);
         let subtitle = decoder

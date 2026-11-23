@@ -7,8 +7,8 @@
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, Status};
-use triergon_subtitles::pgs::PacketClock;
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Status};
+use triergon_subtitles::pgs::Clock;
 
 /// `(x, y, width, height, stride, pixels)` of one rectangle.
 type Rectangle = (u16, u16, u16, u16, u16, Vec<u8>);
@@ -26,10 +26,10 @@ fn presented(packets: &[&str], limits: Limits) -> Vec<Option<Vec<Rectangle>>> {
     let mut runs = [1, 7, 4096].map(|quantum| {
         let budget = Budget::new(64 << 20).unwrap();
         let cancel = AtomicBool::new(false);
-        let mut decoder = ReceiverDecoder::new(&budget, limits, Options::default()).unwrap();
+        let mut decoder = Decoder::new(&budget, Options::default(), limits).unwrap();
         let mut out = Vec::new();
         for (index, packet) in packets.iter().enumerate() {
-            let clock = PacketClock {
+            let clock = Clock {
                 pts: Some(90_000 * (index as i64 + 1)),
                 dts: None,
                 timebase: TimeBase::new(1, 90_000).unwrap(),
@@ -41,7 +41,7 @@ fn presented(packets: &[&str], limits: Limits) -> Vec<Option<Vec<Rectangle>>> {
                     .poll(&mut WorkBudget::new(quantum), &cancel)
                     .unwrap()
                 {
-                    Status::OutputReady => break decoder.take_output(&cancel).unwrap(),
+                    Status::Ready => break decoder.take_output(&cancel).unwrap(),
                     Status::Yield => {}
                     status => panic!("packet {index}: {status:?}"),
                 }

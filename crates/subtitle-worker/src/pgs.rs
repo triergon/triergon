@@ -5,7 +5,7 @@
 //! [`container::read_file_track`] a Matroska `S_HDMV/PGS` track or an MPEG-TS /
 //! M2TS stream of type 0x90 as one packet per PES. The readers stream the file,
 //! so only the packets stay resident. The operation runs the receiver
-//! ([`ReceiverDecoder`]) over every packet and reports each subtitle it outputs.
+//! ([`Decoder`]) over every packet and reports each subtitle it outputs.
 
 use crate::container::{self, Packet, Result, Track};
 use crate::sink::{Bitmap, EventHead, RectHead, RectKind, Sink};
@@ -18,8 +18,8 @@ use std::sync::atomic::AtomicBool;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_mpegts::PacketFormat;
-use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, Rect, Refusal, Status};
-use triergon_subtitles::pgs::PacketClock;
+use triergon_subtitles::compat::pgs::{Limits, Options, Decoder, Rect, Refusal, Status};
+use triergon_subtitles::pgs::Clock;
 
 /// The candidate's pool limit: the prepared packets and one display set.
 const POOL_BYTES: usize = 1 << 30;
@@ -29,7 +29,7 @@ struct Pgs {
     configuration: Vec<u8>,
     time_base: TimeBase,
     /// The prepared packets, moved into the pool; each operation clones them.
-    packets: Vec<(Bytes, PacketClock)>,
+    packets: Vec<(Bytes, Clock)>,
     forced_only: bool,
     /// The `sub-input` view, built from `packets` only when asked for.
     input: OnceCell<Track>,
@@ -54,7 +54,7 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
         .packets
         .into_iter()
         .map(|packet| {
-            let clock = PacketClock {
+            let clock = Clock {
                 pts: packet.pts,
                 dts: packet.dts,
                 timebase: track.time_base,
@@ -92,7 +92,7 @@ impl Prepared for Pgs {
         let config = Options {
             forced_only: self.forced_only,
         };
-        let mut decoder = ReceiverDecoder::new(&self.pool, limits, config)?;
+        let mut decoder = Decoder::new(&self.pool, config, limits)?;
         sink.header(self.packets.len(), None)?;
         for (index, (payload, clock)) in self.packets.iter().enumerate() {
             if payload.is_empty() {
@@ -107,7 +107,7 @@ impl Prepared for Pgs {
                     .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
                     .at(index)?
                 {
-                    Status::OutputReady => break decoder.take_output(&cancel).at(index)?,
+                    Status::Ready => break decoder.take_output(&cancel).at(index)?,
                     Status::Yield => {}
                     status => return Err(format!("pgs: unexpected {status:?}").into()),
                 }
@@ -141,7 +141,7 @@ impl Prepared for Pgs {
         while decoder
             .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
             .at(end)?
-            != Status::Ended
+            != Status::End
         {}
         Ok(())
     }

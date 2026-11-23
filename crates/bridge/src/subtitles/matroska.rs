@@ -12,8 +12,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, TimeBase, WorkBudget};
 use triergon_matroska::{Event as MkvEvent, TypedPacket as Packet};
 use triergon_playback::{Delivery, Event, Output, TrackKey};
-use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder, Status};
-use triergon_subtitles::{compat, dvb, pgs::PacketClock};
+use triergon_subtitles::compat::dvb::{Options, Decoder, Status};
+use triergon_subtitles::{compat, dvb, pgs::Clock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;
 
@@ -56,7 +56,7 @@ impl MatroskaDvbPacket {
     /// room, `Error::Limit` never fits the pool and is dropped.
     pub fn decode<'d>(
         &self,
-        decoder: &'d mut ReceiverDecoder,
+        decoder: &'d mut Decoder,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<MatroskaDvbStep<'d>> {
@@ -75,11 +75,11 @@ impl MatroskaDvbPacket {
             decoder.decode(&self.packet.payload, pts, work, cancel)
         };
         let subtitle = match status {
-            Ok(Status::Subtitle(subtitle)) => subtitle,
+            Ok(Status::Ready(subtitle)) => subtitle,
             Ok(Status::Yield) => return Ok(MatroskaDvbStep::Yield),
             Ok(Status::Nothing) => return Ok(MatroskaDvbStep::Decoded),
             Err(error @ Error::Invalid(_)) => return Ok(MatroskaDvbStep::Refused(error)),
-            Ok(Status::Stalled(error)) | Err(error) => return Err(error),
+            Ok(Status::NeedOutput(error)) | Err(error) => return Err(error),
         };
         if matches!(
             self.source.delivery,
@@ -104,8 +104,8 @@ pub enum MatroskaDvbStep<'a> {
     Refused(Error),
     /// The work budget ran out. The decoder keeps the packet: decode the same
     /// packet again to resume it, or drop it with
-    /// [`ReceiverDecoder::abandon`]. A memory refusal after the packet was
-    /// admitted ([`Status::Stalled`]) is returned as its error and keeps the
+    /// [`Decoder::abandon`]. A memory refusal after the packet was
+    /// admitted ([`Status::NeedOutput`]) is returned as its error and keeps the
     /// packet the same way.
     Yield,
 }
@@ -199,7 +199,7 @@ impl MatroskaBitmapTrack {
     /// track without `CodecPrivate` gets the receiver's default palette and
     /// canvas: the codec mapping says what the element holds, not that it is
     /// present.
-    pub fn vobsub_settings(&self) -> Result<compat::dvd::Settings> {
+    pub fn vobsub_settings(&self) -> Result<compat::dvd::Options> {
         if !matches!(self.codec, Codec::VobSub) {
             return Err(Error::Invalid("VobSub settings require a VobSub track"));
         }
@@ -208,8 +208,8 @@ impl MatroskaBitmapTrack {
             .configuration
             .initialization_bytes(self.association.track)
         {
-            Some(raw) => compat::dvd::Settings::from_configuration(&raw),
-            None => Ok(compat::dvd::Settings::default()),
+            Some(raw) => compat::dvd::Options::from_configuration(&raw),
+            None => Ok(compat::dvd::Options::default()),
         }
     }
 
@@ -223,9 +223,9 @@ impl MatroskaBitmapTrack {
 
     /// The receiver for this track's [`MatroskaDvbPacket`]s, charged to the
     /// track's pool. Like FFmpeg's decoder it decodes every page.
-    pub fn dvb_decoder(&self) -> Result<ReceiverDecoder> {
+    pub fn dvb_decoder(&self) -> Result<Decoder> {
         let config = self.check_dvb()?;
-        Ok(ReceiverDecoder::new(
+        Ok(Decoder::new(
             &self.pool,
             config.original(),
             Options::default(),
@@ -350,7 +350,7 @@ impl MatroskaBitmapTrack {
             scope: self.scope,
             sequence,
             raw,
-            clock: PacketClock {
+            clock: Clock {
                 pts: timing.pts,
                 dts: timing.dts,
                 timebase: TimeBase::new(1, NS_PER_SECOND)?,

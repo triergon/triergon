@@ -535,11 +535,11 @@ impl TextBridge {
                 self.pending = None;
                 TextStep::NeedPacket
             }
-            text::Status::Finished => {
+            text::Status::End => {
                 self.pending = None;
                 TextStep::Finished
             }
-            text::Status::Cue(cue) => TextStep::Cue(TextOutput {
+            text::Status::Ready(cue) => TextStep::Cue(TextOutput {
                 source: self
                     .pending
                     .as_ref()

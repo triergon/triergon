@@ -5,7 +5,7 @@
 //! stream of type 0x06 whose PMT entry carries a subtitling descriptor (0x59),
 //! each PES data field cut into codec packets; or from a Matroska `S_DVBSUB`
 //! track. The configuration is five bytes per service: composition page,
-//! ancillary page, subtitling type. The operation runs [`ReceiverDecoder`] over
+//! ancillary page, subtitling type. The operation runs [`Decoder`] over
 //! every packet and reports each subtitle it outputs.
 //!
 //! Decoder options: `compute_edt` (0, 1), `compute_clut` and `dvb_substream`
@@ -21,7 +21,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon::CodecId;
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvb::{AutomaticPalette, Options, ReceiverDecoder, Status};
+use triergon_subtitles::compat::dvb::{AutomaticPalette, Decoder, Options, Status};
 
 /// The candidate's pool: room for the decoder's regions and output.
 const POOL_BYTES: usize = 1 << 30;
@@ -89,7 +89,7 @@ const INVALID_DATA: i32 = -1_094_995_529;
 impl Prepared for Dvb {
     fn run(&self, sink: &mut Sink<'_>) -> Result<()> {
         let cancel = AtomicBool::new(false);
-        let mut decoder = ReceiverDecoder::new(&self.pool, &self.track.configuration, self.options);
+        let mut decoder = Decoder::new(&self.pool, &self.track.configuration, self.options);
         let count = self.track.packets.len();
         sink.header(count, None)?;
         for (index, (packet, &pts)) in self.track.packets.iter().zip(&self.pts).enumerate() {
@@ -103,13 +103,13 @@ impl Prepared for Dvb {
                 status = decoder.resume(&mut WorkBudget::new(crate::WORK_SLICE), &cancel);
             }
             let subtitle = match status {
-                Ok(Status::Subtitle(subtitle)) => subtitle,
+                Ok(Status::Ready(subtitle)) => subtitle,
                 Ok(Status::Nothing | Status::Yield) => continue,
                 Err(triergon_core::Error::Invalid(_)) => {
                     sink.refused(index, INVALID_DATA)?;
                     continue;
                 }
-                Ok(Status::Stalled(error)) | Err(error) => return Err(error).at(index),
+                Ok(Status::NeedOutput(error)) | Err(error) => return Err(error).at(index),
             };
             sink.begin(EventHead {
                 packet: index as u64,

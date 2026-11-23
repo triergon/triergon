@@ -16,7 +16,7 @@ use super::epoch::{
 };
 use super::palette::Census;
 use super::segment::{PageComposition, Placement, RegionComposition, Segments};
-use super::{AutomaticPalette, Parsed, ReceiverDecoder, Slot, push};
+use super::{AutomaticPalette, Decoder, Parsed, Slot, push};
 use triergon_core::{BudgetVec, Result};
 
 /// Bytes held beyond the start, and the most at any one time. A segment
@@ -270,7 +270,7 @@ pub(super) struct PacketPlan {
     pub(super) work: u64,
 }
 
-impl ReceiverDecoder {
+impl Decoder {
     /// The most bytes decoding `packet` from its start may hold beyond what
     /// the decoder holds now. The plan's list of regions is charged to the
     /// budget and kept for the next packet.

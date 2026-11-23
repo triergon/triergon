@@ -27,7 +27,7 @@ fn extract(bytes: &[u8], q: u64) -> triergon_subtitles::text::Cue {
             .step(&mut WorkBudget::new(q), &AtomicBool::new(false))
             .unwrap()
         {
-            Status::Cue(cue) => return cue,
+            Status::Ready(cue) => return cue,
             Status::Yield => {}
             x => panic!("unexpected {x:?}"),
         }

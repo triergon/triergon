@@ -9,7 +9,7 @@ use crate::subtitles::ts::{PesBinding, PesData, Taken, TakenPes};
 use triergon_core::{Error, Result, TimeBase, WorkBudget};
 use triergon_mpegts::{clock::SourceTimestamp, psi::stream_type};
 use triergon_playback::Output;
-use triergon_subtitles::pgs::PacketClock;
+use triergon_subtitles::pgs::Clock;
 
 /// Where a PGS packet came from in the transport stream, kept as its
 /// [`BitmapInput`] metadata.
@@ -140,7 +140,7 @@ impl PgsTsTrack {
             scope: self.scope,
             sequence: self.sequence,
             raw: raw.clone(),
-            clock: PacketClock {
+            clock: Clock {
                 pts: ticks(facts.pts)?,
                 dts: ticks(facts.dts)?,
                 timebase: TimeBase::HZ_90000,

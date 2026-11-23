@@ -12,7 +12,7 @@ use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 /// The receiver's colour and selection settings and its canvas: the decoder
 /// options and the `palette:` and `size:` lines of the stream configuration.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Settings {
+pub struct Options {
     /// Sixteen `0xRRGGBB` colours, or `None` for the receiver's automatic greys.
     pub palette: Option<[u32; 16]>,
     /// The width and height the subpictures are placed on, from the last
@@ -22,8 +22,8 @@ pub struct Settings {
     pub forced_only: bool,
 }
 
-impl Settings {
-    /// Settings from VobSub-style configuration text, read as the reference
+impl Options {
+    /// Options from VobSub-style configuration text, read as the reference
     /// reads it: up to the first NUL, a line at a time (CR and LF both end a
     /// line). A line beginning `palette:` replaces the palette and one
     /// beginning `size:` the canvas; other lines are ignored. Both values are
@@ -259,7 +259,7 @@ pub struct Bitmap<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status<'a> {
     /// The packet completed a unit that presents this subpicture.
-    Subtitle(Subtitle<'a>),
+    Ready(Subtitle<'a>),
     /// Nothing to present: the packet was buffered, dropped, or its unit shows
     /// no visible pixels.
     Nothing,
@@ -313,7 +313,7 @@ pub enum Status<'a> {
 ///   if the packet had never been sent.
 #[derive(Debug)]
 pub struct Decoder {
-    settings: Settings,
+    settings: Options,
     limits: Limits,
     pending: BudgetVec<u8>,
     plane: BudgetVec<u8>,
@@ -379,18 +379,18 @@ impl Default for Colours {
 
 impl Decoder {
     /// A decoder with nothing buffered and no colours carried, charging its
-    /// buffers to `budget`.
-    pub fn new(budget: &Budget, settings: Settings, limits: Limits) -> Self {
+    /// buffers to `pool`.
+    pub fn new(pool: &Budget, options: Options, limits: Limits) -> Self {
         Self {
-            settings,
+            settings: options,
             limits,
-            pending: BudgetVec::new(budget),
-            plane: BudgetVec::new(budget),
+            pending: BudgetVec::new(pool),
+            plane: BudgetVec::new(pool),
             colours: Colours::default(),
             palette: [0; 256],
             last: None,
             suspended: None,
-            held: BudgetVec::new(budget),
+            held: BudgetVec::new(pool),
         }
     }
 
@@ -411,7 +411,7 @@ impl Decoder {
     }
 
     /// The settings the decoder was made with.
-    pub fn settings(&self) -> &Settings {
+    pub fn settings(&self) -> &Options {
         &self.settings
     }
 
@@ -559,7 +559,7 @@ impl Decoder {
             }
         }
         match outcome {
-            Ok(shown) => Ok(Status::Subtitle(
+            Ok(shown) => Ok(Status::Ready(
                 shown.subtitle(&self.palette, self.plane.as_slice()),
             )),
             Err(Halt::Malformed) => Ok(Status::Nothing),
@@ -742,7 +742,7 @@ struct Fields {
 
 /// One slice of a unit's run through its control sequences.
 struct Pass<'d, 'w> {
-    settings: &'d Settings,
+    settings: &'d Options,
     limits: Limits,
     palette: &'d mut [u32; 256],
     plane: &'d mut BudgetVec<u8>,
@@ -1326,7 +1326,7 @@ impl Bounds {
 
 #[cfg(test)]
 mod tests {
-    use super::{Settings, below_0e};
+    use super::{Options, below_0e};
 
     #[test]
     fn below_0e_flags_exactly_the_words_with_a_low_byte() {
@@ -1351,7 +1351,7 @@ mod tests {
                 let mut text = vec![b'.'; prefix];
                 text.push(stop);
                 text.extend_from_slice(b"palette: 7");
-                let palette = Settings::from_configuration(&text).unwrap().palette;
+                let palette = Options::from_configuration(&text).unwrap().palette;
                 assert_eq!(palette.map(|p| p[0]), found.then_some(7), "{text:?}");
             }
         }

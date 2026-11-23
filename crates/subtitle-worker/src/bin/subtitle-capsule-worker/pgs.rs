@@ -1,5 +1,5 @@
 //! PGS display sets through the FFmpeg-compatible receiver
-//! (`triergon_subtitles::compat::pgs::ReceiverDecoder`), the same operation as the
+//! (`triergon_subtitles::compat::pgs::Decoder`), the same operation as the
 //! reference worker's `pgssub` modes.
 //!
 //! The input is a case capsule (`SMBMO001`): the packet time base, the forced-only
@@ -16,8 +16,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
 use triergon_harness_protocol::digest::fold_bytes;
 use triergon_harness_runner::{Invocation, Result, Totals, measure};
-use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, Status};
-use triergon_subtitles::pgs::PacketClock;
+use triergon_subtitles::compat::pgs::{Limits, Options, Decoder, Status};
+use triergon_subtitles::pgs::Clock;
 
 pub const PREFIX: &str = "pgs-";
 const OPERATION: &str = "pgs-receiver-display";
@@ -212,8 +212,8 @@ impl Work {
     }
 }
 
-fn open(pool: &Budget, case: &Case) -> std::result::Result<ReceiverDecoder, ()> {
-    ReceiverDecoder::new(pool, Limits::default(), case.config).map_err(drop)
+fn open(pool: &Budget, case: &Case) -> std::result::Result<Decoder, ()> {
+    Decoder::new(pool, case.config, Limits::default()).map_err(drop)
 }
 
 /// Decode every record, folding each published subtitle. `Err` is a refusal.
@@ -232,7 +232,7 @@ fn decode(
             decoder = open(pool, case)?;
             continue;
         }
-        let clock = PacketClock {
+        let clock = Clock {
             pts: record.pts,
             dts: record.dts,
             timebase,
@@ -245,7 +245,7 @@ fn decode(
             let status = decoder
                 .poll(&mut WorkBudget::new(quantum), cancel)
                 .map_err(drop)?;
-            if status == Status::OutputReady {
+            if status == Status::Ready {
                 output = Some(decoder.take_output(cancel).map_err(drop)?);
                 break;
             }
@@ -292,7 +292,7 @@ fn decode(
         if decoder
             .poll(&mut WorkBudget::new(quantum), cancel)
             .map_err(drop)?
-            == Status::Ended
+            == Status::End
         {
             return Ok(());
         }

@@ -13,7 +13,7 @@ use triergon_playback::{
     Delivery, Event, Output, TrackKey,
     mp4::{Mp4Event, Mp4Packet},
 };
-use triergon_subtitles::{compat, pgs::PacketClock};
+use triergon_subtitles::{compat, pgs::Clock};
 
 /// The object type of DVD subpicture streams.
 const OBJECT_TYPE_VOBSUB: u8 = 0xe0;
@@ -62,8 +62,8 @@ impl Mp4DvdSetup {
             .as_deref()
             .and_then(compat::dvd::mp4_configuration)
             .map_or_else(
-                || Ok(compat::dvd::Settings::default()),
-                |text| compat::dvd::Settings::from_configuration(&text),
+                || Ok(compat::dvd::Options::default()),
+                |text| compat::dvd::Options::from_configuration(&text),
             )?;
         Ok(Some(Mp4DvdTrack {
             scope: self.scope,
@@ -131,7 +131,7 @@ impl Mp4DvdTrack {
             scope: self.scope,
             sequence,
             raw: packet.source.payload.clone(),
-            clock: PacketClock {
+            clock: Clock {
                 pts: ticks(sample.cts_ticks)?,
                 dts: ticks(sample.dts_ticks)?,
                 timebase: base,

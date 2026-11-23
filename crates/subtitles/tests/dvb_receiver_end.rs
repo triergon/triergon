@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder, Subtitle};
+use triergon_subtitles::compat::dvb::{Decoder, Options, Subtitle};
 use triergon_subtitles::dvb::Size;
 
 struct Case {
@@ -20,7 +20,7 @@ mod cases;
 
 /// One packet through the receiver decoder at one second.
 fn receive(pool: &Budget, bytes: &[u8], check: impl FnOnce(Subtitle<'_>)) {
-    let mut decoder = ReceiverDecoder::new(pool, &[0, 1, 0, 2, 0x14], Options::default());
+    let mut decoder = Decoder::new(pool, &[0, 1, 0, 2, 0x14], Options::default());
     let mut work = WorkBudget::new(u64::MAX);
     let subtitle = decoder
         .decode(bytes, Some(1_000_000), &mut work, &AtomicBool::new(false))

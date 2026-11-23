@@ -32,8 +32,8 @@ fn finish(decoder: &mut Decoder, quantum: u64) -> Output {
             .poll(&mut WorkBudget::new(quantum), &cancel)
             .unwrap()
         {
-            Status::Pending => (),
-            Status::OutputReady => return decoder.take_output(&cancel).unwrap(),
+            Status::Yield => (),
+            Status::Ready => return decoder.take_output(&cancel).unwrap(),
             s => panic!("unexpected status {s:?}"),
         }
     }
@@ -239,7 +239,7 @@ fn work_zero_and_cancel_preserve_cursors_funding_and_allocation_state() {
     let used = pool.used();
     assert_eq!(
         d.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
-        Status::Pending
+        Status::Yield
     );
     assert_eq!(d.work_spent(), 0);
     assert_eq!(pool.used(), used);
@@ -271,7 +271,7 @@ fn pressure_resumes_without_recharging_a_fully_funded_allocation() {
     let spent = d.work_spent();
     assert_eq!(
         d.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
-        Status::Pending
+        Status::Yield
     );
     assert_eq!(d.work_spent(), spent);
     drop(block);
@@ -314,7 +314,7 @@ fn take_cancel_reset_and_context_drop_preserve_retained_output_owners() {
     d.provide(input(&pool, &sample(b"a", &[])), Clock::default())
         .unwrap();
     let cancel = AtomicBool::new(false);
-    while d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() != Status::OutputReady {}
+    while d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() != Status::Ready {}
     cancel.store(true, Ordering::Relaxed);
     assert!(matches!(d.take_output(&cancel), Err(Error::Cancelled)));
     cancel.store(false, Ordering::Relaxed);
@@ -341,7 +341,7 @@ fn core_limits_are_distinct_from_data_refusal_and_remain_sticky() {
     let e = loop {
         match d.poll(&mut WorkBudget::new(4096), &cancel) {
             Err(e) => break e,
-            Ok(Status::Pending) => (),
+            Ok(Status::Yield) => (),
             s => panic!("{s:?}"),
         }
     };
@@ -358,8 +358,8 @@ fn eof_has_no_delayed_ass_and_never_accepts_an_extra_packet() {
     d.finish_input(&cancel).unwrap();
     loop {
         match d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() {
-            Status::Pending => (),
-            Status::Finished => break,
+            Status::Yield => (),
+            Status::End => break,
             s => panic!("{s:?}"),
         }
     }
@@ -455,7 +455,7 @@ fn configuration_and_style_count_limits_are_explicit_core_errors() {
     loop {
         match d.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)) {
             Err(Error::Limit { maximum: 0, .. }) => break,
-            Ok(Status::Pending) => (),
+            Ok(Status::Yield) => (),
             other => panic!("policy error was replaced by {other:?}"),
         }
     }
@@ -478,7 +478,7 @@ fn cancelling_after_configuration_prefix_keeps_exact_font_source_and_header() {
     let cancel = AtomicBool::new(false);
     assert_eq!(
         d.poll(&mut WorkBudget::new(40), &cancel).unwrap(),
-        Status::Pending
+        Status::Yield
     );
     let spent = d.work_spent();
     let used = pool.used();
@@ -491,7 +491,7 @@ fn cancelling_after_configuration_prefix_keeps_exact_font_source_and_header() {
     cancel.store(false, Ordering::Relaxed);
     loop {
         match d.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
-            Status::Pending => (),
+            Status::Yield => (),
             Status::NeedInput => break,
             s => panic!("{s:?}"),
         }
@@ -520,7 +520,7 @@ fn cancellation_at_each_funded_emission_step_never_duplicates_style_output() {
     let cancel = AtomicBool::new(false);
     loop {
         let status = d.poll(&mut WorkBudget::new(1), &cancel).unwrap();
-        if status == Status::OutputReady {
+        if status == Status::Ready {
             break;
         }
         let spent = d.work_spent();

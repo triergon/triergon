@@ -25,7 +25,7 @@ fn decode(options: Options, packets: &[Vec<u8>]) -> Vec<Call> {
         });
         let mut work = WorkBudget::new(Decoder::MAX_PACKET_WORK);
         match decoder.decode(data, pts, &mut work).expect("decode") {
-            Decoded::Subtitle(s) => out.push((index, s.pts, Ok(s.ass.map(str::to_owned)))),
+            Decoded::Ready(s) => out.push((index, s.pts, Ok(s.ass.map(str::to_owned)))),
             Decoded::Refused(refusal) => out.push((index, None, Err(refusal))),
             Decoded::Nothing if index >= packets.len() => break,
             Decoded::Nothing => {}

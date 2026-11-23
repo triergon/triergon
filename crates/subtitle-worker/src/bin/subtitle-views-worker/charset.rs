@@ -100,7 +100,7 @@ fn packet_conversion(
     let mut input = packet_input(Bytes::copy_from_slice(pool, input)?, Format::OpaqueAss);
     input.charset_label = Some(Bytes::copy_from_slice(pool, label)?);
     let mut job = AssPacketJob::new(input, pool, Limits::default(), 0)?;
-    while job.poll(&mut WorkBudget::new(1024), cancel)? == PacketStatus::Pending {}
+    while job.poll(&mut WorkBudget::new(1024), cancel)? == PacketStatus::Yield {}
     Ok(job.take_output(cancel)?.visible().map(<[u8]>::to_vec))
 }
 

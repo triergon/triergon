@@ -256,7 +256,7 @@ fn run_case(index: usize) {
                     assert!(work.spent() <= units);
                     match status {
                         Ok(Status::Yield) => assert!(work.spent() != 0),
-                        Ok(Status::Cue(cue)) => {
+                        Ok(Status::Ready(cue)) => {
                             let expected = case
                                 .events
                                 .get(output.len())
@@ -267,7 +267,7 @@ fn run_case(index: usize) {
                             }
                             output.push(cue);
                         }
-                        Ok(Status::Finished) => {
+                        Ok(Status::End) => {
                             finished = true;
                             break;
                         }
@@ -323,7 +323,7 @@ fn opaque(pool: &Budget, bytes: &[u8], generation: u64) -> Input {
 fn next_opaque(parser: &mut Extractor) -> Cue {
     let mut work = WorkBudget::new(4096);
     match parser.step(&mut work, &AtomicBool::new(false)).unwrap() {
-        Status::Cue(cue) => cue,
+        Status::Ready(cue) => cue,
         other => panic!("expected opaque event, got {other:?}"),
     }
 }
@@ -351,7 +351,7 @@ fn explicit_finish_is_distinct_from_empty_packet() {
         parser
             .step(&mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        Status::Finished
+        Status::End
     ));
 }
 
@@ -575,7 +575,7 @@ fn resource_failure(id: &str, limits: Limits, expected_cues: usize) {
                 assert!(work.spent() <= units);
                 match result {
                     Ok(Status::Yield) => assert!(work.spent() != 0),
-                    Ok(Status::Cue(cue)) => {
+                    Ok(Status::Ready(cue)) => {
                         same_input(&cue.input, &original);
                         cues += 1;
                     }
@@ -622,7 +622,7 @@ fn first_cue(parser: &mut Extractor, units: u64) -> Cue {
         let mut work = WorkBudget::new(units);
         match parser.step(&mut work, &AtomicBool::new(false)).unwrap() {
             Status::Yield => assert!(work.spent() != 0),
-            Status::Cue(cue) => return cue,
+            Status::Ready(cue) => return cue,
             other => panic!("expected cue, got {other:?}"),
         }
     }
@@ -744,7 +744,7 @@ fn long_utf8_validation_yields_and_charges_every_source_byte() {
                 yielded += 1;
                 assert_eq!(work.spent(), 1);
             }
-            Status::Cue(cue) => {
+            Status::Ready(cue) => {
                 assert_eq!(cue.decoded_utf8.unwrap().as_ref(), original.as_ref());
                 emitted = true;
                 break;

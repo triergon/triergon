@@ -114,7 +114,7 @@ fn vobsub_track_without_codec_private_decodes_with_the_receiver_defaults() {
     let settings = track.vobsub_settings().unwrap();
     assert_eq!(
         settings,
-        triergon_subtitles::compat::dvd::Settings::default()
+        triergon_subtitles::compat::dvd::Options::default()
     );
     let mut receiver = DvdReceiver::new(
         &pool,

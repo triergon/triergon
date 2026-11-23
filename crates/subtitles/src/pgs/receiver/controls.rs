@@ -40,28 +40,28 @@ fn picture(references: &[(u8, u16)]) -> Vec<u8> {
     out
 }
 
-fn clock() -> PacketClock {
-    PacketClock {
+fn clock() -> Clock {
+    Clock {
         pts: Some(90_000),
         dts: None,
         timebase: TimeBase::new(1, 90_000).unwrap(),
     }
 }
 
-fn decode(d: &mut ReceiverDecoder, b: &Budget, raw: &[u8]) -> ReceiverPacket {
+fn decode(d: &mut Decoder, b: &Budget, raw: &[u8]) -> DecodedPacket {
     let cancel = AtomicBool::new(false);
     let input = Bytes::copy_from_slice(b, raw).unwrap();
     d.push(input, &clock(), &cancel).unwrap();
     loop {
-        if d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() == Status::OutputReady {
+        if d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() == Status::Ready {
             return d.take_output(&cancel).unwrap();
         }
     }
 }
 
-fn receiver(b: &Budget, forced_only: bool) -> ReceiverDecoder {
+fn receiver(b: &Budget, forced_only: bool) -> Decoder {
     let options = Options { forced_only };
-    ReceiverDecoder::new(b, Limits::default(), options).unwrap()
+    Decoder::new(b, options, Limits::default()).unwrap()
 }
 
 #[test]
@@ -100,11 +100,11 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
         let hold = b.reserve(b.available()).unwrap();
         match d.poll(&mut WorkBudget::new(4096), &cancel) {
             Err(Error::Backpressure { .. }) => pressured += 1,
-            Ok(Status::OutputReady) => break d.take_output(&cancel).unwrap(),
+            Ok(Status::Ready) => break d.take_output(&cancel).unwrap(),
             other => panic!("unexpected {other:?}"),
         }
         drop(hold);
-        if d.poll(&mut WorkBudget::new(1), &cancel).unwrap() == Status::OutputReady {
+        if d.poll(&mut WorkBudget::new(1), &cancel).unwrap() == Status::Ready {
             break d.take_output(&cancel).unwrap();
         }
     };
@@ -117,7 +117,7 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
 }
 
 /// Each presented rectangle as `(x, y, width, height, stride, pixels)`.
-fn presented(packet: &ReceiverPacket) -> Vec<Rectangle> {
+fn presented(packet: &DecodedPacket) -> Vec<Rectangle> {
     packet
         .subtitle()
         .unwrap()

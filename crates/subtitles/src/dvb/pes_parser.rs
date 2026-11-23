@@ -73,11 +73,11 @@ impl PesPacket {
 #[derive(Debug)]
 pub enum PesProgress {
     /// No field is pending; [`provide`](PesParser::provide) the next one.
-    NeedPacket,
+    NeedInput,
     /// The work budget ran out; step again.
     Yield,
     /// The codec packet cut from the pending field, which is consumed.
-    Packet(PesPacket),
+    Ready(PesPacket),
 }
 
 /// Cuts the PES data fields of one selected service and clock epoch into
@@ -217,7 +217,7 @@ impl PesParser {
         // The field is held here while it is cut, and kept again when the
         // step stops short of a packet.
         let Some(Pending { pes, pts, scan }) = self.input.take() else {
-            return Ok(PesProgress::NeedPacket);
+            return Ok(PesProgress::NeedInput);
         };
         if work.remaining() == 0 {
             self.input = Some(Pending { pes, pts, scan });
@@ -286,7 +286,7 @@ impl PesParser {
 
     fn passthrough(&mut self, pes: Bytes, pts: Option<i128>) -> PesProgress {
         self.last_pts = pts.or(self.last_pts);
-        PesProgress::Packet(PesPacket {
+        PesProgress::Ready(PesPacket {
             codec: pes.clone(),
             pes,
             framing: PesFraming::Passthrough,
@@ -332,7 +332,7 @@ impl PesParser {
         };
         self.active = end.active;
         self.last_pts = pts.or(self.last_pts);
-        Ok(PesProgress::Packet(PesPacket {
+        Ok(PesProgress::Ready(PesPacket {
             pes,
             codec,
             framing,

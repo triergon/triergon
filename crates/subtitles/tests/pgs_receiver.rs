@@ -1,7 +1,7 @@
 //! The receiver against recorded reference output: every packet of each
 //! fixture in `pgs-receiver-fixtures/` (written by
 //! `harness/subtitles/pgs_fixtures.py` from the pinned FFmpeg build's decoded
-//! subtitles) through one `ReceiverDecoder`, at several work quanta.
+//! subtitles) through one `Decoder`, at several work quanta.
 //!
 //! The fixtures cover what the receiver tolerates: packets refused while the
 //! decoder keeps its state, segments read past their end, rejected canvases,
@@ -12,12 +12,12 @@
 use std::fmt::Write as _;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::{Limits, Options, ReceiverDecoder, Status};
-use triergon_subtitles::pgs::PacketClock;
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Status};
+use triergon_subtitles::pgs::Clock;
 
 struct Fixture {
     forced_only: bool,
-    packets: Vec<(PacketClock, Vec<u8>)>,
+    packets: Vec<(Clock, Vec<u8>)>,
     /// The recorded `refused`, `event` and `rect` lines, in order.
     expected: String,
 }
@@ -48,7 +48,7 @@ fn parse(text: &str) -> Fixture {
         match fields[0] {
             "options" => fixture.forced_only = fields[1] == "forced_only=1",
             "packet" => fixture.packets.push((
-                PacketClock {
+                Clock {
                     pts: clock(fields[1]),
                     dts: clock(fields[2]),
                     timebase,
@@ -73,7 +73,7 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
     let config = Options {
         forced_only: fixture.forced_only,
     };
-    let mut decoder = ReceiverDecoder::new(&budget, Limits::default(), config).unwrap();
+    let mut decoder = Decoder::new(&budget, config, Limits::default()).unwrap();
     let mut out = String::new();
     for (index, (clock, data)) in fixture.packets.iter().enumerate() {
         if data.is_empty() {
@@ -85,7 +85,7 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
         let packet = loop {
             let mut work = WorkBudget::new(quantum);
             match decoder.poll(&mut work, &cancel).unwrap() {
-                Status::OutputReady => break decoder.take_output(&cancel).unwrap(),
+                Status::Ready => break decoder.take_output(&cancel).unwrap(),
                 Status::Yield => assert!(work.spent() <= quantum),
                 status => panic!("packet {index}: {status:?}"),
             }
@@ -118,7 +118,7 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
     while decoder
         .poll(&mut WorkBudget::new(quantum), &cancel)
         .unwrap()
-        != Status::Ended
+        != Status::End
     {}
     out
 }

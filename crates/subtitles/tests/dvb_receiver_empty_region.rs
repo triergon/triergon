@@ -4,7 +4,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
+use triergon_subtitles::compat::dvb::{Decoder, Options};
 
 /// Page with region 1 at (0, 0), a filled 2x2 region 1 and an end of display set.
 const EMPTY: &[u8] = &[
@@ -23,7 +23,7 @@ fn payload(x: u16, y: u16) -> Vec<u8> {
 fn receiver_presents_an_empty_subtitle_for_an_undrawn_region() {
     for (x, y) in [(719, 0), (0, 575), (1, 2)] {
         let pool = Budget::new(4 << 20).unwrap();
-        let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x14], Options::default());
+        let mut decoder = Decoder::new(&pool, &[0, 1, 0, 2, 0x14], Options::default());
         let mut work = WorkBudget::new(u64::MAX);
         let subtitle = decoder
             .decode(
@@ -48,7 +48,7 @@ fn receiver_presents_an_empty_subtitle_for_an_undrawn_region() {
 #[test]
 fn receiver_presents_nothing_for_a_segment_past_the_packet() {
     let pool = Budget::new(4 << 20).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut decoder = Decoder::new(&pool, &[], Options::default());
     let mut source = payload(719, 0);
     source[18..20].copy_from_slice(&u16::MAX.to_be_bytes());
     let mut work = WorkBudget::new(u64::MAX);

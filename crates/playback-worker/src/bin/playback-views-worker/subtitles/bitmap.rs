@@ -21,14 +21,14 @@ use triergon_mpegts::{
 use triergon_playback::{ByteSource, Event, Output, Player, TrackKey, TsEvent, mp4::Mp4Event};
 use triergon_subtitles::{
     compat::{
-        dvb::ReceiverDecoder,
+        dvb::Decoder as DvbDecoder,
         dvd::Limits as DvdLimits,
         pgs::{Limits as PgsLimits, Options as PgsOptions},
     },
-    pgs::PacketClock,
+    pgs::Clock,
 };
 
-fn clock(clock: PacketClock, pts: Option<i64>) -> Result<u64> {
+fn clock(clock: Clock, pts: Option<i64>) -> Result<u64> {
     Ok(pts
         .map(|ticks| {
             clock
@@ -374,7 +374,7 @@ fn dvb(records: &mut Records, action: DvbQueueAction<'_>) {
 
 fn mkv_dvb(
     packet: &MatroskaDvbPacket,
-    decoder: &mut ReceiverDecoder,
+    decoder: &mut DvbDecoder,
     records: &mut Records,
 ) -> Result<()> {
     if records.trace {
