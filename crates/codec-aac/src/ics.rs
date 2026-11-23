@@ -65,20 +65,21 @@ impl Default for Ltp {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub(crate) struct IcsInfo {
-    pub window_sequence: WindowSequence,
-    pub window_shape: u8,
+    pub ltp: [Ltp; 2],
+    pub swb: &'static [u16],
     pub max_sfb: usize,
     pub num_windows: usize,
     pub num_window_groups: usize,
     pub window_group_len: [u8; 8],
+    pub num_swb: usize,
     pub predictor_data_present: bool,
+    pub prediction_used: [bool; 41],
+    pub window_sequence: WindowSequence,
+    pub window_shape: u8,
     /// 0 = no reset, else predictor_reset_group_number.
     pub predictor_reset_group: u8,
-    pub prediction_used: [bool; 41],
-    pub ltp: [Ltp; 2],
-    pub swb: &'static [u16],
-    pub num_swb: usize,
 }
 
 impl Default for IcsInfo {
