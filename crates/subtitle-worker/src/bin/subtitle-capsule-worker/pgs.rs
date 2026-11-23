@@ -345,8 +345,8 @@ mod tests {
     /// the recorded cases end in a refusal.
     #[test]
     fn fold_equals_the_digest_of_every_recorded_transcript() {
-        let gold = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../subtitles/tests/pgs-receiver-recorded");
+        let gold =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../subtitles/tests/pgs-receiver-recorded");
         let mut cases = 0;
         let mut refusals = 0;
         for entry in std::fs::read_dir(&gold).unwrap() {
