@@ -2354,18 +2354,13 @@
       "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc-truncated",
+        "asc",
         "27"
       ],
       "expected": {
         "packets": 3,
         "bytes": 0,
         "digest": 77448094642625
-      },
-      "candidate_expected": {
-        "packets": 3,
-        "bytes": 0,
-        "digest": 2498330253099
       }
     },
     {
@@ -2375,18 +2370,13 @@
       "sha256": "a69eef1ff3b4bfa54e591f224043c5c1f0384e1d08c6f0180d2b27e5192bb21e",
       "rights": "authored-synthetic",
       "arguments": [
-        "asc-truncated",
+        "asc",
         "31"
       ],
       "expected": {
         "packets": 3,
         "bytes": 0,
         "digest": 80859658792389
-      },
-      "candidate_expected": {
-        "packets": 3,
-        "bytes": 0,
-        "digest": 2608380709543
       }
     },
     {
@@ -2488,11 +2478,6 @@
         "packets": 3,
         "bytes": 0,
         "digest": 95358806458677
-      },
-      "candidate_expected": {
-        "packets": 3,
-        "bytes": 0,
-        "digest": 3076095149430
       }
     },
     {

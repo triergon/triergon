@@ -369,7 +369,7 @@ fn sbr_ps_sync_signals_only_at_the_actual_immediate_bit_boundary() {
 }
 
 #[test]
-fn complete_extension_markers_cannot_hide_truncated_selected_fields() {
+fn sync_extensions_are_read_only_where_the_syntax_leaves_room_for_them() {
     let mut b = lc();
     b.put(0x2b7, 11);
     b.put(5, 5);
@@ -379,7 +379,14 @@ fn complete_extension_markers_cannot_hide_truncated_selected_fields() {
     b.put(1, 1);
     let pool = Budget::new(100_000).unwrap();
     let raw = Bytes::copy_from_slice(&pool, &b.bytes).unwrap();
-    for end in [27, 31, 32, 36, 48] {
+    // Fewer than 16 bits after the GASpecificConfig hold no SBR sync extension.
+    for end in 16..32 {
+        let o = run(&pool, raw.clone(), end, limits()).unwrap();
+        assert_eq!(o.facts().sbr, AacExtensionSignal::Unsignalled, "end={end}");
+        assert_eq!(o.facts().understood_end_bit, 16);
+    }
+    // With 16 the extension is read, and a cut inside its fields is a truncation.
+    for end in 32..37 {
         assert!(
             matches!(
                 run(&pool, raw.clone(), end, limits()),
@@ -388,11 +395,15 @@ fn complete_extension_markers_cannot_hide_truncated_selected_fields() {
             "end={end}"
         );
     }
-    for end in 38..48 {
+    // Fewer than 12 bits after the SBR fields hold no PS sync extension.
+    for end in 37..49 {
         let o = run(&pool, raw.clone(), end, limits()).unwrap();
-        assert_eq!(o.facts().ps, AacExtensionSignal::Unsignalled);
+        assert_eq!(o.facts().sbr, AacExtensionSignal::Sync(true));
+        assert_eq!(o.facts().ps, AacExtensionSignal::Unsignalled, "end={end}");
         assert_eq!(o.facts().understood_end_bit, 37);
     }
+    let o = run(&pool, raw, 49, limits()).unwrap();
+    assert_eq!(o.facts().ps, AacExtensionSignal::Sync(true));
 }
 
 #[test]

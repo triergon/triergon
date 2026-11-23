@@ -839,7 +839,10 @@ impl Fields {
     }
 
     /// One field of the SBR and PS sync extensions: the next one, or `None` when the
-    /// record has none, or no more.
+    /// record has none, or no more. As the AudioSpecificConfig syntax of ISO/IEC 14496-3
+    /// reads them, `syncExtensionType` `0x2b7` is looked for only while at least 16 bits
+    /// remain (the type and an audio object type), and `0x548` only while at least 12
+    /// do (the type and `psPresentFlag`); fewer bits end a complete record.
     fn sync_extension(
         &mut self,
         bits: &mut Bits,
@@ -849,7 +852,7 @@ impl Fields {
         Ok(match field {
             SyncField::Sbr => {
                 let mut probe = *bits;
-                if probe.remaining() >= 11 && probe.read(raw, 11)? == 0x2b7 {
+                if probe.remaining() >= 16 && probe.read(raw, 11)? == 0x2b7 {
                     *bits = probe;
                     Some(SyncField::SbrObject)
                 } else {
@@ -876,7 +879,7 @@ impl Fields {
             },
             SyncField::Ps => {
                 let mut probe = *bits;
-                if probe.remaining() >= 11 && probe.read(raw, 11)? == 0x548 {
+                if probe.remaining() >= 12 && probe.read(raw, 11)? == 0x548 {
                     *bits = probe;
                     Some(SyncField::PsPresent)
                 } else {

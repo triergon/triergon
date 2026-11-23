@@ -407,8 +407,6 @@ fn asc(root: &Path, corpus: &mut Corpus) -> Result<()> {
                 | "fixed-bits-13"
                 | "fixed-bits-14"
                 | "fixed-bits-15"
-                | "sync-extent-27"
-                | "sync-extent-31"
                 | "sync-extent-36"
         ) {
             "asc-truncated"

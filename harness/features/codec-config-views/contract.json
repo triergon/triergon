@@ -109,25 +109,12 @@
     }
   ],
   "pending_module_requirements": [
-    "The E-AC-3 configuration view opens the frame reader with the E-AC-3 only selection and refuses a stream whose access units are an AC-3 syncframe (bsid 6) followed by an E-AC-3 dependent substream. ATSC A/52:2018 Annex E allows that pairing and the reference returns 157 access units of 4608 bytes. The view must read with either family selected and group the dependent substream with its independent AC-3 frame.",
-    "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
+    "The E-AC-3 configuration view opens the frame reader with the E-AC-3 only selection and refuses a stream whose access units are an AC-3 syncframe (bsid 6) followed by an E-AC-3 dependent substream. ATSC A/52:2018 Annex E allows that pairing and the reference returns 157 access units of 4608 bytes. The view must read with either family selected and group the dependent substream with its independent AC-3 frame."
   ],
   "open_cases": [
     {
       "id": "the-great-wall-7-1",
       "requirement": "The E-AC-3 configuration view opens the frame reader with the E-AC-3 only selection and refuses a stream whose access units are an AC-3 syncframe (bsid 6) followed by an E-AC-3 dependent substream. ATSC A/52:2018 Annex E allows that pairing and the reference returns 157 access units of 4608 bytes. The view must read with either family selected and group the dependent substream with its independent AC-3 frame."
-    },
-    {
-      "id": "asc-sync-extent-27",
-      "requirement": "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
-    },
-    {
-      "id": "asc-sync-extent-31",
-      "requirement": "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
-    },
-    {
-      "id": "asc-sync-extent-48",
-      "requirement": "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
     }
   ],
   "open_unmeasured": [
