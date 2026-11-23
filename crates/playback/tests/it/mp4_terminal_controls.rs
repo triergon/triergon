@@ -1336,7 +1336,7 @@ fn front_first_fragment_without_tfdt_starts_at_zero_without_claiming_complete_en
     }
     assert_eq!(
         format!("{:?}", samples[0].occurrence.as_ref().unwrap().clock_origin),
-        "FrontSourceMediaStart"
+        "SourceClock"
     );
     assert_eq!(samples[0].occurrence.as_ref().unwrap().demux.dts, Some(0));
     s.eof.store(true, Ordering::Relaxed);
