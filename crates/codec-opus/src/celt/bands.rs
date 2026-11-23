@@ -572,6 +572,7 @@ impl Bands<'_, '_> {
         if n == 1 {
             return self.single(x, None, None);
         }
+        // A fixed-width partition-scale enum adds 0.181% instructions with the numeric split test.
         if lm != -1 && n > 2 && b > split_threshold(self.band, lm) {
             let half = n >> 1;
             let lm = lm - 1;
