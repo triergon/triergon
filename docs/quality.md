@@ -100,7 +100,8 @@ contract's `required_targets` only, and the cases must pass elsewhere.
   `compat` policy the entry names; `cargo xtask check-design` fails on a `compat`
   path no crate's `compat` module defines. A deviating case holds only between two
   runs that finished, and only while each side gives its pin: the reference's
-  `expected` and the candidate's `candidate_expected`, which the recorder writes for
+  `expected` and the candidate's `candidate_expected` (`candidate_expected_by_target`
+  where a contract pins per target), which the recorder writes for
   every listed case. A case without a candidate pin, or one compared by a comparison
   that pins the reference alone, is reported as `deviation-unpinned` and stays open;
   check-design lists those contracts. Additional-coverage features (`shape-text`,

@@ -222,7 +222,8 @@ pub fn one_sided(data: &[(String, Value)]) -> Vec<OneSided> {
         let pinned = |case: &str| {
             rows.iter().any(|row| {
                 row.get("id").and_then(Value::as_str) == Some(case)
-                    && row.get("candidate_expected").is_some()
+                    && (row.get("candidate_expected").is_some()
+                        || row.get("candidate_expected_by_target").is_some())
             })
         };
         let unpinned = ids.iter().filter(|case| !pinned(case)).count();

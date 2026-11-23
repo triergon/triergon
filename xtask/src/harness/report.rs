@@ -1325,7 +1325,7 @@ fn collect_with_inputs(
                 }
             }
             let deviation = open.is_deviation(&id).then(|| parity::Deviation {
-                candidate: case.get("candidate_expected"),
+                candidate: candidate_expected_for(case, &target),
             });
             let ran = parity::feed_parity(
                 &run,
@@ -1638,6 +1638,14 @@ fn publish_measurements(
     )?;
     validation::put(&mut header, "case_storage", Value::str("inline"))?;
     write_observed_case_report(output, &header, rows.iter().map(load_case))
+}
+
+/// The candidate's pinned fold of a listed case on `target`: its
+/// `candidate_expected_by_target` entry, or `candidate_expected`.
+pub fn candidate_expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
+    case.get("candidate_expected_by_target")
+        .and_then(|pins| pins.get(target))
+        .or_else(|| case.get("candidate_expected"))
 }
 
 /// The cases a contract lists as differing from their pins on one target.

@@ -1,7 +1,7 @@
 use super::{
     DEVIATION, DEVIATION_CHANGED, DEVIATION_RUN_FAILED, DEVIATION_UNPINNED, Open, PrefixFeature,
-    entity_input_failure, measure_pinned, open, open_cases, ratchet, recorded_corpus,
-    reviewed_inputs, rights_reviewed, s, unpinned_deviation,
+    candidate_expected_for, entity_input_failure, measure_pinned, open, open_cases, ratchet,
+    recorded_corpus, reviewed_inputs, rights_reviewed, s, unpinned_deviation,
 };
 use crate::json::{self, Value, parse};
 use std::collections::BTreeMap;
@@ -496,6 +496,20 @@ fn a_registered_deviation_holds_only_as_both_pins() {
     );
     let pass = parse(r#"{"status": "pass"}"#).unwrap();
     assert_eq!(unpinned_deviation(pass.clone()), pass);
+    let case = parse(
+        r#"{"candidate_expected": {"packets": 1},
+            "candidate_expected_by_target": {"t": {"packets": 2}}}"#,
+    )
+    .unwrap();
+    let by_target = case.get("candidate_expected_by_target");
+    assert_eq!(
+        candidate_expected_for(&case, "t"),
+        by_target.and_then(|pins| pins.get("t"))
+    );
+    assert_eq!(
+        candidate_expected_for(&case, "u"),
+        case.get("candidate_expected")
+    );
     assert!(
         !ratchet("f", &deviating("pass"), &open),
         "a passing deviation must leave the list"
