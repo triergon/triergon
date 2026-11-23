@@ -8,7 +8,7 @@
 use crate::ts::{PesBinding, PesData, TakenPes};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, Rounding, TimeBase, WorkBudget};
-use triergon_mpegts::psi::CodecIdentification;
+use triergon_mpegts::psi::{CodecIdentification, ElementaryStream, descriptor_tag};
 use triergon_playback::Output;
 use triergon_subtitles::compat::dvb::{
     Options, PesPacket, PesParser, PesProgress, ReceiverDecoder, Rect, Status, Subtitle,
@@ -120,8 +120,11 @@ pub enum DvbStep<'a> {
 }
 
 impl DvbTsBridge {
-    /// Require an explicit DVB namespace and a single service descriptor for
-    /// this PID. The complete descriptor aliases the active PMT's storage.
+    /// Binds the one DVB subtitling service of `pid`: its PMT entry, in a DVB
+    /// namespace, carries one subtitling descriptor that names one service, beside
+    /// any other descriptors. Fails with `Unsupported` otherwise;
+    /// [`new_for_service`](Self::new_for_service) selects one of several. The
+    /// descriptor aliases the active PMT's storage.
     pub fn new(
         output: &Output,
         pid: u16,
@@ -154,7 +157,7 @@ impl DvbTsBridge {
         let is_dvb = stream.codec_identification() == CodecIdentification::DvbSubtitles;
         let (descriptor, entry) = match service {
             Some(service) if is_dvb => (
-                subtitling_descriptor(stream, service.descriptor, cancel)?,
+                subtitling_descriptor(stream, Some(service.descriptor), cancel)?,
                 service.entry,
             ),
             Some(_) => {
@@ -162,14 +165,8 @@ impl DvbTsBridge {
                     "DVB bridge requires DVB subtitling signalling",
                 ));
             }
-            None if is_dvb && stream.descriptor_bytes.len() == 10 => {
-                (stream.descriptor_bytes.clone(), 0)
-            }
-            None => {
-                return Err(Error::Unsupported(
-                    "DVB bridge requires one subtitling service",
-                ));
-            }
+            None if is_dvb => (subtitling_descriptor(stream, None, cancel)?, 0),
+            None => return Err(ONE_SERVICE),
         };
         let pool = output.pool();
         let configuration = SourceConfiguration::from_subtitling_descriptor(
@@ -298,13 +295,20 @@ impl DvbTsBridge {
     }
 }
 
+/// The refusal of a default binding the PMT does not settle.
+const ONE_SERVICE: Error = Error::Unsupported("DVB bridge requires one subtitling service");
+
+/// The subtitling descriptor of `stream` that `selected` counts to among them in wire
+/// order, or, for `None`, the only one, which must name one service; a slice of the PMT's
+/// storage. Other descriptors of the loop are skipped.
 fn subtitling_descriptor(
-    stream: &triergon_mpegts::psi::ElementaryStream,
-    selected: usize,
+    stream: &ElementaryStream,
+    selected: Option<usize>,
     cancel: &AtomicBool,
 ) -> Result<Bytes> {
     let mut index = 0;
     let mut offset = 0_usize;
+    let mut only = None;
     for descriptor in stream.descriptors() {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
@@ -313,15 +317,25 @@ fn subtitling_descriptor(
         let end = offset
             .checked_add(descriptor.source.len())
             .ok_or(Error::Overflow)?;
-        if descriptor.tag == 0x59 {
-            if index == selected {
-                return stream.descriptor_bytes.slice(offset..end);
+        if descriptor.tag == descriptor_tag::DVB_SUBTITLING {
+            match selected {
+                Some(selected) if index == selected => {
+                    return stream.descriptor_bytes.slice(offset..end);
+                }
+                Some(_) => {}
+                None if only.is_some() => return Err(ONE_SERVICE),
+                // A service entry is eight bytes (EN 300 468 6.2.41).
+                None => only = Some((offset..end, descriptor.data.len() == 8)),
             }
             index += 1;
         }
         offset = end;
     }
-    Err(Error::Invalid("DVB subtitling descriptor index"))
+    match (selected, only) {
+        (None, Some((range, true))) => stream.descriptor_bytes.slice(range),
+        (None, _) => Err(ONE_SERVICE),
+        (Some(_), _) => Err(Error::Invalid("DVB subtitling descriptor index")),
+    }
 }
 
 impl Pending {

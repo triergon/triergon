@@ -9030,11 +9030,6 @@
         "packets": 3545,
         "bytes": 1710720,
         "digest": 2352441826164330983
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 280
       }
     },
     {

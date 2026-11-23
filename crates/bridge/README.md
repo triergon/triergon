@@ -73,8 +73,10 @@ A Matroska VobSub track's `vobsub_settings` reads its palette and canvas, or
 gives the receiver's defaults for a track without CodecPrivate; the DVD queue
 places pictures on that canvas.
 The DVB queue exposes up to eight rectangles per picture in decoder order
-and uses zero before it has a presentation clock. Explicit service binding
-keeps the selected composition and ancillary pages.
+and uses zero before it has a presentation clock. `DvbTsBridge::new` binds a
+PID whose PMT entry names one subtitling service, whatever other descriptors
+it carries; `new_for_service` selects one of several. Either keeps the
+service's composition and ancillary pages.
 Teletext pages and closed captions become opaque ASS `TextSource`s, which
 `TextBridge` reports as it reports a Matroska ASS track's cues; an empty
 teletext page is a clear. A teletext decode needs the decoder's whole packet

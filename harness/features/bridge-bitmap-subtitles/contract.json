@@ -1584,17 +1584,12 @@
     }
   ],
   "pending_module_requirements": [
-    "DvbTsBridge reports a DVB subtitle PES whose PES_packet_length is 0 as Error::Invalid instead of dropping it with neither output nor error: ITU-T H.222.0 (08/2023) section 2.4.3.7 allows length 0 only for video in a transport stream.",
-    "The PAT and PMT readers ignore the reserved bits before a PID and before program_info_length and ES_info_length, and a table refused for any other reason surfaces as a typed error rather than as an absent stream: ITU-T H.222.0 (08/2023) section 2.1 requires encoders to set reserved bits to 1, which constrains the bitstream, not its readers."
+    "DvbTsBridge reports a DVB subtitle PES whose PES_packet_length is 0 as Error::Invalid instead of dropping it with neither output nor error: ITU-T H.222.0 (08/2023) section 2.4.3.7 allows length 0 only for video in a transport stream."
   ],
   "open_cases": [
     {
       "id": "dvb-pes-unbounded-ts",
       "requirement": "DvbTsBridge reports a DVB subtitle PES whose PES_packet_length is 0 as Error::Invalid instead of dropping it with neither output nor error: ITU-T H.222.0 (08/2023) section 2.4.3.7 allows length 0 only for video in a transport stream."
-    },
-    {
-      "id": "dvb-fate-dvbsubtest_filter",
-      "requirement": "The PAT and PMT readers ignore the reserved bits before a PID and before program_info_length and ES_info_length, and a table refused for any other reason surfaces as a typed error rather than as an absent stream: ITU-T H.222.0 (08/2023) section 2.1 requires encoders to set reserved bits to 1, which constrains the bitstream, not its readers."
     }
   ],
   "open_refusals": [

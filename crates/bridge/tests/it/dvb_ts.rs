@@ -113,6 +113,7 @@ fn selected_ts_service_reaches_the_bitmap_queue() {
     let source = include_bytes!("../../../mpegts/tests/data/dvb/dvb2-literals-fields.ts");
     let split = split_pes(source);
     let (multiple, _) = multiple_services(source);
+    let described = one_service_among_descriptors(source);
     let indices =
         include_bytes!("../../../subtitles/tests/boundary-fixtures/dvb2-literals-fields.indices");
     let truncated = include_bytes!("../../../mpegts/tests/data/dvb/dvb-truncated-segment.ts");
@@ -133,6 +134,7 @@ fn selected_ts_service_reaches_the_bitmap_queue() {
         (source.as_slice(), 37, relative, None, true),
         (&split, 4096, SourceTimePolicy::Unanchored, None, true),
         (&multiple, 37, relative, Some(selected), true),
+        (&described, 37, relative, None, true),
         (truncated.as_slice(), 37, relative, None, true),
         (&clear, 37, relative, None, false),
     ] {
@@ -271,6 +273,28 @@ fn multiple_services(source: &[u8; 1504]) -> ([u8; 1504], [u8; 18]) {
     packet[start - 1] = 0;
     packet[start..].copy_from_slice(&section);
     (bytes, selected)
+}
+
+// Put an ISO 639 language descriptor before the one subtitling descriptor and a
+// stream identifier descriptor after it.
+fn one_service_among_descriptors(source: &[u8; 1504]) -> [u8; 1504] {
+    const TS: usize = 188;
+    let mut bytes = *source;
+    let packet = &mut bytes[TS..2 * TS];
+    let old_start = 6 + usize::from(packet[4]);
+    let mut section = packet[old_start..old_start + 17].to_vec();
+    section.extend_from_slice(&[0x0a, 4, b'e', b'n', b'g', 0]);
+    section.extend_from_slice(&packet[old_start + 17..old_start + 27]);
+    section.extend_from_slice(&[0x52, 1, 7]);
+    section[2] = u8::try_from(section.len() + 1).unwrap();
+    section[16] = u8::try_from(section.len() - 17).unwrap();
+    section.extend_from_slice(&PsiCrc32::of(&section).to_be_bytes());
+
+    let start = TS - section.len();
+    packet[4] = u8::try_from(start - 6).unwrap();
+    packet[start - 1] = 0;
+    packet[start..].copy_from_slice(&section);
+    bytes
 }
 
 #[test]
