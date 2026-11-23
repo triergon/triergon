@@ -1,4 +1,6 @@
 //! The integration tests of `triergon-mpegts`, one test binary.
+#![forbid(unsafe_code)]
+
 use triergon_harness_test_support::sha256;
 
 mod support;
