@@ -111,11 +111,11 @@ impl Configuration {
             .fonts
             .as_slice()
             .get(index)
-            .ok_or(Error::Invalid("native font index"))?;
+            .ok_or(Error::Invalid("mov_text font index"))?;
         let raw = self
             .raw
             .as_ref()
-            .ok_or(Error::Invalid("native font source"))?;
+            .ok_or(Error::Invalid("mov_text font table without extradata"))?;
         let name = raw
             .as_ref()
             .get(font.name.clone())
@@ -206,7 +206,7 @@ impl Configuration {
                     let raw = self
                         .raw
                         .as_ref()
-                        .ok_or(Error::Invalid("native configuration owner"))?;
+                        .ok_or(Error::Invalid("mov_text font table without extradata"))?;
                     let bytes = raw.as_ref();
                     let Some(header) = bytes.get(self.at..self.at.saturating_add(3)) else {
                         self.fallback();
@@ -312,7 +312,7 @@ impl Configuration {
             let raw = self
                 .raw
                 .as_ref()
-                .ok_or(Error::Invalid("native default font owner"))?;
+                .ok_or(Error::Invalid("mov_text font table without extradata"))?;
             let bytes = &raw.as_ref()[range.clone()];
             h.append(until_nul(bytes))?;
         } else {

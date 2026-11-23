@@ -206,10 +206,12 @@ impl Decoder {
             return Err(error);
         }
         if self.finished || self.job.is_some() {
-            return Err(Error::Invalid("native mov_text input state"));
+            return Err(Error::Invalid(
+                "mov_text packet provided while one is pending or after the end of input",
+            ));
         }
         if input.format != Format::Tx3g {
-            return Err(Error::Unsupported("native mov_text requires tx3g packet"));
+            return Err(Error::Unsupported("mov_text decodes tx3g samples only"));
         }
         if input.generation != self.generation {
             return Err(Error::StaleGeneration {
@@ -310,7 +312,7 @@ impl Decoder {
         cancelled(cancel)?;
         match self.job.take_if(|job| job.ready()) {
             Some(job) => job.take_output(self.options),
-            None => Err(Error::Invalid("native mov_text output not ready")),
+            None => Err(Error::Invalid("mov_text output not ready")),
         }
     }
     /// Ends input: once no packet is pending, [`poll`](Self::poll) returns

@@ -432,16 +432,16 @@ impl ReceiverDecoder {
             return Err(self.poison(Error::Cancelled));
         }
         if self.phase != Phase::Idle || self.final_input {
-            return Err(Error::Invalid("PGS recovery packet busy or finalized"));
+            return Err(Error::Invalid(
+                "PGS packet pushed while one is active or after the end of input",
+            ));
         }
-        let packet = raw
-            .as_ref()
-            .ok_or(Error::Invalid("PGS recovery packet absent"))?;
+        let packet = raw.as_ref().ok_or(Error::Invalid("PGS packet absent"))?;
         if !packet.belongs_to(&self.budget) {
             return Err(Error::ForeignPool);
         }
         if packet.is_empty() {
-            return Err(Error::Invalid("PGS recovery empty physical packet"));
+            return Err(Error::Invalid("empty PGS packet"));
         }
         if packet.len() > self.limits.max_packet_bytes {
             return Err(Error::Limit {
@@ -563,7 +563,7 @@ impl ReceiverDecoder {
     fn packet(&self) -> Result<&Bytes> {
         self.packet
             .as_ref()
-            .ok_or(Error::Invalid("PGS recovery physical packet absent"))
+            .ok_or(Error::Invalid("PGS packet absent"))
     }
 
     /// The segment at `at`: its header (the length read past the packet end as
@@ -595,7 +595,7 @@ impl ReceiverDecoder {
         let raw = self
             .packet
             .as_ref()
-            .ok_or(Error::Invalid("PGS recovery physical packet absent"))?;
+            .ok_or(Error::Invalid("PGS packet absent"))?;
         let (receiver, limits) = (&mut self.receiver, &self.limits);
         match kind {
             COMPOSITION => receiver.composition(raw, body.clone(), self.subtitle_pts, limits)?,
@@ -712,7 +712,7 @@ impl ReceiverDecoder {
         let packet = self
             .packet
             .as_ref()
-            .ok_or(Error::Invalid("PGS recovery physical packet absent"))?;
+            .ok_or(Error::Invalid("PGS packet absent"))?;
         let empty = || packet.slice(0..0);
         if let Planes::Kept(_) = self.planes
             && let Planes::Kept(kept) = std::mem::replace(&mut self.planes, Planes::None)
@@ -816,7 +816,7 @@ impl ReceiverDecoder {
             .take()
             .ok_or(Error::Invalid("PGS receiver display absent"))?;
         if self.event.is_some() {
-            return Err(Error::Invalid("PGS native public event already stored"));
+            return Err(Error::Invalid("PGS subtitle already stored"));
         }
         match std::mem::replace(&mut self.planes, Planes::None) {
             Planes::Writing(planes, _) => {
@@ -895,12 +895,12 @@ impl ReceiverDecoder {
             return Err(self.poison(Error::Cancelled));
         }
         if self.phase != Phase::Ready {
-            return Err(Error::Invalid("PGS recovery output not ready"));
+            return Err(Error::Invalid("PGS output not ready"));
         }
         let result = self
             .output
             .take()
-            .ok_or(Error::Invalid("PGS recovery output absent"))?;
+            .ok_or(Error::Invalid("PGS output absent"))?;
         self.done(Phase::Idle);
         Ok(result)
     }
@@ -920,7 +920,7 @@ impl ReceiverDecoder {
             return Err(self.poison(Error::Cancelled));
         }
         if self.phase != Phase::Idle {
-            return Err(Error::Invalid("PGS recovery input busy"));
+            return Err(Error::Invalid("PGS input ended while a packet is active"));
         }
         self.final_input = true;
         self.done(Phase::Eof);
@@ -941,7 +941,7 @@ impl ReceiverDecoder {
             return Err(self.poison(Error::Cancelled));
         }
         if self.failed.is_none() && self.phase != Phase::Idle && self.phase != Phase::Ended {
-            return Err(Error::Invalid("PGS recovery reset busy"));
+            return Err(Error::Invalid("PGS decoder reset while a packet is active"));
         }
         self.event = None;
         self.planes = Planes::None;
