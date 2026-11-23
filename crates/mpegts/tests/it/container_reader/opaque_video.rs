@@ -4,8 +4,8 @@ use triergon_core::container::Event;
 use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, Step, WorkBudget,
 };
-use triergon_mpegts::compat::annex_b::VideoEofPolicy;
 use triergon_mpegts::reader::SourceEvent;
+use triergon_mpegts::reader::UnframedVideo;
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::transport::ContinuityOutcome;
 use triergon_mpegts::{Reader, ReaderEvent, ReaderLimits};
@@ -14,7 +14,7 @@ const LEADING_BYTES: Error = Error::Invalid("Annex B leading bytes");
 
 fn report() -> ReaderLimits {
     ReaderLimits {
-        video_eof_policy: VideoEofPolicy::ReportUnframed,
+        unframed_video_policy: UnframedVideo::Report,
         ..ReaderLimits::default()
     }
 }

@@ -10,7 +10,7 @@ use triergon_mpegts::clock::{
     ClockKey, SourceClockAnchor, SourceClockSample, SourceTimePolicy, SourceTimeStatus,
     SourceTimestamp, source_timestamp,
 };
-use triergon_mpegts::compat::annex_b::VideoEofPolicy;
+use triergon_mpegts::reader::UnframedVideo;
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{Reader, ReaderEvent, ReaderLimits};
 
@@ -183,7 +183,7 @@ impl ClockCase {
         let limits = ReaderLimits {
             program: Some(self.anchor.key.program),
             time_policy: policy,
-            video_eof_policy: VideoEofPolicy::ReportUnframed,
+            unframed_video_policy: UnframedVideo::Report,
             ..ReaderLimits::default()
         };
         let mut reader = Reader::new(

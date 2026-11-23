@@ -257,9 +257,9 @@ records its clocks, source positions and packet digest.
 | `ReaderLimits` field | Non-default choice |
 | --- | --- |
 | `audio_eof_policy` | `ReportIncomplete`: unfinished audio at logical EOF becomes `IncompleteAudio` instead of `Truncated` |
-| `video_eof_policy` | `ReportUnframed`: an AVC/HEVC byte run without an Annex B start code becomes `IncompleteVideo` when the source ends it, at logical EOF or at a fault, signalled discontinuity, clock epoch or table change (`IncompleteVideo::ended_by`) |
+| `unframed_video_policy` | `Report`: an AVC/HEVC byte run without an Annex B start code becomes `IncompleteVideo` when the source ends it, at logical EOF or at a fault, signalled discontinuity, clock epoch or table change (`IncompleteVideo::ended_by`) |
 | `dvb_subtitle_tail_policy` | `ReportCompletePrefix`: a PES with an unfinished final segment yields its complete segments as `DvbSubtitlePrefix` |
-| `unframed_audio_policy` | `ReportAtEof`: one opaque private-audio PES without a syncword becomes `UnframedAudio` when the source ends its byte run |
+| `unframed_audio_policy` | `Report`: one opaque private-audio PES without a syncword becomes `UnframedAudio` when the source ends its byte run |
 | `adts_packet_policy` | `ReportFragments`: FFmpeg's parser framing, with opaque bytes as `AdtsFragment` |
 | `adts_pes_policy` | `ReportUnbounded`: assemble zero-length ADTS PES (a H.222.0 §2.4.3.7 violation) |
 | `latm_packet_policy` | `PreservePes`: one `LatmPes` per validated PES |
@@ -419,7 +419,7 @@ opt-in policies above, a PES whose payload is not the track's framing syntax
 (for example AVC bytes before the first start code) fails the reader with
 `Invalid`.
 
-With `VideoEofPolicy::ReportUnframed`, a run of complete PES that holds no start
+With `UnframedVideo::Report`, a run of complete PES that holds no start
 code at all is not a cut access unit. The reader reports it whole as
 `IncompleteVideo` before the event that ends the run, which `ended_by` names: a
 fault on the PID or on the carrier grid, a signalled discontinuity, a new clock

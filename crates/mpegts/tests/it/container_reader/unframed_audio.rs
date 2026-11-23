@@ -4,8 +4,9 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceFailure, SourceId,
     Step, WorkBudget,
 };
-use triergon_mpegts::compat::pes::{PrivateAudioCarriage, UnframedAudioPolicy};
+use triergon_mpegts::compat::pes::PrivateAudioCarriage;
 use triergon_mpegts::psi::DescriptorNamespace;
+use triergon_mpegts::reader::UnframedAudioPolicy;
 use triergon_mpegts::reader::{EntityTransition, SourceEvent};
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{AccessUnit, ReaderEvent, ReaderLimits};
@@ -16,7 +17,7 @@ const SYNC: Error = Error::Unsupported("unframed audio contains a syncframe star
 
 fn limits() -> ReaderLimits {
     ReaderLimits {
-        unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
+        unframed_audio_policy: UnframedAudioPolicy::Report,
         ..ReaderLimits::default()
     }
 }

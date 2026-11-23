@@ -59,6 +59,61 @@ impl<T> Shared<T> {
     }
 }
 
+/// An unsplit PES observation with its exact source and clock facts.
+#[derive(Clone, Debug)]
+pub struct LatmPes {
+    track: Track,
+    source: SourceEvent,
+    clock_key: ClockKey,
+    clock_quarantined: bool,
+}
+
+impl LatmPes {
+    pub(crate) fn new(
+        track: Track,
+        source: SourceEvent,
+        clock_key: ClockKey,
+        clock_quarantined: bool,
+    ) -> Self {
+        Self {
+            track,
+            source,
+            clock_key,
+            clock_quarantined,
+        }
+    }
+
+    /// The retained PMT entry that identifies this LATM elementary stream.
+    pub fn track_info(&self) -> &Track {
+        &self.track
+    }
+
+    /// The source event owning the original LATM header, payload spans and byte ranges.
+    pub fn source(&self) -> &SourceEvent {
+        &self.source
+    }
+
+    /// Program, PCR PID and source epoch that apply to the encoded timestamps.
+    pub fn clock_key(&self) -> ClockKey {
+        self.clock_key
+    }
+
+    /// Whether the program clock was quarantined at this PES, leaving its timestamps
+    /// unresolved.
+    pub fn clock_is_quarantined(&self) -> bool {
+        self.clock_quarantined
+    }
+
+    /// The complete validated LATM PES, with its wire header and source ranges.
+    // Typed only with the PES shared apart from `TraceEvent::Pes`, as `SourceEvent::pes`.
+    pub fn pes(&self) -> &crate::pes::Pes {
+        let TraceEvent::Pes(pes) = self.source.event() else {
+            unreachable!("LATM packet owns its source PES");
+        };
+        pes
+    }
+}
+
 /// A shared original source event. Clones share its charged storage, including
 /// every ordered descriptor, source range, rejected carrier and PES span.
 #[derive(Clone, Debug)]
@@ -840,7 +895,7 @@ pub enum ReaderEvent {
     /// The unit and its provenance remain outside the neutral packet stream.
     RecoveredAdts(Packet),
     /// Original LATM PES bytes under the explicit PES packet policy.
-    LatmPes(crate::compat::latm::PesPacket),
+    LatmPes(LatmPes),
     /// A proven segment prefix with an unfinished final segment in the source PES.
     DvbSubtitlePrefix(Packet),
     /// An unframed video run that the source ended, under the explicit reporting policy.

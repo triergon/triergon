@@ -91,11 +91,6 @@ pub mod dts {
 
 pub mod latm {
     //! LOAS framing or preservation of nonempty LATM PES packet boundaries.
-    use crate::Track;
-    use crate::clock::ClockKey;
-    use crate::pes::Pes;
-    use crate::reader::SourceEvent;
-    use crate::stream::TraceEvent;
 
     /// Choose LOAS envelope framing or the demuxer's unsplit PES boundaries.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -105,61 +100,6 @@ pub mod latm {
         Strict,
         /// Emit each validated, nonempty LATM PES as a separate observation.
         PreservePes,
-    }
-
-    /// An unsplit PES observation with its exact source and clock facts.
-    #[derive(Clone, Debug)]
-    pub struct PesPacket {
-        track: Track,
-        source: SourceEvent,
-        clock_key: ClockKey,
-        clock_quarantined: bool,
-    }
-
-    impl PesPacket {
-        pub(crate) fn new(
-            track: Track,
-            source: SourceEvent,
-            clock_key: ClockKey,
-            clock_quarantined: bool,
-        ) -> Self {
-            Self {
-                track,
-                source,
-                clock_key,
-                clock_quarantined,
-            }
-        }
-
-        /// The retained PMT entry that identifies this LATM elementary stream.
-        pub fn track_info(&self) -> &Track {
-            &self.track
-        }
-
-        /// The source event owning the original LATM header, payload spans and byte ranges.
-        pub fn source(&self) -> &SourceEvent {
-            &self.source
-        }
-
-        /// Program, PCR PID and source epoch that apply to the encoded timestamps.
-        pub fn clock_key(&self) -> ClockKey {
-            self.clock_key
-        }
-
-        /// Whether the program clock was quarantined at this PES, leaving its timestamps
-        /// unresolved.
-        pub fn clock_is_quarantined(&self) -> bool {
-            self.clock_quarantined
-        }
-
-        /// The complete validated LATM PES, with its wire header and source ranges.
-        // Typed only with the PES shared apart from `TraceEvent::Pes`, as `SourceEvent::pes`.
-        pub fn pes(&self) -> &Pes {
-            let TraceEvent::Pes(pes) = self.source.event() else {
-                unreachable!("LATM packet owns its source PES");
-            };
-            pes
-        }
     }
 }
 

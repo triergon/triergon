@@ -68,17 +68,3 @@ pub enum PcrPolicy {
     /// extension. Other adaptation-field checks still apply.
     IgnoreReservedBits,
 }
-
-/// Reporting of unframed payload in a private-audio carriage when the source ends its
-/// byte run, at logical EOF or before a fault or boundary.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum UnframedAudioPolicy {
-    /// Require the source namespace before admitting a private-audio framer.
-    #[default]
-    Strict,
-    /// With unspecified namespace, admit one finite private-audio PES per
-    /// uninterrupted run when its payload has no AC-3 or E-AC-3 syncword
-    /// and does not end with the first byte of one.
-    /// The observation preserves the track's source codec and namespace.
-    ReportAtEof,
-}

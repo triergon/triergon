@@ -9,11 +9,13 @@ use crate::compat::adts;
 use crate::stream::{CarrierObservation, TransportStream};
 use advance::{InFlight, LaneWork};
 use lane::{Lane, StorageScan};
-pub use limits::{AudioEofPolicy, DvbSubtitleTailPolicy, ReaderLimits};
+pub use limits::{
+    AudioEofPolicy, DvbSubtitleTailPolicy, ReaderLimits, UnframedAudioPolicy, UnframedVideo,
+};
 use model::Shared;
 pub use model::{
     Ac3AccessUnit, AccessUnit, DtsAudioFrame, DtsExtensionFrame, DvbSubtitleUnit, IncompleteVideo,
-    LoasFrame, MpegAudioFrame, MpegPictureCoding, MpegVideoPicture, Packet, PacketClock,
+    LatmPes, LoasFrame, MpegAudioFrame, MpegPictureCoding, MpegVideoPicture, Packet, PacketClock,
     PayloadSource, ReaderEvent, SourceEvent, Track, UnframedAudio,
 };
 pub use seek::SeekEntity;

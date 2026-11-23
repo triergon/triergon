@@ -24,11 +24,12 @@ use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, Contin
 use triergon_mpegts::compat::input::PositionBasis;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::latm;
-use triergon_mpegts::compat::pes::{DemuxClock, UnframedAudioPolicy};
+use triergon_mpegts::compat::pes::DemuxClock;
 use triergon_mpegts::reader::{
     AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, IncompleteVideo, PacketClock,
     PayloadSource, UnframedAudio,
 };
+use triergon_mpegts::reader::{LatmPes, UnframedAudioPolicy};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::{AccessUnit, Packet, PacketFormat, ReaderEvent, ReaderLimits, SourceEpochs};
 
@@ -214,7 +215,7 @@ enum Payload<'a> {
         bytes: &'a [u8],
         position: PositionSource,
     },
-    PreservedPes(&'a latm::PesPacket),
+    PreservedPes(&'a LatmPes),
 }
 
 struct PacketProjection<'a> {
@@ -281,8 +282,8 @@ impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
     }
 }
 
-impl<'a> From<&'a latm::PesPacket> for PacketProjection<'a> {
-    fn from(packet: &'a latm::PesPacket) -> Self {
+impl<'a> From<&'a LatmPes> for PacketProjection<'a> {
+    fn from(packet: &'a LatmPes) -> Self {
         let pes = packet.pes();
         Self {
             pid: pes.pid,
@@ -514,7 +515,7 @@ fn operation<const TRACE: bool, const EXPLAIN: bool>(
         probe_unlabelled_dts_core: request.probe_dts_core,
         pcr_policy: request.pcr_policy,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
-        unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
+        unframed_audio_policy: UnframedAudioPolicy::Report,
         adts_packet_policy: PacketPolicy::ReportFragments,
         adts_pes_policy: PesPolicy::ReportUnbounded,
         latm_packet_policy: latm::PacketPolicy::PreservePes,

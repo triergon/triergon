@@ -1,9 +1,7 @@
 //! Reader bounds and the policies for unfinished input.
 use crate::clock::SourceTimePolicy;
 use crate::compat::adts::{self, PacketPolicy};
-use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
-use crate::compat::pes::UnframedAudioPolicy;
 use crate::psi::DescriptorNamespace;
 use crate::{PacketFormat, ParseLimits};
 use triergon_framing::nal::RawAnnexBLimits;
@@ -26,6 +24,35 @@ pub enum DvbSubtitleTailPolicy {
     RejectTruncated,
     /// Report complete preceding segments as a source event with the original PES.
     ReportCompletePrefix,
+}
+
+/// Reporting of an unframed AVC or HEVC byte run when the source ends it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum UnframedVideo {
+    /// Keep the video framer's leading-byte error.
+    #[default]
+    Refuse,
+    /// Report a nonempty run of validated PES payload with invalid leading bytes
+    /// and no Annex B start code anywhere in the run, as
+    /// [`ReaderEvent::IncompleteVideo`](crate::ReaderEvent::IncompleteVideo) at logical EOF
+    /// or before a fault, signalled
+    /// discontinuity, clock epoch or table change that ends the run. A discontinuity
+    /// the caller declares discards the run and reports its extent as `Interrupted`.
+    Report,
+}
+
+/// Reporting of unframed payload in a private-audio carriage when the source ends its
+/// byte run, at logical EOF or before a fault or boundary.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum UnframedAudioPolicy {
+    /// Require the source namespace before admitting a private-audio framer.
+    #[default]
+    Refuse,
+    /// With unspecified namespace, admit one finite private-audio PES per
+    /// uninterrupted run when its payload has no AC-3 or E-AC-3 syncword
+    /// and does not end with the first byte of one.
+    /// The observation preserves the track's source codec and namespace.
+    Report,
 }
 
 /// Bounds and source interpretation for the AU reader, independent of its live
@@ -68,7 +95,7 @@ pub struct ReaderLimits {
     /// Reporting of an overlong final DVB subtitle segment.
     pub dvb_subtitle_tail_policy: DvbSubtitleTailPolicy,
     /// Reporting of an unframed AVC or HEVC byte run when the source ends it.
-    pub video_eof_policy: VideoEofPolicy,
+    pub unframed_video_policy: UnframedVideo,
     /// Nonzero cap on units a track can publish before its lane is reset. An additional
     /// unit returns `Limit`. Codec-specific framing limits also apply.
     pub maximum_access_units: usize,
@@ -96,7 +123,7 @@ impl Default for ReaderLimits {
             maximum_audio_frame_bytes: 8192,
             maximum_dts_hd_pes_bytes: 65_535,
             audio_eof_policy: AudioEofPolicy::RejectIncomplete,
-            unframed_audio_policy: UnframedAudioPolicy::Strict,
+            unframed_audio_policy: UnframedAudioPolicy::Refuse,
             unlabelled_dts_core: None,
             probe_unlabelled_dts_core: false,
             pcr_policy: crate::compat::pes::PcrPolicy::Strict,
@@ -104,7 +131,7 @@ impl Default for ReaderLimits {
             adts_pes_policy: adts::PesPolicy::Strict,
             latm_packet_policy: latm::PacketPolicy::Strict,
             dvb_subtitle_tail_policy: DvbSubtitleTailPolicy::RejectTruncated,
-            video_eof_policy: VideoEofPolicy::RejectUnframed,
+            unframed_video_policy: UnframedVideo::Refuse,
             maximum_access_units: 32_000_000,
             maximum_pes_per_access_unit: 4096,
             elementary_input_window: 64 * 1024,

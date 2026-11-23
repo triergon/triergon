@@ -11,17 +11,16 @@ use triergon_core::{
 };
 use triergon_framing::ac3::{Ac3Family, Ac3FrameHeader, probe_header};
 use triergon_framing::mpeg_audio::MpegLayer;
-use triergon_mpegts::compat::annex_b::{
-    ContinuityEvent, ContinuityReader, ContinuityResidue, VideoEofPolicy,
-};
+use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
 use triergon_mpegts::compat::input::PositionBasis;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
-use triergon_mpegts::compat::pes::{DemuxClock, PrivateAudioCarriage, UnframedAudioPolicy};
+use triergon_mpegts::compat::pes::{DemuxClock, PrivateAudioCarriage};
 use triergon_mpegts::compat::{adts, latm};
 use triergon_mpegts::pes::{Pes, PesHeader};
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
 use triergon_mpegts::reader::{
-    AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, PacketClock,
+    AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, PacketClock, UnframedAudioPolicy,
+    UnframedVideo,
 };
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::transport::ContinuityOutcome;
@@ -67,12 +66,12 @@ pub(super) fn operation<'a>(
         program: Some(program),
         descriptor_namespace,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
-        unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
+        unframed_audio_policy: UnframedAudioPolicy::Report,
         adts_packet_policy: adts::PacketPolicy::ReportFragments,
         adts_pes_policy: adts::PesPolicy::ReportUnbounded,
         latm_packet_policy: latm::PacketPolicy::PreservePes,
         dvb_subtitle_tail_policy: DvbSubtitleTailPolicy::ReportCompletePrefix,
-        video_eof_policy: VideoEofPolicy::ReportUnframed,
+        unframed_video_policy: UnframedVideo::Report,
         ..ReaderLimits::default()
     };
     if input.len() > CAPACITY / 2 {

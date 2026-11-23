@@ -1,9 +1,8 @@
-//! Unframed AVC and HEVC observations: the reader's policy and the proof through
-//! continuity changes to logical source EOF.
+//! Unframed AVC and HEVC bytes joined across continuity changes at logical EOF.
 
 mod continuity;
 
-use crate::reader::EntityTransition;
+use crate::reader::{EntityTransition, UnframedVideo};
 use crate::stream::{CarrierObservation, TraceEvent};
 use crate::{Packet, Reader, ReaderEvent, ReaderLimits, Track};
 use continuity::{EofStep, Proof, SourceJob};
@@ -15,20 +14,6 @@ use triergon_core::{
 };
 
 pub use continuity::{ContinuityEvidence, ContinuityResidue};
-
-/// Reporting of an unframed AVC or HEVC byte run when the source ends it.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum VideoEofPolicy {
-    /// Keep the video framer's leading-byte error.
-    #[default]
-    RejectUnframed,
-    /// Report a nonempty run of validated PES payload with invalid leading bytes
-    /// and no Annex B start code anywhere in the run, as
-    /// [`ReaderEvent::IncompleteVideo`]: at logical EOF, and before a fault, signalled
-    /// discontinuity, clock epoch or table change that ends the run. A discontinuity
-    /// the caller declares discards the run and reports its extent as `Interrupted`.
-    ReportUnframed,
-}
 
 /// One step of [`ContinuityReader`].
 #[derive(Debug)]
@@ -46,7 +31,7 @@ pub enum ContinuityEvent {
 /// logical end of the source, the unframed bytes the demuxer joins across the track's
 /// continuity changes ([`ContinuityResidue`]). Packets and source events are the reader's.
 ///
-/// The source reader uses [VideoEofPolicy::ReportUnframed], so the run before each
+/// The source reader uses [UnframedVideo::Report], so the run before each
 /// continuity change arrives as its own `IncompleteVideo`; the residue at EOF holds
 /// their bytes in order, with those the demuxer merges across the changes. A continuity
 /// difference must be observed within the first 16 selected carriers. A later
@@ -74,7 +59,7 @@ impl std::fmt::Debug for ContinuityReader {
 
 impl ContinuityReader {
     /// A continuity reader over `source`, with the same arguments as [`Reader::new`]; the source
-    /// reader always uses [`VideoEofPolicy::ReportUnframed`].
+    /// reader always uses [`UnframedVideo::Report`].
     ///
     /// Fails as [`Reader::new`] does.
     pub fn new(
@@ -84,7 +69,7 @@ impl ContinuityReader {
         mut limits: ReaderLimits,
         input_window: usize,
     ) -> Result<Self> {
-        limits.video_eof_policy = VideoEofPolicy::ReportUnframed;
+        limits.unframed_video_policy = UnframedVideo::Report;
         Ok(Self {
             reader: Reader::new(pool, source, caps, limits, input_window)?,
             limits,

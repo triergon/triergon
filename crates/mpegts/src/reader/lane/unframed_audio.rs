@@ -1,9 +1,9 @@
 //! Bounded admission for a private-audio PES with no syncframe start.
 use super::Track;
-use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
+use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
 use crate::pes::{Pes, stream_id};
 use crate::psi::{DescriptorNamespace, stream_type};
-use crate::reader::ReaderLimits;
+use crate::reader::{ReaderLimits, UnframedAudioPolicy};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -20,7 +20,7 @@ pub(super) struct Scan {
 impl Scan {
     pub(super) fn for_track(track: &Track, limits: ReaderLimits) -> Result<Option<Self>> {
         let stream = track.stream();
-        if limits.unframed_audio_policy == UnframedAudioPolicy::Strict
+        if limits.unframed_audio_policy == UnframedAudioPolicy::Refuse
             || stream.descriptor_namespace() != DescriptorNamespace::Unspecified
             || !matches!(
                 stream.stream_type,

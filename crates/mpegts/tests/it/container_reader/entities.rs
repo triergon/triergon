@@ -3,7 +3,8 @@ use triergon_core::container::{ContainerReader, Event, PacketInfo, TrackId};
 use triergon_core::{
     Budget, Bytes, Error, InputToken, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, VideoEofPolicy};
+use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader};
+use triergon_mpegts::reader::UnframedVideo;
 use triergon_mpegts::reader::{AudioEofPolicy, EntityTransition};
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::{Packet, Reader, ReaderEvent, ReaderLimits};
@@ -443,7 +444,7 @@ fn open_pes_at_pmt_boundary(signal_drop: bool) {
 #[test]
 fn opaque_video_waits_across_continuation_and_discards_on_discontinuity() {
     let limits = ReaderLimits {
-        video_eof_policy: VideoEofPolicy::ReportUnframed,
+        unframed_video_policy: UnframedVideo::Report,
         ..ReaderLimits::default()
     };
     let mut transport = Transport::new();

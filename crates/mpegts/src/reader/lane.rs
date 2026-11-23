@@ -19,11 +19,11 @@ use super::{
     Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame, LoasFrame, Packet,
     PacketClock, PayloadSource, ReaderLimits, SourceEvent, Track,
 };
+use super::{LatmPes, UnframedAudioPolicy, UnframedVideo};
 use crate::clock::{SourceTimePolicy, source_timestamp};
 use crate::compat::adts::PacketPolicy;
-use crate::compat::annex_b::VideoEofPolicy;
 use crate::compat::latm;
-use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors, UnframedAudioPolicy};
+use crate::compat::pes::{PrivateAudioCarriage, PrivateAudioDescriptors};
 use crate::pes::stream_id;
 use crate::psi::{CodecIdentification, DescriptorNamespace, stream_type};
 use crate::stream::{StorageItem, TransportStorageCursor};
@@ -418,7 +418,7 @@ pub(super) enum LaneStep {
     PictureProbe(SeekProbe),
     /// An unframed video run, copied and ready to report.
     IncompleteVideo(Shared<UnframedData>),
-    LatmPes(latm::PesPacket),
+    LatmPes(LatmPes),
     /// The opaque PES of a private-audio carriage, copied and ready to report.
     UnframedAudio(Shared<UnframedData>, PrivateAudioCarriage),
     NeedPayload,
@@ -919,7 +919,7 @@ impl Lane {
                 Err(LEADING_VIDEO_BYTES)
                     if matches!(framer, Framer::Video(_))
                         && self.completed == 0
-                        && self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed =>
+                        && self.limits.unframed_video_policy == UnframedVideo::Report =>
                 {
                     let end = self
                         .pieces
@@ -977,9 +977,8 @@ impl Lane {
                 Step::End(_) => {
                     if draining
                         && (self.limits.audio_eof_policy == AudioEofPolicy::ReportIncomplete
-                            || self.limits.video_eof_policy == VideoEofPolicy::ReportUnframed
-                            || self.limits.unframed_audio_policy
-                                == UnframedAudioPolicy::ReportAtEof)
+                            || self.limits.unframed_video_policy == UnframedVideo::Report
+                            || self.limits.unframed_audio_policy == UnframedAudioPolicy::Report)
                     {
                         self.framer = None;
                         continue;
@@ -1105,7 +1104,7 @@ impl Lane {
             return Ok(LaneStep::Yield);
         }
         self.check_output_limit()?;
-        let packet = latm::PesPacket::new(
+        let packet = LatmPes::new(
             self.track.clone(),
             piece.source.clone(),
             piece.clock.key,
