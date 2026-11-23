@@ -1,7 +1,6 @@
 //! Output channel layouts: FFmpeg's FLAC defaults and the WAVEFORMATEXTENSIBLE channel
 //! mask a VORBIS_COMMENT block may carry.
-use triergon_codec::layout::flac_order;
-use triergon_codec::{ChannelLayout, Speaker};
+use triergon_codec::{ChannelLayout, Speaker, flac_order};
 
 /// The layout of `channels` coded channels without a channel mask.
 ///
