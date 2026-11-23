@@ -469,10 +469,5 @@ fn known(time: i64) -> Option<i64> {
 /// snapshot at 934 267 µs lasts 2 783 137 874 ms, and one starting at 0
 /// lasts 1 511 828 488 ms.
 fn milliseconds(us: i64) -> u32 {
-    let ms = if us >= 0 {
-        (i128::from(us) + 500) / 1000
-    } else {
-        (i128::from(us) - 500) / 1000
-    };
-    ms as u32
+    crate::milliseconds(us) as u32
 }

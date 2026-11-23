@@ -34,3 +34,11 @@ fn cancelled(cancel: &AtomicBool) -> triergon_core::Result<()> {
         Ok(())
     }
 }
+
+/// Microseconds to milliseconds, rounded to nearest with ties away from zero;
+/// exact for every `i64`.
+fn milliseconds(us: i64) -> i64 {
+    // At most 2^63 + 500 before the division, below 2^54 after it.
+    let ms = ((us.unsigned_abs() + 500) / 1000) as i64;
+    if us < 0 { -ms } else { ms }
+}

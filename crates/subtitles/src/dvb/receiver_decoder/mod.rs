@@ -730,7 +730,7 @@ impl ReceiverDecoder {
         if self.options.end_from_next {
             let previous = self.previous_pts;
             let end = previous.map_or(-1, |previous| {
-                millis(pts.unwrap_or(i64::MIN).wrapping_sub(previous)) - 1
+                crate::milliseconds(pts.unwrap_or(i64::MIN).wrapping_sub(previous)) - 1
             });
             // The receiver's display time is 32 bits: a negative end wraps.
             self.present(previous, end as u32, previous.is_some())?;
@@ -886,13 +886,6 @@ fn push<T>(vec: &mut BudgetVec<T>, value: T) -> Result<()> {
 fn push_exact<T>(vec: &mut BudgetVec<T>, value: T) -> Result<()> {
     vec.try_reserve_exact(1)?;
     push(vec, value)
-}
-
-/// Microseconds to milliseconds, rounded to nearest with ties away from zero.
-fn millis(us: i64) -> i64 {
-    let us = i128::from(us);
-    // Within 64 bits: a thousandth of a 64-bit value.
-    ((us + if us < 0 { -500 } else { 500 }) / 1000) as i64
 }
 
 #[cfg(test)]
