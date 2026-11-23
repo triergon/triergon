@@ -3,7 +3,9 @@
 use crate::{CaptureError, Result};
 use triergon_codec_mpeg1::{EncodedPicture, Encoder, EncoderConfig};
 use triergon_mpegts::mux::{MuxConfig, Muxer};
-use triergon_pixel::{CodedPicture, Converter, MacroblockGeometry, Orientation, PictureView};
+#[cfg(feature = "reference-trace")]
+use triergon_pixel::PictureView;
+use triergon_pixel::{CodedPicture, Converter, MacroblockGeometry, Orientation};
 
 /// Receives each frame's complete transport stream bytes.
 pub trait Sink {
@@ -41,9 +43,9 @@ pub struct SessionConfig {
 }
 
 impl SessionConfig {
-    /// The capture rate rule at `bit_rate`: `max_rate` = `bit_rate`·7/5 (saturating
-    /// at `u32::MAX`), `vbv_bits` = `bit_rate`/7, a GOP of 30 and the default
-    /// multiplex.
+    /// A configuration with a fill rate of `bit_rate`·7/5 (saturating at
+    /// `u32::MAX`), a buffer of `bit_rate`/7 bits, an intra period of 30
+    /// pictures and the default multiplex.
     pub fn with_rate_rule(width: u32, height: u32, bit_rate: u32) -> SessionConfig {
         SessionConfig {
             width,
@@ -170,17 +172,20 @@ impl Session {
     }
 
     /// The last frame as converted to YUV 4:2:0, before encoding.
+    #[cfg(feature = "reference-trace")]
     pub fn converted(&self) -> &CodedPicture {
         &self.input
     }
 
     /// What a decoder reconstructs from the last frame.
+    #[cfg(feature = "reference-trace")]
     pub fn reconstruction(&self) -> PictureView<'_> {
         self.encoder.reconstruction()
     }
 
     /// Bits by which frames so far exceeded the encoder's modelled VBV occupancy,
     /// summed ([`Encoder::vbv_underflow_bits`]).
+    #[cfg(feature = "reference-trace")]
     pub fn vbv_underflow_bits(&self) -> f64 {
         self.encoder.vbv_underflow_bits()
     }

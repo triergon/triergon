@@ -25,9 +25,10 @@ assert!(report.picture.key && out.len() == report.ts_bytes && out.len() % 188 ==
 `SessionConfig` holds `width`, `height`, `bit_rate`, `max_rate`, `vbv_bits`, `gop` and
 `mux` (a `mux::MuxConfig`). `SessionConfig::with_rate_rule(width, height, b)` sets
 `max_rate = b·7/5`, `vbv_bits = b/7`, `gop = 30` and the default multiplex. The
-component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session` also gives
-`geometry()`, `converted()` (the last converted input), `reconstruction()` and
-`vbv_underflow_bits()`.
+component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session::geometry()`
+gives the visible and coded sizes. The optional `reference-trace` feature exposes the
+last converted input, reconstructed picture and accumulated VBV underflow bits through
+`converted()`, `reconstruction()` and `vbv_underflow_bits()`.
 
 `Session::open` selects the chroma conversion by width, as the reference does on 32-bit
 ARMv7; `Session::open_filtered` uses the centre-sited chroma filter at every width, as it

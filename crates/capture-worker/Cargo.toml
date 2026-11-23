@@ -9,7 +9,7 @@ publish.workspace = true
 
 [dependencies]
 triergon-harness-runner = { path = "../harness-runner" }
-triergon-capture = { path = "../capture" }
+triergon-capture = { path = "../capture", features = ["reference-trace"] }
 triergon-worker-entry = { path = "../worker-entry" }
 
 [lints]

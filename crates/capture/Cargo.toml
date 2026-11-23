@@ -7,6 +7,9 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
+[features]
+reference-trace = []
+
 [dependencies]
 triergon-codec-mpeg1 = { path = "../codec-mpeg1" }
 triergon-core = { path = "../core" }
