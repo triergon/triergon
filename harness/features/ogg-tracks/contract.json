@@ -262,21 +262,27 @@
       "cases": [
         "vorbis-chapter-extension-demo.ogg"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "The Skeleton identification packet is the configuration of its opaque track (a representation choice)",
-      "clause": "RFC 3533 section 3 and the Ogg Skeleton document define the fishead BOS packet; Track::configuration keeps the first packet of a mapping it does not decode.",
-      "candidate": "Publishes the Skeleton track configured with its 64-byte fishead packet; the Speex track agrees.",
-      "reference": "Publishes the Skeleton stream unconfigured, without configuration bytes.",
+      "policy": "The Skeleton identification packet is the configuration of its opaque track",
+      "undecided": "RFC 3533 section 3 and the Ogg Skeleton document define the fishead BOS packet; Track::configuration keeps the first packet of a mapping it does not decode.",
+      "rule": "Publishes the Skeleton track configured with its 64-byte fishead packet; the Speex track agrees.",
+      "documented": "crates/ogg/README.md#supported",
+      "reference_rule": "Publishes the Skeleton stream unconfigured, without configuration bytes.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "speex-skeleton.spx"
       ]
     },
     {
-      "reading": "A short Opus comment header makes its stream invalid; the source still opens (policy)",
-      "clause": "RFC 7845 section 5.2: implementations SHOULD treat a stream as invalid if its comment header lacks enough data for its fields; Track::header_error reports this per stream.",
-      "candidate": "Opens the source and lists the Opus stream with its OpusHead and a header error, unconfigured, with an empty comment view.",
-      "reference": "Refuses the whole open.",
+      "policy": "A short Opus comment header makes its stream invalid; the source still opens",
+      "undecided": "RFC 7845 section 5.2: implementations SHOULD treat a stream as invalid if its comment header lacks enough data for its fields; Track::header_error reports this per stream.",
+      "rule": "Opens the source and lists the Opus stream with its OpusHead and a header error, unconfigured, with an empty comment view.",
+      "documented": "crates/ogg/README.md#supported",
+      "reference_rule": "Refuses the whole open.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "bad-comment"
       ]

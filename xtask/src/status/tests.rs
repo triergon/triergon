@@ -67,6 +67,12 @@ const PAGE_TEXT: &str = "# Status
 | Core | tests | via dependents | via dependents |
 | F | 4 cases | 0.95 as written | heap as written |
 | Parts | f | 0.7000 (3/3 pass, worst `v`) at `964b36cb` | heap ≤0.3000, total RSS ≤0.5000 (3/3 lower) at `964b36cb` |
+
+## Listed differences
+
+| Comparison | departs | policy | unimplemented | refuses | defect | listed | cases |
+|---|---|---|---|---|---|---|---|
+| **Total** |  |  |  |  |  |  | 0 |
 ";
 
 /// A repository with two runs on Linux AArch64's (sharded) and ARMv7's, an older ARMv7
@@ -321,4 +327,61 @@ fn a_cell_rounds_its_bounds_up() {
     assert_eq!(bound(0.9807), "0.9807");
     assert_eq!(bound(0.980_701), "0.9808");
     assert_eq!(bound(0.4), "0.4000");
+}
+
+#[test]
+fn the_listed_table_counts_each_form_once_per_case_and_target() {
+    let contract = format!(
+        r#"{{"open_cases": [{{"id": "a", "requirement": "r"}}],
+            "open_deviations": [{{"cases": ["a", "b"]}}, {{"cases": ["c"], "targets": ["{T}"]}}],
+            "open_policies": [{{"cases": ["b", "d"]}}],
+            "open_refusals": [{{"cases": ["e"]}}],
+            "open_unmeasured": [{{"cases": ["z"]}}]}}"#
+    );
+    let manifest = r#"{"vectors": [{}, {}, {}], "open_cases": ["v"],
+        "open_unimplemented": [{"cases": [{"id": "w"}]}]}"#;
+    let data = vec![
+        (
+            "harness/features/f/contract.json".to_owned(),
+            json::parse(&contract).unwrap(),
+        ),
+        (
+            "harness/features/g/contract.json".to_owned(),
+            json::parse(r#"{"open_unmeasured": [{"cases": ["z"]}]}"#).unwrap(),
+        ),
+        (
+            "harness/codecs/m.json".to_owned(),
+            json::parse(manifest).unwrap(),
+        ),
+        (
+            "harness/features/f/corpus.json".to_owned(),
+            json::parse(
+                r#"{"cases": [{}, {}, {}, {}, {}, {}, {}], "open_cases": ["not a registry file"]}"#,
+            )
+            .unwrap(),
+        ),
+    ];
+    // A case with two causes counts under both and once as listed; a comparison that
+    // lists nothing has no row; a count that differs between the targets shows both.
+    assert_eq!(
+        listed_table(&data),
+        [
+            "| Comparison | departs | policy | unimplemented | refuses | defect | listed | cases |",
+            "|---|---|---|---|---|---|---|---|",
+            "| [`codecs/m`](../harness/codecs/m.json) |  |  | 1 |  | 1 | 2 | 3 |",
+            "| [`f`](../harness/features/f/contract.json) | 2 / 3 | 2 |  | 1 | 1 | 4 / 5 | 7 |",
+            "| **Total** | 2 / 3 | 2 | 1 | 1 | 2 | 6 / 7 | 10 |",
+        ]
+    );
+    let page: Vec<&str> = PAGE_TEXT.lines().collect();
+    assert_eq!(listed_errors(&[], &page), Vec::<String>::new());
+    let errors = listed_errors(&data, &page);
+    assert!(
+        errors.len() == 1 && errors[0].contains("cargo xtask status --write"),
+        "{errors:?}"
+    );
+    assert_eq!(
+        listed_errors(&data, &["# Status"]),
+        ["docs/status.md: no heading Listed differences"]
+    );
 }

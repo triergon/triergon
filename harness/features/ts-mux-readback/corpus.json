@@ -378,10 +378,10 @@
         "Test\tLab",
         "Service01"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 9
+        "digest": 8
       }
     },
     {

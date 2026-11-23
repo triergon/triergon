@@ -102,18 +102,6 @@
       ]
     },
     {
-      "reading": "The normal-sync reader searches for no sync and reads no extension substream, so it refuses a stream that begins with neither",
-      "clause": "ETSI TS 102 114 V1.6.1 clause 5.3 begins decoding with a search for SYNC and clause 7.2 allows a stream of extension substreams alone: no clause makes such a start an error, and the refusal is the scope the reader documents, not a departure of the reference",
-      "candidate": "refuses with Invalid for zero bytes, and with Unsupported for the extension substream sync 0x64582025, as the core reader does",
-      "reference": "the dca parser returns the bytes as a packet with no clock",
-      "cases": [
-        "matrix-bad-sync-be14",
-        "matrix-bad-sync-le14",
-        "matrix-reserved-extension-sync-be14",
-        "matrix-reserved-extension-sync-le14"
-      ]
-    },
-    {
       "reading": "Coded clock of arrangements the parser has no layout for",
       "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: SFREQ gives the core sampling frequency (Table 5-5) and NBLKS a window of 32 x (NBLKS + 1) samples, 256 to 4096 in a normal frame, whatever AMODE says; AMODE 10 to 15 are defined arrangements and 16 to 63 user defined (Table 5-4)",
       "candidate": "reports the rate and duration SFREQ and NBLKS code: 48000 Hz with 512 samples, or 256 samples for NBLKS 7",
@@ -887,6 +875,22 @@
         "xxch_71_24_48_2046-first-le16"
       ],
       "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "The normal-sync reader searches for no sync and reads no extension substream, so it refuses a stream that begins with neither",
+      "undecided": "ETSI TS 102 114 V1.6.1 clause 5.3 begins decoding with a search for SYNC and clause 7.2 allows a stream of extension substreams alone: no clause makes such a start an error, and the refusal is the scope the reader documents, not a departure of the reference",
+      "rule": "refuses with Invalid for zero bytes, and with Unsupported for the extension substream sync 0x64582025, as the core reader does",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "reference_rule": "the dca parser returns the bytes as a packet with no clock",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "matrix-bad-sync-be14",
+        "matrix-bad-sync-le14",
+        "matrix-reserved-extension-sync-be14",
+        "matrix-reserved-extension-sync-le14"
+      ]
     }
   ]
 }

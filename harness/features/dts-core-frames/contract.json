@@ -84,27 +84,6 @@
       ]
     },
     {
-      "reading": "The aligned core reader does not search for the next sync after bytes that are no frame",
-      "clause": "ETSI TS 102 114 V1.6.1 clause 5.3 begins decoding with a search for SYNC and TS 102 114 V1.2.1 clause 5.3 searches again after losing it: stopping there is the scope the reader documents, not a departure of the reference",
-      "candidate": "returns the frames before those bytes, then refuses with Invalid where a frame is due and SYNC is absent; the aligned reader documents that it does not search",
-      "reference": "the dca parser resumes at the next SYNC and returns the bytes between as a packet of their own or appended to the previous frame (112 and 100 bytes for 96-byte frames)",
-      "cases": [
-        "matrix-bad-sync",
-        "good-then-invalid",
-        "interframe-garbage"
-      ]
-    },
-    {
-      "reading": "The core reader reads no stream that begins with an extension substream",
-      "clause": "ETSI TS 102 114 V1.6.1 clause 7.2: the audio stream may consist of extension substreams alone, so the input is valid and the refusal is a feature the reader does not implement",
-      "candidate": "refuses with Unsupported at the extension substream sync word",
-      "reference": "the dca parser returns the extension substream bytes as a packet with no clock or the 48000 Hz, 1024-sample clock of the XLL asset, and its dca_core filter then refuses the coreless one",
-      "cases": [
-        "matrix-reserved-extension-sync",
-        "xll_51_24_48_none"
-      ]
-    },
-    {
       "reading": "Coded clock of arrangements the parser has no layout for",
       "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: SFREQ gives the core sampling frequency (Table 5-5) and NBLKS a window of 32 x (NBLKS + 1) samples, 256 to 4096 in a normal frame, whatever AMODE says; AMODE 10 to 15 are defined arrangements and 16 to 63 user defined (Table 5-4)",
       "candidate": "returns each frame with the rate and duration SFREQ and NBLKS code: 48000 Hz and 512 samples",
@@ -416,6 +395,34 @@
         "xll_x96_51_24_96_1509-decoded", "xll_xch_61_24_48_768-decoded", "xxch_71_24_48_2046-decoded"
       ],
       "cause": "decoder work exceeds header inspection"
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "The aligned core reader does not search for the next sync after bytes that are no frame",
+      "undecided": "ETSI TS 102 114 V1.6.1 clause 5.3 begins decoding with a search for SYNC and TS 102 114 V1.2.1 clause 5.3 searches again after losing it: stopping there is the scope the reader documents, not a departure of the reference",
+      "rule": "returns the frames before those bytes, then refuses with Invalid where a frame is due and SYNC is absent; the aligned reader documents that it does not search",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "reference_rule": "the dca parser resumes at the next SYNC and returns the bytes between as a packet of their own or appended to the previous frame (112 and 100 bytes for 96-byte frames)",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "matrix-bad-sync",
+        "good-then-invalid",
+        "interframe-garbage"
+      ]
+    }
+  ],
+  "open_unimplemented": [
+    {
+      "feature": "The core reader reads no stream that begins with an extension substream",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 7.2: the audio stream may consist of extension substreams alone, so the input is valid and the refusal is a feature the reader does not implement",
+      "candidate": "refuses with Unsupported at the extension substream sync word",
+      "reference": "the dca parser returns the extension substream bytes as a packet with no clock or the 48000 Hz, 1024-sample clock of the XLL asset, and its dca_core filter then refuses the coreless one",
+      "cases": [
+        "matrix-reserved-extension-sync",
+        "xll_51_24_48_none"
+      ]
     }
   ]
 }

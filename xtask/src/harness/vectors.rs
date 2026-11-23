@@ -789,7 +789,6 @@ fn prefix_traces(
                 &feature.work_fields,
                 feature.per_target,
                 None,
-                None,
             )?;
             verdicts.push((
                 format!("{}/{id}", feature.id),

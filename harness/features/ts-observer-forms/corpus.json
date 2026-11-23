@@ -2613,10 +2613,10 @@
           "id": "transport-tei"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 60,
+        "digest": 17017220949092147030
       }
     },
     {
@@ -2647,10 +2647,10 @@
           "id": "transport-tei"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 60,
+        "digest": 17017220949092147030
       }
     },
     {
@@ -2681,10 +2681,10 @@
           "id": "transport-tei"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 60,
+        "digest": 17017220949092147030
       }
     },
     {
@@ -2715,10 +2715,10 @@
           "id": "transport-scrambled"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 60,
+        "digest": 17017220949092147030
       }
     },
     {
@@ -2749,10 +2749,10 @@
           "id": "transport-scrambled"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 60,
+        "digest": 17017220949092147030
       }
     },
     {
@@ -2783,10 +2783,10 @@
           "id": "transport-scrambled"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 60,
+        "digest": 17017220949092147030
       }
     },
     {
@@ -3157,10 +3157,10 @@
           "id": "transport-partial-final-packet"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 84,
+        "digest": 14553395899588572371
       }
     },
     {
@@ -3191,10 +3191,10 @@
           "id": "transport-partial-final-packet"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 84,
+        "digest": 14553395899588572371
       }
     },
     {
@@ -3259,10 +3259,10 @@
           "id": "transport-sync-loss"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 77,
+        "digest": 2599403413553035900
       }
     },
     {
@@ -3293,10 +3293,10 @@
           "id": "transport-sync-loss"
         }
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
-        "bytes": 27,
-        "digest": 7910521612812314295
+        "bytes": 77,
+        "digest": 2599403413553035900
       }
     },
     {

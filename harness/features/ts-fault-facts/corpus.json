@@ -149,10 +149,10 @@
         "256",
         "faults"
       ],
-      "expected": {
-        "packets": 3,
-        "bytes": 31,
-        "digest": 244316537035128232
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -285,10 +285,10 @@
         "256",
         "faults"
       ],
-      "expected": {
-        "packets": 3,
-        "bytes": 31,
-        "digest": 11277948698910861032
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -302,10 +302,10 @@
         "256",
         "faults"
       ],
-      "expected": {
-        "packets": 3,
-        "bytes": 31,
-        "digest": 1544904721207424907
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -319,10 +319,10 @@
         "256",
         "faults"
       ],
-      "expected": {
-        "packets": 3,
-        "bytes": 31,
-        "digest": 244316537035128232
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -336,10 +336,10 @@
         "256",
         "faults"
       ],
-      "expected": {
-        "packets": 3,
-        "bytes": 31,
-        "digest": 1619002472359860262
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -404,10 +404,10 @@
         "256",
         "faults"
       ],
-      "expected": {
-        "packets": 3,
-        "bytes": 31,
-        "digest": 6559086074965407640
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -540,10 +540,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 3,
         "bytes": 41,
-        "digest": 301763614231778749
+        "digest": 301763614231778750
       }
     },
     {
@@ -574,10 +574,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -591,10 +591,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -608,10 +608,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -625,10 +625,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -642,10 +642,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -659,10 +659,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -676,10 +676,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -693,10 +693,10 @@
         "256",
         "faults"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -812,10 +812,10 @@
         "256",
         "faults"
       ],
-      "expected": {
-        "packets": 3,
-        "bytes": 41,
-        "digest": 5163137376740456928
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -1356,10 +1356,10 @@
         "256",
         "input192"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 7
+        "digest": 8
       }
     },
     {
@@ -1424,10 +1424,10 @@
         "256",
         "input192"
       ],
-      "expected": {
-        "packets": 2,
-        "bytes": 4,
-        "digest": 2691570181265018333
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {

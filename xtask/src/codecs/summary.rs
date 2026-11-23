@@ -96,6 +96,13 @@ const CONTINUED: &str = "decoder-error";
 /// README lists as not implemented; the specification justifies none of them.
 pub(super) const UNIMPLEMENTED: &str = "unimplemented";
 
+/// The list of a codec manifest that holds the refusals of unimplemented features.
+pub(super) const REFUSALS: &str = "open_unimplemented";
+
+/// The list that holds the refusals of streams a clause forbids. Nothing of the
+/// reference is compared for them, whether it decodes the stream or refuses it too.
+const JUSTIFIED: &str = "open_refusals";
+
 /// Whether the reference decodes the refused feature (`"decodes"`) or does not
 /// implement it either (`"unimplemented"`), from a refusal group's `basis` and
 /// `reference`. Where it does not, what it emits is error concealment or nothing:
@@ -131,21 +138,32 @@ type VideoRefusals<'a> = BTreeMap<(&'a str, &'a str), VideoException<'a>>;
 
 fn video_refusals(manifest: &Value) -> Result<VideoRefusals<'_>, String> {
     let mut refusals = BTreeMap::new();
-    let Some(groups) = manifest.get("open_refusals") else {
+    let lists: Vec<(&str, &Value)> = [REFUSALS, JUSTIFIED]
+        .into_iter()
+        .filter_map(|list| Some((list, manifest.get(list)?)))
+        .collect();
+    if lists.is_empty() {
         return Ok(refusals);
-    };
+    }
     let vectors = manifest
         .get("vectors")
         .and_then(Value::as_array)
         .ok_or("registered video refusals need pinned vectors")?;
-    for group in groups.as_array().ok_or("open_refusals must be an array")? {
+    let groups = lists.into_iter().flat_map(|(list, groups)| {
+        groups
+            .as_array()
+            .unwrap_or_default()
+            .iter()
+            .map(move |group| (list, group))
+    });
+    for (list, group) in groups {
         if text(group.get("kind")) != Some(VIDEO_REFUSAL_KIND) {
             continue;
         }
         let reading = |key| refusal_line(group, key);
         let (reason, error) = (reading("reason")?, reading("detail")?);
         reading("clause")?;
-        let reference_decodes = reference_decodes(group)?;
+        let reference_decodes = list == REFUSALS && reference_decodes(group)?;
         let cases = group
             .get("cases")
             .and_then(Value::as_array)
@@ -399,16 +417,14 @@ fn manifest_of(lane: &str) -> &'static str {
 }
 
 fn deviation_cases(document: &Value) -> impl Iterator<Item = (&Value, &str)> {
-    super::correctness::deviations(document)
-        .iter()
-        .flat_map(|deviation| {
-            deviation
-                .get("cases")
-                .and_then(Value::as_array)
-                .unwrap_or_default()
-                .iter()
-                .filter_map(move |case| Some((deviation, case.as_str()?)))
-        })
+    super::correctness::deviations(document).flat_map(|(_, deviation)| {
+        deviation
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+            .iter()
+            .filter_map(move |case| Some((deviation, case.as_str()?)))
+    })
 }
 
 fn listing_of<'a>(
@@ -422,9 +438,10 @@ fn listing_of<'a>(
         Entry::Vacant(entry) => entry.insert(json::read(&crate::root().join(path))?),
     };
     if let Some((deviation, _)) = deviation_cases(document).find(|(_, case)| *case == name) {
-        return deviation
-            .get("reading")
-            .and_then(Value::as_str)
+        // A deviation's reading, or what a policy difference leaves undecided.
+        return ["reading", "policy"]
+            .iter()
+            .find_map(|key| deviation.get(key).and_then(Value::as_str))
             .map(|reading| Some(Listed { reading }))
             .ok_or_else(|| format!("{path}: {name} needs a deviation reading"));
     }
@@ -872,7 +889,8 @@ mod tests {
             "../../../harness/codecs/correctness-manifest.json"
         ));
         let registered = video_refusals(&manifest).unwrap();
-        assert_eq!(registered.len(), 35);
+        // 35 refusals of features not implemented, and one stream the standard forbids.
+        assert_eq!(registered.len(), 36);
         assert_eq!(
             registered
                 .keys()
@@ -885,7 +903,12 @@ mod tests {
                 .keys()
                 .filter(|(lane, _)| *lane == "hevc")
                 .count(),
-            11
+            12
+        );
+        // The forbidden stream pins no picture of the reference.
+        assert_eq!(
+            registered[&("hevc", "EXT_A_ericsson_3.bit")].pictures,
+            [Some(0), None, Some(0)]
         );
     }
 

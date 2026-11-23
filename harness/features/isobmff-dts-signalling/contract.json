@@ -234,7 +234,19 @@
       ]
     },
     {
-      "reading": "The core check refuses a dtse entry: DTS LBR is not implemented",
+      "reading": "MPEG-4 object type AA declares a DTS core and extension",
+      "clause": "MP4 Registration Authority, Object Types table (A9–AC): AA denotes the core plus extension substream",
+      "candidate": "reports eligibility for core inspection and 48000 Hz from the sample entry",
+      "reference": "reports no DTS codec classification and no DTS clock",
+      "cases": [
+        "mp4a-object-aa"
+      ]
+    }
+  ],
+  "open_unimplemented": [
+    {
+      "feature": "The core check refuses a dtse entry: DTS LBR is not implemented",
+      "documented": "crates/isobmff/README.md#container-reader",
       "clause": "ETSI TS 102 114 V1.6.1 Annex E Tables E-1 and E-2: dtse designates LBR in an extension substream without a core; FrameDuration code 3 is 4096 samples (E.2.2.3.2), which is what the reference reports: the input is valid",
       "candidate": "refuses core admission",
       "reference": "reports generic DTS at 48000 Hz with 4096 samples",
@@ -243,7 +255,8 @@
       ]
     },
     {
-      "reading": "The core check refuses a dtsx entry as unsupported where the reference reports no DTS",
+      "feature": "The core check refuses a dtsx entry as unsupported where the reference reports no DTS",
+      "documented": "crates/isobmff/README.md#container-reader",
       "clause": "ETSI TS 103 491 V1.2.1 §§B.2.2 and F.2.3: dtsx is DTS-UHD profile 2 and its entry carries udts, distinct from the DTS-HD coding names in ETSI TS 102 114 V1.6.1 Table E-1: both answers say the entry is no DTS core, and no clause decides between refused and not recognised",
       "candidate": "refuses the unsupported DTS-UHD tag for core playback",
       "reference": "reports no DTS codec classification for the fixture",
@@ -252,16 +265,8 @@
       ]
     },
     {
-      "reading": "MPEG-4 object type AA declares a DTS core and extension",
-      "clause": "MP4 Registration Authority, Object Types table (A9–AC): AA denotes the core plus extension substream",
-      "candidate": "reports eligibility for core inspection and 48000 Hz from the sample entry",
-      "reference": "reports no DTS codec classification and no DTS clock",
-      "cases": [
-        "mp4a-object-aa"
-      ]
-    },
-    {
-      "reading": "The core check refuses object types 0xAB and 0xAC: DTS extension substreams without a core are not implemented",
+      "feature": "The core check refuses object types 0xAB and 0xAC: DTS extension substreams without a core are not implemented",
+      "documented": "crates/isobmff/README.md#container-reader",
       "clause": "MP4 Registration Authority, Object Types table (A9–AC): AB declares an XLL-only extension and AC declares an LBR-only extension; ETSI TS 102 114 V1.6.1 clause 7.2 allows a stream of extension substreams alone, so the input is valid; both sides decline it, and no clause decides between refused and not recognised",
       "candidate": "reports unsupported core signalling for both known extension-only object types",
       "reference": "reports no DTS codec classification for either",

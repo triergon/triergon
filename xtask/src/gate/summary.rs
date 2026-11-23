@@ -11,8 +11,9 @@ use super::{Item, Placement, R, SHARD, Step, select, shards};
 
 /// Placeholder for the host output directory in summary command templates.
 pub(super) const SUMMARY_OUTPUT: &str = "OUT";
-/// Whether a grade step's only failures are the contract's listed open cases: its
-/// log reports N of M cases passing and M - N open failures, as listed.
+/// Whether a grade step's only failures are the cases the contract lists: its log
+/// reports N of M cases passing and M - N that differ as listed (in a run recorded
+/// before the registry's forms, M - N open failures, as listed).
 pub(super) fn only_open_cases(record: &Value) -> bool {
     let lines: Vec<&str> = record
         .get("outcome")
@@ -33,11 +34,10 @@ pub(super) fn only_open_cases(record: &Value) -> bool {
         }
     });
     let open = lines.iter().find_map(|line| {
-        line[..line.find(" open failures, as listed")?]
-            .split_whitespace()
-            .last()?
-            .parse::<usize>()
-            .ok()
+        let end = line
+            .find(" cases differ as listed")
+            .or_else(|| line.find(" open failures, as listed"))?;
+        line[..end].split_whitespace().last()?.parse::<usize>().ok()
     });
     matches!((passing, open), (Some((passed, total)), Some(open)) if passed + open == total)
 }

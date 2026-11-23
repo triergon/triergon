@@ -420,233 +420,99 @@
     {
       "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 (PCR fields and 0xFF adaptation stuffing_byte)",
+      "class": "unsupported",
       "detail": "rejected clock is not the sole checked source fault",
       "cases": [
-        {
-          "id": "pcr-and-stuffing",
-          "sha256": "19d64784c4e568ac55ef9ebf356c449f42bbf88f646e7bc9bb9dadbb82bfb403",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "pcr-and-stuffing"
       ]
     },
     {
       "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault",
       "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 (scrambling with PTS_DTS_flags 01)",
+      "class": "unsupported",
       "detail": "selected diagnostic additional header fault/context",
       "cases": [
-        {
-          "id": "scrambling-and-forbidden",
-          "sha256": "53560589d001f9fe832bd39ca2f8ef72a693d8311e13d0ae57c2b288298daa7e",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "scrambling-and-forbidden"
       ]
     },
     {
       "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault; PesFaultPolicy covers the PTS-only prefix 0010 alone",
       "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 Table 2-21 (TEI with a zero marker bit; PTS prefix 0011 with PTS_DTS_flags 10)",
+      "class": "unsupported",
       "detail": "selected diagnostic additional timestamp fault/prefix",
       "cases": [
-        {
-          "id": "tei-and-marker",
-          "sha256": "88a2c37019f0004a4daddcecb4df19cdae452ba10b5041127e8817a37c3f8212",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "wrong-time-prefix",
-          "sha256": "4530c5c14e6880fbfda05e3c3529e69ab003f1da1a231004f286a0e612c95057",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "tei-and-marker",
+        "wrong-time-prefix"
       ]
     },
     {
       "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 (TEI and scrambling in one carrier)",
+      "class": "unsupported",
       "detail": "selected diagnostic additional transport fault/context",
       "cases": [
-        {
-          "id": "tei-and-scrambling",
-          "sha256": "5f2ef7c050e7bd9e423cff5ad38596310f526c467790683b29125640c4ca7141",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "tei-and-scrambling"
       ]
     },
     {
       "reason": "compat::pes::TransportFaultRecovery recovers only a complete finite PES",
       "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 (TEI and a finite PES that ends early)",
+      "class": "unsupported",
       "detail": "selected incomplete/unbounded finite PES unobserved",
       "cases": [
-        {
-          "id": "tei-incomplete-finite",
-          "sha256": "da89950f20f28df410d204be495f0ca50ec04b3fa67bd0859b08151b10d1b5aa",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "tei-incomplete-finite"
       ]
     },
     {
       "reason": "The fault adapter is scoped to AVC; its registered AVC carriage refuses the AAC route",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 Table 2-34 (stream type 0x0f) and \u00a72.4.3.7 (PES_packet_length 0 for audio)",
+      "class": "invalid",
       "detail": "invalid data: registered PES carriage disagrees with the PMT stream type",
       "cases": [
-        {
-          "id": "pes-audio-zero-length-invalid",
-          "sha256": "e3faae845ad4399024785e8a975a67f2953fccf27c3788dba706cdc4da335af4",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "pes-audio-zero-length-invalid"
       ]
     },
     {
       "reason": "TransportTailConfirmation confirms a terminal transport fault only at the physical end",
       "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.2 and 2.4.3.3 (packet geometry and sync_byte)",
+      "class": "unsupported",
       "detail": "source boundary confirmation required",
       "cases": [
-        {
-          "id": "valid-transport-sync-loss-then-valid",
-          "sha256": "16986950a3ca49e38f277108c03a42dfc73176fce55743cb828e7161a3dc013e",
-          "candidate": {
-            "packets": 3,
-            "bytes": 41,
-            "digest": 301763614231778750
-          }
-        }
+        "valid-transport-sync-loss-then-valid"
       ]
     },
     {
       "reason": "MalformedInputCompletion confirms a zero-packet outcome only when every carrier is classified; these inputs hold payload no selected PMT routes",
       "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.4.3 to 2.4.4.10 (PSI sections and program membership)",
+      "class": "unsupported",
       "detail": "malformed completion has unproved packet work",
       "cases": [
-        {
-          "id": "inactive-pat-then-unrouted-pes",
-          "sha256": "33af9e70a2f08e48e4b730618aaf6fd1e23db95d8dc11523301ec341a2e476ca",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "pes-on-declared-pmt-pid",
-          "sha256": "a76ee3c7bc186ca8c35d87385bca0e98d2454c855ed9782f26fddcd3054947d0",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "physical-truncated-tail",
-          "sha256": "75e936a5a331222dc208e0c2d1a5c1cf0070fbad96cf56fee6e674ad94254c39",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "pmt-control-truncated-section",
-          "sha256": "a5862356a79f9b9c78272b2597888a4c121ff103f0b7b509cf99e94ea4352725",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "tei-rejected-control",
-          "sha256": "c828522c81c4ec9022d5682ecb4eb35c78e75dec4ea905cf25f9c4556c950de1",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "unanchored-pmt-control",
-          "sha256": "e1caa6e1642d406fed46fc937f789a5f0d2c8567233082ec5beb8392af4146f0",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "unknown-pid-continuation-after-control",
-          "sha256": "e76bd798b25dcb807947abc329f1e041a30ffb3774b6377a9976c178f1bba8dc",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "unknown-pid-pes-after-pat-control",
-          "sha256": "6999ce34811696d772473c1da0ec4c7398fcef3ed04b5c8926e9c52efed4c15b",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "inactive-pat-then-unrouted-pes",
+        "pes-on-declared-pmt-pid",
+        "physical-truncated-tail",
+        "pmt-control-truncated-section",
+        "tei-rejected-control",
+        "unanchored-pmt-control",
+        "unknown-pid-continuation-after-control",
+        "unknown-pid-pes-after-pat-control"
       ]
     },
     {
       "reason": "InputBootstrap refuses an entity on which both packet grids are plausible",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 (TS188) beside the four-byte M2TS prefix",
+      "class": "unsupported",
       "detail": "PES startup found a competing packet sync grid",
       "cases": [
-        {
-          "id": "false188-7",
-          "sha256": "3fa695e493bb41050dff90ddb0cdf2d2006e25d1b7a617064326f0ad7a0fd569",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "false188-7"
       ]
     },
     {
       "reason": "InputBootstrap admits a finite entity only on one sync grid",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 places sync_byte 0x47 at every packet start; the finite input binding checks every carrier",
+      "class": "unsupported",
       "detail": "PES startup found missing sync bytes on the expected packet grid",
       "cases": [
-        {
-          "id": "seventh-sync-zero",
-          "sha256": "a29993fe31a1bf18c7b208862a19e8ce1de20ba50a00bc30479d5402e3d0857d",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "seventh-sync-zero"
       ]
     }
   ]

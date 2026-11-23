@@ -18995,12 +18995,16 @@
         "raw-282-avc-80x48-h264-377",
         "raw-282-avc-80x48-h264-389"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "No standard decides how many bytes identify Matroska; our rule selects it from the EBML header ID, the reference names no format from these bytes",
-      "clause": "RFC 8794 \u00a7\u00a77 and 11.2 reserve the EBML header ID 0x1A45DFA3 and RFC 9559 \u00a74 identifies Matroska by the header's DocType; neither says what a probe answers from 4, 8 or 32 bytes. Our rule: triergon_core::signature::select, described in crates/triergon/README.md (Behaviour and limits).",
-      "candidate": "Selects Matroska from the ID and replays the 4 or 8 bytes.",
-      "reference": "The opener names no format for the 4- or 8-byte stream.",
+      "policy": "Whether a probe names Matroska from the EBML header ID alone, before the DocType that identifies it",
+      "undecided": "RFC 8794 \u00a7\u00a77 and 11.2 reserve the EBML header ID 0x1A45DFA3 and RFC 9559 \u00a74 identifies Matroska by the header's DocType; neither says what a probe answers from 4, 8 or 32 bytes.",
+      "rule": "Selects Matroska from the ID and replays the 4 or 8 bytes.",
+      "documented": "crates/triergon/README.md#behaviour-and-limits",
+      "reference_rule": "The opener names no format for the 4- or 8-byte stream.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "playback-226-damaged-lace-before-valid-anchor-mkv-4",
         "playback-226-damaged-lace-before-valid-anchor-mkv-8",
@@ -19125,10 +19129,12 @@
       ]
     },
     {
-      "reading": "No standard decides whether a probe searches for a transport grid that does not start the source; ours does not, the reference's opener finds it",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 starts every packet of a transport stream with sync_byte 0x47; these inputs put other bytes before the first packet, so they are not conforming streams. Our rule: triergon_core::signature::select, a grid from byte 0 or byte 4 only (crates/triergon/README.md, triergon_playback::probe::SELECTION).",
-      "candidate": "Names no format: no sync grid starts at byte 0 or byte 4.",
-      "reference": "The opener finds the packets after the other bytes and selects MPEG-TS (score 2).",
+      "policy": "Whether a probe searches for a transport grid that does not start the source",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 starts every packet of a transport stream with sync_byte 0x47; these inputs put other bytes before the first packet, so they are not conforming streams.",
+      "rule": "Names no format: no sync grid starts at byte 0 or byte 4.",
+      "documented": "triergon_playback::probe::SELECTION",
+      "reference_rule": "The opener finds the packets after the other bytes and selects MPEG-TS (score 2).",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "playback-350-ts188-junk-1-ts-2048",
         "playback-350-ts188-junk-1-ts-377",
@@ -19173,10 +19179,12 @@
       ]
     },
     {
-      "reading": "No standard decides whether a player opens a file whose first box is moof; playback does not, the reference's opener reads it as MOV",
-      "clause": "ISO/IEC 14496-12:2015 \u00a78.8.4 defines moof as a fragment of a movie whose moov comes first; this input carries a file-type payload under a moof type, then moov and mdat. Our rule: triergon_playback::probe::SELECTION (a movie opens with ftyp, styp, moov, free, wide or mdat).",
-      "candidate": "Refuses the source: no signature selects Matroska, MP4 or MPEG-TS.",
-      "reference": "The opener selects MOV (score 100) and every byte reads back.",
+      "policy": "Whether a player opens a file whose first box is moof",
+      "undecided": "ISO/IEC 14496-12:2015 \u00a78.8.4 defines moof as a fragment of a movie whose moov comes first; this input carries a file-type payload under a moof type, then moov and mdat.",
+      "rule": "Refuses the source: no signature selects Matroska, MP4 or MPEG-TS.",
+      "documented": "triergon_playback::probe::SELECTION",
+      "reference_rule": "The opener selects MOV (score 100) and every byte reads back.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "playback-349-moof-first-mp4-188",
         "playback-349-moof-first-mp4-2048",

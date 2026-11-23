@@ -26,6 +26,7 @@ pub mod parity;
 pub mod policy;
 pub mod preflight;
 pub mod provenance;
+pub mod registry;
 pub mod report;
 pub mod reuse;
 pub mod screen;

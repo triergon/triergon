@@ -44,6 +44,18 @@ impl Run<'_> {
         self.exec(self.candidate, op, extra)
     }
 
+    /// The candidate's trace output for `op`, when the run finished with status 0.
+    fn trace(&self, op: &str, extra: &[OsString]) -> Option<String> {
+        let mut argv = vec![
+            self.candidate.as_os_str().to_owned(),
+            op.into(),
+            self.input.as_os_str().to_owned(),
+        ];
+        argv.extend_from_slice(extra);
+        let finished = worker::run(&argv, &[], self.timeout).ok()??;
+        (finished.code == 0).then(|| String::from_utf8_lossy(&finished.stdout).into_owned())
+    }
+
     fn write(&self, name: &str, value: &Value) -> Result<(), String> {
         json::write(&self.raw.join(format!("{name}.json")), value)
     }
@@ -728,8 +740,8 @@ pub fn seek_parity(
 /// (`pinned_per_target`), on a case whose pin for this target carries the same
 /// flag; elsewhere the case fails as `host-dependent-reference`.
 ///
-/// `deviation` is set for a case of `open_deviations`; see [`judge_deviation`].
-#[allow(clippy::too_many_arguments)] // One case's comparison as the report describes it.
+/// `listing` is set for a case the registry lists; see [`judge_listed`] and, for a
+/// case that compares nothing of the reference, [`candidate_only`].
 pub(super) fn feed_parity(
     run: &Run<'_>,
     prefixes: (&str, &str),
@@ -737,60 +749,43 @@ pub(super) fn feed_parity(
     expected: &Value,
     work_fields: &[String],
     per_target: bool,
-    refusal: Option<&super::fold_refusal::Refusal<'_>>,
-    deviation: Option<Deviation<'_>>,
+    listing: Option<Listing<'_>>,
 ) -> Result<Value, String> {
     let (prefix, reference_prefix) = prefixes;
     let mode = format!("{prefix}fold");
-    let left = if refusal.is_some() {
-        let mut arguments = arguments.to_vec();
-        arguments.push(super::fold_refusal::REQUEST.into());
-        run.candidate(&mode, &arguments)
-    } else {
-        run.candidate(&mode, arguments)
+    let named = listing
+        .as_ref()
+        .and_then(|listing| listing.case.named.as_ref());
+    let left = match named {
+        Some(named) if !named.trace => {
+            let mut arguments = arguments.to_vec();
+            arguments.push(super::fold_refusal::REQUEST.into());
+            run.candidate(&mode, &arguments)
+        }
+        _ => run.candidate(&mode, arguments),
     };
-    let right = run.exec(run.reference, &format!("{reference_prefix}fold"), arguments);
-    let unpinned_reference = refusal.is_some_and(|spec| !spec.compares_reference());
-    let expected = if unpinned_reference {
-        &Value::Null
-    } else {
-        expected
+    let trace = match named {
+        Some(named) if named.trace => run.trace(&format!("{prefix}trace"), arguments),
+        _ => None,
     };
-    let mut result = feed_result(&left, &right, expected, work_fields, per_target);
-    if let Some(deviation) = deviation {
-        judge_deviation(&mut result, (&left, &right), expected, deviation.candidate);
+    if let Some(listing) = listing
+        .as_ref()
+        .filter(|listing| listing.case.candidate_only)
+    {
+        let result = candidate_only(listing, &left, trace.as_deref(), work_fields);
+        run.write(&mode, &Value::object([("candidate", left)]))?;
+        return Ok(result);
     }
-    if let Some(refusal) = refusal {
-        let proof = refusal.proof(&left, &right, expected, work_fields);
-        set(&mut result, "status", status_of(proof.is_some()));
-        set(
+    let right = run.exec(run.reference, &format!("{reference_prefix}fold"), arguments);
+    let mut result = feed_result(&left, &right, expected, work_fields, per_target);
+    if let Some(listing) = &listing {
+        judge_listed(
             &mut result,
-            "source_timing_status",
-            status_of(proof.is_some()),
+            (&left, &right),
+            expected,
+            listing,
+            trace.as_deref(),
         );
-        if unpinned_reference {
-            let reason = if proof.is_some() {
-                "reference fold not compared on this target"
-            } else {
-                "registered refusal evidence changed. Reference fold not compared on this target"
-            };
-            set(&mut result, "reference_comparison", Value::str("unpinned"));
-            set(&mut result, "reason", Value::str(reason));
-        }
-        if let Some(proof) = proof {
-            set(
-                &mut result,
-                "comparison",
-                Value::str(super::fold_refusal::COMPARISON),
-            );
-            set(&mut result, "refusal_proof", proof);
-        } else if !unpinned_reference {
-            set(
-                &mut result,
-                "reason",
-                Value::str("registered refusal evidence changed"),
-            );
-        }
     }
     run.write(
         &mode,
@@ -799,29 +794,98 @@ pub(super) fn feed_parity(
     Ok(result)
 }
 
-/// A case of `open_deviations`.
-pub(super) struct Deviation<'a> {
-    /// The candidate's pinned fold, the case's `candidate_expected`, when recorded.
+/// A case the registry lists, with the candidate's pinned fold when it is recorded.
+pub(super) struct Listing<'a> {
+    /// How the registry files the case.
+    pub(super) case: &'a super::registry::Case,
+    /// The candidate's pinned fold: the case's `candidate_expected`.
     pub(super) candidate: Option<&'a Value>,
 }
 
-/// The verdict on a case of `open_deviations` from its two runs (`runs`: the
-/// candidate's and the reference's outcome) and the parity `result` already made of
-/// them. A deviation is registered between two outputs, so it holds
-/// ([`super::report::DEVIATION`]) only when both workers ran to the end of the input
-/// and each side's fold equals its pin: the reference's `expected` and the
-/// candidate's `candidate_pin`. A run that exited with an error, timed out or did
-/// not finish never satisfies it ([`super::report::DEVIATION_RUN_FAILED`]); a fold
-/// that differs from its pin is [`super::report::DEVIATION_CHANGED`]; a case with no
-/// candidate pin is reported as [`super::report::DEVIATION_UNPINNED`]. A passing
-/// case keeps its status, so the report asks for its removal from the list.
-fn judge_deviation(
+impl Listing<'_> {
+    /// What every row of a listed case records: the lists that name it and the
+    /// candidate's pin.
+    fn annotate(&self, result: &mut Value) {
+        set(result, "listed", Value::strings(self.case.lists()));
+        set(
+            result,
+            "candidate_expected",
+            self.candidate.cloned().unwrap_or(Value::Null),
+        );
+    }
+}
+
+/// The parity of a listed case that compares nothing of the reference, from the
+/// candidate's run alone ([`super::fold_refusal::proof`]): a refusal the
+/// specification justifies passes as a registered refusal; a feature neither side
+/// implements holds as [`super::report::LISTED`], which is no pass. A proof that
+/// fails is a mismatch.
+fn candidate_only(
+    listing: &Listing<'_>,
+    left: &Value,
+    trace: Option<&str>,
+    work_fields: &[String],
+) -> Value {
+    use super::fold_refusal::{CANDIDATE_ONLY, COMPARISON, proof};
+    let refusal = listing.case.refusal();
+    let proof = proof(listing.case, listing.candidate, left, trace, work_fields);
+    let status = match (&proof, refusal) {
+        (Some(_), true) => "pass",
+        (Some(_), false) => super::report::LISTED,
+        (None, _) if listing.candidate.is_none() => super::report::LISTED_UNPINNED,
+        (None, _) => "mismatch",
+    };
+    let mut result = Value::object([
+        ("status", Value::str(status)),
+        ("source_timing_status", Value::str(status)),
+        ("expected", Value::Null),
+        (
+            "candidate",
+            super::comparison::work_summary(data(left), work_fields).unwrap_or(Value::Null),
+        ),
+        ("reference", Value::Null),
+        ("reference_comparison", Value::str("none")),
+        (
+            "comparison",
+            Value::str(if refusal { COMPARISON } else { CANDIDATE_ONLY }),
+        ),
+    ]);
+    match proof {
+        Some(proof) => set(&mut result, "refusal_proof", proof),
+        None => set(
+            &mut result,
+            "reason",
+            Value::str(if listing.candidate.is_none() {
+                "no candidate_expected: the candidate's fold up to the refusal is not pinned"
+            } else {
+                "the candidate's fold or the detail it names differs from the registry"
+            }),
+        ),
+    }
+    listing.annotate(&mut result);
+    result
+}
+
+/// The verdict on a listed case from its two runs (`runs`: the candidate's and the
+/// reference's outcome) and the parity `result` already made of them. Whatever its
+/// form, a listed difference is registered between two outputs, so it holds
+/// ([`super::report::LISTED`]) only when both workers ran to the end of the input,
+/// each side's fold equals its pin (the reference's `expected` and the candidate's
+/// `candidate_expected`) and the candidate names the entry's detail when it has
+/// one. A run that exited with an error, timed out or did not finish never
+/// satisfies it ([`super::report::LISTED_RUN_FAILED`]); a fold off its pin or an
+/// unnamed detail is [`super::report::LISTED_CHANGED`]; a case with no candidate
+/// pin is [`super::report::LISTED_UNPINNED`]. A passing case keeps its status, so
+/// the report asks for its removal from its lists.
+fn judge_listed(
     result: &mut Value,
     (left, right): (&Value, &Value),
     expected: &Value,
-    candidate_pin: Option<&Value>,
+    listing: &Listing<'_>,
+    trace: Option<&str>,
 ) {
-    use super::report::{DEVIATION, DEVIATION_CHANGED, DEVIATION_RUN_FAILED, DEVIATION_UNPINNED};
+    use super::report::{LISTED, LISTED_CHANGED, LISTED_RUN_FAILED, LISTED_UNPINNED};
+    listing.annotate(result);
     // A pass is reported for removal; a host-dependent reference fails on its own.
     if matches!(status(result), "pass" | "host-dependent-reference") {
         return;
@@ -833,30 +897,40 @@ fn judge_deviation(
         members.retain(|(key, _)| key != crate::generators::HOST_DEPENDENT && key != "eof");
     }
     let side = |key: &str| result.get(key).cloned().unwrap_or(Value::Null);
+    let named = listing
+        .case
+        .named
+        .as_ref()
+        .is_none_or(|named| super::fold_refusal::names(named, data(left), trace));
     let (status, reason) = if !finished(left) || !finished(right) {
         (
-            DEVIATION_RUN_FAILED,
-            "a worker exited with an error or did not finish; a registered deviation \
-             holds only between two complete runs",
+            LISTED_RUN_FAILED,
+            "a worker exited with an error or did not finish; a listed difference holds \
+             only between two complete runs",
         )
-    } else if let Some(pin) = candidate_pin {
-        if super::diff::equal(&side("candidate"), pin)
-            && super::diff::equal(&side("reference"), &pinned)
+    } else if let Some(pin) = listing.candidate {
+        if !super::diff::equal(&side("candidate"), pin)
+            || !super::diff::equal(&side("reference"), &pinned)
         {
             (
-                DEVIATION,
-                "both folds equal their pins, as the deviation registers them",
+                LISTED_CHANGED,
+                "the candidate's or the reference's fold differs from its pin",
+            )
+        } else if !named {
+            (
+                LISTED_CHANGED,
+                "the candidate does not name the detail its entry registers",
             )
         } else {
             (
-                DEVIATION_CHANGED,
-                "the candidate's or the reference's fold differs from its pin",
+                LISTED,
+                "both folds equal their pins, as the registry lists the case",
             )
         }
     } else {
         (
-            DEVIATION_UNPINNED,
-            "no candidate_expected: the deviation pins the reference's fold only",
+            LISTED_UNPINNED,
+            "no candidate_expected: the registry pins the reference's fold only",
         )
     };
     set(result, "status", Value::str(status));
@@ -1026,22 +1100,45 @@ mod feed_tests {
         ])
     }
 
-    /// The verdict on a deviating case whose candidate gave `left` and reference
-    /// `right`, against the reference pin of one packet and `candidate_pin`.
-    fn deviation(left: &Value, right: &Value, candidate_pin: Option<&Value>) -> Value {
+    /// The verdict on a listed case whose candidate gave `left` and reference
+    /// `right`, against the reference pin of one packet and `candidate_pin`; the
+    /// entry registers `detail` when it has one.
+    fn listed(
+        left: &Value,
+        right: &Value,
+        candidate_pin: Option<&Value>,
+        detail: Option<&str>,
+    ) -> Value {
+        use crate::harness::registry::{Case, Form, Named};
         let Value::Object(mut expected) = work(1) else {
             unreachable!()
         };
         expected.push(("eof".into(), Value::Bool(true)));
         let expected = Value::Object(expected);
+        let case = Case {
+            forms: vec![Form::Policy],
+            named: detail.map(|detail| Named {
+                detail: detail.into(),
+                trace: false,
+            }),
+            ..Case::default()
+        };
+        let listing = Listing {
+            case: &case,
+            candidate: candidate_pin,
+        };
         let mut result = feed_result(left, right, &expected, &[], false);
-        judge_deviation(&mut result, (left, right), &expected, candidate_pin);
+        judge_listed(&mut result, (left, right), &expected, &listing, None);
+        assert_eq!(
+            result.get("listed"),
+            Some(&Value::strings(["open_policies"]))
+        );
         result.get("status").cloned().unwrap_or(Value::Null)
     }
 
     #[test]
-    fn a_worker_that_exits_with_an_error_never_satisfies_a_deviation() {
-        use crate::harness::report::DEVIATION_RUN_FAILED;
+    fn a_worker_that_exits_with_an_error_never_satisfies_a_listing() {
+        use crate::harness::report::LISTED_RUN_FAILED;
         let failed = Value::object([
             ("status", Value::str("worker-error")),
             ("exit_code", Value::int(1)),
@@ -1058,35 +1155,115 @@ mod feed_tests {
         for (left, right) in [(&failed, &one), (&two, &failed), (&unfinished, &one)] {
             for pin in [Some(&work(2)), None] {
                 assert_eq!(
-                    deviation(left, right, pin),
-                    Value::str(DEVIATION_RUN_FAILED)
+                    listed(left, right, pin, None),
+                    Value::str(LISTED_RUN_FAILED)
                 );
             }
         }
     }
 
     #[test]
-    fn a_deviation_holds_only_while_both_sides_give_their_pins() {
-        use crate::harness::report::{DEVIATION, DEVIATION_CHANGED, DEVIATION_UNPINNED};
+    fn a_listed_case_holds_only_while_both_sides_give_their_pins() {
+        use crate::harness::report::{LISTED, LISTED_CHANGED, LISTED_UNPINNED};
         let ran = |packets| outcome(&work(packets));
         let pin = work(2);
         assert_eq!(
-            deviation(&ran(2), &ran(1), Some(&pin)),
-            Value::str(DEVIATION)
+            listed(&ran(2), &ran(1), Some(&pin), None),
+            Value::str(LISTED)
         );
         // The candidate moved from its pin, or the reference from its own.
         for (left, right) in [(ran(3), ran(1)), (ran(2), ran(4))] {
             assert_eq!(
-                deviation(&left, &right, Some(&pin)),
-                Value::str(DEVIATION_CHANGED)
+                listed(&left, &right, Some(&pin), None),
+                Value::str(LISTED_CHANGED)
             );
         }
         assert_eq!(
-            deviation(&ran(2), &ran(1), None),
-            Value::str(DEVIATION_UNPINNED)
+            listed(&ran(2), &ran(1), None, None),
+            Value::str(LISTED_UNPINNED)
         );
         // Agreement passes, and the report asks for the entry's removal.
-        assert_eq!(deviation(&ran(1), &ran(1), Some(&pin)), Value::str("pass"));
+        assert_eq!(
+            listed(&ran(1), &ran(1), Some(&pin), None),
+            Value::str("pass")
+        );
+    }
+
+    #[test]
+    fn a_listed_case_with_a_detail_holds_only_while_the_candidate_names_it() {
+        use crate::harness::report::{LISTED, LISTED_CHANGED};
+        let pin = work(2);
+        let naming = |detail: &str| {
+            let mut work = work(2);
+            super::super::validation::put(&mut work, "unsupported", Value::str(detail)).unwrap();
+            outcome(&work)
+        };
+        let reference = outcome(&work(1));
+        assert_eq!(
+            listed(
+                &naming("bit depth > 8"),
+                &reference,
+                Some(&pin),
+                Some("bit depth > 8")
+            ),
+            Value::str(LISTED)
+        );
+        for left in [naming("chroma 4:2:2"), outcome(&work(2))] {
+            assert_eq!(
+                listed(&left, &reference, Some(&pin), Some("bit depth > 8")),
+                Value::str(LISTED_CHANGED)
+            );
+        }
+    }
+
+    #[test]
+    fn a_case_that_compares_no_reference_is_judged_by_the_candidate_alone() {
+        use crate::harness::registry::{Case, Form, Named};
+        use crate::harness::report::{LISTED, LISTED_UNPINNED};
+        let pin = work(2);
+        let mut named = work(2);
+        super::super::validation::put(&mut named, "unsupported", Value::str("slice groups"))
+            .unwrap();
+        let left = outcome(&named);
+        let case = |form| Case {
+            forms: vec![form],
+            named: Some(Named {
+                detail: "slice groups".into(),
+                trace: false,
+            }),
+            candidate_only: true,
+            unpinned: false,
+        };
+        let status = |case: &Case, left: &Value, pin: Option<&Value>| {
+            let listing = Listing {
+                case,
+                candidate: pin,
+            };
+            let result = candidate_only(&listing, left, None, &[]);
+            assert_eq!(result.get("reference"), Some(&Value::Null));
+            assert_eq!(result.get("expected"), Some(&Value::Null));
+            result.get("status").cloned().unwrap_or(Value::Null)
+        };
+        // A justified refusal passes as a registered refusal; a feature neither side
+        // implements holds as listed, which is no pass.
+        assert_eq!(
+            status(&case(Form::Refusal), &left, Some(&pin)),
+            Value::str("pass")
+        );
+        assert_eq!(
+            status(&case(Form::Unimplemented), &left, Some(&pin)),
+            Value::str(LISTED)
+        );
+        for form in [Form::Refusal, Form::Unimplemented] {
+            assert_eq!(
+                status(&case(form), &outcome(&work(3)), Some(&pin)),
+                Value::str("mismatch")
+            );
+            assert_eq!(
+                status(&case(form), &left, None),
+                Value::str(LISTED_UNPINNED)
+            );
+        }
     }
 
     #[test]

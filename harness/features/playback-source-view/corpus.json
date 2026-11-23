@@ -120,6 +120,11 @@
         "packets": 15,
         "bytes": 262,
         "digest": 5514132299722156667
+      },
+      "candidate_expected": {
+        "packets": 15,
+        "bytes": 262,
+        "digest": 3835553331160063023
       }
     },
     {
@@ -210,6 +215,11 @@
         "packets": 15,
         "bytes": 262,
         "digest": 6465897929216377559
+      },
+      "candidate_expected": {
+        "packets": 15,
+        "bytes": 262,
+        "digest": 15639630954509255883
       }
     },
     {
@@ -675,6 +685,11 @@
         "packets": 6,
         "bytes": 1713,
         "digest": 4921800643535295238
+      },
+      "candidate_expected": {
+        "packets": 5,
+        "bytes": 1662,
+        "digest": 12893178934198263209
       }
     },
     {
@@ -795,6 +810,11 @@
         "packets": 14,
         "bytes": 1929,
         "digest": 4881584205605038775
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 1929,
+        "digest": 3015654973908781967
       }
     },
     {
@@ -810,6 +830,11 @@
         "packets": 14,
         "bytes": 1902,
         "digest": 14563600927535536216
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 1902,
+        "digest": 318620300584891096
       }
     },
     {
@@ -825,6 +850,11 @@
         "packets": 14,
         "bytes": 1937,
         "digest": 17135392260851043558
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 1937,
+        "digest": 14308341347371749330
       }
     },
     {
@@ -840,6 +870,11 @@
         "packets": 105,
         "bytes": 13088,
         "digest": 2571574113466733035
+      },
+      "candidate_expected": {
+        "packets": 105,
+        "bytes": 13088,
+        "digest": 9649099587300746749
       }
     },
     {
@@ -855,6 +890,11 @@
         "packets": 16,
         "bytes": 2003,
         "digest": 8398276900219891779
+      },
+      "candidate_expected": {
+        "packets": 16,
+        "bytes": 2003,
+        "digest": 12738959149813306563
       }
     },
     {
@@ -885,6 +925,11 @@
         "packets": 14,
         "bytes": 3505,
         "digest": 11318278898236679869
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 3505,
+        "digest": 11304676656242558221
       }
     },
     {
@@ -900,6 +945,11 @@
         "packets": 14,
         "bytes": 3506,
         "digest": 15223277300718053299
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 3506,
+        "digest": 1203848245988310135
       }
     },
     {
@@ -915,6 +965,11 @@
         "packets": 14,
         "bytes": 3525,
         "digest": 10587637987846406402
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 3525,
+        "digest": 10390101534961531482
       }
     },
     {
@@ -930,6 +985,11 @@
         "packets": 56,
         "bytes": 42589,
         "digest": 17663065643263618940
+      },
+      "candidate_expected": {
+        "packets": 56,
+        "bytes": 42589,
+        "digest": 7421670242316070258
       }
     },
     {
@@ -945,6 +1005,11 @@
         "packets": 14,
         "bytes": 3506,
         "digest": 10693992490488052019
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 3506,
+        "digest": 8956424303933925171
       }
     },
     {
@@ -960,6 +1025,11 @@
         "packets": 8,
         "bytes": 2110,
         "digest": 14627289102836837134
+      },
+      "candidate_expected": {
+        "packets": 8,
+        "bytes": 2110,
+        "digest": 9040692932266365090
       }
     },
     {
@@ -975,6 +1045,11 @@
         "packets": 14,
         "bytes": 3516,
         "digest": 4117395403535969007
+      },
+      "candidate_expected": {
+        "packets": 14,
+        "bytes": 3516,
+        "digest": 2379827216981842159
       }
     },
     {
@@ -990,6 +1065,11 @@
         "packets": 66,
         "bytes": 31163,
         "digest": 6179951825579115549
+      },
+      "candidate_expected": {
+        "packets": 66,
+        "bytes": 31163,
+        "digest": 4677638252674212409
       }
     },
     {
@@ -1005,6 +1085,11 @@
         "packets": 66,
         "bytes": 25141,
         "digest": 4862214113938814175
+      },
+      "candidate_expected": {
+        "packets": 66,
+        "bytes": 25141,
+        "digest": 7605877899374989939
       }
     },
     {
@@ -1020,6 +1105,11 @@
         "packets": 66,
         "bytes": 25141,
         "digest": 16424324983208576095
+      },
+      "candidate_expected": {
+        "packets": 66,
+        "bytes": 25141,
+        "digest": 4354324239244774111
       }
     },
     {
@@ -1035,6 +1125,11 @@
         "packets": 66,
         "bytes": 25141,
         "digest": 4862214113938814175
+      },
+      "candidate_expected": {
+        "packets": 66,
+        "bytes": 25141,
+        "digest": 7605877899374989939
       }
     },
     {
@@ -1067,6 +1162,11 @@
         "packets": 5,
         "bytes": 63,
         "digest": 9601810493354388200
+      },
+      "candidate_expected": {
+        "packets": 4,
+        "bytes": 36,
+        "digest": 341883602800470150
       }
     },
     {
@@ -1083,6 +1183,11 @@
         "packets": 7,
         "bytes": 117,
         "digest": 6831214062560157662
+      },
+      "candidate_expected": {
+        "packets": 7,
+        "bytes": 119,
+        "digest": 13891922774085696579
       }
     },
     {
@@ -1099,6 +1204,11 @@
         "packets": 7,
         "bytes": 210,
         "digest": 2218748911582902263
+      },
+      "candidate_expected": {
+        "packets": 7,
+        "bytes": 197,
+        "digest": 7726687908419964061
       }
     },
     {
@@ -1610,6 +1720,11 @@
         "packets": 5,
         "bytes": 126,
         "digest": 10483115591486877622
+      },
+      "candidate_expected": {
+        "packets": 11,
+        "bytes": 162,
+        "digest": 17498647306055950439
       }
     },
     {
@@ -1655,6 +1770,11 @@
         "packets": 3,
         "bytes": 175,
         "digest": 4887636282187126188
+      },
+      "candidate_expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 18123119132272517508
       }
     },
     {
@@ -1700,6 +1820,11 @@
         "packets": 3,
         "bytes": 32,
         "digest": 1527148562105671751
+      },
+      "candidate_expected": {
+        "packets": 2,
+        "bytes": 5,
+        "digest": 18123119132272517508
       }
     },
     {
@@ -1745,6 +1870,11 @@
         "packets": 5,
         "bytes": 63,
         "digest": 9601810493354388200
+      },
+      "candidate_expected": {
+        "packets": 4,
+        "bytes": 36,
+        "digest": 341883602800470150
       }
     },
     {
@@ -1760,6 +1890,11 @@
         "packets": 9,
         "bytes": 264,
         "digest": 18012899988438693564
+      },
+      "candidate_expected": {
+        "packets": 9,
+        "bytes": 251,
+        "digest": 11212127348291688546
       }
     },
     {
@@ -1775,6 +1910,11 @@
         "packets": 7,
         "bytes": 210,
         "digest": 2218748911582902263
+      },
+      "candidate_expected": {
+        "packets": 7,
+        "bytes": 197,
+        "digest": 7726687908419964061
       }
     },
     {

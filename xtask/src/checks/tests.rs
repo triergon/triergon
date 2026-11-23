@@ -273,10 +273,16 @@ fn stated_status(root: &Path) {
         ),
     )
     .unwrap();
-    let page: String = crate::gate::TARGETS
+    let mut page: String = crate::gate::TARGETS
         .iter()
         .map(|target| format!("## {target}\n\n| Area | Runtime | Memory |\n|---|---|---|\n\n"))
         .collect();
+    // The registry of this repository lists no case.
+    page.push_str(&format!("## {}\n\n", crate::status::LISTED));
+    for line in crate::status::listed_table(&[]) {
+        page.push_str(&line);
+        page.push('\n');
+    }
     fs::write(root.join(crate::status::PAGE), page).unwrap();
 }
 

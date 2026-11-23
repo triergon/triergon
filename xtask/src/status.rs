@@ -5,6 +5,9 @@
 //! ([`Measured`]). `cargo xtask check-design` renders them again and fails on any
 //! difference; `cargo xtask status` prints the tables as rendered, or writes them.
 //!
+//! The page's table of listed differences ([`LISTED`]) is rendered from the registry:
+//! per comparison, how many cases each form of [`crate::harness::registry`] lists.
+//!
 //! A row's cells stay as written only while `open_cells` lists the row on that target,
 //! which it may only while every result the row cites predates the measured record (its
 //! index entry records no target): `cargo xtask evidence measure` records the target
@@ -16,6 +19,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::harness::measured::Measured;
+use crate::harness::registry::Form;
 use crate::json::{self, Value};
 
 /// Which results each status row shows, relative to the repository root.
@@ -754,6 +758,231 @@ fn recorded_revisions(set: &Value) -> Vec<&str> {
     revisions
 }
 
+/// The heading of the page's table of listed differences.
+pub const LISTED: &str = "Listed differences";
+
+/// The forms in the order the table shows them.
+const SHOWN: [Form; 5] = [
+    Form::Departure,
+    Form::Policy,
+    Form::Unimplemented,
+    Form::Refusal,
+    Form::Defect,
+];
+
+/// The link a comparison's row shows for registry file `file`, when it is one: a
+/// feature's contract, a container pin file or a codec manifest.
+fn comparison(file: &str) -> Option<String> {
+    let link = |label: String| format!("[{label}](../{file})");
+    if let Some(rest) = file.strip_prefix("harness/features/") {
+        let (id, name) = rest.split_once('/')?;
+        return match name {
+            "contract.json" => Some(link(format!("`{id}`"))),
+            "container-pins.json" => Some(link(format!("`{id}` container seeks"))),
+            _ => None,
+        };
+    }
+    let name = file
+        .strip_prefix("harness/codecs/")?
+        .strip_suffix(".json")?;
+    (!name.contains('/')).then(|| link(format!("`codecs/{name}`")))
+}
+
+/// The cases each form of `document` lists on `target`: per shown form the ids, a
+/// case of two forms in both.
+fn listed_on<'a>(document: &'a Value, target: &str) -> [BTreeSet<&'a str>; 5] {
+    SHOWN.map(|form| {
+        let mut ids = BTreeSet::new();
+        for entry in document
+            .get(form.list())
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            let scoped = strings(entry, "targets");
+            if scoped.is_some_and(|targets| !targets.contains(&target)) {
+                continue;
+            }
+            // An open case names itself; the other forms group their cases.
+            let own = entry
+                .as_str()
+                .or_else(|| text(entry, "id"))
+                .or_else(|| text(entry, "name"));
+            let grouped = entry
+                .get("cases")
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|case| case.as_str().or_else(|| text(case, "id")));
+            match entry.get("cases") {
+                Some(_) => ids.extend(grouped),
+                None => ids.extend(own),
+            }
+        }
+        ids
+    })
+}
+
+/// A count on the gate's targets, AArch64 first: one number where they agree, the
+/// numbers separated by `/` where they differ, nothing where none is listed.
+fn count_cell(counts: &[usize]) -> String {
+    match counts {
+        [first, rest @ ..] if rest.iter().all(|count| count == first) => {
+            if *first == 0 {
+                String::new()
+            } else {
+                first.to_string()
+            }
+        }
+        _ => counts
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join(" / "),
+    }
+}
+
+/// The table of listed differences as the registry files of `data` give it: its
+/// header, one row for each comparison that lists a case, by path, and the totals.
+/// Each row counts the cases of each form, the cases listed at all and, last, the
+/// cases the comparison holds.
+pub fn listed_table(data: &[(String, Value)]) -> Vec<String> {
+    // AArch64 before ARMv7, as the page orders its tables.
+    let mut targets = crate::gate::TARGETS.to_vec();
+    targets.sort_unstable();
+    let mut lines = vec![
+        "| Comparison | departs | policy | unimplemented | refuses | defect | listed | cases |"
+            .to_owned(),
+        "|---|---|---|---|---|---|---|---|".to_owned(),
+    ];
+    let mut totals = vec![[0usize; 6]; targets.len()];
+    let mut total_cases = 0;
+    let mut files: Vec<(&String, &Value)> = data
+        .iter()
+        .filter(|(file, _)| comparison(file).is_some())
+        .map(|(file, document)| (file, document))
+        .collect();
+    files.sort_by(|a, b| a.0.cmp(b.0));
+    for (file, document) in files {
+        let per_target: Vec<[usize; 6]> = targets
+            .iter()
+            .map(|target| {
+                let forms = listed_on(document, target);
+                let all: BTreeSet<&str> = forms.iter().flatten().copied().collect();
+                let mut counts = [0; 6];
+                for (count, ids) in counts.iter_mut().zip(&forms) {
+                    *count = ids.len();
+                }
+                counts[5] = all.len();
+                counts
+            })
+            .collect();
+        if per_target.iter().all(|counts| counts[5] == 0) {
+            continue;
+        }
+        for (total, counts) in totals.iter_mut().zip(&per_target) {
+            for (sum, count) in total.iter_mut().zip(counts) {
+                *sum += count;
+            }
+        }
+        let cases = case_count(data, file, document);
+        total_cases += cases.unwrap_or(0);
+        lines.push(table_row(
+            &comparison(file).unwrap_or_default(),
+            &per_target,
+            cases,
+        ));
+    }
+    lines.push(table_row("**Total**", &totals, Some(total_cases)));
+    lines
+}
+
+/// How many cases the comparison of registry file `file` holds, where the harness
+/// data says: the rows of a feature's manifest or the pins of a generated one, the
+/// pins of a container pin file, the vectors or cases of a codec manifest.
+fn case_count(data: &[(String, Value)], file: &str, document: &Value) -> Option<usize> {
+    let beside = |name: &str| {
+        let (directory, _) = file.rsplit_once('/')?;
+        let path = format!("{directory}/{name}");
+        data.iter()
+            .find(|(other, _)| *other == path)
+            .map(|(_, document)| document)
+    };
+    let len = |value: Option<&Value>| match value? {
+        Value::Array(items) => Some(items.len()),
+        Value::Object(members) => Some(members.len()),
+        _ => None,
+    };
+    if file.ends_with("/contract.json") {
+        len(beside("corpus.json").and_then(|corpus| corpus.get("cases")))
+            .or_else(|| len(beside("pins.json").and_then(|pins| pins.get("pins"))))
+    } else if file.ends_with("/container-pins.json") {
+        len(document.get("pins"))
+    } else {
+        len(document.get("vectors")).or_else(|| len(document.get("cases")))
+    }
+}
+
+fn table_row(label: &str, per_target: &[[usize; 6]], cases: Option<usize>) -> String {
+    let mut cells: Vec<String> = (0..6)
+        .map(|column| {
+            let counts: Vec<usize> = per_target.iter().map(|counts| counts[column]).collect();
+            count_cell(&counts)
+        })
+        .collect();
+    cells.push(cases.map_or_else(String::new, |cases| cases.to_string()));
+    format!("| {label} | {} |", cells.join(" | "))
+}
+
+/// The lines of the page's table of listed differences: the first and one past the
+/// last.
+fn listed_lines(page: &[&str]) -> Result<(usize, usize), String> {
+    let start = page
+        .iter()
+        .position(|line| {
+            let title = line.trim_start_matches('#');
+            title.len() < line.len() && title.trim() == LISTED
+        })
+        .ok_or_else(|| format!("{PAGE}: no heading {LISTED}"))?;
+    let first = (start + 1..page.len())
+        .take_while(|&i| !page[i].starts_with('#'))
+        .find(|&i| page[i].starts_with("| Comparison "))
+        .ok_or_else(|| format!("{PAGE}: no Comparison table under {LISTED}"))?;
+    let end = (first..page.len())
+        .find(|&i| !page[i].starts_with('|'))
+        .unwrap_or(page.len());
+    Ok((first, end))
+}
+
+/// Why the page's table of listed differences is not the one `data` gives.
+fn listed_errors(data: &[(String, Value)], page: &[&str]) -> Vec<String> {
+    match listed_lines(page) {
+        Ok((first, end)) if page[first..end] == listed_table(data) => Vec::new(),
+        Ok(_) => vec![format!(
+            "{PAGE}: the {LISTED} table is not what the registry lists; write it with \
+             `cargo xtask status --write`"
+        )],
+        Err(error) => vec![error],
+    }
+}
+
+/// The registry files under `root`, parsed, by their path from it.
+fn registry_files(root: &Path) -> Result<Vec<(String, Value)>, String> {
+    let mut files = Vec::new();
+    for path in crate::files::walk(&root.join("harness"), &|rel| {
+        rel.extension().is_some_and(|e| e == "json")
+    }) {
+        let rel = path
+            .strip_prefix(root)
+            .map_err(|e| e.to_string())?
+            .display()
+            .to_string();
+        if comparison(&rel).is_some() {
+            files.push((rel, json::read(&path)?));
+        }
+    }
+    Ok(files)
+}
+
 /// Why the page's tables differ from what [`ROWS`] renders from `data`, the parsed
 /// JSON files under `harness/` by their path from the repository root.
 pub fn check(root: &Path, data: &[(String, Value)]) -> Vec<String> {
@@ -774,7 +1003,7 @@ pub fn check(root: &Path, data: &[(String, Value)]) -> Vec<String> {
         Ok(rendered) => rendered,
         Err(errors) => return errors,
     };
-    let mut errors = Vec::new();
+    let mut errors = listed_errors(data, &lines);
     for (table, cells) in &rendered {
         for ((line, written), cell) in table.rows.iter().zip(cells) {
             for (column, shown, name) in cell.cells(table) {
@@ -875,6 +1104,12 @@ pub fn tables(root: &Path, write: bool) -> Result<String, String> {
         }
         printed.push(String::new());
     }
+    let listed = listed_table(&registry_files(root)?);
+    let (first, end) = listed_lines(&lines)?;
+    rewritten.splice(first..end, listed.iter().cloned());
+    printed.push(format!("## {LISTED}\n"));
+    printed.extend(listed);
+    printed.push(String::new());
     if write {
         let mut text = rewritten.join("\n");
         text.push('\n');

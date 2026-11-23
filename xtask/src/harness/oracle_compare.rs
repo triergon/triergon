@@ -305,10 +305,9 @@ pub(crate) fn compare_with_inputs(
             }
         };
         // The oracle comparison pins the reference side only.
-        let parity = if open.is_deviation(case_id) {
-            report::unpinned_deviation(parity)
-        } else {
-            parity
+        let parity = match open.get(case_id) {
+            Some(case) => report::unpinned_listed(parity, case),
+            None => parity,
         };
         rows.push(Value::object([
             ("id", Value::str(case_id)),

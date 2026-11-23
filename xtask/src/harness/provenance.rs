@@ -35,6 +35,8 @@ pub fn shared_inputs(root: &Path) -> Result<Vec<String>, String> {
         "xtask/src/harness/parity.rs",
         "xtask/src/harness/policy.rs",
         "xtask/src/harness/provenance.rs",
+        "xtask/src/harness/fold_refusal.rs",
+        "xtask/src/harness/registry.rs",
         "xtask/src/harness/report.rs",
         "xtask/src/harness/timing.rs",
         "xtask/src/harness/validation.rs",

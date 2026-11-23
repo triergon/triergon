@@ -153,30 +153,36 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "open_deviations": [
+  "open_policies": [
     {
-      "reading": "Triergon refuses a truncated HDR10+ BlockAdditional (recovery policy)",
-      "clause": "RFC 9559 section 5.1.3.5.2 with BlockAddIDType 4 (section 5.1.4.1.17): the BlockAdditional is an ITU-T T.35 HDR10+ message, here cut after 13 bytes, inside its syntax.",
-      "candidate": "Returns the first packet and the affected packet, then refuses with Truncated.",
-      "reference": "Returns the first packet, then reports the end of the stream without the affected packet.",
+      "policy": "Triergon refuses a truncated HDR10+ BlockAdditional",
+      "undecided": "RFC 9559 section 5.1.3.5.2 with BlockAddIDType 4 (section 5.1.4.1.17): the BlockAdditional is an ITU-T T.35 HDR10+ message, here cut after 13 bytes, inside its syntax.",
+      "rule": "Returns the first packet and the affected packet, then refuses with Truncated.",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Returns the first packet, then reports the end of the stream without the affected packet.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "hdr-truncated"
       ]
     },
     {
-      "reading": "Triergon refuses two BlockMore elements with the same effective BlockAddID (recovery policy)",
-      "clause": "RFC 9559 section 5.1.3.5.2.3: each BlockAddID MUST be unique among the BlockMore elements of a BlockAdditions element, and an omitted BlockAddID is 1.",
-      "candidate": "Returns the first packet, then refuses the BlockAdditions that repeats BlockAddID 1 with Invalid.",
-      "reference": "Keeps the last BlockMore (last) and attaches it, with the LCEVC data, to both laces.",
+      "policy": "Triergon refuses two BlockMore elements with the same effective BlockAddID",
+      "undecided": "RFC 9559 section 5.1.3.5.2.3: each BlockAddID MUST be unique among the BlockMore elements of a BlockAdditions element, and an omitted BlockAddID is 1.",
+      "rule": "Returns the first packet, then refuses the BlockAdditions that repeats BlockAddID 1 with Invalid.",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Keeps the last BlockMore (last) and attaches it, with the LCEVC data, to both laces.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "laced-opaque-lcevc"
       ]
     },
     {
-      "reading": "Triergon refuses a BlockAddID above the track maximum (recovery policy)",
-      "clause": "RFC 9559 section 5.1.4.1.16: MaxBlockAdditionID is the maximum BlockAddID of the track, default 0, where 0 means the track has no BlockAdditions; this file declares none and carries BlockMores with IDs 1, 2, 3 and 8.",
-      "candidate": "Returns the first packet, then refuses the second with Invalid (BlockAddID exceeds track maximum).",
-      "reference": "Returns every packet and exports only the last BlockMore (ID 8, eight) on the second.",
+      "policy": "Triergon refuses a BlockAddID above the track maximum",
+      "undecided": "RFC 9559 section 5.1.4.1.16: MaxBlockAdditionID is the maximum BlockAddID of the track, default 0, where 0 means the track has no BlockAdditions; this file declares none and carries BlockMores with IDs 1, 2, 3 and 8.",
+      "rule": "Returns the first packet, then refuses the second with Invalid (BlockAddID exceeds track maximum).",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Returns every packet and exports only the last BlockMore (ID 8, eight) on the second.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "opaque-webm"
       ]

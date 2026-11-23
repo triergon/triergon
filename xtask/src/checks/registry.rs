@@ -1,13 +1,19 @@
-//! Checks of the registered differences that hold for every contract and list: a
-//! `compat` policy an entry names exists, and a deviation pins both sides' folds.
+//! Checks of the registry of differences ([`crate::harness::registry`]) that hold for
+//! every registry file: a feature's contract, a container pin file and the codec
+//! manifests. Every entry has the fields of its form; what it cites exists (a
+//! `compat` policy, the place a rule is `documented`); every listed case is a case
+//! and pins the candidate's output, and a case that compares nothing of the
+//! reference pins none of the reference's.
 //!
-//! How a deviating case is judged when a comparison runs is in
+//! How a listed case is judged when a comparison runs is in
 //! [`crate::harness::report::ratchet`]; these check the registry itself.
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::files;
+use crate::harness::registry::{self, Form};
 use crate::json::Value;
 
 /// Every `compat::` path the `compat` text of a registry entry names, in any
@@ -177,105 +183,365 @@ fn defines_item(line: &str, name: &str) -> bool {
     item || variant || reexport
 }
 
-/// A feature contract whose deviating cases pin only the reference's fold: its id,
-/// those cases, its deviating cases, and whether its comparison could pin the
-/// candidate's fold (a `cargo xtask report` prefix comparison records it as each
-/// case's `candidate_expected`; a generated manifest's `pins.json` holds it under
-/// `candidate_pins`).
-pub struct OneSided {
-    pub id: String,
-    pub unpinned: usize,
-    pub cases: usize,
-    pub comparison_pins: bool,
+/// The codec manifests' pins of both sides, by manifest path and lane.
+const CODEC_PINS: &str = "harness/codecs/open-pins.json";
+
+fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
+    value.get(key).and_then(Value::as_str)
 }
 
-/// Every feature contract with a deviating case whose candidate fold is not pinned.
-pub fn one_sided(data: &[(String, Value)]) -> Vec<OneSided> {
-    let document = |file: &str| {
-        data.iter()
-            .find(|(path, _)| path == file)
-            .map(|(_, document)| document)
-    };
-    let mut found = Vec::new();
-    for (file, contract) in data {
-        let Some(id) = file
-            .strip_prefix("harness/features/")
-            .and_then(|rest| rest.strip_suffix("/contract.json"))
-        else {
+fn array<'a>(value: &'a Value, key: &str) -> &'a [Value] {
+    value.get(key).and_then(Value::as_array).unwrap_or_default()
+}
+
+/// The feature a registry file under `harness/features/` belongs to, when `file` is
+/// that feature's `name`.
+fn feature<'a>(file: &'a str, name: &str) -> Option<&'a str> {
+    file.strip_prefix("harness/features/")?
+        .strip_suffix(name)?
+        .strip_suffix('/')
+        .filter(|id| !id.contains('/'))
+}
+
+/// Why the registry files of `data` (the parsed JSON files under `harness/` by
+/// their path from the repository root) are not well formed, one error per file
+/// and finding. A feature contract and a container pin file are read as the report
+/// reads them, on every gate target ([`registry::read`]); a codec manifest keeps
+/// fields of its own, so its entries are held to the fields of their form alone.
+/// Then, for every listed case: its candidate pin is recorded, unless
+/// `open_unpinned` registers why not; and a refusal, or a case not comparable with
+/// the reference, carries no reference pin.
+pub fn listing_errors(root: &Path, data: &[(String, Value)]) -> Vec<String> {
+    let mut errors = Vec::new();
+    for (file, document) in data {
+        let found = if let Some(id) = feature(file, "contract.json") {
+            contract_errors(root, id, document)
+        } else if feature(file, "container-pins.json").is_some() {
+            container_errors(document)
+        } else if file.starts_with("harness/codecs/") {
+            let pins = data
+                .iter()
+                .find(|(path, _)| path == CODEC_PINS)
+                .and_then(|(_, pins)| pins.get("pins"))
+                .and_then(|pins| pins.get(file));
+            codec_errors(document, pins)
+        } else {
             continue;
         };
-        let ids: Vec<&str> = contract
-            .get("open_deviations")
-            .and_then(Value::as_array)
-            .unwrap_or_default()
-            .iter()
-            .flat_map(|entry| {
-                entry
-                    .get("cases")
-                    .and_then(Value::as_array)
-                    .unwrap_or_default()
-            })
-            .filter_map(Value::as_str)
-            .collect();
-        if ids.is_empty() {
-            continue;
+        errors.extend(found.into_iter().map(|error| format!("{file}: {error}")));
+        for (form, entry) in registry::groups(document) {
+            if matches!(form, Form::Policy | Form::Unimplemented)
+                && let Some(documented) = text(entry, "documented")
+                && let Some(error) = documented_error(root, documented)
+            {
+                errors.push(format!("{file}: {}: {error}", form.list()));
+            }
         }
-        let rows = document(&format!("harness/features/{id}/corpus.json"))
-            .and_then(|corpus| corpus.get("cases"))
-            .and_then(Value::as_array)
-            .unwrap_or_default();
-        let generated = document(&format!("harness/features/{id}/pins.json"));
-        let pinned = |case: &str| {
-            rows.iter().any(|row| {
-                row.get("id").and_then(Value::as_str) == Some(case)
-                    && (row.get("candidate_expected").is_some()
-                        || row.get("candidate_expected_by_target").is_some())
-            }) || generated
-                .and_then(|pins| pins.get("candidate_pins"))
-                .is_some_and(|pins| pins.get(case).is_some())
+    }
+    errors
+}
+
+/// Whether `document` holds an entry in any list of the registry.
+fn lists_cases(document: &Value) -> bool {
+    Form::ALL
+        .into_iter()
+        .any(|form| !array(document, form.list()).is_empty())
+        || !array(document, registry::UNPINNED).is_empty()
+}
+
+/// The errors of feature `id`'s contract against its manifest.
+fn contract_errors(root: &Path, id: &str, contract: &Value) -> Vec<String> {
+    if !lists_cases(contract) {
+        return Vec::new();
+    }
+    let corpus = root.join("harness/features").join(id).join("corpus.json");
+    let manifest = match crate::harness::manifest::read(root, &corpus) {
+        Ok((manifest, _)) => manifest,
+        Err(error) => return vec![format!("its listed cases need its manifest: {error}")],
+    };
+    let rows = array(&manifest, "cases");
+    let row = |case: &str| rows.iter().find(|row| text(row, "id") == Some(case));
+    // The targets the feature runs on: those it requires, else the gate's.
+    let required: Vec<&str> = array(contract, "required_targets")
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    let targets = if required.is_empty() {
+        crate::gate::TARGETS.to_vec()
+    } else {
+        required
+    };
+    let mut errors = BTreeSet::new();
+    for target in targets {
+        let listed = match registry::read(contract, &manifest, target) {
+            Ok(listed) => listed,
+            Err(error) => {
+                errors.insert(error);
+                continue;
+            }
         };
-        let unpinned = ids.iter().filter(|case| !pinned(case)).count();
-        if unpinned > 0 {
-            found.push(OneSided {
-                id: id.to_owned(),
+        let (mut unpinned, mut registered, mut pinned_reference) = (0, 0, 0);
+        for case in listed.ids() {
+            let (Some(listing), Some(row)) = (listed.get(case), row(case)) else {
+                continue;
+            };
+            let candidate = crate::harness::report::candidate_expected_for(row, target).is_some();
+            unpinned += usize::from(!candidate && !listing.unpinned);
+            registered += usize::from(candidate && listing.unpinned);
+            pinned_reference += usize::from(
+                listing.candidate_only
+                    && crate::harness::report::expected_for(row, target).is_some(),
+            );
+        }
+        for (count, finding) in [
+            (
                 unpinned,
-                cases: ids.len(),
-                comparison_pins: generated.is_some()
-                    || (contract.get("runner").and_then(Value::as_str)
-                        == Some("cargo xtask report")
-                        && contract.get("worker_operation").is_some()),
-            });
+                "listed cases pin no candidate fold; record it, or register in open_unpinned \
+                 why it cannot be recorded yet",
+            ),
+            (
+                registered,
+                "cases of open_unpinned have a candidate pin; take them out of the list",
+            ),
+            (
+                pinned_reference,
+                "refusals, or cases not comparable with the reference, pin the reference's fold",
+            ),
+        ] {
+            if count > 0 {
+                errors.insert(format!("{count} {finding} ({target})"));
+            }
         }
     }
-    found
+    errors.into_iter().collect()
 }
 
-/// The line `check-design` prints of [`one_sided`]: reported, not failed.
-pub fn one_sided_summary(found: &[OneSided]) -> Option<String> {
-    if found.is_empty() {
-        return None;
-    }
-    let list = |pins: bool| {
-        found
-            .iter()
-            .filter(|one| one.comparison_pins == pins)
-            .map(|one| format!("{} ({}/{})", one.id, one.unpinned, one.cases))
-            .collect::<Vec<_>>()
-            .join(", ")
+/// The errors of a container pin file: its lists scoped by the gate's targets,
+/// its cases the keys of `pins`, its candidate pins those of `candidate_pins`.
+fn container_errors(document: &Value) -> Vec<String> {
+    let keys = |name: &str| -> Vec<&str> {
+        match document.get(name) {
+            Some(Value::Object(pins)) => pins.iter().map(|(id, _)| id.as_str()).collect(),
+            _ => Vec::new(),
+        }
     };
-    let (recordable, other) = (list(true), list(false));
-    let mut text = String::from(
-        "Deviations not pinned on the candidate's side, reported (unpinned/deviating cases):",
-    );
-    if !recordable.is_empty() {
-        text.push_str(&format!("\n  candidate folds to record: {recordable}"));
+    let manifest = Value::object([(
+        "cases",
+        Value::Array(
+            keys("pins")
+                .into_iter()
+                .map(|id| Value::object([("id", Value::str(id))]))
+                .collect(),
+        ),
+    )]);
+    // The kinds of difference an entry declares are the runner's, not the registry's.
+    let mut declarations = vec![(
+        "required_targets".to_owned(),
+        Value::strings(crate::gate::TARGETS),
+    )];
+    for form in Form::GROUPS {
+        let entries = array(document, form.list())
+            .iter()
+            .map(|entry| match entry {
+                Value::Object(fields) => Value::Object(
+                    fields
+                        .iter()
+                        .filter(|(key, _)| key != "differences")
+                        .cloned()
+                        .collect(),
+                ),
+                other => other.clone(),
+            });
+        declarations.push((form.list().to_owned(), Value::Array(entries.collect())));
     }
-    if !other.is_empty() {
-        text.push_str(&format!(
-            "\n  comparisons that pin the reference only: {other}"
+    let declarations = Value::Object(declarations);
+    let candidates = keys("candidate_pins");
+    let mut errors = BTreeSet::new();
+    for target in crate::gate::TARGETS {
+        match registry::read(&declarations, &manifest, target) {
+            Ok(listed) => {
+                let unpinned = listed
+                    .ids()
+                    .iter()
+                    .filter(|id| !candidates.contains(&id.as_str()))
+                    .count();
+                if unpinned > 0 {
+                    errors.insert(format!(
+                        "{unpinned} listed cases have no entry in candidate_pins"
+                    ));
+                }
+            }
+            Err(error) => {
+                errors.insert(error);
+            }
+        }
+    }
+    errors.into_iter().collect()
+}
+
+/// The errors of a codec manifest: each entry has the fields of its form, and each
+/// vector an open case, a deviation or a policy difference lists has its pin, in
+/// `pins` (this manifest's part of [`CODEC_PINS`], by lane) or, for the seek
+/// comparisons, in its entry's `expected_by_case`.
+fn codec_errors(document: &Value, pins: Option<&Value>) -> Vec<String> {
+    let mut errors = Vec::new();
+    let mut listed: Vec<&str> = array(document, Form::Defect.list())
+        .iter()
+        .filter_map(|case| case.as_str().or_else(|| text(case, "name")))
+        .collect();
+    let mut own_pins = false;
+    for (form, entry) in registry::groups(document) {
+        if form == Form::Unimplemented {
+            // A codec refusal keeps the fields its runner reads; the registry adds
+            // where the crate lists the feature as not implemented.
+            let missing = ["reason", "documented", "clause", "detail"]
+                .into_iter()
+                .find(|key| text(entry, key).is_none_or(|line| line.trim().is_empty()));
+            errors.extend(missing.map(|key| format!("{}: an entry states its {key}", form.list())));
+        } else {
+            errors.extend(registry::entry_error(form, entry, false));
+        }
+        if matches!(form, Form::Departure | Form::Policy) {
+            let cases = array(entry, "cases").iter().filter_map(Value::as_str);
+            match entry.get("expected_by_case") {
+                Some(expected) => {
+                    own_pins = true;
+                    let missing = cases.filter(|case| expected.get(case).is_none()).count();
+                    if missing > 0 {
+                        errors.push(format!(
+                            "{}: {missing} cases have no observation in expected_by_case",
+                            form.list()
+                        ));
+                    }
+                }
+                None => listed.extend(cases),
+            }
+        }
+    }
+    let pinned = |case: &str| match pins {
+        Some(Value::Object(lanes)) => lanes.iter().any(|(_, lane)| lane.get(case).is_some()),
+        _ => false,
+    };
+    // An open seek case states its own expectation.
+    let unpinned = if own_pins && document.get("vectors").is_none() {
+        0
+    } else {
+        listed.iter().filter(|case| !pinned(case)).count()
+    };
+    if unpinned > 0 {
+        errors.push(format!(
+            "{unpinned} listed vectors have no pin in {CODEC_PINS}; record them with \
+             `cargo xtask codecs summarize RUN OUT --record-pins`"
         ));
     }
-    Some(text)
+    errors
+}
+
+/// Why `documented` does not name a place a consumer reads a rule: a section of a
+/// crate README (`crates/NAME/README.md#anchor`, the anchor of one of its headings)
+/// or a public item of a workspace crate (`triergon_core::signature::select`).
+fn documented_error(root: &Path, documented: &str) -> Option<String> {
+    if let Some((file, anchor)) = documented.split_once('#') {
+        let readme = file.starts_with("crates/") && file.ends_with("/README.md");
+        let Some(text) = readme
+            .then(|| fs::read_to_string(root.join(file)).ok())
+            .flatten()
+        else {
+            return Some(format!("documented: {file} is not a crate README"));
+        };
+        let mut fenced = false;
+        let found = text.lines().any(|line| {
+            fenced ^= line.starts_with("```");
+            !fenced && line.starts_with('#') && slug(line.trim_start_matches('#')) == anchor
+        });
+        return (!found).then(|| format!("documented: {file} has no section #{anchor}"));
+    }
+    let (Some((package, _)), Some(item)) =
+        (documented.split_once("::"), documented.rsplit("::").next())
+    else {
+        return Some(format!(
+            "documented: {documented} is neither crates/NAME/README.md#section nor a public item"
+        ));
+    };
+    let Some(source) = crate_sources(root, package) else {
+        return Some(format!("documented: no workspace crate is named {package}"));
+    };
+    let defined = files::walk(&source, &|rel| rel.extension().is_some_and(|e| e == "rs"))
+        .iter()
+        .any(|file| {
+            read(file).lines().any(|line| {
+                // An enum variant has no visibility of its own.
+                defines_item(line, item)
+                    && (line.contains("pub") || line.trim_start().starts_with(item))
+            })
+        });
+    (!defined).then(|| format!("documented: {package} defines no public item {item}"))
+}
+
+/// The anchor of a Markdown heading: lower case, spaces as hyphens, punctuation
+/// dropped.
+fn slug(heading: &str) -> String {
+    heading
+        .trim()
+        .chars()
+        .filter_map(|c| match c {
+            ' ' => Some('-'),
+            '-' | '_' => Some(c),
+            c if c.is_alphanumeric() => Some(c.to_ascii_lowercase()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `src` directory of the workspace crate whose library is named `package`
+/// (its package name with `_` for `-`).
+fn crate_sources(root: &Path, package: &str) -> Option<PathBuf> {
+    fs::read_dir(root.join("crates"))
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .find(|directory| {
+            fs::read_to_string(directory.join("Cargo.toml"))
+                .ok()
+                .and_then(|manifest| crate::toml::parse(&manifest).ok())
+                .and_then(|manifest| {
+                    Some(
+                        manifest
+                            .get("package")?
+                            .get("name")?
+                            .as_str()?
+                            .replace('-', "_"),
+                    )
+                })
+                .is_some_and(|name| name == package)
+        })
+        .map(|directory| directory.join("src"))
+}
+
+/// The line `check-design` prints of the cases `open_unpinned` registers: the
+/// features whose listed cases still wait for a candidate pin, with their causes.
+pub fn unpinned_summary(data: &[(String, Value)]) -> Option<String> {
+    let lines: Vec<String> = data
+        .iter()
+        .filter_map(|(file, document)| {
+            let id = feature(file, "contract.json")?;
+            let entries = array(document, registry::UNPINNED);
+            let cases: usize = entries.iter().map(|e| array(e, "cases").len()).sum();
+            let causes: BTreeSet<&str> = entries.iter().filter_map(|e| text(e, "cause")).collect();
+            (cases > 0).then(|| {
+                format!(
+                    "  {id}: {cases} ({})",
+                    causes.into_iter().collect::<Vec<_>>().join("; ")
+                )
+            })
+        })
+        .collect();
+    (!lines.is_empty()).then(|| {
+        format!(
+            "Listed cases whose candidate fold is not yet recorded, as open_unpinned registers:\n{}",
+            lines.join("\n")
+        )
+    })
 }
 
 #[cfg(test)]
@@ -376,39 +642,193 @@ mod tests {
     }
 
     #[test]
-    fn a_deviation_without_its_candidate_fold_is_reported() {
-        let contract = r#"{"runner": "cargo xtask report", "worker_operation": "v-",
-            "open_deviations": [{"cases": ["a", "b"]}]}"#;
+    fn a_documented_rule_names_a_readme_section_or_a_public_item() {
+        let root = files::scratch("registry-documented");
+        let demo = root.join("crates/demo");
+        fs::create_dir_all(demo.join("src")).unwrap();
+        fs::write(
+            demo.join("Cargo.toml"),
+            "[package]\nname = \"triergon-demo\"\n",
+        )
+        .unwrap();
+        fs::write(
+            demo.join("README.md"),
+            "# Demo\n\n## Recovery from `bad` input\n\n```sh\n# Not a heading\n```\n",
+        )
+        .unwrap();
+        fs::write(
+            demo.join("src/lib.rs"),
+            "pub fn probe() {}\nfn hidden() {}\npub enum Probed {\n    Need(usize),\n}\n",
+        )
+        .unwrap();
+        for (documented, holds) in [
+            ("crates/demo/README.md#recovery-from-bad-input", true),
+            ("crates/demo/README.md#not-a-heading", false),
+            ("crates/demo/README.md#limits", false),
+            ("docs/quality.md#gates", false),
+            ("triergon_demo::probe", true),
+            ("triergon_demo::Probed::Need", true),
+            ("triergon_demo::hidden", false),
+            ("triergon_other::probe", false),
+            ("the README says so", false),
+        ] {
+            assert_eq!(
+                documented_error(&root, documented).is_none(),
+                holds,
+                "{documented}"
+            );
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    fn feature_files(contract: &str, corpus: &str) -> (PathBuf, Vec<(String, Value)>) {
+        let root = files::scratch("registry-listing");
+        let directory = root.join("harness/features/f");
+        fs::create_dir_all(&directory).unwrap();
+        fs::write(directory.join("contract.json"), contract).unwrap();
+        fs::write(directory.join("corpus.json"), corpus).unwrap();
+        let data = vec![(
+            "harness/features/f/contract.json".to_owned(),
+            parse(contract).unwrap(),
+        )];
+        (root, data)
+    }
+
+    const DEVIATION: &str = r#""open_deviations": [{"reading": "r", "clause": "c",
+        "candidate": "x", "reference": "y", "cases": ["a", "b"]}]"#;
+
+    #[test]
+    fn a_listed_case_without_its_candidate_fold_fails_unless_registered() {
+        let contract = |more: &str| {
+            format!(r#"{{"required_targets": ["aarch64-unknown-linux-gnu"], {DEVIATION}{more}}}"#)
+        };
         let corpus = r#"{"cases": [{"id": "a", "expected": {}, "candidate_expected": {}},
             {"id": "b", "expected": {}}]}"#;
-        let data = [
-            (
-                "harness/features/f/contract.json".to_owned(),
-                parse(contract).unwrap(),
-            ),
-            (
-                "harness/features/f/corpus.json".to_owned(),
-                parse(corpus).unwrap(),
-            ),
-        ];
-        let found = one_sided(&data);
-        assert_eq!(found.len(), 1);
-        assert_eq!((found[0].unpinned, found[0].cases), (1, 2));
-        assert!(found[0].comparison_pins);
-        assert_eq!(
-            one_sided_summary(&found).unwrap(),
-            "Deviations not pinned on the candidate's side, reported (unpinned/deviating \
-             cases):\n  candidate folds to record: f (1/2)"
+        let (root, data) = feature_files(&contract(""), corpus);
+        let errors = listing_errors(&root, &data);
+        assert!(
+            errors.len() == 1 && errors[0].contains("1 listed cases pin no candidate fold"),
+            "{errors:?}"
         );
-        let pinned = r#"{"cases": [{"id": "a", "candidate_expected": {}},
-            {"id": "b", "candidate_expected": {}}]}"#;
-        let data = [
-            data[0].clone(),
+        fs::remove_dir_all(root).unwrap();
+        // The missing pin is registered with its cause, on the target it is due on.
+        let registered = contract(
+            r#", "open_unpinned": [{"cases": ["b"], "cause": "recorded on the gate host"}]"#,
+        );
+        let (root, data) = feature_files(&registered, corpus);
+        assert_eq!(listing_errors(&root, &data), Vec::<String>::new());
+        assert_eq!(
+            unpinned_summary(&data).unwrap(),
+            "Listed cases whose candidate fold is not yet recorded, as open_unpinned \
+             registers:\n  f: 1 (recorded on the gate host)"
+        );
+        fs::remove_dir_all(root).unwrap();
+        // Once recorded, the case leaves the list.
+        let pinned = r#"{"cases": [{"id": "a", "expected": {}, "candidate_expected": {}},
+            {"id": "b", "expected": {}, "candidate_expected": {}}]}"#;
+        let (root, data) = feature_files(&registered, pinned);
+        let errors = listing_errors(&root, &data);
+        assert!(
+            errors
+                .iter()
+                .all(|e| e.contains("take them out of the list"))
+                && !errors.is_empty(),
+            "{errors:?}"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_refusal_pins_nothing_of_the_reference() {
+        let contract = r#"{"required_targets": ["aarch64-unknown-linux-gnu"],
+            "open_refusals": [{"reason": "r", "clause": "c", "class": "unsupported",
+            "detail": "d", "cases": ["a"]}]}"#;
+        let (root, data) = feature_files(
+            contract,
+            r#"{"cases": [{"id": "a", "expected": {}, "candidate_expected": {}}]}"#,
+        );
+        let errors = listing_errors(&root, &data);
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("pin the reference's fold")),
+            "{errors:?}"
+        );
+        fs::remove_dir_all(root).unwrap();
+        let (root, data) = feature_files(
+            contract,
+            r#"{"cases": [{"id": "a", "candidate_expected": {}}]}"#,
+        );
+        assert_eq!(listing_errors(&root, &data), Vec::<String>::new());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_container_pin_file_and_a_codec_manifest_follow_the_same_rules() {
+        let root = files::scratch("registry-other-files");
+        let entry = r#"{"reading": "r", "clause": "c", "candidate": "x", "reference": "y",
+            "differences": ["pts"], "cases": ["a", "b"]}"#;
+        let container = |candidates: &str| {
             (
-                "harness/features/f/corpus.json".to_owned(),
-                parse(pinned).unwrap(),
-            ),
-        ];
-        assert!(one_sided(&data).is_empty());
+                "harness/features/f/container-pins.json".to_owned(),
+                parse(&format!(
+                    r#"{{"open_deviations": [{entry}], "pins": {{"a": "1", "b": "2"}},
+                        "candidate_pins": {candidates}}}"#
+                ))
+                .unwrap(),
+            )
+        };
+        assert_eq!(
+            listing_errors(&root, &[container(r#"{"a": "3", "b": "4"}"#)]),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            listing_errors(&root, &[container(r#"{"a": "3"}"#)]),
+            [
+                "harness/features/f/container-pins.json: 1 listed cases have no entry in candidate_pins"
+            ]
+        );
+        let manifest = |list: &str| {
+            (
+                "harness/codecs/m.json".to_owned(),
+                parse(&format!(
+                    r#"{{"vectors": [], "open_cases": ["v"], {list}: [{{"reading": "r",
+                        "clause": "c", "candidate": "x", "reference": "y", "cases": ["w"]}}]}}"#
+                ))
+                .unwrap(),
+            )
+        };
+        let pins = |vectors: &str| {
+            (
+                CODEC_PINS.to_owned(),
+                parse(&format!(
+                    r#"{{"pins": {{"harness/codecs/m.json": {{"lane": {vectors}}}}}}}"#
+                ))
+                .unwrap(),
+            )
+        };
+        let deviations = manifest(r#""open_deviations""#);
+        assert_eq!(
+            listing_errors(&root, &[deviations.clone(), pins(r#"{"v": {}, "w": {}}"#)]),
+            Vec::<String>::new()
+        );
+        let errors = listing_errors(&root, &[deviations, pins(r#"{"v": {}}"#)]);
+        assert!(
+            errors.len() == 1 && errors[0].contains("1 listed vectors have no pin"),
+            "{errors:?}"
+        );
+        // A deviation's fields are not a policy difference's.
+        let errors = listing_errors(
+            &root,
+            &[
+                manifest(r#""open_policies""#),
+                pins(r#"{"v": {}, "w": {}}"#),
+            ],
+        );
+        assert!(
+            errors.len() == 1 && errors[0].contains("open_policies"),
+            "{errors:?}"
+        );
+        fs::remove_dir_all(root).unwrap();
     }
 }

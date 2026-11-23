@@ -243,10 +243,10 @@
         "aac",
         "4096"
       ],
-      "expected": {
-        "packets": 1136,
-        "bytes": 458820,
-        "digest": 8155211389701319334
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {

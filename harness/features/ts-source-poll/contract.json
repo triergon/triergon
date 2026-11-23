@@ -1673,12 +1673,15 @@
         "transport-scrambled-compact",
         "transport-scrambled-compact-observed"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "An excess copy of a transport packet: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 allows at most two consecutive packets with one continuity_counter value; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the excess copy discards the PES assembly it interrupts; a PES already published stays and assembly resumes at the next unit start.",
-      "reference": "Observed rule: no duplicate detection; the copies' payload is delivered or merged into the affected PES.",
+      "policy": "An excess copy of a transport packet",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 allows at most two consecutive packets with one continuity_counter value; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the excess copy discards the PES assembly it interrupts; a PES already published stays and assembly resumes at the next unit start.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: no duplicate detection; the copies' payload is delivered or merged into the affected PES.",
       "compat": "compat::pes::DemuxObserver cuts the demuxer's PES packets from this input (its ts-observer-forms cases pass)",
       "cases": [
         "cc-third-copy-poll",
@@ -1694,10 +1697,11 @@
       ]
     },
     {
-      "reading": "A PES interrupted by a continuity-counter gap: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 defines continuity_counter per PID, so a gap means lost packets; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): a lost packet discards the partial PES it interrupts; the next complete PES is published.",
-      "reference": "Observed rule: publishes the available bytes flagged corrupt and continues at the next unit start.",
+      "policy": "A PES interrupted by a continuity-counter gap",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 defines continuity_counter per PID, so a gap means lost packets; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): a lost packet discards the partial PES it interrupts; the next complete PES is published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the available bytes flagged corrupt and continues at the next unit start.",
       "compat": "compat::pes::DemuxObserver cuts the demuxer's PES packets from this input (its ts-observer-forms cases pass)",
       "cases": [
         "cc-loss-mid-pes-poll",
@@ -1718,10 +1722,11 @@
       ]
     },
     {
-      "reading": "A PES in a carrier whose PCR extension is out of range: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 codes program_clock_reference_extension modulo 300; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with an invalid PCR is rejected with its payload, so no PES comes from it.",
-      "reference": "Observed rule: ignores the extension and returns the 27-byte PES at PTS 90000.",
+      "policy": "A PES in a carrier whose PCR extension is out of range",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 codes program_clock_reference_extension modulo 300; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with an invalid PCR is rejected with its payload, so no PES comes from it.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: ignores the extension and returns the 27-byte PES at PTS 90000.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pcr-extension-invalid passes)",
       "cases": [
         "pcr-extension-invalid-poll",
@@ -1732,10 +1737,11 @@
       ]
     },
     {
-      "reading": "A PES in a carrier that codes OPCR without PCR: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 allows OPCR only in a packet that carries PCR; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with the unpaired OPCR is rejected with its payload; no PES is published from this input.",
-      "reference": "Observed rule: ignores the OPCR and returns both 27-byte PES.",
+      "policy": "A PES in a carrier that codes OPCR without PCR",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 allows OPCR only in a packet that carries PCR; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with the unpaired OPCR is rejected with its payload; no PES is published from this input.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: ignores the OPCR and returns both 27-byte PES.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts opcr-without-pcr-invalid passes)",
       "cases": [
         "opcr-without-pcr-invalid-poll",
@@ -1746,10 +1752,11 @@
       ]
     },
     {
-      "reading": "A PES in a carrier with the transport error indicator set: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 defines transport_error_indicator as at least one uncorrectable bit error in the packet; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the errored carrier's payload is discarded and its PES is not published.",
-      "reference": "Observed rule: delivers the 27 bytes at PTS 90000 without a corrupt flag.",
+      "policy": "A PES in a carrier with the transport error indicator set",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 defines transport_error_indicator as at least one uncorrectable bit error in the packet; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the errored carrier's payload is discarded and its PES is not published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: delivers the 27 bytes at PTS 90000 without a corrupt flag.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts transport-tei passes)",
       "cases": [
         "transport-tei-poll",
@@ -1760,10 +1767,11 @@
       ]
     },
     {
-      "reading": "A PES header with a zero timestamp marker bit: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 Table 2-21 requires each PTS marker_bit to be 1; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed header is rejected and its PES is not published.",
-      "reference": "Observed rule: reads the timestamp regardless and returns the 27 bytes with PTS and DTS 90000.",
+      "policy": "A PES header with a zero timestamp marker bit",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 Table 2-21 requires each PTS marker_bit to be 1; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed header is rejected and its PES is not published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: reads the timestamp regardless and returns the 27 bytes with PTS and DTS 90000.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-timestamp-marker passes)",
       "cases": [
         "pes-timestamp-marker-poll",
@@ -1774,10 +1782,11 @@
       ]
     },
     {
-      "reading": "A PES header with PTS_DTS_flags 01: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 forbids PTS_DTS_flags value 01; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed header is rejected and its PES is not published.",
-      "reference": "Observed rule: returns the 27 bytes with neither clock.",
+      "policy": "A PES header with PTS_DTS_flags 01",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 forbids PTS_DTS_flags value 01; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed header is rejected and its PES is not published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: returns the 27 bytes with neither clock.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-forbidden-time-flags passes)",
       "cases": [
         "pes-forbidden-time-flags-poll",
@@ -1788,10 +1797,11 @@
       ]
     },
     {
-      "reading": "A finite PES that ends before its declared length: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 PES_packet_length declares more bytes than the input holds; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): an incomplete finite PES is not published.",
-      "reference": "Observed rule: publishes the 24 available bytes flagged corrupt.",
+      "policy": "A finite PES that ends before its declared length",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 PES_packet_length declares more bytes than the input holds; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): an incomplete finite PES is not published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the 24 available bytes flagged corrupt.",
       "compat": "compat::pes::DemuxObserver cuts the demuxer's PES packets from this input (its ts-observer-forms cases pass)",
       "cases": [
         "pes-finite-truncated-eof-poll",
@@ -1802,10 +1812,11 @@
       ]
     },
     {
-      "reading": "An audio PES with PES_packet_length zero: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 allows PES_packet_length 0 only for a video elementary stream in TS; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the unbounded audio PES is rejected.",
-      "reference": "Observed rule: returns its 27 bytes at PTS 90000.",
+      "policy": "An audio PES with PES_packet_length zero",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 allows PES_packet_length 0 only for a video elementary stream in TS; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the unbounded audio PES is rejected.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: returns its 27 bytes at PTS 90000.",
       "compat": "compat::pes::DemuxObserver cuts the demuxer's PES packets from this input (its ts-observer-forms cases pass)",
       "cases": [
         "pes-audio-zero-length-invalid-poll",
@@ -1816,10 +1827,11 @@
       ]
     },
     {
-      "reading": "Continuation payload past a finite PES's declared extent: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7: a carrier without payload_unit_start_indicator continues a PES past its PES_packet_length; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the PES is published with the 400 bytes its PES_packet_length declares, and the bytes past that length in its last carrier are reported after it as a separate Pes fault.",
-      "reference": "Observed rule: publishes all 401 to 415 carried bytes in two packets, the first 354 bytes flagged corrupt with the PES clocks and the remaining 47 to 61 bytes without clocks; that second packet starts no PES, so these cases compare demux clocks without the source-clocks projection.",
+      "policy": "Continuation payload past a finite PES's declared extent",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7: a carrier without payload_unit_start_indicator continues a PES past its PES_packet_length; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the PES is published with the 400 bytes its PES_packet_length declares, and the bytes past that length in its last carrier are reported after it as a separate Pes fault.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes all 401 to 415 carried bytes in two packets, the first 354 bytes flagged corrupt with the PES clocks and the remaining 47 to 61 bytes without clocks; that second packet starts no PES, so these cases compare demux clocks without the source-clocks projection.",
       "compat": "compat::pes::DemuxObserver cuts the demuxer's PES packets from this input (its ts-observer-forms cases pass)",
       "cases": [
         "finite-continuation-body-401-poll",

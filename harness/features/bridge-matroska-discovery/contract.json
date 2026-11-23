@@ -185,15 +185,6 @@
       ]
     },
     {
-      "reading": "Triergon's Dolby feed refuses an AC-3 Block that does not start with the syncword (recovery policy)",
-      "clause": "ATSC A/52:2018 section 5.4.1.1: a syncframe begins with syncword 0x0B77; Matroska codec mappings draft 21 section 3.4.11 carries A_AC3 as syncframes.",
-      "candidate": "Publishes both track descriptors, then refuses the first AC-3 Block (0077...) with Invalid, replaying no packet of either track.",
-      "reference": "Replays all 16 Blocks of both tracks, the damaged 768-byte Block with a 32000000 ns duration.",
-      "cases": [
-        "audio-bad-first-discovery"
-      ]
-    },
-    {
       "reading": "Matroska discovery subtracts CodecDelay exactly",
       "clause": "RFC 9559 section 5.1.4.1.25: CodecDelay is in nanoseconds and MUST be subtracted from each frame timestamp; section 11.2 gives the exact Block presentation time.",
       "candidate": "Subtracts the exact delay: AAC -21333333 and -23219955 ns, AC-3 and E-AC-3 -5333333 ns and 26666667 ns; in audio-mixed-discovery and hevc-dolby it also returns the E-AC-3 syncframe duration 32000000 ns (ATSC A/52:2018 Annex E: six blocks of 256 samples at 48 kHz), a value it derives.",
@@ -202,6 +193,19 @@
         "audio-mixed-discovery",
         "hevc-dolby",
         "three-tracks"
+      ]
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "Triergon's Dolby feed refuses an AC-3 Block that does not start with the syncword",
+      "undecided": "ATSC A/52:2018 section 5.4.1.1: a syncframe begins with syncword 0x0B77; Matroska codec mappings draft 21 section 3.4.11 carries A_AC3 as syncframes.",
+      "rule": "Publishes both track descriptors, then refuses the first AC-3 Block (0077...) with Invalid, replaying no packet of either track.",
+      "documented": "crates/bridge/README.md#access-units",
+      "reference_rule": "Replays all 16 Blocks of both tracks, the damaged 768-byte Block with a 32000000 ns duration.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "audio-bad-first-discovery"
       ]
     }
   ]

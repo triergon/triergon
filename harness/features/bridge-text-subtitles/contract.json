@@ -747,12 +747,26 @@
       "cases": [
         "ass-empty-not-clear"
       ]
-    },
+    }
+  ],
+  "open_refusals": [
     {
-      "reading": "An empty tx3g string is reported as a zero-byte cue (a bridge rule, not a specification rule)",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 allows a text-length of 0 and does not say whether a player publishes an event for it; TextBridge reports every sample as a cue.",
-      "candidate": "Emits a zero-byte cue for each empty sample: at 0 (1001000 us and 1500000 us), at 0 before b, at 0, 21334 and 2621334 us in fragmented-subtitles and at 0 and 2600000 us in fragmented-subtitle-edit; every nonempty cue agrees.",
-      "reference": "The mov_text decoder publishes no event for an empty string.",
+      "reason": "Byte-reversed UTF-16 tx3g text is not read",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.1: terminals are not required to recognise byte-reversed UTF-16 (a string beginning FF FE).",
+      "class": "unsupported",
+      "detail": "byte-reversed UTF-16",
+      "cases": [
+        "capsule-mov-text-utf16le"
+      ]
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "An empty tx3g string is reported as a zero-byte cue",
+      "undecided": "ETSI TS 126 245 V19.0.0 section 5.17 allows a text-length of 0 and does not say whether a player publishes an event for it; TextBridge reports every sample as a cue.",
+      "rule": "Emits a zero-byte cue for each empty sample: at 0 (1001000 us and 1500000 us), at 0 before b, at 0, 21334 and 2621334 us in fragmented-subtitles and at 0 and 2600000 us in fragmented-subtitle-edit; every nonempty cue agrees.",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "The mov_text decoder publishes no event for an empty string.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-empty-sample",
@@ -763,10 +777,11 @@
       ]
     },
     {
-      "reading": "A size-0 modifier box extends to the end of its sample (a reading of ours)",
-      "clause": "ISO/IEC 14496-12:2015 section 4.2 defines size 0 only for the last box of a file, whose contents extend to the end of the file; ETSI TS 126 245 V19.0.0 section 5.17 does not define it inside a sample. Extractor::tx3g_iso_boxes reads it as extending to the end of the sample.",
-      "candidate": "Keeps the text abcd and x, and a at 0 followed by b at 1001000 us.",
-      "reference": "Refuses the sample with a size-0 box (tsmb_size invalid) and publishes no event for it; b at 1001000 us agrees. It accepts the 64-bit size form.",
+      "policy": "A size-0 modifier box extends to the end of its sample",
+      "undecided": "ISO/IEC 14496-12:2015 section 4.2 defines size 0 only for the last box of a file, whose contents extend to the end of the file; ETSI TS 126 245 V19.0.0 section 5.17 does not define it inside a sample. Extractor::tx3g_iso_boxes reads it as extending to the end of the sample.",
+      "rule": "Keeps the text abcd and x, and a at 0 followed by b at 1001000 us.",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "Refuses the sample with a size-0 box (tsmb_size invalid) and publishes no event for it; b at 1001000 us agrees. It accepts the 64-bit size form.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "capsule-mov-text-size0",
@@ -775,10 +790,11 @@
       ]
     },
     {
-      "reading": "Triergon refuses a tx3g sample whose text is shorter than its length (recovery policy)",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17: text-length counts the bytes of the string that follows.",
-      "candidate": "Refuses the sample with Truncated and publishes nothing for it; later samples are read.",
-      "reference": "Publishes the bytes present as the text: xy, ab and xy.",
+      "policy": "Triergon refuses a tx3g sample whose text is shorter than its length",
+      "undecided": "ETSI TS 126 245 V19.0.0 section 5.17: text-length counts the bytes of the string that follows.",
+      "rule": "Refuses the sample with Truncated and publishes nothing for it; later samples are read.",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "Publishes the bytes present as the text: xy, ab and xy.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-text-overrun",
@@ -787,10 +803,11 @@
       ]
     },
     {
-      "reading": "Triergon refuses a tx3g sample with a malformed modifier box (recovery policy)",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 fills the rest of the sample with modifier boxes; ISO/IEC 14496-12:2015 section 4.2 gives each box a size of at least its header and within its container.",
-      "candidate": "Refuses the sample with Truncated for an incomplete header or a box past the sample and publishes nothing for it; later samples are read.",
-      "reference": "Publishes the text for an incomplete header or an overrunning box: x, abcd, abcd, x and a.",
+      "policy": "Triergon refuses a tx3g sample with a malformed modifier box",
+      "undecided": "ETSI TS 126 245 V19.0.0 section 5.17 fills the rest of the sample with modifier boxes; ISO/IEC 14496-12:2015 section 4.2 gives each box a size of at least its header and within its container.",
+      "rule": "Refuses the sample with Truncated for an incomplete header or a box past the sample and publishes nothing for it; later samples are read.",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "Publishes the text for an incomplete header or an overrunning box: x, abcd, abcd, x and a.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-box-overrun",
@@ -801,10 +818,11 @@
       ]
     },
     {
-      "reading": "Triergon refuses a tx3g string that is not well formed in its encoding (recovery policy)",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.1 requires UTF-8 or BOM-marked UTF-16; RFC 3629 sections 3 and 4 exclude overlong forms, surrogates and incomplete sequences.",
-      "candidate": "Refuses the sample with Invalid and publishes nothing for it; later samples are read. In capsule-mov-text-nul-invalid-tail that is its one sample, a NUL followed by a byte that is not UTF-8; in capsule-mov-text-tags-nul-transitions it is sample 9 (ab NUL ff d) at 18000000 us, and the other 13 samples keep the NUL and the text after it.",
-      "reference": "Ends the text at its first NUL, so the bytes after it are not decoded: a in capsule-mov-text-nul-invalid-tail; in capsule-mov-text-tags-nul-transitions ab for each sample, ending at its NUL, through 24000000 us.",
+      "policy": "Triergon refuses a tx3g string that is not well formed in its encoding",
+      "undecided": "ETSI TS 126 245 V19.0.0 section 5.1 requires UTF-8 or BOM-marked UTF-16; RFC 3629 sections 3 and 4 exclude overlong forms, surrogates and incomplete sequences.",
+      "rule": "Refuses the sample with Invalid and publishes nothing for it; later samples are read. In capsule-mov-text-nul-invalid-tail that is its one sample, a NUL followed by a byte that is not UTF-8; in capsule-mov-text-tags-nul-transitions it is sample 9 (ab NUL ff d) at 18000000 us, and the other 13 samples keep the NUL and the text after it.",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "Ends the text at its first NUL, so the bytes after it are not decoded: a in capsule-mov-text-nul-invalid-tail; in capsule-mov-text-tags-nul-transitions ab for each sample, ending at its NUL, through 24000000 us.",
       "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "capsule-mov-text-nul-invalid-tail",
@@ -812,39 +830,25 @@
       ]
     },
     {
-      "reading": "Triergon refuses Matroska UTF-8 text with a scalar above U+10FFFF (recovery policy)",
-      "clause": "Matroska codec mappings draft 21 section 3.5.11 carries S_TEXT/UTF8 as UTF-8 text; RFC 3629 section 3 limits UTF-8 to U+10FFFF.",
-      "candidate": "Refuses the Block with Invalid (invalid Unicode scalar) and publishes nothing for it.",
-      "reference": "Returns the four-byte Block f4908080.",
+      "policy": "Triergon refuses Matroska UTF-8 text with a scalar above U+10FFFF",
+      "undecided": "Matroska codec mappings draft 21 section 3.5.11 carries S_TEXT/UTF8 as UTF-8 text; RFC 3629 section 3 limits UTF-8 to U+10FFFF.",
+      "rule": "Refuses the Block with Invalid (invalid Unicode scalar) and publishes nothing for it.",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "Returns the four-byte Block f4908080.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "utf8-packet-too-large-scalar"
       ]
     },
     {
-      "reading": "Triergon refuses a WebVTT BlockAdditional without its identifier line (recovery policy)",
-      "clause": "Matroska codec mappings draft 21 section 5.4.4: the type-1 BlockAdditional holds the cue settings, a LF, the cue identifier, a LF, then comments.",
-      "candidate": "Refuses the Block with Truncated and publishes nothing for it.",
-      "reference": "Returns the Block body and its 41-byte type-1 addition (align:start LF and an unterminated identifier); it does not interpret the addition.",
+      "policy": "Triergon refuses a WebVTT BlockAdditional without its identifier line",
+      "undecided": "Matroska codec mappings draft 21 section 5.4.4: the type-1 BlockAdditional holds the cue settings, a LF, the cue identifier, a LF, then comments.",
+      "rule": "Refuses the Block with Truncated and publishes nothing for it.",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "Returns the Block body and its 41-byte type-1 addition (align:start LF and an unterminated identifier); it does not interpret the addition.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "mkv-vtt-truncated-addition"
-      ]
-    }
-  ],
-  "open_refusals": [
-    {
-      "reason": "Byte-reversed UTF-16 tx3g text is not read",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.1: terminals are not required to recognise byte-reversed UTF-16 (a string beginning FF FE).",
-      "detail": "byte-reversed UTF-16",
-      "cases": [
-        {
-          "id": "capsule-mov-text-utf16le",
-          "sha256": "9b82819f5b6f70d2884bc050bb10d915570c024834f0641148cf45207edffa32",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 280
-          }
-        }
       ]
     }
   ]

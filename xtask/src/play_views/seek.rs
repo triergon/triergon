@@ -523,10 +523,13 @@ fn compare(
 }
 
 /// The listed cases and the differences each must show: open cases and the cases
-/// of every deviation, with the `differences` their entry declares.
+/// of every other list of the registry, with the `differences` their entry declares.
+/// A case with two causes is listed in two lists and must show the differences of
+/// both entries, and no other.
 fn declared(previous: &Value, cases: &[Case]) -> Result<BTreeMap<String, Vec<String>>> {
-    let mut listed = BTreeMap::new();
-    let differences = |entry: &Value, what: &str| -> Result<Vec<String>> {
+    use crate::harness::registry::Form;
+    let mut listed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let differences = |entry: &Value, what: &str| -> Result<BTreeSet<String>> {
         let kinds = list(entry, "differences")
             .map_err(|_| format!("{what} declares no differences"))?
             .iter()
@@ -536,7 +539,7 @@ fn declared(previous: &Value, cases: &[Case]) -> Result<BTreeMap<String, Vec<Str
         if kinds.is_empty() {
             return Err(format!("{what} declares no differences"));
         }
-        Ok(kinds.into_iter().collect())
+        Ok(kinds)
     };
     for entry in previous
         .get("open_cases")
@@ -546,43 +549,67 @@ fn declared(previous: &Value, cases: &[Case]) -> Result<BTreeMap<String, Vec<Str
         let id = text(entry, "id")?;
         listed.insert(id.to_owned(), differences(entry, id)?);
     }
-    if let Some(deviations) = previous.get("open_deviations") {
-        let declarations = Value::object([
-            ("open_deviations", deviations.clone()),
-            (
-                "required_targets",
-                Value::Array(crate::gate::TARGETS.into_iter().map(Value::str).collect()),
-            ),
-        ]);
-        let manifest = Value::object([(
-            "cases",
-            Value::Array(
-                cases
+    // The lists that group cases, without the `differences` the registry does not
+    // know, and scoped by the gate's targets.
+    let mut declarations = vec![(
+        "required_targets".to_owned(),
+        Value::Array(crate::gate::TARGETS.into_iter().map(Value::str).collect()),
+    )];
+    for form in Form::GROUPS {
+        let entries = previous
+            .get(form.list())
+            .and_then(Value::as_array)
+            .unwrap_or_default();
+        let entries = entries.iter().map(|entry| match entry {
+            Value::Object(fields) => Value::Object(
+                fields
                     .iter()
-                    .map(|case| Value::object([("id", Value::str(&case.id))]))
+                    .filter(|(key, _)| key != "differences")
+                    .cloned()
                     .collect(),
             ),
-        )]);
-        let open = report::open_cases(&declarations, &manifest, &report::gate_target()?)?;
-        for entry in deviations.as_array().unwrap_or_default() {
-            let kinds = differences(entry, text(entry, "reading")?)?;
+            other => other.clone(),
+        });
+        declarations.push((form.list().to_owned(), Value::Array(entries.collect())));
+    }
+    let manifest = Value::object([(
+        "cases",
+        Value::Array(
+            cases
+                .iter()
+                .map(|case| Value::object([("id", Value::str(&case.id))]))
+                .collect(),
+        ),
+    )]);
+    let open = report::open(
+        &Value::Object(declarations),
+        &manifest,
+        &report::gate_target()?,
+    )?;
+    for form in Form::GROUPS {
+        for entry in previous
+            .get(form.list())
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+        {
+            let kinds = differences(entry, form.list())?;
             for id in list(entry, "cases")? {
-                let id = id.as_str().ok_or("a deviating case is not an id")?;
-                if !open.iter().any(|open| open == id) {
-                    continue;
-                }
-                if listed.insert(id.to_owned(), kinds.clone()).is_some() {
-                    return Err(format!("{id}: listed as both an open case and a deviation"));
+                let id = id.as_str().ok_or("a listed case is not an id")?;
+                if open.contains(id) {
+                    listed
+                        .entry(id.to_owned())
+                        .or_default()
+                        .extend(kinds.clone());
                 }
             }
         }
     }
-    Ok(listed)
+    Ok(listed
+        .into_iter()
+        .map(|(id, kinds)| (id, kinds.into_iter().collect()))
+        .collect())
 }
 
-/// What is wrong with a case's result against its listing, if anything: an
-/// unlisted case must pass; a listed one must show exactly its declared
-/// differences with exactly its pinned candidate output.
 fn verdict(
     report: &Value,
     declared: Option<&Vec<String>>,

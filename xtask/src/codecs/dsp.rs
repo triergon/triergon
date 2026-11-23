@@ -460,7 +460,7 @@ pub(super) fn main(root: &Path, output: &Path, record: bool, record_pins: bool) 
     let mut definitions_ok = true;
     for case in &cases {
         let (mut row, definition, reference, outputs) = comparison.case(case)?;
-        if open.is_deviation(&case.id) {
+        if let Some(listing) = open.get(&case.id) {
             let listed = match &mut pinned {
                 Value::Object(members) => members
                     .iter_mut()
@@ -486,17 +486,18 @@ pub(super) fn main(root: &Path, output: &Path, record: bool, record_pins: bool) 
             let mut parity = row.get("parity").cloned().unwrap_or(Value::Null);
             let differs = parity.get("status").and_then(Value::as_str) == Some("mismatch");
             parity = match outputs.pinned(listed, &target) {
-                // Both sides write the bytes the deviation was recorded with.
+                // Both sides write the bytes the case was listed with.
                 Some(holds) if differs => {
                     let status = if holds {
-                        report::DEVIATION
+                        report::LISTED
                     } else {
-                        report::DEVIATION_CHANGED
+                        report::LISTED_CHANGED
                     };
                     validation::put(&mut parity, "status", Value::str(status))?;
+                    validation::put(&mut parity, "listed", Value::strings(listing.lists()))?;
                     parity
                 }
-                _ => report::unpinned_deviation(parity),
+                _ => report::unpinned_listed(parity, listing),
             };
             validation::put(&mut row, "parity", parity)?;
         }

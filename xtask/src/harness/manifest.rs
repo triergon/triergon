@@ -63,6 +63,24 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
     if work_fields.is_some() && per_target && targets.is_empty() {
         return Err("per-target pins need required targets".into());
     }
+    // A refusal, or a case not comparable with the reference, pins the candidate's
+    // fold and nothing of the reference.
+    let mut candidate_only = BTreeSet::new();
+    let scopes: Vec<&str> = targets.iter().filter_map(Value::as_str).collect();
+    for target in if scopes.is_empty() {
+        &[""][..]
+    } else {
+        &scopes
+    } {
+        let listed = super::registry::read_unchecked(contract, target)?;
+        candidate_only.extend(
+            listed
+                .ids()
+                .iter()
+                .filter(|id| listed.get(id).is_some_and(|case| case.candidate_only))
+                .cloned(),
+        );
+    }
     for case in cases {
         let id = case
             .get("id")
@@ -71,6 +89,20 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
             .ok_or("required manifest has a case without an ID")?;
         if !ids.insert(id) {
             return Err(format!("duplicate case ID {id}"));
+        }
+        if candidate_only.contains(id) {
+            if case.get("expected").is_some()
+                || case.get(crate::generators::EXPECTED_BY_TARGET).is_some()
+            {
+                return Err(format!(
+                    "{id}: a refusal, or a case not comparable with the reference, pins no \
+                     reference fold"
+                ));
+            }
+            if let Some(profile) = case.get("profile").and_then(Value::as_str) {
+                profiles.insert(profile.to_owned());
+            }
+            continue;
         }
         if configured_aac {
             for key in ["sha256", "source_sha256"] {
@@ -221,6 +253,24 @@ mod tests {
         assert_eq!(
             validate_required(&contract, &without_pin).unwrap_err(),
             "two: missing expected fold"
+        );
+        // A refusal the contract lists pins the candidate alone, and no reference fold.
+        let refusing = json::parse(
+            r#"{"worker_operation":"test-","required_profiles":["first","second"],
+                "open_refusals":[{"reason":"r","clause":"c","class":"unsupported","detail":"d",
+                                  "cases":["two"]}]}"#,
+        )
+        .unwrap();
+        validate_required(&refusing, &without_pin).unwrap();
+        let pinned = json::parse(
+            r#"{"cases":[{"id":"one","profile":"first","expected":{"packets":1,"bytes":1,"digest":1}},
+                          {"id":"two","profile":"second","expected":{"packets":1,"bytes":1,"digest":1}}]}"#,
+        )
+        .unwrap();
+        assert!(
+            validate_required(&refusing, &pinned)
+                .unwrap_err()
+                .contains("pins no reference fold")
         );
     }
 

@@ -133,17 +133,10 @@
     {
       "reason": "MuxConfig refuses a name with a control character (triergon-mpegts README, Writing TS)",
       "clause": "ETSI EN 300 468 V1.17.1 \u00a76.2.33 and Annex A; a C0 code such as TAB after the first byte has no meaning in character table 00",
+      "class": "unsupported",
       "detail": "service name encoding: control character",
       "cases": [
-        {
-          "id": "refuse-provider-control",
-          "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "refuse-provider-control"
       ]
     }
   ]

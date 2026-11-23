@@ -405,22 +405,28 @@
         "mkv-feed-three-tracks-1-aac",
         "mkv-feed-three-tracks-2-aac"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "Triergon refuses an AVC High-profile record that ends before its profile fields (recovery policy)",
-      "clause": "ISO/IEC 14496-15 section 5.3.3.1.2: for AVCProfileIndication 100 the record continues after the PPS list with chroma_format, the bit depths and the SPS extension count.",
-      "candidate": "Refuses the 38-byte and 41-byte records as truncated at the end of the PPS list.",
-      "reference": "Opens both records without the four extension bytes and returns 120 and 48 Annex B packets.",
+      "policy": "Triergon refuses an AVC High-profile record that ends before its profile fields",
+      "undecided": "ISO/IEC 14496-15 section 5.3.3.1.2: for AVCProfileIndication 100 the record continues after the PPS list with chroma_format, the bit depths and the SPS extension count.",
+      "rule": "Refuses the 38-byte and 41-byte records as truncated at the end of the PPS list.",
+      "documented": "crates/bridge/README.md#access-units",
+      "reference_rule": "Opens both records without the four extension bytes and returns 120 and 48 Annex B packets.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "range-mp4-init-nonkeyframe-0-h264",
         "range-mov-stream-shorter-than-movie-0-h264"
       ]
     },
     {
-      "reading": "Triergon refuses a fragment whose sample runs past the source (recovery policy)",
-      "clause": "ISO/IEC 14496-12:2015 sections 8.8.8.2 and 8.8.8.3: a track run's samples lie in the media data; this file ends inside a declared sample.",
-      "candidate": "Checks the whole sample plan first and publishes no access unit.",
-      "reference": "Publishes the two complete earlier packets, then logs a partial file at sample offset 0xd25.",
+      "policy": "Triergon refuses a fragment whose sample runs past the source",
+      "undecided": "ISO/IEC 14496-12:2015 sections 8.8.8.2 and 8.8.8.3: a track run's samples lie in the media data; this file ends inside a declared sample.",
+      "rule": "Checks the whole sample plan first and publishes no access unit.",
+      "documented": "crates/bridge/README.md#access-units",
+      "reference_rule": "Publishes the two complete earlier packets, then logs a partial file at sample offset 0xd25.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "forward-forward-fragment-aac-short-0-h264",
         "forward-forward-fragment-aac-short-1-aac"

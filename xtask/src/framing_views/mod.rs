@@ -218,10 +218,11 @@ fn directory(root: &Path, contract: &Value, listing: &Value) -> Option<PathBuf> 
 }
 
 /// Records each case's reference fold as `expected` and, for every case the contract
-/// lists as open on this target (`open_cases` and `open_deviations`), the
-/// candidate's fold as `candidate_expected`, so that a listed case pins both outputs
-/// of its difference and not only that one exists. A case that is not listed keeps
-/// no candidate pin. A contract pinned per target records this host's entries of
+/// lists on this target in any list of its registry, the candidate's fold as
+/// `candidate_expected`, so that a listed case pins both outputs of its difference
+/// and not only that one exists. A case that is not listed keeps no candidate pin;
+/// a refusal, or a case not comparable with the reference, keeps no reference pin
+/// and its reference is not run. A contract pinned per target records this host's entries of
 /// `expected_by_target` and `candidate_expected_by_target` and keeps the other
 /// targets'; a reference fold that went through a step C leaves to the target keeps
 /// its flag.
@@ -240,8 +241,8 @@ fn reference_pins(
         report::PrefixFeature::load(root, contract_path, manifest_path, directory.as_deref())?;
     let identity = json::read(&root.join("target/harness/identity.json"))?;
     let reference = feature.reference_worker(root, &identity)?;
-    let open = report::open_cases(contract, listing, &target)?;
-    let candidate = if open.is_empty() {
+    let open = report::open(contract, listing, &target)?;
+    let candidate = if open.ids().is_empty() {
         None
     } else {
         Some(crate::generators::built_candidate(
@@ -313,13 +314,16 @@ fn reference_pins(
             cases.push(case);
             continue;
         }
-        let listed = open.iter().any(|open| open == id);
-        let expected = fold(reference.as_path(), reference_prefix, &case)?;
+        let listed = open.get(id);
+        let expected = match listed {
+            Some(listed) if listed.candidate_only => None,
+            _ => Some(fold(reference.as_path(), reference_prefix, &case)?),
+        };
         let observed = match (&candidate, listed) {
-            (Some(candidate), true) => Some(fold(candidate.as_path(), &feature.prefix, &case)?),
+            (Some(candidate), Some(_)) => Some(fold(candidate.as_path(), &feature.prefix, &case)?),
             _ => None,
         };
-        if observed.as_ref() == Some(&expected) {
+        if observed.is_some() && observed == expected {
             return Err(format!(
                 "{id}: listed as open, but the candidate's fold equals the reference's"
             ));
@@ -331,7 +335,7 @@ fn reference_pins(
             ),
             None => ("expected", "candidate_expected"),
         };
-        set_pin(&mut case, reference_key, per_target, Some(expected))?;
+        set_pin(&mut case, reference_key, per_target, expected)?;
         set_pin(&mut case, candidate_key, per_target, observed)?;
         cases.push(case);
     }

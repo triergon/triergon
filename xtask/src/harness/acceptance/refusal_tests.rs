@@ -142,3 +142,80 @@ fn streaming_failure_cannot_omit_required_refusals() {
     )));
     assert!(reasons.contains(&Value::str("refusal: required refusal missing or invalid")));
 }
+
+/// The verdict on the rows of a contract with one policy difference (`p`) and one
+/// justified refusal (`r`).
+fn listed_verdict(rows: &[Value]) -> Vec<String> {
+    let contract = crate::json::parse(
+        r#"{"open_policies": [{"policy": "q", "undecided": "u", "rule": "ours",
+                "documented": "crates/x/README.md#rules", "reference_rule": "theirs",
+                "compat": "none: a heuristic", "cases": ["p"]}],
+            "open_refusals": [{"reason": "r", "clause": "c", "class": "unsupported",
+                "detail": "d", "cases": ["r"]}]}"#,
+    )
+    .unwrap();
+    let verdict = acceptance(
+        Path::new("."),
+        &contract,
+        rows,
+        &Value::Object(Vec::new()),
+        "t",
+        &[],
+        &[],
+    );
+    verdict
+        .get("slice_reasons")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect()
+}
+
+#[test]
+fn only_a_justified_refusal_counts_among_the_listed_cases() {
+    let row = |text: &str| crate::json::parse(text).unwrap();
+    let refused = |named: &str, digest: u32| {
+        row(&format!(
+            r#"{{"id": "r", "parity": {{"status": "pass", "source_timing_status": "pass",
+                "comparison": "registered-fold-refusal",
+                "candidate_expected": {{"packets": 1, "bytes": 0, "digest": 8}},
+                "refusal_proof": {{"named": "{named}", "candidate": {{"packets": 1, "bytes": 0,
+                    "digest": {digest}, "eof": true, "unsupported": "d"}}}}}}}}"#
+        ))
+    };
+    let refusal = refused("d", 8);
+    let policy = row(
+        r#"{"id": "p", "parity": {"status": "listed", "source_timing_status": "listed",
+            "listed": ["open_policies"]}}"#,
+    );
+    let reasons = listed_verdict(&[refusal, policy]);
+    // The policy difference withholds acceptance and is named by its list; the
+    // refusal's proof holds and adds no reason of its own.
+    assert!(
+        reasons.contains(&"p: listed in open_policies".to_owned()),
+        "{reasons:?}"
+    );
+    assert!(
+        !reasons
+            .iter()
+            .any(|r| r.starts_with("r: registered") || r.starts_with("r: listed")),
+        "{reasons:?}"
+    );
+    // A refusal whose recorded proof names another detail, or whose fold is not the
+    // pin recorded with it, is no proof.
+    for forged in [refused("e", 8), refused("d", 9)] {
+        let reasons = listed_verdict(&[forged]);
+        assert!(
+            reasons.contains(&"r: registered fold refusal proof missing or invalid".to_owned()),
+            "{reasons:?}"
+        );
+    }
+    // A listed refusal the report did not see is missing.
+    let reasons = listed_verdict(&[]);
+    assert!(
+        reasons.contains(&"r: required refusal missing or invalid".to_owned()),
+        "{reasons:?}"
+    );
+}

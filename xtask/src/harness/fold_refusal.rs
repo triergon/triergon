@@ -1,289 +1,175 @@
-//! One-sided decoder refusals with complete, input-bound worker folds.
-
-use std::collections::BTreeMap;
+//! The proof of a listed case that compares nothing of the reference: a refusal the
+//! specification justifies, or a feature neither side implements. It holds the
+//! candidate's fold up to the refusal, as pinned, and the detail the candidate
+//! names; what the reference makes of the input is no part of it.
 
 use crate::json::Value;
 
+use super::registry::{Case, Named};
 use super::{comparison, diff, worker};
 
+/// The comparison a justified refusal's row records.
 pub(super) const COMPARISON: &str = "registered-fold-refusal";
+/// The comparison of a case not comparable with the reference that is no refusal.
+pub(super) const CANDIDATE_ONLY: &str = "candidate-only";
+/// The argument that asks a worker to name its refusal on the result line.
 pub(super) const REQUEST: &str = "--report-refusal";
 
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
 }
 
-pub(super) struct Refusal<'a> {
-    sha256: &'a str,
-    detail: &'a str,
-    candidate: &'a Value,
-    compare_reference: bool,
+/// Whether the candidate named `named`: as the `unsupported` value of its result
+/// line `data`, or in its `trace`.
+pub(super) fn names(named: &Named, data: &Value, trace: Option<&str>) -> bool {
+    if named.trace {
+        trace.is_some_and(|trace| trace.contains(&named.detail))
+    } else {
+        text(data, "unsupported") == Some(named.detail.as_str())
+    }
 }
 
-pub(super) fn read<'a>(
-    contract: &'a Value,
-    target: &str,
-) -> Result<BTreeMap<&'a str, Refusal<'a>>, String> {
-    let Some(groups) = contract.get("open_refusals") else {
-        return Ok(BTreeMap::new());
+/// The proof of `case` from the candidate's run `left` and, under trace evidence,
+/// its `trace`: the run finished, its fold equals `pin`, and it names the case's
+/// detail. `None` when any of them fails or the case has no pin.
+pub(super) fn proof(
+    case: &Case,
+    pin: Option<&Value>,
+    left: &Value,
+    trace: Option<&str>,
+    fields: &[String],
+) -> Option<Value> {
+    if !worker::ok(left) {
+        return None;
+    }
+    let candidate = worker::data(left);
+    let named = case.named.as_ref();
+    let holds =
+        folded(candidate, pin?, fields) && named.is_none_or(|named| names(named, candidate, trace));
+    holds.then(|| {
+        Value::object([
+            ("candidate", candidate.clone()),
+            (
+                "named",
+                named.map_or(Value::Null, |named| Value::str(&named.detail)),
+            ),
+        ])
+    })
+}
+
+/// Whether the result line `candidate` finished with exactly the fold `pin`.
+fn folded(candidate: &Value, pin: &Value, fields: &[String]) -> bool {
+    candidate.get("eof") == Some(&Value::Bool(true))
+        && comparison::work_summary(candidate, fields).is_ok_and(|actual| diff::equal(&actual, pin))
+}
+
+/// Whether a report `row` still holds the proof of the refusal `case` against the
+/// candidate's `pin`: the row was neither timed nor measured, its parity records
+/// the refusal, and the recorded candidate result folds to the pin and names the
+/// detail (which a trace's proof records as found).
+pub(super) fn row_holds(row: &Value, case: &Case, pin: Option<&Value>, fields: &[String]) -> bool {
+    let Some(pin) = pin else {
+        return false;
     };
-    let mut all = BTreeMap::new();
-    if text(contract, "worker_operation").is_none() || contract.get("oracle").is_some() {
-        return Err("registered fold refusals require a prefix worker comparison".into());
-    }
-    let groups = groups.as_array().ok_or("open_refusals must be an array")?;
-    let targets = contract
-        .get("required_targets")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
-    let fields = comparison::work_fields(contract)?;
-    for group in groups {
-        let line = |key| {
-            text(group, key)
-                .filter(|text| !text.trim().is_empty() && !text.contains('\n'))
-                .ok_or_else(|| format!("registered fold refusal needs {key}"))
-        };
-        line("reason")?;
-        line("clause")?;
-        let detail = line("detail")?;
-        let active = match group.get("targets") {
-            None => true,
-            Some(scope) => {
-                let scope = scope.as_array().ok_or("invalid refusal targets")?;
-                if scope.is_empty() || scope.iter().any(|entry| !targets.contains(entry)) {
-                    return Err("refusal targets must be among the required targets".into());
-                }
-                scope.iter().any(|value| value.as_str() == Some(target))
-            }
-        };
-        let cases = group
-            .get("cases")
-            .and_then(Value::as_array)
-            .filter(|cases| !cases.is_empty())
-            .ok_or("registered fold refusal needs cases")?;
-        for case in cases {
-            let id = text(case, "id")
-                .filter(|id| !id.is_empty())
-                .ok_or("missing refusal id")?;
-            let sha256 = super::validation::hash(case, "sha256")?;
-            let candidate = case
-                .get("candidate")
-                .ok_or("missing candidate refusal fold")?;
-            if !diff::equal(candidate, &comparison::work_summary(candidate, &fields)?) {
-                return Err(format!(
-                    "{id}: candidate refusal fold has unexpected fields"
-                ));
-            }
-            let compare_reference = match case.get("reference_pin_targets") {
-                None => true,
-                Some(pins) => {
-                    let pins = pins
-                        .as_array()
-                        .filter(|pins| !pins.is_empty() && pins.iter().all(|p| targets.contains(p)))
-                        .ok_or_else(|| {
-                            format!("{id}: reference_pin_targets must name required targets")
-                        })?;
-                    pins.iter().any(|pin| pin.as_str() == Some(target))
-                }
-            };
-            let entry = Refusal {
-                sha256,
-                detail,
-                candidate,
-                compare_reference,
-            };
-            if all.insert(id, active.then_some(entry)).is_some() {
-                return Err(format!("{id}: duplicate registered fold refusal"));
-            }
-        }
-    }
-    Ok(all
-        .into_iter()
-        .filter_map(|(id, entry)| Some((id, entry?)))
-        .collect())
-}
-
-impl Refusal<'_> {
-    pub(super) fn binds_input(&self, sha256: Option<&str>) -> bool {
-        sha256 == Some(self.sha256)
-    }
-
-    pub(super) fn compares_reference(&self) -> bool {
-        self.compare_reference
-    }
-
-    pub(super) fn proof(
-        &self,
-        left: &Value,
-        right: &Value,
-        expected: &Value,
-        fields: &[String],
-    ) -> Option<Value> {
-        if !worker::ok(left) || !worker::ok(right) {
-            return None;
-        }
-        let candidate = worker::data(left);
-        let reference = worker::data(right);
-        self.matches(candidate, reference, expected, fields)
-            .then(|| {
-                Value::object([
-                    ("candidate", candidate.clone()),
-                    ("reference", reference.clone()),
-                ])
-            })
-    }
-
-    fn matches(
-        &self,
-        candidate: &Value,
-        reference: &Value,
-        expected: &Value,
-        fields: &[String],
-    ) -> bool {
-        let eof = Some(&Value::Bool(true));
-        if text(candidate, "unsupported") != Some(self.detail)
-            || candidate.get("eof") != eof
-            || reference.get("eof") != eof
-            || !comparison::work_summary(candidate, fields)
-                .is_ok_and(|actual| diff::equal(&actual, self.candidate))
-        {
-            return false;
-        }
-        comparison::work_summary(reference, fields).is_ok_and(|actual| {
-            !self.compare_reference
-                || (!crate::generators::host_dependent(reference)
-                    && !crate::generators::host_dependent(expected)
-                    && !diff::equal(self.candidate, expected)
-                    && diff::equal(&actual, expected))
+    ["timing", "memory"]
+        .iter()
+        .all(|key| row.get(key).is_none_or(|value| *value == Value::Null))
+        && row.get("parity").is_some_and(|parity| {
+            text(parity, "comparison") == Some(COMPARISON)
+                && parity.get("refusal_proof").is_some_and(|proof| {
+                    let candidate = proof.get("candidate").unwrap_or(&Value::Null);
+                    folded(candidate, pin, fields)
+                        && case.named.as_ref().is_none_or(|named| {
+                            text(proof, "named") == Some(named.detail.as_str())
+                                && (named.trace || names(named, candidate, None))
+                        })
+                })
         })
-    }
-
-    pub(super) fn matches_row(&self, row: &Value, expected: &Value, fields: &[String]) -> bool {
-        self.compare_reference
-            && self.binds_input(text(row, "input_sha256"))
-            && ["timing", "memory"]
-                .iter()
-                .all(|key| row.get(key).is_none_or(|value| *value == Value::Null))
-            && row.get("parity").is_some_and(|parity| {
-                text(parity, "comparison") == Some(COMPARISON)
-                    && parity.get("refusal_proof").is_some_and(|proof| {
-                        self.matches(
-                            proof.get("candidate").unwrap_or(&Value::Null),
-                            proof.get("reference").unwrap_or(&Value::Null),
-                            expected,
-                            fields,
-                        )
-                    })
-            })
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::super::registry::Form;
     use super::*;
     use crate::json::parse;
 
-    #[test]
-    fn registered_refusal_requires_candidate_evidence_and_compares_only_pinned_references() {
-        const PINNED: &str = "aarch64-unknown-linux-gnu";
-        const UNPINNED: &str = "x86_64-unknown-linux-gnu";
-        const SHA: &str = "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade";
-        let contract = parse(&format!(
-            r#"{{
-                "worker_operation": "picture-properties",
-                "required_targets": ["{PINNED}"],
-                "open_refusals": [{{
-                    "reason": "Slice groups", "clause": "H.264 §8.2.2", "detail": "slice groups",
-                    "cases": [
-                        {{"id":"strict","sha256":"{SHA}",
-                          "candidate":{{"packets":2,"bytes":11,"digest":22}}}},
-                        {{"id":"marked","sha256":"{SHA}","reference_pin_targets":["{PINNED}"],
-                          "candidate":{{"packets":2,"bytes":11,"digest":22}}}}
-                    ]
-                }}]
-            }}"#
-        ))
-        .unwrap();
-        let expected = parse(r#"{"packets":4,"bytes":19,"digest":42}"#).unwrap();
-        let outcome = |data| Value::object([("status", Value::str("ok")), ("data", data)]);
-        let left = outcome(
-            parse(
-                r#"{"packets":2,"bytes":11,"digest":22,"unsupported":"slice groups","eof":true}"#,
-            )
-            .unwrap(),
-        );
-        let right = outcome(parse(r#"{"packets":4,"bytes":19,"digest":42,"eof":true}"#).unwrap());
-        let changed = |worker, key, value| {
-            let mut data = worker::data(worker).clone();
-            super::super::validation::put(&mut data, key, value).unwrap();
-            outcome(data)
-        };
-        for target in [PINNED, UNPINNED] {
-            let refusals = read(&contract, target).unwrap();
-            for (id, refusal) in refusals {
-                let compares = id == "strict" || target == PINNED;
-                assert_eq!(refusal.compares_reference(), compares);
-                let proof = refusal.proof(&left, &right, &expected, &[]).unwrap();
-                let row = |sha| {
-                    Value::object([
-                        ("input_sha256", Value::str(sha)),
-                        (
-                            "parity",
-                            Value::object([
-                                ("comparison", Value::str(COMPARISON)),
-                                ("refusal_proof", proof.clone()),
-                            ]),
-                        ),
-                    ])
-                };
-                assert!(refusal.binds_input(Some(SHA)));
-                assert!(!refusal.binds_input(Some("different")));
-                assert_eq!(refusal.matches_row(&row(SHA), &expected, &[]), compares);
-                assert!(!refusal.matches_row(&row("different"), &expected, &[]));
-                for (key, value) in [
-                    ("unsupported", Value::str("other")),
-                    ("digest", Value::int(23)),
-                    ("eof", Value::Bool(false)),
-                ] {
-                    let bad = changed(&left, key, value);
-                    assert!(
-                        refusal.proof(&bad, &right, &expected, &[]).is_none(),
-                        "{key}"
-                    );
-                }
-                for (key, value, passes) in [
-                    ("digest", Value::int(43), !compares),
-                    ("host_dependent", Value::Bool(true), !compares),
-                    ("eof", Value::Bool(false), false),
-                    ("digest", Value::Null, false),
-                ] {
-                    let other = changed(&right, key, value);
-                    assert_eq!(
-                        refusal.proof(&left, &other, &expected, &[]).is_some(),
-                        passes,
-                        "{key}"
-                    );
-                }
-                let mut flagged = expected.clone();
-                super::super::validation::put(&mut flagged, "host_dependent", Value::Bool(true))
-                    .unwrap();
-                assert_eq!(
-                    refusal.proof(&left, &right, &flagged, &[]).is_some(),
-                    !compares
-                );
-                assert_eq!(
-                    refusal
-                        .proof(&left, &left, refusal.candidate, &[])
-                        .is_some(),
-                    !compares
-                );
-                assert!(refusal.proof(&left, &Value::Null, &expected, &[]).is_none());
-                assert!(
-                    refusal
-                        .proof(&Value::Null, &right, &expected, &[])
-                        .is_none()
-                );
-            }
+    fn outcome(data: &str) -> Value {
+        Value::object([("status", Value::str("ok")), ("data", parse(data).unwrap())])
+    }
+
+    fn refusal(trace: bool) -> Case {
+        Case {
+            forms: vec![Form::Refusal],
+            named: Some(Named {
+                detail: if trace {
+                    "invalid data: short box".into()
+                } else {
+                    "slice groups".into()
+                },
+                trace,
+            }),
+            candidate_only: true,
+            unpinned: false,
         }
+    }
+
+    #[test]
+    fn a_refusal_is_proved_by_the_candidate_alone() {
+        let pin = parse(r#"{"packets":2,"bytes":11,"digest":22}"#).unwrap();
+        let left = outcome(
+            r#"{"packets":2,"bytes":11,"digest":22,"unsupported":"slice groups","eof":true}"#,
+        );
+        let case = refusal(false);
+        let proof = proof(&case, Some(&pin), &left, None, &[]).unwrap();
+        assert_eq!(proof.get("named"), Some(&Value::str("slice groups")));
+        let row = |proof: &Value| {
+            Value::object([(
+                "parity",
+                Value::object([
+                    ("comparison", Value::str(COMPARISON)),
+                    ("refusal_proof", proof.clone()),
+                ]),
+            )])
+        };
+        assert!(row_holds(&row(&proof), &case, Some(&pin), &[]));
+        // Another fold, another detail, an unfinished run, a failed run or no pin.
+        for changed in [
+            r#"{"packets":2,"bytes":11,"digest":23,"unsupported":"slice groups","eof":true}"#,
+            r#"{"packets":2,"bytes":11,"digest":22,"unsupported":"other","eof":true}"#,
+            r#"{"packets":2,"bytes":11,"digest":22,"eof":true}"#,
+            r#"{"packets":2,"bytes":11,"digest":22,"unsupported":"slice groups","eof":false}"#,
+        ] {
+            assert!(
+                super::proof(&case, Some(&pin), &outcome(changed), None, &[]).is_none(),
+                "{changed}"
+            );
+            let forged = Value::object([
+                ("candidate", parse(changed).unwrap()),
+                ("named", Value::str("slice groups")),
+            ]);
+            assert!(
+                !row_holds(&row(&forged), &case, Some(&pin), &[]),
+                "{changed}"
+            );
+        }
+        let failed = Value::object([("status", Value::str("worker-error"))]);
+        assert!(super::proof(&case, Some(&pin), &failed, None, &[]).is_none());
+        assert!(super::proof(&case, None, &left, None, &[]).is_none());
+        assert!(!row_holds(&row(&proof), &case, None, &[]));
+        // A measured row is no refusal.
+        let mut timed = row(&proof);
+        super::super::validation::put(&mut timed, "timing", Value::Object(Vec::new())).unwrap();
+        assert!(!row_holds(&timed, &case, Some(&pin), &[]));
+    }
+
+    #[test]
+    fn a_trace_names_the_refusal_where_the_result_line_does_not() {
+        let pin = parse(r#"{"packets":1,"bytes":0,"digest":280}"#).unwrap();
+        let left = outcome(r#"{"packets":1,"bytes":0,"digest":280,"eof":true}"#);
+        let case = refusal(true);
+        let trace = "9 1\n# candidate: invalid data: short box\n";
+        assert!(proof(&case, Some(&pin), &left, Some(trace), &[]).is_some());
+        assert!(proof(&case, Some(&pin), &left, Some("9 1\n"), &[]).is_none());
+        assert!(proof(&case, Some(&pin), &left, None, &[]).is_none());
     }
 }

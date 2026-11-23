@@ -1212,7 +1212,7 @@ fn vector_name(lane: &str, vector: &Value) -> Option<String> {
     }
 }
 
-/// Vectors that differ as listed, with either an open case or a declared deviation.
+/// Vectors that differ as listed: open cases, declared deviations and policy differences.
 /// Every name must be a vector of the manifest.
 fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>, String> {
     let mut open = Vec::new();
@@ -1242,27 +1242,19 @@ fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>
     {
         admit(case)?;
     }
-    for deviation in deviations(manifest) {
-        let line = |key| {
-            deviation
-                .get(key)
-                .and_then(Value::as_str)
-                .is_some_and(|value| !value.trim().is_empty() && !value.contains('\n'))
-        };
+    for (form, deviation) in deviations(manifest) {
         let cases = deviation
             .get("cases")
             .and_then(Value::as_array)
             .unwrap_or_default();
-        if cases.is_empty()
-            || !["reading", "clause", "candidate", "reference"]
-                .into_iter()
-                .all(line)
-            || deviation.get("compat").is_some() && !line("compat")
-            || deviation.get("targets").is_some()
-        {
+        if cases.is_empty() || deviation.get("targets").is_some() {
             return Err(
-                "a codec deviation needs its reading, clause, both results and cases".into(),
+                "a codec deviation or policy difference names its cases and holds on every target"
+                    .into(),
             );
+        }
+        if let Some(error) = crate::harness::registry::entry_error(form, deviation, false) {
+            return Err(error);
         }
         for case in cases {
             admit(case)?;
@@ -1271,11 +1263,13 @@ fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>
     Ok(open)
 }
 
-pub(super) fn deviations(manifest: &Value) -> &[Value] {
-    manifest
-        .get("open_deviations")
-        .and_then(Value::as_array)
-        .unwrap_or_default()
+/// The entries of a manifest's `open_deviations` and `open_policies`, each with its
+/// form: the lists whose vectors both sides decode to pinned, differing output.
+pub(super) fn deviations(
+    manifest: &Value,
+) -> impl Iterator<Item = (crate::harness::registry::Form, &Value)> {
+    use crate::harness::registry::{Form, groups};
+    groups(manifest).filter(|(form, _)| matches!(form, Form::Departure | Form::Policy))
 }
 
 fn all_vectors(manifests: &[Value]) -> Result<Vec<Value>, String> {

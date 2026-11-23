@@ -8931,12 +8931,16 @@
         "unit-signed-position-t1-at5500-eof0-w65536",
         "unit-signed-position-t1-at5500-eof1-w65536"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "Recovery policy the standard leaves open: a damaged later chunk does not stop the demuxer from landing on valid earlier entries",
-      "clause": "ISO/IEC 14496-12:2015 8.7.5.3 and 8.7.3.2.2 make a chunk outside the file or a 2^29-byte final sample invalid and say nothing of the valid samples before it; the compat seek validates every media range before it publishes a landing (crates/isobmff README, Seek)",
-      "candidate": "refuses the whole index once validation reaches the invalid range (Invalid: sample outside media extent)",
-      "reference": "lands on sample 1 at position 28 for queries before 3000 ticks of the co64 movies, and on sample 1 at 675 or sample 4 at 711 of signed-size.mov on a fresh seek",
+      "policy": "Recovery policy the standard leaves open: a damaged later chunk does not stop the demuxer from landing on valid earlier entries",
+      "undecided": "ISO/IEC 14496-12:2015 8.7.5.3 and 8.7.3.2.2 make a chunk outside the file or a 2^29-byte final sample invalid and say nothing of the valid samples before it; the compat seek validates every media range before it publishes a landing (crates/isobmff README, Seek)",
+      "rule": "refuses the whole index once validation reaches the invalid range (Invalid: sample outside media extent)",
+      "documented": "crates/isobmff/README.md#behaviour-and-limits",
+      "reference_rule": "lands on sample 1 at position 28 for queries before 3000 ticks of the co64 movies, and on sample 1 at 675 or sample 4 at 711 of signed-size.mov on a fresh seek",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "unit-sample-end-overflow-t1-at-1-eof0-w1",
         "unit-sample-end-overflow-t1-at-1-eof0-w65536",
@@ -8999,10 +9003,12 @@
       ]
     },
     {
-      "reading": "Seek policy the standard leaves open: a query within the composition shift of the smallest tick has no preceding key",
-      "clause": "ISO/IEC 14496-12:2015 8.6.1 and 8.6.2 define sample times and sync samples but no seek; SeekJob documents the first key entry as its landing when none precedes the query",
-      "candidate": "lands on the first key entry: r-ctts-v1 entry 0 at -1000 ticks, position 731; f-ctts-v1 entry 0 at 0, position 771",
-      "reference": "lands on the last key entry, entry 3 at 2000 (position 767) or 3000 (position 975): the query -2^63+1 less the 1000-tick composition shift wraps to the top of the signed range",
+      "policy": "Seek policy the standard leaves open: a query within the composition shift of the smallest tick has no preceding key",
+      "undecided": "ISO/IEC 14496-12:2015 8.6.1 and 8.6.2 define sample times and sync samples but no seek; SeekJob documents the first key entry as its landing when none precedes the query",
+      "rule": "lands on the first key entry: r-ctts-v1 entry 0 at -1000 ticks, position 731; f-ctts-v1 entry 0 at 0, position 771",
+      "documented": "crates/isobmff/README.md#behaviour-and-limits",
+      "reference_rule": "lands on the last key entry, entry 3 at 2000 (position 767) or 3000 (position 975): the query -2^63+1 less the 1000-tick composition shift wraps to the top of the signed range",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "unit-f-ctts-v1-t1-at-9223372036854775807-eof0-w1",
         "unit-f-ctts-v1-t1-at-9223372036854775807-eof0-w65536",

@@ -1581,59 +1581,34 @@
       "cases": [
         "dvb-source-separate-descriptors-service-0"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "Triergon's strict PES reader discards a DVB subtitle PES whose PES_packet_length is 0, and DvbTsBridge reports it as DvbStep::Discarded (recovery policy)",
-      "clause": "ITU-T H.222.0 (08/2023) section 2.4.3.7: a PES_packet_length of 0 is allowed only in PES packets whose payload is a video elementary stream carried in transport stream packets.",
-      "candidate": "Reports each of the two PES as discarded with Error::Invalid and publishes nothing (9 0).",
-      "reference": "Ends each PES at the next unit start and decodes pictures at 1000000 and 2000000 us.",
+      "policy": "Triergon's strict PES reader discards a DVB subtitle PES whose PES_packet_length is 0, and DvbTsBridge reports it as DvbStep::Discarded",
+      "undecided": "ITU-T H.222.0 (08/2023) section 2.4.3.7: a PES_packet_length of 0 is allowed only in PES packets whose payload is a video elementary stream carried in transport stream packets.",
+      "rule": "Reports each of the two PES as discarded with Error::Invalid and publishes nothing (9 0).",
+      "documented": "crates/bridge/README.md#subtitles",
+      "reference_rule": "Ends each PES at the next unit start and decodes pictures at 1000000 and 2000000 us.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "dvb-pes-unbounded-ts"
       ]
     }
   ],
-  "open_refusals": [
+  "open_unimplemented": [
     {
-      "reason": "The default DVB binding needs one subtitling service",
+      "feature": "The default DVB binding needs one subtitling service",
+      "documented": "crates/bridge/README.md#subtitles",
       "clause": "ETSI EN 300 468 V1.18.1 section 6.2.41 lists every subtitling service of a PID and leaves the choice to the receiver; DvbTsBridge::new requires a single service descriptor for the PID and refuses otherwise with Unsupported; DvbTsBridge::new_for_service decodes one service a caller identifies.",
+      "candidate": "Refuses the binding as unsupported: DVB bridge requires one subtitling service",
+      "reference": "Decodes the subtitles of the PID",
       "detail": "DVB bridge requires one subtitling service",
       "cases": [
-        {
-          "id": "dvb-services-two-ts",
-          "sha256": "52f13b5840224f50475ab65853d48cea1103a4bd79da9685356b0be17d4538d7",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 280
-          }
-        },
-        {
-          "id": "dvb-services-two-ordered-ts",
-          "sha256": "c11b39f9956893002f65788e1a3c750a3fbf7d8e15383781c46887edb0262834",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 280
-          }
-        },
-        {
-          "id": "dvb-source-combined-services",
-          "sha256": "95cbe2f47853bc613482ecf9521995b0b64dd53c7c6b6dc34452cd44d515db32",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 280
-          }
-        },
-        {
-          "id": "dvb-source-separate-descriptors",
-          "sha256": "1a2346dc1b16f6afcb9f11f56e5c68b392d2286355ec9210b20d25ca80a93fa1",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 280
-          }
-        }
+        "dvb-services-two-ts",
+        "dvb-services-two-ordered-ts",
+        "dvb-source-combined-services",
+        "dvb-source-separate-descriptors"
       ]
     }
   ]

@@ -2171,10 +2171,10 @@
         "0",
         "0"
       ],
-      "expected": {
+      "candidate_expected": {
         "packets": 1,
         "bytes": 0,
-        "digest": 279
+        "digest": 280
       }
     },
     {

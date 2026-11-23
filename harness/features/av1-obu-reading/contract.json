@@ -40,31 +40,12 @@
       ]
     },
     {
-      "reading": "A set obu_forbidden_bit is reported as a diagnostic here and refused by the reference",
-      "clause": "AV1 Bitstream v1.0.0 with Errata 1 clauses 5.3.2–5.3.3 and 6.2.2–6.2.3 (header and extension zero bits): obu_forbidden_bit must be 0, so the stream does not conform, and no clause says whether a reader goes on",
-      "candidate": "retains the complete OBU and reports the offending bits in the wire view",
-      "reference": "refuses the packet",
-      "cases": [
-        "zero-bit-issues-1-0-w1",
-        "zero-bit-issues-1-1-w1"
-      ]
-    },
-    {
       "reading": "Low-overhead OBUs carry their own size field",
       "clause": "AV1 Bitstream v1.0.0 with Errata 1 clause 5.2 (obu_has_size_field shall equal 1)",
       "candidate": "refuses the size-less unit in low-overhead mode; a caller that knows the extent reads the unit as Av1ObuFraming::OneObu",
       "reference": "uses its packet boundary as the extent and emits the size-less unit",
       "cases": [
         "low-unsized-w1"
-      ]
-    },
-    {
-      "reading": "A temporal unit above the configured OBU count is refused; the reference reads it",
-      "clause": "AV1 Bitstream v1.0.0 with Errata 1 clause 5.2 (series of OBUs) and Av1ObuLimits::maximum_obus; the specification sets no count of OBUs in a temporal unit, so the 65-OBU unit is valid and the refusal is the resource limit the caller sets",
-      "candidate": "returns the first 64 delimiters then refuses the 65th",
-      "reference": "emits all 65 delimiters",
-      "cases": [
-        "obu-count-limit-w1"
       ]
     }
   ],
@@ -446,6 +427,31 @@
         "obu-count-limit-w1"
       ],
       "cause": "declared differences or a recovered complete prefix"
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "A set obu_forbidden_bit is reported as a diagnostic here and refused by the reference",
+      "undecided": "AV1 Bitstream v1.0.0 with Errata 1 clauses 5.3.2–5.3.3 and 6.2.2–6.2.3 (header and extension zero bits): obu_forbidden_bit must be 0, so the stream does not conform, and no clause says whether a reader goes on",
+      "rule": "retains the complete OBU and reports the offending bits in the wire view",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "reference_rule": "refuses the packet",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "zero-bit-issues-1-0-w1",
+        "zero-bit-issues-1-1-w1"
+      ]
+    },
+    {
+      "policy": "A temporal unit above the configured OBU count is refused; the reference reads it",
+      "undecided": "AV1 Bitstream v1.0.0 with Errata 1 clause 5.2 (series of OBUs) and Av1ObuLimits::maximum_obus; the specification sets no count of OBUs in a temporal unit, so the 65-OBU unit is valid and the refusal is the resource limit the caller sets",
+      "rule": "returns the first 64 delimiters then refuses the 65th",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "reference_rule": "emits all 65 delimiters",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "obu-count-limit-w1"
+      ]
     }
   ]
 }

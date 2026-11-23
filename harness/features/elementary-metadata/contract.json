@@ -902,31 +902,39 @@
       "cases": [
         "he-free.bit"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "The 4 MiB metadata retention limit drops a larger FLAC comment block (a resource limit of ours)",
-      "clause": "RFC 9639 sections 8.1 and 8.6 allow comment blocks of up to 2^24 - 1 bytes; the elementary reader's Limits::retained_metadata_bytes keeps 4 MiB by default.",
-      "candidate": "Returns the track without the unretained comments.",
-      "reference": "Publishes the 16770684-byte comment, or eight joined fields of up to 15848084 bytes in the combined file.",
+      "policy": "The 4 MiB metadata retention limit drops a larger FLAC comment block",
+      "undecided": "RFC 9639 sections 8.1 and 8.6 allow comment blocks of up to 2^24 - 1 bytes; the elementary reader's Limits::retained_metadata_bytes keeps 4 MiB by default.",
+      "rule": "Returns the track without the unretained comments.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "Publishes the 16770684-byte comment, or eight joined fields of up to 15848084 bytes in the combined file.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "51---extremely-large-vorbiscomment.flac",
         "55---file-48-53-combined.flac"
       ]
     },
     {
-      "reading": "Stream facts from a CRC-checked frame of a file without a FLAC header (a capability of ours)",
-      "clause": "RFC 9639 sections 6 and 9.1 require fLaC and STREAMINFO first, so this file is not conforming; a frame header carries its own rate and channels. The elementary reader documents markerless access.",
-      "candidate": "Reports 44100 Hz and one channel from the first confirmed frame, with no STREAMINFO and no duration.",
-      "reference": "Reports no rate, channels, STREAMINFO or duration.",
+      "policy": "Stream facts from a CRC-checked frame of a file without a FLAC header",
+      "undecided": "RFC 9639 sections 6 and 9.1 require fLaC and STREAMINFO first, so this file is not conforming; a frame header carries its own rate and channels. The elementary reader documents markerless access.",
+      "rule": "Reports 44100 Hz and one channel from the first confirmed frame, with no STREAMINFO and no duration.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "Reports no rate, channels, STREAMINFO or duration.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "11---file-starting-with-unparsable-data.flac"
       ]
     },
     {
-      "reading": "A leading ID3v2 tag before AC-3 or E-AC-3 is read (a capability of ours)",
-      "clause": "ID3v2.4 main structure section 3.1 and native frames section 4.2 define the tag; ATSC A/52 does not carry tags, and the elementary reader reads a leading tag before any audio format.",
-      "candidate": "Reports the syncframe properties and the tag's text: TITLE Hello, or the twelve mapped text fields.",
-      "reference": "Reports the same syncframe properties with an empty dictionary.",
+      "policy": "A leading ID3v2 tag before AC-3 or E-AC-3 is read",
+      "undecided": "ID3v2.4 main structure section 3.1 and native frames section 4.2 define the tag; ATSC A/52 does not carry tags, and the elementary reader reads a leading tag before any audio format.",
+      "rule": "Reports the syncframe properties and the tag's text: TITLE Hello, or the twelve mapped text fields.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "Reports the same syncframe properties with an empty dictionary.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "ac3-tags.ac3",
         "ac3-id3v2",
@@ -934,20 +942,24 @@
       ]
     },
     {
-      "reading": "APEv2 titles are read (a capability of ours)",
-      "clause": "The APEv2 specification (layout of APE tags and of items) defines the APETAGEX header and footer and text items; Reader::tags exposes the trailing tag.",
-      "candidate": "Adds title Test to the MPEG audio file's dictionary and title Hello in the standalone APEv2 case.",
-      "reference": "Does not read APEv2: keeps the MPEG file's encoder key alone, and an empty dictionary.",
+      "policy": "APEv2 titles are read",
+      "undecided": "The APEv2 specification (layout of APE tags and of items) defines the APETAGEX header and footer and text items; Reader::tags exposes the trailing tag.",
+      "rule": "Adds title Test to the MPEG audio file's dictionary and title Hello in the standalone APEv2 case.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "Does not read APEv2: keeps the MPEG file's encoder key alone, and an empty dictionary.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "mp3-tags-tail.mp3",
         "apev2"
       ]
     },
     {
-      "reading": "A leading ID3v2 and a trailing ID3v1 tag disagree; no standard orders them (policy)",
-      "clause": "ID3v2.4 section 3.1 places ID3v2 before the audio and ID3v1 is a 128-byte trailer; neither ISO/IEC 13818-7 nor the tag documents say which a reader shows.",
-      "candidate": "Publishes the leading ID3v2 title Hello at the first packet; the trailer is not read for ADTS.",
-      "reference": "Publishes the trailing ID3v1 title Title, artist Artist and date 2026 at the same point.",
+      "policy": "A leading ID3v2 and a trailing ID3v1 tag disagree; no standard orders them",
+      "undecided": "ID3v2.4 section 3.1 places ID3v2 before the audio and ID3v1 is a 128-byte trailer; neither ISO/IEC 13818-7 nor the tag documents say which a reader shows.",
+      "rule": "Publishes the leading ID3v2 title Hello at the first packet; the trailer is not read for ADTS.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "Publishes the trailing ID3v1 title Title, artist Artist and date 2026 at the same point.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "adts-tags.aac"
       ]

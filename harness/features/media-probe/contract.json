@@ -27854,12 +27854,16 @@
         "container-mpegts-access-units-crates-mpegts-tests-data-transport-sync-loss.ts-65536",
         "container-mpegts-access-units-crates-mpegts-tests-data-transport-sync-loss.ts-whole"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "No standard decides how many bytes identify Matroska; our rule selects it from the EBML header ID, the reference names no format from these bytes",
-      "clause": "RFC 8794 \u00a7\u00a77 and 11.2 reserve the EBML header ID 0x1A45DFA3 and RFC 9559 \u00a74 identifies Matroska by the header's DocType; neither says what a probe answers from 4, 8 or 32 bytes. Our rule: triergon_core::signature::select, described in crates/triergon/README.md (Behaviour and limits).",
-      "candidate": "Selects Matroska from the four-byte ID at byte 0 of a 32-byte prefix.",
-      "reference": "Names no format (score 0) and so recommends a larger probe buffer.",
+      "policy": "Whether a probe names Matroska from the EBML header ID alone, before the DocType that identifies it",
+      "undecided": "RFC 8794 \u00a7\u00a77 and 11.2 reserve the EBML header ID 0x1A45DFA3 and RFC 9559 \u00a74 identifies Matroska by the header's DocType; neither says what a probe answers from 4, 8 or 32 bytes.",
+      "rule": "Selects Matroska from the four-byte ID at byte 0 of a 32-byte prefix.",
+      "documented": "crates/triergon/README.md#behaviour-and-limits",
+      "reference_rule": "Names no format (score 0) and so recommends a larger probe buffer.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "container-carriage-trace-harness-features-text-extraction-inputs-ass-empty-not-clear.mkv-32",
         "container-carriage-trace-harness-features-text-extraction-inputs-ass-invalid-utf8-unvalidated.mkv-32",
@@ -28144,10 +28148,12 @@
       ]
     },
     {
-      "reading": "No standard decides how many frames identify an elementary stream; our rule selects it from two frame headers, the reference ranks it first and asks for more bytes",
-      "clause": "ISO/IEC 11172-3 \u00a72.4.2.3, ISO/IEC 13818-7 \u00a76.2, ATSC A/52:2018 \u00a75.4.1 and Annex E, and RFC 9639 \u00a79.1 define frame headers, not how many a probe needs. Our rule: crates/elementary/README.md (two headers that agree; FLAC by a header the next one numbers on from).",
-      "candidate": "Selects the stream (FLAC, MPEG audio, ADTS or the AC-3 family) and asks for no more bytes.",
-      "reference": "Ranks the same format first at a score of at most AVPROBE_SCORE_RETRY, so it recommends a larger probe buffer; the records differ in that word alone.",
+      "policy": "How many frames identify an elementary stream",
+      "undecided": "ISO/IEC 11172-3 \u00a72.4.2.3, ISO/IEC 13818-7 \u00a76.2, ATSC A/52:2018 \u00a75.4.1 and Annex E, and RFC 9639 \u00a79.1 define frame headers, not how many a probe needs.",
+      "rule": "Selects the stream (FLAC, MPEG audio, ADTS or the AC-3 family) and asks for no more bytes.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "Ranks the same format first at a score of at most AVPROBE_SCORE_RETRY, so it recommends a larger probe buffer; the records differ in that word alone.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "10---file-starting-at-frame-header.flac-2048",
         "10---file-starting-at-frame-header.flac-65536",
@@ -28245,10 +28251,12 @@
       ]
     },
     {
-      "reading": "No standard decides whether a probe names a format before it is sure; ours names none and asks for more bytes, the reference ranks a best guess, here the stream's own format",
-      "clause": "No specification defines a probe's answer before the input decides it; the wire syntax (ISO/IEC 11172-3, ISO/IEC 13818-7, ATSC A/52:2018, RFC 9639, ITU-T H.222.0, ITU-T H.264) defines only frames, packets and byte streams. Our rule: triergon_elementary::probe returns None while the prefix is too short to tell, and triergon::probe answers Probed::Need.",
-      "candidate": "Names no format and asks for more bytes.",
-      "reference": "Ranks the stream's own format first at a score of at most AVPROBE_SCORE_RETRY and recommends a larger probe buffer.",
+      "policy": "Whether a probe names a format before it is sure",
+      "undecided": "No specification defines a probe's answer before the input decides it; the wire syntax (ISO/IEC 11172-3, ISO/IEC 13818-7, ATSC A/52:2018, RFC 9639, ITU-T H.222.0, ITU-T H.264) defines only frames, packets and byte streams.",
+      "rule": "Names no format and asks for more bytes.",
+      "documented": "triergon_elementary::probe",
+      "reference_rule": "Ranks the stream's own format first at a score of at most AVPROBE_SCORE_RETRY and recommends a larger probe buffer.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "10---file-starting-at-frame-header.flac-32",
         "ac3-junk-1024-2048",
@@ -28317,10 +28325,12 @@
       ]
     },
     {
-      "reading": "No standard decides whether a probe names a format before it is sure; ours names none and asks for more bytes, the reference ranks a best guess, here another format",
-      "clause": "No specification defines a probe's answer before the input decides it; the wire syntax (ISO/IEC 11172-3, ISO/IEC 13818-7, ATSC A/52:2018, RFC 9639, ITU-T H.222.0, ITU-T H.264) defines only frames, packets and byte streams. Our rule: triergon_elementary::probe returns None while the prefix is too short to tell, and triergon::probe answers Probed::Need.",
-      "candidate": "Names no format and asks for more bytes.",
-      "reference": "Ranks another format first (MPEG audio for an ID3v2 tag, MPEG-TS for raw Annex B video) at a score of at most AVPROBE_SCORE_RETRY and recommends a larger probe buffer.",
+      "policy": "Whether a probe names a format before it is sure",
+      "undecided": "No specification defines a probe's answer before the input decides it; the wire syntax (ISO/IEC 11172-3, ISO/IEC 13818-7, ATSC A/52:2018, RFC 9639, ITU-T H.222.0, ITU-T H.264) defines only frames, packets and byte streams.",
+      "rule": "Names no format and asks for more bytes.",
+      "documented": "triergon_elementary::probe",
+      "reference_rule": "Ranks another format first (MPEG audio for an ID3v2 tag, MPEG-TS for raw Annex B video) at a score of at most AVPROBE_SCORE_RETRY and recommends a larger probe buffer.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "11---file-starting-with-unparsable-data.flac-2048",
         "aac-id3v2-32",
@@ -28336,10 +28346,12 @@
       ]
     },
     {
-      "reading": "No standard decides whether a probe recovers FLAC behind other bytes; ours does from a frame its CRC-16 confirms, the reference names no format",
-      "clause": "RFC 9639 \u00a76 starts a FLAC stream with the fLaC marker, so these inputs are not conforming streams, and \u00a79.1 (frame sync code and CRC) makes a recovery possible, not required. Our rule: crates/elementary/README.md.",
-      "candidate": "Selects FLAC from a frame header after other bytes whose CRC-16 holds.",
-      "reference": "Names no format: score 0 on the 65536-byte prefix, and the opener refuses the whole input.",
+      "policy": "Whether a probe recovers FLAC behind other bytes",
+      "undecided": "RFC 9639 \u00a76 starts a FLAC stream with the fLaC marker, so these inputs are not conforming streams, and \u00a79.1 (frame sync code and CRC) makes a recovery possible, not required.",
+      "rule": "Selects FLAC from a frame header after other bytes whose CRC-16 holds.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "Names no format: score 0 on the 65536-byte prefix, and the opener refuses the whole input.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "11---file-starting-with-unparsable-data.flac-65536",
         "11---file-starting-with-unparsable-data.flac-whole",
@@ -28358,10 +28370,12 @@
       ]
     },
     {
-      "reading": "No standard decides whether one frame and a cut header make a stream; ours asks a second header to confirm the first, the reference's opener accepts the first",
-      "clause": "ISO/IEC 11172-3 \u00a72.4.2.3 and ISO/IEC 13818-7 \u00a76.2 define the frame header and length, not how many frames a probe needs. Our rule: crates/elementary/README.md (a following header confirms a frame; three bytes are not a header).",
-      "candidate": "Names no stream: the input ends three bytes into the second header.",
-      "reference": "The opener selects MPEG audio or AAC (score 1) for the whole input.",
+      "policy": "Whether one frame and a cut header make a stream",
+      "undecided": "ISO/IEC 11172-3 \u00a72.4.2.3 and ISO/IEC 13818-7 \u00a76.2 define the frame header and length, not how many frames a probe needs.",
+      "rule": "Names no stream: the input ends three bytes into the second header.",
+      "documented": "crates/elementary/README.md#behaviour-and-limits",
+      "reference_rule": "The opener selects MPEG audio or AAC (score 1) for the whole input.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "aac-short-second-2048",
         "aac-short-second-65536",
@@ -28372,10 +28386,12 @@
       ]
     },
     {
-      "reading": "No standard decides which of two cut-short signatures wins; ours tests the EBML header ID first, the reference's opener selects MOV",
-      "clause": "RFC 8794 \u00a711.2 reserves the EBML ID at byte 0 and ISO/IEC 14496-12:2015 \u00a74.2 places a box type at bytes 4 to 7; in this 24-byte input both the EBML header's size and the box's size run past its end. Our rule: triergon_core::signature::select tests an EBML header first.",
-      "candidate": "Selects Matroska.",
-      "reference": "The opener selects MOV (score 100).",
+      "policy": "Which of two cut-short signatures wins",
+      "undecided": "RFC 8794 \u00a711.2 reserves the EBML ID at byte 0 and ISO/IEC 14496-12:2015 \u00a74.2 places a box type at bytes 4 to 7; in this 24-byte input both the EBML header's size and the box's size run past its end.",
+      "rule": "Selects Matroska.",
+      "documented": "triergon_core::signature::select",
+      "reference_rule": "The opener selects MOV (score 100).",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "two-signatures-2048",
         "two-signatures-32",
@@ -28384,10 +28400,12 @@
       ]
     },
     {
-      "reading": "No standard decides a prefix whose sync bytes fit both carrier spacings; ours selects TS188, the reference names no format",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 defines the 188-byte packet and no 192-byte carrier, so it cannot resolve the two spacings. Our rule: crates/triergon/README.md (Behaviour and limits), TS188 wins when both spacings match.",
-      "candidate": "Selects MPEG transport at the 188-byte spacing.",
-      "reference": "Names no format: the bytes probe scores 0, the opener refuses the stream.",
+      "policy": "A prefix whose sync bytes fit both carrier spacings",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 defines the 188-byte packet and no 192-byte carrier, so it cannot resolve the two spacings.",
+      "rule": "Selects MPEG transport at the 188-byte spacing.",
+      "documented": "crates/triergon/README.md#behaviour-and-limits",
+      "reference_rule": "Names no format: the bytes probe scores 0, the opener refuses the stream.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "ts-both-spacings-2048",
         "ts-both-spacings-65536",

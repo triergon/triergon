@@ -522,12 +522,16 @@
         "desc-4294967295,1,1-ordinary",
         "desc-4294967295,1,1-tiny"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "Recovery policy the standard leaves open: an invalid description index on the last chunk",
-      "clause": "ISO/IEC 14496-12:2015 8.7.4.3 makes index 0 invalid and says nothing of what a reader then does; the run profile refuses invalid stsc rows",
-      "candidate": "refuses the stsc rows of desc-1,1,0 (Invalid: stsc order/count/description)",
-      "reference": "reads all six samples at their positions 675 to 735 with the decode times stts gives",
+      "policy": "Recovery policy the standard leaves open: an invalid description index on the last chunk",
+      "undecided": "ISO/IEC 14496-12:2015 8.7.4.3 makes index 0 invalid and says nothing of what a reader then does; the run profile refuses invalid stsc rows",
+      "rule": "refuses the stsc rows of desc-1,1,0 (Invalid: stsc order/count/description)",
+      "documented": "triergon_isobmff::table::RunRecoveryBuilder",
+      "reference_rule": "reads all six samples at their positions 675 to 735 with the decode times stts gives",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "desc-1,1,0-ordinary",
         "desc-1,1,0-tiny"

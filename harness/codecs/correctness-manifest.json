@@ -1,16 +1,42 @@
 {
  "schema": "triergon.codecs.correctness-manifest.v1",
- "open_deviations": [
-  {
-   "reading": "A FLAC layout of front left, top back centre and top back right has no reference on the stereo device path",
-   "clause": "RFC 9639 section 8.6.2 permits the channel mask; no clause defines a stereo downmix of these speakers, and the reference's converter refuses the layout",
-   "candidate": "Matches the native decoded PCM and emits 52920 stereo samples per channel.",
-   "reference": "Matches the native decoded PCM and refuses the FL+TBC+TBR layout on the stereo path with zero output.",
-   "cases": ["flac_3ch_odd_mask.flac"]
-  }
- ],
  "open_refusals": [
   {
+   "kind": "video-grade",
+   "reason": "The stream's PPS sets the bits the 2013 edition left as extension data; since the 2014 edition they are the range, multilayer, 3D and screen content extension flags, and the range extension they then enable is not one a 4:2:0 stream may carry",
+   "clause": "ITU-T H.265 §7.4.3.3.2: cross_component_prediction_enabled_flag shall be 0 unless ChromaArrayType is 3; EXT_A_ericsson_4.bit is the stream regenerated with the extension flags zero",
+   "class": "invalid",
+   "detail": "invalid HEVC data: bitstream overrun",
+   "cases": [
+    {
+     "id": "EXT_A_ericsson_3.bit",
+     "decoder": "ffmpeg-refused",
+     "output": "reference-produced-nothing",
+     "pictures": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  }
+ ],
+ "open_policies": [
+  {
+   "policy": "A FLAC layout of front left, top back centre and top back right has no reference on the stereo device path",
+   "undecided": "RFC 9639 section 8.6.2 permits the channel mask; no clause defines a stereo downmix of these speakers, and the reference's converter refuses the layout",
+   "rule": "Matches the native decoded PCM and emits 52920 stereo samples per channel.",
+   "documented": "crates/session/README.md#behaviour-and-limits",
+   "reference_rule": "Matches the native decoded PCM and refuses the FL+TBC+TBR layout on the stereo path with zero output.",
+   "compat": "none: no compat item reproduces the reference's rule",
+   "cases": [
+    "flac_3ch_odd_mask.flac"
+   ]
+  }
+ ],
+ "open_unimplemented": [
+  {
+   "documented": "crates/codec-h264/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "unimplemented",
    "kind": "video-grade",
@@ -18,13 +44,50 @@
    "detail": "flexible macroblock ordering",
    "reason": "The decoder supports one slice group and refuses flexible macroblock ordering. The reference does not implement it either: it emits no picture for three streams and error concealment for the fourth, so its output is no reference and its picture count is not pinned.",
    "cases": [
-    {"id": "FM1_BT_B.h264", "decoder": "failed-exit", "output": "fail", "pictures": [50, 0, 0]},
-    {"id": "FM1_FT_E.264", "decoder": "decoder-error", "output": "fail", "pictures": [119, 305, 119]},
-    {"id": "FM2_SVA_B.264", "decoder": "ffmpeg-refused", "output": "reference-produced-nothing", "pictures": [0, 0, 0]},
-    {"id": "FM2_SVA_C.264", "decoder": "ffmpeg-refused", "output": "reference-produced-nothing", "pictures": [0, 0, 0]}
+    {
+     "id": "FM1_BT_B.h264",
+     "decoder": "failed-exit",
+     "output": "fail",
+     "pictures": [
+      50,
+      0,
+      0
+     ]
+    },
+    {
+     "id": "FM1_FT_E.264",
+     "decoder": "decoder-error",
+     "output": "fail",
+     "pictures": [
+      119,
+      305,
+      119
+     ]
+    },
+    {
+     "id": "FM2_SVA_B.264",
+     "decoder": "ffmpeg-refused",
+     "output": "reference-produced-nothing",
+     "pictures": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "id": "FM2_SVA_C.264",
+     "decoder": "ffmpeg-refused",
+     "output": "reference-produced-nothing",
+     "pictures": [
+      0,
+      0,
+      0
+     ]
+    }
    ]
   },
   {
+   "documented": "crates/codec-h264/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "decodes",
    "kind": "video-grade",
@@ -32,11 +95,30 @@
    "detail": "SP/SI slices",
    "reason": "The decoder supports I, P and B slice prediction and refuses the Extended-profile SP or SI slice, which it does not implement. The planar example decodes on after the refusal; only the ten pictures before it, which equal the reference's, are pinned.",
    "cases": [
-    {"id": "sp1_bt_a.h264", "decoder": "decoder-error", "output": "fail", "pictures": [10, 400, 10]},
-    {"id": "sp2_bt_b.h264", "decoder": "decoder-error", "output": "fail", "pictures": [10, 400, 10]}
+    {
+     "id": "sp1_bt_a.h264",
+     "decoder": "decoder-error",
+     "output": "fail",
+     "pictures": [
+      10,
+      400,
+      10
+     ]
+    },
+    {
+     "id": "sp2_bt_b.h264",
+     "decoder": "decoder-error",
+     "output": "fail",
+     "pictures": [
+      10,
+      400,
+      10
+     ]
+    }
    ]
   },
   {
+   "documented": "crates/codec-h264/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "decodes",
    "kind": "video-grade",
@@ -44,11 +126,30 @@
    "detail": "chroma format 4:2:2 / 4:4:4",
    "reason": "The decoder supports 4:2:0 and monochrome and refuses the High 4:2:2 chroma.",
    "cases": [
-    {"id": "Hi422FR10_SONY_B.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 5, 0]},
-    {"id": "Hi422FR1_SONY_A.jsv", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 5, 0]}
+    {
+     "id": "Hi422FR10_SONY_B.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      5,
+      0
+     ]
+    },
+    {
+     "id": "Hi422FR1_SONY_A.jsv",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      5,
+      0
+     ]
+    }
    ]
   },
   {
+   "documented": "crates/codec-h264/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "decodes",
    "kind": "video-grade",
@@ -56,25 +157,170 @@
    "detail": "bit depth > 8",
    "reason": "The decoder supports 8-bit samples and refuses the signalled higher bit depth.",
    "cases": [
-    {"id": "Hi422FR13_SONY_B.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 5, 0]},
-    {"id": "Hi422FR6_SONY_A.jsv", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 5, 0]},
-    {"id": "PPH10I1_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH10I2_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH10I3_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH10I4_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH10I5_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH10I6_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH10I7_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH422I1_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH422I2_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH422I3_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH422I4_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH422I5_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH422I6_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]},
-    {"id": "PPH422I7_Panasonic_A.264", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 10, 0]}
+    {
+     "id": "Hi422FR13_SONY_B.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      5,
+      0
+     ]
+    },
+    {
+     "id": "Hi422FR6_SONY_A.jsv",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      5,
+      0
+     ]
+    },
+    {
+     "id": "PPH10I1_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH10I2_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH10I3_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH10I4_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH10I5_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH10I6_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH10I7_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH422I1_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH422I2_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH422I3_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH422I4_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH422I5_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH422I6_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    },
+    {
+     "id": "PPH422I7_Panasonic_A.264",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      10,
+      0
+     ]
+    }
    ]
   },
   {
+   "documented": "crates/codec-hevc/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "decodes",
    "kind": "video-grade",
@@ -82,13 +328,50 @@
    "detail": "chroma_format_idc 2 (4:2:2, RExt)",
    "reason": "The decoder supports 4:2:0 and refuses Range Extensions 4:2:2 chroma.",
    "cases": [
-    {"id": "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 3, 0]},
-    {"id": "IPCM_A_RExt_NEC.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 1, 0]},
-    {"id": "Main_422_10_A_RExt_Sony_1.bin", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 24, 0]},
-    {"id": "Main_422_10_B_RExt_Sony_1.bin", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 17, 0]}
+    {
+     "id": "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      3,
+      0
+     ]
+    },
+    {
+     "id": "IPCM_A_RExt_NEC.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      1,
+      0
+     ]
+    },
+    {
+     "id": "Main_422_10_A_RExt_Sony_1.bin",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      24,
+      0
+     ]
+    },
+    {
+     "id": "Main_422_10_B_RExt_Sony_1.bin",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      17,
+      0
+     ]
+    }
    ]
   },
   {
+   "documented": "crates/codec-hevc/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "decodes",
    "kind": "video-grade",
@@ -96,14 +379,60 @@
    "detail": "chroma_format_idc 3 (4:4:4, RExt)",
    "reason": "The decoder supports 4:2:0 and refuses Range Extensions 4:4:4 chroma.",
    "cases": [
-    {"id": "IPCM_B_RExt_NEC.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 1, 0]},
-    {"id": "PERSIST_RPARAM_A_RExt_Sony_1.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 2, 0]},
-    {"id": "PERSIST_RPARAM_A_RExt_Sony_3.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 2, 0]},
-    {"id": "QMATRIX_A_RExt_Sony_1.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 20, 0]},
-    {"id": "SAO_A_RExt_MediaTek_1.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 8, 0]}
+    {
+     "id": "IPCM_B_RExt_NEC.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      1,
+      0
+     ]
+    },
+    {
+     "id": "PERSIST_RPARAM_A_RExt_Sony_1.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      2,
+      0
+     ]
+    },
+    {
+     "id": "PERSIST_RPARAM_A_RExt_Sony_3.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      2,
+      0
+     ]
+    },
+    {
+     "id": "QMATRIX_A_RExt_Sony_1.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      20,
+      0
+     ]
+    },
+    {
+     "id": "SAO_A_RExt_MediaTek_1.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      8,
+      0
+     ]
+    }
    ]
   },
   {
+   "documented": "crates/codec-hevc/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "decodes",
    "kind": "video-grade",
@@ -111,10 +440,20 @@
    "detail": "transform_skip_rotation_enabled_flag (RExt)",
    "reason": "The decoder refuses the Range Extensions transform-skip rotation tool.",
    "cases": [
-    {"id": "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit", "decoder": "refused-unsupported", "output": "fail", "pictures": [0, 3, 0]}
+    {
+     "id": "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+     "decoder": "refused-unsupported",
+     "output": "fail",
+     "pictures": [
+      0,
+      3,
+      0
+     ]
+    }
    ]
   },
   {
+   "documented": "crates/codec-hevc/README.md#behaviour-and-limits",
    "basis": "unimplemented",
    "reference": "unimplemented",
    "kind": "video-grade",
@@ -122,12 +461,19 @@
    "detail": "unequal luma/chroma bit depth",
    "reason": "The decoder refuses unequal luma and chroma bit depths, which it does not implement. The reference does not implement them either and emits no picture.",
    "cases": [
-    {"id": "TSUNEQBD_A_MAIN10_Technicolor_2.bit", "decoder": "ffmpeg-refused", "output": "reference-produced-nothing", "pictures": [0, 0, 0]}
+    {
+     "id": "TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+     "decoder": "ffmpeg-refused",
+     "output": "reference-produced-nothing",
+     "pictures": [
+      0,
+      0,
+      0
+     ]
+    }
    ]
   }
  ],
- "open_cases": ["EXT_A_ericsson_3.bit"],
- "open_case_readings": {"EXT_A_ericsson_3.bit": "Neither decoder decodes this conformance stream: the candidate reports a bitstream overrun and the reference reports an overread SPS, and both emit no picture. Whether the stream conforms to the current edition of ITU-T H.265, and with it whether the refusal is right, is not established."},
  "vectors": [
   {
    "lane": "h264",

@@ -75,47 +75,79 @@ never redistributed. Any other case fails as `rights-unreviewed`.
 
 ## When a result differs
 
-A case that differs from its pin, a refusal, a bound that fails and a bound not yet
-measured each fail the step until the difference is fixed or registered in one of the
-forms below. `report` and `grade` check each entry against the run, so an entry must
-stay true. An open case, a deviation and an open or unmeasured bound withhold
-acceptance of their feature until the entry is gone; a registered refusal whose proof
-holds counts as a declared refusal. Every entry lists the manifest's
-case ids it covers, each once; an entry with `targets` applies on those of the
-contract's `required_targets` only, and the cases must pass elsewhere.
+A case whose result differs from its pin, a refusal, a bound that fails and a bound not
+yet measured each fail the step until the difference is fixed or listed in the feature's
+registry: the lists of its contract below. A list states what a difference is, so a case
+goes into the one that is true of it. `report` and `grade` check every entry against the
+run, so an entry must stay true. Only a refusal the specification justifies counts
+toward acceptance, as a declared refusal whose proof holds; every other entry withholds
+acceptance of its feature until it is gone. Every entry lists the manifest's case ids it
+covers; an entry with `targets` applies on those of the contract's `required_targets`
+only, and its cases must pass elsewhere.
 
-| The difference | Register it as | Fields |
+| The difference | List | An entry states, one line each |
 |---|---|---|
-| Our defect, not yet fixed | `open_cases` | `id`, the `requirement` (one of the contract's `pending_module_requirements`), optional `targets` |
-| The reference departs from the specification, and Triergon keeps to it | `open_deviations` | `reading` (the decided reading, one line), the specification `clause`, both observed results (`candidate`, `reference`), optionally the `compat` policy a consumer needing the reference's result would use, `cases`, optional `targets` |
-| Triergon refuses an input the reference decodes (prefix comparisons) | `open_refusals` | `reason`, `clause`, `detail` (the first typed unsupported detail), optional `targets`, and per case its `id`, input `sha256`, the exact `candidate` fold up to the refusal and optional `reference_pin_targets` |
-| A runtime, heap or total RSS bound fails | `open_bounds` | `bound` (`runtime`, `heap` or `total_rss`), `cases`, the measured `cause`, optional `targets` |
-| A bound is not yet measured | `open_unmeasured` | `bound`, `cases`, `cause` (one line), optional `targets` |
+| Our defect, not yet fixed | `open_cases` | `id`, the `requirement` (one of the contract's `pending_module_requirements`) |
+| The input is valid, and the crate README lists the feature as not implemented | `open_unimplemented` | the `feature`, the README section that lists it (`documented`), the `clause` that defines it, both observed results (`candidate`, `reference`), optionally the `detail` the candidate names |
+| The reference departs from the specification, and Triergon keeps to it | `open_deviations` | the decided `reading`, the specification `clause`, both observed results (`candidate`, `reference`), optionally the `compat` policy a consumer needing the reference's result would use |
+| No standard decides, and Triergon's rule differs from the reference's | `open_policies` | the `policy` at issue, the clauses that define the syntax and leave it open (`undecided`), our `rule`, where the crate states it (`documented`), the `reference_rule` as observed, and `compat` |
+| A clause forbids the input or lets a reader refuse it, and Triergon refuses | `open_refusals` | the `reason`, the `clause`, the error `class` and the `detail` the candidate names |
+| A runtime, heap or total RSS bound fails | `open_bounds` | `bound` (`runtime`, `heap` or `total_rss`), `cases`, the measured `cause` |
+| A bound is not yet measured | `open_unmeasured` | `bound`, `cases`, `cause` |
 
-- **Open cases and deviations.** `report` and `grade` still run every listed case.
-  The step passes only while every listed case still differs and every other case
-  passes; a listed case that passes fails the step until it leaves the list, so the
-  lists only shrink. A deviation is a decision, not a defect: write its reading from
-  the clause, and implement the reference's result, if a consumer needs it, as the
-  `compat` policy the entry names; `cargo xtask check-design` fails on a `compat`
-  path no crate's `compat` module defines. A deviating case holds only between two
-  runs that finished, and only while each side gives its pin: the reference's
-  `expected` and the candidate's `candidate_expected` (`candidate_expected_by_target`
-  where a contract pins per target), which the recorder writes for
-  every listed case. A case without a candidate pin, or one compared by a comparison
-  that pins the reference alone, is reported as `deviation-unpinned` and stays open;
-  check-design lists those contracts. Additional-coverage features (`shape-text`,
-  `shape-text-all`) do not block their module.
-- **Registered refusals.** The report checks the input hash, that the candidate stops
-  with exactly `detail` after exactly the registered fold, and that the reference
-  completes with a fold that equals the case's pin and differs from the candidate's.
-  A refusal is never timed or measured. A case whose reference fold depends on the
-  host lists the targets it is pinned on in `reference_pin_targets`; on another target
-  the report still verifies the candidate's refusal and the reference's completion,
-  marks the reference fold unpinned and withholds acceptance. Where both sides refuse
-  an input, the ISO BMFF suites list it under `required_refusals` (`id`, `profile`,
+- **Choosing the list.** A deviation needs a clause that says what its reading claims;
+  where the clause only defines the syntax and the two sides recover, select or project
+  by rules of their own, the difference is a policy. A policy needs its rule stated for
+  consumers: a rule the crate documents nowhere is first written into its README. A
+  rule consumers depend on in the reference's form belongs in `compat`
+  ([architecture](architecture.md#reference-compatible-behaviour)), and its cases are
+  open cases until it exists. A refusal of valid input is never a justified refusal: with
+  the limit in the README it is a feature not implemented, without it an open case. A
+  case with two causes is listed once in each of their lists (`open_cases`,
+  `open_unimplemented`, `open_deviations`, `open_policies`), never twice in one.
+- **What an entry cites.** `documented` names a section of a crate README
+  (`crates/NAME/README.md#section`) or a public item (`triergon_core::signature::select`).
+  A deviation's `compat` is optional; a policy's is required, and either names the
+  `compat::` item that gives the reference's rule or begins `none: ` and says why the
+  crate offers none. `cargo xtask check-design` fails on a section, item or `compat`
+  path that does not exist.
+- **Pins.** A listed case holds between two outputs, so it pins both: the reference's
+  fold as `expected` and the candidate's as `candidate_expected` on its corpus row
+  (`expected_by_target` and `candidate_expected_by_target` where a contract pins per
+  target), which the recorder writes for every listed case. `report` and `grade` still
+  run every listed case, and the step passes only while each differs exactly as pinned:
+  both workers finish, each side gives its pin, and the two differ (`listed`). A fold
+  off its pin is `listed-changed`, a failed run `listed-run-failed`, a missing candidate
+  pin `listed-unpinned`; each fails the step, and so does a listed case that passes
+  until it leaves its lists, so the lists only shrink. Where a candidate fold can only
+  be recorded on a host that is not at hand, `open_unpinned` (`cases`, `cause`, optional
+  `targets`) registers the missing pin until it is recorded; `check-design` fails on
+  any other listed case without one. The row of a listed case names its lists.
+- **Refusals.** A justified refusal pins what Triergon does and nothing of the
+  reference: its corpus row carries `candidate_expected`, the fold up to the refusal,
+  and no `expected`, and the reference is not run. The report adds `--report-refusal`
+  to the candidate's arguments and requires the result line to name exactly `detail` as
+  `unsupported`: the detail of an `Unsupported` error, or the whole text of an error of
+  another class (`invalid data: …`). For a worker that does not report it,
+  `"evidence": "trace"` has the report read `detail` in the candidate's trace instead,
+  as the trace prints the error. `class` (`invalid`, `truncated`, `unsupported`, `limit`
+  or `policy`) is the class of `triergon_core::Error` that `detail` shows. A refusal is
+  never timed or measured. An unimplemented feature, or a policy whose rule is to refuse,
+  may name the `detail` its candidate reports, checked the same way; it still pins the
+  reference's fold, which for an unimplemented feature is what it must produce once it
+  exists; with `"not_comparable": true`, for a feature the reference does not implement
+  either, an unimplemented feature pins the candidate alone. Where both sides refuse an
+  input, the ISO BMFF suites list it under `required_refusals` (`id`, `profile`,
   `sha256`) and the contract's `refusal` states the reference's exit and error codes
   and the candidate's error prefixes; an unregistered refusal is a failure.
+- **Comparisons with pins of their own.** The facade's container seeks
+  ([container-pins.json](../harness/features/facade-seek/container-pins.json)) pin
+  every case's reference output (`pins`) and every listed case's candidate output
+  (`candidate_pins`); each entry also declares the kinds of `differences` its cases
+  show, and a listed case must show exactly those of its entries. The generated
+  features keep the candidate's folds in `pins.json` under `candidate_pins`.
+  Additional-coverage features (`shape-text`, `shape-text-all`) do not block their
+  module.
 - **Bounds.** `grade` fails a case whose runtime bound is above the ceiling, whose heap
   or total RSS bound is not below 1, or whose measurement is not valid. A bound listed
   in `open_bounds` fails as `open as listed` without failing the step, and one that
@@ -126,12 +158,16 @@ contract's `required_targets` only, and the cases must pass elsewhere.
   the status page shows the row as unmeasured. A bound is listed in one of the two lists
   at most. Suites without a grade apply the same verdicts to their own collections.
 - **Codec lanes.** The codec manifests and workload lists under `harness/codecs/` use
-  the same forms: `open_cases` and `open_deviations` (on every target) in the vector
-  manifests, `open_refusals` for video session and decoder refusals with their picture
-  counts, `open_unmeasured` and `open_workloads` (`id`, measured `cause`, optional
-  `targets`) in the workload lists. The reader comparisons keep their reviewed
-  differences in `harness/codecs/reader-differences.json`, and a reviewed seek
-  difference must reproduce its recorded observations.
+  the same lists: `open_cases`, `open_deviations` and `open_policies` (on every target)
+  in the vector manifests, each listed vector pinned on both sides in
+  [open-pins.json](../harness/codecs/open-pins.json) (`codecs summarize RUN OUT
+  --record-pins`); `open_unimplemented` for video session and decoder refusals, with
+  the pictures before the refusal and whether the reference decodes the feature;
+  `open_refusals` for a stream a clause forbids, whatever the reference makes of it;
+  `open_unmeasured` and `open_workloads` (`id`, measured `cause`, optional `targets`)
+  in the workload lists. The reader comparisons keep their reviewed differences in
+  `harness/codecs/reader-differences.json`, and a listed seek must reproduce the
+  observations its entry records (`expected_by_case`).
 - **Public features without a comparison.** [`harness/not-compared.json`](../harness/not-compared.json)
   lists, per library crate, each public feature no gated comparison compares directly:
   its `name`, the public items it is reached through (`entry_points`), how near it
@@ -143,7 +179,9 @@ contract's `required_targets` only, and the cases must pass elsewhere.
 [`harness/gate-exceptions.json`](../harness/gate-exceptions.json) records how many
 features each gate requires and every exception: the entries of each list whose name
 starts with `open_`, counted per case and per target they are open on, the status
-page's `open_cells`, and the features per crate in `not-compared.json`.
+page's `open_cells`, and the features per crate in `not-compared.json`. The
+[status page](status.md#listed-differences) shows the same counts per comparison and
+form.
 `cargo xtask check-design` counts them again and fails on any difference, so a change
 that adds an exception or drops a requirement changes that file in the same commit,
 where review sees it.
@@ -709,7 +747,9 @@ joins its directories by their largest bounds and summed counts, and its cells r
 each bound up to four decimals and name the run's revision. A row that names a feature
 as `unmeasured` shows the causes its contract's `open_unmeasured` gives, marked
 `parity only` when nothing of the feature is measured on that target. `cargo xtask status --write`
-renders the cells into [status](status.md); `cargo xtask check-design` renders them
+renders the cells into [status](status.md), with the page's table of
+[listed differences](status.md#listed-differences), which counts per comparison the
+cases of each list of its registry; `cargo xtask check-design` renders them
 again and fails on a difference, on a cited run that is not kept or whose sets record
 another source revision, and on a cited directory its run does not hold. `open_cells`
 lists the rows whose cells are written by hand: a row may be listed only while none of

@@ -110,33 +110,6 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
-  "open_refusals": [
-    {
-      "reason": "Sound sample descriptions version 1 and 2",
-      "clause": "Apple QuickTime File Format 'Sound sample description version 1 (stsd)' and 'version 2' extend version 0 for uncompressed audio; the crate README reads QuickTime sound through SoundDescriptionV0 and PCM in version 0 only",
-      "detail": "QT sound description version1/2",
-      "cases": [
-        {
-          "id": "sound-v1",
-          "sha256": "68e83ceff3cddf5a37d68a9d66d9f3371c103b6fa8c4844c3641640cc42b8d41",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        },
-        {
-          "id": "sound-v2",
-          "sha256": "e86fc8a5ea721f926828a4e24637b4fa0b3ebf89a610812ff8ca88c5d795e898",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
-      ]
-    }
-  ],
   "open_deviations": [
     {
       "reading": "A version 0 description outside the version 0 layout",
@@ -197,6 +170,20 @@
       "reference": "reads 16 bytes as PCM, the last eight of them the start of the Movie Box",
       "cases": [
         "twos-8bit-1ch"
+      ]
+    }
+  ],
+  "open_unimplemented": [
+    {
+      "feature": "Sound sample descriptions version 1 and 2",
+      "documented": "crates/isobmff/README.md#supported",
+      "clause": "Apple QuickTime File Format 'Sound sample description version 1 (stsd)' and 'version 2' extend version 0 for uncompressed audio; the crate README reads QuickTime sound through SoundDescriptionV0 and PCM in version 0 only",
+      "candidate": "Refuses the description as unsupported: QT sound description version1/2",
+      "reference": "Reads the PCM samples of the version 1 and version 2 descriptions",
+      "detail": "QT sound description version1/2",
+      "cases": [
+        "sound-v1",
+        "sound-v2"
       ]
     }
   ]

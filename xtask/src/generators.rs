@@ -5,7 +5,7 @@
 //! takes each case's expected work from `harness/features/<id>/pins.json`: the
 //! reference's folds, written only by [`Generator::record`] and never edited by hand,
 //! and, as `candidate_pins`, the candidate's folds of the cases the contract lists as
-//! open (`open_cases`, `open_deviations`), so a listed case pins both outputs. The
+//! differing in any list of its registry, so a listed case pins both outputs. The
 //! harness reads a generated manifest at `harness/features/<id>/corpus.json`; its
 //! identity is the SHA-256 of the canonical JSON the generator writes. Each
 //! feature's contract names when it runs ([`Gate`]).

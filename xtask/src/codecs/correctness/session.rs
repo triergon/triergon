@@ -26,10 +26,13 @@ pub(in crate::codecs) fn registered_refusals(
     manifest: &Value,
 ) -> Result<BTreeMap<&str, RegisteredRefusal<'_>>, String> {
     let mut refusals = BTreeMap::new();
-    let Some(groups) = manifest.get("open_refusals") else {
+    let Some(groups) = manifest.get(crate::codecs::summary::REFUSALS) else {
         return Ok(refusals);
     };
-    for group in groups.as_array().ok_or("open_refusals must be an array")? {
+    for group in groups
+        .as_array()
+        .ok_or("open_unimplemented must be an array")?
+    {
         if group.get("kind").and_then(Value::as_str)
             == Some(crate::codecs::summary::VIDEO_REFUSAL_KIND)
         {
@@ -493,7 +496,7 @@ mod tests {
     #[test]
     fn registered_refusal_requires_the_same_error_and_complete_prefix() {
         let manifest = crate::json::parse(
-            r#"{"open_refusals":[{"basis":"unimplemented","reference":"decodes","reason":"SP/SI slices","clause":"H.264 §8.6.2",
+            r#"{"open_unimplemented":[{"basis":"unimplemented","reference":"decodes","reason":"SP/SI slices","clause":"H.264 §8.6.2",
                 "detail":"SP/SI slices (Extended profile)",
                 "cases":[{"id":"session-h264:switching.h264",
                     "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
@@ -524,7 +527,7 @@ mod tests {
     fn a_reference_that_does_not_decode_the_feature_pins_no_picture_count() {
         let group = |fields: &str| {
             crate::json::parse(&format!(
-                r#"{{"open_refusals":[{{{fields}"reason":"slice groups","clause":"H.264 §8.2.2",
+                r#"{{"open_unimplemented":[{{{fields}"reason":"slice groups","clause":"H.264 §8.2.2",
                 "detail":"flexible macroblock ordering (slice groups)",
                 "cases":[{{"id":"session-h264:groups.264",
                     "sha256":"0000000000000000000000000000000000000000000000000000000000000000",

@@ -1,7 +1,7 @@
 use super::{
-    DEVIATION, DEVIATION_CHANGED, DEVIATION_RUN_FAILED, DEVIATION_UNPINNED, Open, PrefixFeature,
+    LISTED, LISTED_CHANGED, LISTED_RUN_FAILED, LISTED_UNPINNED, Listed, PrefixFeature,
     candidate_expected_for, entity_input_failure, measure_pinned, open, open_cases, ratchet,
-    recorded_corpus, reviewed_inputs, rights_reviewed, s, unpinned_deviation,
+    recorded_corpus, reviewed_inputs, rights_reviewed, s, unpinned_listed,
 };
 use crate::json::{self, Value, parse};
 use std::collections::BTreeMap;
@@ -335,33 +335,50 @@ fn the_font_features_are_registered_prefix_features() {
     assert_eq!(recorded_corpus(root, &Value::Object(vec![])), None);
 }
 
+/// The listing of a contract with `lists` over the cases `a` to `d`.
+fn listing(lists: &str) -> Listed {
+    let contract = parse(&format!(
+        r#"{{"required_targets": ["t", "u"], "pending_module_requirements": ["x"], {lists}}}"#
+    ))
+    .unwrap();
+    let manifest =
+        parse(r#"{"cases": [{"id": "a"}, {"id": "b"}, {"id": "c"}, {"id": "d"}]}"#).unwrap();
+    open(&contract, &manifest, "t").unwrap()
+}
+
+/// Rows of the given ids and parity statuses.
+fn rows(statuses: &[(&str, &str)]) -> Vec<Value> {
+    statuses
+        .iter()
+        .map(|(id, status)| {
+            parse(&format!(
+                r#"{{"id": "{id}", "parity": {{"status": "{status}"}}}}"#
+            ))
+            .unwrap()
+        })
+        .collect()
+}
+
+const DEVIATION: &str = r#""open_deviations": [{"reading": "r", "clause": "c",
+    "candidate": "p", "reference": "q", "cases": ["d"]}]"#;
+
 #[test]
-fn open_cases_only_shrink() {
-    let rows = |pass: &[(&str, bool)]| -> Vec<Value> {
-        pass.iter()
-            .map(|(id, ok)| {
-                let status = if *ok { "pass" } else { "mismatch" };
-                parse(&format!(
-                    r#"{{"id": "{id}", "parity": {{"status": "{status}"}}}}"#
-                ))
-                .unwrap()
-            })
-            .collect()
-    };
-    let listed = Open {
-        cases: vec!["b".to_owned()],
-        deviations: Vec::new(),
-    };
-    assert!(ratchet("f", &rows(&[("a", true), ("b", false)]), &listed));
+fn listed_cases_only_shrink() {
+    let listed = listing(r#""open_cases": [{"id": "b", "requirement": "x"}]"#);
+    assert!(ratchet(
+        "f",
+        &rows(&[("a", "pass"), ("b", LISTED)]),
+        &listed
+    ));
     assert!(
-        !ratchet("f", &rows(&[("a", false), ("b", false)]), &listed),
+        !ratchet("f", &rows(&[("a", "mismatch"), ("b", LISTED)]), &listed),
         "unlisted failure"
     );
     assert!(
-        !ratchet("f", &rows(&[("a", true), ("b", true)]), &listed),
+        !ratchet("f", &rows(&[("a", "pass"), ("b", "pass")]), &listed),
         "listed case passes"
     );
-    assert!(ratchet("f", &rows(&[("a", true)]), &Open::default()));
+    assert!(ratchet("f", &rows(&[("a", "pass")]), &Listed::default()));
     let contract = |requirement: &str| {
         parse(&format!(
                 r#"{{"pending_module_requirements": ["x"], "open_cases": [{{"id": "b", "requirement": "{requirement}"}}]}}"#
@@ -369,7 +386,7 @@ fn open_cases_only_shrink() {
             .unwrap()
     };
     let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}]}"#).unwrap();
-    assert_eq!(open(&contract("x"), &manifest, "t").unwrap(), listed);
+    assert_eq!(open_cases(&contract("x"), &manifest, "t").unwrap(), ["b"]);
     assert!(
         open_cases(&contract("y"), &manifest, "t").is_err(),
         "requirement not pending"
@@ -379,29 +396,6 @@ fn open_cases_only_shrink() {
         open_cases(&contract("x"), &other, "t").is_err(),
         "unknown case"
     );
-    // An open case scoped to targets is open there only.
-    let scoped = |targets: &str| {
-        parse(&format!(
-            r#"{{"required_targets": ["t", "u"], "pending_module_requirements": ["x"],
-                    "open_cases": [{{"id": "b", "requirement": "x", "targets": {targets}}}]}}"#
-        ))
-        .unwrap()
-    };
-    assert_eq!(
-        open_cases(&scoped(r#"["t"]"#), &manifest, "t").unwrap(),
-        listed.cases
-    );
-    assert!(
-        open_cases(&scoped(r#"["t"]"#), &manifest, "u")
-            .unwrap()
-            .is_empty()
-    );
-    for wrong in ["[]", r#"["v"]"#] {
-        assert!(
-            open_cases(&scoped(wrong), &manifest, "t").is_err(),
-            "{wrong}"
-        );
-    }
 }
 
 #[test]
@@ -439,7 +433,6 @@ fn a_deviation_states_its_reading_once_for_its_cases() {
             "cases": ["b"]}"#,
         r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": []}"#,
         r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": ["d"]}"#,
-        r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": ["a"]}"#,
         r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q", "cases": ["b", "b"]}"#,
     ] {
         assert!(
@@ -447,55 +440,69 @@ fn a_deviation_states_its_reading_once_for_its_cases() {
             "{wrong}"
         );
     }
-}
-
-fn deviating(status: &str) -> Vec<Value> {
-    vec![
-        parse(r#"{"id": "a", "parity": {"status": "pass"}}"#).unwrap(),
-        parse(&format!(
-            r#"{{"id": "d", "parity": {{"status": "{status}"}}}}"#
-        ))
-        .unwrap(),
-    ]
-}
-
-fn deviation_list() -> Open {
-    Open {
-        cases: Vec::new(),
-        deviations: vec!["d".to_owned()],
-    }
+    // A case with two causes is an open case and a deviation at once.
+    let both = r#"{"reading": "r", "clause": "c", "candidate": "p", "reference": "q",
+                   "cases": ["a"]}"#;
+    let listed = open(&contract(both), &manifest, "t").unwrap();
+    assert_eq!(
+        listed.get("a").unwrap().lists(),
+        ["open_cases", "open_deviations"]
+    );
 }
 
 #[test]
-fn a_failed_run_never_satisfies_a_registered_deviation() {
-    let open = deviation_list();
-    assert!(!ratchet("f", &deviating(DEVIATION_RUN_FAILED), &open));
-    // A difference the comparison did not judge as a deviation does not hold either.
-    assert!(!ratchet("f", &deviating("mismatch"), &open));
+fn a_failed_run_never_satisfies_a_listing() {
+    let listed = listing(DEVIATION);
+    assert!(!ratchet(
+        "f",
+        &rows(&[("a", "pass"), ("d", LISTED_RUN_FAILED)]),
+        &listed
+    ));
+    // A difference the comparison did not judge against the pins does not hold either.
+    assert!(!ratchet(
+        "f",
+        &rows(&[("a", "pass"), ("d", "mismatch")]),
+        &listed
+    ));
+    let case = listed.get("d").unwrap();
     for failed in ["worker-error", "timeout", "worker-failure", "error"] {
         let row = parse(&format!(r#"{{"status": "{failed}", "reason": "r"}}"#)).unwrap();
         assert_eq!(
-            unpinned_deviation(row).get("status"),
-            Some(&Value::str(DEVIATION_RUN_FAILED)),
+            unpinned_listed(row, case).get("status"),
+            Some(&Value::str(LISTED_RUN_FAILED)),
             "{failed}"
         );
     }
 }
 
 #[test]
-fn a_registered_deviation_holds_only_as_both_pins() {
-    let open = deviation_list();
-    assert!(ratchet("f", &deviating(DEVIATION), &open));
-    assert!(!ratchet("f", &deviating(DEVIATION_CHANGED), &open));
-    // A comparison that pins one side only is reported, not failed.
-    assert!(ratchet("f", &deviating(DEVIATION_UNPINNED), &open));
+fn a_listed_case_holds_only_as_both_pins() {
+    let listed = listing(DEVIATION);
+    let holds = |status: &str, listed: &Listed| {
+        ratchet("f", &rows(&[("a", "pass"), ("d", status)]), listed)
+    };
+    assert!(holds(LISTED, &listed));
+    assert!(!holds(LISTED_CHANGED, &listed));
+    // A missing candidate pin fails, unless the contract registers why it is missing.
+    assert!(!holds(LISTED_UNPINNED, &listed));
+    let registered = listing(&format!(
+        r#"{DEVIATION}, "open_unpinned": [{{"cases": ["d"], "cause": "recorded on that host"}}]"#
+    ));
+    assert!(holds(LISTED_UNPINNED, &registered));
+    assert!(holds(LISTED, &registered));
+    let case = listed.get("d").unwrap();
     let mismatch = parse(r#"{"status": "mismatch"}"#).unwrap();
+    let judged = unpinned_listed(mismatch, case);
+    assert_eq!(judged.get("status"), Some(&Value::str(LISTED_UNPINNED)));
     assert_eq!(
-        unpinned_deviation(mismatch).get("status"),
-        Some(&Value::str(DEVIATION_UNPINNED))
+        judged.get("listed"),
+        Some(&Value::strings(["open_deviations"]))
     );
     let pass = parse(r#"{"status": "pass"}"#).unwrap();
-    assert_eq!(unpinned_deviation(pass.clone()), pass);
+    assert_eq!(
+        unpinned_listed(pass, case).get("status"),
+        Some(&Value::str("pass"))
+    );
     let case = parse(
         r#"{"candidate_expected": {"packets": 1},
             "candidate_expected_by_target": {"t": {"packets": 2}}}"#,
@@ -511,7 +518,63 @@ fn a_registered_deviation_holds_only_as_both_pins() {
         case.get("candidate_expected")
     );
     assert!(
-        !ratchet("f", &deviating("pass"), &open),
-        "a passing deviation must leave the list"
+        !holds("pass", &listed),
+        "a passing listed case must leave its lists"
     );
+}
+
+#[test]
+fn every_form_but_a_justified_refusal_is_listed_and_no_pass() {
+    // Whatever a difference is filed as, it holds as listed and never as a pass.
+    for lists in [
+        r#""open_cases": [{"id": "d", "requirement": "x"}]"#.to_owned(),
+        DEVIATION.to_owned(),
+        r#""open_policies": [{"policy": "q", "undecided": "u", "rule": "ours",
+            "documented": "crates/x/README.md#rules", "reference_rule": "theirs",
+            "compat": "none: a heuristic", "cases": ["d"]}]"#
+            .to_owned(),
+        r#""open_unimplemented": [{"feature": "f", "documented": "crates/x/README.md#scope",
+            "clause": "c", "candidate": "refuses", "reference": "decodes", "cases": ["d"]}]"#
+            .to_owned(),
+    ] {
+        let listed = listing(&lists);
+        assert!(
+            ratchet("f", &rows(&[("a", "pass"), ("d", LISTED)]), &listed),
+            "{lists}"
+        );
+        assert!(
+            !ratchet("f", &rows(&[("a", "pass"), ("d", "pass")]), &listed),
+            "{lists}"
+        );
+    }
+    // A refusal the specification justifies passes by its proof, and only so.
+    let refusal = listing(
+        r#""open_refusals": [{"reason": "r", "clause": "c", "class": "unsupported",
+            "detail": "d", "cases": ["d"]}]"#,
+    );
+    let row = |comparison: &str, status: &str| {
+        vec![
+            parse(r#"{"id": "a", "parity": {"status": "pass"}}"#).unwrap(),
+            parse(&format!(
+                r#"{{"id": "d", "parity": {{"status": "{status}", "comparison": "{comparison}"}}}}"#
+            ))
+            .unwrap(),
+        ]
+    };
+    assert!(ratchet(
+        "f",
+        &row(crate::harness::fold_refusal::COMPARISON, "pass"),
+        &refusal
+    ));
+    assert!(!ratchet("f", &row("output", "pass"), &refusal));
+    assert!(!ratchet(
+        "f",
+        &row(crate::harness::fold_refusal::COMPARISON, "mismatch"),
+        &refusal
+    ));
+    assert!(!ratchet(
+        "f",
+        &row(crate::harness::fold_refusal::COMPARISON, LISTED),
+        &refusal
+    ));
 }

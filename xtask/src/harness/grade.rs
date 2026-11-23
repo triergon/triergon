@@ -690,7 +690,7 @@ fn memory_binding(memory: &Value, identity: &Value, workers: &Value, linux: bool
     Ok(())
 }
 
-/// A case the contract lists in `open_cases`: its parity is graded, its timing and
+/// A case the contract lists as differing: its parity is graded, its timing and
 /// memory are not. A listed case that passes must leave the list, which only
 /// shrinks.
 fn open_case(timed: &Value, measured: &Value) -> R<Value> {
@@ -700,7 +700,7 @@ fn open_case(timed: &Value, measured: &Value) -> R<Value> {
         "case fields/parity",
     )?;
     if super::acceptance::parity_passes(timed) {
-        return Err("listed open case now passes; remove it from open_cases".into());
+        return Err("listed case now passes; remove it from its lists".into());
     }
     let mut row = without(timed, &["timing", "memory"])?;
     put(&mut row, "open_case", Value::Bool(true))?;
@@ -1027,8 +1027,8 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     let (memory, memory_sha) = document(&options.memory)?;
     let (contract, contract_sha) = document(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    // Open cases scoped to targets are those of the target the reports measured.
-    let open = super::report::open(&contract, &manifest, text(&timed, "target")?)?;
+    // Entries scoped to targets are those of the target the reports measured.
+    let listed = super::report::open(&contract, &manifest, text(&timed, "target")?)?;
     let binding = Binding {
         contract: &contract,
         manifest: &manifest,
@@ -1046,7 +1046,6 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     )?;
     let identity = field(&memory, "identity")?;
     let target = text(&memory, "target")?;
-    let fold_refusals = super::fold_refusal::read(&contract, target)?;
     let fold_fields = super::comparison::work_fields(&contract)?;
     let unmeasured = super::bounds::Unmeasured::read(&contract, &manifest, target)?;
     let pinned = gate_build::pinned_release(root)?;
@@ -1085,26 +1084,27 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
         let id = text(spec, "id")?;
         let clock = expanded_case(&timed, &options.timing, timed_rows[id])?;
         let measured = expanded_case(&memory, &options.memory, memory_rows[id])?;
-        if let Some(refusal) = fold_refusals.get(id) {
-            require_same(
-                &joined_fields(&clock)?,
-                &joined_fields(&measured)?,
-                "case fields/parity",
-            )?;
-            selected(&clock, spec, &contract, identity)?;
-            if !super::acceptance::parity_passes(&clock)
-                || has_measurement(&measured)
-                || !super::report::expected_for(spec, target)
-                    .is_some_and(|pin| refusal.matches_row(&clock, pin, &fold_fields))
-            {
-                return Err(format!(
-                    "{id}: registered fold refusal proof missing or invalid"
-                ));
+        match listed.get(id) {
+            Some(case) if case.refusal() => {
+                require_same(
+                    &joined_fields(&clock)?,
+                    &joined_fields(&measured)?,
+                    "case fields/parity",
+                )?;
+                selected(&clock, spec, &contract, identity)?;
+                let pin = super::report::candidate_expected_for(spec, target);
+                if !super::acceptance::parity_passes(&clock)
+                    || has_measurement(&measured)
+                    || !super::fold_refusal::row_holds(&clock, case, pin, &fold_fields)
+                {
+                    return Err(format!(
+                        "{id}: registered fold refusal proof missing or invalid"
+                    ));
+                }
+                return Ok(clock);
             }
-            return Ok(clock);
-        }
-        if open.contains(id) {
-            return open_case(&clock, &measured).map_err(|e| format!("{id}: {e}"));
+            Some(_) => return open_case(&clock, &measured).map_err(|e| format!("{id}: {e}")),
+            None => {}
         }
         for (bound, cause) in unmeasured.causes(id) {
             println!("{id}: {bound} not measured: {cause}");
@@ -1247,7 +1247,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     }
     let mut code = exit_code(&verdict, report_rows(&memory)?, options.requirement);
     let label = text(&contract, "id")?;
-    if !super::report::ratchet(label, report_rows(&timed)?, &open) {
+    if !super::report::ratchet(label, report_rows(&timed)?, &listed) {
         code = code.max(1);
     }
     // Each case's runtime, heap and total RSS bounds, as the codec bounds are graded.

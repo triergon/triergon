@@ -90,12 +90,14 @@
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "open_deviations": [
+  "open_policies": [
     {
-      "reading": "An hvcE mapping whose record is too short is kept as written (policy for invalid optional track metadata)",
-      "clause": "RFC 9559 section 5.1.4.1.17.4: BlockAddIDExtraData is binary data the BlockAddIDType uses; for hvcE it is an HEVC decoder configuration record (ISO/IEC 14496-15 section 8.3.3.1), which five bytes cannot hold. The Matroska reader opens the track and reports a mapping as written, as it does for an out-of-range BlockAddIDValue.",
-      "candidate": "Opens the track with the mapping's five bytes (short), unvalidated.",
-      "reference": "Refuses the whole input at open because the embedded configuration record is too short.",
+      "policy": "An hvcE mapping whose record is too short is kept as written",
+      "undecided": "RFC 9559 section 5.1.4.1.17.4: BlockAddIDExtraData is binary data the BlockAddIDType uses; for hvcE it is an HEVC decoder configuration record (ISO/IEC 14496-15 section 8.3.3.1), which five bytes cannot hold. The Matroska reader opens the track and reports a mapping as written, as it does for an out-of-range BlockAddIDValue.",
+      "rule": "Opens the track with the mapping's five bytes (short), unvalidated.",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Refuses the whole input at open because the embedded configuration record is too short.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "mapping-short-hvce"
       ]

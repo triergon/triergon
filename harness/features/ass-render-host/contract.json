@@ -27,31 +27,35 @@
   "iterations": 1,
   "minimum_pairs": 30,
   "confidence": 0.95,
-  "open_deviations": [
+  "open_policies": [
     {
-      "reading": "Event box fields beyond int follow 32-bit arithmetic (the candidate keeps the 32-bit ARM result on every target)",
-      "clause": "ISO C sections 6.3.1.3, 6.3.1.4 and 6.5 paragraph 5: signed overflow is undefined and out-of-range conversions are implementation-defined; GCC generates different results for the two targets.",
-      "candidate": "Saturates out-of-range event box fields and doubles the border in 32 bits: 12 packets and 824574 or 444346 bytes, the 32-bit ARM pins.",
-      "reference": "On AArch64 uses other event box bounds: 10 packets and 566316 or 286940 bytes.",
+      "policy": "Event box fields beyond int follow 32-bit arithmetic",
+      "undecided": "ISO C sections 6.3.1.3, 6.3.1.4 and 6.5 paragraph 5: signed overflow is undefined and out-of-range conversions are implementation-defined; GCC generates different results for the two targets.",
+      "rule": "Saturates out-of-range event box fields and doubles the border in 32 bits: 12 packets and 824574 or 444346 bytes, the 32-bit ARM pins.",
+      "documented": "crates/ass/README.md#target-dependent-results",
+      "reference_rule": "On AArch64 uses other event box bounds: 10 packets and 566316 or 286940 bytes.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ],
       "cases": [
         "border-x-overflow-ass-1080p",
         "border-x-overflow-ass-720p"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "reading": "Collision placement follows the saturated event boxes (the candidate keeps the 32-bit ARM result on every target)",
-      "clause": "ISO C sections 6.3.1.4 and 6.5 paragraph 5: the conversion and the int subtraction of cmp_rect_y0 overflow; the two GCC targets order the boxes differently.",
-      "candidate": "Places the 46 events from the saturated boxes: 452054 and 313098 bytes, the 32-bit ARM pins.",
-      "reference": "On AArch64 places them elsewhere: 1349868 and 953212 bytes.",
+      "policy": "Collision placement follows the saturated event boxes",
+      "undecided": "ISO C sections 6.3.1.4 and 6.5 paragraph 5: the conversion and the int subtraction of cmp_rect_y0 overflow; the two GCC targets order the boxes differently.",
+      "rule": "Places the 46 events from the saturated boxes: 452054 and 313098 bytes, the 32-bit ARM pins.",
+      "documented": "crates/ass/README.md#target-dependent-results",
+      "reference_rule": "On AArch64 places them elsewhere: 1349868 and 953212 bytes.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ],
       "cases": [
         "collision-far-tops-ass-1080p",
         "collision-far-tops-ass-720p"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     }
   ],

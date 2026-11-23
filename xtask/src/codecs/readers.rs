@@ -662,10 +662,24 @@ impl SeekCase {
                 attach(name, reason, row.get("expected"), false)?;
             }
         }
-        if let Some(deviations) = document.get("open_deviations") {
+        // A declared deviation and a policy difference pin their seeks alike; each
+        // form states the same four things under its own field names.
+        for (list, [title, clause, candidate, reference]) in [
+            (
+                "open_deviations",
+                ["reading", "clause", "candidate", "reference"],
+            ),
+            (
+                "open_policies",
+                ["policy", "undecided", "rule", "reference_rule"],
+            ),
+        ] {
+            let Some(deviations) = document.get(list) else {
+                continue;
+            };
             for row in deviations
                 .as_array()
-                .ok_or("open_deviations is not an array")?
+                .ok_or_else(|| format!("{list} is not an array"))?
             {
                 if row.get("targets").is_some() {
                     return Err("seek deviations apply to all gate targets".into());
@@ -678,10 +692,10 @@ impl SeekCase {
                 };
                 let reason = format!(
                     "{} ({}). Candidate: {}. Reference: {}.",
-                    line("reading")?,
-                    line("clause")?,
-                    line("candidate")?,
-                    line("reference")?
+                    line(title)?,
+                    line(clause)?,
+                    line(candidate)?,
+                    line(reference)?
                 );
                 if row.get("compat").is_some() {
                     line("compat")?;

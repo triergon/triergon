@@ -423,6 +423,11 @@ fn a_grade_failing_only_on_listed_open_cases_is_told_apart() {
         "subtitle-cc: 201 of 205 cases pass"
     ])));
     assert!(!only_open_cases(&record(&[])));
+    // A report names the forms its listed cases are filed under.
+    assert!(only_open_cases(&record(&[
+        "ts-source-poll: 345 of 485 cases pass",
+        "ts-source-poll: 140 cases differ as listed (departs 55, policy 85): a, b",
+    ])));
     // A codec collection's verdict lines read the same way.
     assert!(only_open_cases(&record(&[
         "workloads timing: 19 of 20 cases pass",

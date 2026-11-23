@@ -29,17 +29,6 @@
   "iterations": 1,
   "open_deviations": [
     {
-      "reading": "A vpcC box of a version other than 1, or with no version, is refused here and ignored by the reference",
-      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (version 1, version 0 deprecated); the binding defines version 1 alone, and skipping a box of an unrecognised version is the general practice of ISO base media readers, so neither result departs from a clause",
-      "candidate": "refuses version 0 and version 2 without deriving colour fields",
-      "reference": "opens the entry and reports unknown range and unspecified colour: nothing is read from the box",
-      "cases": [
-        "vpcc-version-zero-unsupported",
-        "vpcc-future-version-unsupported",
-        "vpcc-short-fullbox-0"
-      ]
-    },
-    {
       "reading": "A byte after the zero codecInitializationDataSize is refused here and ignored by the reference",
       "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (codecInitializationDataSize is zero for VP9); it does not say what a reader does with a byte that follows the zero size",
       "candidate": "refuses bytes after the zero-length initialization field",
@@ -74,19 +63,6 @@
       "reference": "opens configuration 13 and publishes 24 channels",
       "cases": [
         "asc-channel-13"
-      ]
-    },
-    {
-      "reading": "The AAC-LC configuration reader implements no other audio object type",
-      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (audioObjectType and the object-specific grammar); audio object types 1 (Main), 3 (SSR), 4 (LTP), 17 (ER LC) and 23 (ER LD) are defined there, so the inputs are valid",
-      "candidate": "refuses the non-LC object type in both scopes",
-      "reference": "opens AAC Main, SSR, LTP, ER LC and ER LD and publishes two channels each",
-      "cases": [
-        "asc-object-1",
-        "asc-object-3",
-        "asc-object-4",
-        "asc-object-17",
-        "asc-object-23"
       ]
     },
     {
@@ -723,6 +699,37 @@
         "the-great-wall-7-1"
       ],
       "cause": "The reference publishes E-AC-3 side data only while decoding audio"
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "A vpcC box of a version other than 1, or with no version, is refused here and ignored by the reference",
+      "undecided": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (version 1, version 0 deprecated); the binding defines version 1 alone, and skipping a box of an unrecognised version is the general practice of ISO base media readers, so neither result departs from a clause",
+      "rule": "refuses version 0 and version 2 without deriving colour fields",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "reference_rule": "opens the entry and reports unknown range and unspecified colour: nothing is read from the box",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "vpcc-version-zero-unsupported",
+        "vpcc-future-version-unsupported",
+        "vpcc-short-fullbox-0"
+      ]
+    }
+  ],
+  "open_unimplemented": [
+    {
+      "feature": "The AAC-LC configuration reader implements no other audio object type",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (audioObjectType and the object-specific grammar); audio object types 1 (Main), 3 (SSR), 4 (LTP), 17 (ER LC) and 23 (ER LD) are defined there, so the inputs are valid",
+      "candidate": "refuses the non-LC object type in both scopes",
+      "reference": "opens AAC Main, SSR, LTP, ER LC and ER LD and publishes two channels each",
+      "cases": [
+        "asc-object-1",
+        "asc-object-3",
+        "asc-object-4",
+        "asc-object-17",
+        "asc-object-23"
+      ]
     }
   ]
 }

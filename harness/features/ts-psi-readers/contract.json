@@ -296,64 +296,71 @@
       "cause": "Runtime and memory bounds await isolated native gate hosts."
     }
   ],
-  "open_deviations": [
+  "open_policies": [
     {
-      "reading": "A PAT version announced over two sections of which one arrives: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.6 applies version_number to the whole PAT and last_section_number gives its extent; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers waits for every section of a version before routing its programs, so no program comes from the partial PAT.",
-      "reference": "Observed rule: routes the program from the first section although the second never arrives.",
-      "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
+      "policy": "A PAT version announced over two sections of which one arrives",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.4.6 applies version_number to the whole PAT and last_section_number gives its extent; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers waits for every section of a version before routing its programs, so no program comes from the partial PAT.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: routes the program from the first section although the second never arrives.",
+      "compat": "none: no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
         "pat-incomplete-version"
       ]
     },
     {
-      "reading": "A PMT descriptor that runs past its loop: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.4.10 and 2.6.1: ES_info_length 6 encloses an ISO 639 descriptor of length 8; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers rejects the malformed PMT and exposes no stream from it.",
-      "reference": "Observed rule: publishes the stream entry from the malformed PMT.",
-      "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
+      "policy": "A PMT descriptor that runs past its loop",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.4.10 and 2.6.1: ES_info_length 6 encloses an ISO 639 descriptor of length 8; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers rejects the malformed PMT and exposes no stream from it.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the stream entry from the malformed PMT.",
+      "compat": "none: no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
         "pmt-descriptor-overrun"
       ]
     },
     {
-      "reading": "A PMT with section_number 1: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 requires section_number and last_section_number 0 in a PMT; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers rejects the PMT and exposes no stream from it.",
-      "reference": "Observed rule: publishes the stream from the PMT.",
-      "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
+      "policy": "A PMT with section_number 1",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 requires section_number and last_section_number 0 in a PMT; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers rejects the PMT and exposes no stream from it.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the stream from the PMT.",
+      "compat": "none: no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
         "pmt-multi-section-forbidden"
       ]
     },
     {
-      "reading": "A final transport packet shorter than 188 bytes: a recovery policy no standard decides; no compat option exists",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.1 and 2.4.3.2 fix the transport packet at 188 bytes; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the readers publish the catalogue read so far and report Truncated for the final carrier.",
-      "reference": "Observed rule: publishes the catalogue and ends cleanly.",
+      "policy": "A final transport packet shorter than 188 bytes",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.1 and 2.4.3.2 fix the transport packet at 188 bytes; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the readers publish the catalogue read so far and report Truncated for the final carrier.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the catalogue and ends cleanly.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "cases": [
         "physical-truncated-tail",
         "mpegts-transport-partial-final-packet"
       ]
     },
     {
-      "reading": "Stream types 0x81 and 0x87 without a declared descriptor namespace: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 Table 2-34 leaves stream type 0x06 to private data and 0x80 to 0xFF to user-private use, and \u00a72.6.1 Table 2-45 leaves descriptor tags 64 to 255 user-private; the AC-3 meaning comes from the system (ETSI EN 300 468 Annex D, ATSC A/52 Annex A) the input does not declare; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Opt-in policies): with DescriptorNamespace::Unspecified, the default, the PMT reader keeps the private stream type and leaves the codec unknown.",
-      "reference": "Observed rule: assumes ATSC and identifies AC-3 and E-AC-3.",
-      "compat": "ReaderLimits::descriptor_namespace = Dvb or Atsc identifies the codec as the reference does (the declared-namespace cases of the same carriage pass)",
+      "policy": "Stream types 0x81 and 0x87 without a declared descriptor namespace",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 Table 2-34 leaves stream type 0x06 to private data and 0x80 to 0xFF to user-private use, and \u00a72.6.1 Table 2-45 leaves descriptor tags 64 to 255 user-private; the AC-3 meaning comes from the system (ETSI EN 300 468 Annex D, ATSC A/52 Annex A) the input does not declare; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Opt-in policies): with DescriptorNamespace::Unspecified, the default, the PMT reader keeps the private stream type and leaves the codec unknown.",
+      "documented": "crates/mpegts/README.md#opt-in-policies",
+      "reference_rule": "Observed rule: assumes ATSC and identifies AC-3 and E-AC-3.",
+      "compat": "none: ReaderLimits::descriptor_namespace = Dvb or Atsc identifies the codec as the reference does (the declared-namespace cases of the same carriage pass)",
       "cases": [
         "carriage-ac3-direct",
         "carriage-eac3-direct"
       ]
     },
     {
-      "reading": "DVB AC-3 and E-AC-3 descriptors without a declared descriptor namespace: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 Table 2-34 leaves stream type 0x06 to private data and 0x80 to 0xFF to user-private use, and \u00a72.6.1 Table 2-45 leaves descriptor tags 64 to 255 user-private; the AC-3 meaning comes from the system (ETSI EN 300 468 Annex D, ATSC A/52 Annex A) the input does not declare; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Opt-in policies): with DescriptorNamespace::Unspecified, the default, the PMT reader does not read the private descriptors and leaves the codec unknown.",
-      "reference": "Observed rule: assumes DVB and identifies AC-3 and E-AC-3 from the descriptors.",
-      "compat": "ReaderLimits::descriptor_namespace = Dvb or Atsc identifies the codec as the reference does (the declared-namespace cases of the same carriage pass)",
+      "policy": "DVB AC-3 and E-AC-3 descriptors without a declared descriptor namespace",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 Table 2-34 leaves stream type 0x06 to private data and 0x80 to 0xFF to user-private use, and \u00a72.6.1 Table 2-45 leaves descriptor tags 64 to 255 user-private; the AC-3 meaning comes from the system (ETSI EN 300 468 Annex D, ATSC A/52 Annex A) the input does not declare; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Opt-in policies): with DescriptorNamespace::Unspecified, the default, the PMT reader does not read the private descriptors and leaves the codec unknown.",
+      "documented": "crates/mpegts/README.md#opt-in-policies",
+      "reference_rule": "Observed rule: assumes DVB and identifies AC-3 and E-AC-3 from the descriptors.",
+      "compat": "none: ReaderLimits::descriptor_namespace = Dvb or Atsc identifies the codec as the reference does (the declared-namespace cases of the same carriage pass)",
       "cases": [
         "carriage-ac3-dvb",
         "carriage-eac3-dvb",

@@ -590,7 +590,9 @@ pub(crate) fn acceptance_iter(
     let registered = registered_refusals(contract)
         .map_err(|error| reasons.push(error))
         .unwrap_or_default();
-    let fold_refusals = super::fold_refusal::read(contract, target)
+    // The rows are the manifest here: every listed id is checked against it when
+    // the report and the grade read the contract.
+    let listed = super::registry::read_unchecked(contract, target)
         .map_err(|error| reasons.push(error))
         .unwrap_or_default();
     let fields = super::comparison::work_fields(contract)
@@ -617,11 +619,14 @@ pub(crate) fn acceptance_iter(
             reasons.push("duplicate case identities".into());
         }
         all_parity &= parity_passes(&row);
-        if let Some(spec) = fold_refusals.get(id) {
-            let expected = row.get("parity").and_then(|parity| parity.get("expected"));
-            if parity_passes(&row)
-                && expected.is_some_and(|expected| spec.matches_row(&row, expected, &fields))
-            {
+        let listing = listed.get(id);
+        if let Some(case) = listing.filter(|case| case.refusal()) {
+            // The report recorded the candidate's pin beside the proof it made of it;
+            // the grade replays the proof against the manifest's.
+            let pin = row
+                .get("parity")
+                .and_then(|parity| parity.get("candidate_expected"));
+            if parity_passes(&row) && super::fold_refusal::row_holds(&row, case, pin, &fields) {
                 refusals.insert(id.to_owned());
                 if let Some(profile) = s(&row, "profile") {
                     passed.insert(profile.to_owned());
@@ -658,10 +663,14 @@ pub(crate) fn acceptance_iter(
             {
                 passed.insert(profile.to_owned());
             }
-            if row.get("open_case") == Some(&Value::Bool(true)) {
-                // A listed open case has no timing or memory to grade; its failing
-                // parity already withholds acceptance.
-                reasons.push(format!("{id}: listed open case"));
+            if listing.is_some() || row.get("open_case") == Some(&Value::Bool(true)) {
+                // A listed case has no timing or memory to grade. Whatever its form,
+                // it is no pass: its parity already withholds acceptance, and the
+                // verdict names the lists that hold it.
+                reasons.push(match listing {
+                    Some(case) => format!("{id}: listed in {}", case.lists().join(", ")),
+                    None => format!("{id}: listed open case"),
+                });
                 if let Err(error) = validate_case_evidence(&row, identity, s(contract, "id")) {
                     reasons.push(format!("{id}: {error}"));
                 }
@@ -675,10 +684,16 @@ pub(crate) fn acceptance_iter(
     if ids.is_empty() || !all_parity {
         reasons.push("selected-feature parity incomplete or failing".into());
     }
+    let listed_refusals = listed
+        .ids()
+        .iter()
+        .map(String::as_str)
+        .filter(|id| listed.get(id).is_some_and(super::registry::Case::refusal));
     for id in registered
         .keys()
-        .chain(fold_refusals.keys())
-        .filter(|id| !refusals.contains(**id))
+        .copied()
+        .chain(listed_refusals)
+        .filter(|id| !refusals.contains(*id))
     {
         reasons.push(format!("{id}: required refusal missing or invalid"));
     }

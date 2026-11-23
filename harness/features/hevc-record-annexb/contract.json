@@ -51,20 +51,6 @@
       ]
     },
     {
-      "reading": "A record above the configured HvcConfigLimits is refused; the reference converts it",
-      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord field widths, as documented by HvcConfigLimits and HvcConfigParser; the 8-bit numOfArrays and the 16-bit numNalus and lengths make these records valid, and the refusal is the resource limit the caller sets",
-      "candidate": "refuses limits of 131072 record bytes, 64 arrays or 256 NALs when exceeded",
-      "reference": "emits the full output at the next size or count",
-      "cases": [
-        "hvcc-array-limit-plus-one-all",
-        "hvcc-array-limit-plus-one-decoder",
-        "hvcc-nal-count-limit-plus-one-all",
-        "hvcc-nal-count-limit-plus-one-decoder",
-        "hvcc-record-size-limit-plus-one-all",
-        "hvcc-record-size-limit-plus-one-decoder"
-      ]
-    },
-    {
       "reading": "A record ending inside an array header",
       "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array syntax, as documented by HvcConfigParser: NAL_unit_type is followed by a 16-bit numNalus",
       "candidate": "refuses truncation without a disallowed-array diagnostic",
@@ -155,6 +141,24 @@
         "hvcc-zero-length-nal-all", "hvcc-zero-length-nal-decoder"
       ],
       "cause": "both workers refuse the input"
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "A record above the configured HvcConfigLimits is refused; the reference converts it",
+      "undecided": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord field widths, as documented by HvcConfigLimits and HvcConfigParser; the 8-bit numOfArrays and the 16-bit numNalus and lengths make these records valid, and the refusal is the resource limit the caller sets",
+      "rule": "refuses limits of 131072 record bytes, 64 arrays or 256 NALs when exceeded",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "reference_rule": "emits the full output at the next size or count",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "hvcc-array-limit-plus-one-all",
+        "hvcc-array-limit-plus-one-decoder",
+        "hvcc-nal-count-limit-plus-one-all",
+        "hvcc-nal-count-limit-plus-one-decoder",
+        "hvcc-record-size-limit-plus-one-all",
+        "hvcc-record-size-limit-plus-one-decoder"
+      ]
     }
   ]
 }

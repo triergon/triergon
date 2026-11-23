@@ -700,7 +700,7 @@ fn open_cases_are_graded_on_parity_and_only_shrink() {
 
     let passing = Fixture::new();
     let error = open_case(&passing.timed, &passing.measured).unwrap_err();
-    assert!(error.contains("remove it from open_cases"), "{error}");
+    assert!(error.contains("remove it from its lists"), "{error}");
 
     let mut other = fixture.measured.clone();
     put(&mut other, "parity", Value::Null).unwrap();

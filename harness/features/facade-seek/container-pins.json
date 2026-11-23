@@ -1008,7 +1008,39 @@
         "cues-opus-two-tracks-input-rate-15500000000-fresh",
         "cues-opus-two-tracks-input-rate-15500000000-after-eof",
         "cues-opus-two-tracks-input-rate-25000000000-fresh",
-        "cues-opus-two-tracks-input-rate-25000000000-after-eof"
+        "cues-opus-two-tracks-input-rate-25000000000-after-eof",
+        "cues-opus-zero-before-cutoff-2500000000-fresh",
+        "cues-opus-zero-before-cutoff-2500000000-after-eof",
+        "cues-opus-zero-before-cutoff-7500000000-fresh",
+        "cues-opus-zero-before-cutoff-7500000000-after-eof",
+        "cues-opus-zero-before-cutoff-15500000000-fresh",
+        "cues-opus-zero-before-cutoff-15500000000-after-eof",
+        "cues-opus-zero-before-cutoff-25000000000-fresh",
+        "cues-opus-zero-before-cutoff-25000000000-after-eof",
+        "cues-opus-omitted-before-cutoff-2500000000-fresh",
+        "cues-opus-omitted-before-cutoff-2500000000-after-eof",
+        "cues-opus-omitted-before-cutoff-7500000000-fresh",
+        "cues-opus-omitted-before-cutoff-7500000000-after-eof",
+        "cues-opus-omitted-before-cutoff-15500000000-fresh",
+        "cues-opus-omitted-before-cutoff-15500000000-after-eof",
+        "cues-opus-omitted-before-cutoff-25000000000-fresh",
+        "cues-opus-omitted-before-cutoff-25000000000-after-eof",
+        "cues-opus-timed-before-cutoff-2500000000-fresh",
+        "cues-opus-timed-before-cutoff-2500000000-after-eof",
+        "cues-opus-timed-before-cutoff-7500000000-fresh",
+        "cues-opus-timed-before-cutoff-7500000000-after-eof",
+        "cues-opus-timed-before-cutoff-15500000000-fresh",
+        "cues-opus-timed-before-cutoff-15500000000-after-eof",
+        "cues-opus-timed-before-cutoff-25000000000-fresh",
+        "cues-opus-timed-before-cutoff-25000000000-after-eof",
+        "cues-opus-two-tracks-before-cutoff-2500000000-fresh",
+        "cues-opus-two-tracks-before-cutoff-2500000000-after-eof",
+        "cues-opus-two-tracks-before-cutoff-7500000000-fresh",
+        "cues-opus-two-tracks-before-cutoff-7500000000-after-eof",
+        "cues-opus-two-tracks-before-cutoff-15500000000-fresh",
+        "cues-opus-two-tracks-before-cutoff-15500000000-after-eof",
+        "cues-opus-two-tracks-before-cutoff-25000000000-fresh",
+        "cues-opus-two-tracks-before-cutoff-25000000000-after-eof"
       ]
     },
     {
@@ -1070,17 +1102,55 @@
         "cues-opus-before-first-keyframe-0-fresh",
         "cues-opus-before-first-keyframe-0-after-eof",
         "cues-opus-before-first-keyframe-250000000-fresh",
-        "cues-opus-before-first-keyframe-250000000-after-eof"
+        "cues-opus-before-first-keyframe-250000000-after-eof",
+        "cues-opus-padding-rounds-to-zero-2500000000-fresh",
+        "cues-opus-padding-rounds-to-zero-2500000000-after-eof",
+        "cues-opus-padding-rounds-to-zero-7500000000-fresh",
+        "cues-opus-padding-rounds-to-zero-7500000000-after-eof",
+        "cues-opus-padding-rounds-to-zero-15500000000-fresh",
+        "cues-opus-padding-rounds-to-zero-15500000000-after-eof",
+        "cues-opus-padding-rounds-to-zero-25000000000-fresh",
+        "cues-opus-padding-rounds-to-zero-25000000000-after-eof",
+        "cues-opus-before-first-keyframe-2500000000-fresh",
+        "cues-opus-before-first-keyframe-2500000000-after-eof",
+        "cues-opus-before-first-keyframe-7500000000-fresh",
+        "cues-opus-before-first-keyframe-7500000000-after-eof",
+        "cues-opus-before-first-keyframe-15500000000-fresh",
+        "cues-opus-before-first-keyframe-15500000000-after-eof",
+        "cues-opus-before-first-keyframe-25000000000-fresh",
+        "cues-opus-before-first-keyframe-25000000000-after-eof"
+      ]
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "Seek policy the standard leaves open: a target between a sync sample's decode and presentation times",
+      "undecided": "ISO/IEC 14496-12:2015 8.6.1 defines decode and composition times and 8.6.2 sync samples but no seek; the facade lands on the latest sync sample presented at or before the target (crates/isobmff README, Container reader)",
+      "rule": "lands on the sync sample presented at 843000 ticks (decoded at 840000) for the target 924000",
+      "documented": "crates/isobmff/README.md#container-reader",
+      "reference_rule": "av_seek_frame lands on the key decoded at 924000 and presented at 927000, after the target",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "differences": [
+        "dts",
+        "payload",
+        "pts",
+        "receipt-discard",
+        "receipt-landing"
+      ],
+      "cases": [
+        "regular-composition-600-t1-sync-seek-ordinary",
+        "regular-composition-600-t1-sync-eof-seek-ordinary"
       ]
     },
     {
-      "reading": "Seek policy the specification leaves open, with nanosecond CodecDelay: the facade replays the Opus preroll before the target",
-      "clause": "RFC 9559 section 5.1.4.1.26 has the decoder decode SeekPreRoll after a discontinuity and assigns a seek no landing; sections 5.1.4.1.25 and 11.2 subtract the nanosecond CodecDelay",
-      "candidate": "delivers two Opus packets before the first wanted packet on their track, each verified against the sequential source and the Block timing oracle, and exact times on the common packets",
-      "reference": "its seek starts at the cue without those two packets; the common packets carry times rounded to 1 ms and the same bytes",
+      "policy": "Whether a seek replays the preroll before its target",
+      "undecided": "RFC 9559 section 5.1.4.1.26 has the decoder decode SeekPreRoll after a discontinuity and assigns a seek no landing",
+      "rule": "The facade replays the preroll: it delivers the Opus packets, and a subtitle packet, before the first wanted packet on their track, each verified against the sequential source and the Block timing oracle",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Its seek starts at the cue without those packets",
+      "compat": "none: no compat item seeks without the preroll packets",
       "differences": [
-        "preroll",
-        "pts"
+        "preroll"
       ],
       "cases": [
         "cues-opus-zero-before-cutoff-2500000000-fresh",
@@ -1114,20 +1184,7 @@
         "cues-opus-two-tracks-before-cutoff-15500000000-fresh",
         "cues-opus-two-tracks-before-cutoff-15500000000-after-eof",
         "cues-opus-two-tracks-before-cutoff-25000000000-fresh",
-        "cues-opus-two-tracks-before-cutoff-25000000000-after-eof"
-      ]
-    },
-    {
-      "reading": "Seek policy the specification leaves open, with nanosecond DefaultDuration and CodecDelay on a 20 ms Segment tick",
-      "clause": "RFC 9559 sections 5.1.4.1.26 (SeekPreRoll is the decoder's to decode), 5.1.4.1.13 (DefaultDuration in nanoseconds), 5.1.4.1.25 and 11.2 (CodecDelay subtracted in nanoseconds)",
-      "candidate": "delivers a subtitle and two Opus packets before the first wanted packets, each verified against the sequential source, with DefaultDuration 125000000 ns and exact times",
-      "reference": "starts at the cue without them, truncates DefaultDuration to 120000000 ns and rounds the times to the 20 ms tick",
-      "differences": [
-        "duration",
-        "preroll",
-        "pts"
-      ],
-      "cases": [
+        "cues-opus-two-tracks-before-cutoff-25000000000-after-eof",
         "cues-opus-padding-rounds-to-zero-2500000000-fresh",
         "cues-opus-padding-rounds-to-zero-2500000000-after-eof",
         "cues-opus-padding-rounds-to-zero-7500000000-fresh",
@@ -1144,23 +1201,6 @@
         "cues-opus-before-first-keyframe-15500000000-after-eof",
         "cues-opus-before-first-keyframe-25000000000-fresh",
         "cues-opus-before-first-keyframe-25000000000-after-eof"
-      ]
-    },
-    {
-      "reading": "Seek policy the standard leaves open: a target between a sync sample's decode and presentation times",
-      "clause": "ISO/IEC 14496-12:2015 8.6.1 defines decode and composition times and 8.6.2 sync samples but no seek; the facade lands on the latest sync sample presented at or before the target (crates/isobmff README, Container reader)",
-      "candidate": "lands on the sync sample presented at 843000 ticks (decoded at 840000) for the target 924000",
-      "reference": "av_seek_frame lands on the key decoded at 924000 and presented at 927000, after the target",
-      "differences": [
-        "dts",
-        "payload",
-        "pts",
-        "receipt-discard",
-        "receipt-landing"
-      ],
-      "cases": [
-        "regular-composition-600-t1-sync-seek-ordinary",
-        "regular-composition-600-t1-sync-eof-seek-ordinary"
       ]
     }
   ],

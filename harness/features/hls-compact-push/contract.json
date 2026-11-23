@@ -110,17 +110,10 @@
     {
       "reason": "The standalone compact AVC assembler refuses a stream whose first access unit has no access unit delimiter; the segment and progressive views of the same input accept it",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.14.1 requires an access unit delimiter in every AVC access unit; ITU-T H.264 (08/2024) \u00a77.4.1.2.3 places it first",
+      "class": "unsupported",
       "detail": "AVC TS access unit has no initial delimiter",
       "cases": [
-        {
-          "id": "reordered-48000",
-          "sha256": "ccc8b45b5138dc0d33c72513db7f0aed0a20a9b1546ddd7253b7577674b1f076",
-          "candidate": {
-            "packets": 1,
-            "bytes": 0,
-            "digest": 8
-          }
-        }
+        "reordered-48000"
       ]
     }
   ]

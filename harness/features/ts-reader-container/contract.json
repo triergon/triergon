@@ -769,72 +769,81 @@
       "cases": [
         "transport-scrambled"
       ]
-    },
+    }
+  ],
+  "open_policies": [
     {
-      "reading": "An opaque PES in a carrier whose PCR extension is out of range: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 codes program_clock_reference_extension modulo 300; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with an invalid PCR is rejected with its payload and no opaque packet is published.",
-      "reference": "Observed rule: publishes the 27 bytes at PTS 90000.",
+      "policy": "An opaque PES in a carrier whose PCR extension is out of range",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 codes program_clock_reference_extension modulo 300; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with an invalid PCR is rejected with its payload and no opaque packet is published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the 27 bytes at PTS 90000.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pcr-extension-invalid passes) at the PES level; no option reproduces the parsed packet",
       "cases": [
         "pcr-extension-invalid"
       ]
     },
     {
-      "reading": "An opaque PES in a carrier with the transport error indicator set: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 defines transport_error_indicator as at least one uncorrectable bit error; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the errored carrier's payload is discarded and no opaque packet is published.",
-      "reference": "Observed rule: publishes the 27 bytes at PTS 90000.",
+      "policy": "An opaque PES in a carrier with the transport error indicator set",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 defines transport_error_indicator as at least one uncorrectable bit error; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the errored carrier's payload is discarded and no opaque packet is published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the 27 bytes at PTS 90000.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts transport-tei passes) at the PES level; no option reproduces the parsed packet",
       "cases": [
         "transport-tei"
       ]
     },
     {
-      "reading": "An opaque PES whose header has a zero timestamp marker bit: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 Table 2-21 requires each PTS marker_bit to be 1; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed PES is rejected and no opaque packet is published.",
-      "reference": "Observed rule: publishes the 27 bytes at PTS 90000.",
+      "policy": "An opaque PES whose header has a zero timestamp marker bit",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 Table 2-21 requires each PTS marker_bit to be 1; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed PES is rejected and no opaque packet is published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the 27 bytes at PTS 90000.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-timestamp-marker passes) at the PES level; no option reproduces the parsed packet",
       "cases": [
         "pes-timestamp-marker"
       ]
     },
     {
-      "reading": "An opaque PES whose header has PTS_DTS_flags 01: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 forbids PTS_DTS_flags value 01; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed PES is rejected and no opaque packet is published.",
-      "reference": "Observed rule: publishes the 27 bytes with neither clock.",
+      "policy": "An opaque PES whose header has PTS_DTS_flags 01",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 forbids PTS_DTS_flags value 01; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the malformed PES is rejected and no opaque packet is published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the 27 bytes with neither clock.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-forbidden-time-flags passes) at the PES level; no option reproduces the parsed packet",
       "cases": [
         "pes-forbidden-time-flags"
       ]
     },
     {
-      "reading": "An opaque PES across a carrier that codes OPCR without PCR: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 allows OPCR only in a packet that carries PCR; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with the unpaired OPCR is rejected and no opaque packet is published.",
-      "reference": "Observed rule: combines both payloads into 54 opaque bytes.",
+      "policy": "An opaque PES across a carrier that codes OPCR without PCR",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 allows OPCR only in a packet that carries PCR; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the carrier with the unpaired OPCR is rejected and no opaque packet is published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: combines both payloads into 54 opaque bytes.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts opcr-without-pcr-invalid passes) at the PES level; no option reproduces the parsed packet",
       "cases": [
         "opcr-without-pcr-invalid"
       ]
     },
     {
-      "reading": "An opaque finite PES that ends before its declared length: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 PES_packet_length declares more bytes than the input holds; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the incomplete PES is not published.",
-      "reference": "Observed rule: publishes the 24 available bytes.",
+      "policy": "An opaque finite PES that ends before its declared length",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 PES_packet_length declares more bytes than the input holds; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the incomplete PES is not published.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes the 24 available bytes.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-finite-truncated-eof passes) at the PES level; no option reproduces the parsed packet",
       "cases": [
         "pes-finite-truncated-eof"
       ]
     },
     {
-      "reading": "Payload past the declared length of an opaque finite PES: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7: PES_packet_length gives the extent of the PES packet, and a carrier without payload_unit_start_indicator continues it past that extent; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the PES is delivered with the 400 bytes its PES_packet_length declares and the bytes past them are reported as a Pes fault and dropped; ContinuityReader publishes the 400 bytes as an opaque run before that fault.",
-      "reference": "Observed rule: publishes every carried byte, 401 to 415, as one opaque packet.",
+      "policy": "Payload past the declared length of an opaque finite PES",
+      "undecided": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7: PES_packet_length gives the extent of the PES packet, and a carrier without payload_unit_start_indicator continues it past that extent; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "rule": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the PES is delivered with the 400 bytes its PES_packet_length declares and the bytes past them are reported as a Pes fault and dropped; ContinuityReader publishes the 400 bytes as an opaque run before that fault.",
+      "documented": "crates/mpegts/README.md#recovery-from-nonconforming-input",
+      "reference_rule": "Observed rule: publishes every carried byte, 401 to 415, as one opaque packet.",
       "compat": "compat::opaque_video::OpaqueRecovery replays the entity and reports the run with the bytes past the declared length, as the reference does (the mpegts-access-units cases of these inputs pass)",
       "cases": [
         "finite-continuation-body-401",

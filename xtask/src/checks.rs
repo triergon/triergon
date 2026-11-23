@@ -116,6 +116,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         document(crate::exceptions::NOT_COMPARED),
     ));
     errors.extend(registry::compat_errors(root, &data));
+    errors.extend(registry::listing_errors(root, &data));
     errors.extend(crate::status::check(root, &data));
     errors.extend(crate::test_skips::design_errors(&data));
     if let Some(lanes) = document(crate::gate::lanes::FILE) {
@@ -148,9 +149,9 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
             data.len(),
             cases.len()
         );
-        if let Some(one_sided) = registry::one_sided_summary(&registry::one_sided(&data)) {
+        if let Some(unpinned) = registry::unpinned_summary(&data) {
             summary.push('\n');
-            summary.push_str(&one_sided);
+            summary.push_str(&unpinned);
         }
         Ok(summary)
     } else {

@@ -23,31 +23,47 @@
     "aarch64-unknown-linux-gnu",
     "thumbv7neon-unknown-linux-gnueabihf"
   ],
-  "open_deviations": [
+  "open_policies": [
     {
-      "reading": "A drawing coordinate outside the 26.6 range discards the drawing (the candidate keeps the 32-bit ARM result on every target)",
-      "clause": "ISO C sections 6.3.1.3 and 7.12.9.5: lrint's result outside long and the narrowing of a long to int are implementation-defined; libass rounds through long, 32 bits on ARMv7 and 64 on AArch64, so the two builds differ.",
-      "candidate": "Rejects the drawing at the extreme coordinate (folds 6/44/7102520413637202956 and 15881649056746129386), the 32-bit ARM pins.",
-      "reference": "On AArch64 rounds with a 64-bit long, keeps the low 32 bits and admits the drawing (6/44/2758801544890065950 and 17791394752719166305).",
+      "policy": "A drawing coordinate outside the 26.6 range discards the drawing",
+      "undecided": "ISO C sections 6.3.1.3 and 7.12.9.5: lrint's result outside long and the narrowing of a long to int are implementation-defined; libass rounds through long, 32 bits on ARMv7 and 64 on AArch64, so the two builds differ.",
+      "rule": "Rejects the drawing at the extreme coordinate (folds 6/44/7102520413637202956 and 15881649056746129386), the 32-bit ARM pins.",
+      "documented": "crates/ass/README.md#target-dependent-results",
+      "reference_rule": "On AArch64 rounds with a 64-bit long, keeps the low 32 bits and admits the drawing (6/44/2758801544890065950 and 17791394752719166305).",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ],
       "cases": [
         "drawings-infinite-ass",
         "drawings-int-min-ass"
-      ],
-      "targets": [
-        "aarch64-unknown-linux-gnu"
       ]
     },
     {
-      "reading": "A drawing coordinate of exactly INT_MIN is rejected (a choice of ours, not a host effect)",
-      "clause": "ISO C section 7.22.6.1 paragraph 2: abs of an unrepresentable result is undefined; GCC wraps abs(INT_MIN) on both targets, so libass's bound check passes and both builds admit the drawing with the same fold.",
-      "candidate": "Rejects the drawing with an INT_MIN coordinate in either axis on both targets (6/31/7855372470377351486 and 6/31/16898026539907838526).",
-      "reference": "Both target builds admit it (6/31/956854100840633194 and 6/31/6665314754141197418, the same pin on each target).",
+      "policy": "A drawing coordinate of exactly INT_MIN is rejected",
+      "undecided": "ISO C section 7.22.6.1 paragraph 2: abs of an unrepresentable result is undefined; GCC wraps abs(INT_MIN) on both targets, so libass's bound check passes and both builds admit the drawing with the same fold.",
+      "rule": "Rejects the drawing with an INT_MIN coordinate in either axis on both targets (6/31/7855372470377351486 and 6/31/16898026539907838526).",
+      "documented": "crates/ass/README.md#target-dependent-results",
+      "reference_rule": "Both target builds admit it (6/31/956854100840633194 and 6/31/6665314754141197418, the same pin on each target).",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "targets": [
+        "aarch64-unknown-linux-gnu",
+        "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "cases": [
+        "drawings-int-min-x-ass",
+        "drawings-int-min-y-ass"
+      ]
+    }
+  ],
+  "open_unpinned": [
+    {
       "cases": [
         "drawings-int-min-x-ass",
         "drawings-int-min-y-ass"
       ],
+      "cause": "The candidate's fold of these drawings on 32-bit ARM is recorded on that host; the AArch64 fold is pinned",
       "targets": [
-        "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
       ]
     }

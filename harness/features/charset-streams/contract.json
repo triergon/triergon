@@ -389,10 +389,22 @@
   ],
   "open_deviations": [
     {
-      "reading": "The strict big5 profile decodes Big5 as the Encoding Standard does (a profile choice: the reference's C library converts with its own Big5 charmap)",
-      "clause": "WHATWG Encoding Standard, Big5 decoder and index-big5: lead bytes 81 to FE, the Hong Kong supplement with its plane 2 characters, the codes 8862, 8864, 88A3 and 88A5 as two code points each, and no single byte beyond ASCII.",
-      "candidate": "Refuses byte 80; maps 8740 to U+43F0, 8862 to U+00CA U+0304, C6A1 to U+2460 and F9FE to U+FFED.",
-      "reference": "glibc 2.39 iconv decodes 80 as U+0080, refuses 8740 and 8862, and maps C6A1 to U+F6B1 and F9FE to U+2593.",
+      "reading": "An unmapped CP949 pair is refused at the start of the pair",
+      "clause": "POSIX iconv(): on an invalid input sequence the input position points to the beginning of that sequence; Microsoft CP949.TXT 2.01 has no A2E8.",
+      "candidate": "Refuses A2E8 at byte 0.",
+      "reference": "Refuses A2E8 at byte 2.",
+      "cases": [
+        "cp949-pairs"
+      ]
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "The strict big5 profile decodes Big5 as the Encoding Standard does",
+      "undecided": "WHATWG Encoding Standard, Big5 decoder and index-big5: lead bytes 81 to FE, the Hong Kong supplement with its plane 2 characters, the codes 8862, 8864, 88A3 and 88A5 as two code points each, and no single byte beyond ASCII.",
+      "rule": "Refuses byte 80; maps 8740 to U+43F0, 8862 to U+00CA U+0304, C6A1 to U+2460 and F9FE to U+FFED.",
+      "documented": "crates/subtitles/README.md#text",
+      "reference_rule": "glibc 2.39 iconv decodes 80 as U+0080, refuses 8740 and 8862, and maps C6A1 to U+F6B1 and F9FE to U+2593.",
       "compat": "triergon_subtitles::compat::charset::receiver_charset, whose gbk, big5, shift_jis, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "big5-bytes",
@@ -403,20 +415,22 @@
       ]
     },
     {
-      "reading": "The strict gbk profile decodes GBK as the Encoding Standard does (a profile choice: the reference's C library converts GBK as code page 936)",
-      "clause": "WHATWG Encoding Standard, gb18030 decoder (the GBK decoder) with index-gb18030 and index-gb18030-ranges: lead bytes 81 to FE, trail bytes 40 to 7E and 80 to FE, the two-byte codes GB18030 adds to CP936 (the user-defined areas AAA1 to AFFE, F8A1 to FEFE and A140 to A7A0 among them), 80 as U+20AC, and four-byte codes.",
-      "candidate": "Decodes the 2,149 two-byte codes GB18030 adds to CP936: A140 as U+E4C6, AAA1 as U+E000, A2E3 as U+20AC, A6D9 as U+FE10.",
-      "reference": "glibc 2.39 iconv refuses them at the start of the pair.",
+      "policy": "The strict gbk profile decodes GBK as the Encoding Standard does",
+      "undecided": "WHATWG Encoding Standard, gb18030 decoder (the GBK decoder) with index-gb18030 and index-gb18030-ranges: lead bytes 81 to FE, trail bytes 40 to 7E and 80 to FE, the two-byte codes GB18030 adds to CP936 (the user-defined areas AAA1 to AFFE, F8A1 to FEFE and A140 to A7A0 among them), 80 as U+20AC, and four-byte codes.",
+      "rule": "Decodes the 2,149 two-byte codes GB18030 adds to CP936: A140 as U+E4C6, AAA1 as U+E000, A2E3 as U+20AC, A6D9 as U+FE10.",
+      "documented": "crates/subtitles/README.md#text",
+      "reference_rule": "glibc 2.39 iconv refuses them at the start of the pair.",
       "compat": "triergon_subtitles::compat::charset::receiver_charset, whose gbk, big5, shift_jis, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "gbk-pairs"
       ]
     },
     {
-      "reading": "The strict shift_jis profile decodes Shift_JIS as the Encoding Standard does (a profile choice: the reference's C library converts the historical Shift-JIS)",
-      "clause": "WHATWG Encoding Standard, Shift_JIS decoder and index-jis0208: ASCII as itself, 80 as U+0080, A1 to DF as the halfwidth katakana, lead bytes 81 to 9F and E0 to FC with the NEC and IBM extensions, and F040 to F9FC as U+E000 to U+E757.",
-      "candidate": "Decodes 5C as U+005C, 7E as U+007E and 80 as U+0080; maps 8160 to U+FF5E, 8161 to U+2225, 817C to U+FF0D, 8191 to U+FFE0, 8192 to U+FFE1 and 81CA to U+FFE2; decodes the lead bytes F0 to FC and the extension rows (8740 as U+2460).",
-      "reference": "glibc 2.39 iconv decodes 5C as U+00A5 and 7E as U+203E, refuses 80, maps 8160 to U+301C, 8161 to U+2016, 817C to U+2212, 8191 to U+00A2, 8192 to U+00A3 and 81CA to U+00AC, and refuses the extension rows.",
+      "policy": "The strict shift_jis profile decodes Shift_JIS as the Encoding Standard does",
+      "undecided": "WHATWG Encoding Standard, Shift_JIS decoder and index-jis0208: ASCII as itself, 80 as U+0080, A1 to DF as the halfwidth katakana, lead bytes 81 to 9F and E0 to FC with the NEC and IBM extensions, and F040 to F9FC as U+E000 to U+E757.",
+      "rule": "Decodes 5C as U+005C, 7E as U+007E and 80 as U+0080; maps 8160 to U+FF5E, 8161 to U+2225, 817C to U+FF0D, 8191 to U+FFE0, 8192 to U+FFE1 and 81CA to U+FFE2; decodes the lead bytes F0 to FC and the extension rows (8740 as U+2460).",
+      "documented": "crates/subtitles/README.md#text",
+      "reference_rule": "glibc 2.39 iconv decodes 5C as U+00A5 and 7E as U+203E, refuses 80, maps 8160 to U+301C, 8161 to U+2016, 817C to U+2212, 8191 to U+00A2, 8192 to U+00A3 and 81CA to U+00AC, and refuses the extension rows.",
       "compat": "triergon_subtitles::compat::charset::receiver_charset, whose gbk, big5, shift_jis, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "shift_jis-bytes",
@@ -424,10 +438,11 @@
       ]
     },
     {
-      "reading": "The strict windows-950 profile converts code page 950 as Windows does (a profile choice: the reference's C library converts cp950 with its Big5 charmap)",
-      "clause": "Microsoft CP950.TXT 2.01 lists the code page's assigned characters; Windows converts the four user-defined areas FA40 to FEFE, 8E40 to A0FE, 8140 to 8DFE and C6A1 to C8FE to U+E000 to U+F848, and the single bytes 80 and FF to U+0080 and U+F8F8.",
-      "candidate": "Maps FF to U+F8F8 and every user-defined pair to private use, FA40 to U+E000.",
-      "reference": "glibc 2.39 iconv converts CP950 as BIG5: of the user-defined areas it maps C6A1 to C8FE only, and it refuses FF and pairs such as FA40.",
+      "policy": "The strict windows-950 profile converts code page 950 as Windows does",
+      "undecided": "Microsoft CP950.TXT 2.01 lists the code page's assigned characters; Windows converts the four user-defined areas FA40 to FEFE, 8E40 to A0FE, 8140 to 8DFE and C6A1 to C8FE to U+E000 to U+F848, and the single bytes 80 and FF to U+0080 and U+F8F8.",
+      "rule": "Maps FF to U+F8F8 and every user-defined pair to private use, FA40 to U+E000.",
+      "documented": "crates/subtitles/README.md#text",
+      "reference_rule": "glibc 2.39 iconv converts CP950 as BIG5: of the user-defined areas it maps C6A1 to C8FE only, and it refuses FF and pairs such as FA40.",
       "compat": "triergon_subtitles::compat::charset::receiver_charset, whose gbk, big5, shift_jis, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "cp950-bytes",
@@ -435,23 +450,15 @@
       ]
     },
     {
-      "reading": "The strict euc-kr profile decodes EUC-KR as the Encoding Standard does: the UHC pairs, and no byte 80 to 9F (a profile choice: the reference's C library converts KS X 1001 with the C1 controls)",
-      "clause": "WHATWG Encoding Standard, EUC-KR decoder and index-euc-kr: lead bytes 81 to FE, trail bytes 41 to FE, the UHC extension pairs of code page 949, and no single byte beyond ASCII; ISO/IEC 2022 and ISO/IEC 4873 let an EUC carry C1 controls in 80 to 9F, which glibc decodes.",
-      "candidate": "Refuses every byte 80 to 9F, alone or in a pair; decodes the UHC pairs (8141 as U+AC02) and refuses A2E8, as index-euc-kr and code page 949 do.",
-      "reference": "glibc 2.39 iconv decodes 80 to 9F as the C1 controls U+0080 to U+009F (8141 as U+0081 U+0041), refuses the UHC pairs with a lead byte from A1 on, and maps A2E8 to U+327E.",
+      "policy": "The strict euc-kr profile decodes EUC-KR as the Encoding Standard does: the UHC pairs, and no byte 80 to 9F",
+      "undecided": "WHATWG Encoding Standard, EUC-KR decoder and index-euc-kr: lead bytes 81 to FE, trail bytes 41 to FE, the UHC extension pairs of code page 949, and no single byte beyond ASCII; ISO/IEC 2022 and ISO/IEC 4873 let an EUC carry C1 controls in 80 to 9F, which glibc decodes.",
+      "rule": "Refuses every byte 80 to 9F, alone or in a pair; decodes the UHC pairs (8141 as U+AC02) and refuses A2E8, as index-euc-kr and code page 949 do.",
+      "documented": "crates/subtitles/README.md#text",
+      "reference_rule": "glibc 2.39 iconv decodes 80 to 9F as the C1 controls U+0080 to U+009F (8141 as U+0081 U+0041), refuses the UHC pairs with a lead byte from A1 on, and maps A2E8 to U+327E.",
       "compat": "triergon_subtitles::compat::charset::receiver_charset, whose gbk, big5, shift_jis, cp950 and euc-kr profiles convert as the reference build's glibc iconv does",
       "cases": [
         "euc-kr-bytes",
         "euc-kr-pairs"
-      ]
-    },
-    {
-      "reading": "An unmapped CP949 pair is refused at the start of the pair",
-      "clause": "POSIX iconv(): on an invalid input sequence the input position points to the beginning of that sequence; Microsoft CP949.TXT 2.01 has no A2E8.",
-      "candidate": "Refuses A2E8 at byte 0.",
-      "reference": "Refuses A2E8 at byte 2.",
-      "cases": [
-        "cp949-pairs"
       ]
     }
   ]
