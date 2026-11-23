@@ -142,6 +142,8 @@ fn cubic_weight(distance: i128) -> i128 {
     6 * weight
 }
 
+type TapWindow = (i64, Vec<i128>);
+
 impl Filter {
     /// The reference's taps for `src -> dst` samples summing to `one`.
     ///
@@ -164,6 +166,13 @@ impl Filter {
                 coef: vec![one as i16; src],
             };
         }
+        let (mut windows, unit) = Self::tap_windows(src, dst);
+        Self::trim_taps(&mut windows, unit);
+        Self::fold_taps(&windows, src, one)
+    }
+
+    #[inline(always)]
+    fn tap_windows(src: usize, dst: usize) -> (Vec<TapWindow>, i128) {
         let (src_i, dst_i) = (src as i64, dst as i64);
         let inc = ((src_i << 16) + dst_i / 2) / dst_i;
         let down = inc > 65536;
@@ -172,7 +181,7 @@ impl Filter {
         let headroom = (src / dst).checked_ilog2().unwrap_or(0).min(8);
         let scale = 1_i128 << headroom;
         let unit = (1_i128 << 54) / scale;
-        let mut windows: Vec<(i64, Vec<i128>)> = (0..dst_i)
+        let windows = (0..dst_i)
             .map(|x| {
                 let c2 = 2 * x * inc + inc - 65536;
                 let mut s = (c2 - half + (1 << 16)).div_euclid(1 << 17);
@@ -191,6 +200,11 @@ impl Filter {
                 (s, w)
             })
             .collect();
+        (windows, unit)
+    }
+
+    #[inline(always)]
+    fn trim_taps(windows: &mut [TapWindow], unit: i128) {
         for i in (0..windows.len()).rev() {
             let next = windows.get(i + 1).map(|w| w.0);
             let (s, w) = &mut windows[i];
@@ -207,9 +221,15 @@ impl Filter {
             }
             w.drain(..drop);
         }
+    }
+
+    #[inline(always)]
+    fn fold_taps(windows: &[TapWindow], src: usize, one: i32) -> Self {
+        let src_i = src as i64;
+        let dst = windows.len();
         let mut folded: Vec<(usize, Vec<i32>)> = Vec::with_capacity(dst);
         let mut len = 1;
-        for (s, w) in &windows {
+        for (s, w) in windows {
             let lo = (*s).max(0) as usize;
             let hi = ((*s + w.len() as i64) as usize).min(src);
             let mut f = vec![0_i128; hi - lo];
