@@ -47,7 +47,10 @@ fn index_view(records: &mut Records<'_, '_>, input: &[u8], sub: &[u8]) -> Result
                 }
             }
             Ok(Line::Track { language, index }) => {
-                languages.entry(index.unwrap_or(0)).or_insert(language);
+                // A track without a language code is `und`, as Matroska writes it.
+                languages
+                    .entry(index.unwrap_or(0))
+                    .or_insert(language.unwrap_or(b"und"));
             }
             Ok(_) => {}
             Err(_) => return records.refused(),

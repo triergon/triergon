@@ -22,9 +22,10 @@ pub enum Line<'a> {
     /// `id: LANGUAGE, index: N`: the following lines describe track `N`, the
     /// subpictures in substream `0x20 + N`. A missing index is `None`.
     Track {
-        /// The language code up to the comma, without surrounding white
-        /// space.
-        language: &'a [u8],
+        /// The ISO 639 code up to the comma, without surrounding white space:
+        /// two or three ASCII letters; `None` for anything else, which names
+        /// no language.
+        language: Option<&'a [u8]>,
         /// The decimal number after `index:`; one above 255 fails the line.
         index: Option<u8>,
     },
@@ -98,8 +99,10 @@ fn classify(line: &[u8]) -> Result<Line<'_>> {
             .and_then(|mut s| s.number())
             .map(|n| u8::try_from(n).map_err(|_| Error::Invalid("VobSub track index")))
             .transpose()?;
+        let language = language.trim_ascii();
+        let code = matches!(language.len(), 2 | 3) && language.iter().all(u8::is_ascii_alphabetic);
         return Ok(Line::Track {
-            language: language.trim_ascii(),
+            language: code.then_some(language),
             index,
         });
     }
