@@ -572,29 +572,30 @@ impl TsEngine {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<T> {
-        // Borrow the packet until its clock is ready to leave it pending across a yield.
-        let packet = self
-            .pes_pending
-            .as_ref()
-            .ok_or(Error::Invalid("pending PES packet missing"))?;
-        // The PMT installs the projector before a PES can be delivered.
-        let projector = self
-            .pes_clock
-            .as_mut()
-            .ok_or(Error::Invalid("PES packet before program discovery"))?;
-        let (pid, epochs, header) = match packet {
-            FeedPacket::Owned(packet) => (packet.pid, packet.source_epochs, packet.time_header()),
-            FeedPacket::Compact(packet) => (packet.pid, packet.source_epochs, packet.time_header()),
-        };
-        let Some(clock) = projector.project_header(pid, epochs, header, work, cancel)? else {
-            return T::project(FeedStep::Yield);
-        };
-        // Clock projection succeeded above, so the packet can now be moved into the output.
-        let packet = self
-            .pes_pending
-            .take()
-            .ok_or(Error::Invalid("pending PES packet missing"))?;
-        T::project(FeedStep::Packet { packet, clock })
+        let mut clock = Err(Error::Invalid("pending PES packet missing"));
+        let packet = self.pes_pending.take_if(|packet| {
+            clock = (|| {
+                // The PMT installs the projector before a PES can be delivered.
+                let projector = self
+                    .pes_clock
+                    .as_mut()
+                    .ok_or(Error::Invalid("PES packet before program discovery"))?;
+                let (pid, epochs, header) = match packet {
+                    FeedPacket::Owned(packet) => {
+                        (packet.pid, packet.source_epochs, packet.time_header())
+                    }
+                    FeedPacket::Compact(packet) => {
+                        (packet.pid, packet.source_epochs, packet.time_header())
+                    }
+                };
+                projector.project_header(pid, epochs, header, work, cancel)
+            })();
+            matches!(clock, Ok(Some(_)))
+        });
+        match (packet, clock?) {
+            (Some(packet), Some(clock)) => T::project(FeedStep::Packet { packet, clock }),
+            _ => T::project(FeedStep::Yield),
+        }
     }
 
     /// The next selected track's carriage or refusal from track `at` on, if any
