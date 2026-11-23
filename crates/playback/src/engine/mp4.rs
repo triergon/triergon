@@ -71,19 +71,19 @@ pub struct Mp4Engine {
     /// The forward continuation of a progressive source, if it is one.
     pub(crate) progressive: Option<progressive::ProgressiveState>,
     /// The front read boundary, once a packet reached it.
-    pub(crate) front_boundary: Option<FrontReadBoundary>,
+    front_boundary: Option<FrontReadBoundary>,
     pub(crate) configs: [Option<CachedDescription>; MAXIMUM_TRACKS],
     pub(crate) seek: SeekReplay,
     pub(crate) input: InputCursor,
     /// The media a demux-order replay serves from memory, until it is read.
-    pub(crate) media_cache_fill: Option<PendingMedia>,
+    media_cache_fill: Option<PendingMedia>,
     /// The empty packet still to deliver at the boundary and how many times.
-    pub(crate) empty_run: Option<(Mp4EmptyPacket, u32)>,
+    empty_run: Option<(Mp4EmptyPacket, u32)>,
     pub(crate) row: usize,
     pub(crate) revision: u64,
-    pub(crate) maximum_packet: usize,
+    maximum_packet: usize,
     /// Whether the demux view ended at a short or missing sample.
-    pub(crate) ended_short: bool,
+    ended_short: bool,
 }
 
 #[cfg(target_arch = "aarch64")]
