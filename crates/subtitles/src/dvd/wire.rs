@@ -1,5 +1,6 @@
-use triergon_core::{Error, Result};
+//! The display control commands of a DVD subpicture unit's control sequences.
 
+/// A display area's inclusive columns and rows, 12 bits each.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct DvdArea {
     pub left: u16,
@@ -9,26 +10,12 @@ pub(crate) struct DvdArea {
 }
 
 impl DvdArea {
-    pub(crate) fn dimensions(self) -> Result<(u16, u16)> {
-        let width = self
-            .right
-            .checked_sub(self.left)
-            .and_then(|n| n.checked_add(1));
-        let height = self
-            .bottom
-            .checked_sub(self.top)
-            .and_then(|n| n.checked_add(1));
-        match (width, height) {
-            (Some(w), Some(h)) => Ok((w, h)),
-            _ => Err(Error::Invalid("DVD reversed or overflowing display area")),
-        }
+    /// Width and height, or `None` for a reversed area.
+    pub(crate) fn dimensions(self) -> Option<(u16, u16)> {
+        let width = self.right.checked_sub(self.left)? + 1;
+        let height = self.bottom.checked_sub(self.top)? + 1;
+        Some((width, height))
     }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct FieldOffsets {
-    pub top: u16,
-    pub bottom: u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,18 +27,18 @@ pub(crate) enum Command<'a> {
     Palette(u16),
     Alpha(u16),
     Area(DvdArea),
-    Fields(FieldOffsets),
+    /// The offsets of the top and bottom fields' pixels: `0x06` codes them in
+    /// 16 bits, `0x86` in 32.
+    Fields {
+        top: u32,
+        bottom: u32,
+    },
     /// `0x83`: 256 (Y, Cr, Cb) colours of an eight-bit subpicture.
     ExtendedPalette(&'a [u8; 768]),
     /// `0x84`: the contrast of each of the 256 colours.
     ExtendedContrast(&'a [u8; 256]),
     /// `0x85`: the display area of eight-bit pixels.
     ExtendedArea(DvdArea),
-    /// `0x86`: 32-bit field offsets.
-    ExtendedFields {
-        top: u32,
-        bottom: u32,
-    },
     End,
     /// Any other opcode. Its operands' length is unknown, so the control
     /// sequence ends here.
@@ -59,7 +46,7 @@ pub(crate) enum Command<'a> {
 }
 
 /// A display area's 12-bit inclusive columns and rows.
-fn area(b: &[u8]) -> DvdArea {
+fn area(b: &[u8; 6]) -> DvdArea {
     DvdArea {
         left: u16::from(b[0]) << 4 | u16::from(b[1] >> 4),
         right: u16::from(b[1] & 15) << 8 | u16::from(b[2]),
@@ -68,92 +55,57 @@ fn area(b: &[u8]) -> DvdArea {
     }
 }
 
+/// The commands of one control sequence, read from a position.
 #[derive(Debug)]
 pub(crate) struct Commands<'a> {
     input: &'a [u8],
     at: usize,
-    done: bool,
 }
 
 impl<'a> Commands<'a> {
     pub(super) fn resume(input: &'a [u8], at: usize) -> Self {
-        Self {
-            input,
-            at,
-            done: false,
-        }
+        Self { input, at }
     }
 
     pub(super) fn position(&self) -> usize {
         self.at
     }
 
-    fn take_array<const N: usize>(&mut self) -> Result<&'a [u8; N]> {
-        self.take(N)?.try_into().map_err(|_| Error::Truncated)
+    fn take<const N: usize>(&mut self) -> Option<&'a [u8; N]> {
+        let bytes = self.input.get(self.at..)?.first_chunk::<N>()?;
+        self.at += N;
+        Some(bytes)
     }
 
-    fn take(&mut self, n: usize) -> Result<&'a [u8]> {
-        let end = self.at.checked_add(n).ok_or(Error::Overflow)?;
-        let bytes = self.input.get(self.at..end).ok_or(Error::Truncated)?;
-        self.at = end;
-        Ok(bytes)
-    }
-
-    fn parse(&mut self) -> Result<Command<'a>> {
-        let opcode = self.take(1)?[0];
-        Ok(match opcode {
+    /// The next command; `None` when its operands are cut short.
+    pub(super) fn next_command(&mut self) -> Option<Command<'a>> {
+        let &[opcode] = self.take::<1>()?;
+        Some(match opcode {
             0 => Command::ForcedStart,
             1 => Command::Start,
             2 => Command::Stop,
-            3 | 4 => {
-                let b = self.take(2)?;
-                let value = u16::from_be_bytes([b[0], b[1]]);
-                if opcode == 3 {
-                    Command::Palette(value)
-                } else {
-                    Command::Alpha(value)
-                }
-            }
-            5 => Command::Area(area(self.take(6)?)),
-            0x85 => Command::ExtendedArea(area(self.take(6)?)),
-            0x83 => Command::ExtendedPalette(self.take_array()?),
-            0x84 => Command::ExtendedContrast(self.take_array()?),
-            0x86 => {
-                let b = self.take(8)?;
-                Command::ExtendedFields {
-                    top: u32::from_be_bytes([b[0], b[1], b[2], b[3]]),
-                    bottom: u32::from_be_bytes([b[4], b[5], b[6], b[7]]),
-                }
-            }
+            3 => Command::Palette(u16::from_be_bytes(*self.take()?)),
+            4 => Command::Alpha(u16::from_be_bytes(*self.take()?)),
+            5 => Command::Area(area(self.take()?)),
             6 => {
-                let b = self.take(4)?;
-                Command::Fields(FieldOffsets {
-                    top: u16::from_be_bytes([b[0], b[1]]),
-                    bottom: u16::from_be_bytes([b[2], b[3]]),
-                })
+                let &[t0, t1, b0, b1] = self.take()?;
+                Command::Fields {
+                    top: u32::from(u16::from_be_bytes([t0, t1])),
+                    bottom: u32::from(u16::from_be_bytes([b0, b1])),
+                }
             }
-            0xff => {
-                self.done = true;
-                Command::End
+            0x83 => Command::ExtendedPalette(self.take()?),
+            0x84 => Command::ExtendedContrast(self.take()?),
+            0x85 => Command::ExtendedArea(area(self.take()?)),
+            0x86 => {
+                let &[t0, t1, t2, t3, b0, b1, b2, b3] = self.take()?;
+                Command::Fields {
+                    top: u32::from_be_bytes([t0, t1, t2, t3]),
+                    bottom: u32::from_be_bytes([b0, b1, b2, b3]),
+                }
             }
-            _ => {
-                self.done = true;
-                Command::Unknown
-            }
+            0xff => Command::End,
+            _ => Command::Unknown,
         })
-    }
-}
-
-impl<'a> Iterator for Commands<'a> {
-    type Item = Result<Command<'a>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.done {
-            return None;
-        }
-        let result = self.parse();
-        if result.is_err() {
-            self.done = true;
-        }
-        Some(result)
     }
 }

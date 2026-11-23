@@ -845,7 +845,7 @@ impl Pass<'_, '_> {
         let mut commands = Commands::resume(body, self.cursor.read);
         while commands.position() < body.len() {
             let from = commands.position();
-            let command = commands.next().ok_or(Halt::Malformed)?;
+            let command = commands.next_command().ok_or(Halt::Malformed)?;
             // A sequence reads on to its end command, through the bytes of the
             // sequences after it if need be: each sequence pays for what it
             // reads.
@@ -854,7 +854,7 @@ impl Pass<'_, '_> {
             }
             self.cursor.read = commands.position();
             let cursor = &mut *self.cursor;
-            match command.map_err(|_| Halt::Malformed)? {
+            match command {
                 Command::ForcedStart => cursor.state.forced = true,
                 Command::Start => cursor.state.start = date,
                 Command::Stop => cursor.state.stop = date,
@@ -881,13 +881,7 @@ impl Pass<'_, '_> {
                     cursor.area = Some(value);
                     cursor.state.eight_bit = true;
                 }
-                Command::Fields(value) => {
-                    cursor.fields = Some(Fields {
-                        top: usize::from(value.top),
-                        bottom: usize::from(value.bottom),
-                    });
-                }
-                Command::ExtendedFields { top, bottom } => {
+                Command::Fields { top, bottom } => {
                     cursor.fields = Some(Fields {
                         top: top as usize,
                         bottom: bottom as usize,
@@ -908,7 +902,7 @@ impl Pass<'_, '_> {
         fields: Fields,
         state: &UnitState,
     ) -> std::result::Result<Option<Drawn>, Halt> {
-        let Ok((width, height)) = area.dimensions() else {
+        let Some((width, height)) = area.dimensions() else {
             return Ok(None);
         };
         let (width, height) = (usize::from(width), usize::from(height));
@@ -1061,6 +1055,8 @@ static SPLATS: Splats = {
 /// at a time, alternating between the fields: interleaving the runs of two
 /// lines mixes their run lengths in the branch history, and the stores of
 /// short and long runs then mispredict about once a run.
+// Out of line, as LLVM compiles it beside a pass of the control sequences.
+#[inline(never)]
 fn fill_fields(
     rows: &mut [u8],
     width: usize,
