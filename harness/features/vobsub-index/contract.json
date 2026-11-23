@@ -692,14 +692,5 @@
         "long-timestamp"
       ]
     }
-  ],
-  "pending_module_requirements": [
-    "Publish a VobSub track's language only when its id line names an ISO 639 language: an id line such as 'id: invalid' gives no language (und), as Matroska codec mappings draft 21 section 3.5.13 maps the id line to the track's Language element."
-  ],
-  "open_cases": [
-    {
-      "id": "malformed-id",
-      "requirement": "Publish a VobSub track's language only when its id line names an ISO 639 language: an id line such as 'id: invalid' gives no language (und), as Matroska codec mappings draft 21 section 3.5.13 maps the id line to the track's Language element."
-    }
   ]
 }
