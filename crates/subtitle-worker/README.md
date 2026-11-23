@@ -57,8 +57,11 @@ extradata), packets (optional PTS and duration) and flushes. tx3g samples go
 through `compat::mov_text::Decoder` and ASS packets through `compat::ass::Decoder`,
 with the capsule's label if it has one. `srt` and `vtt` read one SubRip or WebVTT
 document through `compat::document::Reader`, folding every cue's start, duration,
-text and WebVTT identifier and settings. The inputs are written by
-`harness/subtitle_corpus.py`; the corpus is `harness/features/subtitle-text/`.
+text and WebVTT identifier and settings. A tx3g session, an ASS session and a
+document are each a function of their own, called from the measured loop, so a
+change to one decoder leaves the instruction counts of the other operations as they
+were. The inputs are written by `harness/subtitle_corpus.py`; the corpus is
+`harness/features/subtitle-text/`.
 
 ## Recorded PGS cases
 
