@@ -144,25 +144,24 @@ pub fn resolve_hls_aac_clocks(
     Ok(clocks)
 }
 
-pub(crate) fn ns_aac_clocks<T>(
+/// [`ns_audio_clocks`] of AAC frames.
+pub(crate) fn ns_aac_clocks(
     frames: &BudgetVec<HlsAacFrame>,
     cancel: &AtomicBool,
-    make: impl Fn(HlsAudioClockNs) -> T,
-) -> Result<BudgetVec<T>> {
-    ns_audio_clocks(
-        frames,
-        cancel,
-        |frame| (frame.pts.or(frame.dts), frame.duration),
-        make,
-    )
+) -> Result<BudgetVec<HlsAudioClockNs>> {
+    ns_audio_clocks(frames, cancel, |frame| {
+        (frame.pts.or(frame.dts), frame.duration)
+    })
 }
 
-pub(crate) fn ns_audio_clocks<F, T>(
+/// The nanosecond clock of each frame, from its anchor and duration (`facts`): a frame
+/// without an anchor follows the previous one; frames before the first anchor are
+/// counted back from it.
+pub(crate) fn ns_audio_clocks<F>(
     frames: &BudgetVec<F>,
     cancel: &AtomicBool,
     facts: impl Fn(&F) -> (Option<Time>, Time),
-    make: impl Fn(HlsAudioClockNs) -> T,
-) -> Result<BudgetVec<T>> {
+) -> Result<BudgetVec<HlsAudioClockNs>> {
     let mut output = BudgetVec::new(frames.budget());
     if cancel.load(Ordering::Relaxed) {
         return Err(Error::Cancelled);
@@ -212,10 +211,10 @@ pub(crate) fn ns_audio_clocks<F, T>(
         }
         let duration_ns = duration_nanoseconds(duration)?;
         output
-            .try_push(make(HlsAudioClockNs {
+            .try_push(HlsAudioClockNs {
                 pts_ns: pts,
                 duration_ns,
-            }))
+            })
             .map_err(|error| error.error)?;
         previous = Some(pts);
         next = pts.checked_add(duration_ns).ok_or(Error::Overflow)?;
@@ -300,7 +299,8 @@ mod tests {
         for pts in [None, Some(3), None, Some(8), None] {
             frames.try_push(frame(&pool, pts)).unwrap();
         }
-        let stamps = ns_aac_clocks(&frames, &AtomicBool::new(false), |clock| clock.pts_ns).unwrap();
+        let stamps = ns_aac_clocks(&frames, &AtomicBool::new(false)).unwrap();
+        let stamps: Vec<_> = stamps.as_slice().iter().map(|clock| clock.pts_ns).collect();
         let step = 1_024_000_000_000 / 44_100;
         let first = frames.as_slice()[1]
             .pts
@@ -313,8 +313,8 @@ mod tests {
             .to_nanoseconds(Rounding::NearestAway)
             .unwrap();
         assert_eq!(
-            stamps.as_slice(),
-            &[first - step, first, first + step, next, next + step]
+            stamps,
+            [first - step, first, first + step, next, next + step]
         );
         assert!(frames.as_slice()[0].pts.is_none());
     }

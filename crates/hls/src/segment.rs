@@ -186,22 +186,42 @@ impl<C, V, A> HlsSegment<C, V, A> {
     }
 
     /// The units in feed order.
-    #[expect(
-        clippy::expect_used,
-        reason = "the sealed lane order names exactly the stored video and audio units"
-    )]
     pub fn access_units(&self) -> impl ExactSizeIterator<Item = HlsFeedUnit<'_, C, V, A>> {
-        let mut video = self.video.as_slice().iter();
-        let mut audio = self.audio.as_slice().iter().zip(self.clocks.as_slice());
-        self.order.as_slice().iter().map(move |lane| match lane {
-            Lane::Video => HlsFeedUnit::Video(video.next().expect("sealed video order")),
+        FeedUnits {
+            order: self.order.as_slice().iter(),
+            video: self.video.as_slice().iter(),
+            audio: self.audio.as_slice().iter().zip(self.clocks.as_slice()),
+        }
+    }
+}
+
+/// The units of a segment in feed order: its lane order names, one by one, the next
+/// stored unit of each lane.
+struct FeedUnits<'a, C, V, A> {
+    order: std::slice::Iter<'a, Lane>,
+    video: std::slice::Iter<'a, V>,
+    audio: std::iter::Zip<std::slice::Iter<'a, A>, std::slice::Iter<'a, C>>,
+}
+
+impl<'a, C, V, A> Iterator for FeedUnits<'a, C, V, A> {
+    type Item = HlsFeedUnit<'a, C, V, A>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(match self.order.next()? {
+            Lane::Video => HlsFeedUnit::Video(self.video.next()?),
             Lane::Audio => {
-                let (frame, clock) = audio.next().expect("sealed audio order");
+                let (frame, clock) = self.audio.next()?;
                 HlsFeedUnit::Audio(frame, clock)
             }
         })
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.order.size_hint()
+    }
 }
+
+impl<C, V, A> ExactSizeIterator for FeedUnits<'_, C, V, A> {}
 
 /// One step of a segment reader.
 #[derive(Debug)]
@@ -383,9 +403,8 @@ impl<S: Source> HlsSegmentReader<S> {
         &mut self,
         cancel: &AtomicBool,
     ) -> Result<Option<HlsSegment<HlsAudioClockNs>>> {
-        self.inner.take_with(cancel, |reader| {
-            ns_aac_clocks(&reader.audio, cancel, |clock| clock)
-        })
+        self.inner
+            .take_with(cancel, |reader| ns_aac_clocks(&reader.audio, cancel))
     }
 }
 
@@ -421,12 +440,9 @@ impl<S: Source> HlsMediaSegmentReader<S> {
     /// with `Closed` after a failure.
     pub fn take(&mut self, cancel: &AtomicBool) -> Result<Option<HlsMediaSegment>> {
         self.inner.take_with(cancel, |reader| {
-            ns_audio_clocks(
-                &reader.audio,
-                cancel,
-                |frame| (frame.pts.or(frame.dts), frame.duration),
-                |clock| clock,
-            )
+            ns_audio_clocks(&reader.audio, cancel, |frame| {
+                (frame.pts.or(frame.dts), frame.duration)
+            })
         })
     }
 }
