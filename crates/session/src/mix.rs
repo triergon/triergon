@@ -36,7 +36,7 @@ impl StereoMatrix {
             lfe,
             encoding,
         } = levels;
-        if speakers == [Speaker::FrontCenter] || speakers.len() == 1 {
+        if speakers.len() == 1 {
             return Self {
                 gains: vec![[SQRT_HALF, SQRT_HALF]],
             };
@@ -159,10 +159,11 @@ enum Mixer {
 impl Mixer {
     fn new(layout: ChannelLayout, levels: DownmixLevels, format: SampleFormat) -> Self {
         // FFmpeg's resampler mixes an unspecified order as its default layout.
-        let layout = Some(layout)
-            .filter(|layout| layout.mask() != 0 || layout.channels() < 2)
-            .or_else(|| ChannelLayout::default_for(layout.channels()))
-            .unwrap_or(layout);
+        let layout = if layout.mask() == 0 && layout.channels() >= 2 {
+            ChannelLayout::default_for(layout.channels()).unwrap_or(layout)
+        } else {
+            layout
+        };
         let matrix = StereoMatrix::with_levels(layout.speakers(), levels);
         // A 16-bit stereo pair passes through exactly on either path.
         if format == SampleFormat::S16 && !matrix.is_identity_stereo() {
