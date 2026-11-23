@@ -44,7 +44,7 @@ fn extract_configured<'a>(
     extractor.configure(record, &mut work).expect("configure");
     let mut frames = Vec::new();
     let mut collect = |extractor: &mut CaptionExtractor| {
-        while let Some(f) = extractor.pop().expect("pop") {
+        while let Some(f) = extractor.pop() {
             frames.push((f.pts, f.duration, f.data.to_vec()));
         }
     };
@@ -1465,13 +1465,13 @@ fn hevc_pictures_kept_for_reference_beyond_the_buffer_are_let_go() {
                 duration: None,
             };
             extractor.push(packet, &mut work).expect("push");
-            while extractor.pop().expect("pop").is_some() {
+            while extractor.pop().is_some() {
                 frames += 1;
             }
             used.push(pool.used());
         }
         extractor.finish().expect("finish");
-        while extractor.pop().expect("pop").is_some() {
+        while extractor.pop().is_some() {
             frames += 1;
         }
         assert_eq!(frames, 4000);
@@ -1715,7 +1715,7 @@ fn extract_starved(coding: VideoCoding, packets: &[VideoPacket<'_>]) -> (Vec<Fra
             refused += 1;
             assert_eq!(extractor.peek().map(owned), front, "packet {at}");
         }
-        while let Some(f) = extractor.pop().expect("pop") {
+        while let Some(f) = extractor.pop() {
             frames.push(owned(f));
         }
     }

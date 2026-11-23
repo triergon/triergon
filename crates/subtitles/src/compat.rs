@@ -145,9 +145,7 @@ pub mod cc {
     //! demuxer produces.
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::cc::extraction::{
-        CaptionExtractor, CaptionFrame, RAW_MPEG2_TIME_BASE, VideoCoding, VideoPacket,
-    };
+    pub use crate::cc::extraction::{CaptionExtractor, CaptionFrame, VideoCoding, VideoPacket};
     pub use crate::cc::receiver::{ASS_HEADER, Clock, DataField, Decoder, Options, Subtitle};
     pub use crate::cc::scc::{SccPacket, SccPackets};
 }

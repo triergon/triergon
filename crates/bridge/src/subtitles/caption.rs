@@ -263,7 +263,7 @@ impl CaptionBridge {
             return Ok(Decoding::Unpaid);
         }
         self.decode_paid = 0;
-        let Some(frame) = self.extractor.pop()? else {
+        let Some(frame) = self.extractor.pop() else {
             return Ok(Decoding::Idle);
         };
         let rescale = |ticks: i64, to: u64| {

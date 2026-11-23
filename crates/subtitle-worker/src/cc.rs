@@ -205,7 +205,7 @@ impl Extraction {
     }
 
     fn collect(&mut self) -> Result<()> {
-        while let Some(frame) = self.extractor.pop()? {
+        while let Some(frame) = self.extractor.pop() {
             self.frames.push(Packet {
                 pts: frame.pts,
                 dts: frame.pts,
