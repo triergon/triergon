@@ -291,55 +291,8 @@ impl Substream {
         self.dbaflde = br.bit();
         self.skipflde = br.bit();
         let spxattene = br.bit();
-        // Coupling data.
-        if self.acmod > 1 {
-            self.cplstre_blk[0] = true;
-            self.cplinu_blk[0] = br.bit();
-            for blk in 1..nblk {
-                self.cplstre_blk[blk] = br.bit();
-                self.cplinu_blk[blk] = if self.cplstre_blk[blk] {
-                    br.bit()
-                } else {
-                    self.cplinu_blk[blk - 1]
-                };
-            }
-        } else {
-            self.cplstre_blk = [false; 6];
-            self.cplinu_blk = [false; 6];
-        }
-        let ncplblks = self.cplinu_blk[..nblk].iter().filter(|&&c| c).count();
-        // Exponent strategies.
-        if expstre {
-            for blk in 0..nblk {
-                self.expstr[CPL][blk] = if self.cplinu_blk[blk] {
-                    ExpStrategy::from_code(br.read(2))
-                } else {
-                    ExpStrategy::Reuse
-                };
-                for ch in 0..nfch {
-                    self.expstr[ch][blk] = ExpStrategy::from_code(br.read(2));
-                }
-            }
-        } else {
-            self.features.frame_expstr = true;
-            if self.acmod > 1 && ncplblks > 0 {
-                let s = br.read(5) as usize;
-                for blk in 0..6 {
-                    self.expstr[CPL][blk] = FRM_EXPSTR[s][blk];
-                }
-            } else {
-                self.expstr[CPL] = [ExpStrategy::Reuse; 6];
-            }
-            for ch in 0..nfch {
-                let s = br.read(5) as usize;
-                self.expstr[ch] = FRM_EXPSTR[s];
-            }
-        }
-        if self.lfeon {
-            for blk in 0..nblk {
-                self.expstr[LFE][blk] = ExpStrategy::from_code(br.read(1));
-            }
-        }
+        let ncplblks = self.read_coupling_strategy(br, nblk);
+        self.read_frame_exponents(br, expstre, nblk, nfch, ncplblks);
         // Converter exponent strategy.
         if self.strmtyp == 0 {
             let convexpstre = if nblk != 6 { br.bit() } else { true };
@@ -347,34 +300,7 @@ impl Substream {
                 br.skip(5 * nfch);
             }
         }
-        // AHT.
-        self.aht = [false; NCH];
-        self.aht_read = [false; NCH];
-        if ahte {
-            let ncplregs = (0..6)
-                .filter(|&b| self.cplstre_blk[b] || self.expstr[CPL][b] != ExpStrategy::Reuse)
-                .count();
-            if ncplblks == 6 && ncplregs == 1 {
-                self.aht[CPL] = br.bit();
-            }
-            for ch in 0..nfch {
-                let nregs = (0..6)
-                    .filter(|&b| self.expstr[ch][b] != ExpStrategy::Reuse)
-                    .count();
-                if nregs == 1 {
-                    self.aht[ch] = br.bit();
-                }
-            }
-            if self.lfeon {
-                let nregs = (0..6)
-                    .filter(|&b| self.expstr[LFE][b] != ExpStrategy::Reuse)
-                    .count();
-                if nregs == 1 {
-                    self.aht[LFE] = br.bit();
-                }
-            }
-            self.features.aht |= self.aht.iter().any(|&a| a);
-        }
+        self.read_hybrid_transform_flags(br, ahte, nfch, ncplblks);
         if self.snroffststr == 0 {
             self.frmcsnroffst = br.read(6) as u8;
             self.frmfsnroffst = br.read(4) as u8;
@@ -415,5 +341,107 @@ impl Substream {
         self.cplbndstrc_set_in_frame = false;
         self.spxbndstrc[..17].copy_from_slice(&DEF_SPX_BNDSTRC);
         Ok(())
+    }
+
+    /// Each block's coupling strategy and whether it uses coupling.
+    #[inline(always)]
+    fn read_coupling_strategy(&mut self, br: &mut BitReader<'_>, nblk: usize) -> usize {
+        if self.acmod > 1 {
+            self.cplstre_blk[0] = true;
+            self.cplinu_blk[0] = br.bit();
+            for blk in 1..nblk {
+                self.cplstre_blk[blk] = br.bit();
+                self.cplinu_blk[blk] = if self.cplstre_blk[blk] {
+                    br.bit()
+                } else {
+                    self.cplinu_blk[blk - 1]
+                };
+            }
+        } else {
+            self.cplstre_blk = [false; 6];
+            self.cplinu_blk = [false; 6];
+        }
+        self.cplinu_blk[..nblk].iter().filter(|&&c| c).count()
+    }
+
+    /// Explicit or frame-coded exponent strategy of each channel and block.
+    #[inline(always)]
+    fn read_frame_exponents(
+        &mut self,
+        br: &mut BitReader<'_>,
+        expstre: bool,
+        nblk: usize,
+        nfch: usize,
+        ncplblks: usize,
+    ) {
+        if expstre {
+            for blk in 0..nblk {
+                self.expstr[CPL][blk] = if self.cplinu_blk[blk] {
+                    ExpStrategy::from_code(br.read(2))
+                } else {
+                    ExpStrategy::Reuse
+                };
+                for ch in 0..nfch {
+                    self.expstr[ch][blk] = ExpStrategy::from_code(br.read(2));
+                }
+            }
+        } else {
+            self.features.frame_expstr = true;
+            if self.acmod > 1 && ncplblks > 0 {
+                let s = br.read(5) as usize;
+                for blk in 0..6 {
+                    self.expstr[CPL][blk] = FRM_EXPSTR[s][blk];
+                }
+            } else {
+                self.expstr[CPL] = [ExpStrategy::Reuse; 6];
+            }
+            for ch in 0..nfch {
+                let s = br.read(5) as usize;
+                self.expstr[ch] = FRM_EXPSTR[s];
+            }
+        }
+        if self.lfeon {
+            for blk in 0..nblk {
+                self.expstr[LFE][blk] = ExpStrategy::from_code(br.read(1));
+            }
+        }
+    }
+
+    /// Adaptive hybrid transform flags of the channels eligible to use it.
+    #[inline(always)]
+    fn read_hybrid_transform_flags(
+        &mut self,
+        br: &mut BitReader<'_>,
+        ahte: bool,
+        nfch: usize,
+        ncplblks: usize,
+    ) {
+        self.aht = [false; NCH];
+        self.aht_read = [false; NCH];
+        if ahte {
+            let ncplregs = (0..6)
+                .filter(|&b| self.cplstre_blk[b] || self.expstr[CPL][b] != ExpStrategy::Reuse)
+                .count();
+            if ncplblks == 6 && ncplregs == 1 {
+                self.aht[CPL] = br.bit();
+            }
+            for ch in 0..nfch {
+                let nregs = (0..6)
+                    .filter(|&b| self.expstr[ch][b] != ExpStrategy::Reuse)
+                    .count();
+                if nregs == 1 {
+                    self.aht[ch] = br.bit();
+                }
+            }
+            if self.lfeon {
+                let nregs = (0..6)
+                    .filter(|&b| self.expstr[LFE][b] != ExpStrategy::Reuse)
+                    .count();
+                if nregs == 1 {
+                    self.aht[LFE] = br.bit();
+                }
+            }
+            self.features.aht |= self.aht.iter().any(|&a| a);
+        }
     }
 }
