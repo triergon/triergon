@@ -2,11 +2,11 @@ use std::fmt;
 use triergon_pixel::MacroblockGeometry;
 
 /// The result of building an encoder or coding a picture.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, EncodeError>;
 
 /// Why an encoder refused a configuration or a picture.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Error {
+pub enum EncodeError {
     /// `bit_rate` is zero, or `max_rate` is zero or above the 104,856,800 bit/s the
     /// sequence header's bit_rate field states as a rate; carries the refused rate in
     /// bit/s.
@@ -28,19 +28,19 @@ pub enum Error {
     Budget(triergon_core::Error),
 }
 
-impl From<triergon_core::Error> for Error {
+impl From<triergon_core::Error> for EncodeError {
     fn from(error: triergon_core::Error) -> Self {
-        Error::Budget(error)
+        EncodeError::Budget(error)
     }
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::BitRate(bps) => write!(f, "unsupported bit rate {bps} bps"),
-            Error::VbvBuffer(bits) => write!(f, "unsupported VBV buffer size {bits} bits"),
-            Error::Gop(g) => write!(f, "unsupported intra period {g}"),
-            Error::PictureGeometry { expected, actual } => write!(
+            EncodeError::BitRate(bps) => write!(f, "unsupported bit rate {bps} bps"),
+            EncodeError::VbvBuffer(bits) => write!(f, "unsupported VBV buffer size {bits} bits"),
+            EncodeError::Gop(g) => write!(f, "unsupported intra period {g}"),
+            EncodeError::PictureGeometry { expected, actual } => write!(
                 f,
                 "picture geometry {}x{} does not match {}x{}",
                 actual.width(),
@@ -48,9 +48,9 @@ impl fmt::Display for Error {
                 expected.width(),
                 expected.height()
             ),
-            Error::Budget(error) => write!(f, "storage budget: {error}"),
+            EncodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for EncodeError {}

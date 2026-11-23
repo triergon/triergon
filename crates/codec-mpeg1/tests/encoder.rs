@@ -1,4 +1,4 @@
-use triergon_codec_mpeg1::{Budget, Encoder, EncoderConfig, Error, Limits};
+use triergon_codec_mpeg1::{Budget, EncodeError, Encoder, EncoderConfig, Limits};
 use triergon_pixel::{CodedPicture, MacroblockGeometry};
 fn cfg() -> EncoderConfig {
     EncoderConfig {
@@ -13,7 +13,7 @@ fn cfg() -> EncoderConfig {
 fn direct_zero_gop_is_rejected_before_allocation() {
     assert!(matches!(
         Encoder::new(EncoderConfig { gop: 0, ..cfg() }),
-        Err(Error::Gop(0))
+        Err(EncodeError::Gop(0))
     ));
 }
 #[test]
@@ -22,7 +22,7 @@ fn a_max_rate_the_header_would_code_as_variable_bit_rate_is_refused() {
     for max_rate in [104_856_801, 104_857_200] {
         assert!(matches!(
             Encoder::new(EncoderConfig { max_rate, ..cfg() }),
-            Err(Error::BitRate(rate)) if rate == max_rate
+            Err(EncodeError::BitRate(rate)) if rate == max_rate
         ));
     }
     let mut e = Encoder::new(EncoderConfig {
@@ -52,7 +52,7 @@ fn a_vbv_buffer_below_one_picture_at_the_average_rate_is_refused() {
         })
     };
     for vbv_bits in [0, 1, 83_333] {
-        assert!(matches!(rate(vbv_bits), Err(Error::VbvBuffer(bits)) if bits == vbv_bits));
+        assert!(matches!(rate(vbv_bits), Err(EncodeError::VbvBuffer(bits)) if bits == vbv_bits));
     }
     assert!(rate(83_334).is_ok());
 }
@@ -63,7 +63,7 @@ fn mismatched_picture_returns_owner_unchanged_before_encoder_mutation() {
     let mut out = vec![1, 2, 3];
     assert!(matches!(
         e.encode(&p, &mut out),
-        Err(Error::PictureGeometry { .. })
+        Err(EncodeError::PictureGeometry { .. })
     ));
     assert_eq!(out, [1, 2, 3]);
     let p = CodedPicture::new(MacroblockGeometry::new(16, 16).unwrap());
@@ -81,7 +81,7 @@ fn a_budget_too_small_for_the_pictures_is_a_typed_error() {
     };
     assert!(matches!(
         Encoder::with_limits(cfg(), limits),
-        Err(Error::Budget(triergon_core::Error::Limit { .. }))
+        Err(EncodeError::Budget(triergon_core::Error::Limit { .. }))
     ));
 }
 #[test]
@@ -94,7 +94,9 @@ fn a_refused_output_charge_changes_no_state_and_the_pool_drains_on_drop() {
     let held = budget.reserve(budget.available()).unwrap();
     assert!(matches!(
         e.encode(&p, &mut out),
-        Err(Error::Budget(triergon_core::Error::Backpressure { .. }))
+        Err(EncodeError::Budget(
+            triergon_core::Error::Backpressure { .. }
+        ))
     ));
     drop(held);
     let first = e.encode(&p, &mut out).unwrap();
@@ -127,7 +129,9 @@ fn motion_scratch_backpressure_retries_the_same_picture_exactly() {
     for _ in 0..2 {
         assert!(matches!(
             retry.encode(&input, &mut out),
-            Err(Error::Budget(triergon_core::Error::Backpressure { .. }))
+            Err(EncodeError::Budget(
+                triergon_core::Error::Backpressure { .. }
+            ))
         ));
         assert_eq!(out, expected);
     }

@@ -26,7 +26,7 @@ mod tables;
 use analysis::Decision;
 use bits::BitWriter;
 use block::Quantizer;
-pub use error::{Error, Result};
+pub use error::{EncodeError, Result};
 use motion::Mv;
 use planes::Planes;
 use rate::RateControl;
@@ -172,9 +172,9 @@ impl Encoder {
         Encoder::new_in(cfg, &Budget::new(limits.live_storage_bytes)?)
     }
 
-    /// An encoder charging the caller's pool. Fails with [`Error::BitRate`],
-    /// [`Error::VbvBuffer`] or [`Error::Gop`] for a configuration outside the ranges of
-    /// [`EncoderConfig`], and with [`Error::Budget`] when its storage does not fit.
+    /// An encoder charging the caller's pool. Fails with [`EncodeError::BitRate`],
+    /// [`EncodeError::VbvBuffer`] or [`EncodeError::Gop`] for a configuration outside the ranges of
+    /// [`EncoderConfig`], and with [`EncodeError::Budget`] when its storage does not fit.
     pub fn new_in(cfg: EncoderConfig, budget: &Budget) -> Result<Encoder> {
         validate(&cfg)?;
         let g = cfg.geometry;
@@ -239,12 +239,12 @@ impl Encoder {
     /// bytes. The input must have the configured geometry and its coded padding
     /// filled ([`CodedPicture::pad_edges`]).
     ///
-    /// A geometry mismatch is [`Error::PictureGeometry`]; storage refused before
-    /// coding is [`Error::Budget`]. Either error codes nothing and leaves `out` as it
+    /// A geometry mismatch is [`EncodeError::PictureGeometry`]; storage refused before
+    /// coding is [`EncodeError::Budget`]. Either error codes nothing and leaves `out` as it
     /// was: release space and retry the same input at the same picture index.
     pub fn encode(&mut self, input: &CodedPicture, out: &mut Vec<u8>) -> Result<EncodedPicture> {
         if input.geometry() != self.cfg.geometry {
-            return Err(Error::PictureGeometry {
+            return Err(EncodeError::PictureGeometry {
                 expected: self.cfg.geometry,
                 actual: input.geometry(),
             });
@@ -259,20 +259,20 @@ impl Encoder {
 
 fn validate(cfg: &EncoderConfig) -> Result<()> {
     if cfg.gop == 0 {
-        return Err(Error::Gop(cfg.gop));
+        return Err(EncodeError::Gop(cfg.gop));
     }
     if cfg.bit_rate == 0 {
-        return Err(Error::BitRate(cfg.bit_rate));
+        return Err(EncodeError::BitRate(cfg.bit_rate));
     }
     if cfg.max_rate == 0 || cfg.max_rate.div_ceil(400) >= syntax::VARIABLE_BIT_RATE {
-        return Err(Error::BitRate(cfg.max_rate));
+        return Err(EncodeError::BitRate(cfg.max_rate));
     }
     // Each picture leaves the VBV whole at its decode time (Annex C), so pictures
     // averaging bit_rate / 30 bits need a buffer of at least that.
     if u64::from(cfg.vbv_bits) * (FPS as u64) < u64::from(cfg.bit_rate)
         || cfg.vbv_bits.div_ceil(16384) > 1023
     {
-        return Err(Error::VbvBuffer(cfg.vbv_bits));
+        return Err(EncodeError::VbvBuffer(cfg.vbv_bits));
     }
     Ok(())
 }

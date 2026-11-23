@@ -10,7 +10,7 @@ pub enum CaptureError {
     /// The frame geometry, or an RGBA frame shorter than it.
     Pixel(triergon_pixel::Error),
     /// Rates or an intra period the encoder refuses, or encoder storage refused.
-    Encoder(triergon_codec_mpeg1::Error),
+    Encoder(triergon_codec_mpeg1::EncodeError),
     /// A multiplex field the writer cannot represent.
     Mux(triergon_core::Error),
     /// The sink refused or only partly wrote a frame's bytes.
@@ -39,8 +39,8 @@ impl From<triergon_pixel::Error> for CaptureError {
     }
 }
 
-impl From<triergon_codec_mpeg1::Error> for CaptureError {
-    fn from(e: triergon_codec_mpeg1::Error) -> Self {
+impl From<triergon_codec_mpeg1::EncodeError> for CaptureError {
+    fn from(e: triergon_codec_mpeg1::EncodeError) -> Self {
         Self::Encoder(e)
     }
 }

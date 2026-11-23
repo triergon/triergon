@@ -2,8 +2,8 @@
 
 MPEG-1 video encoder (ISO/IEC 11172-2) producing I and P pictures under a VBV
 constraint. It is a codec-layer crate whose dependencies are
-[triergon-pixel](../pixel/README.md), which supplies the input `Picture` and its
-`Geometry`, and [triergon-core](../core/README.md), which supplies the storage
+[triergon-pixel](../pixel/README.md), which supplies the input `CodedPicture` and its
+`MacroblockGeometry`, and [triergon-core](../core/README.md), which supplies the storage
 `Budget`. Each call encodes one picture and returns its complete bytes, with no
 reordering delay. It does not convert RGBA (see triergon-pixel), multiplex (see
 [`triergon_mpegts::mux`](../mpegts/README.md#writing-ts)) or pace frames.
@@ -12,9 +12,9 @@ reordering delay. It does not convert RGBA (see triergon-pixel), multiplex (see
 
 ```rust
 use triergon_codec_mpeg1::{Encoder, EncoderConfig};
-use triergon_pixel::{Geometry, Picture};
+use triergon_pixel::{CodedPicture, MacroblockGeometry};
 
-let geometry = Geometry::new(960, 540)?;
+let geometry = MacroblockGeometry::new(960, 540)?;
 let b = 2_500_000;
 let mut encoder = Encoder::new(EncoderConfig {
     geometry,
@@ -23,7 +23,7 @@ let mut encoder = Encoder::new(EncoderConfig {
     vbv_bits: b / 7,      // VBV buffer size, bits
     gop: 30,              // intra period, pictures
 })?;
-let input = Picture::new(geometry);              // filled by triergon_pixel::Converter
+let input = CodedPicture::new(geometry);         // filled by triergon_pixel::Converter
 let mut es = Vec::new();
 let picture = encoder.encode(&input, &mut es)?;
 // es: this picture's bytes; picture.key, .index, .bits, .qscale_mean
@@ -42,7 +42,7 @@ charges a caller's `Budget`.
 | Area | Behaviour |
 |---|---|
 | Pictures | I and P; no B or D pictures |
-| Sequence header | Before every I picture. Size from the `Geometry`, square pixels (pel_aspect_ratio 1), 30 Hz (frame_rate_code 5), bit_rate = `max_rate` in 400 bit/s units, vbv_buffer_size from `vbv_bits` in 16 kbit units (1–1023), default intra and non-intra matrices, constrained_parameters_flag 0 |
+| Sequence header | Before every I picture. Configured geometry, square pixels (pel_aspect_ratio 1), 30 Hz (frame_rate_code 5), bit_rate = `max_rate` in 400 bit/s units, vbv_buffer_size from `vbv_bits` in 16 kbit units (1–1023), default intra and non-intra matrices, constrained_parameters_flag 0 |
 | GOP | GOP header before every I picture; time code from the picture index at 30 Hz. An I picture every `gop` pictures; a P picture whose prediction is worse than intra coding across the picture becomes an I picture and restarts the GOP (scene change). Without B pictures every GOP decodes independently; `closed_gop` is set on the first GOP only, as FFmpeg does |
 | Slices | One slice per picture; DC and vector predictors run across row ends, and per-row quantiser changes travel in macroblock_quant fields |
 | Motion | Forward half-sample vectors, search window ±64 luma samples, f_code up to 4; skipped macroblocks; a P macroblock is intra coded when that is cheaper. A picture whose luma repeats the previous source picture's is predicted at the zero vector without a search |
@@ -51,13 +51,13 @@ charges a caller's `Budget`.
 
 ## Behaviour and limits
 
-- `Encoder::new` refuses `gop == 0` (`Error::Gop`), a zero `bit_rate` or `max_rate`
+- `Encoder::new` refuses `gop == 0` (`EncodeError::Gop`), a zero `bit_rate` or `max_rate`
   or a `max_rate` beyond the 18-bit sequence-header field in 400 bit/s units
-  (`Error::BitRate`), and a zero `vbv_bits` or one beyond the 10-bit vbv_buffer_size
-  field in 16 kbit units (`Error::VbvBuffer`). Geometry limits (even, 2–4094) are enforced by
-  `Geometry::new`.
+  (`EncodeError::BitRate`), and a `vbv_bits` below one picture at the average rate or
+  above the 10-bit vbv_buffer_size field in 16 kbit units (`EncodeError::VbvBuffer`).
+  `MacroblockGeometry::new` requires even dimensions from 2 to 4094.
 - `encode` refuses a picture whose geometry differs from the configuration
-  (`Error::PictureGeometry`) before changing any state. A successful encode replaces the
+  (`EncodeError::PictureGeometry`) before changing any state. A successful encode replaces the
   contents of `out`.
 - Storage sized from the configuration is charged to the encoder's budget before it
   is allocated: the reference, reconstructed and previous source pictures, the
@@ -66,10 +66,10 @@ charges a caller's `Budget`.
   at the bound of one picture (the VBV buffer plus one full and 16 bytes per further
   macroblock), and the first I picture's trial pass (one row). The default
   `Limits::live_storage_bytes` is 96 MiB; 4094x4094 at the largest signalled VBV buffer
-  (1023 × 16 kbit) needs about 74 MiB. A refused charge is `Error::Budget`, from the
+  (1023 × 16 kbit) needs about 74 MiB. A refused charge is `EncodeError::Budget`, from the
   constructor or before coding the picture; `out` then keeps its previous bytes, and
   the same input can be retried at the same picture index once space is released.
-- The input must have its coded padding filled (`Picture::pad_edges`; the pixel
+- The input must have its coded padding filled (`CodedPicture::pad_edges`; the pixel
   `Converter` does this).
 - Every successful call encodes and advances the picture index, also for an unchanged
   source picture (a keepalive). The first I picture runs a trial pass to seed the intra

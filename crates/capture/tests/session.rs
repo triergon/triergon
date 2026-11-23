@@ -164,7 +164,7 @@ fn invalid_requests_are_explicit_errors() {
     ));
     assert!(matches!(
         Session::open(&SessionConfig::with_rate_rule(64, 48, 0)),
-        Err(CaptureError::Encoder(mpeg1::Error::BitRate(_)))
+        Err(CaptureError::Encoder(mpeg1::EncodeError::BitRate(_)))
     ));
     let mut s = Session::open(&SessionConfig::with_rate_rule(64, 48, 1_000_000)).unwrap();
     assert!(matches!(
@@ -179,7 +179,7 @@ fn a_vbv_buffer_too_small_for_the_average_rate_is_refused_at_open() {
     c.vbv_bits = 1;
     assert_eq!(
         Session::open(&c).unwrap_err(),
-        CaptureError::Encoder(mpeg1::Error::VbvBuffer(1))
+        CaptureError::Encoder(mpeg1::EncodeError::VbvBuffer(1))
     );
     c.vbv_bits = 83_334;
     assert!(Session::open(&c).is_ok());
@@ -191,7 +191,7 @@ fn the_rate_rule_saturates_a_rate_beyond_the_encoder() {
     assert_eq!(cfg.max_rate, u32::MAX);
     assert_eq!(
         Session::open(&cfg).unwrap_err(),
-        CaptureError::Encoder(mpeg1::Error::BitRate(u32::MAX))
+        CaptureError::Encoder(mpeg1::EncodeError::BitRate(u32::MAX))
     );
 }
 
@@ -201,7 +201,7 @@ fn session_and_direct_encoder_share_gop_validation() {
     c.gop = 0;
     assert!(matches!(
         Session::open(&c),
-        Err(CaptureError::Encoder(mpeg1::Error::Gop(0)))
+        Err(CaptureError::Encoder(mpeg1::EncodeError::Gop(0)))
     ));
 }
 
