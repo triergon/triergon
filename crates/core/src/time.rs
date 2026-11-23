@@ -30,6 +30,12 @@ pub struct TimeBase {
 }
 
 impl TimeBase {
+    /// One millisecond per tick.
+    pub const MILLISECONDS: Self = Self {
+        numerator: NonZeroU64::MIN,
+        denominator: NonZeroU64::new(1_000).unwrap(),
+    };
+
     /// One microsecond per tick.
     pub const MICROSECONDS: Self = Self {
         numerator: NonZeroU64::MIN,
@@ -187,6 +193,20 @@ impl TickScale {
 /// instruction they divide.
 const SOFTWARE_DIVISION: bool = cfg!(target_pointer_width = "32");
 
+macro_rules! binary_gcd_steps {
+    ($a:ident, $b:ident) => {{
+        let shift = ($a | $b).trailing_zeros();
+        let (mut a, mut b) = ($a >> $a.trailing_zeros(), $b);
+        loop {
+            b >>= b.trailing_zeros();
+            (a, b) = (a.min(b), a.max(b) - a.min(b));
+            if b == 0 {
+                break a << shift;
+            }
+        }
+    }};
+}
+
 /// The greatest common divisor of two nonzero values by shifts and subtractions
 /// alone, in 32-bit registers when both values fit them.
 fn binary_gcd(a: u64, b: u64) -> u64 {
@@ -194,28 +214,12 @@ fn binary_gcd(a: u64, b: u64) -> u64 {
     if let (Ok(a), Ok(b)) = (u32::try_from(a), u32::try_from(b)) {
         return u64::from(binary_gcd_u32(a, b));
     }
-    let shift = (a | b).trailing_zeros();
-    let (mut a, mut b) = (a >> a.trailing_zeros(), b);
-    loop {
-        b >>= b.trailing_zeros();
-        (a, b) = (a.min(b), a.max(b) - a.min(b));
-        if b == 0 {
-            return a << shift;
-        }
-    }
+    binary_gcd_steps!(a, b)
 }
 
 /// [`binary_gcd`] of two nonzero 32-bit values.
 fn binary_gcd_u32(a: u32, b: u32) -> u32 {
-    let shift = (a | b).trailing_zeros();
-    let (mut a, mut b) = (a >> a.trailing_zeros(), b);
-    loop {
-        b >>= b.trailing_zeros();
-        (a, b) = (a.min(b), a.max(b) - a.min(b));
-        if b == 0 {
-            return a << shift;
-        }
-    }
+    binary_gcd_steps!(a, b)
 }
 
 /// A nonzero divisor prepared to divide its multiples without division: it is

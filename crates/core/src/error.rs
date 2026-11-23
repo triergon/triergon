@@ -5,24 +5,27 @@ use std::{fmt, io};
 ///
 /// It is `Copy` and small: a class, with the numbers or the `&'static str` that
 /// tell one cause from another. Building one allocates and formats nothing.
+///
+/// Use [`Limit`](Self::Limit) for a permanent byte bound, including configured
+/// byte limits, with the requested and maximum byte counts. Use
+/// [`Policy`](Self::Policy) to name a configured bound measured in other units,
+/// such as a count, depth or amount of work. Use [`Backpressure`](Self::Backpressure)
+/// only when the caller can release capacity and retry the same operation.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     /// The input breaks its format's syntax or a caller broke a precondition;
     /// the text names what.
     Invalid(&'static str),
-    /// A request for `requested` bytes exceeds the `maximum` a pool or window
-    /// policy allows. It can never succeed for this input.
+    /// A byte request above the applicable capacity.
     Limit {
         /// Bytes asked for.
         requested: usize,
         /// The most a single request may take.
         maximum: usize,
     },
-    /// A named format limit was exceeded (element count, nesting depth, scan
-    /// distance). Like [`Error::Limit`], permanent for this input.
+    /// A named limit measured in units other than bytes.
     Policy(&'static str),
-    /// The pool lacks free bytes for a request because the caller still holds
-    /// earlier output. Nothing changed: release output and repeat the call.
+    /// The requested bytes and the space currently available for them.
     Backpressure(Backpressure),
     /// The allocator refused memory the pool had granted.
     Allocation,

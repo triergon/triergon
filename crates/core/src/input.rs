@@ -191,6 +191,7 @@ pub struct InputCursor {
     token: InputToken,
     position: u64,
     maximum_window: usize,
+    // A single enum for shared and inline windows has not been measured on the read path.
     window: Option<Bytes>,
     inline: [u8; INLINE_INPUT_BYTES],
     inline_len: usize,

@@ -49,7 +49,7 @@ assert_eq!(header, [0x1a, 0x45, 0xdf, 0xa3]);
 let base = TimeBase::new(1, 90_000)?;
 let pts = Time::from_ticks(183_003, base)?;               // exact, reduced
 assert_eq!(pts.to_nanoseconds(Rounding::NearestAway)?, 2_033_366_667);
-assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 2033);
+assert_eq!(base.rescale(183_003, TimeBase::MILLISECONDS, Rounding::Floor)?, 2033);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -77,7 +77,7 @@ result, and nothing allocates. Rounded views (`to_ticks`, `to_i64_ticks`,
 `to_nanoseconds`, `TimeBase::rescale`) take an explicit `Rounding`:
 `TowardZero`, `AwayFromZero`, `Floor`, `Ceil` or `NearestAway`. Results that do
 not fit return `Error::Overflow`; a zero timebase or denominator is `Invalid`.
-Use `TimeBase::MICROSECONDS` and `TimeBase::NANOSECONDS` for those fixed clocks.
+`TimeBase` provides constants for millisecond, microsecond and nanosecond clocks.
 
 **Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones share
 it, and its limit includes its own control block (`Budget::control_storage_bytes()`).
@@ -92,10 +92,8 @@ hand an allocation back as an empty `BudgetVec` for reuse without allocating.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input. `used()` and `peak()`
 report requested capacity, not RSS or allocator overhead.
 
-Two capacity errors are distinct. `Error::Limit` means the request can never fit
-the policy. `Error::Backpressure` means it fits once the caller releases retained
-output; the operation can be retried without losing state. Readers that own output
-storage report the same condition as `Step::Backpressure` (see below).
+[`Error`](src/error.rs) describes the three resource outcomes `Limit`, `Policy`
+and `Backpressure`. Readers can surface retryable pressure as `Step::Backpressure`.
 
 **Input cursor.** `InputCursor` holds at most one supplied window at a time
 (at most `maximum_window` bytes, or 12 inline bytes via `provide_inline`
