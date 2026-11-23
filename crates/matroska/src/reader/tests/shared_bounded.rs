@@ -40,6 +40,7 @@ fn pending(pool: &Budget, policy: PayloadOwnership, block: bool) -> Reader {
         .unwrap();
     for _ in 0..10 {
         match reader
+            .stream
             .envelope
             .step(&mut WorkBudget::new(64), &AtomicBool::new(false))
             .unwrap()
@@ -84,6 +85,7 @@ fn leaf(reader: &mut Reader, quantum: u64) -> (SharedBytes, u64) {
     for _ in 0..100 {
         let mut work = WorkBudget::new(quantum);
         let step = reader
+            .stream
             .envelope
             .step(&mut work, &AtomicBool::new(false))
             .unwrap();
@@ -173,6 +175,7 @@ fn shared_bounded_precharged_parent_needs_no_new_leaf_owner_under_full_pool() {
     let before = pool.used();
     let mut work = WorkBudget::new(15);
     let output = match reader
+        .stream
         .envelope
         .step(&mut work, &AtomicBool::new(false))
         .unwrap()
@@ -195,6 +198,7 @@ fn shared_bounded_fragmented_block_keeps_the_owned_exact_fallback() {
     let mut first = WorkBudget::new(8192);
     assert!(matches!(
         reader
+            .stream
             .envelope
             .step(&mut first, &AtomicBool::new(false))
             .unwrap(),
@@ -240,6 +244,7 @@ fn both_policies_keep_zero_work_and_literal_byte_work_under_one_seven_large_sche
             let mut zero = WorkBudget::new(0);
             assert!(matches!(
                 reader
+                    .stream
                     .envelope
                     .step(&mut zero, &AtomicBool::new(false))
                     .unwrap(),
@@ -265,7 +270,7 @@ fn policy_persists_across_logical_reset_without_retaining_old_payload() {
     let root = parent(&pool, &BLOCK);
     supply(&mut reader, &root, 7);
     let (output, _) = leaf(&mut reader, 8192);
-    reader.envelope.reset().unwrap();
+    reader.stream.envelope.reset().unwrap();
     assert_eq!(reader.payload_ownership(), PayloadOwnership::SharedBounded);
     assert_eq!(output.as_ref(), BLOCK);
     drop((reader, output, root));
@@ -280,12 +285,14 @@ fn transport_still_precedes_cancel_zero_work_and_any_publication() {
     supply(&mut reader, &root, 7);
     let request = reader.request();
     reader
+        .stream
         .envelope
         .fail(request.source, request.token, SourceFailure::Transport)
         .unwrap();
     let position = reader.position();
     assert!(matches!(
         reader
+            .stream
             .envelope
             .step(&mut WorkBudget::new(0), &AtomicBool::new(true)),
         Err(Error::Transport)
@@ -407,7 +414,7 @@ fn shared_bounded_real_typed_owner_graph_deduplicates_input_and_packet_parent() 
     let used = pool.used();
     for extra in [0, 1] {
         let requested = pool.limit() - used + extra;
-        let mut proof = crate::storage::usage::Pressure::new(requested);
+        let mut proof = Pressure::new(requested);
         let mut done = false;
         for _ in 0..2_000_000 {
             let mut work = WorkBudget::new(7);
@@ -499,6 +506,7 @@ fn pending_commit(pool: &Budget) -> (Reader, Bytes) {
     let mut waiting = false;
     for _ in 0..10 {
         if let ParseStep::NeedInput(_) = reader
+            .stream
             .envelope
             .step(&mut WorkBudget::new(64), &AtomicBool::new(false))
             .unwrap()
@@ -524,6 +532,7 @@ fn pending_commit(pool: &Budget) -> (Reader, Bytes) {
     let mut work = WorkBudget::new(8);
     assert!(matches!(
         reader
+            .stream
             .envelope
             .step(&mut work, &AtomicBool::new(false))
             .unwrap(),
@@ -540,6 +549,7 @@ fn shared_bounded_partial_commit_cancel_has_no_early_output_and_reset_releases_p
     let (mut reader, root) = pending_commit(&pool);
     assert!(matches!(
         reader
+            .stream
             .envelope
             .step(&mut WorkBudget::new(0), &AtomicBool::new(true)),
         Err(Error::Cancelled)
@@ -562,6 +572,7 @@ fn shared_bounded_partial_commit_transport_stays_before_cancel_and_final_unit() 
         .unwrap();
     assert!(matches!(
         reader
+            .stream
             .envelope
             .step(&mut WorkBudget::new(1), &AtomicBool::new(true)),
         Err(Error::Transport)

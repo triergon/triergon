@@ -338,7 +338,12 @@ impl ElementReader {
     ) -> Result<()> {
         self.input.fail(source, token, failure)
     }
+    /// Whether the reader is inside a Cluster.
+    pub(crate) fn in_cluster(&self) -> bool {
+        self.cluster.is_some()
+    }
     pub(crate) fn cluster_checkpoint(&self) -> Option<ClusterCheckpoint> {
+        let cluster = self.cluster?;
         let Document::Segment(segment) = self.document else {
             return None;
         };
@@ -346,7 +351,7 @@ impl ElementReader {
             pool: self.input.budget().clone(),
             parser: self.parser,
             source: self.input.source(),
-            offset: self.cluster?.start,
+            offset: cluster.start,
             segment,
         })
     }

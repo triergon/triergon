@@ -31,9 +31,13 @@ fn health_check_cancel_is_sticky_releases_input_but_preserves_alias() {
         .unwrap();
     let charged = pool.used();
     let mut work = WorkBudget::new(0);
-    r.envelope.healthy_for_job(&mut work, &no_cancel()).unwrap();
+    r.stream
+        .envelope
+        .healthy_for_job(&mut work, &no_cancel())
+        .unwrap();
     assert!(matches!(
-        r.envelope
+        r.stream
+            .envelope
             .check_inner_cancel(&mut work, &AtomicBool::new(true)),
         Err(Error::Cancelled)
     ));
@@ -68,10 +72,12 @@ fn health_check_prior_transport_and_short_finish_win_over_cancel_and_metadata() 
             r.fail(req.source, req.token, SourceFailure::Transport)
                 .unwrap();
         }
-        r.metadata_used = r.limits.metadata_bytes + 1;
+        r.stream.metadata_used = r.stream.limits.metadata_bytes + 1;
         for flag in [true, false] {
             let mut work = WorkBudget::new(0);
-            let result = r.step_demux_mode(&mut work, &AtomicBool::new(flag), None, false);
+            let result = r
+                .stream
+                .step_demux_mode(&mut work, &AtomicBool::new(flag), None, false);
             if short_finish {
                 assert!(matches!(result, Err(Error::Truncated)));
             } else {
@@ -86,21 +92,24 @@ fn health_check_prior_transport_and_short_finish_win_over_cancel_and_metadata() 
 fn health_check_entry_cancel_precedes_metadata_failure_and_survives_flag_clear() {
     let pool = Budget::new(4096).unwrap();
     let mut r = reader(&pool, 1);
-    r.metadata_used = r.limits.metadata_bytes + 1;
+    r.stream.metadata_used = r.stream.limits.metadata_bytes + 1;
     let mut work = WorkBudget::new(7);
     assert!(matches!(
-        r.step_demux_mode(&mut work, &AtomicBool::new(true), None, false),
+        r.stream
+            .step_demux_mode(&mut work, &AtomicBool::new(true), None, false),
         Err(Error::Cancelled)
     ));
     assert!(matches!(
-        r.step_demux_mode(&mut work, &no_cancel(), None, false),
+        r.stream
+            .step_demux_mode(&mut work, &no_cancel(), None, false),
         Err(Error::Cancelled)
     ));
     assert_eq!((r.position(), work.spent()), (0, 0));
     r.reset().unwrap();
-    r.metadata_used = r.limits.metadata_bytes + 1;
+    r.stream.metadata_used = r.stream.limits.metadata_bytes + 1;
     assert!(matches!(
-        r.step_demux_mode(&mut work, &no_cancel(), None, false),
+        r.stream
+            .step_demux_mode(&mut work, &no_cancel(), None, false),
         Err(Error::Policy("metadata"))
     ));
 }
@@ -113,9 +122,13 @@ fn health_check_healthy_empty_check_needs_no_work_or_storage() {
     let charged = pool.used();
     let req = r.request();
     let mut work = WorkBudget::new(0);
-    r.envelope.healthy_for_job(&mut work, &no_cancel()).unwrap();
+    r.stream
+        .envelope
+        .healthy_for_job(&mut work, &no_cancel())
+        .unwrap();
     for _ in 0..7 {
-        r.envelope
+        r.stream
+            .envelope
             .check_inner_cancel(&mut work, &no_cancel())
             .unwrap();
     }
@@ -237,7 +250,7 @@ fn trace(quantum: u64, chunk: usize, shared: bool, tail: Option<bool>) {
             "{}/{}/{}/{}/{}",
             r.position(),
             work.spent(),
-            r.metadata_used,
+            r.stream.metadata_used,
             pool.used(),
             text
         ));

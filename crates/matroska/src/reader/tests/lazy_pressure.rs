@@ -18,6 +18,7 @@ fn pressure_trace(original_workspace: bool) -> Vec<String> {
     .unwrap();
     let request = reader.request();
     reader
+        .stream
         .envelope
         .range_input()
         .provide_inline(
@@ -28,6 +29,7 @@ fn pressure_trace(original_workspace: bool) -> Vec<String> {
         )
         .unwrap();
     let result = reader
+        .stream
         .envelope
         .step_typed_compact(&mut WorkBudget::new(64), &AtomicBool::new(false))
         .unwrap();
@@ -35,16 +37,18 @@ fn pressure_trace(original_workspace: bool) -> Vec<String> {
         panic!("missing actual envelope admission {result:?}");
     };
     reader
+        .stream
         .envelope
         .admit_typed_leaf(header, None, false)
         .unwrap();
     if original_workspace {
         // Conservative control: the original begin() constructs this exact
         // empty workspace. No charge, source byte or work credit is fabricated.
-        crate::element::tests::lazy_body::original_empty_workspace(&mut reader.envelope);
+        crate::element::tests::lazy_body::original_empty_workspace(&mut reader.stream.envelope);
     }
     let request = reader.request();
     reader
+        .stream
         .envelope
         .range_input()
         .provide_inline(request.source, request.token, request.offset, b"a")

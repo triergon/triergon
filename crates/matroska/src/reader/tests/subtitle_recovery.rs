@@ -53,6 +53,7 @@ impl Driver {
             .min(INPUT.len() - at);
         assert!(count != 0);
         self.reader
+            .stream
             .envelope
             .range_input()
             .provide_inline(
@@ -100,7 +101,7 @@ impl Driver {
     }
     fn reach_recovery(&mut self) {
         for _ in 0..1_000_000 {
-            if self.reader.subtitle_recovery.is_some() {
+            if self.reader.seek().is_some_and(Seek::recovering) {
                 return;
             }
             match self.step(false).unwrap() {
@@ -165,8 +166,8 @@ fn subtitle_recovery_work_zero_cancel_and_reset_keep_real_cursor_and_source_iden
         "cancelled transaction is sticky"
     );
     driver.reader.reset().unwrap();
-    assert!(driver.reader.subtitle_recovery.is_none());
-    assert!(driver.reader.replay_prefix.is_none());
+    assert!(!driver.reader.seek().is_some_and(Seek::recovering));
+    assert!(driver.reader.stream.replay_prefix.is_none());
     assert_ne!(driver.reader.generation(), before.1);
     assert_eq!(pool.used(), control);
     drop(driver);

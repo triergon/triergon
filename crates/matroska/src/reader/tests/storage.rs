@@ -185,17 +185,17 @@ fn pending_blocking_read_and_frozen_source_owners_have_the_same_exact_floor() {
     let held = pool.reserve(pool.available() - 1).unwrap();
     assert!(matches!(
         feeder
-            .feed_sequential_request(reader.envelope.range_input(), &request, &cancel)
+            .feed_sequential_request(reader.stream.envelope.range_input(), &request, &cancel)
             .unwrap(),
         input_feeder::FeedStep::Backpressure { .. }
     ));
     reader.set_adapter_storage(feeder.retained_buffer_bytes());
-    assert_eq!(reader.adapter_storage, 1);
+    assert_eq!(reader.stream.adapter_storage, 1);
     drop(held);
     exact_floor(&reader, 1);
     assert!(matches!(
         feeder
-            .feed_sequential_request(reader.envelope.range_input(), &request, &cancel)
+            .feed_sequential_request(reader.stream.envelope.range_input(), &request, &cancel)
             .unwrap(),
         input_feeder::FeedStep::Provided
     ));
@@ -226,48 +226,38 @@ fn inline_transaction_workspace_stays_within_the_observed_host_ceiling() {
 #[test]
 fn reader_fields_keep_their_measured_offsets() {
     macro_rules! layout {
-        ($($field:ident),* $(,)?) => {
-            [$((stringify!($field), std::mem::offset_of!(Reader, $field))),*]
+        ($($($field:ident).+),* $(,)?) => {
+            [$((stringify!($($field).+), std::mem::offset_of!(Reader, $($field).+))),*]
         };
     }
     let fields = layout![
-        cluster_time,
-        failed,
-        recovery_audio,
-        state_coverage_contiguous,
-        state_seen,
-        webm_vp9_t35,
-        envelope,
-        segment_end,
-        scan_remaining,
-        first_cluster,
-        last_location,
-        loaded,
-        seek_targets,
-        subtitle_recovery,
-        replay_prefix,
-        configuration,
-        catalogue,
-        cues,
-        pool,
-        limits,
-        scale,
-        segment_data,
-        revision,
-        metadata_used,
-        demux_read_bytes,
-        seek_metadata_bytes,
-        adapter_storage,
-        state_coverage_end,
-        owned_root,
-        seek_index,
-        opening,
-        pending_seek,
-        epoch_reference,
-        pressure,
-        resolver,
-        seek_stage,
-        state,
+        stream.cluster_time,
+        stream.state_coverage_contiguous,
+        stream.state_seen,
+        stream.webm_vp9_t35,
+        stream.envelope,
+        stream.segment_end,
+        stream.scan_remaining,
+        stream.last_location,
+        stream.loaded,
+        stream.seek_targets,
+        stream.replay_prefix,
+        stream.configuration,
+        stream.catalogue,
+        stream.cues,
+        stream.pool,
+        stream.limits,
+        stream.scale,
+        stream.segment_data,
+        stream.revision,
+        stream.metadata_used,
+        stream.demux_read_bytes,
+        stream.adapter_storage,
+        stream.state_coverage_end,
+        stream.seek_index,
+        stream.state,
+        control,
+        gate,
     ];
     let offsets = fields.map(|(_, offset)| offset);
     println!(
@@ -283,11 +273,10 @@ fn reader_fields_keep_their_measured_offsets() {
         (offsets, size_of::<Reader>()),
         (
             [
-                0, 16, 17, 18, 19, 20, 24, 592, 608, 624, 688, 816, 928, 1040, 1104, 1152, 1184,
-                1256, 1296, 1304, 1408, 1416, 1424, 1432, 1440, 1448, 1456, 1464, 1472, 1496, 1504,
-                1528, 1552, 1592, 1664, 2192, 2656,
+                0, 16, 17, 18, 24, 592, 608, 624, 752, 864, 976, 1024, 1056, 1128, 1168, 1176,
+                1280, 1288, 1296, 1304, 1312, 1320, 1328, 1336, 1344, 8096, 8816,
             ],
-            9408
+            8896
         )
     );
     assert!(offsets.is_sorted());
@@ -320,7 +309,7 @@ fn reader_reset_drops_unpublished_ready_packet_and_all_configuration_owners() {
     .unwrap();
     let mut entered = false;
     for _ in 0..100_000 {
-        if matches!(reader.state, State::Packet(_)) {
+        if matches!(reader.stream.state, State::Packet(_)) {
             entered = true;
             break;
         }
@@ -334,7 +323,7 @@ fn reader_reset_drops_unpublished_ready_packet_and_all_configuration_owners() {
         }
     }
     assert!(entered);
-    let State::Packet(job) = &mut reader.state else {
+    let State::Packet(job) = &mut reader.stream.state else {
         panic!("packet job");
     };
     let mut ready = false;

@@ -116,7 +116,7 @@ impl<R: Read> BlockingReader<R> {
         seek: Option<Seeking<R>>,
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
-        reader.envelope.set_payload_ownership(policy);
+        reader.stream.envelope.set_payload_ownership(policy);
         Self::initialize(Self {
             reader,
             input,
@@ -138,9 +138,16 @@ impl<R: Read> BlockingReader<R> {
         Ok(result)
     }
     fn poll(&mut self, cancel: &AtomicBool) -> ReaderStep<Event> {
-        self.poll_projected::<TypedProjection>(cancel)
+        self.poll_projected::<TypedProjection>(cancel, false)
     }
-    fn poll_projected<D: PacketProjection>(&mut self, cancel: &AtomicBool) -> ReaderStep<D::Event> {
+    /// One reader step and, when it asks for input, one read of the source.
+    /// `lend_root` lends an immutable source's bytes to the step: a seek restores
+    /// state from them (see `EpochRestoreJob::try_owned_prefix`).
+    fn poll_projected<D: PacketProjection>(
+        &mut self,
+        cancel: &AtomicBool,
+        lend_root: bool,
+    ) -> ReaderStep<D::Event> {
         if self.input.has_pending_read() {
             self.input.discard_stale(&self.reader.request());
         }
@@ -150,6 +157,11 @@ impl<R: Read> BlockingReader<R> {
             &mut WorkBudget::new(WORK),
             cancel,
             self.input.owned_source_storage(),
+            if lend_root {
+                self.input.owned_source()
+            } else {
+                None
+            },
         )? {
             Step::NeedInput(request) => {
                 let header = self.reader.needs_header_input();
@@ -168,28 +180,28 @@ impl<R: Read> BlockingReader<R> {
                 let reposition = self.reposition();
                 let result = if let Some(plan) = refill.as_ref().filter(|_| discard) {
                     self.input.feed_typed_discard_refill(
-                        self.reader.envelope.range_input(),
+                        self.reader.stream.envelope.range_input(),
                         plan,
                         cancel,
                         reposition,
                     )
                 } else if let Some(plan) = refill {
                     self.input.feed_typed_header_refill(
-                        self.reader.envelope.range_input(),
+                        self.reader.stream.envelope.range_input(),
                         &plan,
                         cancel,
                         reposition,
                     )
                 } else if discard {
                     self.input.feed_typed_discard_request(
-                        self.reader.envelope.range_input(),
+                        self.reader.stream.envelope.range_input(),
                         &request,
                         cancel,
                         reposition,
                     )
                 } else {
                     self.input.feed_typed_request(
-                        self.reader.envelope.range_input(),
+                        self.reader.stream.envelope.range_input(),
                         &request,
                         header,
                         cancel,
@@ -206,7 +218,7 @@ impl<R: Read> BlockingReader<R> {
                     }
                     Err(error) => {
                         if !matches!(error, Error::Backpressure { .. }) {
-                            self.reader.failed = true;
+                            self.reader.latch_failure();
                         }
                         Err(error)
                     }
@@ -221,11 +233,11 @@ impl<R: Read> BlockingReader<R> {
             let request = self.reader.request();
             if let Err(error) = position(
                 &mut self.input,
-                self.reader.envelope.range_input(),
+                self.reader.stream.envelope.range_input(),
                 &request,
                 cancel,
             ) {
-                self.reader.failed = true;
+                self.reader.latch_failure();
                 return Err(error);
             }
         }
@@ -258,7 +270,7 @@ impl<R: Read> BlockingReader<R> {
     }
     /// Bytes the metadata documents and their list keep charged.
     pub fn metadata_retained_bytes(&self) -> usize {
-        self.reader.catalogue.retained_bytes()
+        self.reader.stream.catalogue.retained_bytes()
     }
     /// Each metadata document as its element ID and payload bytes, in reading order.
     pub fn opaque_metadata(&self) -> impl Iterator<Item = (u64, &[u8])> + '_ {
@@ -291,13 +303,13 @@ impl<R: Read> BlockingReader<R> {
             return Err(Error::Invalid("pending seek must be completed"));
         }
         loop {
-            match self.poll_projected::<LegacyProjection>(cancel)? {
+            match self.poll_projected::<LegacyProjection>(cancel, false)? {
                 Step::Ready(LegacyEvent::Packet(packet)) => return Ok(Some(packet)),
                 Step::Ready(LegacyEvent::FullPacket(packet)) => {
                     if packet.group.as_ref().is_some_and(|group| {
                         group.additions().len() != 0 || group.codec_state().is_some()
                     }) {
-                        self.reader.failed = true;
+                        self.reader.latch_failure();
                         return Err(Error::Unsupported(
                             "Block additions/CodecState require next_typed_packet",
                         ));
@@ -361,18 +373,17 @@ impl<R: Read> BlockingReader<R> {
         audio: RecoveryAudio,
         cancel: &AtomicBool,
     ) -> Result<SeekReceipt> {
-        if self.reader.failed
-            || self.reader.pending_seek() != Some(request)
-            || self.reader.recovery_audio != audio
+        if self.reader.failed()
+            || self
+                .reader
+                .control
+                .seek()
+                .is_none_or(|seek| seek.request() != request || seek.audio() != audio)
         {
             self.reader.begin_seek(request, audio)?;
         }
         loop {
-            // Lent for this poll only; see EpochRestoreJob::try_owned_prefix.
-            self.reader.owned_root = self.input.owned_source().cloned();
-            let step = self.poll(cancel);
-            self.reader.owned_root = None;
-            match step? {
+            match self.poll_projected::<TypedProjection>(cancel, true)? {
                 Step::Ready(Event::Seek(receipt)) => {
                     self.synchronize(cancel)?;
                     return Ok(receipt);

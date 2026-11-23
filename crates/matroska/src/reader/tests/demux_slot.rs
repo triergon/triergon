@@ -231,8 +231,8 @@ fn trace(kind: u8, quantum: u64, seek: bool) -> Vec<String> {
             reader.position(),
             pool.used(),
             reader.is_ready(),
-            reader.subtitle_recovery.is_some(),
-            reader.replay_prefix.is_some()
+            reader.seek().is_some_and(Seek::recovering),
+            reader.stream.replay_prefix.is_some()
         ));
         match result.unwrap() {
             Step::NeedInput(request) => {
@@ -334,7 +334,10 @@ impl WideBaselineSlot for Reader {
         scan_prefix: bool,
         ready: &mut Option<D::Event>,
     ) -> ReaderStep<()> {
-        match self.step_demux_projected::<D>(work, cancel, stop, scan_prefix)? {
+        match self
+            .stream
+            .step_demux_projected::<D>(work, cancel, stop, scan_prefix)?
+        {
             Step::Ready(event) => {
                 *ready = Some(event);
                 Ok(Step::Ready(()))

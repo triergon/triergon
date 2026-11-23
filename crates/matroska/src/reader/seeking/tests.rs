@@ -40,13 +40,14 @@ fn scan_prefix_cancellation_releases_the_complete_span() {
         Step::Yield
     ));
     assert_eq!(reader.position(), fixture.raw.len() as u64);
-    let header = reader.envelope.scan_prefix_header().unwrap();
+    let header = reader.stream.envelope.scan_prefix_header().unwrap();
     let retained = pool.used();
 
     // Cancel between accepting the prefix and charging the drain completion.
     let mut work = WorkBudget::new(1);
     assert_eq!(
         reader
+            .stream
             .envelope
             .resolve_scan_prefix(header, true, &mut work, &AtomicBool::new(true)),
         Err(Error::Cancelled)
@@ -82,8 +83,8 @@ fn scan_in_place_pending_best_cancel_reset_retained_alias() {
             feed.supply(&mut reader, r).unwrap();
         }
         if reader
-            .seek_stage
-            .scan()
+            .seek()
+            .and_then(Seek::scan)
             .is_some_and(|s| s.best.is_some() && s.best_configuration.is_some())
             && reader.position() < fixture.raw.len() as u64
         {
@@ -92,7 +93,7 @@ fn scan_in_place_pending_best_cancel_reset_retained_alias() {
         }
     }
     assert!(reached);
-    let configuration = reader.configuration.clone().unwrap();
+    let configuration = reader.stream.configuration.clone().unwrap();
     let alias = feed.alias.take().unwrap();
     let position = reader.position();
     let used = pool.used();
@@ -124,11 +125,11 @@ fn scan_in_place_layout_and_late_fault_priority() {
     assert!(size_of::<Reader>() <= 10048);
     assert!(size_of::<PacketBatchJob>() <= 3408);
     println!(
-        "SCAN_INPLACE_LAYOUT|reader={}|batch={}|scan={}|stage_offset={}",
+        "SCAN_INPLACE_LAYOUT|reader={}|batch={}|scan={}|control_offset={}",
         size_of::<Reader>(),
         size_of::<PacketBatchJob>(),
         size_of::<ScanState>(),
-        std::mem::offset_of!(Reader, seek_stage)
+        std::mem::offset_of!(Reader, control)
     );
     let fixture = repeated(3, 256);
     let end = fixture.raw.len() - 1;
@@ -163,7 +164,7 @@ fn immutable_seek_index_rejects_foreign_owner_and_wrong_offset_views() {
     }
     open(&mut reader, &mut feed).unwrap();
     drain(&mut reader, &mut feed, 8192).unwrap();
-    assert!(reader.seek_index.as_ref().unwrap().is_complete());
+    assert!(reader.stream.seek_index.as_ref().unwrap().is_complete());
     reader.reset().unwrap();
-    assert!(!reader.seek_index.as_ref().unwrap().is_complete());
+    assert!(!reader.stream.seek_index.as_ref().unwrap().is_complete());
 }

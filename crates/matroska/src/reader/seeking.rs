@@ -4,45 +4,108 @@ use crate::packet::batch::{
 };
 use crate::seek::plan::{LandingPlan, ScanPlan, SeekPlan};
 use crate::step::check;
+use triergon_core::Bytes;
 
-/// Where a seek stands. `Idle` exactly while the reader has no pending seek; every
-/// other stage owns what only it needs and is stepped in place.
+/// A seek from its request to its receipt.
 #[derive(Debug)]
-pub(super) enum SeekStage {
-    Idle,
-    /// Planning the landing from the Cues; the job is built once the resolver has
-    /// read the metadata the SeekHead points to.
+pub(super) struct Seek {
+    operation: Operation,
+    stage: SeekStage,
+}
+/// What a seek carries from stage to stage.
+#[derive(Debug)]
+struct Operation {
+    request: SeekRequest,
+    audio: RecoveryAudio,
+    /// Source bytes read for the metadata the SeekHead points at.
+    metadata_bytes: u64,
+    /// The landing a second scan recovers earlier subtitles and audio for.
+    recovery: Option<SubtitleRecovery>,
+    /// The Cue's CodecState reference a state reconstruction must reach.
+    reference: Option<EpochReference>,
+}
+/// Where a seek stands. Every stage owns what only it needs and is stepped in place.
+#[derive(Debug)]
+enum SeekStage {
+    /// Reading the metadata the SeekHead points at.
+    Metadata(Resolver),
+    /// Planning the landing from the Cues; `None` builds the job on the next step.
     Plan(Option<SeekPlanJob>),
     /// Validating the planned Cue in `State::Cue`.
-    Cue(SeekPlan),
+    Cue {
+        plan: SeekPlan,
+        cue: crate::seek::Cue,
+        scan_after_validation: Option<ScanPlan>,
+        whole_cluster: bool,
+    },
     /// Scanning Clusters for the landing keyframe.
     Scan(ScanState),
-    /// A finished scan is on the stack of the step that completes it.
-    Completing,
     /// Rebuilding codec state up to the landing in `State::Epoch`.
     Epoch(SeekReceipt),
     /// The landing's configuration is returned before the receipt.
     InitialConfiguration(SeekReceipt),
     Receipt(SeekReceipt),
 }
-impl SeekStage {
+/// How far past its request an input answer may reach.
+pub(super) enum ReadAhead {
+    /// Only what was asked for.
+    Exact,
+    /// Up to this source offset.
+    Until(u64),
+    /// As far as the source and the element allow.
+    Free,
+}
+impl Seek {
+    /// A seek that first reads the metadata the SeekHead points at.
+    pub(super) fn new(request: SeekRequest, audio: RecoveryAudio, pool: &Budget) -> Self {
+        Self {
+            operation: Operation {
+                request,
+                audio,
+                metadata_bytes: 0,
+                recovery: None,
+                reference: None,
+            },
+            stage: SeekStage::Metadata(Resolver::new(pool)),
+        }
+    }
+    pub(super) fn request(&self) -> SeekRequest {
+        self.operation.request
+    }
+    pub(super) fn audio(&self) -> RecoveryAudio {
+        self.operation.audio
+    }
+    pub(super) fn resolver(&self) -> Option<&Resolver> {
+        match &self.stage {
+            SeekStage::Metadata(resolver) => Some(resolver),
+            _ => None,
+        }
+    }
     pub(super) fn plan_job(&self) -> Option<&SeekPlanJob> {
-        match self {
-            Self::Plan(job) => job.as_ref(),
+        match &self.stage {
+            SeekStage::Plan(job) => job.as_ref(),
             _ => None,
         }
     }
     pub(super) fn scan(&self) -> Option<&ScanState> {
-        match self {
-            Self::Scan(scan) => Some(scan),
+        match &self.stage {
+            SeekStage::Scan(scan) => Some(scan),
             _ => None,
         }
     }
-    fn scan_mut(&mut self) -> Result<&mut ScanState> {
-        match self {
-            Self::Scan(scan) => Ok(scan),
-            _ => Err(Error::Invalid("missing seek scan")),
-        }
+    /// How far past its request an input answer may reach in this stage.
+    pub(super) fn read_ahead(&self, stream: &Stream) -> Result<ReadAhead> {
+        Ok(match &self.stage {
+            SeekStage::Scan(scan) => scan.policy.stop.map_or(ReadAhead::Free, ReadAhead::Until),
+            SeekStage::Epoch(_) => {
+                let State::Epoch(job) = &stream.state else {
+                    return Err(Error::Invalid("missing active epoch"));
+                };
+                ReadAhead::Until(job.read_ahead_stop())
+            }
+            // Cue validation and metadata ranges retain their exact path.
+            _ => ReadAhead::Exact,
+        })
     }
 }
 /// Destination is the actual validated video RAP. Replay can begin earlier to
@@ -224,44 +287,40 @@ impl ScanSimple {
     }
 }
 
+/// Where a scan is with its range of Clusters.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ScanPhase {
+    /// The range is entered on the next step.
+    Begin,
+    Read,
+    /// The range ended with a landing, taken on the next step.
+    Land,
+}
 #[derive(Debug)]
 pub(super) struct ScanState {
     policy: ScanPlan,
     plan: SeekPlan,
     index_bytes: u64,
     used_index: bool,
-    begun: bool,
-    finishing: bool,
+    phase: ScanPhase,
     retried: bool,
     best: Option<(i64, ReplayLocation)>,
     previous: Option<u64>,
-    read_start: u64,
     prefix_from_initial: bool,
     cluster_configuration: Option<ScanBoundary>,
     best_configuration: Option<ScanBoundary>,
 }
 impl ScanState {
-    pub(super) fn read_ahead_stop(&self) -> Option<u64> {
-        self.policy.stop
-    }
-
-    pub(super) fn new(
-        policy: ScanPlan,
-        plan: SeekPlan,
-        index_bytes: u64,
-        used_index: bool,
-    ) -> Self {
+    fn new(policy: ScanPlan, plan: SeekPlan, index_bytes: u64, used_index: bool) -> Self {
         Self {
             policy,
             plan,
             index_bytes,
             used_index,
-            begun: false,
-            finishing: false,
+            phase: ScanPhase::Begin,
             retried: false,
             best: None,
             previous: None,
-            read_start: 0,
             prefix_from_initial: false,
             cluster_configuration: None,
             best_configuration: None,
@@ -353,16 +412,13 @@ impl ScanState {
                 return Ok(());
             }
             let location = locate()?;
-            self.best_configuration = if self.prefix_from_initial {
-                let boundary = self
-                    .cluster_configuration
-                    .as_ref()
-                    .required("missing scanned Cluster configuration")?;
+            // A scan from the initial configuration notes it at every Cluster start;
+            // any other scan notes none.
+            if let Some(boundary) = &self.cluster_configuration {
                 boundary.validate(pool, envelope, &location)?;
-                Some(boundary.clone())
-            } else {
-                None
-            };
+            }
+            self.best_configuration
+                .clone_from(&self.cluster_configuration);
             self.best = Some((pts, location));
         }
         Ok(())
@@ -404,126 +460,123 @@ impl Reader {
         audio: RecoveryAudio,
     ) -> Result<InputRequest> {
         let result = (|| {
-            if self
+            let stream = &mut self.stream;
+            if stream
                 .tracks()
                 .get(request.track)
                 .is_none_or(|track| track.kind != crate::track::Track::VIDEO)
             {
                 return Err(Error::Unsupported("seek requires video track"));
             }
-            let first = self
-                .first_cluster
-                .as_ref()
-                .required("seek before first Cluster")?;
-            let input = self.envelope.reset_to_cluster(first)?;
-            self.cancel_transaction()?;
-            self.configuration = self.configuration.as_ref().map(|configuration| {
+            let Control::Clusters { first, activity } = &mut self.control else {
+                return Err(Error::Invalid("seek before first Cluster"));
+            };
+            let input = stream.envelope.reset_to_cluster(first)?;
+            stream.cancel_transaction()?;
+            stream.configuration = stream.configuration.as_ref().map(|configuration| {
                 configuration.initial_rebind(input.token.generation(), configuration.revision())
             });
-            self.state = State::Envelope;
-            self.failed = false;
-            self.pressure = None;
-            self.cluster_time = None;
-            self.last_location = None;
-            self.opening = None;
-            self.pending_seek = Some(request);
-            self.recovery_audio = audio;
-            self.subtitle_recovery = None;
-            self.replay_prefix = None;
-            self.scan_remaining = None;
-            self.state_coverage_contiguous = false;
-            if let Some(index) = &mut self.seek_index
+            stream.state = State::Envelope;
+            self.gate = Gate::Open;
+            stream.cluster_time = None;
+            stream.last_location = None;
+            stream.replay_prefix = None;
+            stream.scan_remaining = None;
+            stream.state_coverage_contiguous = false;
+            if let Some(index) = &mut stream.seek_index
                 && index.is_collecting()
             {
                 index.discard();
             }
-            self.epoch_reference = None;
-            self.seek_metadata_bytes = 0;
-            self.seek_stage = SeekStage::Plan(None);
-            self.resolver = Some(Resolver::new(ResolvePurpose::Seek, &self.pool));
+            *activity = Activity::Seek(Seek::new(request, audio, &stream.pool));
             Ok(input)
         })();
         if result.is_err() {
-            self.failed = true;
+            self.gate = Gate::Failed;
         }
         result
     }
-    pub(super) fn start_seek_plan(&mut self) -> Result<()> {
-        let request = self.pending_seek.required("missing seek request")?;
-        self.seek_stage = SeekStage::Plan(Some(Self::seek_plan_job(
-            request,
-            self.configuration.as_ref(),
-            self.first_cluster.as_ref(),
-            self.scale,
-            self.recovery_audio,
-        )?));
-        Ok(())
+}
+
+/// The receipt of a seek that has found its landing; the scan allowance ends here.
+fn land(
+    stream: &mut Stream,
+    plan: SeekPlan,
+    actual_ns: i64,
+    scanned_bytes: u64,
+    used_index: bool,
+    replays_from_start: bool,
+) -> SeekReceipt {
+    stream.scan_remaining = None;
+    SeekReceipt {
+        requested_ns: plan.requested_ns,
+        actual_ns,
+        scanned_bytes,
+        used_index,
+        discard_until_ns: plan.discard_until_ns,
+        preroll_ns: plan.preroll_ns,
+        replays_from_start,
     }
-    fn seek_plan_job(
-        request: SeekRequest,
-        configuration: Option<&Configuration>,
-        first_cluster: Option<&ClusterCheckpoint>,
-        scale: u64,
-        audio: RecoveryAudio,
-    ) -> Result<SeekPlanJob> {
-        let configuration = configuration.cloned().required("missing Tracks")?;
-        let first = first_cluster.required("missing first Cluster")?.offset();
+}
+
+impl Operation {
+    fn plan_job(&self, stream: &Stream, first: &ClusterCheckpoint) -> Result<SeekPlanJob> {
         SeekPlanJob::new(
-            configuration,
-            request.track,
-            request.requested_ns,
-            request.playback_preroll,
-            scale,
-            first,
-            audio,
+            stream.configuration()?.clone(),
+            self.request.track,
+            self.request.requested_ns,
+            self.request.playback_preroll,
+            stream.scale,
+            first.offset(),
+            self.audio,
         )
     }
-    /// Return to the same source's first validated Cluster to find an earlier
-    /// real replay RAP. No index pointer, cached output packet or guessed end is
-    /// substituted for input validation. This is a bounded correctness pass;
-    /// its real I/O is included in the one operation's remaining scan allowance.
-    fn start_subtitle_recovery(
+    /// The scan that returns to the source's first validated Cluster to find an
+    /// earlier real replay RAP, when the landing needs one. No index pointer,
+    /// cached output packet or guessed end is substituted for input validation. This
+    /// is a bounded correctness pass; its real I/O is included in the one operation's
+    /// remaining scan allowance.
+    fn recovery_scan(
         &mut self,
-        request: SeekRequest,
+        first: &ClusterCheckpoint,
+        stream: &mut Stream,
         completion: &SeekCompletion<'_>,
-    ) -> Result<bool> {
-        if self.subtitle_recovery.is_some()
+    ) -> Result<Option<ScanState>> {
+        if self.recovery.is_some()
             || completion.plan.subtitle_recovery_delay_ns == 0
             || !completion.whole_cluster
         {
-            return Ok(false);
+            return Ok(None);
         }
-        let first = self
-            .first_cluster
-            .as_ref()
-            .required("missing first Cluster")?;
         if first.offset() == completion.location.cluster_offset() {
             // This is already complete beginning-of-source replay, including
             // negative CodecDelay and the initial-trim distinction.
-            return Ok(false);
+            return Ok(None);
         }
         let delay_ns = completion.plan.subtitle_recovery_delay_ns;
         let lower_ns = i64::try_from(i128::from(completion.actual_ns) - i128::from(delay_ns))
             .map_err(|_| Error::Overflow)?;
-        let block_start_ticks = if self.recovery_audio == RecoveryAudio::BlockStart {
-            let video_delay_ns = self.tracks()[request.track].codec_delay_ns;
+        let block_start_ticks = if self.audio == RecoveryAudio::BlockStart {
+            let video_delay_ns = stream.tracks()[self.request.track].codec_delay_ns;
             let ticks = (i128::from(completion.actual_ns) + i128::from(video_delay_ns))
-                / i128::from(self.scale);
-            let start = crate::compat::clock::block_start_ticks(ticks, video_delay_ns, self.scale)?;
-            let cutoff = start - i128::from(delay_ns / self.scale);
+                / i128::from(stream.scale);
+            let start =
+                crate::compat::clock::block_start_ticks(ticks, video_delay_ns, stream.scale)?;
+            let cutoff = start - i128::from(delay_ns / stream.scale);
             Some(i64::try_from(cutoff).map_err(|_| Error::Overflow)?)
         } else {
             None
         };
         let used = completion
             .scanned
-            .checked_add(self.seek_metadata_bytes)
+            .checked_add(self.metadata_bytes)
             .ok_or(Error::Overflow)?;
-        self.limits
+        stream
+            .limits
             .scan_bytes
             .checked_sub(used)
             .ok_or(Error::Policy("operation read bytes"))?;
-        self.subtitle_recovery = Some(SubtitleRecovery {
+        self.recovery = Some(SubtitleRecovery {
             actual_ns: completion.actual_ns,
             destination_block: completion.location.block_offset(),
             cutoff: RecoveryCutoff {
@@ -531,13 +584,13 @@ impl Reader {
                 block_start_ticks,
             },
             used_index: completion.used_index,
-            source: self.envelope.request().source,
-            generation: self.generation(),
+            source: stream.envelope.request().source,
+            generation: stream.generation(),
         });
-        self.configuration = self.configuration.as_ref().map(|configuration| {
+        stream.configuration = stream.configuration.as_ref().map(|configuration| {
             configuration.initial_rebind(configuration.generation(), configuration.revision())
         });
-        self.seek_stage = SeekStage::Scan(ScanState::new(
+        Ok(Some(ScanState::new(
             ScanPlan {
                 start: first.offset(),
                 stop: Some(completion.location.cluster_offset()),
@@ -549,13 +602,19 @@ impl Reader {
             completion.plan,
             completion.scanned,
             completion.used_index,
-        ));
-        Ok(true)
+        )))
     }
 
-    fn finish_seek(&mut self, request: SeekRequest, completion: SeekCompletion<'_>) -> Result<()> {
-        if self.start_subtitle_recovery(request, &completion)? {
-            return Ok(());
+    /// The stage that follows a landing: a recovery scan, the reconstruction of
+    /// codec state, the landing's configuration, or the receipt.
+    fn finish(
+        &mut self,
+        first: &ClusterCheckpoint,
+        stream: &mut Stream,
+        completion: SeekCompletion<'_>,
+    ) -> Result<SeekStage> {
+        if let Some(scan) = self.recovery_scan(first, stream, &completion)? {
+            return Ok(SeekStage::Scan(scan));
         }
         let SeekCompletion {
             mut actual_ns,
@@ -566,16 +625,16 @@ impl Reader {
             plan,
             mut scanned_boundary,
         } = completion;
-        let recovering = self.subtitle_recovery.take();
+        let recovering = self.recovery.take();
         if let Some(recovery) = recovering {
-            if recovery.source != self.envelope.request().source
-                || recovery.generation != self.generation()
+            if recovery.source != stream.envelope.request().source
+                || recovery.generation != stream.generation()
             {
                 return Err(Error::Invalid("subtitle recovery source identity changed"));
             }
             actual_ns = recovery.actual_ns;
             used_index = recovery.used_index;
-            self.replay_prefix = Some(ReplayPrefix {
+            stream.replay_prefix = Some(ReplayPrefix {
                 until_block: recovery.destination_block,
                 cutoff: recovery.cutoff,
                 source: recovery.source,
@@ -584,437 +643,227 @@ impl Reader {
             // A scanned replay boundary cannot replace an outstanding proof
             // about the target CueCodecState. The epoch job
             // validates that reference and snapshots the earlier real boundary.
-            if self.epoch_reference.is_some() {
+            if self.reference.is_some() {
                 scanned_boundary = None;
             }
         }
         let scanned_bytes = scanned
-            .checked_add(self.seek_metadata_bytes)
+            .checked_add(self.metadata_bytes)
             .ok_or(Error::Overflow)?;
-        let from_start = recovering.is_none()
-            && request.playback_preroll
-            && self
-                .first_cluster
-                .as_ref()
-                .is_some_and(|first| first.offset() == location.cluster_offset());
-        let receipt = self.land(plan, actual_ns, scanned_bytes, used_index, from_start);
-        let starts_at_initial_configuration = whole_cluster
-            && self
-                .first_cluster
-                .as_ref()
-                .is_some_and(|first| first.offset() == location.cluster_offset())
-            && self.epoch_reference.is_none();
-        if starts_at_initial_configuration {
+        let at_first = first.offset() == location.cluster_offset();
+        let from_start = recovering.is_none() && self.request.playback_preroll && at_first;
+        let receipt = land(
+            stream,
+            plan,
+            actual_ns,
+            scanned_bytes,
+            used_index,
+            from_start,
+        );
+        if whole_cluster && at_first && self.reference.is_none() {
             // Replay begins before every Block/CodecState in the source. Reset
             // ALL tracks, including audio/subtitle state left by an earlier
             // read or a private seek scan. Cue state in this first Cluster was
             // checked by the forward validator; no prefix input is missing.
-            let changed = self.state_seen
-                || self
+            let changed = stream.state_seen
+                || stream
                     .configuration
                     .as_ref()
                     .is_some_and(Configuration::has_codec_states);
             if changed {
-                self.revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
+                stream.revision = stream.revision.checked_add(1).ok_or(Error::Overflow)?;
             }
-            self.configuration = self.configuration.as_ref().map(|configuration| {
-                configuration.initial_rebind(configuration.generation(), self.revision)
+            stream.configuration = stream.configuration.as_ref().map(|configuration| {
+                configuration.initial_rebind(configuration.generation(), stream.revision)
             });
-            self.seek_stage = if changed {
+            return Ok(if changed {
                 SeekStage::InitialConfiguration(receipt)
             } else {
                 SeekStage::Receipt(receipt)
-            };
-            return Ok(());
+            });
         }
         let replay_offset = if whole_cluster {
             location.cluster_offset()
         } else {
             location.block_offset()
         };
-        let needs_epoch = self.state_seen
-            || self.epoch_reference.is_some_and(|reference| {
-                reference.state != 0 || reference.block >= self.state_coverage_end
+        let needs_epoch = stream.state_seen
+            || self.reference.is_some_and(|reference| {
+                reference.state != 0 || reference.block >= stream.state_coverage_end
             })
-            || replay_offset > self.state_coverage_end;
-        if needs_epoch {
-            if let Some(boundary) = scanned_boundary {
-                if !whole_cluster {
-                    return Err(Error::Invalid(
-                        "scanned epoch requires whole Cluster replay",
-                    ));
-                }
-                boundary.validate(&self.pool, &self.envelope, location)?;
-                self.revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
-                self.configuration = Some(
-                    boundary
-                        .configuration
-                        .rebind(self.generation(), self.revision),
-                );
-                // Same observable configuration-before-receipt boundary as an
-                // epoch job; its source prefix has already validated in scan.
-                self.seek_stage = SeekStage::InitialConfiguration(receipt);
-                return Ok(());
+            || replay_offset > stream.state_coverage_end;
+        if !needs_epoch {
+            return Ok(SeekStage::Receipt(receipt));
+        }
+        if let Some(boundary) = scanned_boundary {
+            if !whole_cluster {
+                return Err(Error::Invalid(
+                    "scanned epoch requires whole Cluster replay",
+                ));
             }
-            let remaining = self
-                .limits
-                .scan_bytes
-                .checked_sub(scanned_bytes)
-                .ok_or(Error::Policy("operation read bytes"))?;
-            self.state = State::Epoch(EpochRestoreJob::new(
-                self.configuration
-                    .clone()
-                    .required("missing state configuration")?,
-                EpochTarget {
-                    anchor: self
-                        .first_cluster
-                        .clone()
-                        .required("missing first Cluster")?,
-                    replay: location.clone(),
-                    whole_cluster,
-                    reference: self.epoch_reference,
-                    segment_data: self.segment_data,
-                    remaining,
-                },
-                self.limits,
-                &self.pool,
-            )?);
-            self.seek_stage = SeekStage::Epoch(receipt);
-        } else {
-            self.seek_stage = SeekStage::Receipt(receipt);
+            boundary.validate(&stream.pool, &stream.envelope, location)?;
+            stream.revision = stream.revision.checked_add(1).ok_or(Error::Overflow)?;
+            stream.configuration = Some(
+                boundary
+                    .configuration
+                    .rebind(stream.generation(), stream.revision),
+            );
+            // Same observable configuration-before-receipt boundary as an
+            // epoch job; its source prefix has already validated in scan.
+            return Ok(SeekStage::InitialConfiguration(receipt));
         }
-        Ok(())
-    }
-    /// The receipt of a seek that has found its landing; the scan allowance ends here.
-    fn land(
-        &mut self,
-        plan: SeekPlan,
-        actual_ns: i64,
-        scanned_bytes: u64,
-        used_index: bool,
-        replays_from_start: bool,
-    ) -> SeekReceipt {
-        self.scan_remaining = None;
-        SeekReceipt {
-            requested_ns: plan.requested_ns,
-            actual_ns,
-            scanned_bytes,
-            used_index,
-            discard_until_ns: plan.discard_until_ns,
-            preroll_ns: plan.preroll_ns,
-            replays_from_start,
-        }
+        let remaining = stream
+            .limits
+            .scan_bytes
+            .checked_sub(scanned_bytes)
+            .ok_or(Error::Policy("operation read bytes"))?;
+        stream.state = State::Epoch(EpochRestoreJob::new(
+            stream.configuration()?.clone(),
+            EpochTarget {
+                anchor: first.clone(),
+                replay: location.clone(),
+                whole_cluster,
+                reference: self.reference,
+                segment_data: stream.segment_data,
+                remaining,
+            },
+            stream.limits,
+            &stream.pool,
+        )?);
+        Ok(SeekStage::Epoch(receipt))
     }
 
-    fn try_immutable_seek(
-        &mut self,
-        request: SeekRequest,
+    /// The receipt of a landing the immutable source's keyframe index already knows.
+    fn indexed_landing(
+        &self,
+        first: &ClusterCheckpoint,
+        stream: &mut Stream,
         plan: SeekPlan,
         policy: ScanPlan,
-    ) -> Result<bool> {
-        if !policy.replay_whole_cluster || plan.subtitle_recovery_delay_ns != 0 || self.state_seen {
-            return Ok(false);
+    ) -> Result<Option<SeekReceipt>> {
+        if !policy.replay_whole_cluster || plan.subtitle_recovery_delay_ns != 0 || stream.state_seen
+        {
+            return Ok(None);
         }
-        let Some(landing) = self
+        let Some(landing) = stream
             .seek_index
             .as_ref()
-            .and_then(|index| index.landing(request.track, policy))
+            .and_then(|index| index.landing(self.request.track, policy))
         else {
-            return Ok(false);
+            return Ok(None);
         };
-        let first = self
-            .first_cluster
-            .as_ref()
-            .required("missing first Cluster")?;
         let from_start = first.offset() == landing.cluster;
-        self.envelope
+        stream
+            .envelope
             .begin_internal_cluster_range(first, landing.cluster)?;
         // begin_seek already reset the configuration to the initial revision.
         // This index exists only after an entire pass with no CodecState.
-        let receipt = self.land(
+        Ok(Some(land(
+            stream,
             plan,
             landing.timestamp_ns,
-            self.seek_metadata_bytes,
+            self.metadata_bytes,
             true,
             from_start,
-        );
-        self.seek_stage = SeekStage::Receipt(receipt);
-        Ok(true)
+        )))
     }
 
-    pub(super) fn step_seeking(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> ReaderStep<Event> {
-        loop {
-            check(cancel)?;
-            let request = self
-                .pending_seek
-                .required("missing pending seek operation")?;
-            match &mut self.seek_stage {
-                SeekStage::Idle => return Err(Error::Invalid("missing pending seek operation")),
-                SeekStage::Plan(job) => {
-                    let job = match job {
-                        Some(job) => job,
-                        None => job.insert(Self::seek_plan_job(
-                            request,
-                            self.configuration.as_ref(),
-                            self.first_cluster.as_ref(),
-                            self.scale,
-                            self.recovery_audio,
-                        )?),
-                    };
-                    let cues = self.cues.as_ref().map_or(&[][..], BudgetVec::as_slice);
-                    match job.step(cues, work, cancel)? {
-                        ParseStep::Event(plan) => {
-                            self.seek_stage = SeekStage::Plan(None);
-                            match plan.landing {
-                                LandingPlan::Cue {
-                                    cue, whole_cluster, ..
-                                } => {
-                                    let configuration =
-                                        self.configuration.clone().required("missing Tracks")?;
-                                    let first = self
-                                        .first_cluster
-                                        .clone()
-                                        .required("missing first Cluster")?;
-                                    self.state = State::Cue(
-                                        CueValidationJob::new(
-                                            crate::seek::cue_validation::CueTarget {
-                                                cue,
-                                                track: request.track,
-                                                scale: self.scale,
-                                                anchor: first,
-                                                whole_cluster,
-                                            },
-                                            configuration,
-                                            self.limits,
-                                            &self.pool,
-                                        )?
-                                        .with_segment_data(self.segment_data),
-                                    );
-                                    self.seek_stage = SeekStage::Cue(plan);
-                                }
-                                LandingPlan::Scan(policy) => {
-                                    if !self.try_immutable_seek(request, plan, policy)? {
-                                        self.seek_stage =
-                                            SeekStage::Scan(ScanState::new(policy, plan, 0, false));
-                                    }
-                                }
-                            }
-                        }
-                        other => return other.waiting(),
-                    }
-                }
-                SeekStage::Cue(plan) => {
-                    let State::Cue(job) = &mut self.state else {
-                        return Err(Error::Invalid("missing cue validation job"));
-                    };
-                    match job.step(&mut self.envelope, work, cancel)? {
-                        ParseStep::Event(landing) => {
-                            let plan = *plan;
-                            let LandingPlan::Cue {
-                                cue,
-                                scan_after_validation,
-                                whole_cluster,
-                            } = plan.landing
-                            else {
-                                return Err(Error::Invalid("invalid cue seek plan"));
-                            };
-                            self.epoch_reference = if self
-                                .first_cluster
-                                .as_ref()
-                                .is_some_and(|first| first.offset() == cue.cluster)
-                            {
-                                // The validator proved the reference while
-                                // traversing the first Cluster from its start.
-                                None
-                            } else {
-                                Some(EpochReference {
-                                    block: landing.location.block_offset(),
-                                    state: cue.codec_state,
-                                    track: request.track,
-                                    unchanged_cluster_prefix: landing
-                                        .unchanged_state_prefix
-                                        .then_some(landing.location.cluster_offset()),
-                                })
-                            };
-                            self.state = State::Envelope;
-                            self.cluster_time = landing.replay_cluster_time;
-                            self.last_location = Some(landing.location.clone());
-                            if let Some(policy) = scan_after_validation {
-                                self.seek_stage = SeekStage::Scan(ScanState::new(
-                                    policy,
-                                    plan,
-                                    landing.scanned_bytes,
-                                    true,
-                                ));
-                            } else {
-                                self.finish_seek(
-                                    request,
-                                    SeekCompletion {
-                                        actual_ns: landing.actual_ns,
-                                        scanned: landing.scanned_bytes,
-                                        used_index: true,
-                                        location: &landing.location,
-                                        whole_cluster,
-                                        plan,
-                                        scanned_boundary: None,
-                                    },
-                                )?;
-                            }
-                        }
-                        other => return other.waiting(),
-                    }
-                }
-                SeekStage::Scan(_) => return self.advance_scan(request, work, cancel),
-                SeekStage::Completing => return Err(Error::Invalid("missing seek scan")),
-                SeekStage::Epoch(receipt) => {
-                    let State::Epoch(job) = &mut self.state else {
-                        return Err(Error::Invalid("missing state reconstruction job"));
-                    };
-                    if let Some(root) = self.owned_root.as_ref() {
-                        job.try_owned_prefix(&mut self.envelope, root, cancel)?;
-                    }
-                    match job.step(&mut self.envelope, work, cancel)? {
-                        ParseStep::Event(epoch) => {
-                            receipt.scanned_bytes = receipt
-                                .scanned_bytes
-                                .checked_add(epoch.scanned_bytes)
-                                .ok_or(Error::Overflow)?;
-                            let receipt = *receipt;
-                            self.revision = self.revision.checked_add(1).ok_or(Error::Overflow)?;
-                            let configuration =
-                                epoch.configuration.rebind(self.generation(), self.revision);
-                            self.configuration = Some(configuration.clone());
-                            self.cluster_time = epoch.cluster_time;
-                            self.state = State::Envelope;
-                            self.seek_stage = SeekStage::Receipt(receipt);
-                            return Ok(Step::Ready(Event::Configuration(configuration)));
-                        }
-                        other => return other.waiting(),
-                    }
-                }
-                SeekStage::InitialConfiguration(receipt) => {
-                    self.envelope.healthy_for_job(work, cancel)?;
-                    if !work.try_charge(1) {
-                        return Ok(Step::Yield);
-                    }
-                    let configuration = self
-                        .configuration
-                        .clone()
-                        .required("missing initial replay configuration")?;
-                    self.seek_stage = SeekStage::Receipt(*receipt);
-                    return Ok(Step::Ready(Event::Configuration(configuration)));
-                }
-                SeekStage::Receipt(receipt) => {
-                    self.envelope.healthy_for_job(work, cancel)?;
-                    let receipt = *receipt;
-                    self.pending_seek = None;
-                    self.seek_stage = SeekStage::Idle;
-                    return Ok(Step::Ready(Event::Seek(receipt)));
-                }
-            }
-        }
-    }
+    /// One step of a scan; `None` once its range has ended with a landing.
     fn advance_scan(
         &mut self,
-        request: SeekRequest,
+        scan: &mut ScanState,
+        first: &ClusterCheckpoint,
+        stream: &mut Stream,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> ReaderStep<Event> {
+    ) -> Result<Option<Step<Event, Backpressure>>> {
         loop {
             check(cancel)?;
-            let scan = self.seek_stage.scan_mut()?;
-            if !scan.begun {
-                if !work.try_charge(1) {
-                    return Ok(Step::Yield);
+            match scan.phase {
+                ScanPhase::Begin => {
+                    if !work.try_charge(1) {
+                        return Ok(Some(Step::Yield));
+                    }
+                    scan.prefix_from_initial = scan.policy.replay_whole_cluster
+                        && scan.policy.start == first.offset()
+                        && stream
+                            .configuration
+                            .as_ref()
+                            .is_some_and(|configuration| !configuration.has_codec_states());
+                    scan.cluster_configuration = None;
+                    scan.best_configuration = None;
+                    stream
+                        .envelope
+                        .begin_internal_cluster_range(first, scan.policy.start)?;
+                    stream.state = State::Envelope;
+                    stream.cluster_time = None;
+                    stream.last_location = None;
+                    stream.scan_remaining = Some(if self.recovery.is_some() {
+                        stream
+                            .limits
+                            .scan_bytes
+                            .checked_sub(
+                                scan.index_bytes
+                                    .checked_add(self.metadata_bytes)
+                                    .ok_or(Error::Overflow)?,
+                            )
+                            .ok_or(Error::Policy("operation read bytes"))?
+                    } else {
+                        stream.limits.scan_bytes
+                    });
+                    stream.demux_read_bytes = 0;
+                    scan.phase = ScanPhase::Read;
                 }
-                let first = self
-                    .first_cluster
-                    .as_ref()
-                    .required("missing first Cluster")?;
-                scan.prefix_from_initial = scan.policy.replay_whole_cluster
-                    && scan.policy.start == first.offset()
-                    && self
-                        .configuration
-                        .as_ref()
-                        .is_some_and(|configuration| !configuration.has_codec_states());
-                scan.cluster_configuration = None;
-                scan.best_configuration = None;
-                self.envelope
-                    .begin_internal_cluster_range(first, scan.policy.start)?;
-                self.state = State::Envelope;
-                self.cluster_time = None;
-                self.last_location = None;
-                self.scan_remaining = Some(if self.subtitle_recovery.is_some() {
-                    self.limits
-                        .scan_bytes
-                        .checked_sub(
-                            scan.index_bytes
-                                .checked_add(self.seek_metadata_bytes)
-                                .ok_or(Error::Overflow)?,
-                        )
-                        .ok_or(Error::Policy("operation read bytes"))?
-                } else {
-                    self.limits.scan_bytes
-                });
-                self.demux_read_bytes = 0;
-                scan.read_start = 0;
-                scan.begun = true;
-            }
-            if scan.finishing {
-                if !work.try_charge(1) {
-                    return Ok(Step::Yield);
+                ScanPhase::Land => {
+                    if !work.try_charge(1) {
+                        return Ok(Some(Step::Yield));
+                    }
+                    return Ok(None);
                 }
-                return self.complete_scan(request, work, cancel);
+                ScanPhase::Read => {}
             }
             // The public step already checked the cursor. This loop
             // retains exclusive access and propagates any new read failure.
             let stop = scan.policy.stop;
-            let progress = self.step_demux_after_health_check::<TypedProjection>(
+            let progress = stream.step_demux_after_health_check::<TypedProjection>(
                 work,
                 cancel,
                 stop,
-                self.replay_prefix.is_none(),
+                stream.replay_prefix.is_none(),
             )?;
-            let scan = self.seek_stage.scan_mut()?;
-            if let State::ScanSimple(job) = &self.state
+            if let State::ScanSimple(job) = &stream.state
                 && let Some(fields) = job.completed_fields()
             {
                 // The drain checked the source context and completed in this
                 // call. Retain a replay location only if it improves the landing.
                 let header = job.header();
-                self.state = State::Envelope;
+                stream.state = State::Envelope;
                 scan.consider(
-                    request.track,
-                    &self.pool,
-                    &self.envelope,
+                    self.request.track,
+                    &stream.pool,
+                    &stream.envelope,
                     header.start,
                     fields,
                     || {
-                        self.envelope
-                            .block_replay_location(header, self.cluster_time)
+                        stream
+                            .envelope
+                            .block_replay_location(header, stream.cluster_time)
                     },
                 )?;
                 continue;
             }
             match progress {
                 Step::Ready(Event::Packet(packet)) => {
-                    let location = self
-                        .last_location
-                        .as_ref()
-                        .required("missing scanned block location")?;
+                    let location = stream.block_location()?;
                     let fields = ScanPacketFields {
                         track: packet.packet.track,
                         pts_ns: packet.packet.pts_ns,
                         keyframe: packet.packet.keyframe,
                     };
                     let result = scan.consider(
-                        request.track,
-                        &self.pool,
-                        &self.envelope,
+                        self.request.track,
+                        &stream.pool,
+                        &stream.envelope,
                         location.block_offset(),
                         fields,
                         || Ok(location.clone()),
@@ -1029,17 +878,16 @@ impl Reader {
                 {
                     scan.cluster_configuration = if scan.prefix_from_initial {
                         Some(ScanBoundary {
-                            configuration: self
-                                .configuration
-                                .clone()
-                                .required("missing scanned configuration")?,
-                            source: self.envelope.request().source,
+                            configuration: stream.configuration()?.clone(),
+                            source: stream.envelope.request().source,
                             cluster: header.start,
                         })
                     } else {
                         None
                     };
-                    return Ok(Step::Ready(Event::Envelope(ElementEvent::Start(header))));
+                    return Ok(Some(Step::Ready(Event::Envelope(ElementEvent::Start(
+                        header,
+                    )))));
                 }
                 Step::Ready(Event::Configuration(configuration)) => drop(configuration),
                 Step::End(_) => {
@@ -1047,83 +895,67 @@ impl Reader {
                         if scan.policy.allow_first_after_negative_preroll && !scan.retried {
                             scan.policy.target_ns = 0;
                             scan.retried = true;
-                            scan.begun = false;
+                            scan.phase = ScanPhase::Begin;
                             scan.previous = None;
-                            self.configuration = self.configuration.as_ref().map(|configuration| {
-                                configuration.initial_rebind(
-                                    configuration.generation(),
-                                    configuration.revision(),
-                                )
-                            });
+                            stream.configuration =
+                                stream.configuration.as_ref().map(|configuration| {
+                                    configuration.initial_rebind(
+                                        configuration.generation(),
+                                        configuration.revision(),
+                                    )
+                                });
                             continue;
                         }
                         return Err(Error::Unsupported("no previous random-access block"));
                     }
-                    scan.finishing = true;
+                    scan.phase = ScanPhase::Land;
                 }
                 Step::Ready(Event::Envelope(event)) => {
-                    return Ok(Step::Ready(Event::Envelope(event)));
+                    return Ok(Some(Step::Ready(Event::Envelope(event))));
                 }
                 Step::Ready(Event::Document(document)) => {
-                    return Ok(Step::Ready(Event::Document(document)));
+                    return Ok(Some(Step::Ready(Event::Document(document))));
                 }
                 Step::Ready(Event::Seek(receipt)) => {
-                    return Ok(Step::Ready(Event::Seek(receipt)));
+                    return Ok(Some(Step::Ready(Event::Seek(receipt))));
                 }
-                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
-                Step::Yield => return Ok(Step::Yield),
-                Step::Backpressure(pressure) => return Ok(Step::Backpressure(pressure)),
+                Step::NeedInput(request) => return Ok(Some(Step::NeedInput(request))),
+                Step::Yield => return Ok(Some(Step::Yield)),
+                Step::Backpressure(pressure) => return Ok(Some(Step::Backpressure(pressure))),
             }
         }
     }
-    /// Positions the reader at a finished scan's landing and completes the seek
-    /// from it. The scan leaves its stage for this step: it returns to the stage
-    /// when the completion fails, so a retry finds it, and is otherwise dropped
-    /// after the step that follows.
-    fn complete_scan(
+    /// Positions the stream at a finished scan's landing and gives the stage that
+    /// follows. The scan stays in its stage until that stage exists, so a retry
+    /// after a refused allocation finds it.
+    fn land_scan(
         &mut self,
-        request: SeekRequest,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> ReaderStep<Event> {
-        let SeekStage::Scan(mut scan) =
-            std::mem::replace(&mut self.seek_stage, SeekStage::Completing)
-        else {
-            return Err(Error::Invalid("missing seek scan"));
-        };
-        if let Err(error) = self.land_scan(request, &mut scan) {
-            if matches!(self.seek_stage, SeekStage::Completing) {
-                self.seek_stage = SeekStage::Scan(scan);
-            }
-            return Err(error);
-        }
-        if matches!(self.seek_stage, SeekStage::Scan(_)) {
-            return Ok(Step::Yield);
-        }
-        self.step_seeking(work, cancel)
-    }
-    fn land_scan(&mut self, request: SeekRequest, scan: &mut ScanState) -> Result<()> {
+        scan: &mut ScanState,
+        first: &ClusterCheckpoint,
+        stream: &mut Stream,
+    ) -> Result<SeekStage> {
         let (actual, location) = scan
             .best
             .as_ref()
             .ok_or(Error::Unsupported("no previous random-access block"))?;
-        let bytes = self
+        let bytes = stream
             .demux_read_bytes
-            .checked_sub(scan.read_start)
-            .and_then(|bytes| bytes.checked_add(scan.index_bytes))
+            .checked_add(scan.index_bytes)
             .ok_or(Error::Overflow)?;
-        self.state = State::Envelope;
+        stream.state = State::Envelope;
         if scan.policy.replay_whole_cluster {
-            self.envelope
+            stream
+                .envelope
                 .begin_internal_cluster_range(location.checkpoint(), location.cluster_offset())?;
-            self.cluster_time = None;
+            stream.cluster_time = None;
         } else {
-            self.envelope.restore_internal_block(location)?;
-            self.cluster_time = location.cluster_time;
+            stream.envelope.restore_internal_block(location)?;
+            stream.cluster_time = location.cluster_time;
         }
-        self.last_location = Some(location.clone());
-        self.finish_seek(
-            request,
+        stream.last_location = Some(location.clone());
+        self.finish(
+            first,
+            stream,
             SeekCompletion {
                 actual_ns: *actual,
                 scanned: bytes,
@@ -1134,6 +966,207 @@ impl Reader {
                 scanned_boundary: scan.best_configuration.take(),
             },
         )
+    }
+}
+
+impl Seek {
+    /// One step of the seek. Its receipt is its last event.
+    pub(super) fn step(
+        &mut self,
+        first: &ClusterCheckpoint,
+        stream: &mut Stream,
+        root: Option<&Bytes>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> ReaderStep<Event> {
+        loop {
+            check(cancel)?;
+            let request = self.operation.request;
+            match &mut self.stage {
+                SeekStage::Metadata(resolver) => {
+                    let Some(step) = resolver.step(stream, work, cancel)? else {
+                        self.operation.metadata_bytes = resolver.scanned();
+                        self.stage = SeekStage::Plan(Some(self.operation.plan_job(stream, first)?));
+                        return Ok(Step::Yield);
+                    };
+                    return Ok(step);
+                }
+                SeekStage::Plan(job) => {
+                    let job = match job {
+                        Some(job) => job,
+                        None => job.insert(self.operation.plan_job(stream, first)?),
+                    };
+                    let cues = stream.cues.as_ref().map_or(&[][..], BudgetVec::as_slice);
+                    match job.step(cues, work, cancel)? {
+                        ParseStep::Event(plan) => {
+                            self.stage = SeekStage::Plan(None);
+                            match plan.landing {
+                                LandingPlan::Cue {
+                                    cue,
+                                    scan_after_validation,
+                                    whole_cluster,
+                                } => {
+                                    stream.state = State::Cue(
+                                        CueValidationJob::new(
+                                            crate::seek::cue_validation::CueTarget {
+                                                cue,
+                                                track: request.track,
+                                                scale: stream.scale,
+                                                anchor: first.clone(),
+                                                whole_cluster,
+                                            },
+                                            stream.configuration()?.clone(),
+                                            stream.limits,
+                                            &stream.pool,
+                                        )?
+                                        .with_segment_data(stream.segment_data),
+                                    );
+                                    self.stage = SeekStage::Cue {
+                                        plan,
+                                        cue,
+                                        scan_after_validation,
+                                        whole_cluster,
+                                    };
+                                }
+                                LandingPlan::Scan(policy) => {
+                                    self.stage = match self
+                                        .operation
+                                        .indexed_landing(first, stream, plan, policy)?
+                                    {
+                                        Some(receipt) => SeekStage::Receipt(receipt),
+                                        None => {
+                                            SeekStage::Scan(ScanState::new(policy, plan, 0, false))
+                                        }
+                                    };
+                                }
+                            }
+                        }
+                        other => return other.waiting(),
+                    }
+                }
+                SeekStage::Cue {
+                    plan,
+                    cue,
+                    scan_after_validation,
+                    whole_cluster,
+                } => {
+                    let State::Cue(job) = &mut stream.state else {
+                        return Err(Error::Invalid("missing cue validation job"));
+                    };
+                    match job.step(&mut stream.envelope, work, cancel)? {
+                        ParseStep::Event(landing) => {
+                            let (plan, cue, whole_cluster) = (*plan, *cue, *whole_cluster);
+                            let scan_after_validation = *scan_after_validation;
+                            self.operation.reference = if first.offset() == cue.cluster {
+                                // The validator proved the reference while
+                                // traversing the first Cluster from its start.
+                                None
+                            } else {
+                                Some(EpochReference {
+                                    block: landing.location.block_offset(),
+                                    state: cue.codec_state,
+                                    track: request.track,
+                                    unchanged_cluster_prefix: landing
+                                        .unchanged_state_prefix
+                                        .then_some(landing.location.cluster_offset()),
+                                })
+                            };
+                            stream.state = State::Envelope;
+                            stream.cluster_time = landing.replay_cluster_time;
+                            stream.last_location = Some(landing.location.clone());
+                            self.stage = if let Some(policy) = scan_after_validation {
+                                SeekStage::Scan(ScanState::new(
+                                    policy,
+                                    plan,
+                                    landing.scanned_bytes,
+                                    true,
+                                ))
+                            } else {
+                                self.operation.finish(
+                                    first,
+                                    stream,
+                                    SeekCompletion {
+                                        actual_ns: landing.actual_ns,
+                                        scanned: landing.scanned_bytes,
+                                        used_index: true,
+                                        location: &landing.location,
+                                        whole_cluster,
+                                        plan,
+                                        scanned_boundary: None,
+                                    },
+                                )?
+                            };
+                        }
+                        other => return other.waiting(),
+                    }
+                }
+                SeekStage::Scan(scan) => {
+                    if let Some(step) = self
+                        .operation
+                        .advance_scan(scan, first, stream, work, cancel)?
+                    {
+                        return Ok(step);
+                    }
+                    self.stage = self.operation.land_scan(scan, first, stream)?;
+                    if matches!(self.stage, SeekStage::Scan(_)) {
+                        return Ok(Step::Yield);
+                    }
+                }
+                SeekStage::Epoch(receipt) => {
+                    let State::Epoch(job) = &mut stream.state else {
+                        return Err(Error::Invalid("missing state reconstruction job"));
+                    };
+                    if let Some(root) = root {
+                        job.try_owned_prefix(&mut stream.envelope, root, cancel)?;
+                    }
+                    match job.step(&mut stream.envelope, work, cancel)? {
+                        ParseStep::Event(epoch) => {
+                            receipt.scanned_bytes = receipt
+                                .scanned_bytes
+                                .checked_add(epoch.scanned_bytes)
+                                .ok_or(Error::Overflow)?;
+                            let receipt = *receipt;
+                            stream.revision =
+                                stream.revision.checked_add(1).ok_or(Error::Overflow)?;
+                            let configuration = epoch
+                                .configuration
+                                .rebind(stream.generation(), stream.revision);
+                            stream.configuration = Some(configuration.clone());
+                            stream.cluster_time = epoch.cluster_time;
+                            stream.state = State::Envelope;
+                            self.stage = SeekStage::Receipt(receipt);
+                            return Ok(Step::Ready(Event::Configuration(configuration)));
+                        }
+                        other => return other.waiting(),
+                    }
+                }
+                SeekStage::InitialConfiguration(receipt) => {
+                    stream.envelope.healthy_for_job(work, cancel)?;
+                    if !work.try_charge(1) {
+                        return Ok(Step::Yield);
+                    }
+                    let configuration = stream.configuration()?.clone();
+                    self.stage = SeekStage::Receipt(*receipt);
+                    return Ok(Step::Ready(Event::Configuration(configuration)));
+                }
+                SeekStage::Receipt(receipt) => {
+                    stream.envelope.healthy_for_job(work, cancel)?;
+                    return Ok(Step::Ready(Event::Seek(*receipt)));
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+impl Seek {
+    /// Whether a second scan is recovering earlier subtitles for a landing.
+    pub(super) fn recovering(&self) -> bool {
+        self.operation.recovery.is_some()
+    }
+    /// Whether the seek is rebuilding codec state.
+    pub(super) fn rebuilding_state(&self) -> bool {
+        matches!(self.stage, SeekStage::Epoch(_))
     }
 }
 

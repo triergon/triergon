@@ -12,6 +12,7 @@ use crate::seek::{
 };
 use crate::step::{ParseStep, Required};
 use crate::storage::copy_vec::CopyVec;
+use crate::storage::usage::{Pressure, Storage};
 use crate::track::parse::TracksJob;
 use crate::{
     Error, Limits, Result, ebml,
@@ -61,8 +62,8 @@ mod resolving;
 mod seek_index;
 mod seeking;
 pub use blocking::BlockingReader;
-use resolving::{Opening, ResolvePurpose, Resolver};
-use seeking::{ReplayPrefix, ScanContext, ScanSimple, SeekStage, SubtitleRecovery};
+use resolving::{Opened, Opening, Resolver, begin_blocks};
+use seeking::{ReadAhead, ReplayPrefix, ScanContext, ScanSimple, Seek};
 mod projection;
 use projection::{LegacyEvent, LegacyProjection, PacketProjection, TypedProjection};
 
@@ -180,32 +181,101 @@ enum State {
     Epoch(EpochRestoreJob),
 }
 
-/// Retained format jobs on the envelope's one InputCursor. Every lace
-/// and checksum in a packet batch validates before its first packet is emitted.
-// The fields are declared in address order: the Cluster time, the bytes every step tests
-// and the element reader first, the transaction workspace last, so that a job that changes size moves no
-// other field. The demux and seek steps were measured with this layout
-// (`reader_fields_keep_their_measured_offsets` records it); in the compiler's own order
-// they ran about 0.4% more instructions.
+/// Whether a step may run.
+#[derive(Debug)]
+#[repr(u32)]
+enum Gate {
+    Open,
+    /// An allocation was refused: the storage the reader itself holds is added up
+    /// before the step runs again.
+    Assessing(Pressure),
+    /// A step failed. A seek or a reset opens the gate again.
+    Failed,
+}
+
+/// Who drives the stream.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one controller at a time, inline in the reader; boxing it would put an allocation on every seek"
+)]
+#[derive(Debug)]
+enum Control {
+    /// Elements in source order up to the first Cluster.
+    Head,
+    /// The first Cluster is known and `activity` reads from it.
+    Clusters {
+        first: ClusterCheckpoint,
+        activity: Activity,
+    },
+}
+#[derive(Debug)]
+#[repr(u32)]
+enum Activity {
+    /// Deciding which metadata the SeekHead points at is still unread.
+    Opening(Opening),
+    /// Reading that metadata by range before the first packet.
+    Metadata(Resolver),
+    /// Blocks in source order.
+    Blocks,
+    /// A seek, until its receipt is returned.
+    Seek(Seek),
+}
+impl Control {
+    fn seek(&self) -> Option<&Seek> {
+        match self {
+            Self::Clusters {
+                activity: Activity::Seek(seek),
+                ..
+            } => Some(seek),
+            _ => None,
+        }
+    }
+    fn resolver(&self) -> Option<&Resolver> {
+        match self {
+            Self::Clusters {
+                activity: Activity::Metadata(resolver),
+                ..
+            } => Some(resolver),
+            _ => self.seek().and_then(Seek::resolver),
+        }
+    }
+    /// Whether the stream is read in source order with nothing else to do first.
+    fn in_source_order(&self) -> bool {
+        matches!(
+            self,
+            Self::Head
+                | Self::Clusters {
+                    activity: Activity::Blocks,
+                    ..
+                }
+        )
+    }
+}
+
+/// The element reader and everything read from the source: the one transaction in
+/// progress, the track configuration, the segment metadata and where the reader is
+/// in a Cluster. Its steps read elements in source order; a controller decides
+/// where that order starts.
+// The fields are declared in address order: the Cluster time, the bytes every step
+// tests and the element reader first, the transaction workspace last, so that a job
+// that changes size moves no other field. The demux and seek steps were measured
+// with this layout (`reader_fields_keep_their_measured_offsets` records it); in the
+// compiler's own order they ran about 0.4% more instructions.
 #[derive(Debug)]
 #[repr(C)]
-pub struct Reader {
+struct Stream {
     // First: this tag is the reader's largest niche, and an enum around the reader
     // keeps its own tag there.
     cluster_time: Option<u64>,
-    failed: bool,
-    recovery_audio: RecoveryAudio,
     state_coverage_contiguous: bool,
     state_seen: bool,
     webm_vp9_t35: bool,
     envelope: ElementReader,
     segment_end: Option<u64>,
     scan_remaining: Option<u64>,
-    first_cluster: Option<ClusterCheckpoint>,
     last_location: Option<ReplayLocation>,
     loaded: CopyVec<(u64, u64)>,
     seek_targets: CopyVec<(u64, u64)>,
-    subtitle_recovery: Option<SubtitleRecovery>,
     replay_prefix: Option<ReplayPrefix>,
     configuration: Option<Configuration>,
     catalogue: Catalogue,
@@ -217,22 +287,22 @@ pub struct Reader {
     revision: u64,
     metadata_used: usize,
     demux_read_bytes: u64,
-    seek_metadata_bytes: u64,
     adapter_storage: usize,
     // An allocation-free negative proof: normal sequential parsing has validated
     // every group through this offset. Range jumps never extend this prefix.
     state_coverage_end: u64,
-    // An immutable source's root, lent by the blocking adapter for one seek
-    // poll and never retained across polls.
-    owned_root: Option<triergon_core::Bytes>,
     seek_index: Option<Box<seek_index::ImmutableSeekIndex>>,
-    opening: Option<Opening>,
-    pending_seek: Option<SeekRequest>,
-    epoch_reference: Option<EpochReference>,
-    pressure: Option<crate::storage::usage::Pressure>,
-    resolver: Option<Resolver>,
-    seek_stage: SeekStage,
     state: State,
+}
+
+/// Retained format jobs on the envelope's one InputCursor. Every lace
+/// and checksum in a packet batch validates before its first packet is emitted.
+#[derive(Debug)]
+#[repr(C)]
+pub struct Reader {
+    stream: Stream,
+    control: Control,
+    gate: Gate,
 }
 
 /// A [`Reader`] that also admits WebM VP9's implicit ITU-T T.35 addition
@@ -247,8 +317,69 @@ pub fn new_reader(
     maximum_window: usize,
 ) -> Result<Reader> {
     let mut reader = Reader::new(pool, source, capabilities, limits, maximum_window)?;
-    reader.webm_vp9_t35 = true;
+    reader.stream.webm_vp9_t35 = true;
     Ok(reader)
+}
+
+/// One step of adding up the storage the reader holds.
+fn assess(
+    pressure: &mut Pressure,
+    stream: &Stream,
+    control: &Control,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+    source: Option<&dyn Storage>,
+) -> Result<ParseStep<()>> {
+    let graph = Graph { stream, control };
+    match source {
+        Some(source) => pressure.step(
+            &crate::storage::usage::WithSource {
+                graph: &graph,
+                source,
+            },
+            &stream.pool,
+            work,
+            cancel,
+        ),
+        None => pressure.step(&graph, &stream.pool, work, cancel),
+    }
+}
+
+/// One step of the controller that reads before blocks follow in source order: the
+/// opening check, the opening metadata or a seek.
+#[inline(never)]
+fn step_activity(
+    first: &ClusterCheckpoint,
+    activity: &mut Activity,
+    stream: &mut Stream,
+    root: Option<&triergon_core::Bytes>,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+) -> ReaderStep<Event> {
+    match activity {
+        // Nothing for a controller to do: the next step reads blocks.
+        Activity::Blocks => {}
+        Activity::Opening(opening) => match opening.step(stream, work, cancel)? {
+            Opened::Pending => {}
+            Opened::Blocks => *activity = Activity::Blocks,
+            Opened::Unread => *activity = Activity::Metadata(Resolver::new(&stream.pool)),
+        },
+        Activity::Metadata(resolver) => {
+            if let Some(step) = resolver.step(stream, work, cancel)? {
+                return Ok(step);
+            }
+            begin_blocks(stream, first)?;
+            *activity = Activity::Blocks;
+        }
+        Activity::Seek(seek) => {
+            let result = seek.step(first, stream, root, work, cancel);
+            if matches!(result, Ok(Step::Ready(Event::Seek(_)))) {
+                *activity = Activity::Blocks;
+            }
+            return result;
+        }
+    }
+    Ok(Step::Yield)
 }
 
 impl Reader {
@@ -264,43 +395,35 @@ impl Reader {
         maximum_window: usize,
     ) -> Result<Self> {
         Ok(Self {
-            envelope: ElementReader::new(pool, source, capabilities, limits, maximum_window)?,
-            pool: pool.clone(),
-            limits,
-            state: State::Envelope,
-            failed: false,
-            first_cluster: None,
-            configuration: None,
-            catalogue: Catalogue::new(pool),
-            cues: None,
-            scale: 1_000_000,
-            cluster_time: None,
-            last_location: None,
-            segment_data: 0,
-            segment_end: None,
-            revision: 0,
-            metadata_used: 0,
-            loaded: CopyVec::new(pool),
-            seek_targets: CopyVec::new(pool),
-            opening: None,
-            resolver: None,
-            pending_seek: None,
-            recovery_audio: RecoveryAudio::Overlap,
-            seek_stage: SeekStage::Idle,
-            subtitle_recovery: None,
-            replay_prefix: None,
-            demux_read_bytes: 0,
-            scan_remaining: None,
-            seek_metadata_bytes: 0,
-            pressure: None,
-            adapter_storage: 0,
-            state_coverage_end: 0,
-            owned_root: None,
-            seek_index: None,
-            state_coverage_contiguous: true,
-            state_seen: false,
-            webm_vp9_t35: false,
-            epoch_reference: None,
+            stream: Stream {
+                cluster_time: None,
+                state_coverage_contiguous: true,
+                state_seen: false,
+                webm_vp9_t35: false,
+                envelope: ElementReader::new(pool, source, capabilities, limits, maximum_window)?,
+                segment_end: None,
+                scan_remaining: None,
+                last_location: None,
+                loaded: CopyVec::new(pool),
+                seek_targets: CopyVec::new(pool),
+                replay_prefix: None,
+                configuration: None,
+                catalogue: Catalogue::new(pool),
+                cues: None,
+                pool: pool.clone(),
+                limits,
+                scale: 1_000_000,
+                segment_data: 0,
+                revision: 0,
+                metadata_used: 0,
+                demux_read_bytes: 0,
+                adapter_storage: 0,
+                state_coverage_end: 0,
+                seek_index: None,
+                state: State::Envelope,
+            },
+            control: Control::Head,
+            gate: Gate::Open,
         })
     }
     /// Select an explicit block-payload ownership contract at construction.
@@ -314,7 +437,7 @@ impl Reader {
         policy: crate::storage::PayloadOwnership,
     ) -> Result<Self> {
         let mut reader = Self::new(pool, source, capabilities, limits, maximum_window)?;
-        reader.envelope.set_payload_ownership(policy);
+        reader.stream.envelope.set_payload_ownership(policy);
         Ok(reader)
     }
     /// For a source backed by these exact immutable bytes, remember a bounded
@@ -344,7 +467,7 @@ impl Reader {
             maximum_window,
             crate::storage::PayloadOwnership::SharedBounded,
         )?;
-        reader.seek_index = Some(seek_index::ImmutableSeekIndex::new(
+        reader.stream.seek_index = Some(seek_index::ImmutableSeekIndex::new(
             bytes,
             pool,
             limits.index_entries,
@@ -353,65 +476,64 @@ impl Reader {
     }
     /// The block-payload policy chosen at construction.
     pub fn payload_ownership(&self) -> crate::storage::PayloadOwnership {
-        self.envelope.payload_ownership()
+        self.stream.envelope.payload_ownership()
     }
     /// The source this reader was created for.
     pub fn source(&self) -> SourceId {
-        self.envelope.input().source()
+        self.stream.envelope.input().source()
     }
     /// True until the reader has read or repositioned its input.
     pub fn is_unstarted(&self) -> bool {
-        matches!(self.state, State::Envelope) && self.envelope.input().position() == 0
+        matches!(self.stream.state, State::Envelope) && self.stream.envelope.input().position() == 0
     }
     /// The pool all reader storage is charged to.
     pub fn budget(&self) -> &Budget {
-        &self.pool
+        &self.stream.pool
     }
     /// The current input generation. A seek or reset starts a new one, after which
     /// answers to earlier requests are refused with [`Error::StaleGeneration`].
     pub fn generation(&self) -> u64 {
-        self.envelope.generation()
+        self.stream.generation()
     }
     /// Source byte offset of the next byte the reader reads.
     pub fn position(&self) -> u64 {
-        self.envelope.position()
+        self.stream.position()
     }
     /// The request for the bytes at [`position`](Self::position), with the token an
     /// answer must carry.
     pub fn request(&self) -> InputRequest {
-        self.envelope.request()
+        self.stream.envelope.request()
     }
     /// The source capabilities; `length` becomes known once the caller
     /// [`finish`](Self::finish)es the source.
     pub fn capabilities(&self) -> SourceCapabilities {
-        self.envelope.input_capabilities()
+        self.stream.envelope.input_capabilities()
     }
     /// The current track configuration; `None` until Tracks has been read.
     pub fn configuration(&self) -> Option<&Configuration> {
-        self.configuration.as_ref()
+        self.stream.configuration.as_ref()
     }
     /// The seek in progress, until its [`Event::Seek`] receipt has been returned.
     pub fn pending_seek(&self) -> Option<SeekRequest> {
-        self.pending_seek
+        self.control.seek().map(Seek::request)
     }
     /// The tracks of the current configuration; empty until Tracks has been read.
     pub fn tracks(&self) -> &[crate::track::Track] {
-        self.configuration
-            .as_ref()
-            .map_or(&[], Configuration::tracks)
+        self.stream.tracks()
     }
     /// TimestampScale: nanoseconds per Segment tick; 1000000 until Info sets it.
     pub fn timestamp_scale_ns(&self) -> u64 {
-        self.scale
+        self.stream.scale
     }
     /// The segment-metadata documents read so far, in reading order.
     pub fn catalogue(&self) -> &[SharedDocument] {
-        self.catalogue.documents()
+        self.stream.catalogue.documents()
     }
     /// The attachments of every Attachments document in the
     /// [`catalogue`](Self::catalogue).
     pub fn attachments(&self) -> impl Iterator<Item = Attachment> + '_ {
-        self.catalogue
+        self.stream
+            .catalogue
             .documents()
             .iter()
             .flat_map(SharedDocument::attachments)
@@ -419,30 +541,33 @@ impl Reader {
     /// Whether opening is complete: Tracks read, the first Cluster found and every
     /// metadata element the SeekHead points to resolved.
     pub fn is_ready(&self) -> bool {
-        self.first_cluster.is_some()
-            && !self.tracks().is_empty()
-            && self.opening.is_none()
-            && self.resolver.is_none()
+        !self.tracks().is_empty()
+            && match &self.control {
+                Control::Head => false,
+                Control::Clusters { activity, .. } => match activity {
+                    Activity::Opening(_) | Activity::Metadata(_) => false,
+                    Activity::Blocks => true,
+                    Activity::Seek(seek) => seek.resolver().is_none(),
+                },
+            }
     }
     /// Answers the current [`request`](Self::request) with `window`. A refused window
     /// leaves the reader unchanged: a stale token ([`Error::StaleGeneration`],
     /// [`Error::StaleRequest`]), another source or pool, more bytes than requested
     /// ([`Error::Limit`]), or a window at the wrong offset ([`Error::Invalid`]).
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
-        if let Some(index) = &self.seek_index {
+        if let Some(index) = &self.stream.seek_index {
             index.verify(window)?;
         }
-        self.envelope.provide(window)?;
-        if let Some(pressure) = &self.pressure {
-            self.pressure = Some(crate::storage::usage::Pressure::new(pressure.requested));
-        }
+        self.stream.envelope.provide(window)?;
+        self.restart_assessment();
         Ok(())
     }
     /// Answers the current request with the end of the source. A source that ends
     /// before its known length is [`Error::Truncated`]; a stale token is refused as
     /// by [`provide`](Self::provide).
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
-        self.envelope.finish(source, token)
+        self.stream.envelope.finish(source, token)
     }
     /// Answers the current request with a failure; later steps return
     /// [`Error::Transport`] or [`Error::Cancelled`] to match it.
@@ -452,46 +577,38 @@ impl Reader {
         token: InputToken,
         failure: SourceFailure,
     ) -> Result<()> {
-        self.envelope.fail(source, token, failure)
+        self.stream.envelope.fail(source, token, failure)
     }
     /// Restarts at offset 0 in a new input generation, dropping the configuration,
     /// metadata and seek state, and returns the first request. Packets and documents
     /// the caller holds stay valid and charged.
     pub fn reset(&mut self) -> Result<InputRequest> {
-        let request = self.envelope.reset()?;
-        self.state = State::Envelope;
-        self.failed = false;
-        self.pressure = None;
-        self.first_cluster = None;
-        self.configuration = None;
-        self.catalogue = Catalogue::new(&self.pool);
-        self.cues = None;
-        self.scale = 1_000_000;
-        self.cluster_time = None;
-        self.last_location = None;
-        self.segment_data = 0;
-        self.segment_end = None;
-        self.revision = 0;
-        self.state_coverage_end = 0;
-        if let Some(index) = &mut self.seek_index {
-            index.reset(self.limits.index_entries);
+        let stream = &mut self.stream;
+        let request = stream.envelope.reset()?;
+        stream.state = State::Envelope;
+        self.gate = Gate::Open;
+        self.control = Control::Head;
+        stream.configuration = None;
+        stream.catalogue = Catalogue::new(&stream.pool);
+        stream.cues = None;
+        stream.scale = 1_000_000;
+        stream.cluster_time = None;
+        stream.last_location = None;
+        stream.segment_data = 0;
+        stream.segment_end = None;
+        stream.revision = 0;
+        stream.state_coverage_end = 0;
+        if let Some(index) = &mut stream.seek_index {
+            index.reset(stream.limits.index_entries);
         }
-        self.state_coverage_contiguous = true;
-        self.state_seen = false;
-        self.epoch_reference = None;
-        self.metadata_used = 0;
-        self.loaded = CopyVec::new(&self.pool);
-        self.seek_targets = CopyVec::new(&self.pool);
-        self.opening = None;
-        self.resolver = None;
-        self.pending_seek = None;
-        self.recovery_audio = RecoveryAudio::Overlap;
-        self.seek_stage = SeekStage::Idle;
-        self.subtitle_recovery = None;
-        self.replay_prefix = None;
-        self.scan_remaining = None;
-        self.seek_metadata_bytes = 0;
-        self.demux_read_bytes = 0;
+        stream.state_coverage_contiguous = true;
+        stream.state_seen = false;
+        stream.metadata_used = 0;
+        stream.loaded = CopyVec::new(&stream.pool);
+        stream.seek_targets = CopyVec::new(&stream.pool);
+        stream.replay_prefix = None;
+        stream.scan_remaining = None;
+        stream.demux_read_bytes = 0;
         Ok(request)
     }
     /// One bounded unit of work. `End` is the end of the Segment at the
@@ -499,18 +616,19 @@ impl Reader {
     #[inline]
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> ReaderStep<Event> {
         let result = self.step_projected::<TypedProjection>(work, cancel);
-        if self.state_coverage_contiguous
-            && let Some(index) = &mut self.seek_index
+        let stream = &mut self.stream;
+        if stream.state_coverage_contiguous
+            && let Some(index) = &mut stream.seek_index
             && index.is_collecting()
         {
-            if self.state_seen || self.cues.as_ref().is_some_and(|cues| !cues.is_empty()) {
+            if stream.state_seen || stream.cues.as_ref().is_some_and(|cues| !cues.is_empty()) {
                 index.discard();
             } else {
                 match &result {
                     Ok(Step::Ready(Event::Packet(packet))) => {
                         if packet.configuration.tracks()[packet.packet.track].kind
                             == crate::track::Track::VIDEO
-                            && let Some(location) = &self.last_location
+                            && let Some(location) = &stream.last_location
                         {
                             index.observe(packet, location.cluster_offset(), work);
                         }
@@ -528,92 +646,188 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> ReaderStep<D::Event> {
-        self.step_projected_with_source::<D>(work, cancel, None)
+        self.step_projected_with_source::<D>(work, cancel, None, None)
     }
+    /// One step with what a blocking adapter over an immutable source lends for it:
+    /// `source`, the storage it holds, for the storage assessment, and `root`, its
+    /// bytes, for a seek that restores state from them.
     #[inline]
     fn step_projected_with_source<D: PacketProjection>(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        source: Option<&dyn crate::storage::usage::Storage>,
+        source: Option<&dyn Storage>,
+        root: Option<&triergon_core::Bytes>,
     ) -> ReaderStep<D::Event> {
-        let result = (|| {
-            self.envelope.healthy_for_job(work, cancel)?;
-            if self.failed {
+        if let Err(error) = self.stream.envelope.healthy_for_job(work, cancel) {
+            self.latch_failure();
+            return Err(error);
+        }
+        match &self.gate {
+            Gate::Open => {}
+            Gate::Assessing(_) => {
+                let result = self.continue_assessment(work, cancel, source);
+                if result.is_err() {
+                    self.latch_failure();
+                }
+                return result;
+            }
+            Gate::Failed => {
                 return Err(Error::Invalid(
                     "reader requires explicit seek/reset after error",
                 ));
             }
-            if self.pressure.is_some() {
-                return D::progress(self.step_pressure(work, cancel, source));
+        }
+        // The step is written into the place it is returned from: its common
+        // outcomes, a packet or a yield, are inspected there and not moved.
+        let mut result = match &mut self.control {
+            Control::Clusters {
+                activity: Activity::Blocks,
+                ..
+            } => {
+                let result = self
+                    .stream
+                    .step_demux_after_health_check::<D>(work, cancel, None, false);
+                self.stream.cover(&result);
+                result
             }
-            let result = if self.resolver.is_some() {
-                D::progress(self.step_resolver(work, cancel))
-            } else if self.opening.is_some() {
-                D::progress(self.step_opening(work, cancel))
-            } else if self.pending_seek.is_some() {
-                D::progress(self.step_seeking(work, cancel))
-            } else {
-                let result = self.step_demux_after_health_check::<D>(work, cancel, None, false);
-                if self.state_coverage_contiguous && matches!(result, Ok(Step::Ready(_))) {
-                    self.state_coverage_end = self.state_coverage_end.max(self.envelope.position());
+            Control::Head => {
+                let result = self
+                    .stream
+                    .step_demux_after_health_check::<D>(work, cancel, None, false);
+                self.stream.cover(&result);
+                if self.stream.envelope.in_cluster() {
+                    self.enter_clusters();
                 }
                 result
-            };
-            match result {
-                Err(Error::Backpressure(Backpressure { requested, .. }))
-                | Ok(Step::Backpressure(Backpressure { requested, .. })) => {
-                    self.allocation_blocked(requested);
-                    D::progress(self.step_pressure(work, cancel, source))
-                }
-                Ok(Step::NeedInput(request)) => D::progress(self.canonical_input_hint(request)),
-                other => other,
             }
-        })();
+            Control::Clusters { first, activity } => D::progress(step_activity(
+                first,
+                activity,
+                &mut self.stream,
+                root,
+                work,
+                cancel,
+            )),
+        };
+        match &mut result {
+            Ok(Step::NeedInput(request)) => {
+                if let Err(error) = self.widen_input_request(request) {
+                    result = Err(error);
+                }
+            }
+            Err(Error::Backpressure(Backpressure { requested, .. }))
+            | Ok(Step::Backpressure(Backpressure { requested, .. })) => {
+                let requested = *requested;
+                result = self.begin_assessment(requested, work, cancel, source);
+            }
+            _ => {}
+        }
         if result.is_err() {
-            self.failed = true;
+            self.latch_failure();
         }
         result
+    }
+    /// The stream has reached its first Cluster: the controllers start from it.
+    #[cold]
+    #[inline(never)]
+    fn enter_clusters(&mut self) {
+        if let Some(first) = self.stream.envelope.cluster_checkpoint() {
+            self.control = Control::Clusters {
+                first,
+                activity: Activity::Opening(Opening::new()),
+            };
+        }
+    }
+    /// The first step of the storage assessment that follows a refused allocation
+    /// of `requested` bytes; the assessment stays at the gate until it is complete.
+    #[cold]
+    #[inline(never)]
+    fn begin_assessment<U>(
+        &mut self,
+        requested: usize,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        source: Option<&dyn Storage>,
+    ) -> ReaderStep<U> {
+        self.stream.forget_seek_index();
+        let mut pressure = Pressure::new(requested);
+        match assess(
+            &mut pressure,
+            &self.stream,
+            &self.control,
+            work,
+            cancel,
+            source,
+        )? {
+            ParseStep::Event(()) => Ok(Step::Yield),
+            step => {
+                self.gate = Gate::Assessing(pressure);
+                step.waiting()
+            }
+        }
+    }
+    /// One more step of the storage assessment at the gate.
+    #[cold]
+    #[inline(never)]
+    fn continue_assessment<U>(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+        source: Option<&dyn Storage>,
+    ) -> ReaderStep<U> {
+        let Gate::Assessing(pressure) = &mut self.gate else {
+            return Ok(Step::Yield);
+        };
+        match assess(pressure, &self.stream, &self.control, work, cancel, source)? {
+            ParseStep::Event(()) => {
+                self.gate = Gate::Open;
+                Ok(Step::Yield)
+            }
+            step => step.waiting(),
+        }
     }
     // The ordinary reader and the blocking adapter use this header policy.
     // Seek and metadata transactions have separate refill boundaries.
     fn ordinary_header_refill(
         &self,
     ) -> Result<Option<crate::element::refill::HeaderRefillRequest>> {
-        if self.resolver.is_some()
-            || self.opening.is_some()
-            || self.pending_seek.is_some()
-            || !matches!(self.seek_stage, SeekStage::Idle)
-            || self.scan_remaining.is_some()
-            || !matches!(&self.state, State::Envelope)
+        let stream = &self.stream;
+        if !self.control.in_source_order()
+            || stream.scan_remaining.is_some()
+            || !matches!(&stream.state, State::Envelope)
         {
             return Ok(None);
         }
-        let Some(exact) = self.envelope.exact_header_request() else {
+        let Some(exact) = stream.envelope.exact_header_request() else {
             return Ok(None);
         };
-        self.envelope.bounded_header_refill(&exact, 4096)
+        stream.envelope.bounded_header_refill(&exact, 4096)
     }
-    fn canonical_input_hint(&self, request: InputRequest) -> ReaderStep<Event> {
+    /// Widens the request a step is about to return to the canonical refill: a
+    /// header may be answered with up to 4096 bytes, and over an immutable source a
+    /// seek's reads may reach as far as its scan allows.
+    fn widen_input_request(&self, request: &mut InputRequest) -> Result<()> {
         let mut plan = self.ordinary_header_refill()?;
-        if plan.is_none() && self.seek_index.is_some() {
+        if plan.is_none() && self.stream.seek_index.is_some() {
             // These windows are checked against the immutable source. Read
             // ahead within the same scan/parent bounds as the blocking adapter.
             plan = if self.needs_header_input() {
-                self.blocking_seek_header_refill(&request)?
+                self.blocking_seek_header_refill(request)?
             } else if self.needs_discard_input() {
-                self.blocking_seek_discard_refill(&request)?
+                self.blocking_seek_discard_refill(request)?
             } else {
                 None
             };
         }
         let Some(plan) = plan else {
-            return Ok(Step::NeedInput(request));
+            return Ok(());
         };
-        if !plan.matches_exact(&request) {
+        if !plan.matches_exact(request) {
             return Err(Error::Invalid("canonical refill request identity changed"));
         }
-        Ok(Step::NeedInput(plan.expanded().clone()))
+        request.clone_from(plan.expanded());
+        Ok(())
     }
     // This validates an already issued canonical hint; it cannot widen it.
     // The adapter may supply a short prefix under pre-read pressure, exactly
@@ -631,6 +845,20 @@ impl Reader {
         Ok(Some(plan))
     }
 
+    /// How many bytes past `request` a seek's scan or state reconstruction lets an
+    /// input answer reach; `None` outside those stages and at their stop offset.
+    fn seek_read_ahead(&self, request: &InputRequest) -> Result<Option<usize>> {
+        let Some(seek) = self.control.seek() else {
+            return Ok(None);
+        };
+        Ok(match seek.read_ahead(&self.stream)? {
+            ReadAhead::Exact => None,
+            ReadAhead::Free => Some(usize::MAX),
+            ReadAhead::Until(stop) => stop
+                .checked_sub(request.offset)
+                .map(|left| usize::try_from(left).unwrap_or(usize::MAX)),
+        })
+    }
     // Engine-only supply certificate, separate from the public canonical
     // NeedInput and the ordinary refill policy. This expanded response policy is
     // an explicit new blocking seek contract, not an ordinary-hint override.
@@ -638,28 +866,12 @@ impl Reader {
         &self,
         request: &InputRequest,
     ) -> Result<Option<crate::element::refill::HeaderRefillRequest>> {
-        if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
+        let Some(left) = self.seek_read_ahead(request)? else {
             return Ok(None);
-        }
-        let stop = match &self.seek_stage {
-            SeekStage::Scan(scan) => scan.read_ahead_stop(),
-            SeekStage::Epoch(_) => {
-                let State::Epoch(job) = &self.state else {
-                    return Err(Error::Invalid("missing active epoch"));
-                };
-                Some(job.read_ahead_stop())
-            }
-            // Cue validation and metadata ranges retain their exact path.
-            _ => return Ok(None),
         };
-        let mut maximum = 4096;
-        if let Some(stop) = stop {
-            let Some(left) = stop.checked_sub(request.offset) else {
-                return Ok(None);
-            };
-            maximum = maximum.min(usize::try_from(left).unwrap_or(usize::MAX));
-        }
-        self.envelope.bounded_header_refill(request, maximum)
+        self.stream
+            .envelope
+            .bounded_header_refill(request, left.min(4096))
     }
     // The same engine-only certificate for a discarded body: bounded by the
     // active stop, parent/source ends and scan allowance. Immutable sources only.
@@ -667,84 +879,89 @@ impl Reader {
         &self,
         request: &InputRequest,
     ) -> Result<Option<crate::element::refill::HeaderRefillRequest>> {
-        if self.pending_seek.is_none() || self.resolver.is_some() || self.opening.is_some() {
+        let Some(left) = self.seek_read_ahead(request)? else {
             return Ok(None);
-        }
-        let stop = match &self.seek_stage {
-            SeekStage::Scan(scan) => scan.read_ahead_stop(),
-            SeekStage::Epoch(_) => {
-                let State::Epoch(job) = &self.state else {
-                    return Err(Error::Invalid("missing active epoch"));
-                };
-                Some(job.read_ahead_stop())
-            }
-            _ => return Ok(None),
         };
-        let mut maximum = usize::MAX;
-        if let Some(stop) = stop {
-            let Some(left) = stop.checked_sub(request.offset) else {
-                return Ok(None);
-            };
-            maximum = usize::try_from(left).unwrap_or(usize::MAX);
-        }
-        self.envelope.bounded_discard_refill(request, maximum)
+        self.stream.envelope.bounded_discard_refill(request, left)
     }
 
     fn needs_header_input(&self) -> bool {
-        self.resolver.as_ref().map_or_else(
-            || self.envelope.needs_header_input(),
+        self.control.resolver().map_or_else(
+            || self.stream.envelope.needs_header_input(),
             Resolver::needs_header_input,
         )
     }
     fn needs_discard_input(&self) -> bool {
-        self.resolver.is_none() && self.envelope.needs_discard_input()
+        self.control.resolver().is_none() && self.stream.envelope.needs_discard_input()
     }
+    /// Whether a step failed and no seek or reset has followed.
+    fn failed(&self) -> bool {
+        matches!(self.gate, Gate::Failed)
+    }
+    /// Closes the gate after a failure: of a step, or of the blocking adapter's input.
+    #[cold]
+    #[inline(never)]
+    fn latch_failure(&mut self) {
+        self.gate = Gate::Failed;
+    }
+    /// Starts the storage assessment for an allocation of `requested` bytes that the
+    /// blocking adapter was refused.
     fn allocation_blocked(&mut self, requested: usize) {
+        self.stream.forget_seek_index();
+        if !self.failed() {
+            self.gate = Gate::Assessing(Pressure::new(requested));
+        }
+    }
+    /// An assessment in progress starts over: the storage it was adding up changed.
+    fn restart_assessment(&mut self) {
+        if let Gate::Assessing(pressure) = &mut self.gate {
+            *pressure = Pressure::new(pressure.requested);
+        }
+    }
+    fn set_adapter_storage(&mut self, bytes: usize) {
+        if self.stream.adapter_storage != bytes {
+            self.stream.adapter_storage = bytes;
+            self.restart_assessment();
+        }
+    }
+}
+
+impl Stream {
+    fn generation(&self) -> u64 {
+        self.envelope.generation()
+    }
+    fn position(&self) -> u64 {
+        self.envelope.position()
+    }
+    fn tracks(&self) -> &[crate::track::Track] {
+        self.configuration
+            .as_ref()
+            .map_or(&[], Configuration::tracks)
+    }
+    /// The track configuration; the input's error until Tracks is read.
+    fn configuration(&self) -> Result<&Configuration> {
+        self.configuration.as_ref().required("missing Tracks")
+    }
+    /// Where the block of the packet just returned lies.
+    fn block_location(&self) -> Result<&ReplayLocation> {
+        self.last_location
+            .as_ref()
+            .required("missing scanned block location")
+    }
+    /// Extends the proof that sequential reading met no CodecState up to the input
+    /// position, after a step that returned an event.
+    #[inline(always)]
+    fn cover<T>(&mut self, result: &ReaderStep<T>) {
+        if self.state_coverage_contiguous && matches!(result, Ok(Step::Ready(_))) {
+            self.state_coverage_end = self.state_coverage_end.max(self.envelope.position());
+        }
+    }
+    /// Drops the keyframe index of an immutable source when storage runs short.
+    fn forget_seek_index(&mut self) {
         if let Some(index) = &mut self.seek_index
             && (index.is_collecting() || index.is_complete())
         {
             index.discard();
-        }
-        self.pressure = Some(crate::storage::usage::Pressure::new(requested));
-    }
-    fn set_adapter_storage(&mut self, bytes: usize) {
-        if self.adapter_storage != bytes {
-            self.adapter_storage = bytes;
-            if let Some(pressure) = &self.pressure {
-                self.pressure = Some(crate::storage::usage::Pressure::new(pressure.requested));
-            }
-        }
-    }
-    fn step_pressure(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-        source: Option<&dyn crate::storage::usage::Storage>,
-    ) -> ReaderStep<Event> {
-        let mut pressure = self
-            .pressure
-            .take()
-            .required("missing storage assessment")?;
-        let result = if let Some(source) = source {
-            pressure.step(
-                &crate::storage::usage::WithSource {
-                    graph: self,
-                    source,
-                },
-                &self.pool,
-                work,
-                cancel,
-            )
-        } else {
-            pressure.step(self, &self.pool, work, cancel)
-        };
-        match result {
-            Ok(ParseStep::Event(())) => Ok(Step::Yield),
-            Ok(step) => {
-                self.pressure = Some(pressure);
-                step.waiting()
-            }
-            Err(error) => Err(error),
         }
     }
     /// The element reader's step that carries no event, as the reader's step: the
@@ -1105,10 +1322,6 @@ impl Reader {
                                 }
                                 if header.id == CLUSTER {
                                     self.cluster_time = None;
-                                    if self.first_cluster.is_none() {
-                                        self.first_cluster = self.envelope.cluster_checkpoint();
-                                        self.opening = Some(Opening::new());
-                                    }
                                 }
                                 return Ok(Step::Ready(D::envelope(ElementEvent::Start(header))?));
                             }
@@ -1524,7 +1737,7 @@ impl Reader {
 }
 
 crate::storage::usage::storage!(Admission, |s| [s.catalogue]);
-impl crate::storage::usage::Storage for State {
+impl Storage for State {
     fn storage_slots(&self) -> Result<usize> {
         use crate::storage::usage::{Storage, slots};
         match self {
@@ -1564,20 +1777,60 @@ impl crate::storage::usage::Storage for State {
         }
     }
 }
-crate::storage::usage::storage!(Reader, |s| [
-    s.envelope,
-    s.configuration,
-    s.catalogue,
-    s.cues,
-    s.loaded,
-    s.seek_targets,
-    s.state,
-    s.resolver,
-    s.seek_stage.scan(),
-    s.seek_index.as_deref(),
-    s.seek_stage.plan_job(),
-    crate::storage::usage::Charge(s.adapter_storage)
+/// The storage the reader holds, in the order the assessment adds it up.
+struct Graph<'a> {
+    stream: &'a Stream,
+    control: &'a Control,
+}
+crate::storage::usage::storage!(Graph<'_>, |s| [
+    s.stream.envelope,
+    s.stream.configuration,
+    s.stream.catalogue,
+    s.stream.cues,
+    s.stream.loaded,
+    s.stream.seek_targets,
+    s.stream.state,
+    s.control.resolver(),
+    s.control.seek().and_then(Seek::scan),
+    s.stream.seek_index.as_deref(),
+    s.control.seek().and_then(Seek::plan_job),
+    crate::storage::usage::Charge(s.stream.adapter_storage)
 ]);
+impl Storage for Reader {
+    fn storage_slots(&self) -> Result<usize> {
+        Graph {
+            stream: &self.stream,
+            control: &self.control,
+        }
+        .storage_slots()
+    }
+    fn storage_owner(&self, index: usize) -> Result<Option<crate::storage::usage::Owner>> {
+        Graph {
+            stream: &self.stream,
+            control: &self.control,
+        }
+        .storage_owner(index)
+    }
+}
+
+#[cfg(test)]
+impl Reader {
+    /// The seek in progress.
+    fn seek(&self) -> Option<&Seek> {
+        self.control.seek()
+    }
+    /// The first Cluster, once the stream has reached it.
+    fn first_cluster(&self) -> Option<&ClusterCheckpoint> {
+        match &self.control {
+            Control::Head => None,
+            Control::Clusters { first, .. } => Some(first),
+        }
+    }
+    /// Whether a storage assessment is in progress.
+    fn assessing(&self) -> bool {
+        matches!(self.gate, Gate::Assessing(_))
+    }
+}
 
 #[cfg(test)]
 mod tests;

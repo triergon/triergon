@@ -172,7 +172,7 @@ fn run(raw: &[u8], quantum: u64, chunk: usize, shared: bool) -> (Vec<Vec<u8>>, O
             r.position(),
             work.spent(),
             pool.used(),
-            r.state.storage_slots().unwrap(),
+            r.stream.state.storage_slots().unwrap(),
             event
         ));
         match step {
@@ -354,7 +354,7 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Option<Result<ParseStep<()>>> {
-        match &mut self.state {
+        match &mut self.stream.state {
             State::Packet(job) => Some(job.step_ready(None, work, cancel)),
             State::Simple(job) => Some(job.step_ready(None, work, cancel)),
             _ => None,

@@ -23,7 +23,7 @@ fn seek_window_pressure_retry_and_truncation_keep_source_and_owner_facts() {
         let pressure = pool.reserve(pool.available()).unwrap();
         let attempt = reader.seek_for_playback(0, 40_000_000, &cancel);
         assert!(attempt.is_ok() || matches!(&attempt, Err(Error::Backpressure { .. })));
-        assert!(!reader.reader.failed);
+        assert!(!reader.reader.failed());
         let observed = format!("{attempt:?}:used={}", pool.used());
         drop(pressure);
         let receipt = reader.seek_for_playback(0, 40_000_000, &cancel).unwrap();
@@ -100,24 +100,26 @@ fn seek_window_epoch_certificate_keeps_public_hint_and_stops_before_replay() {
         match reader.step(&mut WorkBudget::new(8192), &cancel).unwrap() {
             Step::NeedInput(request) => {
                 if sought
-                    && matches!(reader.seek_stage, SeekStage::Epoch(_))
-                    && request.offset == reader.first_cluster.as_ref().unwrap().offset()
+                    && reader.seek().is_some_and(seeking::Seek::rebuilding_state)
+                    && request.offset == reader.first_cluster().unwrap().offset()
                     && request.maximum == 1
                 {
                     let plan = reader
                         .blocking_seek_header_refill(&request)
                         .unwrap()
                         .expect("new seek engine must offer a real bounded input response");
-                    let stop = reader.last_location.as_ref().unwrap().cluster_offset();
+                    let stop = reader
+                        .stream
+                        .last_location
+                        .as_ref()
+                        .unwrap()
+                        .cluster_offset();
                     assert!(stop > request.offset);
                     assert!(plan.expanded().maximum > request.maximum);
                     assert!(plan.expanded().maximum <= 4096);
                     assert!(plan.expanded().offset + plan.expanded().maximum as u64 <= stop);
-                    let Step::NeedInput(public) =
-                        reader.canonical_input_hint(request.clone()).unwrap()
-                    else {
-                        panic!("canonical request disappeared")
-                    };
+                    let mut public = request.clone();
+                    reader.widen_input_request(&mut public).unwrap();
                     assert_eq!(public.source, request.source);
                     assert_eq!(public.token, request.token);
                     assert_eq!(public.offset, request.offset);
@@ -186,7 +188,7 @@ fn scan_projection_public_work_trace_and_held_alias_survive_seek() {
             for turn in 0..50_000 {
                 let allowance = if turn % 3 == 0 { 0 } else { quantum };
                 let mut work = WorkBudget::new(allowance);
-                let before = reader.envelope.position();
+                let before = reader.stream.envelope.position();
                 let step = reader.step(&mut work, &cancel).unwrap();
                 assert!(work.spent() <= allowance);
                 let item = match step {
@@ -240,7 +242,7 @@ fn scan_projection_public_work_trace_and_held_alias_survive_seek() {
                     Step::End(_) => {
                         tape.push(format!(
                             "F:{before}:{}:{}:{}",
-                            reader.envelope.position(),
+                            reader.stream.envelope.position(),
                             work.spent(),
                             pool.used()
                         ));
@@ -249,7 +251,7 @@ fn scan_projection_public_work_trace_and_held_alias_survive_seek() {
                 };
                 tape.push(format!(
                     "{item}:{before}:{}:{}:{}",
-                    reader.envelope.position(),
+                    reader.stream.envelope.position(),
                     work.spent(),
                     pool.used()
                 ));
@@ -289,7 +291,7 @@ fn scan_projection_pressure_retry_keeps_both_caller_aliases_and_configuration() 
         let pressure = pool.reserve(pool.available()).unwrap();
         let attempt = reader.seek_for_playback(0, 40_000_000, &cancel);
         assert!(attempt.is_ok() || matches!(&attempt, Err(Error::Backpressure { .. })));
-        assert!(!reader.reader.failed);
+        assert!(!reader.reader.failed());
         let observed = format!("{attempt:?}:{}", pool.used());
         drop(pressure);
         let receipt = reader.seek_for_playback(0, 40_000_000, &cancel).unwrap();

@@ -17,6 +17,7 @@ fn admitted_body(pool: &Budget) -> Reader {
     .unwrap();
     let request = reader.request();
     reader
+        .stream
         .envelope
         .range_input()
         .provide_inline(
@@ -27,6 +28,7 @@ fn admitted_body(pool: &Budget) -> Reader {
         )
         .unwrap();
     let result = reader
+        .stream
         .envelope
         .step_typed_compact(&mut WorkBudget::new(64), &AtomicBool::new(false))
         .unwrap();
@@ -34,11 +36,13 @@ fn admitted_body(pool: &Budget) -> Reader {
         panic!("missing exact admission {result:?}")
     };
     reader
+        .stream
         .envelope
         .admit_typed_leaf(header, None, false)
         .unwrap();
     let request = reader.request();
     reader
+        .stream
         .envelope
         .range_input()
         .provide_inline(request.source, request.token, request.offset, b"abc")
@@ -52,19 +56,19 @@ fn compact_controller_late_counter_overflow_drops_new_ready_leaf_before_error() 
     let mut reader = admitted_body(&pool);
     // Exercise the existing checked controller debit after real leaf completion.
     // The source bytes/header/work still pass through the actual parser.
-    reader.scan_remaining = Some(u64::MAX);
-    reader.demux_read_bytes = u64::MAX;
+    reader.stream.scan_remaining = Some(u64::MAX);
+    reader.stream.demux_read_bytes = u64::MAX;
     assert!(matches!(
         reader.step(&mut WorkBudget::new(8192), &AtomicBool::new(false)),
         Err(Error::Overflow)
     ));
     assert_eq!(reader.position(), 8);
-    assert!(reader.failed);
+    assert!(reader.failed());
     assert_eq!(pool.used(), baseline);
     // Error priority consumed the ready owner, exactly like dropping old progress.
     // The envelope had already completed the leaf and may now request a header.
     assert!(
-        matches!(reader.envelope.step_typed_compact(&mut WorkBudget::new(0),&AtomicBool::new(false)).unwrap(),CompactEnvelopeProgress::Step(ParseStep::NeedInput(request)) if request.offset==8 && request.maximum==1)
+        matches!(reader.stream.envelope.step_typed_compact(&mut WorkBudget::new(0),&AtomicBool::new(false)).unwrap(),CompactEnvelopeProgress::Step(ParseStep::NeedInput(request)) if request.offset==8 && request.maximum==1)
     );
     reader.reset().unwrap();
     assert_eq!(pool.used(), baseline);
@@ -74,7 +78,7 @@ fn compact_controller_read_limit_keeps_unpublished_body_owner_until_reset() {
     let pool = Budget::new(4096).unwrap();
     let baseline = pool.used();
     let mut reader = admitted_body(&pool);
-    reader.scan_remaining = Some(0);
+    reader.stream.scan_remaining = Some(0);
     assert!(matches!(
         reader.step(&mut WorkBudget::new(8192), &AtomicBool::new(false)),
         Err(Error::Policy("operation read bytes"))

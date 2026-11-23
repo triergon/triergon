@@ -135,7 +135,7 @@ fn original_next(
         .as_ref()
         .is_some_and(|group| group.additions().len() != 0 || group.codec_state().is_some())
     {
-        reader.reader.failed = true;
+        reader.reader.latch_failure();
         return Err(Error::Unsupported(
             "Block additions/CodecState require next_typed_packet",
         ));
@@ -175,8 +175,11 @@ fn compare_all(raw: Vec<u8>, short: usize, fail_at: Option<u64>) {
         }
     }
     assert_eq!(*old_io.borrow(), *new_io.borrow());
-    assert_eq!(old.reader.state_coverage_end, new.reader.state_coverage_end);
-    assert_eq!(old.reader.failed, new.reader.failed);
+    assert_eq!(
+        old.reader.stream.state_coverage_end,
+        new.reader.stream.state_coverage_end
+    );
+    assert_eq!(old.reader.failed(), new.reader.failed());
     assert_eq!(old.reader.position(), new.reader.position());
 }
 #[test]
@@ -233,15 +236,18 @@ fn legacy_projection_refusal_keeps_following_seek_io_receipt_and_source_state() 
             "Block additions/CodecState require next_typed_packet"
         ))
     ));
-    assert_eq!(old.reader.state_coverage_end, new.reader.state_coverage_end);
-    assert!(new.reader.failed);
+    assert_eq!(
+        old.reader.stream.state_coverage_end,
+        new.reader.stream.state_coverage_end
+    );
+    assert!(new.reader.failed());
     let a = old.seek_previous(0, 0, &cancel).unwrap();
     let b = new.seek_previous(0, 0, &cancel).unwrap();
     assert_eq!(format!("{a:?}"), format!("{b:?}"));
     assert_eq!(*old_io.borrow(), *new_io.borrow());
     assert_eq!(
-        old.reader.configuration.as_ref().unwrap().revision(),
-        new.reader.configuration.as_ref().unwrap().revision()
+        old.reader.stream.configuration.as_ref().unwrap().revision(),
+        new.reader.stream.configuration.as_ref().unwrap().revision()
     );
 }
 #[test]
@@ -258,7 +264,7 @@ fn legacy_projection_pending_seek_refusal_is_nonsticky_and_same_seek_can_finish(
         reader.next_packet(&AtomicBool::new(false)),
         Err(Error::Invalid("pending seek must be completed"))
     ));
-    assert!(!reader.reader.failed);
+    assert!(!reader.reader.failed());
     assert_eq!(reader.reader.pending_seek(), Some(request));
     assert_eq!(reader.reader.request().token, token);
     let receipt = reader.seek_previous(0, 0, &AtomicBool::new(false)).unwrap();
@@ -337,14 +343,14 @@ fn quantum<D: PacketProjection>(
         let refill = reader.reader.header_refill_for_request(&request)?;
         let result = if let Some(plan) = refill {
             reader.input.feed_typed_header_refill(
-                reader.reader.envelope.range_input(),
+                reader.reader.stream.envelope.range_input(),
                 &plan,
                 &AtomicBool::new(false),
                 reader.seek.map(|(reposition, _)| reposition),
             )
         } else {
             reader.input.feed_typed_request(
-                reader.reader.envelope.range_input(),
+                reader.reader.stream.envelope.range_input(),
                 &request,
                 header,
                 &AtomicBool::new(false),
@@ -365,7 +371,7 @@ fn quantum<D: PacketProjection>(
 fn paused_plain<D: PacketProjection>() -> BlockingReader<Recorded> {
     let (mut reader, _) = open(plain(), 1, None);
     for _ in 0..100000 {
-        if matches!(&reader.reader.state, State::Simple(_)) {
+        if matches!(&reader.reader.stream.state, State::Simple(_)) {
             return reader;
         }
         let _ = quantum::<D>(&mut reader, 1).unwrap();
@@ -376,16 +382,16 @@ fn paused_plain<D: PacketProjection>() -> BlockingReader<Recorded> {
 fn legacy_projection_omits_only_unused_plain_snapshot_and_preserves_typed_owner_graph() {
     let legacy = paused_plain::<LegacyProjection>();
     let typed = paused_plain::<TypedProjection>();
-    let State::Simple(a) = &legacy.reader.state else {
+    let State::Simple(a) = &legacy.reader.stream.state else {
         panic!("missing legacy simple")
     };
-    let State::Simple(b) = &typed.reader.state else {
+    let State::Simple(b) = &typed.reader.stream.state else {
         panic!("missing typed simple")
     };
     assert!(!snapshot_slot(a));
     assert!(snapshot_slot(b));
     assert_eq!(legacy.reader.tracks().len(), typed.reader.tracks().len());
-    assert!(legacy.reader.configuration.is_some());
+    assert!(legacy.reader.stream.configuration.is_some());
     assert_eq!(size_of::<SimplePacketJob>(), size_of_val(a));
 }
 #[test]
@@ -398,12 +404,12 @@ fn legacy_projection_switch_during_real_pressure_does_not_change_walk_graph_befo
     for units in [0, 1, 1, 1, 7, 8192] {
         let step = quantum::<TypedProjection>(&mut reader, units).unwrap();
         assert!(matches!(step, Step::Yield | Step::Backpressure(_)));
-        if let State::Simple(job) = &reader.reader.state {
+        if let State::Simple(job) = &reader.reader.stream.state {
             assert!(!snapshot_slot(job));
         } else {
             panic!("pressure replaced plain job");
         }
-        if reader.reader.pressure.is_none() {
+        if !reader.reader.assessing() {
             break;
         }
     }
@@ -423,13 +429,13 @@ fn legacy_projection_borrowed_lace_promotion_restores_owned_full_snapshot() {
     ]);
     let (mut reader, _) = open(raw, 1, None);
     for _ in 0..100000 {
-        if let State::Packet(job) = &reader.reader.state {
+        if let State::Packet(job) = &reader.reader.stream.state {
             assert!(job.storage_slots().unwrap() > 0);
             break;
         }
         let _ = quantum::<LegacyProjection>(&mut reader, 1).unwrap();
     }
-    assert!(matches!(reader.reader.state, State::Packet(_)));
+    assert!(matches!(reader.reader.stream.state, State::Packet(_)));
     let packet = reader
         .next_typed_packet(&AtomicBool::new(false))
         .unwrap()
@@ -543,9 +549,12 @@ fn legacy_projection_additions_refusal_preserves_noninitial_cue_zero_state_epoch
             "Block additions/CodecState require next_typed_packet"
         ))
     ));
-    assert!(!old.reader.state_seen);
-    assert!(!new.reader.state_seen);
-    assert_eq!(old.reader.state_coverage_end, new.reader.state_coverage_end);
+    assert!(!old.reader.stream.state_seen);
+    assert!(!new.reader.stream.state_seen);
+    assert_eq!(
+        old.reader.stream.state_coverage_end,
+        new.reader.stream.state_coverage_end
+    );
     let a = old.seek_previous(0, 11_000_000, &cancel).unwrap();
     let b = new.seek_previous(0, 11_000_000, &cancel).unwrap();
     assert!(a.used_index && b.used_index);
