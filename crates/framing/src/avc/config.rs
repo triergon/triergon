@@ -634,9 +634,10 @@ impl AvcConfigParser {
                                 self.understood_end = end;
                                 self.phase = Phase::Reserve(prefix);
                             } else {
-                                if end != self.understood_end || nals.len() != self.total {
-                                    return Err(Error::Invalid("AVC second walk"));
-                                }
+                                // The second walk reads the same immutable record.
+                                debug_assert!(
+                                    end == self.understood_end && nals.len() == self.total
+                                );
                                 return Ok(Walked::Ready(prefix));
                             }
                         }
@@ -655,9 +656,7 @@ impl AvcConfigParser {
                         if cancel.load(Ordering::Relaxed) {
                             return Err(Error::Cancelled);
                         }
-                        if nals.len() != self.total {
-                            return Err(Error::Invalid("AVC second walk"));
-                        }
+                        debug_assert_eq!(nals.len(), self.total);
                         return Ok(Walked::Ready(prefix));
                     }
                     nals.clear_inline();

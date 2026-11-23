@@ -559,12 +559,11 @@ impl HvcConfigParser {
                         Event::ArrayEnd(end)
                             if filling || tables_fit_inline(self.scan.array_count, self.total) =>
                         {
-                            // The array the walk is in ends with the NAL units read.
-                            match arrays.as_mut_slice().last_mut() {
-                                Some(array) if array.nal_indices().end == nals.len() => {
-                                    array.range.end = end;
-                                }
-                                _ => return Err(Error::Invalid("hvcC array second walk")),
+                            // The array the walk is in ends with the NAL units read;
+                            // its header event came first.
+                            if let Some(array) = arrays.as_mut_slice().last_mut() {
+                                debug_assert_eq!(array.nal_indices().end, nals.len());
+                                array.range.end = end;
                             }
                         }
                         Event::End(end) => {
@@ -589,12 +588,12 @@ impl HvcConfigParser {
                                 check_limit(minimum, limit)?;
                                 self.phase = Phase::ReserveArrays(fields);
                             } else {
-                                if end != self.understood_end
-                                    || nals.len() != self.total
-                                    || arrays.len() != usize::from(next.array_count)
-                                {
-                                    return Err(Error::Invalid("hvcC second walk"));
-                                }
+                                // The second walk reads the same immutable record.
+                                debug_assert!(
+                                    end == self.understood_end
+                                        && nals.len() == self.total
+                                        && arrays.len() == usize::from(next.array_count)
+                                );
                                 return Ok(Walked::Ready(fields));
                             }
                         }
