@@ -131,11 +131,12 @@ fn ts_source(input: &[u8]) -> triergon::Result<Source> {
                 PesProgress::NeedPacket => return Err(Error::Invalid("DVB PES parser stalled")),
             }
         };
-        // DTS only where the PES header codes one, as the Matroska path reports it
-        // only where the block does.
+        // DTS only where the PES header codes one (the demux clock places a PTS-only
+        // header's PTS as its DTS), as the Matroska path reports it only where the
+        // block does.
         let timing = PacketTiming {
             pts: unit.codec_pts().map(clock_value),
-            dts: dts.map(clock_value),
+            dts: packet.dts_raw33.and(dts).map(clock_value),
             duration: None,
         };
         packets.push(service.packet(&pool, unit.codec(), timing, identity(sequence))?);
