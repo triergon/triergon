@@ -230,8 +230,10 @@ Limits of the reader:
   and `Reader::movie_box`.
 - External data references and media outside an `mdat` are refused; only a `url `
   entry flagged self-contained counts as this file. An empty `traf` fails the open.
-- A fragment without `tfdt` has `None` times and cannot be a seek landing. Times
-  beyond `i64` fail with `Error::Overflow`.
+- A fragment without `tfdt` starts where its track's preceding samples end: the
+  preceding fragment, or the `moov` table (zero when it is empty). After a fragment
+  whose times are unknown its times are unknown too, and it cannot be a seek landing.
+  Times beyond `i64` fail with `Error::Overflow`.
 - Encrypted entries (`encv`, `enca`), unwalkable QuickTime `mp4a` layouts and object
   types other than AAC or DTS with a core report `CodecId::Other`.
 

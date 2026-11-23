@@ -339,6 +339,31 @@ fn a_fragment_without_tfdt_continues_the_preceding_track_clock() {
 }
 
 #[test]
+fn a_first_fragment_without_tfdt_starts_where_the_movie_table_ends() {
+    // With its `tfdt` renamed, the first fragment follows an empty `stts`: its decode
+    // time is the sum of no durations, zero, and the second fragment continues from it.
+    let mut file = include_bytes!("fixtures/f-no-second-tfdt.mp4").to_vec();
+    let tfdt = file.windows(4).position(|bytes| bytes == b"tfdt").unwrap();
+    file[tfdt..tfdt + 4].copy_from_slice(b"free");
+    let pool = Budget::new(16 << 20).unwrap();
+    for (work, bytes) in [(3, 5), (1 << 20, 1), (1 << 20, 1 << 16)] {
+        let mut reader = open(&pool, &file);
+        let reading = read(&mut reader, &pool, &file, work, bytes).unwrap();
+        let times = reading
+            .packets
+            .iter()
+            .map(|packet| (packet.dts(), packet.pts()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            times,
+            (0..6)
+                .map(|index| (Some(index * 1000), Some(index * 1000)))
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
+#[test]
 fn tracks_appear_only_once_the_movie_is_open() {
     let file = include_bytes!("fixtures/encoded-config/creation-all.mp4");
     let pool = Budget::new(16 << 20).unwrap();

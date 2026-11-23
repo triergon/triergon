@@ -1309,7 +1309,7 @@ fn check_reversed_fragment_source(native: &[Output], literal: &[Output]) {
 }
 
 #[test]
-fn native_from_start_origin_never_claims_complete_entity_or_source_clock() {
+fn front_first_fragment_without_tfdt_starts_at_zero_without_claiming_complete_entity() {
     let raw = include_bytes!("../fixtures/native-terminal-controls/first-source-clock-unknown.mp4");
     let (mut p, _b, s) = make(raw, false, 1, 1, false);
     let mut out = Vec::new();
@@ -1330,9 +1330,9 @@ fn native_from_start_origin_never_claims_complete_entity_or_source_clock() {
     let samples = packets(&out);
     assert_eq!(samples.len(), 9);
     assert_eq!(s.ends.load(Ordering::Relaxed), 0);
-    for p in samples.iter().take(3) {
-        assert_eq!(p.source.sample.dts_ticks, None);
-        assert_eq!(p.source.sample.cts_ticks, None);
+    for (n, p) in samples.iter().take(3).enumerate() {
+        assert_eq!(p.source.sample.dts_ticks, Some(n as i128 * 1000));
+        assert_eq!(p.source.sample.cts_ticks, Some(n as i128 * 1000));
     }
     assert_eq!(
         format!("{:?}", samples[0].occurrence.as_ref().unwrap().clock_origin),

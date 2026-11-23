@@ -1080,6 +1080,12 @@ impl MovieOpen {
                     } else {
                         FragmentBuilder::new_with_inherited_decode_end
                     };
+                    // Without `tfdt` a fragment starts where the track's preceding
+                    // samples end: its last fragment, or the `moov` table.
+                    let inherited = match t.fragments().last() {
+                        Some(previous) => previous.decode_end(),
+                        None => Some(t.table.decode_end()?),
+                    };
                     walk.traf = TrafStage::Build {
                         track,
                         builder: build(
@@ -1088,7 +1094,7 @@ impl MovieOpen {
                             context,
                             self.pool.clone(),
                             self.limits.format,
-                            t.fragments().last().and_then(FragmentIndex::decode_end),
+                            inherited,
                         )?,
                     };
                 }

@@ -135,6 +135,25 @@ impl SampleTable {
     pub(crate) fn decode_runs(&self) -> &Words {
         &self.stts
     }
+    /// Decode time just after the last sample, in media ticks: the sum of the sample
+    /// durations `stts` declares, zero for an empty table (ISO/IEC 14496-12 §8.6.1.2.1).
+    /// Reads each `stts` run once; the runs were bounded when the table was built.
+    pub(crate) fn decode_end(&self) -> Result<i128> {
+        let mut samples = self.sample_count();
+        let mut end = 0i128;
+        for row in 0..self.stts.count {
+            if samples == 0 {
+                break;
+            }
+            let count = u64::from(self.stts.word(row, 0)?).min(samples);
+            let delta = self.stts.word(row, 4)?;
+            end = end
+                .checked_add(i128::from(count) * i128::from(delta))
+                .ok_or(Error::Overflow)?;
+            samples -= count;
+        }
+        Ok(end)
+    }
     /// A cursor over every sample in decode order.
     pub fn cursor(&self) -> SampleCursor<'_> {
         self.resume(SampleCursorPosition::default())

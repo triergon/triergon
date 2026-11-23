@@ -172,23 +172,18 @@ fn multitrack_packet_configuration_uses_its_track_revision_not_latest_other_trac
 }
 
 #[test]
-fn source_unknown_fragment_clock_is_not_filled_from_native_projection() {
+fn fragments_without_tfdt_continue_from_an_empty_table_at_zero() {
     let mut raw = include_bytes!("../fixtures/mp4/f-no-second-tfdt.mp4").to_vec();
     let first_tfdt = raw.windows(4).position(|bytes| bytes == b"tfdt").unwrap();
     raw[first_tfdt..first_tfdt + 4].copy_from_slice(b"free");
     let (mut p, _) = mp4(&raw, View::Demux, 1, 1).unwrap();
     let out = collect(&mut p, 1).unwrap();
-    let unknown: Vec<_> = mp4_packets(&out)
+    let times: Vec<_> = mp4_packets(&out)
         .into_iter()
-        .filter(|p| p.source.sample.dts_ticks.is_none())
+        .map(|p| (p.source.sample.dts_ticks, p.source.sample.cts_ticks))
         .collect();
-    assert!(!unknown.is_empty());
-    assert!(unknown.iter().all(|p| p.source.sample.cts_ticks.is_none()));
-    assert!(
-        unknown
-            .iter()
-            .any(|p| p.occurrence.as_ref().is_some_and(|n| n.demux.dts.is_some()))
-    );
+    let expected: Vec<_> = (0..6).map(|n| (Some(n * 1000), Some(n * 1000))).collect();
+    assert_eq!(times, expected);
 }
 
 #[test]
