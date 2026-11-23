@@ -695,7 +695,15 @@ fn move_position(m: Move, t: i32, duration: i32) -> (f64, f64) {
 /// `duration`.
 fn fade_alpha(fade: Fade, now: i64, duration: i32) -> i32 {
     let (a1, a2, a3, t1, t2, t3, t4) = match fade {
-        Fade::InOut { fade_in, fade_out } => (255, 0, 255, -1, fade_in, fade_out, -1),
+        Fade::InOut { fade_in, fade_out } => (
+            255,
+            0,
+            255,
+            0,
+            fade_in,
+            duration.wrapping_sub(fade_out),
+            duration,
+        ),
         Fade::Full {
             a1,
             a2,
@@ -704,14 +712,14 @@ fn fade_alpha(fade: Fade, now: i64, duration: i32) -> i32 {
             t2,
             t3,
             t4,
-        } => (a1, a2, a3, t1, t2, t3, t4),
-    };
-    // Both outer times -1: the inner ones are durations from the event's
-    // start and back from its end.
-    let (t1, t3, t4) = if t1 == -1 && t4 == -1 {
-        (0, duration.wrapping_sub(t3), duration)
-    } else {
-        (t1, t3, t4)
+        } => {
+            // Explicit -1 at both ends also makes the inner times durations.
+            if t1 == -1 && t4 == -1 {
+                (a1, a2, a3, 0, t2, duration.wrapping_sub(t3), duration)
+            } else {
+                (a1, a2, a3, t1, t2, t3, t4)
+            }
+        }
     };
     let fraction = |from: i32, to: i32| {
         f64::from((now as u32).wrapping_sub(from as u32) as i32)
@@ -790,6 +798,18 @@ mod tests {
             t4: -1,
         };
         assert_eq!(fade_alpha(full, 50, 1000), 127);
+
+        let relative = Fade::Full {
+            a1: 180,
+            a2: 80,
+            a3: 160,
+            t1: -1,
+            t2: 100,
+            t3: 100,
+            t4: -1,
+        };
+        assert_eq!(fade_alpha(relative, 50, 1000), 130);
+        assert_eq!(fade_alpha(relative, 950, 1000), 120);
     }
 
     #[test]
