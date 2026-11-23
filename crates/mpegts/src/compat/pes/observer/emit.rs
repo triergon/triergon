@@ -1,7 +1,7 @@
 //! Storage growth, packet scheduling and emission.
 use super::{
     Arena, CompactDemuxPacket, CompactPayload, DemuxBoundary, DemuxObserver, DemuxPayloadKind,
-    DemuxSpan, Emission, Growth,
+    DemuxSpan, Emission, Growth, PES_CORRUPT,
 };
 use crate::pes::HEADER_MAX;
 use crate::{AssemblyStep, SourceRange, limit};
@@ -188,7 +188,7 @@ impl DemuxObserver {
             boundary,
             kind,
             flags: if self.corrupt || forced_corrupt || incomplete {
-                2
+                PES_CORRUPT
             } else {
                 0
             },

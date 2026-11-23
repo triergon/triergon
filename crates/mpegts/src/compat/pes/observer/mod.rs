@@ -240,7 +240,15 @@ pub struct DemuxPacket {
     /// The payload spans in stream order.
     pub spans: BudgetVec<DemuxSpan>,
 }
+pub(super) const PES_CORRUPT: u32 = 2;
+
 impl DemuxPacket {
+    /// Whether the demuxer marks the payload damaged or incomplete.
+    #[inline]
+    pub const fn is_corrupt(&self) -> bool {
+        self.flags & PES_CORRUPT != 0
+    }
+
     /// The payload bytes, one slice per span, in stream order.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.spans.as_slice().iter().map(AsRef::as_ref)

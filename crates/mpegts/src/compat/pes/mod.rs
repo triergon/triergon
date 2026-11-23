@@ -35,6 +35,7 @@ pub(crate) mod clock;
 pub(crate) mod completion;
 pub(crate) mod cutter;
 pub(crate) mod fault;
+mod feed;
 pub(crate) mod observer;
 
 pub use clock::{
@@ -51,6 +52,7 @@ pub use fault::{
     TransportFaultHeader, TransportFaultKind, TransportFaultPacket, TransportFaultRecovery,
     TransportTailConfirmation,
 };
+pub use feed::{Carriage, FeedPacket, PesFacts, PesInput, SpentLists};
 pub use observer::{
     CompactDemuxPacket, CompactPayload, DemuxBoundary, DemuxObserver, DemuxPacket,
     DemuxPayloadKind, DemuxScope, DemuxSpan, DemuxSpanView, DemuxSpanViews,

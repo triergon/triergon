@@ -560,7 +560,7 @@ impl<S: Source> Player<S> {
     /// Hands a consumed PES's lists back to the observer of `pid`, so that it
     /// allocates nothing for its next PES. Does nothing for other engines.
     #[inline]
-    pub fn reuse_pes_lists(&mut self, pid: u16, lists: crate::engine::ts::feed::SpentLists) {
+    pub fn reuse_pes_lists(&mut self, pid: u16, lists: triergon_mpegts::compat::pes::SpentLists) {
         if let Some(engine) = self.engine.as_mut() {
             engine.reuse_pes_lists(pid, lists);
         }

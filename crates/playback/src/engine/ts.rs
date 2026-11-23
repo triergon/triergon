@@ -5,7 +5,7 @@ pub(crate) mod feed;
 pub(crate) mod tracks;
 
 use crate::compat::pes::{AdmittedCarriage, Carriage, MAXIMUM_SELECTIONS, PidSelection};
-use crate::engine::ts::feed::{FeedPacket, FeedStep, TsStepProjection};
+use crate::engine::ts::feed::{FeedStep, TsStepProjection};
 use crate::engine::ts::tracks::{PesTrack, PesTracks, TrackUpdate};
 use crate::engine::{TrackFact, track_kind};
 use crate::event::TsEvent;
@@ -18,7 +18,9 @@ use triergon_mpegts::{
     self as ts,
     clock::{ClockKey, SourceTimePolicy, source_timestamp},
 };
-use ts::compat::pes::{DemuxClock, ReadyContinuation, SourceContext, selected_track_kind};
+use ts::compat::pes::{
+    DemuxClock, FeedPacket, ReadyContinuation, SourceContext, selected_track_kind,
+};
 use ts::psi::DescriptorNamespace;
 use ts::transport::pid;
 /// TS delivery mode and track discovery policy.
@@ -431,7 +433,7 @@ impl TsEngine {
     }
 
     /// Hands a consumed PES's lists back to the observer of `pid` for its next PES.
-    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: feed::SpentLists) {
+    pub(crate) fn reuse_pes_lists(&mut self, pid: u16, lists: ts::compat::pes::SpentLists) {
         let Some(index) = self.pes_tracks.index(pid) else {
             return;
         };

@@ -25,6 +25,10 @@ The crate exposes two views:
 The non-default `reference-trace` feature adds `reference_trace`: comparison-only
 projections (`recovery`, `catalogue`, `dvb`).
 
+The `compat::pes` packet types expose feed ownership and admission facts for
+owned spans and compact carrier runs. Use `is_corrupt()` to identify damage or
+an incomplete payload.
+
 ## Usage
 
 ```rust

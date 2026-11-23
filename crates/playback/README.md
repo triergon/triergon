@@ -3,6 +3,9 @@
 Bounded Matroska, MP4 and MPEG-TS packet feeds with caller-owned sources,
 format detection, track selection, seeking and a sink adapter.
 
+The PES feed uses the packet ownership and admission types from
+`triergon_mpegts::compat::pes`.
+
 ## Usage
 
 Probe the source, open the engine of its format, and drive one loop: every

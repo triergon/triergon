@@ -12,7 +12,8 @@ use triergon_core::source::SourceReply;
 use triergon_core::{InputCursor, WorkBudget};
 use triergon_mpegts::{ParseLimits, clock::SourceTimePolicy, psi::DescriptorNamespace};
 
-pub use crate::engine::ts::feed::{FeedPacket, FeedStep, PesFacts, PesInput, SpentLists};
+pub use crate::engine::ts::feed::FeedStep;
+pub use triergon_mpegts::compat::pes::{FeedPacket, PesFacts, PesInput, SpentLists};
 
 /// The progressive PES feed of a single-program TS188 source: the PES of the tracks
 /// found in its PMT, those of a registered carriage (AVC, HEVC, AAC) as compact

@@ -2,6 +2,8 @@
 
 pub mod startup;
 
+pub use triergon_mpegts::compat::pes::Carriage;
+
 use crate::engine::ts::{Delivery, TsEngine};
 use crate::{Engine, Result, TrackKey};
 use triergon_core::InputCursor;
@@ -87,19 +89,6 @@ pub fn open_private_audio(
             carriage: Carriage::PrivateAudio(selection.carriage),
         }],
     )
-}
-
-/// Explicit packet interpretation for one selected PID of a TS program.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Carriage {
-    /// A registered stream type, such as AVC, HEVC or ADTS AAC.
-    Registered(RegisteredCarriage),
-    /// AC-3, E-AC-3 or DVB audio in private-stream PES.
-    PrivateAudio(PrivateAudioCarriage),
-    /// DVB subtitles.
-    DvbSubtitles,
-    /// Resolve the established AAC and private-audio profiles from each active PMT.
-    AudioFromPmt,
 }
 
 /// Snapshot of a track's admitted carriage for one active source PMT.
