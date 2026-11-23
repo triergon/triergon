@@ -146,7 +146,6 @@ fn check(pool: &Budget, bytes: &Bytes, trace: bool) -> Result<Totals> {
         bytes: 0,
         digest: 0,
         refusal: None,
-        unsupported: None,
     };
     let calls = RefCell::new(Vec::new());
     if !matches!(

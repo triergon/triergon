@@ -404,7 +404,6 @@ pub(super) fn run(args: &[String]) -> Result<()> {
                     bytes: 0,
                     digest: 0,
                     refusal: None,
-                    unsupported: None,
                 },
                 trace: invocation.mode == Mode::Trace,
             };

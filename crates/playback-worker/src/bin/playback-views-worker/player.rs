@@ -273,7 +273,6 @@ mod worker {
                 bytes: self.work.bytes,
                 digest: self.work.digest,
                 refusal: None,
-                unsupported: None,
             }
         }
     }

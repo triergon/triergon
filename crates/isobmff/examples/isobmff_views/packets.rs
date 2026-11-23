@@ -18,7 +18,7 @@ use triergon_isobmff::{
     quicktime::{PcmEncoding, PcmSampleReader, SoundDescriptionV0},
 };
 
-use triergon_harness_runner::{Operation, Totals};
+use triergon_harness_runner::{Operation, Outcome};
 
 #[path = "packets/encoded.rs"]
 mod encoded;
@@ -108,7 +108,7 @@ impl Source<'_> {
 }
 
 struct Output<'a, 'b> {
-    work: &'a mut Totals,
+    work: &'a mut Outcome,
     trace: Option<&'b mut dyn Write>,
 }
 

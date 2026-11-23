@@ -286,7 +286,6 @@ fn run(words: &[String]) -> Result<()> {
                 bytes: sink.work.bytes,
                 digest: sink.work.digest,
                 refusal,
-                unsupported: None,
             })
         },
     )

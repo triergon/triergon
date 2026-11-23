@@ -85,7 +85,6 @@ impl Work {
             bytes: self.bytes,
             digest: self.digest,
             refusal: None,
-            unsupported: None,
         }
     }
 }

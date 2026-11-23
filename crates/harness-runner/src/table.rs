@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::process::ExitCode;
 
-use crate::{ITERATIONS, Mode, Refusals, Result, Totals, failed, measure_dyn};
+use crate::{ITERATIONS, Mode, Outcome, Result, failed, measure_outcome_dyn};
 
 /// The largest input file a table worker reads.
 const MAX_INPUT: u64 = 256 * 1024 * 1024;
@@ -14,10 +14,10 @@ const MAX_INPUT: u64 = 256 * 1024 * 1024;
 const USAGE: &str =
     "usage: PREFIX{fold|trace|memory} FILE [ARG...] | PREFIXbench FILE ITERATIONS [ARG...]";
 
-/// One run of a prepared operation: it folds its records into the totals and, in
+/// One run of a prepared operation: it folds its records into the outcome and, in
 /// trace mode, prints them to the writer.
 pub type Action<'a> =
-    Box<dyn FnMut(&mut Totals, Option<&mut dyn Write>) -> std::result::Result<(), String> + 'a>;
+    Box<dyn FnMut(&mut Outcome, Option<&mut dyn Write>) -> std::result::Result<(), String> + 'a>;
 
 /// Prepares the operation of a command prefix from the input file and the words after
 /// the file (after the iteration count in bench mode).
@@ -86,23 +86,15 @@ pub fn dispatch(args: &[OsString], operations: &[(&str, Prepare)]) -> Result<()>
     let input = input(file)?;
     let mut operation = prepare(prefix, &input, arguments)?;
     let trace = mode == Mode::Trace;
-    measure_dyn(
-        mode,
-        iterations,
-        operation.name,
-        None,
-        &[],
-        Refusals::Stop,
-        &mut || {
-            let mut totals = Totals::default();
-            if trace {
-                (operation.run)(&mut totals, Some(&mut io::stdout().lock()))?;
-            } else {
-                (operation.run)(&mut totals, None)?;
-            }
-            Ok(totals)
-        },
-    )
+    measure_outcome_dyn(mode, iterations, operation.name, None, &mut || {
+        let mut outcome = Outcome::default();
+        if trace {
+            (operation.run)(&mut outcome, Some(&mut io::stdout().lock()))?;
+        } else {
+            (operation.run)(&mut outcome, None)?;
+        }
+        Ok(outcome)
+    })
 }
 
 /// A bench count: decimal digits for a number of [`ITERATIONS`].

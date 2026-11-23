@@ -15,9 +15,10 @@ mod table;
 
 pub use table::{Action, Operation, Prepare, dispatch, serve, smoke};
 
+use std::cell::Cell;
 use std::fmt::{self, Display};
 use std::io::{self, Write};
-use std::ops::RangeInclusive;
+use std::ops::{Deref, DerefMut, RangeInclusive};
 use std::path::Path;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
@@ -305,8 +306,6 @@ pub struct Totals {
     pub digest: u64,
     /// Why the operation ended without completing its work, if it did.
     pub refusal: Option<Box<Refusal>>,
-    /// An unsupported feature the operation met and reports while completing.
-    pub unsupported: Option<&'static str>,
 }
 
 impl Totals {
@@ -322,6 +321,31 @@ impl Totals {
         }
         self.packets += 1;
         self.bytes += payload.len() as u64;
+    }
+}
+
+/// What one operation produces when it may meet an unsupported feature while
+/// completing its work: its totals and the feature, which the result line reports
+/// for the first operation that met one.
+#[derive(Debug, Default)]
+pub struct Outcome {
+    /// The operation's packets, bytes and digest.
+    pub totals: Totals,
+    /// An unsupported feature the operation met.
+    pub unsupported: Option<&'static str>,
+}
+
+impl Deref for Outcome {
+    type Target = Totals;
+
+    fn deref(&self) -> &Totals {
+        &self.totals
+    }
+}
+
+impl DerefMut for Outcome {
+    fn deref_mut(&mut self) -> &mut Totals {
+        &mut self.totals
     }
 }
 
@@ -367,13 +391,13 @@ pub fn measure_with(
     fields: &[(&str, u64)],
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
-    measure_dyn(
+    measure_dyn::<false>(
         invocation.mode,
         invocation.iterations,
         name,
         held,
         fields,
-        Refusals::Stop,
+        &Cell::new(None),
         &mut operation,
     )
 }
@@ -392,35 +416,69 @@ pub fn measure_repeated(
     held: Option<&Budget>,
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
-    measure_dyn(
+    measure_dyn::<true>(
         invocation.mode,
         invocation.iterations,
         name,
         held,
         &[],
-        Refusals::Repeat,
+        &Cell::new(None),
         &mut operation,
     )
 }
 
-/// What the measured loop does with an operation that ends in a refusal.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Refusals {
-    /// End the loop.
-    Stop,
-    /// Run the remaining operations, which must refuse alike.
-    Repeat,
+/// [`measure`] for an operation that may meet an unsupported feature while it
+/// completes: the result line reports the first one met, after the digest.
+///
+/// # Errors
+///
+/// When the operation fails, retains charged storage, or stdout fails.
+pub fn measure_outcome(
+    invocation: &Invocation<'_>,
+    name: &str,
+    held: Option<&Budget>,
+    mut operation: impl FnMut() -> Result<Outcome>,
+) -> Result<()> {
+    measure_outcome_dyn(
+        invocation.mode,
+        invocation.iterations,
+        name,
+        held,
+        &mut operation,
+    )
+}
+
+/// [`measure_outcome`] with the operation behind a reference.
+fn measure_outcome_dyn(
+    mode: Mode,
+    iterations: u64,
+    name: &str,
+    held: Option<&Budget>,
+    operation: &mut dyn FnMut() -> Result<Outcome>,
+) -> Result<()> {
+    let unsupported = Cell::new(None);
+    measure_dyn::<false>(mode, iterations, name, held, &[], &unsupported, &mut || {
+        let outcome = operation()?;
+        if unsupported.get().is_none() {
+            unsupported.set(outcome.unsupported);
+        }
+        Ok(outcome.totals)
+    })
 }
 
 /// [`measure_with`] with the operation behind a reference, so each worker binary
-/// holds one copy of the loop and of the result line.
-fn measure_dyn(
+/// holds one copy of the loop and of the result line. `REPEAT` runs every planned
+/// operation when they refuse alike; otherwise the first refusal ends the loop.
+/// `unsupported` is what the line reports as met and unsupported once the loop is
+/// done.
+// The refusal policy is a constant so that the loop of `measure` stays as it is.
+fn measure_dyn<const REPEAT: bool>(
     mode: Mode,
     iterations: u64,
     name: &str,
     held: Option<&Budget>,
     fields: &[(&str, u64)],
-    refusals: Refusals,
+    unsupported: &Cell<Option<&'static str>>,
     operation: &mut dyn FnMut() -> Result<Totals>,
 ) -> Result<()> {
     let retained = held.map(Budget::used);
@@ -431,25 +489,22 @@ fn measure_dyn(
     }
     let start = (mode == Mode::Bench).then(Instant::now);
     let (mut packets, mut bytes, mut digest) = (0, 0, 0);
-    let (mut runs, mut refusal, mut unsupported) = (0, None, None);
+    let (mut runs, mut refusal) = (0, None);
     while runs < iterations {
         let totals = operation()?;
         runs += 1;
         packets += totals.packets;
         bytes += totals.bytes;
         fold(&mut digest, totals.digest);
-        unsupported = unsupported.or(totals.unsupported);
-        match refusals {
-            Refusals::Stop if totals.refusal.is_some() => {
+        if REPEAT {
+            if runs == 1 {
                 refusal = totals.refusal;
-                break;
-            }
-            Refusals::Stop => {}
-            Refusals::Repeat if runs == 1 => refusal = totals.refusal,
-            Refusals::Repeat if totals.refusal != refusal => {
+            } else if totals.refusal != refusal {
                 return Err("operation outcome changed across repetitions".into());
             }
-            Refusals::Repeat => {}
+        } else if totals.refusal.is_some() {
+            refusal = totals.refusal;
+            break;
         }
         if held.map(Budget::used) != retained {
             return Err("operation retained charged storage".into());
@@ -469,9 +524,9 @@ fn measure_dyn(
             bytes,
             digest,
             refusal,
-            unsupported,
         },
         fields,
+        unsupported.get(),
     )?;
     Ok(())
 }
@@ -488,7 +543,7 @@ pub fn write_summary(
     elapsed_ns: u128,
     totals: &Totals,
 ) -> io::Result<()> {
-    write_result(out, name, iterations, elapsed_ns, totals, &[])
+    write_result(out, name, iterations, elapsed_ns, totals, &[], None)
 }
 
 fn write_result(
@@ -498,13 +553,13 @@ fn write_result(
     elapsed: u128,
     totals: &Totals,
     fields: &[(&str, u64)],
+    unsupported: Option<&str>,
 ) -> io::Result<()> {
     let Totals {
         packets,
         bytes,
         digest,
         refusal,
-        unsupported,
     } = totals;
     let mut line = format!(
         "{{\"schema\":1,\"operation\":\"{name}\",\"iterations\":{runs},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"elapsed_ns\":{elapsed},\"eof\":{}",

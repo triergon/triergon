@@ -23,7 +23,7 @@ use triergon_isobmff::{
     table::TimingRunPolicy,
 };
 
-use triergon_harness_runner::{Operation, Totals};
+use triergon_harness_runner::{Operation, Outcome, Totals};
 
 const MAX_LOOKUPS: usize = 64;
 const MAX_SAMPLES: u64 = 1_000_000;
@@ -125,7 +125,7 @@ pub(super) fn operation<'a>(
                     if trace.is_some() {
                         eprintln!("{error:?}");
                     }
-                    *work = Totals::default();
+                    *work = Outcome::default();
                     let mut out = Output { work, trace };
                     out.row(8, &[], &[]).map_err(|error| format!("{error:?}"))
                 }
