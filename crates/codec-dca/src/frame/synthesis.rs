@@ -224,19 +224,18 @@ impl FrameDecoder {
     ) -> Result<([usize; MAX_SLOTS], Option<usize>), DecodeError> {
         let (h, set) = (&f.h, &f.set);
         let nsamples = h.blocks * if have_x96 { 64 } else { 32 };
-        let mut order: [(Speaker, usize); MAX_SLOTS + 1] = [(Speaker::FrontLeft, 0); MAX_SLOTS + 1];
+        let mut order = [(Speaker::FrontLeft, None); MAX_SLOTS + 1];
         let mut n = 0;
         for (ch, &sp) in f.speakers.iter().enumerate() {
-            order[n] = (sp, ch);
+            order[n] = (sp, Some(ch as u8));
             n += 1;
         }
         if xch {
-            order[n] = (Speaker::BackCenter, set.nch);
+            order[n] = (Speaker::BackCenter, Some(set.nch as u8));
             n += 1;
         }
-        const LFE_SRC: usize = usize::MAX;
         if h.lfe_mode > 0 {
-            order[n] = (Speaker::LowFrequency, LFE_SRC);
+            order[n] = (Speaker::LowFrequency, None);
             n += 1;
         }
         let order = &mut order[..n];
@@ -253,10 +252,10 @@ impl FrameDecoder {
         out.layout = ChannelLayout::new(order.iter().map(|e| e.0))
             .ok_or(DecodeError::Invalid("more than 16 output planes"))?;
         for (i, &(_, src)) in order.iter().enumerate() {
-            if src == LFE_SRC {
-                lfe_plane = Some(i);
+            if let Some(channel) = src {
+                plane_of[usize::from(channel)] = i;
             } else {
-                plane_of[src] = i;
+                lfe_plane = Some(i);
             }
         }
         Ok((plane_of, lfe_plane))
