@@ -104,7 +104,7 @@
     {
       "reading": "The normal-sync reader searches for no sync and reads no extension substream, so it refuses a stream that begins with neither",
       "clause": "ETSI TS 102 114 V1.6.1 clause 5.3 begins decoding with a search for SYNC and clause 7.2 allows a stream of extension substreams alone: no clause makes such a start an error, and the refusal is the scope the reader documents, not a departure of the reference",
-      "candidate": "refuses with Invalid, for zero bytes and for the extension substream sync 0x64582025 alike (the core reader refuses the latter as Unsupported)",
+      "candidate": "refuses with Invalid for zero bytes, and with Unsupported for the extension substream sync 0x64582025, as the core reader does",
       "reference": "the dca parser returns the bytes as a packet with no clock",
       "cases": [
         "matrix-bad-sync-be14",
@@ -186,6 +186,17 @@
         "matrix-bitrate-31-be14",
         "matrix-bitrate-31-le14",
         "matrix-bitrate-31-le16"
+      ]
+    },
+    {
+      "reading": "A frame type and SHORT code the specification rules out",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2, Table 5-3: a normal frame (FTYPE 1) has SHORT 31 and a termination frame (FTYPE 0) SHORT 0 to 30, so FTYPE 1 with SHORT 0 is no valid header",
+      "candidate": "refuses the stream with Invalid at that header, as the core reader refuses it",
+      "reference": "the dca parser returns the bytes as a packet with no clock",
+      "cases": [
+        "matrix-normal-short-zero-be14",
+        "matrix-normal-short-zero-le14",
+        "matrix-normal-short-zero-le16"
       ]
     },
     {
@@ -271,23 +282,6 @@
         "matrix-termination-raw-le14",
         "matrix-termination-raw-le16"
       ]
-    }
-  ],
-  "pending_module_requirements": [
-    "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
-  ],
-  "open_cases": [
-    {
-      "id": "matrix-normal-short-zero-be14",
-      "requirement": "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
-    },
-    {
-      "id": "matrix-normal-short-zero-le14",
-      "requirement": "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
-    },
-    {
-      "id": "matrix-normal-short-zero-le16",
-      "requirement": "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
     }
   ],
   "open_unmeasured": [

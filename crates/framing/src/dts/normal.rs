@@ -2,7 +2,7 @@
 //! §5.4.2. A frame is the span from one core sync to the next; how its length
 //! relates to `FSIZE` is reported, and neither shows that the coded audio is valid.
 use crate::check_limit;
-use crate::dts::core_frame::CORE_SYNC;
+use crate::dts::core_frame::{CORE_SYNC, EXTENSION_SYNC};
 use crate::dts::reader::source_error;
 use crate::dts::{
     DtsCoreField, DtsPackedHeader, DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob,
@@ -352,9 +352,10 @@ impl DtsNormalSourceReader {
     /// [`Error::Backpressure`] and [`Error::Allocation`] leave the reader as it was:
     /// free pool storage and call again. Every other error is kept and returned by all
     /// later calls: [`Error::Cancelled`] when `cancel` is set, [`Error::Invalid`] when
-    /// the stream does not start with `SYNC`, [`Error::Unsupported`] when it starts
-    /// with a `SHORT` code that disagrees with the frame type,
-    /// [`Error::Truncated`] when the source ends inside a header or a source word, and
+    /// the stream starts neither with `SYNC` nor with an extension substream, or with a
+    /// `SHORT` code the frame type rules out, [`Error::Unsupported`] when it starts with
+    /// an extension substream, [`Error::Truncated`] when the source ends inside a header
+    /// or a source word, and
     /// [`Error::Limit`] when a frame or the number of frames exceeds its limit. A frame
     /// whose whole source units hold its `FSIZE` + 1 bytes is returned before the
     /// part of a source unit after it is refused.
@@ -652,12 +653,13 @@ impl DtsNormalSourceReader {
                 self.packing.bit(&self.prefix[..self.prefix_len], bit)? << (7 - bit % 8);
         }
         let header = inspect_header_bits(&stack, bits.min(120))?;
-        if header.value(DtsCoreField::Sync) != Some(CORE_SYNC) {
-            return Err(if bits < 32 {
-                Error::Truncated
-            } else {
-                Error::Invalid("DTS normal source sync")
-            });
+        match header.value(DtsCoreField::Sync) {
+            Some(CORE_SYNC) => {}
+            None => return Err(Error::Truncated),
+            Some(EXTENSION_SYNC) => {
+                return Err(Error::Unsupported("DTS extension-substream input"));
+            }
+            Some(_) => return Err(Error::Invalid("DTS normal source sync")),
         }
         match (
             header.value(DtsCoreField::Normal),
@@ -673,11 +675,9 @@ impl DtsNormalSourceReader {
                     return Err(Error::Invalid("DTS termination block count"));
                 }
             }
-            _ => {
-                return Err(Error::Unsupported(
-                    "DTS termination or abnormal normal sync",
-                ));
-            }
+            // A normal frame has SHORT 31 and a termination frame 0 to 30
+            // (ETSI TS 102 114 V1.6.1 Table 5-3).
+            _ => return Err(Error::Invalid("DTS frame type and SHORT disagree")),
         }
         header
             .syntax_complete()

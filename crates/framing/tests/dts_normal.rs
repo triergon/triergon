@@ -934,3 +934,36 @@ fn explicit_transport_failure_does_not_become_entity_eof_or_a_recoverable_reset(
     );
     assert_eq!(reader.reset(0).unwrap_err(), Error::Transport);
 }
+
+#[test]
+fn a_frame_type_and_short_code_the_specification_rules_out_are_invalid() {
+    let pool = Budget::new(65536).unwrap();
+    // FTYPE 1 with SHORT 0, and FTYPE 0 with SHORT 31 (Table 5-3).
+    for (ftype, short) in [(1, 0), (0, 31)] {
+        let mut fields = values(96, false);
+        fields[1] = ftype;
+        fields[2] = short;
+        let mut raw = logical(96, false);
+        raw[..13].copy_from_slice(&author(fields));
+        let mut r = reader(&pool, None, P::CanonicalBe, settings());
+        assert_eq!(
+            next(&mut r, &pool, &raw, 7, 31).unwrap_err(),
+            Error::Invalid("DTS frame type and SHORT disagree"),
+            "FTYPE {ftype} SHORT {short}"
+        );
+    }
+    // An extension substream is a stream this reader does not read; other bytes are
+    // not a DTS stream.
+    let mut raw = vec![0x64, 0x58, 0x20, 0x25];
+    raw.resize(96, 0);
+    let mut r = reader(&pool, None, P::CanonicalBe, settings());
+    assert_eq!(
+        next(&mut r, &pool, &raw, 7, 31).unwrap_err(),
+        Error::Unsupported("DTS extension-substream input")
+    );
+    let mut r = reader(&pool, None, P::CanonicalBe, settings());
+    assert_eq!(
+        next(&mut r, &pool, &[0; 96], 7, 31).unwrap_err(),
+        Error::Invalid("DTS normal source sync")
+    );
+}
