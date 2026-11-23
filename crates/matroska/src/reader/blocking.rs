@@ -10,7 +10,7 @@ type Position<R> =
 /// How a seekable source repositions and resynchronizes its cursor.
 type Seeking<R> = (Reposition<R>, Position<R>);
 
-type OpenOwned<R> = fn(R, Limits, &Budget, PayloadOwnership, bool) -> Result<BlockingReader<R>>;
+type OpenOwned<R> = fn(R, Limits, &Budget, PayloadOwnership) -> Result<BlockingReader<R>>;
 
 /// Source access and payload ownership for a [BlockingReader].
 ///
@@ -58,7 +58,9 @@ impl BlockingSource<Cursor<OwnedInputBytes>> {
     /// returns [Error::ForeignPool] if the input uses another pool.
     pub fn owned(source: OwnedInputBytes) -> Self {
         Self {
-            owned: Some(BlockingReader::open_owned),
+            owned: Some(|source, limits, pool, payload| {
+                BlockingReader::open_owned(source, limits, pool, payload, false)
+            }),
             ..Self::from(Cursor::new(source))
         }
     }
@@ -140,18 +142,13 @@ impl<R: Read> BlockingReader<R> {
         limits: Limits,
         pool: &Budget,
     ) -> Result<Self> {
-        Self::open_source(source.into(), limits, pool, false)
+        Self::open_source(source.into(), limits, pool)
     }
 
     #[inline(always)]
-    fn open_source(
-        source: BlockingSource<R>,
-        limits: Limits,
-        pool: &Budget,
-        webm_vp9_t35: bool,
-    ) -> Result<Self> {
+    fn open_source(source: BlockingSource<R>, limits: Limits, pool: &Budget) -> Result<Self> {
         if let Some(open) = source.owned {
-            return open(source.source, limits, pool, source.payload, webm_vp9_t35);
+            return open(source.source, limits, pool, source.payload);
         }
         let reader = Reader::new(
             pool,
@@ -495,19 +492,15 @@ impl BlockingReader<Cursor<OwnedInputBytes>> {
     }
 }
 
-/// Open immutable input with WebM VP9's implicit ITU-T T.35 addition admitted.
-pub fn open_owned_seekable_in(
-    source: OwnedInputBytes,
-    limits: Limits,
-    pool: &Budget,
-    policy: PayloadOwnership,
-) -> Result<BlockingReader<Cursor<OwnedInputBytes>>> {
-    BlockingReader::open_source(
-        BlockingSource::owned(source).with_payload_ownership(policy),
-        limits,
-        pool,
-        true,
-    )
+/// Configure immutable input to admit WebM VP9's implicit ITU-T T.35 addition.
+/// Pass the source to [BlockingReader::open_in] with the input's budget.
+pub fn owned_source(source: OwnedInputBytes) -> BlockingSource<Cursor<OwnedInputBytes>> {
+    BlockingSource {
+        owned: Some(|source, limits, pool, payload| {
+            BlockingReader::open_owned(source, limits, pool, payload, true)
+        }),
+        ..BlockingSource::from(Cursor::new(source))
+    }
 }
 
 #[cfg(test)]

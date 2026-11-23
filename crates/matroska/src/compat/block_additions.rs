@@ -8,7 +8,7 @@ use crate::step::check;
 use crate::track::extensions::TrackExtensions;
 use crate::{Error, Result};
 
-pub use crate::reader::{blocking::open_owned_seekable_in, new_reader};
+pub use crate::reader::{blocking::owned_source, new_reader};
 use std::{mem::discriminant, sync::atomic::AtomicBool};
 use triergon_core::{Step, WorkBudget};
 

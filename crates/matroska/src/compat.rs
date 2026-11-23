@@ -39,9 +39,9 @@ pub mod seek {
 /// Block additions as FFmpeg's Matroska demuxer accepts and exports them.
 ///
 /// The reader refuses a BlockAddID above the track's MaxBlockAdditionID.
-/// [`new_reader`](block_additions::new_reader) and
-/// [`open_owned_seekable_in`](block_additions::open_owned_seekable_in) build readers
-/// that also admit WebM VP9's implicit ITU-T T.35 addition: BlockAddID 4 as the only
+/// Use [`new_reader`](block_additions::new_reader) or
+/// [`owned_source`](block_additions::owned_source) to admit WebM VP9's implicit
+/// ITU-T T.35 addition: BlockAddID 4 as the only
 /// addition of a `V_VP9` track that declares neither MaxBlockAdditionID nor a
 /// BlockAdditionMapping, on a source whose DocType is `webm`.
 ///

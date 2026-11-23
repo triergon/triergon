@@ -1162,16 +1162,16 @@ fn implicit_vp9_hdr10_plus_admission_is_bound_to_the_webm_track() {
         .concat();
         let pool = Budget::new(256 * 1024).unwrap();
         let source = OwnedInputBytes::try_from_vec(&pool, data).unwrap();
-        let payload = PayloadOwnership::SharedBounded;
-        let mut reader = if profile {
-            block_additions::open_owned_seekable_in(source, Limits::default(), &pool, payload)
+        let source = if profile {
+            block_additions::owned_source(source)
         } else {
-            BlockingReader::open_in(
-                BlockingSource::owned(source).with_payload_ownership(payload),
-                Limits::default(),
-                &pool,
-            )
-        }
+            BlockingSource::owned(source)
+        };
+        let mut reader = BlockingReader::open_in(
+            source.with_payload_ownership(PayloadOwnership::SharedBounded),
+            Limits::default(),
+            &pool,
+        )
         .unwrap();
         let result = reader.next_typed_packet(&cancel);
         if !admitted {

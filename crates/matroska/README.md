@@ -41,6 +41,8 @@ Pass a `Read + Seek` source directly to `BlockingReader::open`, or pass
 `BlockingSource::owned(input)` with `BlockingReader::open_in` to read and seek
 within an already charged `OwnedInputBytes`. A `BlockingSource` also selects
 the payload ownership policy. `open_in` uses the caller's `Budget`.
+`compat::block_additions::owned_source` selects the WebM compatibility policy
+for immutable input.
 `next_packet` returns the plain `Packet` and refuses packets that carry block
 additions or CodecState; use `next_typed_packet` for those. Typed configurations
 expose their allocation accounting through `Configuration::budget()`.
@@ -225,7 +227,7 @@ there would leave the slot the reader reserved for it in use.
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
 each names the FFmpeg revision it reproduces: `compat::clock` gives FFmpeg's packet
 clock, `compat::seek` its block-start audio selection after a subtitle seek, and
-`compat::block_additions` builds readers that admit WebM VP9's implicit ITU-T T.35
+`compat::block_additions` configures readers to admit WebM VP9's implicit ITU-T T.35
 addition (BlockAddID 4 without a declared MaxBlockAdditionID) and projects block
 additions to the packet side data and HDR10+ events FFmpeg attaches to packets.
 
