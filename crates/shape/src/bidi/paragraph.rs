@@ -37,7 +37,7 @@ pub(super) struct Storage {
     /// The classes as the rules resolve them.
     types: BudgetVec<BidiClass>,
     /// [`explicit::match_isolates`]'s partners.
-    partner: BudgetVec<u32>,
+    partner: BudgetVec<explicit::Partner>,
     /// The isolate depth of each character.
     depths: BudgetVec<u8>,
     sequences: sequence::Storage,

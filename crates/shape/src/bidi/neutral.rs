@@ -29,8 +29,8 @@
 
 use super::charge;
 use super::class::{BidiClass, Bracket, Level, fill};
-use super::explicit::{MAX_ISOLATE_DEPTH, NONE};
-use super::sequence::Paragraph;
+use super::explicit::{MAX_ISOLATE_DEPTH, Partner};
+use super::sequence::{NONE, Paragraph};
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
 /// The opening brackets a depth keeps unpaired at most.
@@ -244,7 +244,7 @@ fn pair(
                     && paragraph
                         .partner
                         .get(at)
-                        .is_some_and(|&p| p != NONE);
+                        .is_some_and(|&p| p != Partner::NONE);
                 if state.has_level() && !closes_isolate {
                     state.open = 0;
                 }
