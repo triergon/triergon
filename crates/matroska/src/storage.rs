@@ -7,6 +7,7 @@ use triergon_core::{Budget, BudgetVec, Bytes};
 /// allocation's charge, including bytes hidden by a slice.
 #[derive(Clone, Debug, Default)]
 pub struct SharedBytes(Option<Bytes>);
+pub(crate) static EMPTY_BYTES: SharedBytes = SharedBytes(None);
 impl SharedBytes {
     /// A copy of `bytes` in a new allocation charged to `pool`; empty input
     /// allocates nothing. Fails with [`Error::Limit`] when the copy can never fit

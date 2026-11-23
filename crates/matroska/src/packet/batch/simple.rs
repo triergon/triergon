@@ -152,7 +152,7 @@ impl SimplePacketJob {
             frame: 0,
             publish: 0,
             restore: None,
-            ready: None,
+            ready: SharedBytes::default(),
             decoded_capacity: 0,
             failed: self.failed,
         }
@@ -401,9 +401,14 @@ impl SimplePacketJob {
 // The absent full-batch restore/job/group/config-change fields contribute zero
 // slots on this plain path. The retained owner order is the batch's.
 crate::storage::usage::storage!(SimplePacketJob, |s| [
-    s.source,
+    if matches!(s.phase, SimplePhase::Store) {
+        &crate::storage::EMPTY_BYTES
+    } else {
+        &s.source
+    },
     s.configuration,
-    crate::storage::usage::Packets(std::slice::from_ref(&s.staged))
+    crate::storage::usage::Packets(std::slice::from_ref(&s.staged)),
+    matches!(s.phase, SimplePhase::Store).then_some(&s.source),
 ]);
 
 const _: () = assert!(size_of::<SimplePacketJob>() <= 768);

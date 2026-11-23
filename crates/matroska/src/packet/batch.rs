@@ -409,7 +409,7 @@ pub(crate) struct PacketBatchJob {
     frame: usize,
     publish: usize,
     restore: Option<RestoreJob>,
-    ready: Option<SharedBytes>,
+    ready: SharedBytes,
     decoded_capacity: usize,
     failed: bool,
 }
@@ -468,7 +468,7 @@ impl PacketBatchJob {
             frame: 0,
             publish: 0,
             restore: None,
-            ready: None,
+            ready: SharedBytes::default(),
             decoded_capacity: 0,
             failed: false,
         })
@@ -715,7 +715,7 @@ impl PacketBatchJob {
                             // Exactly RestorePlan::identity's immutable source view.
                             // The same one-unit StartFrame admission and subsequent
                             // loop cancellation/Store work gate remain in force.
-                            self.ready = Some(std::mem::take(&mut self.source).into_slice(range)?);
+                            self.ready = std::mem::take(&mut self.source).into_slice(range)?;
                             self.phase = Phase::Store;
                             continue;
                         }
@@ -740,7 +740,7 @@ impl PacketBatchJob {
                                 // Charge transform admission, reserve, bytes and freeze.
                                 // Each lace still owns exactly its restored payload.
                                 work.take(size as u64 + 3);
-                                self.ready = Some(SharedBytes::from_core(bytes));
+                                self.ready = SharedBytes::from_core(bytes);
                                 self.phase = Phase::Store;
                                 continue;
                             }
@@ -767,7 +767,7 @@ impl PacketBatchJob {
                         .step(work, cancel)?
                     {
                         ParseStep::Event(bytes) => {
-                            self.ready = Some(bytes);
+                            self.ready = bytes;
                             self.restore = None;
                             self.phase = Phase::Store;
                         }
@@ -779,10 +779,9 @@ impl PacketBatchJob {
                         }
                         let frames = self.frames;
                         let track = &self.live_configuration()?.tracks()[self.track];
-                        let storage = self.ready.as_ref().required("missing restored frame")?;
                         let capacity = if frames != 1 {
                             self.decoded_capacity
-                                .checked_add(storage.retained_capacity())
+                                .checked_add(self.ready.retained_capacity())
                                 .ok_or(Error::Overflow)?
                         } else {
                             0
@@ -809,13 +808,14 @@ impl PacketBatchJob {
                         self.staged.prepare()?;
                         // Timing, limits and capacity are now validated. Consume
                         // the handle without an Arc clone/drop pair.
-                        let storage = self.ready.take().required("missing restored frame")?;
+                        let storage = std::mem::take(&mut self.ready);
                         let range = 0..storage.len();
                         let mut packet = Some(fields.finish(PacketData { storage, range }));
                         if let Err(error) = self.staged.push(&mut packet) {
                             // A core rejection returns the exact uncommitted value;
                             // keep the same restored owner pending for retry.
-                            self.ready = packet.map(|packet| packet.data.storage);
+                            self.ready = packet
+                                .map_or_else(SharedBytes::default, |packet| packet.data.storage);
                             return Err(error);
                         }
                         self.decoded_capacity = capacity;
@@ -908,7 +908,7 @@ crate::storage::usage::storage!(PacketBatchJob, |s| [
     s.configuration,
     s.staged,
     s.restore,
-    s.ready,
+    matches!(s.phase, Phase::Store).then_some(&s.ready),
     s.side,
     s.lace,
     s.group,
