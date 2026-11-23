@@ -19,22 +19,25 @@ use super::segment::{PageComposition, Placement, RegionComposition, Segments};
 use super::{AutomaticPalette, Parsed, ReceiverDecoder, Slot, push};
 use triergon_core::{BudgetVec, Result};
 
-/// Bytes held beyond the start, and the most at any one time.
+/// Bytes held beyond the start, and the most at any one time. A segment
+/// changes them by a few megabytes at most (a region's pixels, the census, a
+/// vector of 256 regions or of one segment's placements), so for any packet
+/// that fits in memory they stay far inside 64 bits.
 #[derive(Debug, Default)]
 struct Tally {
-    now: i128,
-    peak: i128,
+    now: i64,
+    peak: i64,
 }
 
 impl Tally {
     /// An allocation of `bytes` while everything counted so far is held.
     fn allocate(&mut self, bytes: usize) {
-        self.peak = self.peak.max(self.now + bytes as i128);
-        self.now += bytes as i128;
+        self.peak = self.peak.max(self.now + bytes as i64);
+        self.now += bytes as i64;
     }
 
     fn free(&mut self, bytes: usize) {
-        self.now -= bytes as i128;
+        self.now -= bytes as i64;
     }
 
     /// Grow a vector of `size`-byte elements, `(len, capacity)`, to hold
