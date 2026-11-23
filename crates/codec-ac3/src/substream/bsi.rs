@@ -110,9 +110,41 @@ impl Substream {
         if strmtyp == 1 && br.bit() {
             chanmap = Some(br.read(16) as u16);
         }
+        let dm = Self::parse_mixing_metadata(br, acmod, lfeon, strmtyp, num_blocks);
+        Self::skip_information_metadata(br, acmod, fscod);
+        if strmtyp == 0 && numblkscod != 3 {
+            br.skip(1); // convsync
+        }
+        if strmtyp == 2 {
+            let blkid = if numblkscod == 3 { true } else { br.bit() };
+            if blkid {
+                br.skip(6); // frmsizecod
+            }
+        }
+        if br.bit() {
+            let addbsil = br.read(6) as usize;
+            br.skip((addbsil + 1) * 8);
+        }
+        self.eac3 = true;
+        self.strmtyp = strmtyp;
+        self.set_config(acmod, lfeon, fscod, (hth_idx, 0), num_blocks, bsid);
+        self.dialnorm = dialnorm;
+        self.chanmap = chanmap;
+        self.downmix = dm;
+        Ok(())
+    }
+
+    /// mixmdate: downmix coefficients and per-program mixing data (Annex E 2.3).
+    #[inline(always)]
+    fn parse_mixing_metadata(
+        br: &mut BitReader<'_>,
+        acmod: u8,
+        lfeon: bool,
+        strmtyp: u8,
+        num_blocks: usize,
+    ) -> DownmixCodes {
         let mut dm = DownmixCodes::default();
         if br.bit() {
-            // mixmdate
             if acmod > 2 {
                 dm.dmixmod = Some(br.read(2) as u8);
             }
@@ -160,7 +192,7 @@ impl Substream {
                 }
                 if br.bit() {
                     // frmmixcfginfoe
-                    if numblkscod == 0 {
+                    if num_blocks == 1 {
                         br.skip(5);
                     } else {
                         for _ in 0..num_blocks {
@@ -172,8 +204,13 @@ impl Substream {
                 }
             }
         }
+        dm
+    }
+
+    /// infomdate: production and source properties (Annex E 2.3).
+    #[inline(always)]
+    fn skip_information_metadata(br: &mut BitReader<'_>, acmod: u8, fscod: u8) {
         if br.bit() {
-            // infomdate
             br.skip(5); // bsmod, copyrightb, origbs
             if acmod == 2 {
                 br.skip(4); // dsurmod, dheadphonmod
@@ -191,26 +228,6 @@ impl Substream {
                 br.skip(1); // sourcefscod
             }
         }
-        if strmtyp == 0 && numblkscod != 3 {
-            br.skip(1); // convsync
-        }
-        if strmtyp == 2 {
-            let blkid = if numblkscod == 3 { true } else { br.bit() };
-            if blkid {
-                br.skip(6); // frmsizecod
-            }
-        }
-        if br.bit() {
-            let addbsil = br.read(6) as usize;
-            br.skip((addbsil + 1) * 8);
-        }
-        self.eac3 = true;
-        self.strmtyp = strmtyp;
-        self.set_config(acmod, lfeon, fscod, (hth_idx, 0), num_blocks, bsid);
-        self.dialnorm = dialnorm;
-        self.chanmap = chanmap;
-        self.downmix = dm;
-        Ok(())
     }
 
     fn set_config(
