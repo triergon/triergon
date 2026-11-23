@@ -1921,7 +1921,7 @@
       "feature": "SP/SI slices",
       "documented": "crates/codec-h264/README.md#behaviour-and-limits",
       "clause": "ITU-T H.264 (08/2024) §§7.4.3 and 8.6.2",
-      "candidate": "Refuses the first SP or SI slice as unsupported; the worker goes on feeding the decoder after the refusal, and the pinned fold holds the pictures it then produces",
+      "candidate": "Refuses the first SP or SI slice as unsupported after outputting the same ten pictures as the reference.",
       "reference": "Decodes the stream",
       "detail": "SP/SI slices (Extended profile)",
       "cases": [
