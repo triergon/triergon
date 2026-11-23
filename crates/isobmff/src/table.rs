@@ -485,8 +485,8 @@ impl SampleTableBuilder {
         )
     }
 
-    /// A builder with both policies chosen. `Error::Invalid` for another box type or a box
-    /// from another budget pool.
+    /// A builder with both policies chosen. `Error::Invalid` for another box type,
+    /// `Error::ForeignPool` for a box from another budget pool.
     pub fn with_policy(
         raw: BoxView,
         budget: Budget,
@@ -497,9 +497,7 @@ impl SampleTableBuilder {
             return Err(Error::Invalid("not stbl"));
         }
         if !raw.bytes().belongs_to(&budget) {
-            return Err(Error::Invalid(
-                "metadata and index use different budget pools",
-            ));
+            return Err(Error::ForeignPool);
         }
         let boxes = raw.children(0, limits)?;
         Ok(Self {

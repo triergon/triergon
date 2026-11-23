@@ -412,8 +412,8 @@ pub struct FragmentBuilder {
 }
 impl FragmentBuilder {
     /// A builder for `raw`, a `traf` stored in `budget`, taking from `trex` the defaults
-    /// `tfhd` does not override. `Error::Invalid` for another box type, a box from another
-    /// budget pool or a zero first ordinal.
+    /// `tfhd` does not override. `Error::Invalid` for another box type or a zero first
+    /// ordinal, `Error::ForeignPool` for a box from another budget pool.
     pub fn new(
         raw: BoxView,
         trex: Trex,
@@ -439,9 +439,7 @@ impl FragmentBuilder {
             return Err(Error::Invalid("not traf"));
         }
         if !raw.bytes().belongs_to(&budget) {
-            return Err(Error::Invalid(
-                "fragment and index use different budget pools",
-            ));
+            return Err(Error::ForeignPool);
         }
         if context.first_ordinal == 0 {
             return Err(Error::Invalid("zero first fragment ordinal"));

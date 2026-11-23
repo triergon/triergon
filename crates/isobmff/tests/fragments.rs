@@ -497,3 +497,32 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
     }
     assert_eq!(exercised, 13);
 }
+
+#[test]
+fn a_box_from_another_pool_is_refused_by_the_table_and_fragment_builders() {
+    let case = CASES.iter().find(|c| c.name == "f-explicit").unwrap();
+    let budget = Budget::new(1024 * 1024).unwrap();
+    let other = Budget::new(1024 * 1024).unwrap();
+    let top = common::roots(&budget, case.bytes).unwrap();
+    let movie = top.iter().find(|b| b.header().kind == *b"moov").unwrap();
+    let trex = Trex::parse(&child(&child(movie, b"mvex").unwrap(), b"trex").unwrap()).unwrap();
+    let moof = top.iter().find(|b| b.header().kind == *b"moof").unwrap();
+    let context = FragmentContext {
+        moof_start: moof.header().start,
+        implicit_base: ImplicitBase::FirstTraf,
+        decode_origin: None,
+        first_ordinal: 1,
+        description_count: 1,
+    };
+    let traf = child(moof, b"traf").unwrap();
+    assert_eq!(
+        FragmentBuilder::new(traf, trex, context, other.clone(), Limits::default()).err(),
+        Some(Error::ForeignPool)
+    );
+    let media = child(&child(movie, b"trak").unwrap(), b"mdia").unwrap();
+    let table = child(&child(&media, b"minf").unwrap(), b"stbl").unwrap();
+    assert_eq!(
+        triergon_isobmff::table::SampleTableBuilder::new(table, other, Limits::default()).err(),
+        Some(Error::ForeignPool)
+    );
+}
