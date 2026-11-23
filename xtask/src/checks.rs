@@ -10,6 +10,8 @@ use crate::files;
 use crate::json::{self, Value};
 use crate::process::git;
 
+mod registry;
+
 /// Every relative link target in a tracked-style Markdown file must exist.
 pub fn links(root: &Path) -> Vec<String> {
     let mut errors = Vec::new();
@@ -113,6 +115,7 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         root,
         document(crate::exceptions::NOT_COMPARED),
     ));
+    errors.extend(registry::compat_errors(root, &data));
     errors.extend(crate::status::check(root, &data));
     errors.extend(crate::test_skips::design_errors(&data));
     if let Some(lanes) = document(crate::gate::lanes::FILE) {
@@ -139,12 +142,17 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         errors.push("FATE index misrepresents coverage/rights".into());
     }
     if errors.is_empty() {
-        Ok(format!(
+        let mut summary = format!(
             "Design integrity OK: {} harness data files, {} unmapped FATE identities.\n\
              This is not a feature-parity, performance, memory or FATE pass.",
             data.len(),
             cases.len()
-        ))
+        );
+        if let Some(one_sided) = registry::one_sided_summary(&registry::one_sided(&data)) {
+            summary.push('\n');
+            summary.push_str(&one_sided);
+        }
+        Ok(summary)
     } else {
         Err(errors)
     }
