@@ -449,7 +449,13 @@ packets emitted from then on carry it. One in a carrier that continues a PES ret
   `discard`.
 - **Backpressure and limits.** A rejected push returns the original bytes.
   `Backpressure` means caller-held output must be released; retry after releasing,
-  not in a loop. A total that cannot fit the pool returns `Limit`.
+  not in a loop. A request that cannot fit the pool by itself returns `Limit`. The
+  reader also counts what it holds itself when a PES of the stream grows, at the end
+  of the source and for an unframed run inside the stream, and returns `Limit` when
+  the request can never fit beside that. Its other copies inside the stream (an
+  access unit's bytes, a shared source event) report the pool's `Backpressure` as
+  it is: `Backpressure` while the caller holds no output means the pool is too small
+  for the stream.
 - **Cancellation.** Cancellation and backpressure preserve pending input.
 - **Clocks.** Invalid PCR signalling sets `clock_is_quarantined()` until an
   explicit `discontinuity()`. A signalled PCR discontinuity with a new PCR starts a
