@@ -157,14 +157,15 @@ impl AsMut<Slot> for Media {
 /// The page being processed; kept until every packet is handled, so a step that
 /// fails for want of memory resumes it.
 #[derive(Debug)]
+#[repr(C)]
 struct Current {
-    page: Page,
     /// The page's logical stream, once looked up.
     stream: Option<usize>,
-    /// Its packets are in [`Reader::completed`].
-    assembled: bool,
+    page: Page,
     /// The first completed packet not yet handled.
     next: usize,
+    /// Its packets are in [`Reader::completed`].
+    assembled: bool,
 }
 
 /// A resumable Ogg reader. Errors other than backpressure are sticky until
