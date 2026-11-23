@@ -287,10 +287,21 @@ fn bounded_timing_range_playback_preserves_packets_and_seeks() {
         };
         assert_eq!(track.table().sample_count(), 6);
         assert_eq!(track.table().timing_run_surplus(), surplus);
-        assert!(matches!(
-            Mp4IndexJob::new(&opened.movie, PlanLimits::default()),
-            Err(C::Invalid("source view requires exact timing coverage"))
-        ));
+        // The source view reads the six samples the runs cover (ISO/IEC 14496-12
+        // sections 8.6.1.2 and 8.6.1.3), as the demux view does.
+        {
+            let mut source = Mp4IndexJob::new(&opened.movie, PlanLimits::default()).unwrap();
+            assert!((0..100_000).any(|_| source.poll(&mut WorkBudget::new(3), &off()).unwrap()));
+            let source = source.finish().unwrap();
+            assert_eq!(source.source_rows().len(), 6);
+            for (index, row) in source.source_rows().iter().enumerate() {
+                assert_eq!(row.sample.dts_ticks, Some(index as i128 * 1000));
+                assert_eq!(
+                    row.sample.cts_ticks,
+                    Some(index as i128 * 1000 + i128::from(offset))
+                );
+            }
+        }
         assert!(compat::mov::index(&opened.movie, PlanLimits::default()).is_ok());
 
         let mut job = Mp4RangeOpen::new(&opened.movie, None, PlanLimits::default()).unwrap();

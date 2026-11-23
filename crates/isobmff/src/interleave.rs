@@ -350,13 +350,13 @@ impl ForwardRegularMdat {
 impl<'a> PhysicalSampleCursor<'a> {
     /// A merge that checks the metadata only: the caller checks that samples lie inside
     /// an `mdat` before reading them. Fails as
-    /// [`with_timing_policy`](Self::with_timing_policy) does under the strict policy.
+    /// [`with_timing_policy`](Self::with_timing_policy) does under the default policy.
     pub fn new(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
-        Self::with_timing_policy(budget, tracks, None, limits, TimingRunPolicy::Strict)
+        Self::with_timing_policy(budget, tracks, None, limits, TimingRunPolicy::default())
     }
     /// Checks samples during polling against ascending, disjoint `mdat` payload extents.
     /// A sample outside the extents is invalid. Backward layout is refused after every
@@ -372,7 +372,7 @@ impl<'a> PhysicalSampleCursor<'a> {
             tracks,
             Some(media_extents),
             limits,
-            TimingRunPolicy::Strict,
+            TimingRunPolicy::default(),
         )
     }
     /// A merge for a forward-only source whose movie comes first: `media` must be exactly
@@ -402,10 +402,10 @@ impl<'a> PhysicalSampleCursor<'a> {
     pub fn deferred_media(&self) -> bool {
         self.deferred_media
     }
-    /// A merge with optional `media_extents` and a chosen timing policy; under
-    /// [`TimingRunPolicy::BoundedPrefix`] the samples of a table with surplus timing runs
-    /// are merged too. `Error::Limit` above `max_tracks`; `Error::Invalid` for a repeated
-    /// track ID or, under the strict policy, a table whose timing runs are not exact.
+    /// A merge with optional `media_extents` and a chosen timing policy; only under
+    /// [`TimingRunPolicy::Strict`] is a table with surplus timing runs refused.
+    /// `Error::Limit` above `max_tracks`; `Error::Invalid` for a repeated track ID or,
+    /// under the strict policy, a table whose timing runs are not exact.
     pub fn with_timing_policy(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],

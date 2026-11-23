@@ -158,8 +158,8 @@ neutral track key against its source track and each neutral demux clock and
 trim against the underlying packet or MP4 occurrence.
 The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
 checks sample decode and composition times before the movie's edit list. For
-surplus timing runs, it checks strict indexing and the bounded compatibility
-index as separate operations.
+surplus timing runs, it checks the default opener and the explicit bounded
+opener as separate operations.
 
 ## Supported
 
@@ -269,10 +269,10 @@ edits that require revisiting media bytes.
 Opus track's declared preroll. Decode from the reported first sample and
 present PCM from the video landing through the track's edited end. A refused
 recovery leaves the active playback generation and ordinary seek available.
-For a file with surplus timing entries, `Mp4Open::with_timing_policy` can
-use the timing prefix covered by the sample sizes for forward playback and
-`Mp4RangeOpen`. Each track's table reports the unused timing occurrences. The source playback view
-requires exact coverage. `subp` tracks are subtitle tracks.
+A file whose timing runs count more samples than it has plays the samples the
+runs cover, in every view; each track's table reports the unused timing
+occurrences. `Mp4Open::with_timing_policy` can refuse such a file instead.
+`subp` tracks are subtitle tracks.
 
 The MOV demux packet view opens with `Mp4Open::new_recovery`. When
 the opener read the metadata before any media

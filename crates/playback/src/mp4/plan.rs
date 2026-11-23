@@ -665,11 +665,7 @@ impl<'a> Mp4IndexJob<'a> {
             max_tracks: limits.tracks,
             max_samples: limits.samples,
         };
-        let timing_policy = if view == PlanView::Source {
-            iso::table::TimingRunPolicy::Strict
-        } else {
-            iso::table::TimingRunPolicy::BoundedPrefix
-        };
+        let timing_policy = iso::table::TimingRunPolicy::default();
         let forward_regular = match movie.read_scope() {
             crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(h)
                 if movie.terminal_mdat().is_none()

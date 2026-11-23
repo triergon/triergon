@@ -253,9 +253,8 @@ pub struct SourceSeekPlanner<'a> {
 impl<'a> SourceSeekPlanner<'a> {
     /// A planner for `request` on `source`, whose samples must lie in
     /// `media_extents`, absolute byte ranges of the file's media. Fails with
-    /// `Error::Invalid` for a zero target ordinal or a sample table whose timing runs
-    /// do not cover its samples exactly, and `Error::Limit` for more fragments or
-    /// extents than `limits` allow.
+    /// `Error::Invalid` for a zero target ordinal, and `Error::Limit` for more
+    /// fragments or extents than `limits` allow.
     pub fn new(
         source: SourceTrack<'a>,
         request: SourceSeekRequest,
@@ -265,7 +264,6 @@ impl<'a> SourceSeekPlanner<'a> {
         if request.target_ordinal == 0 {
             return Err(Error::Invalid("zero seek sample ordinal"));
         }
-        source.require_exact_timing()?;
         count_limit(source.fragment_indexes().len(), limits.max_fragments)?;
         count_limit(media_extents.len(), limits.max_media_extents)?;
         let next_ordinal = source

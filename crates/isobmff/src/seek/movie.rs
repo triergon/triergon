@@ -293,16 +293,14 @@ pub struct SourceCompositionLookup<'a> {
 }
 impl<'a> SourceCompositionLookup<'a> {
     /// A lookup for the media time `requested` on `source`, whose samples count in
-    /// `media_base`. Fails with `Error::Invalid` for a sample table whose timing runs
-    /// do not cover its samples exactly; polling fails with `Error::Limit` past
-    /// `max_samples` scanned samples.
+    /// `media_base`. Polling fails with `Error::Limit` past `max_samples` scanned
+    /// samples.
     pub fn new(
         source: SourceTrack<'a>,
         requested: Time,
         media_base: TimeBase,
         max_samples: u64,
     ) -> Result<Self> {
-        source.require_exact_timing()?;
         Ok(Self {
             cursor: TrackSampleCursor::new(source),
             requested,
@@ -633,15 +631,13 @@ pub struct MovieSourceSeekPlanner<'a> {
     phase: Phase<'a>,
 }
 impl<'a> MovieSourceSeekPlanner<'a> {
-    /// A planner for the movie time `requested`. Fails with `Error::Invalid` for a
-    /// sample table whose timing runs do not cover its samples exactly, `Error::Limit`
-    /// for more recovery scopes than `limits` allow, and as [`MovieEditLocator::new`].
+    /// A planner for the movie time `requested`. Fails with `Error::Limit` for more
+    /// recovery scopes than `limits` allow, and as [`MovieEditLocator::new`].
     pub fn new(
         context: MovieSourceSeekContext<'a>,
         requested: Time,
         limits: MovieSeekLimits,
     ) -> Result<Self> {
-        context.source.require_exact_timing()?;
         if context.recovery_scopes.len() > limits.max_recovery_scopes {
             return Err(Error::Limit {
                 requested: context.recovery_scopes.len(),

@@ -4,6 +4,11 @@ Decode time accumulates the sample deltas from stts, or starts at a fragment's
 tfdt and accumulates trun durations. Composition time adds the ctts or trun
 offset, unsigned in version zero and signed in version one. The edit list maps
 media composition time to movie time, leaving all these media-time rows intact.
+
+The sample size box gives the number of samples (8.7.3.1). A timing run gives
+the delta or offset of the samples it covers (8.6.1.2, 8.6.1.3), and no clause
+says what the runs total: runs past the last sample of a nonempty table time
+no sample and are not read. Runs that leave a sample uncovered are refused.
 """
 
 from dataclasses import dataclass
@@ -93,7 +98,7 @@ def check_edits(track: list[Box]) -> None:
             raise InvalidMovie("edit media time is less than the empty-edit marker")
 
 
-def run_values(box: Box, count: int, bounded: bool = False) -> list[int]:
+def run_values(box: Box, count: int) -> list[int]:
     signed = box.kind == b"ctts" and version(box) == 1
     entries = integer(box.payload, 4)
     if len(box.payload) != 8 + entries * 8:
@@ -106,10 +111,8 @@ def run_values(box: Box, count: int, bounded: bool = False) -> list[int]:
         if repeat == 0:
             raise InvalidMovie("zero-length timing run")
         remaining = count - len(result)
-        if repeat > remaining and not (
-            bounded and count > 0 and (box.kind == b"ctts" or index + 1 == entries)
-        ):
-            raise InvalidMovie("timing run extends past the sample count")
+        if repeat > remaining and count == 0:
+            raise InvalidMovie("timing run in a table without samples")
         result.extend([value] * min(remaining, repeat))
     if len(result) != count:
         raise InvalidMovie("timing runs do not cover the declared samples")
@@ -130,7 +133,7 @@ class TrackClock:
         self.end = start + sum(durations)
 
 
-def movie_tracks(movie: Box, bounded: bool) -> tuple[dict[int, TrackClock], dict[int, int]]:
+def movie_tracks(movie: Box) -> tuple[dict[int, TrackClock], dict[int, int]]:
     children = movie.children()
     tracks = {}
     defaults = {}
@@ -149,9 +152,9 @@ def movie_tracks(movie: Box, bounded: bool) -> tuple[dict[int, TrackClock], dict
         count = integer(sizes.payload, 8)
         if count > MAX_SAMPLES:
             raise InvalidMovie("sample count exceeds the oracle bound")
-        delta = run_values(find(table, b"stts"), count, bounded)
+        delta = run_values(find(table, b"stts"), count)
         composition = find(table, b"ctts", required=False)
-        offsets = run_values(composition, count, bounded) if composition else [0] * count
+        offsets = run_values(composition, count) if composition else [0] * count
         tracks[track_id] = TrackClock(scale, 0, [])
         tracks[track_id].append(0, delta, offsets)
     mvex = find(children, b"mvex", required=False)
@@ -214,7 +217,7 @@ def trace(path: Path, *arguments: str) -> list[str]:
         raise ValueError("expected an MP4 opener followed by clock")
     try:
         roots = list(boxes(memoryview(path.read_bytes())))
-        tracks, defaults = movie_tracks(find(roots, b"moov"), arguments[0] == "mp4-timing-policy")
+        tracks, defaults = movie_tracks(find(roots, b"moov"))
         for moof in (root for root in roots if root.kind == b"moof"):
             add_fragment(moof, tracks, defaults)
     except InvalidMovie:

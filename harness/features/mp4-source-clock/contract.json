@@ -7,7 +7,7 @@
   "worker_operation": "source-view-",
   "contract": [
     "Compare MP4 media time before movie edits. The independent ISO/IEC 14496-12 oracle expands stts and ctts in decode order, treats ctts and trun offsets according to their box version, reads fragment decode bases and durations, and keeps media times on the mdhd timescale across edits.",
-    "Emit kind 3 with track ID, time-base numerator and denominator, PTS, DTS and duration in per-track decode order by ascending track ID. Emit kind 7 on clean end or kind 8 on refusal. For the malformed timing controls, compare strict source indexing separately from the compatibility index with the explicit BoundedPrefix opener. Both project source ticks through PacketInfo."
+    "Emit kind 3 with track ID, time-base numerator and denominator, PTS, DTS and duration in per-track decode order by ascending track ID. Emit kind 7 on clean end or kind 8 on refusal. For the surplus timing controls, whose runs count more samples than the sample size box has, compare the default opener and the explicit BoundedPrefix opener: both read the times of the samples the runs cover. Both project source ticks through PacketInfo."
   ],
   "required_profiles": [
     "mp4",

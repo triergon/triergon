@@ -859,17 +859,6 @@
    ]
   },
   {
-   "name": "open-index/bad-stts-count-mismatch",
-   "sha256": "a73197cdcf9dc89806f8d01899d5c28225a3e981bc139a1d23356491caef057a",
-   "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "4d5a19be5a6ca52e36e0af054cb4f0b68ffd62fd3d8d7631fe81d3ff8b7850e8",
-   "differences": [
-    [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
-    [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
-   ]
-  },
-  {
    "name": "open-index/order-rational-2999999-over-3000000",
    "sha256": "a783c6295d7506610edb687c693e61ce65d73de00f6bb2249faab46b7fa8023a",
    "dispositions": ["cross-track-order"],
@@ -1228,17 +1217,6 @@
    "differences": [
     [1, null, null, "packets", 0, 6, "times-beyond-i64"],
     [null, null, null, "end", "error: arithmetic overflow", "eof", "times-beyond-i64"]
-   ]
-  },
-  {
-   "name": "open-index/bad-ctts-count-mismatch",
-   "sha256": "fb888b9ef7a2e2eba2e00fc4e417be33ed690c32b18044cf1ac43fd9d454eb64",
-   "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "4d5a19be5a6ca52e36e0af054cb4f0b68ffd62fd3d8d7631fe81d3ff8b7850e8",
-   "differences": [
-    [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
-    [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
    ]
   },
   {
@@ -3633,12 +3611,12 @@
   {
    "name": "isobmff/field-recovery/mdhd-zero-ctts.mov",
    "sha256": "d6d48389d5dd7179fa34fd58455577ab128534bb22a24444bad88be751c19ee0",
-   "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "4d5a19be5a6ca52e36e0af054cb4f0b68ffd62fd3d8d7631fe81d3ff8b7850e8",
+   "dispositions": ["zero-timescale"],
+   "difference_sha256": "b2e4bf18769e11f72072fa54a3beeb4dc25fd5be30bbb5a93505eaad14f9c1aa",
    "differences": [
-    [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
-    [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
+    [1, null, null, "packets", 0, 6, "zero-timescale"],
+    [null, null, null, "streams", [], [1], "zero-timescale"],
+    [null, null, null, "end", "error: invalid data: zero media/movie timescale", "eof", "zero-timescale"]
    ]
   },
   {
@@ -3763,28 +3741,6 @@
    ]
   },
   {
-   "name": "isobmff/run-recovery/run57-02-r-front-stco-lastcount8.mov",
-   "sha256": "3ad74ba110e7cf15f3356e5d506ef9103318fa48a7e5b6062bfde75d1abfb0a8",
-   "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "4d5a19be5a6ca52e36e0af054cb4f0b68ffd62fd3d8d7631fe81d3ff8b7850e8",
-   "differences": [
-    [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
-    [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
-   ]
-  },
-  {
-   "name": "isobmff/run-recovery/run57-03-r-front-stco-lastcount12.mov",
-   "sha256": "569ac9ad599da464c75a684137db3cc6bbd183604a0c70e26f840116294e0bb2",
-   "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "4d5a19be5a6ca52e36e0af054cb4f0b68ffd62fd3d8d7631fe81d3ff8b7850e8",
-   "differences": [
-    [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
-    [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
-   ]
-  },
-  {
    "name": "isobmff/run-recovery/run57-04-r-front-stco-lastcount5.mov",
    "sha256": "1a8e715760ca5599d32af710f7b769fa5982e6495fd656b56ca3702cc03f4413",
    "dispositions": ["inconsistent-sample-table"],
@@ -3804,28 +3760,6 @@
     [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
     [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
     [null, null, null, "end", "error: invalid data: zero sample count in time run", "eof", "inconsistent-sample-table"]
-   ]
-  },
-  {
-   "name": "isobmff/run-recovery/run57-07-r-vfr-lastcount2.mov",
-   "sha256": "a8e289afbb095b111a96414be29cd252ac3c6649a7aaea98152f474acda2188e",
-   "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "4d5a19be5a6ca52e36e0af054cb4f0b68ffd62fd3d8d7631fe81d3ff8b7850e8",
-   "differences": [
-    [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
-    [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
-   ]
-  },
-  {
-   "name": "isobmff/run-recovery/run57-08-r-vfr-lastcount8.mov",
-   "sha256": "48aa033844be47ac01ff75519bdcf4dcaba3737de06f74cab9b4a02b20e55d13",
-   "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "4d5a19be5a6ca52e36e0af054cb4f0b68ffd62fd3d8d7631fe81d3ff8b7850e8",
-   "differences": [
-    [1, null, null, "packets", 0, 6, "inconsistent-sample-table"],
-    [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
    ]
   },
   {
@@ -3986,11 +3920,11 @@
    "name": "isobmff/direct-recovery/desc-zero-ctts.mov",
    "sha256": "0f07b76aaac2134f031393a572ef29853845b05a4c70ee85a13ca7bd43a130f0",
    "dispositions": ["inconsistent-sample-table"],
-   "difference_sha256": "374160019e6771b9c1d54fb3805c8c79ef070cafb2d213f4de69f21269666575",
+   "difference_sha256": "ff8a4ecb96e8531b4fda711f821bd0373876dd9089a5e78b3e6145c0ac13e2c9",
    "differences": [
     [1, null, null, "packets", 0, 5, "inconsistent-sample-table"],
     [null, null, null, "streams", [], [1], "inconsistent-sample-table"],
-    [null, null, null, "end", "error: invalid data: time run exceeds sample count", "eof", "inconsistent-sample-table"]
+    [null, null, null, "end", "error: invalid data: stsc order/count/description", "eof", "inconsistent-sample-table"]
    ]
   },
   {

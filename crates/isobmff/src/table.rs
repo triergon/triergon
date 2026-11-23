@@ -22,11 +22,16 @@ pub(crate) mod rows;
 /// the sample size table has.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TimingRunPolicy {
-    /// The runs must count exactly the sample count; otherwise `Error::Invalid`.
-    #[default]
+    /// The runs must count exactly the sample count; otherwise `Error::Invalid`. For a
+    /// caller that checks a file's consistency: ISO/IEC 14496-12 puts no rule on what
+    /// the runs total.
     Strict,
-    /// For a nonempty table, the final decode run may straddle the end and
-    /// composition runs may overrun it. Every run must declare at least one sample.
+    /// The runs of a nonempty table may count more samples than it has. Each sample's
+    /// times come from the runs that cover it (ISO/IEC 14496-12 sections 8.6.1.2 and
+    /// 8.6.1.3); the rest is not read, and [`SampleTable::timing_run_surplus`] reports
+    /// it. Every run must declare at least one sample, and the runs must cover every
+    /// sample.
+    #[default]
     BoundedPrefix,
 }
 
@@ -41,7 +46,8 @@ pub enum SyncSamplePolicy {
     BoundedPrefix,
 }
 
-/// Validation policies for regular sample tables. Both are strict by default.
+/// Validation policies for regular sample tables. By default surplus timing runs are
+/// left unread and sync sample entries are strict.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SampleTablePolicy {
     /// How timing runs must cover the samples.
@@ -455,10 +461,10 @@ impl SampleTableBuilder {
         self.acceptance = Acceptance::LegacyDependencyFlags;
     }
 
-    /// Validates an `stbl` with strict timing and sync counts. Fails for another box
-    /// type or budget pool, as in [`with_policy`](Self::with_policy).
+    /// Validates an `stbl` with the default policies. Fails for another box type or
+    /// budget pool, as in [`with_policy`](Self::with_policy).
     pub fn new(raw: BoxView, budget: Budget, limits: Limits) -> Result<Self> {
-        Self::with_timing_policy(raw, budget, limits, TimingRunPolicy::Strict)
+        Self::with_timing_policy(raw, budget, limits, TimingRunPolicy::default())
     }
 
     /// Selects timing validation while keeping sync entries strict.
@@ -752,9 +758,6 @@ impl Findings {
                             let decode = rows.check == Check::Decode;
                             if policy.timing_runs == TimingRunPolicy::Strict
                                 || t.sample_count() == 0
-                                || (decode
-                                    && (rows.row + 1 != source.count
-                                        || rows.total >= t.sample_count()))
                             {
                                 return Err(Error::Invalid("time run exceeds sample count"));
                             }

@@ -46,8 +46,8 @@ pub struct RunCoverage {
     pub(crate) strict_error: Error,
 }
 /// Builds a [`RunRecoveryTable`] from an `stbl` box whose runs overrun its sample count, as
-/// FFmpeg's MOV demuxer reads it. Only the last `stts` run may pass the sample count, and it
-/// must start inside it; any `ctts` run may. `stss` entries out of order or past the last
+/// FFmpeg's MOV demuxer reads it: `stts` and `ctts` runs past the last sample are not read.
+/// `stss` entries out of order or past the last
 /// sample are accepted too, and every sample then has unknown access. All other checks and
 /// limits are those of [`SampleTableBuilder`].
 #[derive(Debug)]

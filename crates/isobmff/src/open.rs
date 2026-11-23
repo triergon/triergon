@@ -633,7 +633,7 @@ impl MovieOpen {
         Ok(Self {
             reader,
             native_recovery,
-            timing_policy: TimingRunPolicy::Strict,
+            timing_policy: TimingRunPolicy::default(),
             prefer_front,
             limits,
             pool: pool.clone(),

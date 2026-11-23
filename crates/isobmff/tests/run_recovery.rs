@@ -8,7 +8,7 @@ use triergon_isobmff::{
     compat::mov::recovery::{RunKind, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable},
     interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
     seek::{SourceCompositionLookup, SourceSeekLimits, SourceSeekPlanner, SourceSeekRequest},
-    table::{SampleTableBuilder, TimingRunPolicy},
+    table::{SampleTableBuilder, TimingRunPolicy, TimingRunSurplus},
 };
 const STTS: &[u8] = include_bytes!("fixtures/bad-stts-count-mismatch.mov");
 const CTTS: &[u8] = include_bytes!("fixtures/bad-ctts-count-mismatch.mov");
@@ -57,11 +57,39 @@ fn clock_prefix(table: &RunRecoveryTable) -> Vec<(u64, i128, i128)> {
     rows
 }
 #[test]
-fn strict_stts_and_ctts_errors_remain_exact() {
+fn surplus_timing_runs_are_left_unread_unless_the_strict_policy_is_chosen() {
+    // The runs count seven and twelve samples where the sample sizes give six. Each
+    // sample's times come from the runs that cover it (ISO/IEC 14496-12 sections
+    // 8.6.1.2 and 8.6.1.3), and no clause says what the runs total.
     let p = Budget::new(1 << 20).unwrap();
-    for bytes in [STTS, CTTS] {
+    for (bytes, surplus) in [
+        (
+            STTS,
+            TimingRunSurplus {
+                decode_samples: 1,
+                composition_samples: 0,
+            },
+        ),
+        (
+            CTTS,
+            TimingRunSurplus {
+                decode_samples: 0,
+                composition_samples: 6,
+            },
+        ),
+    ] {
+        let table = common::table(stbl(bytes, &p), &p, 1).unwrap();
+        assert_eq!(table.sample_count(), 6);
+        assert_eq!(table.timing_run_surplus(), surplus);
+        let mut strict = SampleTableBuilder::with_timing_policy(
+            stbl(bytes, &p),
+            p.clone(),
+            Limits::default(),
+            TimingRunPolicy::Strict,
+        )
+        .unwrap();
         assert_eq!(
-            common::table(stbl(bytes, &p), &p, 1).unwrap_err(),
+            strict.poll(&mut WorkBudget::new(4096)).unwrap_err(),
             Error::Invalid("time run exceeds sample count")
         );
     }
@@ -102,7 +130,7 @@ fn bounded_timing_keeps_short_runs_and_invalid_sync_entries_strict() {
 }
 
 #[test]
-fn source_only_cursors_require_exact_timing_coverage() {
+fn source_cursors_and_planners_read_a_table_with_surplus_timing_runs() {
     let pool = Budget::new(1 << 20).unwrap();
     let base = TimeBase::new(1, 1000).unwrap();
     let start = Time::from_ticks(0, base).unwrap();
@@ -122,32 +150,24 @@ fn source_only_cursors_require_exact_timing_coverage() {
         let table = builder.finish().unwrap();
         let source = SourceTrack::new(1, Some(&table), &[]).unwrap();
         let limits = PhysicalInterleaveLimits::default();
+        assert!(PhysicalSampleCursor::new(&pool, &[source], limits).is_ok());
         assert_eq!(
-            PhysicalSampleCursor::new(&pool, &[source], limits).err(),
-            error
-        );
-        assert!(
             PhysicalSampleCursor::with_timing_policy(
                 &pool,
                 &[source],
                 None,
                 limits,
-                TimingRunPolicy::BoundedPrefix,
+                TimingRunPolicy::Strict,
             )
-            .is_ok()
+            .err(),
+            error
         );
         let request = SourceSeekRequest {
             target_ordinal: 1,
             preroll_samples: 0,
         };
-        assert_eq!(
-            SourceSeekPlanner::new(source, request, &[], SourceSeekLimits::default()).err(),
-            error
-        );
-        assert_eq!(
-            SourceCompositionLookup::new(source, start, base, 64).err(),
-            error
-        );
+        assert!(SourceSeekPlanner::new(source, request, &[], SourceSeekLimits::default()).is_ok());
+        assert!(SourceCompositionLookup::new(source, start, base, 64).is_ok());
     }
 }
 
@@ -240,14 +260,19 @@ fn ctts_unused_trailing_zero_is_still_rejected() {
     );
 }
 #[test]
-fn nonfinal_decode_surplus_is_not_recovered() {
+fn a_decode_run_before_the_last_may_pass_the_sample_count() {
+    // The first run counts seven samples where the table has six: it covers them
+    // all, and the runs after it time no sample.
     let mut bytes = include_bytes!("fixtures/r-vfr.mov").to_vec();
     let at = bytes.windows(4).position(|b| b == b"stts").unwrap();
     bytes[at + 12..at + 16].copy_from_slice(&7u32.to_be_bytes());
     let p = Budget::new(1 << 20).unwrap();
+    let table = build(&bytes, &p, 1).unwrap();
+    let coverage = table.coverage()[0].unwrap();
+    assert!(coverage.declared_samples > coverage.bounded_samples);
     assert_eq!(
-        build(&bytes, &p, 1).unwrap_err(),
-        Error::Invalid("time run exceeds sample count")
+        coverage.surplus_samples,
+        coverage.declared_samples - coverage.bounded_samples
     );
 }
 #[test]

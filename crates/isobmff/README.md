@@ -270,12 +270,14 @@ Limits of the reader:
   `FragmentContext::decode_origin` has unknown DTS/CTS, not zero.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
-- **Table policies.** By default timing runs must cover the sample count exactly
-  and an out-of-range `stss` entry is refused. `SampleTableBuilder` can opt into
-  `TimingRunPolicy::BoundedPrefix` (QuickTime-style overlong runs, reported by
-  `SampleTable::timing_run_surplus`) and `SyncSamplePolicy::BoundedPrefix` (unused
-  entries counted by `SampleTable::unused_sync_entries`, never seek points). The
-  source seek planners and default physical cursors require exact coverage.
+- **Table policies.** A sample's times come from the `stts` and `ctts` runs that
+  cover it, and ISO/IEC 14496-12 puts no rule on what the runs total: by default
+  the runs of a nonempty table may count more samples than it has, the rest is not
+  read, and `SampleTable::timing_run_surplus` reports it. Runs that leave a sample
+  uncovered are refused. `TimingRunPolicy::Strict` refuses surplus runs too, for a
+  caller that checks a file's consistency. By default an out-of-range `stss` entry
+  is refused; `SyncSamplePolicy::BoundedPrefix` counts such entries in
+  `SampleTable::unused_sync_entries` and never seeks to them.
 - **Payload ranges.** `SampleReader::new` requires the sample inside the caller's
   `mdat` payload extent; `PhysicalSampleCursor::new_with_media_extents` checks every
   track first and returns `Unsupported` for valid backward-ordered layouts. Physical

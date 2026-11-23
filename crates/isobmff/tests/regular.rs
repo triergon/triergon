@@ -208,7 +208,7 @@ fn original_regular_corpus_and_explicit_specification_gaps() {
             indexed += 1;
         }
     }
-    assert_eq!((indexed, unsupported, malformed), (30, 0, 10));
+    assert_eq!((indexed, unsupported, malformed), (32, 0, 8));
 }
 
 #[test]
