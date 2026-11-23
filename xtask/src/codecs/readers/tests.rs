@@ -89,6 +89,7 @@ fn format_rules() -> FormatRules {
         media: vec!["audio".to_owned()],
         align_by: SIZE,
         apart: false,
+        native_dts_from_pts: false,
         native: ViewRules {
             compare: all.clone(),
             duration_excludes_padding: true,
@@ -98,6 +99,32 @@ fn format_rules() -> FormatRules {
             duration_excludes_padding: false,
         }),
     }
+}
+
+#[test]
+fn native_dts_absence_keeps_the_numeric_clock_comparison() {
+    let mut rules = format_rules();
+    rules.native_dts_from_pts = true;
+    let rows = r#"{"track":0,"size":1,"time_base":[1,48000],"pts":12,"dts":null,"duration":1536}
+{"end":"eof","tracks":[{"index":0}]}"#;
+    let candidate = parse_candidate(rows, &rules, &[0]).unwrap();
+    let fabricated = rows.replace("\"dts\":null", "\"dts\":12");
+    assert!(parse_candidate(&fabricated, &rules, &[0]).is_err());
+    let reference = reference_of(vec![[
+        Some(1),
+        None,
+        Some(12),
+        Some(13),
+        Some(1536),
+        None,
+        None,
+    ]]);
+    let comparison = Comparison::new(&candidate, &reference, &rules);
+    let differences = comparison.differences(View::Native, &rules.native);
+    assert_eq!(differences.len(), 1);
+    assert_eq!(differences[0].field, "dts");
+    assert_eq!(differences[0].ours, Value::int(12));
+    assert_eq!(differences[0].theirs, Value::int(13));
 }
 
 #[test]

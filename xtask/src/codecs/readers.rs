@@ -162,6 +162,8 @@ struct FormatRules {
     align_by: usize,
     /// Packets that differ in both the aligned field and the size never pair.
     apart: bool,
+    /// Check that the reader leaves DTS absent and compare its PTS to synthesized DTS.
+    native_dts_from_pts: bool,
     native: ViewRules,
     compat: Option<ViewRules>,
 }
@@ -409,6 +411,9 @@ impl Rules {
                         media,
                         align_by,
                         apart: false,
+                        native_dts_from_pts: rules
+                            .get("native_dts_from_pts")
+                            .is_some_and(Value::truthy),
                         native,
                         compat,
                     },
@@ -956,7 +961,7 @@ fn candidate(
     format: &str,
     path: &str,
     mode: Mode<'_>,
-    streams: Streams,
+    rules: &FormatRules,
     audio: &[i128],
     fields: &mut Vec<(String, Value)>,
 ) -> Result<Result<Candidate, String>, Stop> {
@@ -1031,11 +1036,11 @@ fn candidate(
             return Ok(Err("push rows differ from blocking rows".into()));
         }
     }
-    Ok(parse_candidate(&stdout, streams, audio))
+    Ok(parse_candidate(&stdout, rules, audio))
 }
 
 /// Read `codec-worker packets` output; an error describes output that breaks its format.
-fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Candidate, String> {
+fn parse_candidate(stdout: &str, rules: &FormatRules, audio: &[i128]) -> Result<Candidate, String> {
     let lines = python::splitlines(stdout);
     let (last, lines) = lines.split_last().ok_or("codec-worker printed nothing")?;
     let end = python::loads(last).ok_or("codec-worker: the last line is not JSON")?;
@@ -1052,7 +1057,7 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
     // FFmpeg replaces a link's streams in place: the n-th track of every chain link is
     // stream n. An elementary stream's one track is FFmpeg's first audio stream.
     let stream_of = |index: i128| -> Option<i128> {
-        match streams {
+        match rules.streams {
             Streams::FirstAudio => Some(audio.first().copied().unwrap_or(0)),
             Streams::PositionInLink => {
                 let link = link(index);
@@ -1108,6 +1113,11 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
             None => {}
         }
         let track = int(packet.get("track")).ok_or("codec-worker: packet without track")?;
+        if rules.native_dts_from_pts && packet.get("dts") != Some(&Value::Null) {
+            return Err(format!(
+                "codec-worker: expected null native DTS on track {track}"
+            ));
+        }
         let time_base = packet
             .get("time_base")
             .and_then(Value::as_array)
@@ -1281,6 +1291,7 @@ impl Difference {
 struct Comparison<'a> {
     candidate: &'a Candidate,
     reference: &'a Reference,
+    native_dts_from_pts: bool,
     streams: Vec<Aligned>,
 }
 
@@ -1312,15 +1323,24 @@ impl<'a> Comparison<'a> {
                     .iter()
                     .find(|(s, _)| *s == stream)
                     .map(|(_, b)| *b);
-                let projected = |view: fn(&Emitted) -> Option<Fields>| {
-                    let mut fields: Vec<Fields> = ours.iter().filter_map(view).collect();
+                let projected = |mut fields: Vec<Fields>| {
                     if let (Some(first), Some(to)) = (ours.first(), to) {
                         project(&mut fields, first.time_base, to);
                     }
                     fields
                 };
-                let native = projected(|p| Some(p.native));
-                let compat = projected(|p| p.compat);
+                let native = projected(
+                    ours.iter()
+                        .map(|p| {
+                            let mut fields = p.native;
+                            if rules.native_dts_from_pts {
+                                fields[DTS] = fields[PTS];
+                            }
+                            fields
+                        })
+                        .collect(),
+                );
+                let compat = projected(ours.iter().filter_map(|p| p.compat).collect());
                 let keys = |packets: &[Fields]| -> Vec<Key> {
                     packets
                         .iter()
@@ -1339,6 +1359,7 @@ impl<'a> Comparison<'a> {
         Comparison {
             candidate,
             reference,
+            native_dts_from_pts: rules.native_dts_from_pts,
             streams,
         }
     }
@@ -1514,9 +1535,15 @@ impl<'a> Comparison<'a> {
                         })
             }
             Relation::Unprojected => d.stream.zip(d.candidate).is_some_and(|(stream, c)| {
+                let field = if view == View::Native && self.native_dts_from_pts && d.field == "dts"
+                {
+                    Some(PTS)
+                } else {
+                    field_index(d.field)
+                };
                 let raw = packets_of(&self.candidate.streams, stream)
                     .get(c)
-                    .and_then(|p| field_index(d.field).and_then(|f| p.native[f]));
+                    .and_then(|p| field.and_then(|f| p.native[f]));
                 raw.is_some() && raw == theirs_value
             }),
             Relation::PlusUnmatchedDurations => {
@@ -1841,7 +1868,7 @@ fn grade_case(
         format,
         path,
         mode,
-        rules.streams,
+        rules,
         &theirs.tracks,
         &mut fields,
     )? {

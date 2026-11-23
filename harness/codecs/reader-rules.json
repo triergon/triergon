@@ -9,11 +9,12 @@
   "elementary_seek": "Exact seeks count and remove only reference packets before the candidate byte landing. Estimated seeks compare the landing frame positions before comparing the complete suffix. A reviewed open case must reproduce its exact recorded packet differences and landing observations."
  },
  "views": {
-  "native": "what the reader reports: its own times, durations and trims",
+  "native": "what the reader reports: its own times, durations and trims. A rule with native_dts_from_pts requires null DTS in every packet and compares the reader's PTS against the reference's synthesized DTS",
   "compat": "the reader's FFmpeg-compatible policy of the same packets; a native difference this view does not have is reproduced-by-compat and needs no disposition"
  },
  "formats": {
   "ogg": {
+   "native_dts_from_pts": true,
    "streams": "position-in-link",
    "media": [
     "audio",
@@ -45,6 +46,7 @@
    }
   },
   "flac": {
+   "native_dts_from_pts": true,
    "streams": "first-audio",
    "align_by": "position",
    "views": {
@@ -62,6 +64,7 @@
    }
   },
   "mp3": {
+   "native_dts_from_pts": true,
    "streams": "first-audio",
    "align_by": "position",
    "views": {
@@ -79,6 +82,7 @@
    }
   },
   "aac": {
+   "native_dts_from_pts": true,
    "streams": "first-audio",
    "align_by": "position",
    "views": {
@@ -96,6 +100,7 @@
    }
   },
   "ac3": {
+   "native_dts_from_pts": true,
    "streams": "first-audio",
    "align_by": "position",
    "views": {
@@ -113,6 +118,7 @@
    }
   },
   "eac3": {
+   "native_dts_from_pts": true,
    "streams": "first-audio",
    "align_by": "position",
    "views": {
