@@ -345,7 +345,7 @@ impl Framer {
             }),
             Self::Eac3(reader) => map(reader.step(work, cancel)?, AccessUnit::Ac3),
             Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
-                unreachable!("this route uses validated PES input")
+                return crate::refuse(Error::Invalid(WHOLE_PES));
             }
         })
     }
@@ -362,7 +362,7 @@ impl Framer {
             Self::Ac3(reader) => reader.provide_owned(window),
             Self::Eac3(reader) => reader.provide(window),
             Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
-                unreachable!("this route uses validated PES input")
+                crate::refuse(Error::Invalid(WHOLE_PES))
             }
         }
     }
@@ -379,11 +379,14 @@ impl Framer {
             Self::Ac3(reader) => reader.finish(request.source, request.token),
             Self::Eac3(reader) => reader.finish(request),
             Self::Dvb(_) | Self::LatmPes | Self::MpegVideo(_) => {
-                unreachable!("this route uses validated PES input")
+                crate::refuse(Error::Invalid(WHOLE_PES))
             }
         }
     }
 }
+
+/// A byte-stream call on a framer that takes whole PES, which [`Lane::step`] serves first.
+const WHOLE_PES: &str = "MPEG-TS framer takes whole PES";
 
 struct Piece {
     range: Range<u64>,

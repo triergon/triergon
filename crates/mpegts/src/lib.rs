@@ -137,6 +137,16 @@ impl<T> AssemblyStep<T> {
     }
 }
 
+/// Fails with `error` at a state that the operation's own earlier steps exclude.
+///
+/// Out of line and cold, as a panic is: the same error written inline changes how the
+/// surrounding loop is compiled (+0.9% on DTS reads at the framer dispatch).
+#[cold]
+#[inline(never)]
+pub(crate) fn refuse<T>(error: Error) -> Result<T> {
+    Err(error)
+}
+
 pub(crate) fn checked_pid(pid: u16) -> Result<()> {
     if pid >= transport::pid::NULL {
         Err(Error::Invalid("assembly PID"))
