@@ -373,6 +373,10 @@ source spans 4096, programs 64, streams 64, descriptors 256.
 4 MiB and access unit 8 MiB (1024 NALs), 4096 PES per access unit, 32,000,000
 access units, a 64 KiB elementary input window and the 64 MiB seek scan.
 
+`compat::input::InputBootstrap` inspects at most 16 KiB of a finite input's initial
+window (`MAX_BORROWED_BYTES`) and exactly 8192 bytes for an M2TS prefix
+(`M2TS_PREFIX_BYTES`); a larger window fails with `Limit`.
+
 All storage is charged to one shared `Budget`; an emitted `Bytes` charges its
 whole backing allocation.
 
