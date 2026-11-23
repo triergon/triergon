@@ -127,10 +127,18 @@ impl Default for IcsInfo {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+#[repr(u8)]
+enum Direction {
+    #[default]
+    Upward = 0,
+    Downward = 1,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct TnsFilter {
     pub length: u8,
     pub order: u8,
-    pub direction: bool,
+    direction: Direction,
     pub lpc: [f32; 21],
 }
 
@@ -470,7 +478,11 @@ fn parse_tns(br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) 
                 return Err(DecodeError::Invalid("TNS order"));
             }
             if flt.order > 0 {
-                flt.direction = br.bit();
+                flt.direction = if br.bit() {
+                    Direction::Downward
+                } else {
+                    Direction::Upward
+                };
                 let compress = br.read(1);
                 let coef_bits = coef_res + 3 - compress;
                 let mut tmp = [0f32; 20];
@@ -855,15 +867,19 @@ pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, mask: &[bool
     }
 }
 
-pub(crate) const TNS_SYNTHESIS: bool = true;
-pub(crate) const TNS_ANALYSIS: bool = false;
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum TnsKind {
+    AllZero = 0,
+    AllPole = 1,
+}
 
 /// TNS synthesis filtering (ISO/IEC 14496-3 4.6.9.3) of the channel spectrum.
 pub(crate) fn apply_tns(ch: &mut ChannelData, cfg: &CoreCfg) {
     if !ch.tns.present {
         return;
     }
-    tns_filter(&ch.tns, &ch.info, cfg, &mut ch.coef, TNS_SYNTHESIS);
+    tns_filter(&ch.tns, &ch.info, cfg, &mut ch.coef, TnsKind::AllPole);
 }
 
 /// All-pole (synthesis) or all-zero (analysis, used by LTP) TNS filtering of `coef`.
@@ -873,7 +889,7 @@ pub(crate) fn tns_filter(
     info: &IcsInfo,
     cfg: &CoreCfg,
     coef: &mut [f32],
-    synthesis: bool,
+    kind: TnsKind,
 ) {
     let short = info.window_sequence == WindowSequence::EightShort;
     let max_bands = if short {
@@ -901,14 +917,13 @@ pub(crate) fn tns_filter(
             let size = end - start;
             let lpc = &flt.lpc;
             for i in 0..size {
-                let k = if flt.direction {
-                    end - 1 - i
-                } else {
-                    start + i
+                let k = match flt.direction {
+                    Direction::Upward => start + i,
+                    Direction::Downward => end - 1 - i,
                 };
                 let x = spec[k];
                 let mut y = x;
-                if synthesis {
+                if kind == TnsKind::AllPole {
                     for j in 0..order {
                         y = (-state[j]).mul_add(lpc[j + 1], y);
                     }

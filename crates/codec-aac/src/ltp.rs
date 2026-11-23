@@ -6,7 +6,7 @@
 //! analysis filtered when TNS is active, and added to the bands flagged in ltp_long_used.
 
 use crate::filterbank::Filterbank;
-use crate::ics::{ChannelData, CoreCfg, TNS_ANALYSIS, WindowSequence, WindowShape};
+use crate::ics::{ChannelData, CoreCfg, TnsKind, WindowSequence, WindowShape};
 use crate::tables::{LTP_COEF, MAX_LTP_LONG_SFB};
 use triergon_codec::{Budget, BudgetVec, Error};
 
@@ -63,7 +63,7 @@ pub(crate) fn apply(
         &mut l.spec,
     );
     if cd.tns.present {
-        crate::ics::tns_filter(&cd.tns, &info, cfg, &mut l.spec, TNS_ANALYSIS);
+        crate::ics::tns_filter(&cd.tns, &info, cfg, &mut l.spec, TnsKind::AllZero);
     }
     for sfb in 0..info.max_sfb.min(MAX_LTP_LONG_SFB) {
         if ltp.long_used[sfb] {
