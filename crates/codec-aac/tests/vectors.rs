@@ -135,7 +135,7 @@ fn vectors_match_expected_frame_structure() {
 }
 
 #[test]
-fn fate_numeric_with_references() {
+fn vectors_match_reference_samples() {
     let Some(refdir) = std::env::var_os("AAC_REF_DIR") else {
         skipped(format_args!(
             "the AAC numeric comparison: AAC_REF_DIR is not set"

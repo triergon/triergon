@@ -33,7 +33,7 @@ pub const AAC_REFERENCES: &str = ".research/aac-references";
 /// Every suite that reports checks it leaves out.
 pub const SUITES: [Suite; 7] = [
     Suite {
-        source: "crates/codec-aac/tests/fate_vectors.rs",
+        source: "crates/codec-aac/tests/vectors.rs",
         inputs: &[".research/fate-samples/aac", AAC_REFERENCES],
     },
     Suite {
@@ -446,8 +446,8 @@ exit 3";
                 "crates/codec-ac3/tests/vectors.rs".to_owned(),
             ),
             (
-                "fate_vectors-2c".to_owned(),
-                "crates/codec-aac/tests/fate_vectors.rs".to_owned(),
+                "vectors-2c".to_owned(),
+                "crates/codec-aac/tests/vectors.rs".to_owned(),
             ),
         ]);
         let skips = [
@@ -456,7 +456,7 @@ exit 3";
                 "the AC-3 vector checks: x absent",
             ),
             skip(
-                "/t/debug/deps/fate_vectors-2c",
+                "/t/debug/deps/vectors-2c",
                 "the AAC numeric comparison: AAC_REF_DIR is not set",
             ),
             skip("target/debug/deps/other-3d", "the Y check: z absent"),
@@ -466,7 +466,7 @@ exit 3";
             [
                 "crates/codec-ac3/tests/vectors.rs: did not run on a gate host: \
                  the AC-3 vector checks: x absent",
-                "crates/codec-aac/tests/fate_vectors.rs: did not run on a gate host: \
+                "crates/codec-aac/tests/vectors.rs: did not run on a gate host: \
                  the AAC numeric comparison: AAC_REF_DIR is not set",
                 "target/debug/deps/other-3d: did not run, and test_skips::SUITES does not list \
                  its inputs: the Y check: z absent",
@@ -475,7 +475,7 @@ exit 3";
         assert_eq!(
             summary(&skips, &sources),
             "3 checks did not run for absent inputs; the gate's test step runs them\n  \
-             crates/codec-aac/tests/fate_vectors.rs: 1\n  \
+             crates/codec-aac/tests/vectors.rs: 1\n  \
              crates/codec-ac3/tests/vectors.rs: 1\n  target/debug/deps/other-3d: 1"
         );
     }
