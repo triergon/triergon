@@ -3,13 +3,13 @@
 Readers for audio elementary streams: native FLAC, MPEG audio (Layer I, II and III,
 with ID3 and APE tags and Xing/Info/VBRI frames), AAC in ADTS, and AC-3/E-AC-3. Each
 is a `triergon_core::container::ContainerReader` with one track and does no I/O;
-`BlockingReader` drives one from `std::io::Read + Seek`, and `probe` selects the format
-from a prefix.
+`BlockingReader::open` drives one from a sequential `std::io::Read` and
+`open_seekable` enables seeking on `Read + Seek`. The `probe` function selects the
+format from a prefix.
 
 ## Usage
 
 ```rust
-use std::io::Cursor;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_elementary::{BlockingReader, Limits, MpegAudio};
@@ -20,7 +20,7 @@ frame.resize(417, 0);
 let file = [frame.clone(), frame].concat();
 
 let cancel = AtomicBool::new(false);
-let mut reader = BlockingReader::<MpegAudio, _>::open(Cursor::new(file), Limits::default())?;
+let mut reader = BlockingReader::<MpegAudio, _>::open(file.as_slice(), Limits::default())?;
 let first = reader.next_packet(&cancel)?.expect("a frame");
 assert_eq!((first.pts(), first.duration()), (Some(0), Some(1152)));
 let track = reader.reader().stream().expect("the track");

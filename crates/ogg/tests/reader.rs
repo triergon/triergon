@@ -775,7 +775,8 @@ fn a_vorbis_seek_lands_on_the_block_before_the_target() {
     }
     muxer.flush(true, &mut file);
     let mut blocking =
-        triergon_ogg::BlockingReader::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+        triergon_ogg::BlockingReader::open_seekable(std::io::Cursor::new(file), Limits::default())
+            .unwrap();
     let cancel = AtomicBool::new(false);
     let track = blocking.tracks()[0].id();
     let target = Time::new(1_000_000, 44_100).unwrap();
@@ -1163,19 +1164,21 @@ fn open_keeps_the_first_link_end_after_scanning_a_chain() {
         let mut source = Vec::new();
         opus_stream(5, 5, 2, 100, &mut source);
         opus_stream(second_serial, 3, 2, 0, &mut source);
-        let reader =
-            triergon_ogg::BlockingReader::open(std::io::Cursor::new(source), Limits::default())
-                .unwrap();
+        let reader = triergon_ogg::BlockingReader::open_seekable(
+            std::io::Cursor::new(source),
+            Limits::default(),
+        )
+        .unwrap();
         assert_eq!(reader.tracks()[0].end(), Some(5 * 960 - 100 - 312));
     }
 }
 
 #[test]
-fn open_stream_configures_opus_without_an_end_scan() {
+fn sequential_open_configures_opus_without_an_end_scan() {
     let mut source = Vec::new();
     opus_stream(5, 4, 2, 0, &mut source);
     let mut reader =
-        triergon_ogg::BlockingReader::open_stream(source.as_slice(), Limits::default()).unwrap();
+        triergon_ogg::BlockingReader::open(source.as_slice(), Limits::default()).unwrap();
     let track = &reader.tracks()[0];
     assert!(track.is_configured());
     assert!(track.header_error().is_none());
@@ -1244,7 +1247,8 @@ fn open_reads_the_headers_of_every_stream_of_the_first_link() {
     page(END_OF_STREAM, 0, 1, 2, b"", &mut file);
     page(END_OF_STREAM, 640, 2, 2, &[7; 30], &mut file);
     let reader =
-        triergon_ogg::BlockingReader::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+        triergon_ogg::BlockingReader::open_seekable(std::io::Cursor::new(file), Limits::default())
+            .unwrap();
     let tracks = reader.tracks();
     assert_eq!(tracks.len(), 2);
     assert!(tracks.iter().all(triergon_ogg::Track::is_configured));

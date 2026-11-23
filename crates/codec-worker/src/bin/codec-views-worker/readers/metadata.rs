@@ -144,7 +144,7 @@ pub(super) fn ogg_tracks(
     work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
-    let Ok(reader) = ogg::BlockingReader::open(Cursor::new(input), ogg::Limits::default()) else {
+    let Ok(reader) = ogg::BlockingReader::open_seekable(Cursor::new(input), ogg::Limits::default()) else {
         return record(work, trace, 8, &[], &[]);
     };
     if reader.tracks().is_empty() {
@@ -239,7 +239,7 @@ type Opened<'a, F> = (
 );
 
 pub(super) fn opened<F: Format>(input: &[u8]) -> triergon::Result<Opened<'_, F>> {
-    let mut reader = elementary::BlockingReader::<F, _>::open(
+    let mut reader = elementary::BlockingReader::<F, _>::open_seekable(
         Cursor::new(input),
         elementary::Limits::default(),
     )?;

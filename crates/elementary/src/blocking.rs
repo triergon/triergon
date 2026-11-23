@@ -1,34 +1,55 @@
-//! A blocking convenience over [`std::io::Read`] + [`std::io::Seek`].
+//! A blocking adapter over [`std::io`] sources.
 use crate::reader::{Format, Reader};
 use crate::stream::{Limits, Packet, ReaderEvent};
 use std::io::{Read, Seek};
 use std::sync::atomic::AtomicBool;
 use triergon_core::blocking::{Blocking, seekable_capabilities};
-use triergon_core::container::{Event, SeekReceipt, SeekRequest};
-use triergon_core::{Budget, Error, Result, SourceId};
+use triergon_core::container::{ContainerReader, Event, SeekReceipt, SeekRequest};
+use triergon_core::{Budget, Error, Result, SourceCapabilities, SourceId};
 
 /// Bytes the reader requests per window.
 const WINDOW: usize = 64 * 1024;
+const SOURCE: SourceId = SourceId(1);
 
-/// Drives a [`Reader`] from a seekable byte source.
+/// Drives a [`Reader`] from a blocking byte source.
 #[derive(Debug)]
 pub struct BlockingReader<F: Format, S> {
     driver: Blocking<Reader<F>, S>,
 }
 
 impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
-    /// Open `source` with a pool of [`Limits::live_storage_bytes`].
+    /// Open a seekable source with a pool of [`Limits::live_storage_bytes`].
+    pub fn open_seekable(source: S, limits: Limits) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_seekable_in(source, limits, &pool)
+    }
+
+    /// [`BlockingReader::open_seekable`] charging a caller's pool.
+    pub fn open_seekable_in(mut source: S, limits: Limits, pool: &Budget) -> Result<Self> {
+        let capabilities = seekable_capabilities(&mut source)?;
+        let reader = Reader::new(pool, SOURCE, capabilities, limits, WINDOW)?;
+        Ok(BlockingReader {
+            driver: Blocking::seekable(reader, source, pool),
+        })
+    }
+}
+
+impl<F: Format, S: Read> BlockingReader<F, S> {
+    /// Open a sequential source with a pool of [`Limits::live_storage_bytes`].
     pub fn open(source: S, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_in(source, limits, &pool)
     }
 
-    /// Open `source` charging everything to `pool`.
-    pub fn open_in(mut source: S, limits: Limits, pool: &Budget) -> Result<Self> {
-        let capabilities = seekable_capabilities(&mut source)?;
-        let reader = Reader::new(pool, SourceId(1), capabilities, limits, WINDOW)?;
+    /// [`BlockingReader::open`] charging a caller's pool.
+    pub fn open_in(source: S, limits: Limits, pool: &Budget) -> Result<Self> {
+        let capabilities = SourceCapabilities {
+            length: None,
+            random_access: false,
+        };
+        let reader = Reader::new(pool, SOURCE, capabilities, limits, WINDOW)?;
         Ok(BlockingReader {
-            driver: Blocking::seekable(reader, source, pool),
+            driver: Blocking::sequential(reader, source, pool),
         })
     }
 
@@ -67,7 +88,11 @@ impl<F: Format, S: Read + Seek> BlockingReader<F, S> {
     }
 
     /// Seek and return the receipt; packets from the landing point follow.
+    /// Fails with [`Error::Unsupported`] on a sequential source.
     pub fn seek(&mut self, request: SeekRequest, cancel: &AtomicBool) -> Result<SeekReceipt> {
+        if !self.reader().capabilities().random_access {
+            return Err(Error::Unsupported("seeking a sequential source"));
+        }
         self.open_track(cancel)?;
         self.driver.begin_seek(request)?;
         loop {

@@ -82,7 +82,8 @@ fn seeks_resume_the_linear_packets() {
         let file = std::fs::read(&path).unwrap();
         let linear = read(&file, 1 << 16);
         let mut reader =
-            BlockingReader::open(std::fs::File::open(&path).unwrap(), Limits::default()).unwrap();
+            BlockingReader::open_seekable(std::fs::File::open(&path).unwrap(), Limits::default())
+                .unwrap();
         let track = reader.tracks()[0].id();
         let rate = i128::from(reader.tracks()[0].sample_rate().unwrap());
         let last = linear.last().and_then(|row| row.2).unwrap();

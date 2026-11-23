@@ -45,7 +45,8 @@ pub fn reader(
 
 /// Open a sequential source with both the granule clock and the compatibility clock.
 pub fn open<R: Read>(source: R, limits: Limits) -> Result<BlockingReader<R>> {
-    BlockingReader::open_stream_with(source, limits, true)
+    let pool = Budget::new(limits.live_storage_bytes)?;
+    BlockingReader::open_with(source, limits, &pool, true)
 }
 
 /// Open a seekable source with both the granule clock and the compatibility clock.

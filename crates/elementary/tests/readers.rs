@@ -597,10 +597,33 @@ fn seeking_cannot_clear_a_reader_error() {
 }
 
 #[test]
+fn sequential_open_reads_packets_and_refuses_seeking() {
+    let file = mp3_stream(4);
+    let mut reader =
+        BlockingReader::<MpegAudio, _>::open(file.as_slice(), Limits::default()).unwrap();
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        reader
+            .seek(
+                SeekRequest {
+                    track: triergon_elementary::TRACK,
+                    target: Time::new(0, 1).unwrap(),
+                    policy: SeekPolicy::PreviousRandomAccess,
+                },
+                &cancel,
+            )
+            .unwrap_err(),
+        Error::Unsupported("seeking a sequential source")
+    );
+    assert!(reader.next_packet(&cancel).unwrap().is_some());
+}
+
+#[test]
 fn the_blocking_reader_reads_and_seeks() {
     let file: Vec<u8> = (0..60).flat_map(ac3_frame).collect();
     let mut reader =
-        BlockingReader::<Ac3, _>::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+        BlockingReader::<Ac3, _>::open_seekable(std::io::Cursor::new(file), Limits::default())
+            .unwrap();
     let cancel = AtomicBool::new(false);
     let mut count = 0;
     while reader.next_packet(&cancel).unwrap().is_some() {
@@ -782,7 +805,8 @@ fn first_frame_headers_and_lame_tag_remain_available_after_opening() {
     mp3.extend(mp3_stream(3));
     let cancel = AtomicBool::new(false);
     let mut mpeg =
-        BlockingReader::<MpegAudio, _>::open(std::io::Cursor::new(mp3), Limits::default()).unwrap();
+        BlockingReader::<MpegAudio, _>::open_seekable(std::io::Cursor::new(mp3), Limits::default())
+            .unwrap();
     assert!(mpeg.next_packet(&cancel).unwrap().is_some());
     let facts = mpeg.reader().format();
     let header = facts.header().unwrap();
@@ -795,13 +819,15 @@ fn first_frame_headers_and_lame_tag_remain_available_after_opening() {
 
     let aac: Vec<_> = (0..3).flat_map(|n| adts_frame(n, 32)).collect();
     let mut adts =
-        BlockingReader::<Adts, _>::open(std::io::Cursor::new(aac), Limits::default()).unwrap();
+        BlockingReader::<Adts, _>::open_seekable(std::io::Cursor::new(aac), Limits::default())
+            .unwrap();
     assert!(adts.next_packet(&cancel).unwrap().is_some());
     assert_eq!(adts.reader().format().header().unwrap().frame_length(), 32);
 
     let ac3: Vec<_> = (0..3).flat_map(ac3_frame).collect();
     let mut a52 =
-        BlockingReader::<Ac3, _>::open(std::io::Cursor::new(ac3), Limits::default()).unwrap();
+        BlockingReader::<Ac3, _>::open_seekable(std::io::Cursor::new(ac3), Limits::default())
+            .unwrap();
     assert!(a52.next_packet(&cancel).unwrap().is_some());
     assert_eq!(a52.reader().format().header().unwrap().blocks, 6);
 }

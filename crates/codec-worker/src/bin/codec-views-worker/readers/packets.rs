@@ -398,7 +398,7 @@ pub(super) fn seek(
 fn elementary_seek<F: Format>(input: &[u8], request: SeekRequest) -> io::Result<()> {
     let mut out = BufWriter::new(io::stdout().lock());
     let cancel = AtomicBool::new(false);
-    let mut reader = match elementary::BlockingReader::<F, _>::open(
+    let mut reader = match elementary::BlockingReader::<F, _>::open_seekable(
         Cursor::new(input),
         elementary::Limits::default(),
     ) {

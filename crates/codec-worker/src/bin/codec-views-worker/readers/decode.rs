@@ -25,7 +25,7 @@ fn decode<F: Format>(
     mut decoder: impl AudioDecoder<Error: std::fmt::Debug>,
     out: &mut Output,
 ) -> Result<(), String> {
-    let mut reader = BlockingReader::<F, _>::open(Cursor::new(input), Limits::default())
+    let mut reader = BlockingReader::<F, _>::open_seekable(Cursor::new(input), Limits::default())
         .map_err(|error| error.to_string())?;
     let cancel = AtomicBool::new(false);
     let mut downmix = Downmix::default();

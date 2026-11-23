@@ -9,6 +9,7 @@ use triergon_core::{Budget, Error, Result, SourceCapabilities, SourceId};
 
 /// Bytes the reader requests per window.
 const WINDOW: usize = 64 * 1024;
+const SOURCE: SourceId = SourceId(1);
 
 /// Drives a [`Reader`] from a [`Read`] source, seeking it when it is also [`Seek`].
 #[derive(Debug)]
@@ -20,13 +21,13 @@ pub struct BlockingReader<R> {
 
 impl<R: Read + Seek> BlockingReader<R> {
     /// Open a seekable source: seeking bisects and track ends are scanned.
-    pub fn open(source: R, limits: Limits) -> Result<Self> {
+    pub fn open_seekable(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
-        Self::open_in(source, limits, &pool)
+        Self::open_seekable_in(source, limits, &pool)
     }
 
-    /// [`BlockingReader::open`] charging a caller's pool.
-    pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+    /// [`BlockingReader::open_seekable`] charging a caller's pool.
+    pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
         Self::open_seekable_with(source, limits, pool, false)
     }
 
@@ -44,22 +45,28 @@ impl<R: Read + Seek> BlockingReader<R> {
 
 impl<R: Read> BlockingReader<R> {
     /// Open a sequential source; it cannot seek.
-    pub fn open_stream(source: R, limits: Limits) -> Result<Self> {
-        Self::open_stream_with(source, limits, false)
+    pub fn open(source: R, limits: Limits) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_in(source, limits, &pool)
     }
 
-    pub(crate) fn open_stream_with(
+    /// [`BlockingReader::open`] charging a caller's pool.
+    pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        Self::open_with(source, limits, pool, false)
+    }
+
+    pub(crate) fn open_with(
         source: R,
         limits: Limits,
+        pool: &Budget,
         reference_clock: bool,
     ) -> Result<Self> {
-        let pool = Budget::new(limits.live_storage_bytes)?;
         let capabilities = SourceCapabilities {
             length: None,
             random_access: false,
         };
-        let reader = Self::make_reader(&pool, capabilities, limits, reference_clock)?;
-        Self::start(Blocking::sequential(reader, source, &pool), &pool, limits)
+        let reader = Self::make_reader(pool, capabilities, limits, reference_clock)?;
+        Self::start(Blocking::sequential(reader, source, pool), pool, limits)
     }
 
     fn make_reader(
@@ -69,9 +76,9 @@ impl<R: Read> BlockingReader<R> {
         reference_clock: bool,
     ) -> Result<Reader> {
         if reference_clock {
-            crate::compat::clock::reader(pool, SourceId(1), capabilities, limits, WINDOW)
+            crate::compat::clock::reader(pool, SOURCE, capabilities, limits, WINDOW)
         } else {
-            Reader::new(pool, SourceId(1), capabilities, limits, WINDOW)
+            Reader::new(pool, SOURCE, capabilities, limits, WINDOW)
         }
     }
 

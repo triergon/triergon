@@ -16,7 +16,7 @@ use triergon_ogg::{BlockingReader, Limits};
 # let mut file = Vec::new();
 # triergon_ogg::page::write_page(2, 0, 1, 0, &[4], b"head", &mut file);
 let cancel = AtomicBool::new(false);
-let mut reader = BlockingReader::open(std::io::Cursor::new(file), Limits::default())?;
+let mut reader = BlockingReader::open(file.as_slice(), Limits::default())?;
 for track in reader.tracks() {
     let _ = (track.codec(), track.configuration(), track.sample_rate());
 }
@@ -27,8 +27,8 @@ while let Some(packet) = reader.next_packet(&cancel)? {
 # }
 ```
 
-`BlockingReader::open` takes `Read + Seek` (seeking bisects); `open_stream` takes a
-sequential `Read`. Both return once every stream of the first link has read its headers
+`BlockingReader::open` takes a sequential `Read`. Use `open_seekable` with
+`Read + Seek` to enable seeking. Both return once every stream of the first link has read its headers
 (or after `Limits::header_bytes` of other packets), so its tracks are configured.
 `Reader` is the push reader: it performs no I/O, accepts windows of any size down to one
 byte, steps under a `WorkBudget` and a cancellation flag, and charges its storage to the

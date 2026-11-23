@@ -281,7 +281,7 @@ fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io
 
 fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::Result<()> {
     let cancel = AtomicBool::new(false);
-    let mut reader = match elementary::BlockingReader::<F, _>::open(
+    let mut reader = match elementary::BlockingReader::<F, _>::open_seekable(
         BufReader::new(file),
         elementary::Limits::default(),
     ) {
