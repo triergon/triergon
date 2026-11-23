@@ -89,6 +89,7 @@ sets before a picture's first slice.
 inspects up to 32 syncframes to infer a missing duration. Demux clock errors
 identify a wrong packet codec, a mismatched feed, or a video sample that cannot
 extend the decode clock.
+Discovery track and packet scan counts fail with `Error::Policy` at their bounds.
 
 ## Subtitles
 
