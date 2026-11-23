@@ -20,6 +20,18 @@ pub enum Feature {
     ReservedStreamType,
 }
 
+impl fmt::Display for Feature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::EnhancedCoupling => f.write_str("EnhancedCoupling"),
+            Self::BitstreamId(id) => write!(f, "BitstreamId({id})"),
+            Self::Eac3ReducedSampleRate => f.write_str("Eac3ReducedSampleRate"),
+            Self::ReservedSampleRate => f.write_str("ReservedSampleRate"),
+            Self::ReservedStreamType => f.write_str("ReservedStreamType"),
+        }
+    }
+}
+
 /// Why a syncframe could not be decoded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
@@ -98,7 +110,7 @@ impl fmt::Display for DecodeError {
             DecodeError::CrcMismatch { crc1_ok, crc2_ok } => {
                 write!(f, "CRC mismatch (crc1 ok: {crc1_ok}, crc2 ok: {crc2_ok})")
             }
-            DecodeError::Unsupported(feat) => write!(f, "unsupported feature: {feat:?}"),
+            DecodeError::Unsupported(feat) => write!(f, "unsupported feature: {feat}"),
             DecodeError::MissingIndependentSubstream => {
                 write!(f, "access unit does not start with independent substream 0")
             }

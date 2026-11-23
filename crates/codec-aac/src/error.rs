@@ -24,6 +24,21 @@ pub enum Feature {
     SampleRateIndex(u8),
 }
 
+impl fmt::Display for Feature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SsrGainControl => f.write_str("SsrGainControl"),
+            Self::ObjectType(code) => write!(f, "ObjectType({code})"),
+            Self::FrameLength960 => f.write_str("FrameLength960"),
+            Self::RawSbr => f.write_str("RawSbr"),
+            Self::CouplingTarget => f.write_str("CouplingTarget"),
+            Self::TooManyChannels => f.write_str("TooManyChannels"),
+            Self::RawProgramLayout => f.write_str("RawProgramLayout"),
+            Self::SampleRateIndex(index) => write!(f, "SampleRateIndex({index})"),
+        }
+    }
+}
+
 /// Why the decoder refused an access unit or a configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
@@ -71,7 +86,7 @@ impl From<DecodeError> for Error {
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DecodeError::Unsupported(x) => write!(f, "unsupported feature: {x:?}"),
+            DecodeError::Unsupported(x) => write!(f, "unsupported feature: {x}"),
             DecodeError::Invalid(s) => write!(f, "invalid data: {s}"),
             DecodeError::Policy(s) => write!(f, "resource limit: {s}"),
             DecodeError::Truncated => write!(f, "truncated access unit"),
