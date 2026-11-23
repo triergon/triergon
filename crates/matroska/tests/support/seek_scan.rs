@@ -12,8 +12,8 @@ use crate::{
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities, SourceFailure,
-    SourceId, Step, WorkBudget,
+    Budget, Bytes, Error, InputRequest, InputWindow, Result, SourceFailure, SourceId, Step,
+    WorkBudget,
 };
 
 pub(crate) fn entry(number: u64, kind: u64, extra: &[u8]) -> Vec<u8> {
@@ -221,33 +221,9 @@ impl<'a> Feed<'a> {
     }
 }
 
-/// A push reader over a random-access source of `length` bytes (`None`: not known
-/// until the source finishes) that asks for windows of at most `window` bytes.
-pub(crate) fn source_reader(
-    pool: &Budget,
-    length: Option<u64>,
-    limits: Limits,
-    window: usize,
-    ownership: PayloadOwnership,
-) -> Reader {
-    let capabilities = SourceCapabilities {
-        length,
-        random_access: true,
-    };
-    Reader::new_with_payload_ownership(
-        pool,
-        SourceId(28001),
-        capabilities,
-        limits,
-        window,
-        ownership,
-    )
-    .unwrap()
-}
-
-/// [`source_reader`] over `raw`, its length known, with 8 KiB windows and owned payloads.
+/// [`source_reader`](crate::reader_kit::source_reader) over `raw`, its length known, with 8 KiB windows and owned payloads.
 pub(crate) fn new_reader(pool: &Budget, raw: &[u8], limits: Limits) -> Reader {
-    source_reader(
+    crate::reader_kit::source_reader(
         pool,
         Some(raw.len() as u64),
         limits,

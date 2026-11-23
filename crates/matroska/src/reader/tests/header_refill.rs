@@ -2,8 +2,8 @@
 //! scanning.
 use crate::reader::seeking::ScanState;
 use crate::reader::*;
+use crate::reader_kit::source_reader;
 use crate::seek::plan::{LandingPlan, ScanPlan, SeekPlan};
-use crate::seek_scan_kit::source_reader;
 use crate::storage::PayloadOwnership;
 
 fn reader() -> Reader {

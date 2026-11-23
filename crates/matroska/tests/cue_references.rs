@@ -7,10 +7,10 @@ use std::{
     path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
+#[path = "support/reader.rs"]
+mod reader_kit;
 use triergon_core::Step;
-use triergon_core::{
-    Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
-};
+use triergon_core::{Budget, Bytes, InputWindow, SourceFailure, WorkBudget};
 use triergon_matroska::{BlockingReader, Error, Event, Limits, PayloadOwnership, Reader};
 
 fn raw(name: &str) -> Vec<u8> {
@@ -217,27 +217,19 @@ fn drive(
     }
     panic!("bounded Cue operation stalled");
 }
-fn source_reader(bytes: &[u8], pool: &Budget, limits: Limits) -> Reader {
-    Reader::new_with_payload_ownership(
-        pool,
-        SourceId(701),
-        SourceCapabilities {
-            length: Some(bytes.len() as u64),
-            random_access: true,
-        },
-        limits,
-        4096,
-        PayloadOwnership::SharedBounded,
-    )
-    .unwrap()
-}
 #[test]
 fn work_zero_then_work_one_has_the_same_literal_landing_and_packets() {
     let bytes = raw("simple-both-rap3");
     let cancel = AtomicBool::new(false);
     for (cap, quantum) in [(1, 1), (17, 7), (4096, 8192)] {
         let pool = Budget::new(8 * 1024 * 1024).unwrap();
-        let mut r = source_reader(&bytes, &pool, Limits::default());
+        let mut r = reader_kit::source_reader(
+            &pool,
+            Some(bytes.len() as u64),
+            Limits::default(),
+            4096,
+            PayloadOwnership::SharedBounded,
+        );
         let mut events = Vec::new();
         drive(&mut r, &bytes, cap, quantum, &mut events).unwrap();
         events.clear();
@@ -272,7 +264,13 @@ fn work_zero_then_work_one_has_the_same_literal_landing_and_packets() {
 fn an_earlier_invalid_lace_is_still_validated_before_the_referenced_rap() {
     let bytes = raw("strict-earlier-malformed-lace");
     let pool = Budget::new(8 * 1024 * 1024).unwrap();
-    let mut r = source_reader(&bytes, &pool, Limits::default());
+    let mut r = reader_kit::source_reader(
+        &pool,
+        Some(bytes.len() as u64),
+        Limits::default(),
+        4096,
+        PayloadOwnership::SharedBounded,
+    );
     let mut events = Vec::new();
     // Opening only establishes catalogue/first Cluster, then start a real seek.
     let cancel = AtomicBool::new(false);
@@ -303,7 +301,13 @@ fn caller_retention_cancel_transport_and_reset_keep_the_existing_lifecycle() {
     let bytes = raw("simple-both-rap3");
     let pool = Budget::new(8 * 1024 * 1024).unwrap();
     let baseline = pool.used();
-    let mut r = source_reader(&bytes, &pool, Limits::default());
+    let mut r = reader_kit::source_reader(
+        &pool,
+        Some(bytes.len() as u64),
+        Limits::default(),
+        4096,
+        PayloadOwnership::SharedBounded,
+    );
     let mut events = Vec::new();
     drive(&mut r, &bytes, 4096, 8192, &mut events).unwrap();
     let held = events

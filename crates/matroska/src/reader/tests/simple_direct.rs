@@ -1,7 +1,7 @@
 //! SimpleBlock publication and the full-batch handoff yield identical wire facts.
 use crate::ebml_kit::{element as e, mkv};
 use crate::reader::*;
-use crate::seek_scan_kit::source_reader;
+use crate::reader_kit::source_reader;
 use crate::storage::usage::Storage;
 use triergon_core::Bytes;
 

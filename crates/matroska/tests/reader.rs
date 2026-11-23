@@ -3,6 +3,8 @@
 //! header hint.
 #[path = "support/ebml.rs"]
 mod ebml_kit;
+#[path = "support/reader.rs"]
+mod reader_kit;
 use ebml_kit::{abc_laces, cluster, element, mkv, simple, track, uint, zlib_encoding};
 use std::io::Cursor;
 use std::sync::atomic::AtomicBool;
@@ -10,7 +12,9 @@ use triergon_core::Step;
 use triergon_core::{
     Budget, Bytes, InputWindow, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
-use triergon_matroska::{BlockingReader, Error, Event, Limits, ParseStep, Reader};
+use triergon_matroska::{
+    BlockingReader, Error, Event, Limits, ParseStep, PayloadOwnership, Reader,
+};
 
 fn stored_laced_source(bad: bool) -> Vec<u8> {
     let block = abc_laces(bad);
@@ -33,19 +37,6 @@ fn stored_laced_source(bad: bool) -> Vec<u8> {
         element(0x1f43b675, &[uint(0xe7, 2), element(0xa3, &block)].concat()),
     ]
     .concat())
-}
-fn reader(raw: &[u8], known: bool, limits: Limits, pool: &Budget) -> Reader {
-    Reader::new(
-        pool,
-        SourceId(101),
-        SourceCapabilities {
-            length: known.then_some(raw.len() as u64),
-            random_access: true,
-        },
-        limits,
-        1,
-    )
-    .unwrap()
 }
 fn drive(
     reader: &mut Reader,
@@ -92,7 +83,13 @@ fn configuration_precedes_atomic_laced_packets_and_retains_original_source_views
             block_bytes: 33,
             ..Limits::default()
         };
-        let mut reader = reader(&raw, known, limits, &pool);
+        let mut reader = reader_kit::source_reader(
+            &pool,
+            known.then_some(raw.len() as u64),
+            limits,
+            1,
+            PayloadOwnership::OwnedExact,
+        );
         let mut configuration = None;
         let mut packets = Vec::new();
         let mut packet_before_configuration = false;
@@ -144,7 +141,13 @@ fn configuration_precedes_atomic_laced_packets_and_retains_original_source_views
 fn late_lace_crc_failure_cannot_publish_a_packet_or_succeed_at_eof() {
     let raw = stored_laced_source(true);
     let pool = Budget::new(128 * 1024).unwrap();
-    let mut reader = reader(&raw, false, Limits::default(), &pool);
+    let mut reader = reader_kit::source_reader(
+        &pool,
+        None,
+        Limits::default(),
+        1,
+        PayloadOwnership::OwnedExact,
+    );
     let mut packets = 0;
     let result = drive(&mut reader, &raw, |event| {
         if matches!(event, Event::Packet(_)) {
@@ -163,7 +166,13 @@ fn duplicate_track_rejects_the_whole_configuration_transaction() {
     let tracks = element(0x1654ae6b, &[track(1, 1, &[]), track(1, 1, &[])].concat());
     let raw = mkv(&[tracks, element(0x1f43b675, &[])].concat());
     let pool = Budget::new(128 * 1024).unwrap();
-    let mut reader = reader(&raw, false, Limits::default(), &pool);
+    let mut reader = reader_kit::source_reader(
+        &pool,
+        None,
+        Limits::default(),
+        1,
+        PayloadOwnership::OwnedExact,
+    );
     let mut configurations = 0;
     let result = drive(&mut reader, &raw, |event| {
         if matches!(event, Event::Configuration(_)) {
@@ -198,7 +207,13 @@ fn metadata_catalogue_requires_bounded_full_validation_before_document_publicati
     ]
     .concat());
     let pool = Budget::new(128 * 1024).unwrap();
-    let mut reader = reader(&raw, false, Limits::default(), &pool);
+    let mut reader = reader_kit::source_reader(
+        &pool,
+        None,
+        Limits::default(),
+        1,
+        PayloadOwnership::OwnedExact,
+    );
     let mut documents = 0;
     let result = drive(&mut reader, &raw, |event| {
         if matches!(event, Event::Document(_)) {
@@ -230,7 +245,13 @@ fn block_group_trailing_duration_reference_and_padding_apply_before_the_first_la
     ]
     .concat());
     let pool = Budget::new(128 * 1024).unwrap();
-    let mut reader = reader(&raw, false, Limits::default(), &pool);
+    let mut reader = reader_kit::source_reader(
+        &pool,
+        None,
+        Limits::default(),
+        1,
+        PayloadOwnership::OwnedExact,
+    );
     let mut packets = Vec::new();
     drive(&mut reader, &raw, |event| {
         if let Event::Packet(packet) = event {
@@ -289,7 +310,13 @@ fn cues_and_all_track_preroll_produce_verified_receipt_and_replay_interleaved_au
     );
     let raw = mkv(&[tracks, first, second, cues].concat());
     let pool = Budget::new(256 * 1024).unwrap();
-    let mut reader = reader(&raw, true, Limits::default(), &pool);
+    let mut reader = reader_kit::source_reader(
+        &pool,
+        Some(raw.len() as u64),
+        Limits::default(),
+        1,
+        PayloadOwnership::OwnedExact,
+    );
     drive(&mut reader, &raw, |_| ()).unwrap();
     let generation = reader.generation();
     reader.seek_for_playback(0, 90_000_000).unwrap();
@@ -560,7 +587,13 @@ fn known_length_starvation_and_transport_failure_stay_distinct_from_end() {
     ]
     .concat());
     let pool = Budget::new(128 * 1024).unwrap();
-    let mut reader = reader(&raw, true, Limits::default(), &pool);
+    let mut reader = reader_kit::source_reader(
+        &pool,
+        Some(raw.len() as u64),
+        Limits::default(),
+        1,
+        PayloadOwnership::OwnedExact,
+    );
     let cancel = AtomicBool::new(false);
     let mut at_boundary = false;
     for _ in 0..200_000 {
@@ -596,17 +629,13 @@ fn known_length_starvation_and_transport_failure_stay_distinct_from_end() {
 
 #[test]
 fn header_refill_canonical_short_prefix_observes_actual_zero_one_work_and_cancel() {
-    let mut reader = Reader::new(
+    let mut reader = reader_kit::source_reader(
         &Budget::new(128 * 1024).unwrap(),
-        SourceId(2103),
-        SourceCapabilities {
-            length: None,
-            random_access: true,
-        },
+        None,
         Limits::default(),
         8192,
-    )
-    .unwrap();
+        PayloadOwnership::OwnedExact,
+    );
     let cancel = AtomicBool::new(false);
     let request = match reader
         .step_parse(&mut WorkBudget::new(64), &cancel)
@@ -640,7 +669,6 @@ fn header_refill_canonical_short_prefix_observes_actual_zero_one_work_and_cancel
     assert_eq!(reader.position(), 1);
 }
 
-// The engine, not only the blocking adapter, issues the bounded default header hint.
 // The engine, not only the blocking adapter, issues the bounded default header hint.
 #[test]
 fn ordinary_reader_default_issues_the_same_bounded_header_hint() {

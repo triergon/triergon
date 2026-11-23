@@ -312,7 +312,7 @@ fn data_owner(packet: &crate::packet::Packet) -> Bytes {
 }
 
 fn reader(pool: &Budget) -> Reader {
-    crate::seek_scan_kit::source_reader(
+    crate::reader_kit::source_reader(
         pool,
         Some(RAW.len() as u64),
         Limits::default(),

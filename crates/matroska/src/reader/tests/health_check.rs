@@ -2,7 +2,7 @@
 //! cancellation, and exact traces.
 use crate::ebml_kit::{element, mkv};
 use crate::reader::*;
-use crate::seek_scan_kit::source_reader;
+use crate::reader_kit::source_reader;
 use crate::storage::PayloadOwnership;
 use triergon_core::Bytes;
 

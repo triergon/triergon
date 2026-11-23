@@ -110,6 +110,9 @@ mod deflate_kit;
 #[path = "../tests/support/ebml.rs"]
 mod ebml_kit;
 #[cfg(test)]
+#[path = "../tests/support/reader.rs"]
+mod reader_kit;
+#[cfg(test)]
 #[path = "../tests/support/seek_scan.rs"]
 mod seek_scan_kit;
 #[cfg(test)]

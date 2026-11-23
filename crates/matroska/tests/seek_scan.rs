@@ -3,6 +3,8 @@
 //! schedule; an immutable seek index replaces the scan only when it is complete.
 #[path = "support/ebml.rs"]
 mod ebml_kit;
+#[path = "support/reader.rs"]
+mod reader_kit;
 #[path = "support/seek_scan.rs"]
 mod seek_scan_kit;
 use ebml_kit::{ABC, cluster, element as e, uint as u};
