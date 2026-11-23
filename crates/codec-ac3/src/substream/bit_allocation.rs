@@ -17,7 +17,6 @@ impl Substream {
         cplinu: bool,
         new_cpl_strategy: bool,
     ) -> Result<BaRerun, E> {
-        let nfch = self.nfchans;
         let eac3 = self.eac3;
         let mut rerun_all = BaRerun::Nothing;
         if !eac3 || self.bamode {
@@ -46,6 +45,36 @@ impl Substream {
                 rerun_all = rerun_all.max(BaRerun::Mask);
             }
         }
+        rerun_all = self.parse_snr_offsets(br, blk, cplinu, rerun_all)?;
+        if cplinu {
+            let cplleake = if eac3 && self.firstcplleak {
+                self.firstcplleak = false;
+                true
+            } else {
+                br.bit()
+            };
+            if cplleake {
+                self.cplfleak = br.read(3) as u8;
+                self.cplsleak = br.read(3) as u8;
+                self.ba_rerun[CPL] = self.ba_rerun[CPL].max(BaRerun::Mask);
+            } else if !eac3 && new_cpl_strategy && blk == 0 {
+                return Err(bad("coupling leak info missing"));
+            }
+        }
+        Ok(rerun_all)
+    }
+
+    /// Per-channel signal-to-noise offsets and fast gain codes (5.4.3 and Annex E 2.3).
+    #[inline(always)]
+    fn parse_snr_offsets(
+        &mut self,
+        br: &mut BitReader<'_>,
+        blk: usize,
+        cplinu: bool,
+        mut rerun_all: BaRerun,
+    ) -> Result<BaRerun, E> {
+        let nfch = self.nfchans;
+        let eac3 = self.eac3;
         if !eac3 {
             if br.bit() {
                 self.csnroffst = br.read(6) as u8;
@@ -120,21 +149,6 @@ impl Substream {
             }
             if self.strmtyp == 0 && br.bit() {
                 br.skip(10); // convsnroffst
-            }
-        }
-        if cplinu {
-            let cplleake = if eac3 && self.firstcplleak {
-                self.firstcplleak = false;
-                true
-            } else {
-                br.bit()
-            };
-            if cplleake {
-                self.cplfleak = br.read(3) as u8;
-                self.cplsleak = br.read(3) as u8;
-                self.ba_rerun[CPL] = self.ba_rerun[CPL].max(BaRerun::Mask);
-            } else if !eac3 && new_cpl_strategy && blk == 0 {
-                return Err(bad("coupling leak info missing"));
             }
         }
         Ok(rerun_all)
