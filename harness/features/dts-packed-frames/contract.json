@@ -7,7 +7,7 @@
   "worker_operation": "dts-packed-",
   "contract": [
     "Feed identical contiguous windows to the dca parser with default flags and to Dts14SyncReader::per_frame, Dts14CarrierReader or DtsNormalSourceReader as named by argument one. Argument two gives the input packing and argument three the byte window.",
-    "Fold kind 1 with physical packet offset, byte count, sample rate, coded duration in samples per channel, and all source bytes. Candidate rate and duration are source header facts, zero where unavailable. The reference reports its parser clock.",
+    "Fold kind 1 with physical packet offset, byte count, sample rate, coded duration in samples per channel, and all source bytes. Candidate rate and duration are those the header codes for a complete frame (a span that holds FSIZE + 1 bytes) whose header has no field the specification rules out, zero otherwise. The reference reports its parser clock.",
     "Fold kind 7 for clean EOF or kind 8 for a refusal. The sync reader's canonical output is compared to the packing oracle on the byte-exact geometry cases.",
     "Preload input and parse arguments before the operation. Setup, framing, byte folding, and teardown are inside it."
   ],
@@ -149,7 +149,7 @@
     {
       "reading": "SFREQ codes 14 and 15 code no sampling frequency",
       "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2, Table 5-5: SFREQ 14 and 15 are invalid",
-      "candidate": "reports no rate for the code, beside the 512-sample window NBLKS codes",
+      "candidate": "reports no clock for the frame, whose header codes an SFREQ the specification rules out",
       "reference": "the dca parser reports 96000 Hz for code 14 and 192000 Hz for code 15",
       "cases": [
         "matrix-sampling-code-14-be14",
@@ -158,6 +158,32 @@
         "matrix-sampling-code-15-be14",
         "matrix-sampling-code-15-le14",
         "matrix-sampling-code-15-le16"
+      ]
+    },
+    {
+      "reading": "A RATE code the specification rules out",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2, Table 5-7: RATE codes a nominal bit rate from 0 to 24 or the open rate as 29; every other code is invalid, so the header is not a valid core frame header",
+      "candidate": "returns each frame with no clock, as for every other header code the specification rules out; the core reader refuses the same headers with Invalid",
+      "reference": "the dca parser returns the frame with the 48000 Hz and 512 samples SFREQ and NBLKS code, as it does in the core reader comparison",
+      "cases": [
+        "matrix-bitrate-25-be14",
+        "matrix-bitrate-25-le14",
+        "matrix-bitrate-25-le16",
+        "matrix-bitrate-26-be14",
+        "matrix-bitrate-26-le14",
+        "matrix-bitrate-26-le16",
+        "matrix-bitrate-27-be14",
+        "matrix-bitrate-27-le14",
+        "matrix-bitrate-27-le16",
+        "matrix-bitrate-28-be14",
+        "matrix-bitrate-28-le14",
+        "matrix-bitrate-28-le16",
+        "matrix-bitrate-30-be14",
+        "matrix-bitrate-30-le14",
+        "matrix-bitrate-30-le16",
+        "matrix-bitrate-31-be14",
+        "matrix-bitrate-31-le14",
+        "matrix-bitrate-31-le16"
       ]
     },
     {
@@ -247,8 +273,7 @@
   ],
   "pending_module_requirements": [
     "A 14-bit source that holds a complete FSIZE + 1 frame followed by one stray byte loses the frame: the source and sync readers refuse the whole span as Truncated and the carrier reader returns the packet with no clock. FSIZE + 1 is the frame's size (ETSI TS 102 114 V1.6.1 clause 5.4.2), so the frame is complete; the readers must return it with its header's clock and refuse only the remainder.",
-    "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid.",
-    "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
+    "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
   ],
   "open_cases": [
     {
@@ -274,206 +299,6 @@
     {
       "id": "matrix-normal-short-zero-le16",
       "requirement": "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
-    },
-    {
-      "id": "matrix-fixed-one-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-fixed-one-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-fixed-one-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-0-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-0-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-0-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-4-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-4-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-4-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-5-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-5-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-5-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-6-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-6-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-invalid-blocks-6-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-lfe-invalid-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-lfe-invalid-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-lfe-invalid-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-pcm-4-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-pcm-4-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-pcm-4-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-pcm-7-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-pcm-7-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-pcm-7-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-0-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-0-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-0-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-10-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-10-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-10-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-4-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-4-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-4-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-5-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-5-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-5-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-9-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-9-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-sampling-code-9-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-size-0-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-size-0-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-size-94-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "matrix-size-94-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "below-minimum-fsize-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "below-minimum-fsize-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "truncated-13-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "truncated-13-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "truncated-14-be14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "truncated-14-le14",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
-    },
-    {
-      "id": "truncated-14-le16",
-      "requirement": "The packed-frames view reports the coded rate and window of a header the readers do not accept: one ETSI TS 102 114 V1.6.1 clause 5.4.2 invalidates (FixedBit 1, NBLKS 0 to 6 in a normal frame, LFF 3, PCMR 4 or 7, an invalid SFREQ, FSIZE below 95) and one whose span is shorter than FSIZE + 1 bytes. The core reader refuses the same bytes and the reference's parser reports no clock for them. The view must report a clock only for a frame the reader accepts."
     }
   ],
   "open_unmeasured": [

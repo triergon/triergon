@@ -9,9 +9,10 @@ use triergon_core::{
 use triergon_framing::dts::{
     self, Dts14BitUnpacker, Dts14CarrierLimits, Dts14CarrierReader, Dts14CarrierSyntax,
     Dts14SyncLimits, Dts14SyncReader, DtsCoreField, DtsCoreFrameLimits, DtsCoreFrameReader,
-    DtsFrameExtentLimits, DtsHeaderInspector, DtsInspection, DtsNormalLimits,
-    DtsNormalSourceReader, DtsPackedBitLocation, DtsPackedLimits, DtsPackedPayloadJob, DtsPacking,
-    DtsPackingLimits, DtsSourceIdentity, DtsWordOrder, FieldObservation,
+    DtsFrameExtentLimits, DtsHeaderInspector, DtsInspection, DtsInspectionSourceStatus,
+    DtsNormalLimits, DtsNormalSourceReader, DtsPackedBitLocation, DtsPackedLimits,
+    DtsPackedPayloadJob, DtsPacking, DtsPackingLimits, DtsSourceIdentity, DtsWordOrder,
+    FieldObservation,
 };
 use triergon_framing::reference_trace::dts::{
     ParserHints, ParserOperation, ParserOperationEvent, ParserOperationLimits, ParserOperationStep,
@@ -326,12 +327,15 @@ fn packed(
                 Dts14CarrierReader::new(&pool, SOURCE, CAPABILITIES, order, carrier_limits(window))
                     .map_err(error)?;
             drive!(reader, pool, input, window, output, packet => {
-                let header = match packet.syntax {
-                    Dts14CarrierSyntax::ExactNormal(header) => Some(header),
-                    _ => packet.canonical_bytes().and_then(|bytes| dts::probe_core_header(bytes.as_ref()).ok()),
+                let raw = packet.source_bytes().as_ref();
+                let (rate, samples) = match packet.syntax {
+                    Dts14CarrierSyntax::ExactNormal(header) => (header.core_rate_hz, header.coding_window_samples),
+                    _ => match packet.canonical_bytes() {
+                        Some(bytes) => coded_clock(&dts::inspect_header_bits(bytes.as_ref(), bytes.len() * 8).map_err(error)?, raw.len()),
+                        None => (0, 0),
+                    },
                 };
-                let (rate, samples) = header.map_or((0, 0), |h| (h.core_rate_hz, h.coding_window_samples));
-                packed_packet(&mut output, packet.identity.offset, packet.source_bytes().as_ref(), rate, samples)?;
+                packed_packet(&mut output, packet.identity.offset, raw, rate, samples)?;
             })
         }
         Reader::Normal(packing) => {
@@ -349,11 +353,34 @@ fn packed(
             )
             .map_err(error)?;
             drive!(reader, pool, input, window, output, frame => {
-                let facts = frame.facts();
-                let views = facts.header.views();
-                packed_packet(&mut output, facts.identity.offset, frame.source_bytes().as_ref(), views.core_rate_hz.unwrap_or(0), views.coded_window_samples.unwrap_or(0))?;
+                let (facts, raw) = (frame.facts(), frame.source_bytes().as_ref());
+                let (rate, samples) = coded_clock(&facts.header, raw.len());
+                packed_packet(&mut output, facts.identity.offset, raw, rate, samples)?;
             })
         }
+    }
+}
+
+/// The rate and coding window `header` codes for a complete frame: a span of `span`
+/// source bytes that holds its `FSIZE` + 1 bytes, whose header the inspection classes
+/// neither `Invalid` (a field the specification rules out) nor `Truncated`. Zero for
+/// both otherwise, and for a code without a value. Both readers start every span at
+/// the core sync word.
+fn coded_clock(header: &dts::DtsPackedHeader, span: usize) -> (u32, u32) {
+    let views = header.views();
+    let complete = views
+        .declared_frame_bytes
+        .is_some_and(|bytes| span >= bytes as usize);
+    match header.source_status() {
+        DtsInspectionSourceStatus::NormalHeader | DtsInspectionSourceStatus::Unsupported
+            if complete =>
+        {
+            (
+                views.core_rate_hz.unwrap_or(0),
+                views.coded_window_samples.unwrap_or(0),
+            )
+        }
+        _ => (0, 0),
     }
 }
 
@@ -577,7 +604,7 @@ fn header_rows(
     views: dts::DtsInspectionViews,
     issues: u32,
     required: Option<u16>,
-    status: dts::DtsInspectionSourceStatus,
+    status: DtsInspectionSourceStatus,
 ) -> Result<()> {
     output.row(
         inspector,
