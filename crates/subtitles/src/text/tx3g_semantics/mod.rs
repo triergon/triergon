@@ -8,7 +8,7 @@ use super::{
     tx3g_config::{ConfigLimits, Configuration, StyleRecord},
 };
 use std::ops::Range;
-use triergon_core::{BudgetVec, Bytes, Time};
+use triergon_core::{BudgetVec, Bytes, Error, Result, Time};
 
 mod job;
 mod parse;
@@ -321,7 +321,7 @@ impl GlobalEffects {
     }
 }
 /// A font of the description's `ftab`, with its name converted to UTF-8.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SemanticFont {
     /// Font identifier.
     pub id: u16,
@@ -461,6 +461,24 @@ impl FontIndex {
         let page = usize::from(self.mapping[usize::from(id >> 8)]?);
         let value = self.pages.as_slice().get(page)?.entries[usize::from(id & 255)];
         value.checked_sub(1).map(usize::from)
+    }
+    /// The page of `id`'s high byte, added when there is none.
+    fn page(&mut self, id: u16) -> Result<usize> {
+        let high = usize::from(id >> 8);
+        if let Some(page) = self.mapping[high] {
+            return Ok(usize::from(page));
+        }
+        let index = self.pages.len();
+        let value = u8::try_from(index).map_err(|_| Error::Overflow)?;
+        self.pages
+            .try_push(FontPage { entries: [0; 256] })
+            .map_err(|e| e.error)?;
+        self.mapping[high] = Some(value);
+        Ok(index)
+    }
+    /// Records `entry`, the font's index plus one, for `id` in `page`.
+    fn set(&mut self, page: usize, id: u16, entry: u16) {
+        self.pages.as_mut_slice()[page].entries[usize::from(id & 255)] = entry;
     }
 }
 

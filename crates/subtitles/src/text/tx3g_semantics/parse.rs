@@ -23,18 +23,60 @@ pub(super) enum Item {
     Wrap(RecordSource, WrapMode),
     Disparity(RecordSource, i16),
 }
+/// The modifier boxes the reader resolves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    Style,
+    Karaoke,
+    Highlight,
+    HighlightColour,
+    ScrollDelay,
+    Hyperlink,
+    TextBox,
+    Blink,
+    Wrap,
+    Disparity,
+}
+impl Kind {
+    fn of(kind: [u8; 4]) -> Option<Self> {
+        Some(match &kind {
+            b"styl" => Self::Style,
+            b"krok" => Self::Karaoke,
+            b"hlit" => Self::Highlight,
+            b"hclr" => Self::HighlightColour,
+            b"dlay" => Self::ScrollDelay,
+            b"href" => Self::Hyperlink,
+            b"tbox" => Self::TextBox,
+            b"blnk" => Self::Blink,
+            b"twrp" => Self::Wrap,
+            b"disp" => Self::Disparity,
+            _ => return None,
+        })
+    }
+    /// The bytes of the fields before any records or strings.
+    fn header(self) -> usize {
+        match self {
+            Self::Style | Self::Disparity => 2,
+            Self::Karaoke => 6,
+            Self::Highlight | Self::HighlightColour | Self::ScrollDelay | Self::Blink => 4,
+            Self::Hyperlink => 5,
+            Self::TextBox => 8,
+            Self::Wrap => 1,
+        }
+    }
+}
+#[derive(Debug)]
 enum Phase {
     Header,
     Records,
-    Url,
+    Url(Cursor),
     AltLength,
-    Alt,
+    Alt(Cursor),
     Done,
 }
 #[derive(Debug)]
 pub(super) struct Reader {
-    kind: [u8; 4],
+    kind: Kind,
     index: usize,
     at: usize,
     end: usize,
@@ -46,14 +88,15 @@ pub(super) struct Reader {
     need: usize,
     count: usize,
     current: usize,
-    utf8: Option<Cursor>,
     start: u16,
     finish: u16,
     url: Range<usize>,
     alternate: Range<usize>,
 }
 impl Reader {
-    pub(super) fn new(bytes: &[u8], modifier: &Modifier, index: usize) -> Result<Self> {
+    /// The reader of `modifier`, the box at `index`; `None` for a box it does
+    /// not resolve. `Error::Truncated` when the box does not fit `bytes`.
+    pub(super) fn new(bytes: &[u8], modifier: &Modifier, index: usize) -> Result<Option<Self>> {
         let start = modifier.range.start;
         let short = bytes
             .get(start..start.checked_add(4).ok_or(Error::Overflow)?)
@@ -63,39 +106,27 @@ impl Reader {
         if at > modifier.range.end || modifier.range.end > bytes.len() {
             return Err(Error::Truncated);
         }
-        let need = match &modifier.kind {
-            b"styl" => 2,
-            b"krok" => 6,
-            b"hlit" | b"hclr" | b"dlay" | b"blnk" => 4,
-            b"href" => 5,
-            b"tbox" => 8,
-            b"twrp" => 1,
-            b"disp" => 2,
-            _ => 0,
+        let Some(kind) = Kind::of(modifier.kind) else {
+            return Ok(None);
         };
-        Ok(Self {
-            kind: modifier.kind,
+        Ok(Some(Self {
+            kind,
             index,
             at,
             end: modifier.range.end,
             begin: at,
             body_start: at,
-            phase: if need == 0 {
-                Phase::Done
-            } else {
-                Phase::Header
-            },
+            phase: Phase::Header,
             buffer: [0; 12],
             read: 0,
-            need,
+            need: kind.header(),
             count: 0,
             current: 0,
-            utf8: None,
             start: 0,
             finish: 0,
             url: 0..0,
             alternate: 0..0,
-        })
+        }))
     }
     fn source(&self, start: usize) -> RecordSource {
         RecordSource {
@@ -149,24 +180,19 @@ impl Reader {
     ) -> Result<Poll<Item>> {
         loop {
             cancelled(cancel)?;
-            if self.phase == Phase::Done {
+            if let Phase::Done = self.phase {
                 return Ok(Poll::End);
             }
             if work.remaining() == 0 {
                 return Ok(Poll::Yield);
             }
-            if matches!(self.phase, Phase::Url | Phase::Alt) {
-                match self
-                    .utf8
-                    .as_mut()
-                    .ok_or(Error::Invalid("tx3g UTF8 field cursor"))?
-                    .poll(bytes, work, cancel)?
-                {
+            if let Phase::Url(cursor) | Phase::Alt(cursor) = &mut self.phase {
+                match cursor.poll(bytes, work, cancel)? {
                     Poll::Yield => return Ok(Poll::Yield),
                     Poll::Ready(_) => continue,
-                    Poll::End => self.utf8 = None,
+                    Poll::End => {}
                 }
-                if self.phase == Phase::Url {
+                if let Phase::Url(_) = self.phase {
                     self.phase = Phase::AltLength;
                     self.reset(1);
                     continue;
@@ -184,7 +210,7 @@ impl Reader {
             if !self.data(bytes, work, cancel)? {
                 return Ok(Poll::Yield);
             }
-            if self.phase == Phase::AltLength {
+            if let Phase::AltLength = self.phase {
                 let end = self
                     .at
                     .checked_add(usize::from(self.buffer[0]))
@@ -193,19 +219,19 @@ impl Reader {
                     return Err(Error::Truncated);
                 }
                 self.alternate = self.at..end;
-                self.utf8 = Some(Cursor::new(self.alternate.clone(), Encoding::Utf8));
+                self.phase = Phase::Alt(Cursor::new(self.alternate.clone(), Encoding::Utf8));
                 self.at = end;
-                self.phase = Phase::Alt;
                 continue;
             }
-            if self.phase == Phase::Records {
+            if let Phase::Records = self.phase {
                 if self.current == self.count {
                     self.exact_end()?;
                     self.phase = Phase::Done;
                     continue;
                 }
                 let source = self.source(self.begin);
-                let item = if self.kind == *b"styl" {
+                let style = self.kind == Kind::Style;
+                let item = if style {
                     Item::Style(
                         source,
                         StyleRecord {
@@ -214,16 +240,19 @@ impl Reader {
                             font_id: self.u16(4),
                             face_flags: self.buffer[6],
                             font_size: self.buffer[7],
-                            rgba: self.buffer[8..12]
-                                .try_into()
-                                .map_err(|_| Error::Truncated)?,
+                            rgba: [
+                                self.buffer[8],
+                                self.buffer[9],
+                                self.buffer[10],
+                                self.buffer[11],
+                            ],
                         },
                     )
                 } else {
                     Item::Karaoke(source, self.u32(0), self.u16(4), self.u16(6))
                 };
                 self.current += 1;
-                self.reset(if self.kind == *b"styl" { 12 } else { 8 });
+                self.reset(if style { 12 } else { 8 });
                 if self.current == self.count {
                     self.exact_end()?;
                     self.phase = Phase::Done;
@@ -231,9 +260,9 @@ impl Reader {
                 return Ok(Poll::Ready(item));
             }
             let source = self.source(self.begin);
-            let item = match &self.kind {
-                b"styl" | b"krok" => {
-                    let karaoke = self.kind == *b"krok";
+            let item = match self.kind {
+                Kind::Style | Kind::Karaoke => {
+                    let karaoke = self.kind == Kind::Karaoke;
                     self.count = usize::from(self.u16(if karaoke { 4 } else { 0 }));
                     self.current = 0;
                     let count = self
@@ -256,7 +285,7 @@ impl Reader {
                     }
                     continue;
                 }
-                b"href" => {
+                Kind::Hyperlink => {
                     self.start = self.u16(0);
                     self.finish = self.u16(2);
                     let end = self
@@ -267,19 +296,23 @@ impl Reader {
                         return Err(Error::Truncated);
                     }
                     self.url = self.at..end;
-                    self.utf8 = Some(Cursor::new(self.url.clone(), Encoding::Utf8));
+                    self.phase = Phase::Url(Cursor::new(self.url.clone(), Encoding::Utf8));
                     self.at = end;
-                    self.phase = Phase::Url;
                     continue;
                 }
-                b"hlit" => Item::Highlight(source, self.u16(0), self.u16(2)),
-                b"blnk" => Item::Blink(source, self.u16(0), self.u16(2)),
-                b"hclr" => Item::HighlightColour(
+                Kind::Highlight => Item::Highlight(source, self.u16(0), self.u16(2)),
+                Kind::Blink => Item::Blink(source, self.u16(0), self.u16(2)),
+                Kind::HighlightColour => Item::HighlightColour(
                     source,
-                    self.buffer[..4].try_into().map_err(|_| Error::Truncated)?,
+                    [
+                        self.buffer[0],
+                        self.buffer[1],
+                        self.buffer[2],
+                        self.buffer[3],
+                    ],
                 ),
-                b"dlay" => Item::ScrollDelay(source, self.u32(0)),
-                b"tbox" => Item::TextBox(
+                Kind::ScrollDelay => Item::ScrollDelay(source, self.u32(0)),
+                Kind::TextBox => Item::TextBox(
                     source,
                     [
                         self.u16(0) as i16,
@@ -288,7 +321,7 @@ impl Reader {
                         self.u16(6) as i16,
                     ],
                 ),
-                b"twrp" => Item::Wrap(
+                Kind::Wrap => Item::Wrap(
                     source,
                     match self.buffer[0] {
                         0 => WrapMode::NoWrap,
@@ -296,8 +329,7 @@ impl Reader {
                         _ => return Err(Error::Unsupported("tx3g wrap flag")),
                     },
                 ),
-                b"disp" => Item::Disparity(source, self.u16(0) as i16),
-                _ => return Err(Error::Invalid("tx3g semantic reader dispatch")),
+                Kind::Disparity => Item::Disparity(source, self.u16(0) as i16),
             };
             self.exact_end()?;
             self.phase = Phase::Done;
