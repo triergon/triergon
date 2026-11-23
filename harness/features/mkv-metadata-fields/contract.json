@@ -254,20 +254,19 @@
   "open_deviations": [
     {
       "reading": "An absent TagDefault is 1",
-      "clause": "RFC 9559 section 5.1.8.1.2.4: TagDefault defaults to 1, marking the default or original language of the tag",
-      "candidate": "publishes a SimpleTag without TagDefault under its plain key as well as its language-suffixed key",
-      "reference": "publishes only the language-suffixed key, treating the absent flag as 0",
-      "compat": "a consumer that needs the reference's tag keys would use a compat::matroska tag-dictionary policy that treats an absent TagDefault as 0 (not built)",
+      "clause": "RFC 9559 section 5.1.8.1.2.4: TagDefault defaults to 1 and marks the default or original language of the tag.",
+      "candidate": "Publishes each SimpleTag without TagDefault under its plain key as well as its language-suffixed key; in tags-multilingual also TITLE English, and TITLE-fr-CA by the TagLanguageBCP47 rule.",
+      "reference": "Publishes only the language-suffixed keys, treating the absent flag as 0; in tags-multilingual TITLE-fre from the legacy TagLanguage.",
       "cases": [
-        "flags-absent", "tags-multilingual"
+        "flags-absent",
+        "tags-multilingual"
       ]
     },
     {
       "reading": "TagLanguageBCP47 replaces TagLanguage",
-      "clause": "RFC 9559 sections 5.1.8.1.2.2 and 5.1.8.1.2.3: when TagLanguageBCP47 is present, every TagLanguage of the same SimpleTag MUST be ignored",
-      "candidate": "suffixes the key with the BCP 47 language de-DE",
-      "reference": "suffixes it with the legacy TagLanguage ger",
-      "compat": "a consumer that needs the legacy suffix would use a compat::matroska tag-dictionary policy that keeps TagLanguage (not built)",
+      "clause": "RFC 9559 sections 5.1.8.1.2.2 and 5.1.8.1.2.3: when TagLanguageBCP47 is present, every TagLanguage of the same SimpleTag MUST be ignored.",
+      "candidate": "Suffixes the five keys with the BCP 47 language de-DE.",
+      "reference": "Suffixes them with the legacy TagLanguage ger.",
       "cases": [
         "languages-ietf"
       ]

@@ -251,10 +251,10 @@
   "confidence": 0.95,
   "open_deviations": [
     {
-      "reading": "An attachment with empty FileData",
-      "clause": "RFC 9559 section 5.1.6.1.4: FileData, the data of the file, occurs exactly once and has no minimum length",
-      "candidate": "returns the attachment with its zero-length data, name and media type",
-      "reference": "publishes no attachment stream for it",
+      "reading": "An attachment with empty FileData is an attachment",
+      "clause": "RFC 9559 section 5.1.6.1.4: FileData, the data of the file, occurs exactly once and has no minimum length.",
+      "candidate": "Returns the attachment with zero-length data, its name demo.ttf, media type and description.",
+      "reference": "Publishes no attachment stream for it.",
       "cases": [
         "attachments-empty"
       ]

@@ -338,6 +338,11 @@
         "packets": 1,
         "bytes": 0,
         "digest": 7
+      },
+      "candidate_expected": {
+        "packets": 5,
+        "bytes": 51,
+        "digest": 4958868086369487457
       }
     },
     {

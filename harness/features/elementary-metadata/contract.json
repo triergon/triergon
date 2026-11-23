@@ -895,40 +895,38 @@
   ],
   "open_deviations": [
     {
-      "reading": "The metadata retention limit bounds large FLAC comment blocks",
-      "clause": "RFC 9639 sections 8.1 and 8.6 define block and comment lengths. The elementary reader’s Limits bounds retained tags and metadata to 4 MiB by default.",
-      "candidate": "returns the track without the unretained comment dictionary",
-      "reference": "publishes the 16770684-byte comment or concatenates album values into a 59999-byte value",
-      "compat": "compat::flac::retain_large_metadata",
+      "reading": "Free-format MPEG audio is MPEG audio",
+      "clause": "ISO/IEC 11172-3 section 2.4.2.3 defines bitrate_index 0 as free format; the input is the standard's compliance stream he_free.bit.",
+      "candidate": "Reports MPEG audio at 44100 Hz with two channels and no duration.",
+      "reference": "Refuses the forced MP3 demux (it finds no two consecutive frames).",
+      "cases": [
+        "he-free.bit"
+      ]
+    },
+    {
+      "reading": "The 4 MiB metadata retention limit drops a larger FLAC comment block (a resource limit of ours)",
+      "clause": "RFC 9639 sections 8.1 and 8.6 allow comment blocks of up to 2^24 - 1 bytes; the elementary reader's Limits::retained_metadata_bytes keeps 4 MiB by default.",
+      "candidate": "Returns the track without the unretained comments.",
+      "reference": "Publishes the 16770684-byte comment, or eight joined fields of up to 15848084 bytes in the combined file.",
       "cases": [
         "51---extremely-large-vorbiscomment.flac",
         "55---file-48-53-combined.flac"
       ]
     },
     {
-      "reading": "Recover stream facts from a confirmed frame when there is no file header",
-      "clause": "RFC 9639 sections 6, 8.2 and 9.1–9.1.5 distinguish the file header from the CRC-checked frame header. The elementary reader documents markerless access and derived track metadata.",
-      "candidate": "reports the confirmed frame’s 44100 Hz and one channel, with no STREAMINFO or duration",
-      "reference": "reports no sample rate, channel count, STREAMINFO or duration",
+      "reading": "Stream facts from a CRC-checked frame of a file without a FLAC header (a capability of ours)",
+      "clause": "RFC 9639 sections 6 and 9.1 require fLaC and STREAMINFO first, so this file is not conforming; a frame header carries its own rate and channels. The elementary reader documents markerless access.",
+      "candidate": "Reports 44100 Hz and one channel from the first confirmed frame, with no STREAMINFO and no duration.",
+      "reference": "Reports no rate, channels, STREAMINFO or duration.",
       "cases": [
         "11---file-starting-with-unparsable-data.flac"
       ]
     },
     {
-      "reading": "Free-format MPEG audio frame spacing can be determined from subsequent headers",
-      "clause": "ISO/IEC 11172-3 section 2.4.2.3 defines free-format bitrate index zero, as described by the MPEG audio frame documentation and the elementary reader’s frame extent contract.",
-      "candidate": "reports MPEG audio at 44100 Hz with two channels and no duration",
-      "reference": "refuses the forced MP3 demux operation",
-      "cases": [
-        "he-free.bit"
-      ]
-    },
-    {
-      "reading": "Leading ID3v2 text accompanying Dolby syncframes",
-      "clause": "ID3v2.4 Main Structure section 3.1 and Native Frames section 4.2 define the leading envelope and text frames. The elementary reader documents leading envelopes independent of the audio format.",
-      "candidate": "reports the live syncframe rate and the written text, including TITLE Hello in the short tag and the mapped native text fields in the longer tags",
-      "reference": "reports the same syncframe properties after the complete tag packet, with an empty format dictionary",
-      "compat": "compat::tags::demux_dictionary",
+      "reading": "A leading ID3v2 tag before AC-3 or E-AC-3 is read (a capability of ours)",
+      "clause": "ID3v2.4 main structure section 3.1 and native frames section 4.2 define the tag; ATSC A/52 does not carry tags, and the elementary reader reads a leading tag before any audio format.",
+      "candidate": "Reports the syncframe properties and the tag's text: TITLE Hello, or the twelve mapped text fields.",
+      "reference": "Reports the same syncframe properties with an empty dictionary.",
       "cases": [
         "ac3-tags.ac3",
         "ac3-id3v2",
@@ -936,22 +934,20 @@
       ]
     },
     {
-      "reading": "Include APEv2 title fields from the retained trailer",
-      "clause": "APEv2 specification, Layout of APE tags and APE tag items, defines the APETAGEX header/footer and text item. Reader::tags exposes the trailing envelope.",
-      "candidate": "adds title Test in the tagged MPEG audio file or title Hello in the standalone APEv2 case",
-      "reference": "keeps the existing encoder key in the first file and omits both APEv2 titles",
-      "compat": "compat::tags::demux_dictionary",
+      "reading": "APEv2 titles are read (a capability of ours)",
+      "clause": "The APEv2 specification (layout of APE tags and of items) defines the APETAGEX header and footer and text items; Reader::tags exposes the trailing tag.",
+      "candidate": "Adds title Test to the MPEG audio file's dictionary and title Hello in the standalone APEv2 case.",
+      "reference": "Does not read APEv2: keeps the MPEG file's encoder key alone, and an empty dictionary.",
       "cases": [
         "mp3-tags-tail.mp3",
         "apev2"
       ]
     },
     {
-      "reading": "Use the leading ID3v2 text from the first-packet metadata view",
-      "clause": "ID3v2.4 Main Structure section 3.1 and Native Frames section 4.2 describe TIT2 in the leading envelope; ID3v1 defines a separate 128-byte trailer. ADTS ISO/IEC 13818-7 section 6.2 defines neither an ID3 ordering rule nor a dictionary.",
-      "candidate": "publishes the leading title Hello when the first ADTS packet is read",
-      "reference": "publishes the trailing title Title, artist Artist and date 2026 at the same point",
-      "compat": "compat::tags::demux_dictionary",
+      "reading": "A leading ID3v2 and a trailing ID3v1 tag disagree; no standard orders them (policy)",
+      "clause": "ID3v2.4 section 3.1 places ID3v2 before the audio and ID3v1 is a 128-byte trailer; neither ISO/IEC 13818-7 nor the tag documents say which a reader shows.",
+      "candidate": "Publishes the leading ID3v2 title Hello at the first packet; the trailer is not read for ADTS.",
+      "reference": "Publishes the trailing ID3v1 title Title, artist Artist and date 2026 at the same point.",
       "cases": [
         "adts-tags.aac"
       ]

@@ -22,31 +22,41 @@
   ],
   "open_deviations": [
     {
-      "reading": "Text palette overflow saturates at the documented unsigned 32-bit maximum",
-      "clause": "ISO C section 7.22.1.4 paragraph 8 with a 32-bit unsigned long, as documented for DvdConfig",
-      "candidate": "The hexadecimal palette field 1122334455 yields white, 0xffffff.",
-      "reference": "The AArch64 palette field yields the low 24 bits, 0x334455.",
-      "compat": "compat::dvd::host_width_palette",
-      "cases": ["vobsub-palette-option"],
-      "targets": ["aarch64-unknown-linux-gnu"]
+      "reading": "A palette field beyond 32 bits saturates as a 32-bit unsigned long does (the candidate keeps the 32-bit ARM result on every target)",
+      "clause": "ISO C section 7.22.1.4 paragraph 8: strtoul returns ULONG_MAX for a value out of range, and ULONG_MAX is the implementation's; DvdConfig documents fixed 32-bit fields. Neither build of the reference departs from C; their results differ.",
+      "candidate": "Saturates 1122334455 and gives white (0xffffff), the fold the 32-bit ARM reference pins.",
+      "reference": "On AArch64 the 64-bit unsigned long keeps the value and its low 32 bits give 0x334455.",
+      "cases": [
+        "vobsub-palette-option"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
     },
     {
-      "reading": "A signed dimension outside the documented 32-bit range refuses the canvas",
-      "clause": "ISO C sections 6.3.1.3 and 7.22.1.4 paragraph 8, and DvdConfig's positive bounded canvas contract",
-      "candidate": "Refuses both the width 4294968016 and the height -4294966816 when opening the decoder.",
-      "reference": "AArch64 keeps the low 32 bits and opens a 720 by 480 canvas in each case.",
-      "compat": "compat::dvd::host_width_canvas",
-      "cases": ["vobsub-idx-size-beyond-32-bits", "vobsub-idx-size-negative-beyond-32-bits"],
-      "targets": ["aarch64-unknown-linux-gnu"]
+      "reading": "A canvas dimension beyond 32 bits refuses the canvas (the candidate keeps the 32-bit ARM result on every target)",
+      "clause": "ISO C sections 6.3.1.3 and 7.22.1.4 paragraph 8: strtol saturates at the implementation's long range and narrowing an out-of-range value to int is implementation-defined; DvdConfig requires a positive bounded canvas.",
+      "candidate": "Refuses the width 4294968016 and the height -4294966816 when opening the decoder, as the 32-bit ARM reference does (no subtitles, word 2^64 - 1).",
+      "reference": "On AArch64 the 64-bit long keeps the values, their low 32 bits give 720 by 480, and it opens that canvas.",
+      "cases": [
+        "vobsub-idx-size-beyond-32-bits",
+        "vobsub-idx-size-negative-beyond-32-bits"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
     },
     {
-      "reading": "Overflowing VobSub delay fields are saturated before forming the timestamp offset",
-      "clause": "ISO C section 7.22.1.4 paragraph 8 with a 32-bit long, as documented for the VobSub delay field",
-      "candidate": "Saturates the signed decimal delay fields at -2147483648 or 2147483647 before calculating cue times.",
-      "reference": "AArch64 keeps the low 32 bits and places the cues at different times.",
-      "compat": "compat::dvd::host_width_delay",
-      "cases": ["vobsub-idx-delay-beyond-32-bits"],
-      "targets": ["aarch64-unknown-linux-gnu"]
+      "reading": "A delay field beyond 32 bits saturates before forming the time offset (the candidate keeps the 32-bit ARM result on every target)",
+      "clause": "ISO C section 7.22.1.4 paragraph 8: strtol saturates at the implementation's long range; the VobSub delay field is read as a 32-bit long.",
+      "candidate": "Saturates the delay at -2147483648 or 2147483647 before computing cue times, as the 32-bit ARM reference does.",
+      "reference": "On AArch64 the 64-bit long keeps the low 32 bits and places the cues at other times.",
+      "cases": [
+        "vobsub-idx-delay-beyond-32-bits"
+      ],
+      "targets": [
+        "aarch64-unknown-linux-gnu"
+      ]
     }
   ],
   "iterations": 50,
