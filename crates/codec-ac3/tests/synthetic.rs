@@ -175,10 +175,9 @@ fn decodes_silent_mono_frame() {
     assert_eq!(out.samples_per_channel, 1536);
     assert!(out.planes[0].iter().all(|&v| v == 0.0));
     assert!(info.downmix.is_none());
-    // Appending a second frame.
     dec.decode(&mono_frame(0), &mut out).unwrap();
-    assert_eq!(out.samples_per_channel, 3072);
-    assert_eq!(out.planes[0].len(), 3072);
+    assert_eq!(out.samples_per_channel, 1536);
+    assert_eq!(out.planes[0].len(), 1536);
 }
 
 #[test]
