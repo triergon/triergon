@@ -153,7 +153,7 @@ pub struct Vp9ConfigParser {
     used: usize,
 }
 
-/// Where a parse stands. The record and its cursor are held only while it is read.
+/// The record and cursor are dropped when parsing ends.
 #[derive(Debug)]
 enum State {
     Reading { source: Bytes, cursor: InputCursor },

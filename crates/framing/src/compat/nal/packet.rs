@@ -1453,8 +1453,7 @@ impl<M> NalPacketJob<'_, M> {
             configuration_updates: state.session.configuration_updates,
         })
     }
-    /// The same state engine as `step_into`, returning the output directly. Fails as
-    /// [`step_into`](Self::step_into) does, without the occupied slot.
+    /// Fails as [`step_into`](Self::step_into) does for an empty slot.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,

@@ -297,7 +297,7 @@ impl ReceiverAvcConfigParser {
     ) -> Result<Self> {
         Self::with_role(pool, source, raw, limits, true)
     }
-    /// The record as it was given.
+    /// The original record bytes.
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }

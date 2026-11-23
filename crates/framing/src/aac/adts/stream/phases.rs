@@ -1,6 +1,4 @@
-//! The ADTS stream state machine: one method per [`Phase`], driven by
-//! [`AacAdtsStreamReader::advance`]. Each method is one pass of that loop;
-//! `Flow::Continue` re-enters the loop and `Flow::Break` returns.
+//! ADTS frame assembly under a work budget.
 use super::{AacAdtsStreamReader, Mode, Phase, StreamOutput};
 use crate::aac::AacSource;
 use crate::aac::adts::carrier::{AacAdtsCarrier, AacAdtsCarrierBoundary};
@@ -12,7 +10,6 @@ use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Result, SourceLocation, Step, WorkBudget};
 
-/// Outcome of one phase step.
 type Flow = ControlFlow<Step<StreamOutput>>;
 const NEXT: Flow = Flow::Continue(());
 const YIELD: Flow = Flow::Break(Step::Yield);

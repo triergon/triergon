@@ -358,7 +358,7 @@ pub struct Ac3ConfigParser {
     data_rate: u16,
 }
 
-/// Where a parse stands. The record and its cursor are held only while it is read.
+/// The record and cursor are dropped when parsing ends.
 enum State {
     Reading { source: Bytes, cursor: InputCursor },
     Complete,

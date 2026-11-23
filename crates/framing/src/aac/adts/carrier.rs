@@ -209,9 +209,7 @@ impl AacAdtsCarrierReader {
     pub fn completed_packets(&self) -> usize {
         self.inner.completed_frames()
     }
-    /// Answers the current request with `window`, as
-    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
-    /// window changes nothing. A failed reader returns its error.
+    /// A refused window leaves the request open. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.inner.provide(window)
     }
@@ -239,9 +237,7 @@ impl AacAdtsCarrierReader {
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         self.inner.finish(source, token)
     }
-    /// Answers the current request with a failure, as
-    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
-    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says. An
+    /// Subsequent calls return [`Error::Transport`] or [`Error::Cancelled`]. An
     /// unfinished unit is dropped.
     pub fn fail(
         &mut self,

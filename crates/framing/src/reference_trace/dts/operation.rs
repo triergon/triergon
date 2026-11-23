@@ -365,7 +365,6 @@ pub struct ParserOperation {
 const _: () = assert!(size_of::<ParserOperation>() <= 4096);
 const _: () = assert!(size_of::<ParserOperationStep>() <= 256);
 
-/// One reader of a [`ParserOperation`].
 enum Lane<R> {
     /// The reader, still reading.
     Reading(R),
@@ -384,13 +383,11 @@ impl<R> Lane<R> {
     }
 }
 
-/// The reader of one lane, borrowed.
 enum LaneReader<'a> {
     Source(&'a mut Dts14SyncReader),
     Parser(&'a mut Dts14CarrierReader),
 }
 
-/// What the reader of one lane returned.
 enum LaneOutput {
     Frame(Dts14SyncFrame),
     Packet(Dts14CarrierPacket),
@@ -481,7 +478,6 @@ impl ParserOperation {
         self.ready_event = None;
         self.failure = Some(error);
     }
-    /// The reader of `lane` while it reads.
     fn reader(&mut self, lane: ParserOperationLane) -> Result<LaneReader<'_>> {
         self.healthy()?;
         match (lane, &mut self.source, &mut self.parser) {
@@ -564,7 +560,6 @@ impl ParserOperation {
             ParserOperationLane::ParserProjection => ParserOperationLane::Source,
         };
     }
-    /// Stops the reader of `lane` with `terminal`.
     fn stop(&mut self, lane: ParserOperationLane, terminal: ParserOperationTerminal) {
         match lane {
             ParserOperationLane::Source => self.source = Lane::Stopped(terminal),

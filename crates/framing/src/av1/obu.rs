@@ -350,16 +350,12 @@ impl Av1ObuReader {
         self.input.position()
     }
 
-    /// Answers the current request with `window`, as
-    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
-    /// window changes nothing. A failed reader returns its error.
+    /// A refused window leaves the request open. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         self.input.cursor()?.provide(window)
     }
 
-    /// Answers the current request with the end of the source, as
-    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
-    /// ends before its known length fails the reader with [`Error::Truncated`]. An end
+    /// An end before the known source length fails the reader with [`Error::Truncated`]. An end
     /// inside an OBU makes the next [`step`](Self::step) fail as truncated.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
         let result = self.input.cursor()?.finish(source, token);
@@ -369,9 +365,7 @@ impl Av1ObuReader {
         result
     }
 
-    /// Answers the current request with a failure, as
-    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
-    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says.
+    /// Subsequent calls return [`Error::Transport`] or [`Error::Cancelled`].
     pub fn fail(
         &mut self,
         source: SourceId,

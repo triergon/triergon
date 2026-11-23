@@ -214,7 +214,6 @@ enum State {
     Failed(Error),
 }
 
-/// The parse of one extent, then its outcome.
 #[derive(Debug)]
 enum Extent {
     Parsing(AacAscParser),

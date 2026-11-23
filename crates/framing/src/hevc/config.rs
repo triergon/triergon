@@ -288,7 +288,6 @@ struct Record {
     raw: Bytes,
 }
 
-/// What one step of the walk ended with.
 enum Walked {
     Ready(HvcConfigFields),
     Yield,
@@ -339,7 +338,7 @@ impl std::fmt::Debug for HvcConfigParser {
 }
 
 impl HvcConfigParser {
-    /// Starts the parse of `raw`, one complete record charged to `pool`. Fails when
+    /// `raw` must hold one complete record charged to `pool`. Fails when
     /// `maximum_record_bytes` or `maximum_nal_bytes` is zero, `raw` belongs to another
     /// pool, is empty or is longer than `maximum_record_bytes`, or the record's end
     /// offset in the source overflows `u64`.
@@ -402,9 +401,6 @@ impl HvcConfigParser {
         Ok(parser)
     }
 
-    /// Advances by at most the units in `work` and returns the record once, as
-    /// [`BuildStep`] describes.
-    ///
     /// Fails when `cancel` is set; when `configurationVersion` is not 1 or the sample
     /// length field is three bytes; when the record ends inside its fixed bytes, an
     /// array header, a length field or a NAL unit; when a NAL unit is empty, shorter
@@ -424,10 +420,9 @@ impl HvcConfigParser {
             .into_build_step(ready))
     }
 
-    /// Publishes into an empty caller-provided slot without returning the record. An
-    /// occupied slot is rejected before any state, work or retained storage changes.
-    /// Yield, completion and errors leave an initially empty slot empty. Fails as
-    /// [`Self::step`] does; also when `ready` is occupied.
+    /// As [`Self::step`], with the record placed in `ready`. An occupied slot is
+    /// refused before changing state, consuming work or retaining storage.
+    /// Yield, completion and errors leave an empty slot empty.
     pub fn step_into(
         &mut self,
         work: &mut WorkBudget,

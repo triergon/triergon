@@ -83,6 +83,10 @@ assert_eq!(decoder_input, [
 
 ## Supported
 
+The format modules expose source fields and bounded framing operations for consumers
+that parse configurations or assemble decoder input. Comparison projections require
+`reference-trace`.
+
 | Module | Entry points | Output |
 |---|---|---|
 | `nal` | `NalReader`, `AnnexBUnits`, `RawAnnexBReader`, `AnnexBConfigParser`, `DeclaredConfigParser` | AVC/HEVC NAL units, raw access units and declared configurations with original bytes and offsets |

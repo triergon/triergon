@@ -664,7 +664,6 @@ impl Walk {
         Ok(Some(next))
     }
 
-    /// The mixing metadata of an independent stream.
     fn programme(&mut self, input: &mut Input<'_>, field: ProgrammeField) -> Result<Option<Phase>> {
         let next = match field {
             ProgrammeField::ScaleFlag => {

@@ -223,7 +223,6 @@ impl AacAdtsFrame {
     }
 }
 
-/// The next fields to check, with the header once it is read.
 enum ParsePhase {
     Header,
     Extent(AacAdtsHeader),
@@ -233,7 +232,7 @@ enum ParsePhase {
     },
 }
 
-/// Where a parse stands. The buffer is held only until the frame is returned.
+/// The buffer is held until the frame is returned.
 enum ParseState {
     Parsing { raw: Bytes, phase: ParsePhase },
     Complete,

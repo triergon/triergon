@@ -513,7 +513,7 @@ struct Fields {
     ga: AacGaSpecific,
 }
 
-/// Where a parse stands. The walk is held only while the record is read.
+/// The record walk is dropped when parsing ends.
 enum State {
     Reading(Walk),
     Complete,

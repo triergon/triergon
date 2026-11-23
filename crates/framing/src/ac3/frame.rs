@@ -555,8 +555,7 @@ enum Phase {
 /// swap occurs. A complete frame is emitted only after its declared envelope is
 /// present; later input failure cannot invalidate earlier owned outputs.
 pub struct Ac3FrameReader {
-    // `ReaderInput` in place of `cursor` and `failure` measured +1.41% on E-AC-3
-    // transport workloads (a tag test at each of the frame loop's cursor uses).
+    // Testing the `ReaderInput` tag at each cursor use measured +1.41% on E-AC-3 transport.
     cursor: InputCursor,
     selection: Ac3StreamSelection,
     limits: Ac3FrameLimits,
@@ -646,9 +645,7 @@ impl Ac3FrameReader {
     pub fn position(&self) -> u64 {
         self.cursor.position()
     }
-    /// Answers the current request with `window`, as
-    /// [`InputCursor::provide`](triergon_core::InputCursor::provide) does: a refused
-    /// window changes nothing. A failed reader returns its error.
+    /// A refused window leaves the request open. A failed reader returns its error.
     pub fn provide(&mut self, window: &InputWindow) -> Result<()> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -764,9 +761,7 @@ impl Ac3FrameReader {
         }))
     }
 
-    /// Answers the current request with the end of the source, as
-    /// [`InputCursor::finish`](triergon_core::InputCursor::finish) does: a source that
-    /// ends before its known length fails the reader with [`Error::Truncated`]. Once
+    /// An end before the known source length fails the reader with [`Error::Truncated`]. Once
     /// the bytes already provided are read, [`step`](Self::step) returns [`Step::End`]
     /// at a frame boundary and fails inside a frame.
     pub fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
@@ -779,9 +774,7 @@ impl Ac3FrameReader {
         }
         result
     }
-    /// Answers the current request with a failure, as
-    /// [`InputCursor::fail`](triergon_core::InputCursor::fail) does: every later call
-    /// returns [`Error::Transport`] or [`Error::Cancelled`], as `failure` says.
+    /// Subsequent calls return [`Error::Transport`] or [`Error::Cancelled`].
     pub fn fail(
         &mut self,
         source: SourceId,
@@ -999,8 +992,7 @@ impl Ac3FrameReader {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    // The header in nested or flat frame phases measured +0.12 to +1.03% on the
-                    // transport worker; a cache with a prefix fallback, +0.05% on AC-3 preroll.
+                    // Typed header phases measured +1.03%, and a prefix fallback +0.05% on AC-3 preroll.
                     let header = self
                         .header
                         .ok_or(Error::Invalid("missing audio frame header"))?;

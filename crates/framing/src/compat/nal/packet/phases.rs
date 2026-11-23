@@ -17,7 +17,6 @@ use std::ops::ControlFlow;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Bytes, Error, Result, SourceId, SourceLocation, WorkBudget};
 
-/// Outcome of one phase step.
 type Step = ControlFlow<SlotProgress>;
 const NEXT: Step = Step::Continue(());
 const YIELD: Step = Step::Break(SlotProgress::Yield);
