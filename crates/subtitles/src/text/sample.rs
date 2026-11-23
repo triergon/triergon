@@ -4,8 +4,9 @@
 use super::{
     Encoding, Field, FieldOwner, Limits, Modifier,
     emit::Fields,
-    unicode::{Cursor, Poll, cancelled},
+    unicode::{Cursor, Poll},
 };
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 

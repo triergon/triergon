@@ -23,3 +23,14 @@ pub mod reference_trace;
 
 mod canvas;
 mod teletext;
+
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// `Error::Cancelled` once `cancel` is set.
+fn cancelled(cancel: &AtomicBool) -> triergon_core::Result<()> {
+    if cancel.load(Ordering::Relaxed) {
+        Err(triergon_core::Error::Cancelled)
+    } else {
+        Ok(())
+    }
+}

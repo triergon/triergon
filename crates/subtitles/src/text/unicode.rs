@@ -4,10 +4,8 @@ use super::{
     Encoding,
     charset::multibyte::{DecodeStep, MultibyteDecoder},
 };
-use std::{
-    ops::Range,
-    sync::atomic::{AtomicBool, Ordering},
-};
+use crate::cancelled;
+use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 
 #[derive(Debug)]
@@ -15,14 +13,6 @@ pub(crate) enum Poll<T> {
     Ready(T),
     End,
     Yield,
-}
-
-pub(crate) fn cancelled(cancel: &AtomicBool) -> Result<()> {
-    if cancel.load(Ordering::Relaxed) {
-        Err(Error::Cancelled)
-    } else {
-        Ok(())
-    }
 }
 
 /// What a multibyte profile makes of a byte its table refused.

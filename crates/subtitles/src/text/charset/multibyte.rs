@@ -10,7 +10,7 @@
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 
-use super::super::unicode::cancelled;
+use crate::cancelled;
 
 /// A multibyte charset profile: its lead and trail bytes and its mapping
 /// table. Standalone ASCII bytes decode as themselves except where noted.

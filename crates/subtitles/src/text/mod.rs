@@ -184,7 +184,7 @@ impl Extractor {
     /// resumable; any other error is returned by every later call until
     /// [`reset`](Self::reset).
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
-        unicode::cancelled(cancel)?;
+        crate::cancelled(cancel)?;
         let Some(pending) = self.pending.as_mut() else {
             return Ok(if self.finished {
                 Status::Finished

@@ -5,7 +5,7 @@ use super::{
     Funding, Limits, Options,
     write::{Fixed, freeze},
 };
-use crate::text::unicode::cancelled;
+use crate::cancelled;
 use std::{ffi::CStr, fmt::Write, ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 

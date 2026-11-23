@@ -1,7 +1,8 @@
 //! DVB PES data fields cut into the codec packets FFmpeg's demuxer hands its
 //! `dvbsub` decoder, as observed.
+use crate::cancelled;
 use std::ops::Range;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 
 // Observed parser accumulation ceiling. The complete source PES is retained
@@ -388,13 +389,5 @@ fn view(pes: &Bytes, start: usize, joined: Option<&Bytes>, range: Range<usize>) 
         joined.slice(range)
     } else {
         pes.slice(start + range.start..start + range.end)
-    }
-}
-
-fn cancelled(cancel: &AtomicBool) -> Result<()> {
-    if cancel.load(Ordering::Relaxed) {
-        Err(Error::Cancelled)
-    } else {
-        Ok(())
     }
 }

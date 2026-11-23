@@ -1,5 +1,5 @@
-use super::super::unicode::cancelled;
 use super::*;
+use crate::cancelled;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, WorkBudget};
 

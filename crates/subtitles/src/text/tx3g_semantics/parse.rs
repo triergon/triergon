@@ -3,9 +3,10 @@
 use super::super::{
     Encoding, Modifier,
     tx3g_config::StyleRecord,
-    unicode::{Cursor, Poll, cancelled},
+    unicode::{Cursor, Poll},
 };
 use super::{RecordSource, WrapMode};
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 

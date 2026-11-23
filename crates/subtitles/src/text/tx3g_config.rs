@@ -4,8 +4,9 @@
 //! guessed.
 use super::{
     Encoding, Modifier,
-    unicode::{Cursor, Poll, Probe, cancelled},
+    unicode::{Cursor, Poll, Probe},
 };
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 

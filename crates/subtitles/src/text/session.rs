@@ -4,8 +4,9 @@ use super::{
     Cue, Encoding, Format, Input, Limits, Modifier,
     emit::{Emitter, Fields, Plan, TextSpan, Times},
     sample,
-    unicode::{Cursor, Poll, Probe, cancelled},
+    unicode::{Cursor, Poll, Probe},
 };
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 

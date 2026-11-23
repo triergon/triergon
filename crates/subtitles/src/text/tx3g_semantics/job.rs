@@ -2,10 +2,11 @@ use super::super::{
     Encoding, Extractor, Format, Input, Status,
     charset::{Charset, CharsetJob, CharsetStatus},
     tx3g_config::{ConfigJob, ConfigLayout, ConfigStatus},
-    unicode::{Cursor, Poll, cancelled},
+    unicode::{Cursor, Poll},
 };
 use super::parse::{Item, Reader};
 use super::*;
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, Result, WorkBudget};
 

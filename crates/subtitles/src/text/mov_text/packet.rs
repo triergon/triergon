@@ -5,7 +5,8 @@ use super::{
     config::{Configuration, Style, until_nul},
     write::{Fixed, Writer},
 };
-use crate::text::{Input, unicode::cancelled};
+use crate::cancelled;
+use crate::text::Input;
 use std::{fmt::Write, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 

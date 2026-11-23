@@ -9,7 +9,8 @@ mod packet;
 mod write;
 
 pub use super::decoded::{Clock, Subtitle};
-use super::{Format, Input, unicode::cancelled};
+use super::{Format, Input};
+use crate::cancelled;
 use config::Configuration;
 use packet::PacketJob;
 use std::sync::atomic::AtomicBool;

@@ -2,8 +2,9 @@
 //! exactly the counted size, or shared with the payload when it is UTF-8.
 use super::{
     Cue, Encoding, Field, Input, Limits, Modifier,
-    unicode::{Cursor, Poll, Scalar, cancelled},
+    unicode::{Cursor, Poll, Scalar},
 };
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, Time, WorkBudget};
 

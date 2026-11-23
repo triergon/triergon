@@ -3,8 +3,9 @@
 //! the declared label are kept beside the result.
 use super::{
     Encoding, Limits,
-    unicode::{Cursor, Outside, Poll, Probe, cancelled},
+    unicode::{Cursor, Outside, Poll, Probe},
 };
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 pub mod multibyte;

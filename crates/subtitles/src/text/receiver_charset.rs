@@ -7,8 +7,8 @@
 use super::charset::{
     Charset, CharsetJob, CharsetStatus, ConvertedText, multibyte::MultibyteCharset as M,
 };
-use super::unicode::cancelled;
 use super::{Cue, Encoding, Extractor, Format, Input, Limits, Status};
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, Result, WorkBudget};
 

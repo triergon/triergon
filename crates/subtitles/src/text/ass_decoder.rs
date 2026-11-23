@@ -17,7 +17,7 @@ use super::Limits;
 use super::charset::{Charset, CharsetJob, CharsetStatus};
 use super::decoded::{Clock, Subtitle};
 use super::receiver_charset::receiver_charset;
-use super::unicode::cancelled;
+use crate::cancelled;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, TimeBase, WorkBudget};
 
