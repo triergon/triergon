@@ -1,7 +1,9 @@
 //! Test harness: stream splitting, whole-stream decoding and fingerprint checks.
 #![allow(dead_code, reason = "each test binary uses part of the harness")]
 
-use triergon_codec_dca::{AudioFrame, DecodeError, Decoder, Packing};
+use triergon_codec_dca::{
+    AudioFrame, Budget, DecodeError, Decoder, Limits, Packing, compat::ffmpeg::Policy,
+};
 
 /// Byte length of the core frame at the start of `data` in its packing.
 pub fn frame_len(data: &[u8], packing: Packing) -> Option<usize> {
@@ -68,7 +70,16 @@ pub struct Decoded {
 
 /// Decode every frame; planes are concatenated (layout taken from the first good frame).
 pub fn decode_all(frames: &[&[u8]]) -> Decoded {
-    let mut dec = Decoder::new();
+    decode_using(frames, Decoder::new())
+}
+
+/// Decodes with the reference prototype for comparisons with reference PCM.
+pub fn decode_reference(frames: &[&[u8]]) -> Decoded {
+    let budget = Budget::new(Limits::default().live_storage_bytes).unwrap();
+    decode_using(frames, Decoder::with_policy_in(Policy::Reference, &budget))
+}
+
+fn decode_using(frames: &[&[u8]], mut dec: Decoder) -> Decoded {
     let mut f = AudioFrame::default();
     let mut d = Decoded {
         sample_rate: 0,

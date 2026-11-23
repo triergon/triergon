@@ -29,7 +29,7 @@ fn scenarios_match_ffmpeg_fingerprints() {
     for fp in &fps {
         let bytes = scenario(&fp.name);
         let frames = harness::split(&bytes);
-        let d = harness::decode_all(&frames);
+        let d = harness::decode_reference(&frames);
         assert!(d.errors.is_empty(), "{}: {:?}", fp.name, d.errors);
         if let Err(e) = harness::check(fp, &d) {
             failures.push(e);
@@ -50,6 +50,21 @@ fn write_stream() {
         let mut sidecar = path;
         sidecar.push(".meta");
         std::fs::write(sidecar, meta).expect("write sidecar");
+    }
+}
+
+#[test]
+fn the_reference_policy_changes_only_perfect_reconstruction() {
+    for (name, changes) in [("basic", false), ("perfect", true)] {
+        let bytes = scenario(name);
+        let frames = harness::split(&bytes);
+        let standard = harness::decode_all(&frames);
+        let compatible = harness::decode_reference(&frames);
+        assert!(standard.errors.is_empty() && compatible.errors.is_empty());
+        assert_eq!(standard.sample_rate, compatible.sample_rate);
+        assert_eq!(standard.speakers, compatible.speakers);
+        assert_eq!(standard.frames, compatible.frames);
+        assert_eq!(standard.planes != compatible.planes, changes, "{name}");
     }
 }
 

@@ -108,7 +108,7 @@ fn run(name: &str, rel: &str) {
     let fps = harness::parse_fingerprints(include_str!("data/vectors.fp"));
     let fp = fps.iter().find(|f| f.name == name).expect("fingerprint");
     let frames = harness::split(&bytes);
-    let d = harness::decode_all(&frames);
+    let d = harness::decode_reference(&frames);
     assert!(d.errors.is_empty(), "{name}: {:?}", d.errors);
     if let Err(e) = harness::check(fp, &d) {
         panic!("{e}");

@@ -9,7 +9,7 @@ use crate::header::{FrameHeader, SetHeader};
 use crate::lfe::{Lfe2x, LfeFir, LfeState};
 use crate::qmf::{Qmf, QmfState};
 use crate::subframe::{self, SideInfo, SubBuf, SubframeParams};
-use crate::{AudioFrame, DecodeError, Speaker, pr_table, tables, x96};
+use crate::{AudioFrame, DecodeError, Speaker, tables, x96};
 use triergon_codec::{Budget, BudgetVec, Charged, Error, Reservation};
 
 /// Maximum coded primary channels (core 5 + extension channels).
@@ -92,13 +92,12 @@ impl X96Bank {
 }
 
 impl FrameDecoder {
-    pub(crate) fn new(budget: &Budget) -> Self {
+    pub(crate) fn new(budget: &Budget, perfect: &[f64; 512]) -> Self {
         Self {
             sub: SubBuf::new(budget, MAX_SLOTS, 32),
             side: Box::new(SideInfo::new()),
             qmf_np: Qmf::new(&tables::QMF_NONPERFECT, QMF_GAIN * OUT_SCALE),
-            // FFmpeg's effective PR prototype differs from Annex D.8 (see pr_table.rs).
-            qmf_pr: Qmf::new(&pr_table::QMF_PERFECT_REF, QMF_GAIN * OUT_SCALE),
+            qmf_pr: Qmf::new(perfect, QMF_GAIN * OUT_SCALE),
             qstate: (0..MAX_SLOTS).map(|_| QmfState::new()).collect(),
             lfe_fir: LfeFir::new(OUT_SCALE),
             lfe_state: LfeState::default(),

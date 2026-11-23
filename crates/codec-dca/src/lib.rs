@@ -11,13 +11,12 @@
 )]
 mod bits;
 mod books;
+pub mod compat;
 mod dct;
 mod frame;
 mod header;
 mod lfe;
 mod pack;
-#[rustfmt::skip]
-mod pr_table;
 mod qmf;
 mod subframe;
 #[rustfmt::skip]
@@ -34,6 +33,7 @@ mod synthetic;
 pub use pack::Packing;
 pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
 
+use compat::ffmpeg::Policy;
 use frame::FrameDecoder;
 use triergon_codec::{AudioDecoder, BudgetVec, DownmixLevels};
 
@@ -86,11 +86,16 @@ impl Decoder {
         Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
     }
 
-    /// A decoder charging the caller's pool.
+    /// A decoder charging the caller's pool, with the standard synthesis prototype.
     pub fn new_in(budget: &Budget) -> Self {
+        Self::with_policy_in(Policy::default(), budget)
+    }
+
+    /// A decoder with an explicit synthesis prototype, charging the caller's pool.
+    pub fn with_policy_in(policy: Policy, budget: &Budget) -> Self {
         Self {
             scratch: BudgetVec::new(budget),
-            frames: FrameDecoder::new(budget),
+            frames: FrameDecoder::new(budget, policy.prototype()),
         }
     }
 
