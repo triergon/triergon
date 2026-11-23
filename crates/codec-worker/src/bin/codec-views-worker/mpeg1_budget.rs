@@ -3,7 +3,7 @@
 use std::ffi::OsString;
 use std::io::Write;
 
-use triergon::{Budget, Error as StorageError};
+use triergon::Budget;
 use triergon_codec_mpeg1::{Encoder, EncoderConfig, Error, Limits};
 use triergon_pixel::{Geometry, Picture};
 
@@ -50,7 +50,7 @@ fn run(
     let idle = tight.used();
     if !matches!(
         Encoder::new_in(cfg, &tight),
-        Err(Error::Budget(StorageError::Limit { .. }))
+        Err(Error::Budget(triergon::Error::Limit { .. }))
     ) || tight.used() != idle
         || !matches!(
             Encoder::with_limits(
@@ -59,7 +59,7 @@ fn run(
                     live_storage_bytes: 1024
                 }
             ),
-            Err(Error::Budget(StorageError::Limit { .. }))
+            Err(Error::Budget(triergon::Error::Limit { .. }))
         )
     {
         return Err("insufficient constructor storage changed the error or leaked".into());
@@ -77,7 +77,7 @@ fn run(
     let held = pool.reserve(pool.available()).map_err(explain)?;
     if !matches!(
         encoder.encode(&input, &mut output),
-        Err(Error::Budget(StorageError::Backpressure { .. }))
+        Err(Error::Budget(triergon::Error::Backpressure { .. }))
     ) || output != [0xa5, 0x5a]
         || encoder.config() != &cfg
     {
