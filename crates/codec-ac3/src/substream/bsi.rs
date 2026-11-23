@@ -5,6 +5,7 @@ use super::{CPL, DownmixCodes, E, ExpStrategy, LFE, NCH, NFCHANS, Substream, bad
 use crate::error::{DecodeError, Feature};
 use crate::tables::{DEF_SPX_BNDSTRC, FRM_EXPSTR};
 use crate::trace::Trace;
+use core::num::NonZeroU32;
 use triergon_bitstream::BitReader;
 
 impl Substream {
@@ -239,7 +240,9 @@ impl Substream {
         num_blocks: usize,
         bsid: u8,
     ) {
-        let key = (acmod as u32) | (lfeon as u32) << 3 | (fscod as u32) << 4 | rate_shift << 6;
+        let key = NonZeroU32::new(
+            1 << 31 | (acmod as u32) | (lfeon as u32) << 3 | (fscod as u32) << 4 | rate_shift << 6,
+        );
         if key != self.config_key {
             for d in &mut self.delay {
                 d.fill(0.0);

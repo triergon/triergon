@@ -18,6 +18,7 @@ use crate::imdct::Imdct;
 use crate::noise::Rng;
 use crate::quant::GroupTables;
 use crate::trace::{FrameTrace, Trace};
+use core::num::NonZeroU32;
 use triergon_bitstream::BitReader;
 
 pub(crate) const CPL: usize = 5;
@@ -120,7 +121,7 @@ pub(crate) struct Substream {
     pub dialnorm: u8,
     pub chanmap: Option<u16>,
     pub downmix: DownmixCodes,
-    config_key: u32,
+    config_key: Option<NonZeroU32>,
 
     // ---- E-AC-3 audfrm ----
     ahte: bool,
@@ -260,7 +261,7 @@ impl Substream {
             dialnorm: 0,
             chanmap: None,
             downmix: DownmixCodes::default(),
-            config_key: u32::MAX,
+            config_key: None,
             ahte: false,
             snroffststr: 0,
             blkswe: false,
@@ -340,7 +341,7 @@ impl Substream {
         for d in &mut self.delay {
             d.fill(0.0);
         }
-        self.config_key = u32::MAX;
+        self.config_key = None;
         self.ba_rerun = [BaRerun::Psd; NCH];
     }
 
