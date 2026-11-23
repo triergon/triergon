@@ -50,20 +50,20 @@ impl Dct4 {
     ///
     /// Kept out of line: inlined into the synthesis, its butterflies spill more.
     #[inline(never)]
-    #[expect(
-        clippy::expect_used,
-        reason = "N- and M-entry ranges convert to arrays"
-    )]
     pub(crate) fn transform<const N: usize, const M: usize>(
         &self,
         x: &[f32],
         mut emit: impl FnMut(usize, f32, f32),
     ) {
         debug_assert_eq!((self.n, 2 * M), (N, N));
-        let x: &[f32; N] = x[..N].try_into().expect("DCT length");
-        let pre: &[(f32, f32); M] = self.pre[..M].try_into().expect("twiddles");
-        let post: &[(f32, f32); M] = self.post[..M].try_into().expect("twiddles");
-        let rev: &[u8; M] = self.rev[..M].try_into().expect("bit reversal");
+        let (Some(x), Some(pre), Some(post), Some(rev)) = (
+            x.first_chunk::<N>(),
+            self.pre.first_chunk::<M>(),
+            self.post.first_chunk::<M>(),
+            self.rev.first_chunk::<M>(),
+        ) else {
+            return;
+        };
         let mut re = [0f32; M];
         let mut im = [0f32; M];
         for k in 0..M {
