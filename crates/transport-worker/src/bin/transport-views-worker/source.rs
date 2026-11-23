@@ -10,7 +10,7 @@ use triergon_core::{
     Step, Time, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
-use triergon_harness_runner::{Operation, Totals};
+use triergon_harness_runner::{Operation, Outcome};
 use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
 use triergon_mpegts::compat::pes::{
     CompactDemuxPacket, DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DemuxSpanViews,
@@ -217,7 +217,7 @@ pub(super) fn operation<'a>(
 }
 
 struct Output<'a, 'b> {
-    work: &'a mut Totals,
+    work: &'a mut Outcome,
     trace: Option<&'b mut dyn Write>,
 }
 

@@ -19,7 +19,7 @@ use triergon_mpegts::stream::{TraceEvent, TransportStream};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits};
 
 use super::reader::{Stop, explain, refusal_detail, row};
-use triergon_harness_runner::{Operation, Totals};
+use triergon_harness_runner::{Operation, Outcome};
 
 const SOURCE: SourceId = SourceId(1);
 const WORK: u64 = 64 * 1024;
@@ -116,7 +116,7 @@ pub(super) fn operation<'a>(
 }
 
 struct Output<'work, 'trace> {
-    work: &'work mut Totals,
+    work: &'work mut Outcome,
     trace: Option<&'trace mut dyn Write>,
 }
 
