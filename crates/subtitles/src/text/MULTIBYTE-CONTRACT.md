@@ -10,7 +10,7 @@ or `Encoding::Multibyte`; no label or content is guessed.
 | --- | --- | --- |
 | `GbkCp936` | gbk, cp936, windows-936 | Microsoft CP936 table 2.01, including 0x80 → U+20AC. Not GB18030. |
 | `Big5Unicode` | big5, big-5 | Unicode historical BIG5 table 2.0; its seven NO MAPPING entries are errors. |
-| `ShiftJisUnicode` | shift_jis, shift-jis, sjis | Unicode historical SHIFTJIS table 2.0 (0x5C yen, 0x7E overline), plus C0/DEL identity. |
+| `ShiftJisUnicode` | shift_jis, shift-jis, sjis | Unicode historical SHIFTJIS table 2.0 (0x5C yen, 0x7E overline), plus C0/DEL identity, with 815F → U+FF3C (JIS X 0208 1-32, as JIS0208.TXT, Windows and the WHATWG decoder map it) where SHIFTJIS.TXT gives U+005C. |
 | `EucKr` | euc-kr, euc_kr | KS X 1001:2002: CP949 table 2.01 restricted to A1–FE byte pairs, plus A2E8 → U+327E, which KS X 1001:2002 adds and CP949 2.01 predates, and ASCII. UHC extension pairs are refused. |
 | `Windows932` | cp932, windows-932 | Microsoft CP932 table 2.01 plus the 1,880 user-defined codes F040–F9FC → U+E000–U+E757, as Windows and the WHATWG Shift_JIS decoder convert them. |
 | `Windows949` | cp949, windows-949 | Microsoft CP949 table 2.01, including UHC extensions. |

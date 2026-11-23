@@ -161,6 +161,11 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
         }
         assert!(map.insert(code, value).is_none());
     }
+    if profile == M::ShiftJisUnicode {
+        // JIS X 0208 1-32, the reverse solidus, as JIS0208.TXT, Windows and the
+        // WHATWG Shift_JIS decoder map it; SHIFTJIS.TXT gives U+005C.
+        assert_eq!(map.insert(0x815f, '\u{ff3c}'), Some('\\'));
+    }
     if profile == M::Windows932 {
         // CP932.TXT 2.01 leaves out the user-defined area, which Windows
         // converts to the private use area, row by row.
@@ -779,4 +784,12 @@ fn utf8_packets_do_not_adopt_multibyte_selection() {
             Err(Error::Invalid(_))
         ));
     }
+}
+
+#[test]
+fn shift_jis_815f_is_the_fullwidth_reverse_solidus() {
+    assert_eq!(
+        decode(&[0x81, 0x5f], M::ShiftJisUnicode, 1).unwrap(),
+        "\u{ff3c}".as_bytes()
+    );
 }

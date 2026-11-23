@@ -18,7 +18,8 @@ pub enum MultibyteCharset {
     /// Unicode historical Big5 table 2.0, with its seven NO MAPPING entries refused.
     Big5Unicode,
     /// Unicode historical Shift-JIS table 2.0, which decodes 0x5C as yen and
-    /// 0x7E as overline.
+    /// 0x7E as overline, with 81 5F, JIS X 0208's reverse solidus, as
+    /// U+FF3C as JIS0208.TXT maps it.
     ShiftJisUnicode,
     /// KS X 1001:2002 in EUC-KR: CP949 table 2.01 restricted to A1–FE byte
     /// pairs, plus A2 E8 as U+327E, which KS X 1001:2002 adds, and ASCII; the
