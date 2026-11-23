@@ -61,7 +61,7 @@ identical output.
 
 ## Behaviour and limits
 
-- `Picture` carries cropped `width`/`height`, `bit_depth`, `chroma`, three `Plane`s
+- `Picture` carries cropped `width`/`height`, `bit_depth`, three 4:2:0 `Plane`s
   sharing the decoder's frame buffers, `pts`, `poc`, `sar` and `colour`. Each picture
   keeps the timestamp of the access unit that carried it through reordering.
 - Errors use `triergon_codec::DecodeError`. `Unsupported(&str)` names the feature,

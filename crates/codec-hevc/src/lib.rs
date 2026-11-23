@@ -36,7 +36,7 @@ mod transform;
 
 pub use decoder::{Decoder, Limits};
 pub use nal::AccessUnitSplitter;
-pub use output::{ChromaFormat, ColourDescription, Picture, Plane, Row};
+pub use output::{ColourDescription, Picture, Plane, Row};
 pub use triergon_codec::{Budget, DecodeError, Error};
 
 pub(crate) type Result<T> = core::result::Result<T, DecodeError>;

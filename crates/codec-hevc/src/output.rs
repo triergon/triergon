@@ -24,13 +24,6 @@ pub struct ColourDescription {
     pub colour_description_present: bool,
 }
 
-/// Chroma sampling of an output picture. The decoder outputs 4:2:0 only.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ChromaFormat {
-    /// Chroma planes at half the luma width and height.
-    Yuv420,
-}
-
 /// Borrowed samples of a plane: `U8` for 8-bit streams, `U16` for 9- and 10-bit ones.
 #[derive(Debug)]
 pub enum Row<'a> {
@@ -127,9 +120,7 @@ pub struct Picture {
     pub height: u32,
     /// Bits per sample, 8 to 10, the same for luma and chroma.
     pub bit_depth: u32,
-    /// Chroma sampling of `planes[1]` and `planes[2]`.
-    pub chroma: ChromaFormat,
-    /// Y, Cb and Cr.
+    /// Y, Cb and Cr in 4:2:0, with each chroma dimension half the luma dimension.
     pub planes: [Plane; 3],
     /// The timestamp of the access unit (or NAL unit) that carried the picture.
     pub pts: Option<i64>,
@@ -198,7 +189,6 @@ impl Picture {
             width: w as u32,
             height: h as u32,
             bit_depth: info.bit_depth,
-            chroma: ChromaFormat::Yuv420,
             planes: [
                 mk(0, l as usize, t as usize, w, h),
                 mk(1, l as usize / 2, t as usize / 2, w / 2, h / 2),
