@@ -161,13 +161,13 @@ fn trace(codec: Codec, width: u8, raw: &[u8], plan: &[u64]) {
                     output.configuration_bytes().as_ref(),
                     output.configuration_source_refusal(),
                     output.packet_source_refusal(),
-                    output.receiver_epoch(),
+                    output.configuration_updates(),
                     output.forward_new_extradata()
                 )
             }
             Ok(BuildStep::Complete) => panic!("missing output"),
             Err(error) => {
-                let rejection = job.take_receiver_rejection().map(|r| {
+                let rejection = job.take_rejection().map(|r| {
                     assert_eq!(r.source().fields, fields);
                     assert_eq!(r.source().bytes.as_ref(), raw);
                     assert!(r.source().bytes.retained_capacity() >= 1024);
@@ -180,7 +180,7 @@ fn trace(codec: Codec, width: u8, raw: &[u8], plan: &[u64]) {
                         r.kind(),
                         r.source_error(),
                         native,
-                        r.receiver_epoch(),
+                        r.configuration_updates(),
                         r.packet_source_refusal()
                     )
                 });
@@ -279,10 +279,10 @@ fn missing_prefix_byte_spends_one_failed_read_token_after_zero_work_yield() {
             Err(Error::Truncated)
         ));
         assert_eq!(work.spent(), 1);
-        let rejection = job.take_receiver_rejection().unwrap();
+        let rejection = job.take_rejection().unwrap();
         assert_eq!(
             rejection.kind(),
-            NalPacketReceiverErrorKind::IncompleteLengthPrefix
+            NalPacketRejectionKind::IncompleteLengthPrefix
         );
         assert_eq!(rejection.source_error(), Error::Truncated);
         assert_eq!(rejection.source().bytes.as_ref(), &[0, 0]);
@@ -309,7 +309,7 @@ fn cancellation_between_partial_prefix_polls_precedes_more_input_or_work() {
             Err(Error::Cancelled)
         ));
         assert_eq!(work.spent(), 0);
-        assert!(job.take_receiver_rejection().is_none());
+        assert!(job.take_rejection().is_none());
         cancel.store(false, Ordering::Relaxed);
         assert!(matches!(
             job.step(&mut work, &cancel),
@@ -406,7 +406,7 @@ fn every_one_and_two_byte_hevc_header_keeps_strict_and_observed_facts() {
                         let mut expected = vec![0, 0, 0, 1];
                         expected.extend_from_slice(header);
                         assert_eq!(output.bytes().as_ref(), expected.as_slice());
-                        assert_eq!(output.receiver_epoch(), 0);
+                        assert_eq!(output.configuration_updates(), 0);
                         assert!(output.forward_new_extradata());
                         digest = digest
                             .wrapping_mul(131)
@@ -416,7 +416,7 @@ fn every_one_and_two_byte_hevc_header_keeps_strict_and_observed_facts() {
                     Err(error) => {
                         assert!(!observed);
                         assert_eq!(Some(error), refusal);
-                        assert!(job.take_receiver_rejection().is_none());
+                        assert!(job.take_rejection().is_none());
                         let mut empty = WorkBudget::new(0);
                         assert!(
                             matches!(job.step(&mut empty, &AtomicBool::new(false)), Err(e) if e == error)
@@ -475,7 +475,7 @@ fn hevc_first_refusal_and_strict_failure_precede_scan_for_both_orders() {
                         Err(error) => {
                             assert!(!observed);
                             assert_eq!(error, expected);
-                            assert!(job.take_receiver_rejection().is_none());
+                            assert!(job.take_rejection().is_none());
                             complete = true;
                         }
                         _ => panic!("missing authored packet result"),

@@ -3,9 +3,9 @@
 //! `Step::Continue` re-enters the loop and `Step::Break` returns.
 use super::{
     AvcState, ConfigurationRef, EmissionPhase, Injection, NalPacket, NalPacketJob, NalPacketOutput,
-    NalPacketReceiverErrorKind, NalPacketSegment, PacketEmission, PacketInput, PacketPhase,
-    PacketPlan, PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_segment,
-    copy_annex_b_whole, empty_packet_segments, freeze_annex_b_output, start_annex_b_output,
+    NalPacketRejectionKind, NalPacketSegment, PacketEmission, PacketInput, PacketPhase, PacketPlan,
+    PacketSegmentStorage, PacketState, PlanPhase, copy_annex_b_segment, copy_annex_b_whole,
+    empty_packet_segments, freeze_annex_b_output, start_annex_b_output,
 };
 use crate::nal::header::NalHeaderError;
 use crate::{SlotProgress, started};
@@ -193,7 +193,7 @@ impl PacketPlan {
         width: usize,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        refusal: &mut Option<NalPacketReceiverErrorKind>,
+        refusal: &mut Option<NalPacketRejectionKind>,
     ) -> Result<bool> {
         if width == 4
             && self.prefix_read == 0
@@ -220,7 +220,7 @@ impl PacketPlan {
         width: usize,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-        refusal: &mut Option<NalPacketReceiverErrorKind>,
+        refusal: &mut Option<NalPacketRejectionKind>,
     ) -> Result<bool> {
         while self.prefix_read < width {
             let count = (width - self.prefix_read)
@@ -231,7 +231,7 @@ impl PacketPlan {
                 if !work.try_charge(1) {
                     return Ok(false);
                 }
-                *refusal = Some(NalPacketReceiverErrorKind::IncompleteLengthPrefix);
+                *refusal = Some(NalPacketRejectionKind::IncompleteLengthPrefix);
                 return Err(Error::Truncated);
             }
             work.take(count as u64);
@@ -261,11 +261,11 @@ impl PacketPlan {
             self.phase = PlanPhase::Scan;
             return Ok(NEXT);
         }
-        if !self.read_length(bytes, width, work, cancel, &mut state.receiver_failure)? {
+        if !self.read_length(bytes, width, work, cancel, &mut state.rejection_kind)? {
             return Ok(YIELD);
         }
         if self.length == 0 {
-            state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyHevcNal);
+            state.rejection_kind = Some(NalPacketRejectionKind::EmptyHevcNal);
             return Err(Error::Invalid("HEVC NAL length of zero"));
         }
         if self.look_nals == state.session.limits.maximum_nals {
@@ -279,7 +279,7 @@ impl PacketPlan {
             .checked_add(self.length)
             .ok_or(Error::Overflow)?;
         if end > bytes.len() {
-            state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
+            state.rejection_kind = Some(NalPacketRejectionKind::IncompleteNalPayload);
             return Err(Error::Truncated);
         }
         let kind = match NalHeader::parse_compact(Codec::Hevc, &bytes[self.offset..end]) {
@@ -326,7 +326,7 @@ impl PacketPlan {
         };
         let width = usize::from(length_width.bytes());
         if self.offset == 0 && bytes.is_empty() && state.codec == Codec::Avc {
-            state.receiver_failure = Some(NalPacketReceiverErrorKind::EmptyAvcPacket);
+            state.rejection_kind = Some(NalPacketRejectionKind::EmptyAvcPacket);
             return Err(Error::Invalid("empty AVC packet"));
         }
         if self.offset == bytes.len() && self.prefix_read == 0 {
@@ -345,7 +345,7 @@ impl PacketPlan {
             if !work.try_charge(1) {
                 return Ok(YIELD);
             }
-        } else if !self.read_length(bytes, width, work, cancel, &mut state.receiver_failure)? {
+        } else if !self.read_length(bytes, width, work, cancel, &mut state.rejection_kind)? {
             return Ok(YIELD);
         }
         let codec = state.codec;
@@ -357,7 +357,7 @@ impl PacketPlan {
                 .checked_add(self.length)
                 .ok_or(Error::Overflow)?;
             if end > bytes.len() {
-                state.receiver_failure = Some(NalPacketReceiverErrorKind::IncompleteNalPayload);
+                state.rejection_kind = Some(NalPacketRejectionKind::IncompleteNalPayload);
                 return Err(Error::Truncated);
             }
             if self.length == 0 {
@@ -839,7 +839,7 @@ impl PacketEmission {
             state.session.install_avc(c, state.length_width);
         }
         state.session.avc = state.avc;
-        state.session.receiver_epoch = state.epoch;
+        state.session.configuration_updates = state.epoch;
         self.phase = EmissionPhase::Complete;
         *ready = Some(NalPacketOutput {
             bytes,
@@ -856,7 +856,7 @@ impl PacketEmission {
             configuration_source_refusal,
             packet_source_refusal: state.packet_source_refusal,
             segments: std::mem::replace(&mut state.session.segments, empty_packet_segments()),
-            receiver_epoch: state.epoch,
+            configuration_updates: state.epoch,
             forward_new_extradata,
         });
         Ok(Step::Break(SlotProgress::Ready))

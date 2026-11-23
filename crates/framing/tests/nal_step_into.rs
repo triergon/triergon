@@ -207,7 +207,7 @@ fn trace(framed: bool, raw: &[u8], plan: &[u64], direct: bool) -> Vec<String> {
                     Err(error)
                 );
                 assert_eq!(retry_work.remaining(), 17);
-                if let Some(rejection) = job.take_receiver_rejection() {
+                if let Some(rejection) = job.take_rejection() {
                     events.push(format!(
                         "{:?}:{:?}:{}",
                         rejection.kind(),
@@ -626,7 +626,7 @@ fn long_update_and_payload_keep_owners_across_pressure_zero_work_and_cancellatio
                 assert_eq!(work.remaining(), 7);
                 assert!(ready.is_none());
                 drop(job);
-                assert_eq!(session.receiver_epoch(), 0);
+                assert_eq!(session.configuration_updates(), 0);
                 assert_eq!(session.configuration().bytes().as_ref(), avcc(128));
                 drop(session);
             } else {
@@ -634,7 +634,7 @@ fn long_update_and_payload_keep_owners_across_pressure_zero_work_and_cancellatio
                 assert_eq!(polls.last().unwrap().1, Ok(SlotProgress::Ready));
                 let output = ready.unwrap();
                 drop(job);
-                assert_eq!(session.receiver_epoch(), 1);
+                assert_eq!(session.configuration_updates(), 1);
                 drop(session);
                 let mut expected = vec![0, 0, 0, 1];
                 expected.extend_from_slice(&updated[8..13]);
@@ -768,19 +768,19 @@ fn physical_rejection_retains_verified_update_and_original_source_with_no_partia
     });
     assert!(ready.is_none());
     assert_eq!(polls.last().unwrap().1, Err(Error::Truncated));
-    let rejection = job.take_receiver_rejection().unwrap();
+    let rejection = job.take_rejection().unwrap();
     assert_eq!(
         rejection.kind(),
-        NalPacketReceiverErrorKind::IncompleteLengthPrefix
+        NalPacketRejectionKind::IncompleteLengthPrefix
     );
     assert_eq!(rejection.source_error(), Error::Truncated);
     assert_eq!(rejection.source().bytes.as_ref(), &[0, 0]);
     assert_eq!(rejection.source().fields, fields());
     assert_eq!(rejection.configuration_bytes().as_ref(), avcc(129));
-    assert_eq!(rejection.receiver_epoch(), 1);
-    assert!(job.take_receiver_rejection().is_none());
+    assert_eq!(rejection.configuration_updates(), 1);
+    assert!(job.take_rejection().is_none());
     drop(job);
-    assert_eq!(session.receiver_epoch(), 1);
+    assert_eq!(session.configuration_updates(), 1);
     drop(session);
     assert!(pool.used() > baseline);
     drop(rejection);
@@ -858,7 +858,7 @@ fn facts(out: &NalPacketOutput) -> String {
         out.configuration_source_identity(),
         out.configuration_source_refusal(),
         out.packet_source_refusal(),
-        out.receiver_epoch(),
+        out.configuration_updates(),
         out.forward_new_extradata(),
         segments,
     )

@@ -172,7 +172,7 @@ pub struct NalPacket<M = NalPacketFields> {
     /// length must fit `u64`.
     pub location: SourceLocation,
     /// The caller's generation of the source, carried to the output as given. It
-    /// is independent of [`NalPacketSession::receiver_epoch`].
+    /// is independent of [`NalPacketSession::configuration_updates`].
     pub generation: u64,
     /// The caller's metadata, carried to the output as given, timestamps known or
     /// unknown alike. [`NalPacketFields`] is the default type.
@@ -500,7 +500,7 @@ impl Default for AvcState {
 /// packet to packet. For HEVC the whole record goes before the first parameter
 /// set or IRAP NAL unit of each packet that holds an IRAP NAL unit. The
 /// nonempty `new_extradata` of an AVC packet replaces the configuration;
-/// [`receiver_epoch`](Self::receiver_epoch) counts these updates and is
+/// [`configuration_updates`](Self::configuration_updates) counts these updates and is
 /// independent of the generations the caller gives its sources.
 ///
 /// One packet is framed at a time, by the [`NalPacketJob`] that
@@ -523,7 +523,7 @@ pub struct NalPacketSession {
     limits: NalPacketLimits,
     maximum_copy_storage: usize,
     avc: AvcState,
-    receiver_epoch: u64,
+    configuration_updates: u64,
     drained: bool,
     // State of the packet in flight that most packets leave empty. It lives
     // here rather than in the job, which every packet creates and moves.
@@ -540,7 +540,7 @@ impl std::fmt::Debug for NalPacketSession {
             .field("length_width", &self.length_width)
             .field("limits", &self.limits)
             .field("configuration_bytes", &self.configuration.bytes().len())
-            .field("receiver_epoch", &self.receiver_epoch)
+            .field("configuration_updates", &self.configuration_updates)
             .field("drained", &self.drained)
             .finish_non_exhaustive()
     }
@@ -587,7 +587,7 @@ impl NalPacketSession {
             limits,
             maximum_copy_storage,
             avc: AvcState::default(),
-            receiver_epoch: 0,
+            configuration_updates: 0,
             drained: false,
             pending_update: None,
             avc_buffering: None,
@@ -610,8 +610,8 @@ impl NalPacketSession {
     }
     /// The number of AVC configuration updates adopted so far; zero until the
     /// first.
-    pub fn receiver_epoch(&self) -> u64 {
-        self.receiver_epoch
+    pub fn configuration_updates(&self) -> u64 {
+        self.configuration_updates
     }
     /// Marks the end of the stream: every later packet is refused until
     /// [`flush`](Self::flush). The session queues no output, so nothing is left
@@ -623,7 +623,7 @@ impl NalPacketSession {
     /// Restarts the stream: clears the tracking of in-band parameter sets,
     /// releases an update that was not adopted and accepts packets again after
     /// [`drain`](Self::drain). The configuration and
-    /// [`receiver_epoch`](Self::receiver_epoch) stay.
+    /// [`configuration_updates`](Self::configuration_updates) stay.
     pub fn flush(&mut self) {
         self.avc = AvcState::default();
         self.drained = false;
@@ -716,9 +716,11 @@ impl NalPacketSession {
             check_span(update.bytes().len())?;
         }
         let epoch = if changes {
-            self.receiver_epoch.checked_add(1).ok_or(Error::Overflow)?
+            self.configuration_updates
+                .checked_add(1)
+                .ok_or(Error::Overflow)?
         } else {
-            self.receiver_epoch
+            self.configuration_updates
         };
         let avc = if changes {
             AvcState::default()
@@ -756,7 +758,7 @@ impl NalPacketSession {
                 update_verified: false,
                 total: 0,
                 failure: None,
-                receiver_failure: None,
+                rejection_kind: None,
                 observed_packet,
                 packet_source_refusal: None,
             },
@@ -936,7 +938,7 @@ pub struct NalPacketOutput<M = NalPacketFields> {
     configuration_source_refusal: NalConfigurationRefusal,
     packet_source_refusal: Option<NalHeaderError>,
     segments: PacketSegmentStorage,
-    receiver_epoch: u64,
+    configuration_updates: u64,
     forward_new_extradata: bool,
 }
 impl<M> std::fmt::Debug for NalPacketOutput<M> {
@@ -947,7 +949,7 @@ impl<M> std::fmt::Debug for NalPacketOutput<M> {
             .field("source_bytes", &self.source.bytes.len())
             .field("output_bytes", &self.bytes.len())
             .field("segments", &self.segments.as_slice())
-            .field("receiver_epoch", &self.receiver_epoch)
+            .field("configuration_updates", &self.configuration_updates)
             .field("forward_new_extradata", &self.forward_new_extradata)
             .field(
                 "configuration_source_refusal",
@@ -962,7 +964,7 @@ impl<M> std::fmt::Debug for NalPacketOutput<M> {
 /// cancellation and the NAL header refusals of [`NalPacketSession::packet`] are
 /// errors of this implementation, not of the filter, and have no kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum NalPacketReceiverErrorKind {
+pub enum NalPacketRejectionKind {
     /// The packet ends inside a NAL length field.
     IncompleteLengthPrefix,
     /// A length field declares more bytes than the packet has left.
@@ -974,18 +976,18 @@ pub enum NalPacketReceiverErrorKind {
 }
 
 /// A packet that the filter rejects as invalid data, taken from its failed job
-/// with [`NalPacketJob::take_receiver_rejection`]. It holds the input packet
+/// with [`NalPacketJob::take_rejection`]. It holds the input packet
 /// with its metadata, the job's error and the session's configuration. Holding
 /// them does not make the packet or the configuration valid.
 pub struct NalPacketRejection<M = NalPacketFields> {
-    kind: NalPacketReceiverErrorKind,
+    kind: NalPacketRejectionKind,
     error: Error,
     source: NalPacket<M>,
     configuration: Bytes,
     configuration_identity: Option<(SourceLocation, u64)>,
     configuration_source_refusal: NalConfigurationRefusal,
     packet_source_refusal: Option<NalHeaderError>,
-    receiver_epoch: u64,
+    configuration_updates: u64,
 }
 impl<M> std::fmt::Debug for NalPacketRejection<M> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -995,7 +997,7 @@ impl<M> std::fmt::Debug for NalPacketRejection<M> {
             .field("source_error", &self.error)
             .field("location", &self.source.location)
             .field("source_bytes", &self.source.bytes.len())
-            .field("receiver_epoch", &self.receiver_epoch)
+            .field("configuration_updates", &self.configuration_updates)
             .field(
                 "configuration_source_refusal",
                 &self.configuration_source_refusal(),
@@ -1006,7 +1008,7 @@ impl<M> std::fmt::Debug for NalPacketRejection<M> {
 }
 impl<M> NalPacketRejection<M> {
     /// Why the filter rejects the packet.
-    pub fn kind(&self) -> NalPacketReceiverErrorKind {
+    pub fn kind(&self) -> NalPacketRejectionKind {
         self.kind
     }
     /// The error the job returned: [`Error::Truncated`] for the incomplete
@@ -1047,10 +1049,10 @@ impl<M> NalPacketRejection<M> {
     pub fn packet_source_refusal(&self) -> Option<Error> {
         self.packet_source_refusal.map(NalHeaderError::error)
     }
-    /// The session's [`receiver_epoch`](NalPacketSession::receiver_epoch) after
+    /// The session's [`configuration_updates`](NalPacketSession::configuration_updates) after
     /// the failure; it counts the packet's update when the job had verified it.
-    pub fn receiver_epoch(&self) -> u64 {
-        self.receiver_epoch
+    pub fn configuration_updates(&self) -> u64 {
+        self.configuration_updates
     }
 }
 impl<M> NalPacketOutput<M> {
@@ -1091,10 +1093,10 @@ impl<M> NalPacketOutput<M> {
     pub fn packet_source_refusal(&self) -> Option<Error> {
         self.packet_source_refusal.map(NalHeaderError::error)
     }
-    /// The session's [`receiver_epoch`](NalPacketSession::receiver_epoch) with
+    /// The session's [`configuration_updates`](NalPacketSession::configuration_updates) with
     /// this packet, whose own update is counted.
-    pub fn receiver_epoch(&self) -> u64 {
-        self.receiver_epoch
+    pub fn configuration_updates(&self) -> u64 {
+        self.configuration_updates
     }
     /// Whether the filter leaves the packet's `new_extradata` side data on the
     /// packet it outputs: always for HEVC; for AVC only when it is present and
@@ -1161,7 +1163,7 @@ struct PacketState<'a> {
     update_verified: bool,
     total: usize,
     failure: Option<Error>,
-    receiver_failure: Option<NalPacketReceiverErrorKind>,
+    rejection_kind: Option<NalPacketRejectionKind>,
     observed_packet: bool,
     packet_source_refusal: Option<NalHeaderError>,
 }
@@ -1433,12 +1435,12 @@ impl<M> NalPacketJob<'_, M> {
         self.source.as_ref()
     }
     /// After the job failed on a packet that the filter rejects as invalid data
-    /// ([`NalPacketReceiverErrorKind`]): the packet and the failure, handed out
+    /// ([`NalPacketRejectionKind`]): the packet and the failure, handed out
     /// once. `None` for every other failure, before a failure and on later
     /// calls. The job keeps returning its error.
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketRejection<M>> {
+    pub fn take_rejection(&mut self) -> Option<NalPacketRejection<M>> {
         let state = &self.state;
-        let kind = state.receiver_failure?;
+        let kind = state.rejection_kind?;
         let error = state.failure?;
         let source = self.source.take()?;
         Some(NalPacketRejection {
@@ -1449,7 +1451,7 @@ impl<M> NalPacketJob<'_, M> {
             configuration_identity: state.session.configuration.source_identity(),
             configuration_source_refusal: state.session.configuration.refusal(),
             packet_source_refusal: state.packet_source_refusal,
-            receiver_epoch: state.session.receiver_epoch,
+            configuration_updates: state.session.configuration_updates,
         })
     }
     /// The same state engine as `step_into`, returning the output directly. Fails as
@@ -1513,7 +1515,7 @@ impl<M> NalPacketJob<'_, M> {
             self.state
                 .session
                 .install_avc(configuration, self.state.length_width);
-            self.state.session.receiver_epoch = self.state.epoch;
+            self.state.session.configuration_updates = self.state.epoch;
             self.state.session.avc = AvcState::default();
         }
         // A failed job never adopts its update later.

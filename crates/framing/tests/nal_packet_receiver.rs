@@ -215,10 +215,10 @@ fn physical_prefix_rejection_moves_nonclone_metadata_once_and_outlives_session()
     };
     let pointer = std::ptr::from_ref(source.fields.owner.as_ref());
     let mut job = s.packet(source, None).unwrap();
-    assert!(job.take_receiver_rejection().is_none());
+    assert!(job.take_rejection().is_none());
     assert_eq!(error(&mut job), Error::Truncated);
-    let rejected = job.take_receiver_rejection().unwrap();
-    assert!(job.take_receiver_rejection().is_none());
+    let rejected = job.take_rejection().unwrap();
+    assert!(job.take_rejection().is_none());
     assert!(job.source().is_none());
     assert!(matches!(
         job.step(&mut WorkBudget::new(99), &AtomicBool::new(false)),
@@ -228,7 +228,7 @@ fn physical_prefix_rejection_moves_nonclone_metadata_once_and_outlives_session()
     drop(s);
     assert_eq!(
         rejected.kind(),
-        NalPacketReceiverErrorKind::IncompleteLengthPrefix
+        NalPacketRejectionKind::IncompleteLengthPrefix
     );
     #[cfg(feature = "reference-trace")]
     assert_eq!(rejected.native_receive_result(), -1_094_995_529);
@@ -249,10 +249,10 @@ fn physical_payload_rejection_keeps_raw_lengths_flags_and_source_identity() {
     let mut s = session(&p);
     let mut job = s.packet(packet(&p, &[0, 0, 0, 5, 0x65]), None).unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
-    let rejected = job.take_receiver_rejection().unwrap();
+    let rejected = job.take_rejection().unwrap();
     assert_eq!(
         rejected.kind(),
-        NalPacketReceiverErrorKind::IncompleteNalPayload
+        NalPacketRejectionKind::IncompleteNalPayload
     );
     assert_eq!(rejected.source().bytes.as_ref(), [0, 0, 0, 5, 0x65]);
     assert_eq!(rejected.source().fields.flags, u32::MAX);
@@ -274,8 +274,8 @@ fn empty_avc_is_a_receive_error_without_an_output_packet() {
     let mut s = session(&p);
     let mut job = s.packet(packet(&p, &[]), None).unwrap();
     assert!(matches!(error(&mut job), Error::Invalid(_)));
-    let r = job.take_receiver_rejection().unwrap();
-    assert_eq!(r.kind(), NalPacketReceiverErrorKind::EmptyAvcPacket);
+    let r = job.take_rejection().unwrap();
+    assert_eq!(r.kind(), NalPacketRejectionKind::EmptyAvcPacket);
     assert!(r.source().bytes.is_empty());
 }
 #[test]
@@ -285,8 +285,8 @@ fn zero_hevc_nal_is_a_receive_error_with_original_prefix_retained() {
         NalPacketSession::new(&p, NalPacketConfiguration::Hevc(hevc(&p, false)), limits()).unwrap();
     let mut job = s.packet(packet(&p, &[0, 0, 0, 0]), None).unwrap();
     assert!(matches!(error(&mut job), Error::Invalid(_)));
-    let r = job.take_receiver_rejection().unwrap();
-    assert_eq!(r.kind(), NalPacketReceiverErrorKind::EmptyHevcNal);
+    let r = job.take_rejection().unwrap();
+    assert_eq!(r.kind(), NalPacketRejectionKind::EmptyHevcNal);
     assert_eq!(r.source().bytes.as_ref(), [0, 0, 0, 0]);
 }
 #[test]
@@ -297,7 +297,7 @@ fn fixed_header_refusal_is_not_relabelled_as_native_codec_error() {
         .packet(packet(&p, &[0, 0, 0, 2, 0xe5, 128]), None)
         .unwrap();
     assert!(matches!(error(&mut job), Error::Invalid(_)));
-    assert!(job.take_receiver_rejection().is_none());
+    assert!(job.take_rejection().is_none());
     assert_eq!(
         job.source().unwrap().bytes.as_ref(),
         [0, 0, 0, 2, 0xe5, 128]
@@ -309,7 +309,7 @@ fn short_opaque_idr_body_truncation_has_no_inferred_native_result() {
     let mut s = session(&p);
     let mut job = s.packet(packet(&p, &[0, 0, 0, 1, 0x65]), None).unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
-    assert!(job.take_receiver_rejection().is_none());
+    assert!(job.take_rejection().is_none());
 }
 #[test]
 fn cancellation_stays_source_cancellation_after_flag_clears() {
@@ -326,7 +326,7 @@ fn cancellation_stays_source_cancellation_after_flag_clears() {
         job.step(&mut WorkBudget::new(100), &c),
         Err(Error::Cancelled)
     ));
-    assert!(job.take_receiver_rejection().is_none());
+    assert!(job.take_rejection().is_none());
     assert!(job.source().is_some());
 }
 #[test]
@@ -337,7 +337,7 @@ fn output_policy_failure_is_not_a_native_codec_error() {
     let mut s = NalPacketSession::new(&p, NalPacketConfiguration::Avc(avc(&p)), l).unwrap();
     let mut job = s.packet(packet(&p, IDR), None).unwrap();
     assert!(matches!(error(&mut job), Error::Limit { .. }));
-    assert!(job.take_receiver_rejection().is_none());
+    assert!(job.take_rejection().is_none());
 }
 #[test]
 fn external_pressure_reports_no_error_and_resumes_the_same_packet() {
@@ -347,7 +347,7 @@ fn external_pressure_reports_no_error_and_resumes_the_same_packet() {
     let blocker = p.reserve(p.available() - 1).unwrap();
     let mut job = s.packet(source, None).unwrap();
     assert!(matches!(error(&mut job), Error::Backpressure { .. }));
-    assert!(job.take_receiver_rejection().is_none());
+    assert!(job.take_rejection().is_none());
     drop(blocker);
     let out = output(&mut job);
     assert_eq!(out.source().bytes.as_ref(), IDR);
@@ -360,7 +360,7 @@ fn failed_partial_inband_packet_does_not_commit_availability() {
     raw.extend_from_slice(&[0, 0]);
     let mut job = s.packet(packet(&p, &raw), None).unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
-    let rejected = job.take_receiver_rejection().unwrap();
+    let rejected = job.take_rejection().unwrap();
     drop(job);
     let mut next = s.packet(packet(&p, IDR), None).unwrap();
     let out = output(&mut next);
@@ -645,14 +645,14 @@ fn observed_avc_update_changes_native_width_but_keeps_source_refusal_and_epoch()
     src.new_extradata = Some(bytes(&p, &raw));
     let mut job = s.receiver_packet(src, Some(observed_avc(&p, 3))).unwrap();
     let out = output(&mut job);
-    assert_eq!(out.receiver_epoch(), 1);
+    assert_eq!(out.configuration_updates(), 1);
     assert_eq!(out.source().new_extradata.as_ref().unwrap().as_ref(), raw);
     assert_eq!(
         out.configuration_source_refusal(),
         Some(Error::Invalid("AVC three-byte sample length"))
     );
     drop(job);
-    assert_eq!(s.receiver_epoch(), 1);
+    assert_eq!(s.configuration_updates(), 1);
     assert!(matches!(
         s.configuration(),
         NalPacketConfiguration::ReceiverAvc(_)
@@ -726,7 +726,7 @@ fn unsupported_hevc_initial_array_retains_raw_source_and_has_no_fake_output() {
     let p = Budget::new(100000).unwrap();
     let cfg = NalPacketConfiguration::Hevc(hevc(&p, true));
     let mut writer = NalPacketConfigWriter::new(&p, &cfg, 65536).unwrap();
-    assert!(writer.take_receiver_rejection().is_none());
+    assert!(writer.take_rejection().is_none());
     let cancel = AtomicBool::new(false);
     let count = u64::from(hvcc(4, true)[22]);
     let mut before = WorkBudget::new(count - 1);
@@ -735,7 +735,7 @@ fn unsupported_hevc_initial_array_retains_raw_source_and_has_no_fake_output() {
         Ok(BuildStep::Yield)
     ));
     assert_eq!(before.remaining(), 0);
-    assert!(writer.take_receiver_rejection().is_none());
+    assert!(writer.take_rejection().is_none());
     let mut refusal = WorkBudget::new(1);
     assert!(matches!(
         writer.step(&mut refusal, &cancel),
@@ -744,8 +744,8 @@ fn unsupported_hevc_initial_array_retains_raw_source_and_has_no_fake_output() {
         ))
     ));
     assert_eq!(refusal.remaining(), 0);
-    let r = writer.take_receiver_rejection().unwrap();
-    assert!(writer.take_receiver_rejection().is_none());
+    let r = writer.take_rejection().unwrap();
+    assert!(writer.take_rejection().is_none());
     drop(writer);
     drop(cfg);
     assert_eq!(r.source_bytes().as_ref(), hvcc(4, true));
@@ -784,14 +784,14 @@ fn physical_error_after_observed_update_keeps_new_config_without_committing_inba
         .receiver_packet(source, Some(observed_avc(&p, 3)))
         .unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
-    let r = job.take_receiver_rejection().unwrap();
+    let r = job.take_rejection().unwrap();
     drop(job);
     assert!(matches!(
         s.configuration(),
         NalPacketConfiguration::ReceiverAvc(_)
     ));
     drop(s);
-    assert_eq!(r.receiver_epoch(), 1);
+    assert_eq!(r.configuration_updates(), 1);
     assert_eq!(r.configuration_bytes().as_ref(), avcc(3));
     assert_eq!(
         r.configuration_source_refusal(),
@@ -807,16 +807,16 @@ fn observed_hevc_short_header_retains_source_refusal_before_later_physical_failu
         NalPacketSession::new(&p, NalPacketConfiguration::Hevc(hevc(&p, false)), limits()).unwrap();
     let mut job = strict.packet(packet(&p, &raw), None).unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
-    assert!(job.take_receiver_rejection().is_none());
+    assert!(job.take_rejection().is_none());
     drop(job);
     let mut native =
         NalPacketSession::new(&p, NalPacketConfiguration::Hevc(hevc(&p, false)), limits()).unwrap();
     let mut job = native.receiver_packet(packet(&p, &raw), None).unwrap();
     assert_eq!(error(&mut job), Error::Truncated);
-    let rejected = job.take_receiver_rejection().unwrap();
+    let rejected = job.take_rejection().unwrap();
     assert_eq!(
         rejected.kind(),
-        NalPacketReceiverErrorKind::IncompleteLengthPrefix
+        NalPacketRejectionKind::IncompleteLengthPrefix
     );
     assert_eq!(rejected.packet_source_refusal(), Some(Error::Truncated));
     assert_eq!(rejected.source().bytes.as_ref(), raw);

@@ -187,7 +187,7 @@ fn output(run: &mut Run, out: &NalPacketOutput) {
         out.configuration_source_identity(),
         out.configuration_source_refusal(),
         out.packet_source_refusal(),
-        out.receiver_epoch(),
+        out.configuration_updates(),
         out.forward_new_extradata(),
     ));
     for (i, s) in out.segments().iter().enumerate() {
@@ -256,7 +256,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                 }
                 Ok(BuildStep::Yield) => (),
                 _ => {
-                    let r = writer.take_receiver_rejection();
+                    let r = writer.take_rejection();
                     run.push(format!(
                         "init-rejection {:?}",
                         r.map(|r| (r.source_bytes().to_vec(), r.declared_array_type()))
@@ -349,7 +349,7 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                 Ok(BuildStep::Yield) => (),
                 Ok(BuildStep::Complete) => break,
                 Err(_) => {
-                    let r = job.take_receiver_rejection();
+                    let r = job.take_rejection();
                     run.push(format!(
                         "rejection {:?}",
                         r.map(|r| (
@@ -359,14 +359,14 @@ fn receive(codec: Codec, record: &[u8], packets: &[Packet], q: u64) -> Run {
                             r.configuration_source_identity(),
                             r.configuration_source_refusal(),
                             r.packet_source_refusal(),
-                            r.receiver_epoch(),
+                            r.configuration_updates(),
                         ))
                     ));
                     break;
                 }
             }
         }
-        run.push(format!("epoch {}", session.receiver_epoch()));
+        run.push(format!("epoch {}", session.configuration_updates()));
     }
     drop(session);
     // Outputs keep every fact after the session closes.

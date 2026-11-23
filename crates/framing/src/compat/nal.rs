@@ -36,8 +36,8 @@ use crate::{
 use packet::NalConfigurationRefusal;
 pub use packet::{
     NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketJob, NalPacketLimits,
-    NalPacketOrigin, NalPacketOutput, NalPacketReceiverErrorKind, NalPacketRejection,
-    NalPacketSegment, NalPacketSession,
+    NalPacketOrigin, NalPacketOutput, NalPacketRejection, NalPacketRejectionKind, NalPacketSegment,
+    NalPacketSession,
 };
 pub use packet_config::{NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter};
 use std::sync::atomic::AtomicBool;

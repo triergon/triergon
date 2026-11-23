@@ -180,7 +180,7 @@ impl<'a> NalPacketConfigWriter<'a> {
     /// After [`step`](Self::step) refused an HEVC record for the type of one of
     /// its arrays: the record and the error, once. `None` for every other
     /// failure, before a failure and on later calls.
-    pub fn take_receiver_rejection(&mut self) -> Option<NalPacketConfigRejection> {
+    pub fn take_rejection(&mut self) -> Option<NalPacketConfigRejection> {
         if self.rejection_taken {
             return None;
         }
@@ -199,7 +199,7 @@ impl<'a> NalPacketConfigWriter<'a> {
     ///
     /// Fails with [`Error::Unsupported`] for an HEVC record that declares an array of a
     /// NAL unit type other than 32 to 34, 39 and 40, which
-    /// [`take_receiver_rejection`](Self::take_receiver_rejection) then reports;
+    /// [`take_rejection`](Self::take_rejection) then reports;
     /// [`Error::Limit`] when the extradata exceeds `maximum_output_bytes` or the pool's
     /// limit; [`Error::Cancelled`] when `cancel` is set. [`Error::Backpressure`] and
     /// [`Error::Allocation`] are retryable: the writer keeps its progress. Every other
@@ -342,7 +342,9 @@ impl<'a> NalPacketConfigWriter<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStep::Yield);
                     }
-                    // Taking the output from a slot costs up to 0.29% more instructions in configuration workloads.
+                    // Freezing in the matched arm needs an empty vector for the phase (+0.66%), an
+                    // owned output slot (+0.29%) or an out-of-line freeze (+0.39%) on the
+                    // configuration workloads; moving the phase out costs none of them.
                     let Phase::Write { output, .. } =
                         std::mem::replace(&mut self.phase, Phase::Complete)
                     else {

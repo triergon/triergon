@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceId, SourceLocation, WorkBudget};
 use triergon_framing::compat::nal::{
     NalPacket, NalPacketConfigOutput, NalPacketConfigWriter, NalPacketConfiguration,
-    NalPacketFields, NalPacketLimits, NalPacketOrigin, NalPacketOutput, NalPacketReceiverErrorKind,
+    NalPacketFields, NalPacketLimits, NalPacketOrigin, NalPacketOutput, NalPacketRejectionKind,
     NalPacketSegment, NalPacketSession,
 };
 use triergon_framing::{
@@ -431,7 +431,7 @@ fn hevc_update_is_forwarded_but_does_not_change_source_configuration() {
         o.source().new_extradata.as_ref().unwrap().as_ref(),
         b"uninterpreted update"
     );
-    assert_eq!(o.receiver_epoch(), 0);
+    assert_eq!(o.configuration_updates(), 0);
     assert_eq!(o.configuration_bytes().as_ref(), hvcc());
 }
 #[test]
@@ -441,14 +441,14 @@ fn avc_update_is_atomic_and_source_side_data_remains_retained() {
     let mut src = packet(&p, &[IDR]);
     src.new_extradata = Some(bytes(&p, &avcc(130)));
     let out = run(&mut s, src, Some(avc(&p, 130)), 1).unwrap();
-    assert_eq!(out.receiver_epoch(), 1);
+    assert_eq!(out.configuration_updates(), 1);
     assert!(!out.forward_new_extradata());
     assert_eq!(
         out.source().new_extradata.as_ref().unwrap().as_ref(),
         avcc(130)
     );
     assert_eq!(out.configuration_bytes().as_ref(), avcc(130));
-    assert_eq!(s.receiver_epoch(), 1);
+    assert_eq!(s.configuration_updates(), 1);
     assert!(matches!(s.configuration(), NalPacketConfiguration::Avc(_)));
 }
 #[test]
@@ -459,7 +459,7 @@ fn empty_avc_update_is_present_source_but_not_new_epoch() {
     src.new_extradata = Some(bytes(&p, &[]));
     let out = run(&mut s, src, None, 1).unwrap();
     assert!(out.source().new_extradata.as_ref().unwrap().is_empty());
-    assert_eq!(out.receiver_epoch(), 0);
+    assert_eq!(out.configuration_updates(), 0);
     assert!(out.forward_new_extradata());
 }
 #[test]
@@ -472,7 +472,7 @@ fn update_mismatch_fails_before_commit() {
         run(&mut s, src, Some(avc(&p, 130)), 1),
         Err(Error::Invalid(_))
     ));
-    assert_eq!(s.receiver_epoch(), 0);
+    assert_eq!(s.configuration_updates(), 0);
     assert_eq!(s.configuration().bytes().as_ref(), avcc(128));
 }
 #[test]
@@ -513,7 +513,7 @@ fn cancellation_is_sticky_and_does_not_commit_update() {
         Err(Error::Cancelled)
     ));
     drop(j);
-    assert_eq!(s.receiver_epoch(), 0);
+    assert_eq!(s.configuration_updates(), 0);
 }
 #[test]
 fn malformed_packet_is_not_joined_to_next_packet_or_committed() {
@@ -557,7 +557,7 @@ fn offset_overflow_is_checked_without_consuming_session() {
     let mut src = packet(&p, &[IDR]);
     src.location.offset = u64::MAX;
     assert!(matches!(s.packet(src, None), Err(Error::Overflow)));
-    assert_eq!(s.receiver_epoch(), 0);
+    assert_eq!(s.configuration_updates(), 0);
 }
 #[test]
 fn foreign_pool_is_rejected_in_source_and_side_data() {
@@ -775,7 +775,7 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
         }
         assert_eq!(p.used(), charge);
         assert_eq!(j.source().unwrap().fields, fields());
-        assert!(j.take_receiver_rejection().is_none());
+        assert!(j.take_rejection().is_none());
         let mut work = WorkBudget::new(0);
         assert!(matches!(
             j.step(&mut work, &AtomicBool::new(false)),
@@ -794,7 +794,7 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
                 Err(Error::Cancelled)
             ));
             drop(j);
-            assert_eq!(s.receiver_epoch(), 0);
+            assert_eq!(s.configuration_updates(), 0);
             assert_eq!(s.configuration().bytes().as_ref(), avcc(128));
             drop(blocker);
         } else {
@@ -810,11 +810,11 @@ fn spill_pressure_keeps_a_verified_update_until_resume_or_cancellation() {
                 }
             };
             drop(j);
-            assert_eq!(out.receiver_epoch(), 1);
+            assert_eq!(out.configuration_updates(), 1);
             assert_eq!(out.segments().len(), SPILLED);
             assert_eq!(out.configuration_bytes().as_ref(), avcc(129));
             assert_eq!(out.bytes().as_ref(), expected);
-            assert_eq!(s.receiver_epoch(), 1);
+            assert_eq!(s.configuration_updates(), 1);
             assert_eq!(s.configuration().bytes().as_ref(), avcc(129));
         }
         drop(s);
@@ -845,7 +845,7 @@ fn refused_hevc_hint_keeps_inline_progress_and_retries_the_same_packet() {
                     assert_eq!(work.remaining(), 0);
                     assert_eq!(p.used(), charge);
                     assert_eq!(j.source().unwrap().bytes.as_ref(), original);
-                    assert!(j.take_receiver_rejection().is_none());
+                    assert!(j.take_rejection().is_none());
                     if pressure_count == 2 {
                         drop(blocker.take());
                     }
@@ -855,7 +855,7 @@ fn refused_hevc_hint_keeps_inline_progress_and_retries_the_same_packet() {
         };
         drop(j);
         assert_eq!(pressure_count, if under_pressure { 2 } else { 0 });
-        assert_eq!(s.receiver_epoch(), 0);
+        assert_eq!(s.configuration_updates(), 0);
         drop(s);
         let expected: Vec<_> = [32, 33, 34, 19, 1, 2]
             .into_iter()
@@ -892,7 +892,7 @@ fn a_large_hint_does_not_preempt_logical_segment_or_output_refusal() {
                 Err(Error::Limit { requested: r, maximum: m })
                     if r == requested && m == maximum
             ));
-            assert_eq!(s.receiver_epoch(), 0);
+            assert_eq!(s.configuration_updates(), 0);
             drop(blocker);
             drop(s);
             assert_eq!(p.used(), Budget::control_storage_bytes());
@@ -965,7 +965,7 @@ fn avc_parameter_set_counts_preserve_tight_budget_admission() {
             assert_eq!(out.bytes().as_ref(), expected);
             assert_eq!(out.source().bytes.as_ref(), &[0, 0, 0, 3, 0x68, 0xee, 0x3c]);
             assert_eq!(out.source().fields, fields());
-            assert_eq!(s.receiver_epoch(), 0);
+            assert_eq!(s.configuration_updates(), 0);
             if count == 2 {
                 assert_eq!(p.used(), base + output_storage);
             } else {
@@ -1140,7 +1140,7 @@ fn hevc_exact_counts_keep_in_band_duplicates_and_ignore_empty_admitted_arrays() 
                 .collect();
             assert_eq!(out.bytes().as_ref(), expected);
             assert_eq!(out.source().bytes.as_ref(), original);
-            assert_eq!(s.receiver_epoch(), 0);
+            assert_eq!(s.configuration_updates(), 0);
             drop(s);
             assert_eq!(out.configuration_bytes().as_ref(), raw);
             assert_eq!(out.bytes().as_ref(), expected);
@@ -1184,19 +1184,19 @@ fn hevc_zero_nals_and_unknown_arrays_fail_before_any_exact_reservation() {
                         "HEVC array type outside the decoder set"
                     ))
                 ));
-                assert!(j.take_receiver_rejection().is_none());
+                assert!(j.take_rejection().is_none());
             } else {
                 assert!(matches!(
                     result,
                     Err(Error::Invalid("HEVC NAL length of zero"))
                 ));
                 assert_eq!(
-                    j.take_receiver_rejection().unwrap().kind(),
-                    NalPacketReceiverErrorKind::EmptyHevcNal
+                    j.take_rejection().unwrap().kind(),
+                    NalPacketRejectionKind::EmptyHevcNal
                 );
             }
             drop(j);
-            assert_eq!(s.receiver_epoch(), 0);
+            assert_eq!(s.configuration_updates(), 0);
             drop(blocker);
             drop(s);
             assert_eq!(p.used(), Budget::control_storage_bytes());
@@ -1292,7 +1292,7 @@ fn valid_native_config_update_survives_bad_packet_as_separate_fact() {
         run(&mut s, src, Some(avc(&p, 131)), 1),
         Err(Error::Truncated)
     ));
-    assert_eq!(s.receiver_epoch(), 1);
+    assert_eq!(s.configuration_updates(), 1);
     assert_eq!(s.configuration().bytes().as_ref(), avcc(131));
     assert!(matches!(s.configuration(), NalPacketConfiguration::Avc(_)));
     let out = run(&mut s, packet(&p, &[IDR]), None, 1).unwrap();

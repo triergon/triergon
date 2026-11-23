@@ -271,7 +271,7 @@ fn operation(case: &Case) -> Result<Outcome> {
                     return Err(Error::Invalid("configuration publication missing"));
                 }
                 Err(error) => {
-                    if let Some(rejection) = writer.take_receiver_rejection() {
+                    if let Some(rejection) = writer.take_rejection() {
                         outcome.digest.word(4);
                         outcome
                             .digest
@@ -367,7 +367,7 @@ fn operation(case: &Case) -> Result<Outcome> {
                     break;
                 }
                 Err(error) => {
-                    if let Some(rejection) = job.take_receiver_rejection() {
+                    if let Some(rejection) = job.take_rejection() {
                         let words = receive_failure_words(index, rejection.native_receive_result());
                         outcome.digest.fold(&words, &[]);
                         break;
