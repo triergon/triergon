@@ -8,9 +8,7 @@ use triergon_bitstream::{
     RiceReader, Window, runs,
 };
 use triergon_codec::mdct::Imdct;
-use triergon_codec::{
-    AudioDecoder, AudioFrame, BudgetVec, Divisor, Reservation, divide, divide_u32,
-};
+use triergon_codec::{AudioFrame, BudgetVec, Divisor, Reservation, divide, divide_u32};
 
 use triergon_harness_runner::{Operation, Totals};
 
@@ -346,7 +344,7 @@ fn opus<'a>(input: &'a [u8], arguments: &[OsString]) -> Result<Operation<'a>, St
             let mut frame = AudioFrame::default();
             for (i, packet) in packets.iter().enumerate() {
                 match decoder.decode(packet, &mut frame) {
-                    Ok(_) => row(
+                    Ok(()) => row(
                         &mut trace,
                         work,
                         3,
