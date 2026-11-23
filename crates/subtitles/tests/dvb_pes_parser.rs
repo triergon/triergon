@@ -27,7 +27,7 @@ fn project(parser: &mut PesParser, raw: &Bytes, pts: Option<i128>, quantum: u64)
 fn pinned_ts_payloads_project_complete_segments_and_keep_original_bytes() {
     let ordinary = include_bytes!("../../mpegts/tests/data/dvb/dvb2-literals-fields.pes-data");
     let truncated = include_bytes!("../../mpegts/tests/data/dvb/dvb-truncated-segment.pes-data");
-    let prefix = include_bytes!("native-dvb-fixtures/input/prefix101.dvb");
+    let prefix = include_bytes!("dvb-pes-fixtures/input/prefix101.dvb");
     for quantum in [1, 7, 4096] {
         let pool = Budget::new(4096).unwrap();
         let raw = Bytes::copy_from_slice(&pool, ordinary).unwrap();

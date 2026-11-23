@@ -13,7 +13,7 @@ END 0x80) with run-length coded objects, and carries them three ways:
   registration descriptor; M2TS adds the 4-byte arrival-time prefix.
 
 All writers are local and byte for byte the same on every run. The recorded
-packet inputs of `crates/subtitles/tests/native-compatibility-gold/` (authored
+packet inputs of `crates/subtitles/tests/pgs-receiver-recorded/` (authored
 transcripts of FFmpeg's receiver) are converted into TS files with one PES per
 recorded packet when their clocks fit a 90 kHz PES (see `gold_cases`).
 
@@ -40,7 +40,7 @@ else:
     from carriers import crc32_mpeg, ebml_id, ebml_size
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-GOLD = os.path.join(ROOT, "crates/subtitles/tests/native-compatibility-gold")
+GOLD = os.path.join(ROOT, "crates/subtitles/tests/pgs-receiver-recorded")
 
 # ------------------------------------------------------------------ segments
 
@@ -806,7 +806,7 @@ def main():
             file = f"{name}.{ext}"
             with open(os.path.join(out_dir, file), "wb") as f:
                 f.write(data)
-            source = (f"{SOURCE}; recorded input crates/subtitles/tests/native-compatibility-gold/"
+            source = (f"{SOURCE}; recorded input crates/subtitles/tests/pgs-receiver-recorded/"
                       f"{name.replace('gold-', 'pgs-', 1)}/input.bin") if name.startswith("gold-") else SOURCE
             rows.append((f"{name}-{ext}", f"pgs/{file}", "authored-synthetic", source, options))
     # Two PGS streams in one transport stream: the second selected by ordinal.
@@ -836,7 +836,7 @@ def main():
             cases.append({**entry, "expected": expected})
     manifest = {"schema": 1, "cases": cases,
                 "refused": refused,
-                "not_representable": [{"input": f"crates/subtitles/tests/native-compatibility-gold/{n}/input.bin",
+                "not_representable": [{"input": f"crates/subtitles/tests/pgs-receiver-recorded/{n}/input.bin",
                                        "reason": r} for n, r in skipped]}
     target = os.path.join(ROOT, "harness/features/subtitle-pgs/corpus.json")
     with open(target, "w") as f:

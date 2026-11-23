@@ -1,5 +1,5 @@
 //! Public API guards of the PGS receiver. The subtitle worker's `pgs-` modes
-//! fold every recorded case under `native-compatibility-gold/` and check it
+//! fold every recorded case under `pgs-receiver-recorded/` and check it
 //! against the recorded transcript.
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};

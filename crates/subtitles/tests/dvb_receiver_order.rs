@@ -18,7 +18,7 @@ struct Case {
     end_ms: u32,
     rects: &'static [ExpectedRect],
 }
-#[path = "native-order-fixtures/cases.rs"]
+#[path = "dvb-region-order-fixtures/cases.rs"]
 mod cases;
 
 /// The receiver decoder against the recorded output of the reference

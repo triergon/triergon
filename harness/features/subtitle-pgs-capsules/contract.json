@@ -7,8 +7,8 @@
   "worker_operation": "pgs-",
   "reference": "ffmpeg-formats-native",
   "contract": [
-    "the 229 recorded PGS cases in crates/subtitles/tests/native-compatibility-gold, each a capsule of up to 64 complete PGS packets with raw PTS, DTS and time base, the forced-only option and hard resets",
-    "every packet decoded through compat::pgs::ReceiverDecoder on the candidate and FFmpeg's pgssub decoder through avcodec_decode_subtitle2 on the reference; a hard reset reopens the decoder",
+    "the 229 recorded PGS cases in crates/subtitles/tests/pgs-receiver-recorded, each a capsule of up to 64 complete PGS packets with raw PTS, DTS and time base, the forced-only option and hard resets",
+    "every packet decoded through compat::pgs::Decoder on the candidate and FFmpeg's pgssub decoder through avcodec_decode_subtitle2 on the reference; a hard reset reopens the decoder",
     "each published subtitle folded with its packet, consumed bytes, PTS in microseconds, display window and canvas; each rectangle with its geometry, forced flag, stride, index plane, 256-entry ARGB palette and the ARGB value of every pixel; a decoder refusal ends the fold",
     "the fold is the digest of the byte transcript each case stores as expected.bin; the expected fold is recorded independently from the reference worker and equals the digest of that recorded transcript"
   ],

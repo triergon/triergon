@@ -15,7 +15,7 @@ struct Case {
     canvas: [u32; 2],
     geometry: [u32; 4],
 }
-#[path = "native-dvb-fixtures/cases.rs"]
+#[path = "dvb-pes-fixtures/cases.rs"]
 mod cases;
 
 /// One packet through the receiver decoder at one second.
@@ -96,8 +96,8 @@ fn foreign_end_filter_control() {
 #[test]
 fn complete_prefix_is_presented() {
     for bytes in [
-        &include_bytes!("native-dvb-fixtures/input/tail106.dvb")[..],
-        &include_bytes!("native-dvb-fixtures/input/prefix101.dvb")[..],
+        &include_bytes!("dvb-pes-fixtures/input/tail106.dvb")[..],
+        &include_bytes!("dvb-pes-fixtures/input/prefix101.dvb")[..],
     ] {
         let pool = Budget::new(4 << 20).unwrap();
         receive(&pool, bytes, |subtitle| {
@@ -110,7 +110,7 @@ fn default_clut_presents_the_automatic_palette() {
     let pool = Budget::new(4 << 20).unwrap();
     receive(
         &pool,
-        include_bytes!("native-dvb-fixtures/input/default-clut2.dvb"),
+        include_bytes!("dvb-pes-fixtures/input/default-clut2.dvb"),
         |subtitle| {
             let rects: Vec<_> = subtitle.rects().collect();
             assert_eq!(rects.len(), 1);

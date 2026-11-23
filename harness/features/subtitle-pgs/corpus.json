@@ -1614,7 +1614,7 @@
       "file": "pgs/gold-independent89--clock-unknown-nonzero-raw.ts",
       "sha256": "a4b31788400e185555ed358eb3d8439c6f9f8ceb129df24bfed83e2bede53b39",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-unknown-nonzero-raw/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--clock-unknown-nonzero-raw/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1630,7 +1630,7 @@
       "file": "pgs/gold-independent89--clock-unknown-zero.ts",
       "sha256": "a4b31788400e185555ed358eb3d8439c6f9f8ceb129df24bfed83e2bede53b39",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-unknown-zero/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--clock-unknown-zero/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1646,7 +1646,7 @@
       "file": "pgs/gold-independent89--fragment-early-17x3.ts",
       "sha256": "2d1c55a926885c8d1b68e4236d317a98414d2588e53c611cc756a651799818db",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-17x3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-early-17x3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1662,7 +1662,7 @@
       "file": "pgs/gold-independent89--fragment-early-1x1.ts",
       "sha256": "1b5fe52937e2aa5ba12b167bb6c4729a55889b9b6bb0de69eb930bc61310e64a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-1x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-early-1x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1678,7 +1678,7 @@
       "file": "pgs/gold-independent89--fragment-early-2x1.ts",
       "sha256": "ec7a4dcd75bc6cdc917438f4d4148c98c0a9acc38c1cda1a18a615e32d87ef6e",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-2x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-early-2x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1694,7 +1694,7 @@
       "file": "pgs/gold-independent89--fragment-early-3x2.ts",
       "sha256": "43989bd6f4acf1577aa31690d35e3e0be72ef7c4619175544e59da9405815af1",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-early-3x2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-early-3x2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1710,7 +1710,7 @@
       "file": "pgs/gold-independent89--fragment-no-last-17x3.ts",
       "sha256": "f7e90f5f778dccbe9d213a0b96bdc82d0f0afb8f06c2f05a537ad098fd9dde86",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-17x3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-no-last-17x3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1726,7 +1726,7 @@
       "file": "pgs/gold-independent89--fragment-no-last-1x1.ts",
       "sha256": "853093cbfdb0d0519b74a028bf40e299332a5c1bbdb63083963130139fa3dce2",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-1x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-no-last-1x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1742,7 +1742,7 @@
       "file": "pgs/gold-independent89--fragment-no-last-2x1.ts",
       "sha256": "6df3fa4a3debdf323cd065ab56878f96ed4f777e2d652c3da43f6708db87c40b",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-2x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-no-last-2x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1758,7 +1758,7 @@
       "file": "pgs/gold-independent89--fragment-no-last-3x2.ts",
       "sha256": "400920c57305112d2b9204dcea869846f310734c4a30a333c7db8640e43e8818",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-no-last-3x2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-no-last-3x2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1774,7 +1774,7 @@
       "file": "pgs/gold-independent89--fragment-overshoot-17x3.ts",
       "sha256": "131c99302d658db659ca4dd3d48f9c3d9c190c00e1743e737d6d28342b22dea1",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-17x3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-overshoot-17x3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1790,7 +1790,7 @@
       "file": "pgs/gold-independent89--fragment-overshoot-1x1.ts",
       "sha256": "15402795d86592e180ad94fe821bc0de3775d757b07803156b328a9d0a21e93c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-1x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-overshoot-1x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1806,7 +1806,7 @@
       "file": "pgs/gold-independent89--fragment-overshoot-2x1.ts",
       "sha256": "5ed695cd12933b64ee59057d5dbb2a9a61ed486c63fa19080df037ec5fa291bd",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-2x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-overshoot-2x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1822,7 +1822,7 @@
       "file": "pgs/gold-independent89--fragment-overshoot-3x2.ts",
       "sha256": "291c58c73a51dc0d21ae6c3f94e25e887fcb231ab82fe486384bc7a21b3441fb",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-overshoot-3x2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-overshoot-3x2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1838,7 +1838,7 @@
       "file": "pgs/gold-independent89--fragment-version-17x3.ts",
       "sha256": "c9fccdc500d963a0d80be364cc77bdd43992da62d31e00fd2974e61b8f267879",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-17x3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-version-17x3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1854,7 +1854,7 @@
       "file": "pgs/gold-independent89--fragment-version-1x1.ts",
       "sha256": "cc626dc4e2f4e1215c25ef3156643f4c39cc6f17c1a0f91e38ee3bfd7e3560f0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-1x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-version-1x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1870,7 +1870,7 @@
       "file": "pgs/gold-independent89--fragment-version-2x1.ts",
       "sha256": "950f0fe1e6959d7bfc452980cfec64ba48f4320d858f60bfe3462a1d43de59f0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-2x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-version-2x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1886,7 +1886,7 @@
       "file": "pgs/gold-independent89--fragment-version-3x2.ts",
       "sha256": "75fb9f6ca125c475d5e145d2d18d863d00b8977735cdb1663d90fd20175f4eba",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--fragment-version-3x2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--fragment-version-3x2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1902,7 +1902,7 @@
       "file": "pgs/gold-independent89--no-final-EOL-17x3.ts",
       "sha256": "aea60ae0a044dc01e9966604842374ec95ca25575232db8ca23df814a3ef89b2",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-17x3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--no-final-EOL-17x3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1918,7 +1918,7 @@
       "file": "pgs/gold-independent89--no-final-EOL-1x1.ts",
       "sha256": "9923f65357e869a520570879c796814fd725d8f334130438005ea734fa7b1da9",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-1x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--no-final-EOL-1x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1934,7 +1934,7 @@
       "file": "pgs/gold-independent89--no-final-EOL-2x1.ts",
       "sha256": "2094c47cd75d82982d323951cfcaf2f9a303ab7cf0ede1caf0b9a95c08a3fb44",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-2x1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--no-final-EOL-2x1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1950,7 +1950,7 @@
       "file": "pgs/gold-independent89--no-final-EOL-3x2.ts",
       "sha256": "0d25c989dc4d864f3735243dae43ca4760d3e220e6b866f645aa2d2de6da2e04",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--no-final-EOL-3x2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--no-final-EOL-3x2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1966,7 +1966,7 @@
       "file": "pgs/gold-independent89--palette-tail-1-END.ts",
       "sha256": "c38ecd673f426b8ec6043e9cf88a96b26f10fffc3a36dfa71d053c1886fa66ba",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-1-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1982,7 +1982,7 @@
       "file": "pgs/gold-independent89--palette-tail-1-PDS-before-END.ts",
       "sha256": "fe869d91b91a372cc33c3538c1241f59e542b677c173995768052aca01b51ac4",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-PDS-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-1-PDS-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -1998,7 +1998,7 @@
       "file": "pgs/gold-independent89--palette-tail-1-packet-end.ts",
       "sha256": "e3c661f886e33604ba0b6dcb5a7b4ed4cfc32813ab41b354e485fed78ec7e94e",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-packet-end/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-1-packet-end/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2014,7 +2014,7 @@
       "file": "pgs/gold-independent89--palette-tail-1-unknown-before-END.ts",
       "sha256": "d6580d070552d920ed7f3eceb5feef6628ae31affa911280514a19181bde1041",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-1-unknown-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-1-unknown-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2030,7 +2030,7 @@
       "file": "pgs/gold-independent89--palette-tail-2-END.ts",
       "sha256": "dd43d7b7282df9d1d21da89f56d1ec2402b6fea90ade16e0e17d5be91317da17",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-2-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2046,7 +2046,7 @@
       "file": "pgs/gold-independent89--palette-tail-2-PDS-before-END.ts",
       "sha256": "85031214540f4313db5df7f83dae16226478352811b91b86f864068682b56e21",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-PDS-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-2-PDS-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2062,7 +2062,7 @@
       "file": "pgs/gold-independent89--palette-tail-2-packet-end.ts",
       "sha256": "d44e032bfc85e666888e949357792e944c1b392f0fe9913554e74c851f40fa8d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-packet-end/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-2-packet-end/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2078,7 +2078,7 @@
       "file": "pgs/gold-independent89--palette-tail-2-unknown-before-END.ts",
       "sha256": "325c2b10be1bdadb86f13a588e385cc99294ed2f20cef5264e1530fbfad28ba7",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-2-unknown-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-2-unknown-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2094,7 +2094,7 @@
       "file": "pgs/gold-independent89--palette-tail-3-END.ts",
       "sha256": "0a1159a21a11820b54ca484333cac591c4b523bfe39d634fe8fe68fbceaaf410",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-3-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2110,7 +2110,7 @@
       "file": "pgs/gold-independent89--palette-tail-3-PDS-before-END.ts",
       "sha256": "de2468d01bd759a74a28351b8e15dfa647aac5e6e3fd09dc486c5e96f77ae114",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-PDS-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-3-PDS-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2126,7 +2126,7 @@
       "file": "pgs/gold-independent89--palette-tail-3-packet-end.ts",
       "sha256": "5c77a7189ec4993f87ece13d67821fa21c3de1a13284be9bdf8279536eee61d0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-packet-end/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-3-packet-end/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2142,7 +2142,7 @@
       "file": "pgs/gold-independent89--palette-tail-3-unknown-before-END.ts",
       "sha256": "10434ab3713ffccea5d0dd0afb3fe848c91d39ae0c6dfd69c6227ed6182e8112",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-3-unknown-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-3-unknown-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2158,7 +2158,7 @@
       "file": "pgs/gold-independent89--palette-tail-4-END.ts",
       "sha256": "e2a5571555846d22184c79a14d3c18313732a1e9a931ef1217b1d884d219260d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-4-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2174,7 +2174,7 @@
       "file": "pgs/gold-independent89--palette-tail-4-PDS-before-END.ts",
       "sha256": "3ef7e4963536ca84b16dd124f81672f33064cda37c49c51e08df56ab06bebb88",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-PDS-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-4-PDS-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2190,7 +2190,7 @@
       "file": "pgs/gold-independent89--palette-tail-4-packet-end.ts",
       "sha256": "aa82d24bbcc68c0559e0c856482cad8408213cdf033712ae0b6a572bc6df1e0a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-packet-end/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-4-packet-end/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2206,7 +2206,7 @@
       "file": "pgs/gold-independent89--palette-tail-4-unknown-before-END.ts",
       "sha256": "381a897417b7cb89589b4d1ea9f636505d0992d156a8546613f5bd6763cf1b35",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--palette-tail-4-unknown-before-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--palette-tail-4-unknown-before-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2222,7 +2222,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-19-actual-1.ts",
       "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-19-actual-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2238,7 +2238,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-19-actual-11.ts",
       "sha256": "615746497e1118a104439ea787c2c57bcd0d4fafbb26675911fbfa2fb8757319",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-11/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-19-actual-11/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2254,7 +2254,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-19-actual-13.ts",
       "sha256": "5e6d9d6282cb4fae56fecfa535e6a1f074ca6b5743a073a846d4007de31ec586",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-13/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-19-actual-13/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2270,7 +2270,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-19-actual-2.ts",
       "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-19-actual-2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2286,7 +2286,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-19-actual-3.ts",
       "sha256": "7b26aaa9aa14a41f0b225e6d7113006b5722a56dd89a5e01b382c0720b4dbde9",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-19-actual-3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2302,7 +2302,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-19-actual-4.ts",
       "sha256": "0881af5ebc1a20e5f021308f911c7396ddeed859e9fbbe7daa5c96a12ec06c96",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-4/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-19-actual-4/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2318,7 +2318,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-19-actual-7.ts",
       "sha256": "6ac9c0f23c46f4a37b321aa9bc9de173b6cc1f518f81eedbf9cb80bba1fa4549",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-19-actual-7/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-19-actual-7/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2334,7 +2334,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-1.ts",
       "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-65535-actual-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2350,7 +2350,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-11.ts",
       "sha256": "547175613cf4119470637d4359799e34789e2ca749ff1ea691907012acc1296a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-11/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-65535-actual-11/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2366,7 +2366,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-13.ts",
       "sha256": "516415355e68445102ae0a67dd9ee73e093ee3d9bbc2e72f123e3d6d21f4b536",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-13/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-65535-actual-13/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2382,7 +2382,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-2.ts",
       "sha256": "c804193e565ea19fec5b00752349a1ab9e06b8ffab01184fd934b32f091055b7",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-65535-actual-2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2398,7 +2398,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-3.ts",
       "sha256": "b0a157d09c42afdf93b5509478dd6e25d9325995295fd511a76911dce323c471",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-65535-actual-3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2414,7 +2414,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-4.ts",
       "sha256": "9b29e304a18fbc8aa51e358b6560266965e2aa1acd60394cdd4e9fb0270a3253",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-4/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-65535-actual-4/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2430,7 +2430,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-65535-actual-7.ts",
       "sha256": "bf5ec8dc6a83eb234e7717184366af8ba459bcdb39305584f1387570192cbf08",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-65535-actual-7/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-65535-actual-7/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2446,7 +2446,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-71-actual-1.ts",
       "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-71-actual-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2462,7 +2462,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-71-actual-11.ts",
       "sha256": "85141ea626341ea8406a7a6151e5558aeeb2167a16a68bd06f918574543fdae6",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-11/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-71-actual-11/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2478,7 +2478,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-71-actual-13.ts",
       "sha256": "7bb402e4aa9b0843a2c3fbcfb677f4305523e1fd647848d563d13f6f01f6e96a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-13/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-71-actual-13/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2494,7 +2494,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-71-actual-2.ts",
       "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-71-actual-2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2510,7 +2510,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-71-actual-3.ts",
       "sha256": "573b7f44477c91f07b27e48da720dd2ed014f31f52993d8970b53c274cd43dfa",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-3/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-71-actual-3/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2526,7 +2526,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-71-actual-4.ts",
       "sha256": "91982a61d9b901836c6c0dd94f050114e0d2dea122b7d8354e4fca9855478bfe",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-4/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-71-actual-4/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2542,7 +2542,7 @@
       "file": "pgs/gold-independent89--physical-tail-declared-71-actual-7.ts",
       "sha256": "b65249ef535ed7902d898ea0cf275dc82148797efb8d0a078469b882af906482",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--physical-tail-declared-71-actual-7/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--physical-tail-declared-71-actual-7/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2558,7 +2558,7 @@
       "file": "pgs/gold-independent89--rle-17x3-complete.ts",
       "sha256": "0581daa02b6be3fd4f3170ad13e6e6468d1010d7b43a09e5df0d5dd8e007406b",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-complete/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-17x3-complete/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2574,7 +2574,7 @@
       "file": "pgs/gold-independent89--rle-17x3-run-crossing.ts",
       "sha256": "c1ef58e246af42a2268ed41f340ec261f9d029d6ac3c0731fe70ab327402ba62",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-run-crossing/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-17x3-run-crossing/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2590,7 +2590,7 @@
       "file": "pgs/gold-independent89--rle-17x3-short-line.ts",
       "sha256": "88a24dff744efd32192b2ecc72913260b956e9289d701e396eff3548b2f66c23",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-short-line/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-17x3-short-line/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2606,7 +2606,7 @@
       "file": "pgs/gold-independent89--rle-17x3-tail-after-EOL.ts",
       "sha256": "c63cb6dcb7a66959504db8e1820c68d20f961daf9a38c06d88e4130f6760ffd7",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-tail-after-EOL/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-17x3-tail-after-EOL/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2622,7 +2622,7 @@
       "file": "pgs/gold-independent89--rle-17x3-truncated-control.ts",
       "sha256": "b0f323c0a509427a45226c66189b3df17ad2fe5490bb7fae0461a8337e9d7637",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-truncated-control/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-17x3-truncated-control/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2638,7 +2638,7 @@
       "file": "pgs/gold-independent89--rle-17x3-truncated-long-colour.ts",
       "sha256": "4e6ba36db1c4e46c64744ad61af70bb03e87b31bb2110e23958a7da20d9c87ec",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-truncated-long-colour/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-17x3-truncated-long-colour/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2654,7 +2654,7 @@
       "file": "pgs/gold-independent89--rle-17x3-zero-run.ts",
       "sha256": "9bb67371f2a03e5a64e6f5bed13e6f4c232ad8e375c4886c6526e712207cd920",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-17x3-zero-run/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-17x3-zero-run/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2670,7 +2670,7 @@
       "file": "pgs/gold-independent89--rle-1x1-complete.ts",
       "sha256": "9b4cb3d31738394fb2a2961ddc1cbfb3331f033c945129d46a31c32d48af333a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-complete/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-1x1-complete/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2686,7 +2686,7 @@
       "file": "pgs/gold-independent89--rle-1x1-run-crossing.ts",
       "sha256": "6925b5f2d63aa60926e20aac439aa1368c0a04c7105d527f3ec35621c6ddf99d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-run-crossing/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-1x1-run-crossing/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2702,7 +2702,7 @@
       "file": "pgs/gold-independent89--rle-1x1-short-line.ts",
       "sha256": "2387fd5b171a6d73119eb94c2a10c0eecf7a7da7e0ee8d2b158d11f54b69cbba",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-short-line/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-1x1-short-line/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2718,7 +2718,7 @@
       "file": "pgs/gold-independent89--rle-1x1-tail-after-EOL.ts",
       "sha256": "f60f2c33b4de5dd333b96409259d110aa3d4d947b7c9882e27fdfb9e383555a7",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-tail-after-EOL/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-1x1-tail-after-EOL/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2734,7 +2734,7 @@
       "file": "pgs/gold-independent89--rle-1x1-truncated-control.ts",
       "sha256": "978f071a6020371428ffce9465834ae9ac35e603ea2315428210b294d95f4d91",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-truncated-control/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-1x1-truncated-control/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2750,7 +2750,7 @@
       "file": "pgs/gold-independent89--rle-1x1-truncated-long-colour.ts",
       "sha256": "0fea6e26427c915152daa782757a58153c0cba9a00631c623305eb12a0a45573",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-truncated-long-colour/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-1x1-truncated-long-colour/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2766,7 +2766,7 @@
       "file": "pgs/gold-independent89--rle-1x1-zero-run.ts",
       "sha256": "1d0d2ef2234cb10c5016aa7bf75e83f6b0aec9ad353a2cca7a828522afffcd21",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-1x1-zero-run/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-1x1-zero-run/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2782,7 +2782,7 @@
       "file": "pgs/gold-independent89--rle-2x1-complete.ts",
       "sha256": "5b5e7bcf46f30fc7af6c41529d54af9517c2756b94443295f99d358d0f30e923",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-complete/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-2x1-complete/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2798,7 +2798,7 @@
       "file": "pgs/gold-independent89--rle-2x1-run-crossing.ts",
       "sha256": "f7728f9c75b5ea29af399459655954179deca3bed960f4dea5cbf3281f5e835d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-run-crossing/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-2x1-run-crossing/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2814,7 +2814,7 @@
       "file": "pgs/gold-independent89--rle-2x1-short-line.ts",
       "sha256": "6131ac96c1a7bc6e92f119e8129400b361081dad5baff1b0669b8ed667e93388",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-short-line/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-2x1-short-line/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2830,7 +2830,7 @@
       "file": "pgs/gold-independent89--rle-2x1-tail-after-EOL.ts",
       "sha256": "3da6f7e36fc44720e068ea4ffffd3f193052beef09776d1cebd142b6a9285497",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-tail-after-EOL/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-2x1-tail-after-EOL/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2846,7 +2846,7 @@
       "file": "pgs/gold-independent89--rle-2x1-truncated-control.ts",
       "sha256": "72c987f0ab3d08a3eb5b7c1e2e3ef59847082ff1934e9dd0e18fd064bb0a59f0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-truncated-control/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-2x1-truncated-control/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2862,7 +2862,7 @@
       "file": "pgs/gold-independent89--rle-2x1-truncated-long-colour.ts",
       "sha256": "80f086b034d4592ef96bcaa7a896c2aed70094fc26ab908d9211a2e6c3f508e5",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-truncated-long-colour/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-2x1-truncated-long-colour/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2878,7 +2878,7 @@
       "file": "pgs/gold-independent89--rle-2x1-zero-run.ts",
       "sha256": "e4916b391436b3c2f6131104195d280d7e8dcd80e2c56b6735de45b7c79d2793",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-2x1-zero-run/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-2x1-zero-run/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2894,7 +2894,7 @@
       "file": "pgs/gold-independent89--rle-3x2-complete.ts",
       "sha256": "c38c75b6bf1881c7b45882486c61df6375c7ee4626f88e0e45a849f4cd4c332c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-complete/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-3x2-complete/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2910,7 +2910,7 @@
       "file": "pgs/gold-independent89--rle-3x2-run-crossing.ts",
       "sha256": "428b259288f36347337136004d19960312765b5cf8f1884c39a2746f21565ddc",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-run-crossing/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-3x2-run-crossing/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2926,7 +2926,7 @@
       "file": "pgs/gold-independent89--rle-3x2-short-line.ts",
       "sha256": "78947f685a1216bd2abae33f566e998812f15459011fe29e82670ff44a3d4f4e",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-short-line/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-3x2-short-line/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2942,7 +2942,7 @@
       "file": "pgs/gold-independent89--rle-3x2-tail-after-EOL.ts",
       "sha256": "9c5c87ea37382cf92a5209439898becbad83c832346b423c16a13541677f8222",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-tail-after-EOL/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-3x2-tail-after-EOL/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2958,7 +2958,7 @@
       "file": "pgs/gold-independent89--rle-3x2-truncated-control.ts",
       "sha256": "16e8b7f46d64a0f923c00397639226f085ad436ac1751f2ead33de2a503032f6",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-truncated-control/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-3x2-truncated-control/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2974,7 +2974,7 @@
       "file": "pgs/gold-independent89--rle-3x2-truncated-long-colour.ts",
       "sha256": "85b9d341ee339c281e08850b8417030395be1b2ee0c62b67fc40b87d0d5194c1",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-truncated-long-colour/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-3x2-truncated-long-colour/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -2990,7 +2990,7 @@
       "file": "pgs/gold-independent89--rle-3x2-zero-run.ts",
       "sha256": "2fb2afd2d4787a87c9312143e6cca14f7182c64227912bb15d075617df475faa",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-independent89--rle-3x2-zero-run/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--rle-3x2-zero-run/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3006,7 +3006,7 @@
       "file": "pgs/gold-original140--cache-edge-complete-unused-object-preload.ts",
       "sha256": "b14e1f0a7c844927e35c4f8f748a70485245e0a65da2d44984f37086c24ac513",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-complete-unused-object-preload/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--cache-edge-complete-unused-object-preload/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3022,7 +3022,7 @@
       "file": "pgs/gold-original140--cache-edge-pending-across-clear-END.ts",
       "sha256": "d2fd9c4c8a7f45735ab7484d93fd4288f9939849622773818b03931afb417d1a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-across-clear-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--cache-edge-pending-across-clear-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3038,7 +3038,7 @@
       "file": "pgs/gold-original140--cache-edge-pending-across-two-clear-ENDs.ts",
       "sha256": "ffdd855c9ab4e9dfbc2e9d2a636a5e74f31e791c2ad24f7eba84d54db1eab12d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-across-two-clear-ENDs/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--cache-edge-pending-across-two-clear-ENDs/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3054,7 +3054,7 @@
       "file": "pgs/gold-original140--cache-edge-pending-at-explicit-EOF.ts",
       "sha256": "fa97207883e87d600c153fddf08487e547d5416d0bfca1851d7a8c1f5b51aced",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-at-explicit-EOF/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--cache-edge-pending-at-explicit-EOF/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3070,7 +3070,7 @@
       "file": "pgs/gold-original140--cache-edge-pending-discarded-at-epoch.ts",
       "sha256": "fbcab11d6cb1e6ce054a252de3485ea9c113049945d1a2b0e04424e51832a4cc",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--cache-edge-pending-discarded-at-epoch/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--cache-edge-pending-discarded-at-epoch/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3086,7 +3086,7 @@
       "file": "pgs/gold-original140--clock-split-both-unknown.ts",
       "sha256": "d05c6c2558eb96cdc49d103daee053411060db0911b06cde351b1722b7f859cd",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-both-unknown/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-split-both-unknown/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3102,7 +3102,7 @@
       "file": "pgs/gold-original140--clock-split-pcs-known-end-different.ts",
       "sha256": "fe2902cbf24cb292787d0655a6fb31e2e080f85f1d76327d2e0ab2ccddcfe840",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-known-end-different/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-split-pcs-known-end-different/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3118,7 +3118,7 @@
       "file": "pgs/gold-original140--clock-split-pcs-known-end-unknown.ts",
       "sha256": "83d7fa523bd423c7fff06c78d449b963aec8d6b9bc22d4891e7647e54d7fab33",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-known-end-unknown/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-split-pcs-known-end-unknown/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3134,7 +3134,7 @@
       "file": "pgs/gold-original140--clock-split-pcs-unknown-end-known.ts",
       "sha256": "0cbfaff52582c3915a3f0d8eb1af564bb9fbb14fdbdbf74ecd2b8683c338d520",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-split-pcs-unknown-end-known/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-split-pcs-unknown-end-known/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3150,7 +3150,7 @@
       "file": "pgs/gold-original140--compat-EOF-PCS-only.ts",
       "sha256": "a744be42ff082d47427269f1c879c237102942b368461491e23778b5fcfbc90b",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-PCS-only/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-EOF-PCS-only/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3166,7 +3166,7 @@
       "file": "pgs/gold-original140--compat-EOF-complete-ODS-without-END.ts",
       "sha256": "993229664f587a016de12f745377e44e978a12e947f098a95cf271019580f2bb",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-complete-ODS-without-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-EOF-complete-ODS-without-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3182,7 +3182,7 @@
       "file": "pgs/gold-original140--compat-EOF-complete-then-empty-first-pending.ts",
       "sha256": "9cd096be51c8f64887f041f6108105f5cc88e03328834ba8080ddd8f15030cfc",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-complete-then-empty-first-pending/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-EOF-complete-then-empty-first-pending/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3198,7 +3198,7 @@
       "file": "pgs/gold-original140--compat-EOF-palette-update-without-END.ts",
       "sha256": "0109c39947011b7c066e1afe89f513a3c743e929a5d3846f93ebd8a2c0bec575",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-EOF-palette-update-without-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-EOF-palette-update-without-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3214,7 +3214,7 @@
       "file": "pgs/gold-original140--compat-cache-hidden-third-before-rejected-first.ts",
       "sha256": "9c37473b65afefc8b1dd3f046f20ee55f09d6458cf38d635b4c412da5ce1254c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-hidden-third-before-rejected-first/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-cache-hidden-third-before-rejected-first/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3230,7 +3230,7 @@
       "file": "pgs/gold-original140--compat-cache-oversized-replacement-keeps-old-native.ts",
       "sha256": "c88eda38336f0b72d37356be2c9a76d9ea791144639e4df7bd67ac4487342622",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-oversized-replacement-keeps-old-native/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-cache-oversized-replacement-keeps-old-native/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3246,7 +3246,7 @@
       "file": "pgs/gold-original140--compat-cache-rejected-first-then-valid-replacement.ts",
       "sha256": "a53d3849e121e9746c4a8c9ef05bb99316d4494b52c993fa6b3e9960349154f4",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-rejected-first-then-valid-replacement/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-cache-rejected-first-then-valid-replacement/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3262,7 +3262,7 @@
       "file": "pgs/gold-original140--compat-cache-unused-complete-before-rejected-first.ts",
       "sha256": "ddc958352dd7996ba4eba31eebafb14447641d6471732d6d94d41122059dabc8",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-complete-before-rejected-first/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-cache-unused-complete-before-rejected-first/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3278,7 +3278,7 @@
       "file": "pgs/gold-original140--compat-cache-unused-fragments-before-rejected-first.ts",
       "sha256": "aedd0e30b9fd430ac7a5e49d310b4be35d34cfeacd62f3226a9cff01f0bfd748",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-fragments-before-rejected-first/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-cache-unused-fragments-before-rejected-first/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3294,7 +3294,7 @@
       "file": "pgs/gold-original140--compat-cache-unused-preload-epoch-then-rejected-first.ts",
       "sha256": "ed39bfe265c4e8fd35723862d8d8e9aa8ff94c19a82d6ae0594aa2c2f9ef26d5",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-cache-unused-preload-epoch-then-rejected-first/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-cache-unused-preload-epoch-then-rejected-first/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3310,7 +3310,7 @@
       "file": "pgs/gold-original140--compat-empty-first-partial-palette-recolours-old-image.ts",
       "sha256": "09e3dc916126be9553a72ba8dacc2c38830554fcb106b936a9daf3ab0071e958",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-partial-palette-recolours-old-image/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-empty-first-partial-palette-recolours-old-image/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3326,7 +3326,7 @@
       "file": "pgs/gold-original140--compat-empty-first-replacement-00.ts",
       "sha256": "ed19f455beeab199b4c1b511e127bcd603bf0b469232ced49ab0fd577791a406",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-00/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-empty-first-replacement-00/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3342,7 +3342,7 @@
       "file": "pgs/gold-original140--compat-empty-first-replacement-40.ts",
       "sha256": "122ef594ce4ed1579949b920aec12308efc77c0da31cf50fb260bccff6490e57",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-40/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-empty-first-replacement-40/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3358,7 +3358,7 @@
       "file": "pgs/gold-original140--compat-empty-first-replacement-80.ts",
       "sha256": "4fa0cdaba74700284680598b62407379d5fbd4a4672a6bb5cd81de29b1f1948f",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-80/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-empty-first-replacement-80/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3374,7 +3374,7 @@
       "file": "pgs/gold-original140--compat-empty-first-replacement-c0.ts",
       "sha256": "f9cb78899aa0b4f687ad995892845421f38c23e52e630ee3f6d40a816733f7b4",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-c0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-empty-first-replacement-c0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3390,7 +3390,7 @@
       "file": "pgs/gold-original140--compat-empty-first-replacement-new-shape.ts",
       "sha256": "e82806393e905140fc0d4288aa744669e4518158a2025a9604ce422b50058638",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-replacement-new-shape/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-empty-first-replacement-new-shape/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3406,7 +3406,7 @@
       "file": "pgs/gold-original140--compat-first-clear-then-complete-in-one-packet.ts",
       "sha256": "f6ae3f83ebf9582fc9a1c01b6f2c94e4efe6dac703e28beac2e9520dec65b951",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-first-clear-then-complete-in-one-packet/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-first-clear-then-complete-in-one-packet/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3422,7 +3422,7 @@
       "file": "pgs/gold-original140--compat-first-image-then-clear-new-context.ts",
       "sha256": "fad124f586edb023dec13c18998af75a8a994f7bb421c094859a047b7dbc6345",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-first-image-then-clear-new-context/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-first-image-then-clear-new-context/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3438,7 +3438,7 @@
       "file": "pgs/gold-original140--compat-oversized-object-first-rejected-by-native.ts",
       "sha256": "6d8ea58fd1959a962c4fab3f6fbcab8e6fa45eb11ce7a20900e110761839c154",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-oversized-object-first-rejected-by-native/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-oversized-object-first-rejected-by-native/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3454,7 +3454,7 @@
       "file": "pgs/gold-original140--compat-packet-final-context-from-trailing-PCS.ts",
       "sha256": "baeed19bb57806dcd38ff9867a47b935b476455a13e74ff932a9ca8618562e82",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-packet-final-context-from-trailing-PCS/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-packet-final-context-from-trailing-PCS/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3470,7 +3470,7 @@
       "file": "pgs/gold-original140--compat-three-references-forced-false.ts",
       "sha256": "50a9e13d43f068d714f1efaa70b73ae693285a6fc649381d45de4640493c3b47",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-three-references-forced-false/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-three-references-forced-false/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3486,7 +3486,7 @@
       "file": "pgs/gold-original140--compat-three-references-forced-true.ts",
       "sha256": "50a9e13d43f068d714f1efaa70b73ae693285a6fc649381d45de4640493c3b47",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-three-references-forced-true/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-three-references-forced-true/input.bin",
       "arguments": [
         "pgs",
         "opt:forced_subs_only=1"
@@ -3503,7 +3503,7 @@
       "file": "pgs/gold-original140--duplicate-object-references.ts",
       "sha256": "6dd7273ee009b640174c1e97e27285d22789324a0e3f40acc446310731bc38ab",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--duplicate-object-references/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--duplicate-object-references/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3519,7 +3519,7 @@
       "file": "pgs/gold-original140--empty-palette-version-update.ts",
       "sha256": "e6c1e0a9bee846778d33131d074147c83ebd52f5185cabeff8f94990a111d0ab",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--empty-palette-version-update/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--empty-palette-version-update/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3535,7 +3535,7 @@
       "file": "pgs/gold-original140--every-ods-split-00.ts",
       "sha256": "af4e9cfa787c8b4c8ea4e9e09d7bffa456fe1d84e9ccd57e320c1afd9b90bbe9",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-00/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-00/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3551,7 +3551,7 @@
       "file": "pgs/gold-original140--every-ods-split-01.ts",
       "sha256": "faf93af94017bb7cedeef23a4c646997879c0b101f981b01f315c57e5947fec3",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-01/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-01/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3567,7 +3567,7 @@
       "file": "pgs/gold-original140--every-ods-split-02.ts",
       "sha256": "310456346f460aab54481e55886cd2af077df710b4bd039c34b18566cc3a21ed",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-02/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-02/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3583,7 +3583,7 @@
       "file": "pgs/gold-original140--every-ods-split-03.ts",
       "sha256": "7ff9eb46a5428fa76421cba60e7b7adf037af9971f4b120dbfc77b5c4ed5cc66",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-03/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-03/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3599,7 +3599,7 @@
       "file": "pgs/gold-original140--every-ods-split-04.ts",
       "sha256": "83bc98c92e22f1acc96c656111021e1928b492ac1756c8d0569a1098b2cbebf1",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-04/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-04/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3615,7 +3615,7 @@
       "file": "pgs/gold-original140--every-ods-split-05.ts",
       "sha256": "a2f5771cab79b78826e4a200d815e9444077bfddded48539eaeab4e0ef172e78",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-05/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-05/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3631,7 +3631,7 @@
       "file": "pgs/gold-original140--every-ods-split-06.ts",
       "sha256": "2913347275cf9dc016e2f096fabe6f7d0a1741913726d3202d52e7844e2d58da",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-06/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-06/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3647,7 +3647,7 @@
       "file": "pgs/gold-original140--every-ods-split-07.ts",
       "sha256": "7eb2cb4dcc8c83054bb1ae1abb4bc77c1d3e0663c67584220df68ba17c11bfbe",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-07/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-07/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3663,7 +3663,7 @@
       "file": "pgs/gold-original140--every-ods-split-08.ts",
       "sha256": "609e9053a6f7342ac2125e35fc61a55916942a36caee7e8544a4fa8c472999b1",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-08/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-08/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3679,7 +3679,7 @@
       "file": "pgs/gold-original140--every-ods-split-09.ts",
       "sha256": "7a52da0f15ce289c99c3df74c757b287c698608572cfc2198251c2d0124b131d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--every-ods-split-09/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--every-ods-split-09/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3695,7 +3695,7 @@
       "file": "pgs/gold-original140--forced-only-false.ts",
       "sha256": "344cfa6dfeb82b0dbfcfae0ca2293eb1ff12cc190c502223698f973b2aca3930",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--forced-only-false/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--forced-only-false/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3711,7 +3711,7 @@
       "file": "pgs/gold-original140--forced-only-true.ts",
       "sha256": "344cfa6dfeb82b0dbfcfae0ca2293eb1ff12cc190c502223698f973b2aca3930",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--forced-only-true/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--forced-only-true/input.bin",
       "arguments": [
         "pgs",
         "opt:forced_subs_only=1"
@@ -3728,7 +3728,7 @@
       "file": "pgs/gold-original140--interleaved-object-fragments.ts",
       "sha256": "76f89a669ac736faa0ce03f67ea670c71c97357886ddcddad99246d1bfd40946",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--interleaved-object-fragments/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--interleaved-object-fragments/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3744,7 +3744,7 @@
       "file": "pgs/gold-original140--malformed-END-without-PCS.ts",
       "sha256": "2bc5e7f1191b094ac062d04f9e54873d365375d879ee02ef3ea44cfb360433e6",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-END-without-PCS/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-END-without-PCS/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3760,7 +3760,7 @@
       "file": "pgs/gold-original140--malformed-crop-outside-object.ts",
       "sha256": "3845b2e8dc77e30600346e53ac06483e00c04b9ec0fc268488ba1bb98a1c1f5c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-crop-outside-object/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-crop-outside-object/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3776,7 +3776,7 @@
       "file": "pgs/gold-original140--malformed-early-last.ts",
       "sha256": "dbcb1297a1d8a2f3f13e5175c833b81a41232be0a1a5d442d099218955a17507",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-early-last/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-early-last/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3792,7 +3792,7 @@
       "file": "pgs/gold-original140--malformed-missing-END.ts",
       "sha256": "469c955cae5658cf99bee0aab12505169ac340b93fe5be14092d729a3276ec8e",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-missing-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-missing-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3808,7 +3808,7 @@
       "file": "pgs/gold-original140--malformed-missing-last-marker.ts",
       "sha256": "4f8712f77bd1278b91e491f544331b7ef3a4127acb89f16459a485ce267e8c8e",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-missing-last-marker/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-missing-last-marker/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3824,7 +3824,7 @@
       "file": "pgs/gold-original140--malformed-nonempty-END.ts",
       "sha256": "d9f047f738bca2b57b79e727739989af025c7da0db26cf0f09f41c67b5b76e14",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-nonempty-END/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-nonempty-END/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3840,7 +3840,7 @@
       "file": "pgs/gold-original140--malformed-overshoot.ts",
       "sha256": "73f40a47620c908280c97fa60209642b5b9d813f983c09a9bc3b440ff51233e2",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-overshoot/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-overshoot/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3856,7 +3856,7 @@
       "file": "pgs/gold-original140--malformed-palette-entry-truncated.ts",
       "sha256": "16765506e97bbafdc78e824c7b5e6ab6eb93e56105c232281d1f3e1c3fcdbdbd",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-palette-entry-truncated/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-palette-entry-truncated/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3872,7 +3872,7 @@
       "file": "pgs/gold-original140--malformed-windows-truncated.ts",
       "sha256": "1d4d224f46d5891d9a1c66a8aa6401b17fe0392623e8e09629c596d3c01f68f5",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-windows-truncated/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-windows-truncated/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3888,7 +3888,7 @@
       "file": "pgs/gold-original140--malformed-wrong-fragment-version.ts",
       "sha256": "aa46792530c32cb7edbe98b0f7059f163d906c636900fc2f1e457e20fe951e8c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--malformed-wrong-fragment-version/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--malformed-wrong-fragment-version/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3904,7 +3904,7 @@
       "file": "pgs/gold-original140--matrix-height-1080.ts",
       "sha256": "94d6d6e01a9766e2a1b474fd79657e8e30bfb4cfbd1913f15711097b08ea65c2",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-1080/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--matrix-height-1080/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3920,7 +3920,7 @@
       "file": "pgs/gold-original140--matrix-height-480.ts",
       "sha256": "e1baf2b7dfd6bea09365e43ca2df14fd93ff35554efa7afed638764ffd0e0f85",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-480/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--matrix-height-480/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3936,7 +3936,7 @@
       "file": "pgs/gold-original140--matrix-height-576.ts",
       "sha256": "12904978991af17dd62a1712fececc8c5e33c0750bf7a193743cb9cec3207dbc",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-576/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--matrix-height-576/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3952,7 +3952,7 @@
       "file": "pgs/gold-original140--matrix-height-577.ts",
       "sha256": "730bff413d0ca43664f46da1fa01cf6e12a25b2d0cdeeae7c998b499dd1cbd10",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-height-577/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--matrix-height-577/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3968,7 +3968,7 @@
       "file": "pgs/gold-original140--matrix-per-entry-at-update-time.ts",
       "sha256": "e7498e5afb1d6217c6528b66167b8adfa484dcfbf16f81c2f70df1bdf74bc3c5",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--matrix-per-entry-at-update-time/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--matrix-per-entry-at-update-time/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -3984,7 +3984,7 @@
       "file": "pgs/gold-original140--multiple-displays-one-packet.ts",
       "sha256": "a1d6ddd0cea0da709606e93d5ba7bbfe3f2a9b67efcd75badd9af5683a6970d4",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--multiple-displays-one-packet/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--multiple-displays-one-packet/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4000,7 +4000,7 @@
       "file": "pgs/gold-original140--multiple-objects-wire-order.ts",
       "sha256": "344cfa6dfeb82b0dbfcfae0ca2293eb1ff12cc190c502223698f973b2aca3930",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--multiple-objects-wire-order/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--multiple-objects-wire-order/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4016,7 +4016,7 @@
       "file": "pgs/gold-original140--normal-window-replacement.ts",
       "sha256": "3440951fd9cac33bf0eee3f6590b0add121ac053d6d2214557fe7a0d9df66f32",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--normal-window-replacement/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--normal-window-replacement/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4032,7 +4032,7 @@
       "file": "pgs/gold-original140--object-replacement-version-0.ts",
       "sha256": "0427db79ba10ffb414ee10460aaf065f30e6d513d18e1dd592559c0f02be90e1",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--object-replacement-version-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--object-replacement-version-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4048,7 +4048,7 @@
       "file": "pgs/gold-original140--object-replacement-version-2.ts",
       "sha256": "8598e00b15e54819240d19b699cd28b8cc6b10b8f3e440859238918083cffa4d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--object-replacement-version-2/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--object-replacement-version-2/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4064,7 +4064,7 @@
       "file": "pgs/gold-original140--old34-cropped.ts",
       "sha256": "7124aa46eeeaecbfa1b81cf98fce4f5087cd5397ca78f374a680aad3d368777f",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-cropped/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-cropped/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4080,7 +4080,7 @@
       "file": "pgs/gold-original140--old34-forced.ts",
       "sha256": "305399a02e2757e597dd943faaad26075a5d9256a840564a9f47c7327669a79a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-forced/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-forced/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4096,7 +4096,7 @@
       "file": "pgs/gold-original140--old34-forced-and-cropped.ts",
       "sha256": "09ed4e2ea0bf9d5b500e1e3bb0ba781d8b8d99c06b4992db964e309ebb32c885",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-forced-and-cropped/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-forced-and-cropped/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4112,7 +4112,7 @@
       "file": "pgs/gold-original140--old34-mixed-two-rows.ts",
       "sha256": "6b33ae98df7a362791587031d6eb5795ea92939178dc39ddb51bb886fcc5975b",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-mixed-two-rows/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-mixed-two-rows/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4128,7 +4128,7 @@
       "file": "pgs/gold-original140--old34-run-1-0.ts",
       "sha256": "0e613643a4c8c422cba5e4e10578bd35e8919f8e74fa6ad66cec9484a7386c22",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-1-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4144,7 +4144,7 @@
       "file": "pgs/gold-original140--old34-run-1-1.ts",
       "sha256": "1cfdfbb14a7cc162bbafe1516a77c5dfb535d4e66aeca5ba30a087cec140963d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-1-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4160,7 +4160,7 @@
       "file": "pgs/gold-original140--old34-run-1-255.ts",
       "sha256": "2d5222d2eeb881557f369efb6e3356d03da13879fbb8fe7002dadc767e157afe",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-1-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-1-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4176,7 +4176,7 @@
       "file": "pgs/gold-original140--old34-run-16383-0.ts",
       "sha256": "3a1852626c221c08d5553555d20172e67329e9ecd33cd15c4c8105738bc12cbc",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-16383-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4192,7 +4192,7 @@
       "file": "pgs/gold-original140--old34-run-16383-1.ts",
       "sha256": "c582335ce495731e31dfa92555d2f3f37c4a9ce2dd1d935ba5b87d9172dff41d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-16383-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4208,7 +4208,7 @@
       "file": "pgs/gold-original140--old34-run-16383-255.ts",
       "sha256": "b5666f376a4426168c65733dc328ff808bba1ee81eb244a2acfb2cdd5eca0d58",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-16383-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-16383-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4224,7 +4224,7 @@
       "file": "pgs/gold-original140--old34-run-2-0.ts",
       "sha256": "044eae0be33cd13b335e58dc1f965c649a576ce8f412341e3c1afb7e97a163d2",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-2-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4240,7 +4240,7 @@
       "file": "pgs/gold-original140--old34-run-2-1.ts",
       "sha256": "197314c9f20581ed4bc09f174c28a9985b1b8a818b60f17ec1bb119d14e6502a",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-2-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4256,7 +4256,7 @@
       "file": "pgs/gold-original140--old34-run-2-255.ts",
       "sha256": "4e3a636b3e29d1fa53abac72235fe1c3efee1712a82afd50fe880391590229b8",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-2-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-2-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4272,7 +4272,7 @@
       "file": "pgs/gold-original140--old34-run-255-0.ts",
       "sha256": "0d9fa21728e99fb60c1d28e66e691798b0376a6613a59a5ac8f41f9d43211a24",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-255-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4288,7 +4288,7 @@
       "file": "pgs/gold-original140--old34-run-255-1.ts",
       "sha256": "2b95aea21056d5323d232d1fac6ffcea3f37d6d818720178c228a5686cffcdf7",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-255-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4304,7 +4304,7 @@
       "file": "pgs/gold-original140--old34-run-255-255.ts",
       "sha256": "abaae110588813543a6a02e6eaf5e723ba266e39e539b047e8fef659afbc6b00",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-255-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-255-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4320,7 +4320,7 @@
       "file": "pgs/gold-original140--old34-run-256-0.ts",
       "sha256": "eff12551b7199dc69c4b6a36a20f4a968418741b72b16d810c07b234e0062f5d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-256-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4336,7 +4336,7 @@
       "file": "pgs/gold-original140--old34-run-256-1.ts",
       "sha256": "cc1b13cc06913410f4f775e8f5b63d6b056aa6586c0e1dcede790b6bd8d36dec",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-256-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4352,7 +4352,7 @@
       "file": "pgs/gold-original140--old34-run-256-255.ts",
       "sha256": "83735f4f0c223effa8c00a6e123264ef402d2c27ffd4dd18d1977598f064ffcf",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-256-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-256-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4368,7 +4368,7 @@
       "file": "pgs/gold-original140--old34-run-4096-0.ts",
       "sha256": "ab9ae1519f2f9c5ec2a88cba27842e86cd0e4a1eaf0d952298cd84791b0630a5",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-4096-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4384,7 +4384,7 @@
       "file": "pgs/gold-original140--old34-run-4096-1.ts",
       "sha256": "8fe17e1ffc75a62f27d6c524b89def938e4fcc643104da52878858184c5225be",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-4096-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4400,7 +4400,7 @@
       "file": "pgs/gold-original140--old34-run-4096-255.ts",
       "sha256": "543d0be2918ad0cb761ef6b439d5a61630a9684626ae201cb781647f7e19d8f3",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-4096-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-4096-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4416,7 +4416,7 @@
       "file": "pgs/gold-original140--old34-run-63-0.ts",
       "sha256": "16e7174ef6cac8a8db689f8b0b10c75c0d30c162b599f5efd0c05cd3a5cb5afc",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-63-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4432,7 +4432,7 @@
       "file": "pgs/gold-original140--old34-run-63-1.ts",
       "sha256": "09845ae5cba4d2b8ee813af7ad425d44f09778367afeb7e91123f768dd7b1a78",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-63-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4448,7 +4448,7 @@
       "file": "pgs/gold-original140--old34-run-63-255.ts",
       "sha256": "89100c175b8d51a2f0d0f54c70f880d4126b78fb0c7bd2e8975b9ba44b314e20",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-63-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-63-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4464,7 +4464,7 @@
       "file": "pgs/gold-original140--old34-run-64-0.ts",
       "sha256": "6c303a2463622949d63152c90e59d2c00b62519452e84fcdcf7d23c265d2dd94",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-0/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-64-0/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4480,7 +4480,7 @@
       "file": "pgs/gold-original140--old34-run-64-1.ts",
       "sha256": "0cbe08ee0ea5f02bab82138d3832aa04d73cc0c20358d611b5a65bcb01f2ff38",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-1/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-64-1/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4496,7 +4496,7 @@
       "file": "pgs/gold-original140--old34-run-64-255.ts",
       "sha256": "ebbd9f7d8318cc99a7b5ee8b2d2eb6b877f3d4ef3d98ade58c39709d2b0585fd",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-64-255/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-64-255/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4512,7 +4512,7 @@
       "file": "pgs/gold-original140--old34-run-across-row.ts",
       "sha256": "0dd3d4602af0de3f64847496326c4cecf236815045a6ccc8f8756c3ee5351ded",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-run-across-row/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-run-across-row/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4528,7 +4528,7 @@
       "file": "pgs/gold-original140--old34-short-line.ts",
       "sha256": "16b5a264a58c9367c9ce39992a9527be836c70aa84bf36ebd0d2e0321169d05d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-short-line/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-short-line/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4544,7 +4544,7 @@
       "file": "pgs/gold-original140--old34-trailing-rle.ts",
       "sha256": "8e789e3963a10685df9cb25314e5418701508fe750f0925d54edee7381f5bdcb",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-trailing-rle/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-trailing-rle/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4560,7 +4560,7 @@
       "file": "pgs/gold-original140--old34-truncated-control.ts",
       "sha256": "f357547e16baaeb7b319bc7f8ef5c0ccafba56cd21dc4e2d166c6a577d96c360",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-truncated-control/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-truncated-control/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4576,7 +4576,7 @@
       "file": "pgs/gold-original140--old34-truncated-long-colour.ts",
       "sha256": "74d7e7fe7cc9789f14808dc1db6f021f46331e85b574fc5310195dfc2d07ae3c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-truncated-long-colour/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-truncated-long-colour/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4592,7 +4592,7 @@
       "file": "pgs/gold-original140--old34-zero-colour-run.ts",
       "sha256": "3b36d361b60157c23280015164feb2d16fde3cd63d2f0a9265e8f9a8ee50fea4",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--old34-zero-colour-run/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--old34-zero-colour-run/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4608,7 +4608,7 @@
       "file": "pgs/gold-original140--one-rle-byte-per-fragment.ts",
       "sha256": "57b1acb2da8bb87f99c557c8497cd6529ac0ca0675c30985f9b84128431133b5",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--one-rle-byte-per-fragment/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--one-rle-byte-per-fragment/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4624,7 +4624,7 @@
       "file": "pgs/gold-original140--partial-duplicate-palette.ts",
       "sha256": "622928e78be6158d1a8dc24b356da301da87ca519710ede9b0cbd9ad2b53c82f",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--partial-duplicate-palette/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--partial-duplicate-palette/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4640,7 +4640,7 @@
       "file": "pgs/gold-original140--reset-state-40-missing-definitions.ts",
       "sha256": "0cbe862f67d157e8c76d5bb68e3434849f1b7643808341ecdebf85a464d79cbc",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-40-missing-definitions/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--reset-state-40-missing-definitions/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4656,7 +4656,7 @@
       "file": "pgs/gold-original140--reset-state-40-partial-palette.ts",
       "sha256": "bce94ad8d8983a93baa0e30d8c50b97ca86b4a76727848b41878e0950770f01e",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-40-partial-palette/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--reset-state-40-partial-palette/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4672,7 +4672,7 @@
       "file": "pgs/gold-original140--reset-state-80-missing-definitions.ts",
       "sha256": "79d73d3770750a3f50c08c6d5477f1b78e531966fb3f06fbaf7fe9763e2ed4f3",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-80-missing-definitions/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--reset-state-80-missing-definitions/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4688,7 +4688,7 @@
       "file": "pgs/gold-original140--reset-state-80-partial-palette.ts",
       "sha256": "484e66df374fdb31528f04a07fade82a21251092c0c7e4ceb07c465bf2392446",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-80-partial-palette/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--reset-state-80-partial-palette/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4704,7 +4704,7 @@
       "file": "pgs/gold-original140--reset-state-c0-missing-definitions.ts",
       "sha256": "b9e85b1b91d641e70c9be6c5d85ec3e32b520269d8f4b819996398750795cf2c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-c0-missing-definitions/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--reset-state-c0-missing-definitions/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4720,7 +4720,7 @@
       "file": "pgs/gold-original140--reset-state-c0-partial-palette.ts",
       "sha256": "5249175ef7a69d6690d8fc367930b760fdd6f7168908939857b15cd37c187342",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reset-state-c0-partial-palette/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--reset-state-c0-partial-palette/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4736,7 +4736,7 @@
       "file": "pgs/gold-original140--reuse-clear-resume.ts",
       "sha256": "b357521a9ead54b9d192c939d4ff8dff10c11f521b804312a78c2d247c948ce6",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--reuse-clear-resume/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--reuse-clear-resume/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4752,7 +4752,7 @@
       "file": "pgs/gold-original140--same-palette-version-new-values.ts",
       "sha256": "60f43c3055fc3a55600c39af15386ad2bbc75e91e143dd0075edff52111fae84",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--same-palette-version-new-values/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--same-palette-version-new-values/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4768,7 +4768,7 @@
       "file": "pgs/gold-original140--source-position-outside-canvas.ts",
       "sha256": "27b730041a1c3ab1448b9059361de5588e96357b4426feda1b7ae0286ebaba6d",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--source-position-outside-canvas/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--source-position-outside-canvas/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4784,7 +4784,7 @@
       "file": "pgs/gold-original140--three-source-objects-native-two-reference-limit.ts",
       "sha256": "d8993f3e0c8784c7fcab7e386304f98bb9040807bfb2a5c971a90be41a2ffb50",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--three-source-objects-native-two-reference-limit/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--three-source-objects-native-two-reference-limit/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4800,7 +4800,7 @@
       "file": "pgs/gold-original140--truncated-first-header-01.ts",
       "sha256": "fd991f6db9e210778fd46fe3a9f98b974caabe3f8c0a2096803467bf381189a0",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-01/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-01/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4816,7 +4816,7 @@
       "file": "pgs/gold-original140--truncated-first-header-02.ts",
       "sha256": "4b52ef24ce84effd8eb1d92d30264d918fac43a08689ef165c8b3634b08b0c11",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-02/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-02/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4832,7 +4832,7 @@
       "file": "pgs/gold-original140--truncated-first-header-03.ts",
       "sha256": "7b26aaa9aa14a41f0b225e6d7113006b5722a56dd89a5e01b382c0720b4dbde9",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-03/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-03/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4848,7 +4848,7 @@
       "file": "pgs/gold-original140--truncated-first-header-04.ts",
       "sha256": "a08748575f56ab3194c8e4114094208a38dab62709e5243b9be1b1bc8f1b3a86",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-04/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-04/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4864,7 +4864,7 @@
       "file": "pgs/gold-original140--truncated-first-header-05.ts",
       "sha256": "a72ee3b346ea86cd1dbd58b2bcb86b9441788142f4aa7fea96ca164884b74db3",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-05/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-05/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4880,7 +4880,7 @@
       "file": "pgs/gold-original140--truncated-first-header-06.ts",
       "sha256": "a40e115bc5f08ad8f2a463da96720fd70f9786c37846a511e31e072ca5f90139",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-06/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-06/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4896,7 +4896,7 @@
       "file": "pgs/gold-original140--truncated-first-header-07.ts",
       "sha256": "51a9d81cf263b668d0588eff6cd029c4c724e2bb9175a064e732fe89ebb46477",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-07/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-07/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4912,7 +4912,7 @@
       "file": "pgs/gold-original140--truncated-first-header-08.ts",
       "sha256": "238c33200069cfc84ce4236a4e0d46b8fa1707069dbf4c3022db279cb2ce68a2",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-08/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-08/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4928,7 +4928,7 @@
       "file": "pgs/gold-original140--truncated-first-header-09.ts",
       "sha256": "af7dc0925e1c76ebe3dd915cbff98a8c7ca309cfd22c12ecb473bbacbecdc70c",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-09/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-09/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4944,7 +4944,7 @@
       "file": "pgs/gold-original140--truncated-first-header-10.ts",
       "sha256": "745f96c3a940da29444cff4cce420bb7f53dcee9574a88cbfdbc783dabddd4f2",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-10/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-10/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4960,7 +4960,7 @@
       "file": "pgs/gold-original140--truncated-first-header-11.ts",
       "sha256": "466f8874adeb89cdfab8c9a6a05ecc6b6ba7fa75971de560f5dda5ee0ac949d7",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-11/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-11/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4976,7 +4976,7 @@
       "file": "pgs/gold-original140--truncated-first-header-12.ts",
       "sha256": "4517cdf7cec043c1e6d4089624b040808731bddfb591a20a161b59965e618297",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-12/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-12/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -4992,7 +4992,7 @@
       "file": "pgs/gold-original140--truncated-first-header-13.ts",
       "sha256": "d41203c02663dd378222e7e836affe3f6ece493db5b3ae0a376d335d17c17214",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--truncated-first-header-13/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--truncated-first-header-13/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -5008,7 +5008,7 @@
       "file": "pgs/gold-original140--unknown-segment-kept.ts",
       "sha256": "f88e3e75c4a4e3aa54354fd35aaeff5fded9f68253ef3e54c19f36fbec22b4a4",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--unknown-segment-kept/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--unknown-segment-kept/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -5024,7 +5024,7 @@
       "file": "pgs/gold-original140--window-crop-forced-real-pixels.ts",
       "sha256": "66342f42c0539dad0fd7472e583c70c9a958ae723c763b7489c0a50f2a626828",
       "rights": "authored-synthetic",
-      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/native-compatibility-gold/pgs-original140--window-crop-forced-real-pixels/input.bin",
+      "source": "harness/subtitles/pgs_streams.py; recorded input crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--window-crop-forced-real-pixels/input.bin",
       "arguments": [
         "pgs"
       ],
@@ -5154,63 +5154,63 @@
   ],
   "not_representable": [
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-known-native-sentinel/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--clock-known-native-sentinel/input.bin",
       "reason": "clock outside 0..2^33"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-independent89--clock-negative/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-independent89--clock-negative/input.bin",
       "reason": "clock outside 0..2^33"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-large-exact/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-large-exact/input.bin",
       "reason": "time base 1/1000000"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-native-unrepresentable-overflow/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-native-unrepresentable-overflow/input.bin",
       "reason": "time base 2147483647/1"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-native-unrepresentable-sentinel/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-native-unrepresentable-sentinel/input.bin",
       "reason": "time base 1/1000000"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-negative/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-negative/input.bin",
       "reason": "clock outside 0..2^33"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-one-tick/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-one-tick/input.bin",
       "reason": "clock outside 0..2^33"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-prime-base/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-prime-base/input.bin",
       "reason": "time base 19/1001"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-unknown/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-unknown/input.bin",
       "reason": "clock outside 0..2^33"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--clock-zero/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--clock-zero/input.bin",
       "reason": "clock outside 0..2^33"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-negative-half-microsecond/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-clock-negative-half-microsecond/input.bin",
       "reason": "time base 1/2000000"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-sentinel-on-END-fallback/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-clock-sentinel-on-END-fallback/input.bin",
       "reason": "time base 1/1000000"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-clock-unknown-PTS-sentinel-DTS/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-clock-unknown-PTS-sentinel-DTS/input.bin",
       "reason": "clock outside 0..2^33"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--compat-empty-first-after-hard-reset/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--compat-empty-first-after-hard-reset/input.bin",
       "reason": "decoder reopen record"
     },
     {
-      "input": "crates/subtitles/tests/native-compatibility-gold/pgs-original140--explicit-hard-context-reset/input.bin",
+      "input": "crates/subtitles/tests/pgs-receiver-recorded/pgs-original140--explicit-hard-context-reset/input.bin",
       "reason": "decoder reopen record"
     }
   ]

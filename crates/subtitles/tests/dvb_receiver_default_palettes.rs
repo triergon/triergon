@@ -13,7 +13,7 @@ struct Case {
     pts_microseconds: i64,
 }
 
-#[path = "native-defaults-support/cases.rs"]
+#[path = "dvb-default-palette-support/cases.rs"]
 mod cases;
 
 // The expected components are EN 300 743 Tables 36 to 38 tabulated by hand,

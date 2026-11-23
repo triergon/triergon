@@ -2,18 +2,22 @@ use super::Case;
 pub(super) const CASES: [Case; 3] = [
     Case {
         id: "dvb-default-clut2",
-        payload: include_bytes!("../native-defaults-fixtures/dvb-default-clut2.dvb"),
-        indices: include_bytes!("../native-defaults-fixtures/dvb-default-clut2.indices"),
-        native_rgba: include_bytes!("../native-defaults-fixtures/dvb-default-clut2.native-rgba"),
+        payload: include_bytes!("../dvb-default-palette-fixtures/dvb-default-clut2.dvb"),
+        indices: include_bytes!("../dvb-default-palette-fixtures/dvb-default-clut2.indices"),
+        native_rgba: include_bytes!(
+            "../dvb-default-palette-fixtures/dvb-default-clut2.native-rgba"
+        ),
         receiver_words: &[0, 2134867775, 4286578559, 0],
         rect: [7, 9, 4, 2],
         pts_microseconds: 1000000,
     },
     Case {
         id: "dvb4-literals-fields",
-        payload: include_bytes!("../native-defaults-fixtures/dvb4-literals-fields.dvb"),
-        indices: include_bytes!("../native-defaults-fixtures/dvb4-literals-fields.indices"),
-        native_rgba: include_bytes!("../native-defaults-fixtures/dvb4-literals-fields.native-rgba"),
+        payload: include_bytes!("../dvb-default-palette-fixtures/dvb4-literals-fields.dvb"),
+        indices: include_bytes!("../dvb-default-palette-fixtures/dvb4-literals-fields.indices"),
+        native_rgba: include_bytes!(
+            "../dvb-default-palette-fixtures/dvb4-literals-fields.native-rgba"
+        ),
         receiver_words: &[
             34816, 4294967295, 4278190080, 4294967295, 4294967295, 4278190080, 4294967295,
             4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295,
@@ -24,9 +28,11 @@ pub(super) const CASES: [Case; 3] = [
     },
     Case {
         id: "dvb8-literals-fields",
-        payload: include_bytes!("../native-defaults-fixtures/dvb8-literals-fields.dvb"),
-        indices: include_bytes!("../native-defaults-fixtures/dvb8-literals-fields.indices"),
-        native_rgba: include_bytes!("../native-defaults-fixtures/dvb8-literals-fields.native-rgba"),
+        payload: include_bytes!("../dvb-default-palette-fixtures/dvb8-literals-fields.dvb"),
+        indices: include_bytes!("../dvb-default-palette-fixtures/dvb8-literals-fields.indices"),
+        native_rgba: include_bytes!(
+            "../dvb-default-palette-fixtures/dvb8-literals-fields.native-rgba"
+        ),
         receiver_words: &[
             34816, 4294967295, 4278190080, 4294967295, 4294967295, 4278190080, 4294967295,
             4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295, 4294967295,

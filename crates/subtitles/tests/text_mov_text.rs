@@ -383,7 +383,7 @@ fn complete_u16_text_length_is_not_clamped_to_the_2048_recommendation() {
 // The captured inputs; the reference's recorded outputs beside them are
 // checked by the subtitle worker's `subtitle-text` corpus.
 #[allow(dead_code)]
-#[path = "native-mov-text-fixtures/cases.rs"]
+#[path = "mov-text-fixtures/cases.rs"]
 mod captured;
 
 #[test]

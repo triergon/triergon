@@ -82,7 +82,7 @@
         "sha256": "6f2e59ab5bc9dffcf460035d0ce35ada3125babe6915d75fa616db4b1cc0ecf1",
         "bytes": 64
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb-default-clut2.dvb"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb-default-clut2.dvb"
     },
     {
       "source": {
@@ -90,7 +90,7 @@
         "sha256": "94ff8a743f6c7d6abcf43d3027c43994df5f3170a39fd8fd532633b8bbb74e36",
         "bytes": 8
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb-default-clut2.indices"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb-default-clut2.indices"
     },
     {
       "source": {
@@ -98,7 +98,7 @@
         "sha256": "0a2657f0d2344ff709c6c3446fc7e723cc2e05d65ca80c7bc807f52fa5dab805",
         "bytes": 16
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb-default-clut2.native-rgba"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb-default-clut2.native-rgba"
     },
     {
       "source": {
@@ -106,7 +106,7 @@
         "sha256": "2d34bd9703f2bcfab040be4b3842d2aab27296777fedb5213597dfbf1fe7ebf5",
         "bytes": 173
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb4-literals-fields.dvb"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb4-literals-fields.dvb"
     },
     {
       "source": {
@@ -114,7 +114,7 @@
         "sha256": "67bc4c1ed6a28e3ec50ad82830e95097e94652fbd8d1d22c2c80d3940bd8ab0a",
         "bytes": 12
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb4-literals-fields.indices"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb4-literals-fields.indices"
     },
     {
       "source": {
@@ -122,7 +122,7 @@
         "sha256": "3fcf372d814083e8f5413f7d4c9b7a7dcec73cc25d1b08bd4688155522855b12",
         "bytes": 64
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb4-literals-fields.native-rgba"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb4-literals-fields.native-rgba"
     },
     {
       "source": {
@@ -130,7 +130,7 @@
         "sha256": "3b0a8ea3a22ede5a486db5102871fee8bca0fa6de84fcd2d5e931d4f2d53e067",
         "bytes": 211
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb8-literals-fields.dvb"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb8-literals-fields.dvb"
     },
     {
       "source": {
@@ -138,7 +138,7 @@
         "sha256": "c4e13a2c3000629cc33bfb72c623a47022a920b0dba9c1bb6791b3dbf300c054",
         "bytes": 12
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb8-literals-fields.indices"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb8-literals-fields.indices"
     },
     {
       "source": {
@@ -146,7 +146,7 @@
         "sha256": "8754160bc6390d38f0b23f46b8f43bf0fcb4938c8d7a355fc72a9aefb0588e37",
         "bytes": 1024
       },
-      "target": "crates/subtitles/tests/native-defaults-fixtures/dvb8-literals-fields.native-rgba"
+      "target": "crates/subtitles/tests/dvb-default-palette-fixtures/dvb8-literals-fields.native-rgba"
     }
   ],
   "source_policy": "All276 standard defaults retain original source-nearest/studio projections and raw default/encoded facts. Native policy is a separate observed D32 view.",

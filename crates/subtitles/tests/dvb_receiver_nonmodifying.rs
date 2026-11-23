@@ -13,7 +13,7 @@ struct Case {
     depth: u8,
     pts_raw: i64,
 }
-#[path = "native-nonmodifying-support/cases.rs"]
+#[path = "dvb-nonmodifying-support/cases.rs"]
 mod cases;
 /// The receiver decoder against the recorded output of the reference
 /// decoder: the subtitle clock, rectangle, index plane and palette.
@@ -60,4 +60,4 @@ fn check(index: usize) {
     );
 }
 
-include!("native-nonmodifying-support/names.rs");
+include!("dvb-nonmodifying-support/names.rs");

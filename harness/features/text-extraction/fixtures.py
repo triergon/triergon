@@ -233,7 +233,7 @@ def write_corpora(out):
         add("carriage-trace", "capsule-" + name, wrapped, ["mov", "header"], profile="mov")
 
     # Sessions with no description still exercise the explicit absence case.
-    native = Path("crates/subtitles/tests/native-mov-text-fixtures")
+    native = Path("crates/subtitles/tests/mov-text-fixtures")
     empty = file("tx3g-configuration", "absent.bin", b"")
     for directory in sorted(path for path in native.iterdir() if path.is_dir()):
         name = directory.name

@@ -25,7 +25,7 @@
     {
       "id": "config-invalid-font-size",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-invalid-font-size/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/config-invalid-font-size/extradata.bin",
       "sha256": "493d6e5776933237430e9df08210e8a856c621cc4b5bee8dc2257240612ba37e",
       "rights": "authored-synthetic",
       "arguments": [
@@ -45,7 +45,7 @@
     {
       "id": "config-one-dimension",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-one-dimension/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/config-one-dimension/extradata.bin",
       "sha256": "6990a384abcd8dd6b83bc5773a3b02967db4a3813beac441144f83f6700b3315",
       "rights": "authored-synthetic",
       "arguments": [
@@ -60,7 +60,7 @@
     {
       "id": "config-too-short",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-too-short/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/config-too-short/extradata.bin",
       "sha256": "0679246d6c4216de0daa08e5523fb2674db2b6599c3b72ff946b488a15290b62",
       "rights": "authored-synthetic",
       "arguments": [
@@ -80,7 +80,7 @@
     {
       "id": "config-valid-empty-fonts",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/config-valid-empty-fonts/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/config-valid-empty-fonts/extradata.bin",
       "sha256": "4a912dd5e0c6aa1d83811bb3013a1fdad7debb824ac915bc9b2f85b34634e5e2",
       "rights": "authored-synthetic",
       "arguments": [
@@ -100,7 +100,7 @@
     {
       "id": "configured-defaults",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/configured-defaults/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/configured-defaults/extradata.bin",
       "sha256": "df42a082ebdbc24355774dc80c4a2a0f568c61c1f475714b557446f0f91f4886",
       "rights": "authored-synthetic",
       "arguments": [
@@ -115,7 +115,7 @@
     {
       "id": "configured-style-font",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/configured-style-font/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/configured-style-font/extradata.bin",
       "sha256": "d6b4aab2c5a8f5135c394079d8c3f2d1721039c3e91da6c98b97119df2a485f8",
       "rights": "authored-synthetic",
       "arguments": [
@@ -130,7 +130,7 @@
     {
       "id": "duplicate-fonts",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/duplicate-fonts/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/duplicate-fonts/extradata.bin",
       "sha256": "b0fd5c3c13be89f101484b62c2c333e5451b9211e1aa2ff1e5182982f627697c",
       "rights": "authored-synthetic",
       "arguments": [
@@ -145,7 +145,7 @@
     {
       "id": "font-nul",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/font-nul/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/font-nul/extradata.bin",
       "sha256": "4b3c7fd772767ba5b071bfca50571793b121e055dc931a2516ba768c9616759f",
       "rights": "authored-synthetic",
       "arguments": [
@@ -160,7 +160,7 @@
     {
       "id": "font-utf16",
       "profile": "recorded",
-      "file": "crates/subtitles/tests/native-mov-text-fixtures/font-utf16/extradata.bin",
+      "file": "crates/subtitles/tests/mov-text-fixtures/font-utf16/extradata.bin",
       "sha256": "6f097c1f37a8b0a5058a293169d96c935c06d16eed1c3bfb5fbeb3d7579ee8b8",
       "rights": "authored-synthetic",
       "arguments": [

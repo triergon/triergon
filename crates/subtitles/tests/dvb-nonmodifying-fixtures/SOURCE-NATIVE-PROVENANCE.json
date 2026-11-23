@@ -26,7 +26,7 @@
         "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag0.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-literal-flag0.native-indices",
       "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
     },
     {
@@ -35,7 +35,7 @@
         "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d",
         "bytes": 16
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag0.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-literal-flag0.native-rgba",
       "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d"
     },
     {
@@ -44,7 +44,7 @@
         "sha256": "03e022663f363d55fc28c42f0e47015d11a2c2964794e86423117672a3ededb6",
         "bytes": 103
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag0.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-literal-flag0.source-dvb",
       "sha256": "03e022663f363d55fc28c42f0e47015d11a2c2964794e86423117672a3ededb6"
     },
     {
@@ -53,7 +53,7 @@
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag1.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-literal-flag1.native-indices",
       "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb"
     },
     {
@@ -62,7 +62,7 @@
         "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d",
         "bytes": 16
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag1.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-literal-flag1.native-rgba",
       "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d"
     },
     {
@@ -71,7 +71,7 @@
         "sha256": "e5289acc1800dcf5cc5daa228b0f3a23e001f4d979af769d2dadb5a1f12d970c",
         "bytes": 103
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-literal-flag1.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-literal-flag1.source-dvb",
       "sha256": "e5289acc1800dcf5cc5daa228b0f3a23e001f4d979af769d2dadb5a1f12d970c"
     },
     {
@@ -80,7 +80,7 @@
         "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag0.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-run-flag0.native-indices",
       "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
     },
     {
@@ -89,7 +89,7 @@
         "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d",
         "bytes": 16
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag0.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-run-flag0.native-rgba",
       "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d"
     },
     {
@@ -98,7 +98,7 @@
         "sha256": "271d482d22c445e7b067ec5cc9cee37428f4dbd6be8a5c56754091ba30db55e2",
         "bytes": 103
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag0.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-run-flag0.source-dvb",
       "sha256": "271d482d22c445e7b067ec5cc9cee37428f4dbd6be8a5c56754091ba30db55e2"
     },
     {
@@ -107,7 +107,7 @@
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag1.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-run-flag1.native-indices",
       "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb"
     },
     {
@@ -116,7 +116,7 @@
         "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d",
         "bytes": 16
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag1.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-run-flag1.native-rgba",
       "sha256": "edd445a021b51449012ffc2853acb8e8a9b9a8faaf565409890eec9ed51cb09d"
     },
     {
@@ -125,7 +125,7 @@
         "sha256": "7dda9e1dfaa33113383af2c0b2145ca15573a6f5903e6c5ebfd565d2dea2e7bb",
         "bytes": 103
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb2-run-flag1.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb2-run-flag1.source-dvb",
       "sha256": "7dda9e1dfaa33113383af2c0b2145ca15573a6f5903e6c5ebfd565d2dea2e7bb"
     },
     {
@@ -134,7 +134,7 @@
         "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag0.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-literal-flag0.native-indices",
       "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
     },
     {
@@ -143,7 +143,7 @@
         "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead",
         "bytes": 64
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag0.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-literal-flag0.native-rgba",
       "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead"
     },
     {
@@ -152,7 +152,7 @@
         "sha256": "ce8e5146936cc769bf7689558b7d3255ec5db77d247c24e8dcd6a1f09750ea09",
         "bytes": 177
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag0.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-literal-flag0.source-dvb",
       "sha256": "ce8e5146936cc769bf7689558b7d3255ec5db77d247c24e8dcd6a1f09750ea09"
     },
     {
@@ -161,7 +161,7 @@
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag1.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-literal-flag1.native-indices",
       "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb"
     },
     {
@@ -170,7 +170,7 @@
         "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead",
         "bytes": 64
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag1.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-literal-flag1.native-rgba",
       "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead"
     },
     {
@@ -179,7 +179,7 @@
         "sha256": "fd8be94e05c39faab0aded260b9e2ab787571431baff601afc1b4e08053bd091",
         "bytes": 177
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-literal-flag1.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-literal-flag1.source-dvb",
       "sha256": "fd8be94e05c39faab0aded260b9e2ab787571431baff601afc1b4e08053bd091"
     },
     {
@@ -188,7 +188,7 @@
         "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag0.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-run-flag0.native-indices",
       "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
     },
     {
@@ -197,7 +197,7 @@
         "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead",
         "bytes": 64
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag0.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-run-flag0.native-rgba",
       "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead"
     },
     {
@@ -206,7 +206,7 @@
         "sha256": "2e8815a227d00e1600ce83b4106d37e1276a790d1add97ca147bea251773feb6",
         "bytes": 175
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag0.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-run-flag0.source-dvb",
       "sha256": "2e8815a227d00e1600ce83b4106d37e1276a790d1add97ca147bea251773feb6"
     },
     {
@@ -215,7 +215,7 @@
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag1.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-run-flag1.native-indices",
       "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb"
     },
     {
@@ -224,7 +224,7 @@
         "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead",
         "bytes": 64
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag1.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-run-flag1.native-rgba",
       "sha256": "7f57661c6c5a7128ece8ae43200e1a0c692d46829bedfd822ad61af08e877ead"
     },
     {
@@ -233,7 +233,7 @@
         "sha256": "4e096b134929bee1079de32ab21029716095c7fd1ed8423bf40817b58125e1b7",
         "bytes": 175
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb4-run-flag1.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb4-run-flag1.source-dvb",
       "sha256": "4e096b134929bee1079de32ab21029716095c7fd1ed8423bf40817b58125e1b7"
     },
     {
@@ -242,7 +242,7 @@
         "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag0.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-literal-flag0.native-indices",
       "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
     },
     {
@@ -251,7 +251,7 @@
         "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c",
         "bytes": 1024
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag0.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-literal-flag0.native-rgba",
       "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c"
     },
     {
@@ -260,7 +260,7 @@
         "sha256": "2c4307ca94f8bf6c42689c54c90f546927ac9e1fce4568896fffe989bdf6889c",
         "bytes": 1619
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag0.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-literal-flag0.source-dvb",
       "sha256": "2c4307ca94f8bf6c42689c54c90f546927ac9e1fce4568896fffe989bdf6889c"
     },
     {
@@ -269,7 +269,7 @@
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag1.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-literal-flag1.native-indices",
       "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb"
     },
     {
@@ -278,7 +278,7 @@
         "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c",
         "bytes": 1024
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag1.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-literal-flag1.native-rgba",
       "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c"
     },
     {
@@ -287,7 +287,7 @@
         "sha256": "92210ecca8df6091e6ad7e56c60d1918a3002e136c42cee9f182d911793edb24",
         "bytes": 1619
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-literal-flag1.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-literal-flag1.source-dvb",
       "sha256": "92210ecca8df6091e6ad7e56c60d1918a3002e136c42cee9f182d911793edb24"
     },
     {
@@ -296,7 +296,7 @@
         "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag0.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-run-flag0.native-indices",
       "sha256": "c6d14953d4866489db5bb483aa876bc47ac94931e2eeeeff9304df62c0336687"
     },
     {
@@ -305,7 +305,7 @@
         "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c",
         "bytes": 1024
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag0.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-run-flag0.native-rgba",
       "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c"
     },
     {
@@ -314,7 +314,7 @@
         "sha256": "91fc88910a5811e670a96a30b6c9dc30cbd6326e32f7b5db67cedc1da5c113a0",
         "bytes": 1619
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag0.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-run-flag0.source-dvb",
       "sha256": "91fc88910a5811e670a96a30b6c9dc30cbd6326e32f7b5db67cedc1da5c113a0"
     },
     {
@@ -323,7 +323,7 @@
         "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb",
         "bytes": 10
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag1.native-indices",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-run-flag1.native-indices",
       "sha256": "e822eb7c1746656e20ec22c7be1db88c4bc763006e5c75a8ece6732a564a9fcb"
     },
     {
@@ -332,7 +332,7 @@
         "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c",
         "bytes": 1024
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag1.native-rgba",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-run-flag1.native-rgba",
       "sha256": "d5c885574ceae1b684873d32b0c9ae311d2ca6b2d937bfe605cb6d1e2c82b70c"
     },
     {
@@ -341,7 +341,7 @@
         "sha256": "eb87c388ffdc2e078b2aa7fc8eaad5a1992078da7b181f7bb5631654c3c472a7",
         "bytes": 1619
       },
-      "target": "crates/subtitles/tests/native-nonmodifying-fixtures/dvb8-run-flag1.source-dvb",
+      "target": "crates/subtitles/tests/dvb-nonmodifying-fixtures/dvb8-run-flag1.source-dvb",
       "sha256": "eb87c388ffdc2e078b2aa7fc8eaad5a1992078da7b181f7bb5631654c3c472a7"
     }
   ],

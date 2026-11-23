@@ -32,10 +32,10 @@ from pathlib import Path
 
 ROOT = Path.cwd()
 OUT = ROOT / "harness/fixtures/subtitle-text"
-MOV_TEXT = ROOT / "crates/subtitles/tests/native-mov-text-fixtures"
+MOV_TEXT = ROOT / "crates/subtitles/tests/mov-text-fixtures"
 TEXT = ROOT / "crates/subtitles/tests/text-fixtures/fixtures"
 CHARSET = ROOT / "crates/subtitles/tests/receiver-mapping-data/cases74.rs"
-PGS = ROOT / "crates/subtitles/tests/native-compatibility-gold"
+PGS = ROOT / "crates/subtitles/tests/pgs-receiver-recorded"
 # The packet clock of every authored ASS packet: 1/1000, PTS 1 s, duration 2 s.
 ASS_CLOCK = (1, 1000, 1000, 2000)
 # The clock the tx3g semantic tests give every sample: 1/90000, PTS 0, 1.5 s.
