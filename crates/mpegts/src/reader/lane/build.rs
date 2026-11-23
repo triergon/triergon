@@ -15,6 +15,9 @@ impl BuildUnit {
     }
 }
 
+/// A build published before the table of its PES sources was reserved.
+const UNPREPARED_SOURCES: &str = "MPEG-TS access unit sources not reserved";
+
 pub(super) enum BuildOrigins {
     ReserveTable(usize),
     Ready(PayloadSources),
@@ -312,7 +315,7 @@ impl Lane {
             return Ok(LaneStep::Yield);
         }
         let BuildOrigins::Ready(origins) = &mut build.origins else {
-            unreachable!("prepared PES sources");
+            return crate::refuse(Error::Invalid(UNPREPARED_SOURCES));
         };
         let consumed_end = match &build.unit {
             BuildUnit::Packet(AccessUnit::DvbSubtitle(unit)) => unit.pes_end,
@@ -436,7 +439,7 @@ impl Lane {
             });
         let track = self.track.clone();
         let BuildOrigins::Ready(origins) = build.origins else {
-            unreachable!("prepared PES sources");
+            return crate::refuse(Error::Invalid(UNPREPARED_SOURCES));
         };
         match build.unit {
             BuildUnit::Packet(unit) => Ok(LaneStep::Packet(Packet(Shared::new(
