@@ -44,8 +44,8 @@ impl Vector {
 /// The closed rectangle `x_min ≤ x ≤ x_max`, `y_min ≤ y ≤ y_max`. It bounds
 /// points (an outline's control box in 26.6, both corners included) or whole
 /// pixels (an area in frame pixels: columns `x_min..x_max` and rows
-/// `y_min..y_max`, whose squares it covers). [`Rect::EMPTY`] is the identity
-/// of [`Rect::include`] and reports [`Rect::is_empty`].
+/// `y_min..y_max`, whose squares it covers). Start with [`Rect::EMPTY`]
+/// to bound successive points with [`Rect::include_point`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Rect {
     /// The left edge.
