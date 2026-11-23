@@ -98,16 +98,21 @@ struct Redundancy {
     start: usize,
 }
 
+/// The previous frame's mode or a redundant CELT frame that starts the next signal.
+#[derive(Clone, Copy, Debug)]
+enum Previous {
+    None,
+    Frame(Mode),
+    BeginsCelt,
+}
+
 /// Decoder state of one elementary Opus stream of one or two channels.
 #[derive(Debug)]
 pub(crate) struct StreamDecoder {
     channels: usize,
     silk: SilkDecoder,
     celt: CeltDecoder,
-    /// Mode of the last decoded frame.
-    previous: Option<Mode>,
-    /// The last frame ended in a redundant CELT frame that the next CELT frame continues.
-    continues_redundancy: bool,
+    previous: Previous,
     final_range: u32,
     /// Internal rate of the last SILK frame, while SILK runs.
     silk_rate: Option<u32>,
@@ -133,8 +138,7 @@ impl StreamDecoder {
             channels,
             silk: SilkDecoder::new(),
             celt: CeltDecoder::new(channels),
-            previous: None,
-            continues_redundancy: false,
+            previous: Previous::None,
             final_range: 0,
             silk_rate: None,
             held: 0,
@@ -151,8 +155,7 @@ impl StreamDecoder {
     pub(crate) fn reset(&mut self) {
         self.silk.reset();
         self.celt.reset();
-        self.previous = None;
-        self.continues_redundancy = false;
+        self.previous = Previous::None;
         self.final_range = 0;
         self.silk_rate = None;
         self.held = 0;
@@ -340,8 +343,11 @@ impl StreamDecoder {
         } else {
             rc.range() ^ redundant_range
         };
-        self.previous = Some(mode);
-        self.continues_redundancy = redundancy.is_some_and(|r| !r.celt_to_silk);
+        self.previous = if redundancy.is_some_and(|r| !r.celt_to_silk) {
+            Previous::BeginsCelt
+        } else {
+            Previous::Frame(mode)
+        };
         at + len - start
     }
 
@@ -355,7 +361,7 @@ impl StreamDecoder {
         pulses: &[i32],
         work: &mut Workspace,
     ) -> usize {
-        if self.previous == Some(Mode::Celt) {
+        if matches!(self.previous, Previous::Frame(Mode::Celt)) {
             self.silk.reset();
         }
         let n = silk.duration_48k();
@@ -390,7 +396,7 @@ impl StreamDecoder {
             return;
         };
         // A new mode starts the CELT layer afresh unless a redundant frame led into it.
-        if self.previous.is_some_and(|previous| previous != mode) && !self.continues_redundancy {
+        if matches!(self.previous, Previous::Frame(previous) if previous != mode) {
             self.celt.reset();
         }
         let layout = FrameLayout {
