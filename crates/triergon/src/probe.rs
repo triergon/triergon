@@ -34,8 +34,8 @@ pub enum SourceFormat {
 pub enum Probed {
     /// The source starts this format.
     Format(SourceFormat),
-    /// Undecided: a prefix of this many bytes decides. A source that ends first is decided
-    /// by [`probe_whole`].
+    /// Undecided until at least this many prefix bytes are available. For elementary
+    /// streams this can be the 64 KiB probe limit. Call [`probe_whole`] at EOF.
     Need(usize),
     /// No format the facade opens starts with these bytes, whatever follows them.
     Unrecognised,

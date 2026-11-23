@@ -23,8 +23,10 @@ use triergon_core::{
 const WINDOW: usize = 64 * 1024;
 
 /// Every reader the facade can open, one variant per enabled format.
-// Stored inline: a box would add an allocation outside the caller's budget.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "Boxing would allocate outside the caller's budget"
+)]
 #[derive(Debug)]
 pub enum AnyReader {
     /// Matroska or WebM with track configuration and block side data.
@@ -54,8 +56,10 @@ pub enum AnyReader {
 }
 
 /// The packet of whichever reader produced it.
-// Stored inline: a box would allocate per packet, outside the caller's budget.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "Boxing would allocate per packet outside the caller's budget"
+)]
 #[derive(Clone, Debug)]
 pub enum AnyPacket {
     /// One Matroska block frame with its track configuration and side data.
@@ -76,8 +80,10 @@ pub enum AnyPacket {
 }
 
 /// Format-specific payloads of [`Event::Other`].
-// Stored inline for the same reason as `AnyPacket`.
-#[allow(clippy::large_enum_variant)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "Boxing would allocate per event outside the caller's budget"
+)]
 #[derive(Clone, Debug)]
 pub enum AnyOther {
     /// Matroska structure, track configuration or a validated document.
@@ -153,16 +159,14 @@ macro_rules! neutral_step {
 }
 
 impl AnyReader {
-    /// Open the reader of the format `prefix` starts, with the format's default limits;
-    /// feed it the source from its start. A prefix of the length `capabilities` give is
-    /// the whole source ([`probe_whole`]); any other is the start of a longer one
-    /// ([`probe`]).
+    /// Probe `prefix` and open its reader as with [`Self::of`]. Feed the reader from
+    /// the start of the source. A prefix that matches the known source length is
+    /// classified with [`probe_whole`]; otherwise it is classified with [`probe`].
     ///
     /// Fails with [`Error::Unsupported`] when the prefix selects no format, including one
     /// [`probe`] needs more bytes of, or a format whose reader feature is not enabled; and
     /// with the reader's error when the budget cannot hold its state.
-    // Out of line: inlined, the probe's code cost a caller's packet loop around it up to
-    // 0.065% of its instructions (subtitle worker, Matroska inputs).
+    // Inlining this probe increased Matroska subtitle packet-loop instructions by up to 0.065%.
     #[inline(never)]
     pub fn open(
         prefix: &[u8],
@@ -177,11 +181,24 @@ impl AnyReader {
         } else {
             None
         };
-        Self::of(format, pool, source, capabilities)
+        Self::of_probed(format, pool, source, capabilities)
+    }
+
+    /// Open a reader for a known `format` without probing, with default reader limits
+    /// and a maximum input window of 64 KiB. A disabled format returns
+    /// [`Error::Unsupported`]. Reader construction can also fail if the pool cannot
+    /// hold its state or the source capabilities are unsupported.
+    pub fn of(
+        format: SourceFormat,
+        pool: &Budget,
+        source: SourceId,
+        capabilities: SourceCapabilities,
+    ) -> Result<Self> {
+        Self::of_probed(Some(format), pool, source, capabilities)
     }
 
     /// The reader of `format`, or the refusal of a source no format the facade opens starts.
-    pub(crate) fn of(
+    fn of_probed(
         format: Option<SourceFormat>,
         pool: &Budget,
         source: SourceId,

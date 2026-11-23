@@ -18,7 +18,7 @@ pub fn open_blocking<S: Read + Seek>(
     let capabilities = triergon_core::blocking::seekable_capabilities(&mut source)?;
     let format = ProbeBuffer::new(pool).identify(&mut source, capabilities.length);
     source.rewind()?;
-    let reader = AnyReader::of(format?, pool, SourceId(1), capabilities)?;
+    let reader = AnyReader::of_probed(format?, pool, SourceId(1), capabilities)?;
     Ok(Blocking::seekable(reader, source, pool))
 }
 
@@ -39,7 +39,7 @@ pub fn open_sequential<S: Read>(
         length: None,
         random_access: false,
     };
-    let reader = AnyReader::of(format, pool, SourceId(1), capabilities)?;
+    let reader = AnyReader::of_probed(format, pool, SourceId(1), capabilities)?;
     let source = Replayed {
         prefix: Some(prefix.into_replay()?),
         at: 0,
@@ -55,6 +55,14 @@ pub struct Replayed<S> {
     prefix: Option<Prefix>,
     at: usize,
     rest: S,
+}
+
+impl<S> Replayed<S> {
+    /// Return the underlying source at its current position, discarding any unread
+    /// part of the replay prefix.
+    pub fn into_inner(self) -> S {
+        self.rest
+    }
 }
 
 impl<S: Read> Read for Replayed<S> {
