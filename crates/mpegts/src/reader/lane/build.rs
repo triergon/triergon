@@ -456,11 +456,8 @@ impl Lane {
                 charge,
             )))),
             BuildUnit::Unframed(kind, range) => {
-                let PayloadSources::Table(sources) = origins else {
-                    unreachable!("unframed PES sources use a table");
-                };
-                let Some(bytes) = build.bytes else {
-                    return Err(Error::Invalid("MPEG-TS unframed access unit without bytes"));
+                let (PayloadSources::Table(sources), Some(bytes)) = (origins, build.bytes) else {
+                    return Err(Error::Invalid("MPEG-TS unframed unit without bytes or sources"));
                 };
                 let data = Shared::new(
                     UnframedData {
