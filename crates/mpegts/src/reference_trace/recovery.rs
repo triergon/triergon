@@ -1,13 +1,9 @@
 //! The demuxer's packets from rejected carriers.
 //!
-//! [`RecoveryObserver`] wraps a
-//! [`DemuxObserver`] and also assembles the
-//! packets FFmpeg emits for carriers the source view rejects
-//! ([`RecoveredPacket`]) or diagnoses ([`PesFaultPacket`]). It follows one selected program
-//! through PAT and PMT changes ([`PatSelection`], [`PmtBindingJob`]).
-//!
-//! Opt-in real rejected-carrier observation. No validated source packet/header
-//! is forged. OPCR and explicit selected-AVC diagnostic policies are separate.
+//! [`RecoveryObserver`] extends [`DemuxObserver`] with packets from rejected OPCR
+//! carriers ([`RecoveredPacket`]) or selected AVC diagnostics ([`PesFaultPacket`]).
+//! It keeps the original carrier and follows one program through PAT and PMT
+//! changes ([`PatSelection`], [`PmtBindingJob`]).
 use crate::compat::pes::fault::{PesFaultPacket, TransportFaultJob};
 use crate::compat::pes::observer::{
     DemuxObserver, DemuxPacket, DemuxScope, DemuxSpan, PrivateAudioCarriage,
@@ -172,21 +168,12 @@ impl RecoveryObserver {
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
-        Ok(Self {
-            inner: DemuxObserver::new_registered(scope, carriage, budget.clone(), limits)?,
-            budget,
-            policy,
-            pmt_binding: None,
-            pending: None,
-            selected_faults: false,
-            pending_timeline: None,
-            last: None,
-            entity_first: false,
-            fault: None,
-        })
+        let inner = DemuxObserver::new_registered(scope, carriage, budget.clone(), limits)?;
+        Ok(Self::with_observer(inner, budget, policy))
     }
-    /// Explicit finite private-audio operation; rejected source carriers stay
-    /// outside this profile. Accepted carriers use the same charged assembly.
+    /// Observe finite private-audio PES from accepted carriers.
+    ///
+    /// Fails as [`DemuxObserver::new_private_audio`] does.
     pub fn new_private_audio(
         scope: DemuxScope,
         carriage: PrivateAudioCarriage,
@@ -194,24 +181,13 @@ impl RecoveryObserver {
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
-        Ok(Self {
-            inner: DemuxObserver::new_private_audio(
-                scope,
-                carriage,
-                descriptors,
-                budget.clone(),
-                limits,
-            )?,
+        let inner =
+            DemuxObserver::new_private_audio(scope, carriage, descriptors, budget.clone(), limits)?;
+        Ok(Self::with_observer(
+            inner,
             budget,
-            policy: RejectedPolicy::NoRejectedCarrier,
-            pmt_binding: None,
-            pending: None,
-            selected_faults: false,
-            pending_timeline: None,
-            last: None,
-            entity_first: false,
-            fault: None,
-        })
+            RejectedPolicy::NoRejectedCarrier,
+        ))
     }
     /// Observe finite DVB subtitle PES in the selected program. The namespace,
     /// descriptors and stream identifiers must satisfy [`DemuxObserver::new_dvb_subtitles`].
@@ -222,16 +198,25 @@ impl RecoveryObserver {
         budget: Budget,
         limits: ParseLimits,
     ) -> Result<Self> {
-        Ok(Self {
-            inner: DemuxObserver::new_dvb_subtitles(
-                scope,
-                namespace,
-                descriptors,
-                budget.clone(),
-                limits,
-            )?,
+        let inner = DemuxObserver::new_dvb_subtitles(
+            scope,
+            namespace,
+            descriptors,
+            budget.clone(),
+            limits,
+        )?;
+        Ok(Self::with_observer(
+            inner,
             budget,
-            policy: RejectedPolicy::NoRejectedCarrier,
+            RejectedPolicy::NoRejectedCarrier,
+        ))
+    }
+
+    fn with_observer(inner: DemuxObserver, budget: Budget, policy: RejectedPolicy) -> Self {
+        Self {
+            inner,
+            budget,
+            policy,
             pmt_binding: None,
             pending: None,
             selected_faults: false,
@@ -239,7 +224,7 @@ impl RecoveryObserver {
             last: None,
             entity_first: false,
             fault: None,
-        })
+        }
     }
 
     /// Binds the observer to the input positions `context` found; see
