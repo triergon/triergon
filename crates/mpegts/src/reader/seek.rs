@@ -236,6 +236,9 @@ pub(super) struct SeekProbe {
     pub has_vcl: bool,
 }
 
+/// A picture or access unit observed for the landing after the seek has landed.
+const PROBE_AFTER_LANDING: &str = "MPEG-TS seek probe after landing";
+
 fn seekable_audio(codec: CodecId) -> bool {
     matches!(
         codec,
@@ -521,7 +524,7 @@ impl Reader {
                 Ok(())
             }
             Phase::Deliver(_) | Phase::Retained { .. } => {
-                unreachable!("a seek probe precedes landing")
+                crate::refuse(Error::Invalid(PROBE_AFTER_LANDING))
             }
         }
     }
@@ -923,7 +926,9 @@ impl Reader {
                         seek.direct = None;
                         return Ok(Step::Ready(Event::Seek(result)));
                     }
-                    _ => unreachable!("seek probe precedes delivery"),
+                    Phase::Deliver(_) | Phase::Retained { .. } => {
+                        return crate::refuse(Error::Invalid(PROBE_AFTER_LANDING));
+                    }
                 }
                 continue;
             }
@@ -1127,7 +1132,9 @@ impl Reader {
                 (_, progress @ (Step::NeedInput(_) | Step::Yield | Step::Backpressure(_))) => {
                     return Ok(progress);
                 }
-                _ => unreachable!("reader step during seek"),
+                // Delivery and retained output return before the reader steps, and the
+                // reader's own steps carry no seek receipt.
+                _ => return crate::refuse(Error::Invalid("MPEG-TS reader step during seek")),
             }
         }
     }

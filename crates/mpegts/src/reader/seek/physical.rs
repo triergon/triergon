@@ -483,7 +483,7 @@ impl Direct {
             ReaderEvent::Source(source) => match source.event() {
                 TraceEvent::Pat(table) => {
                     let TraceEvent::Pat(original) = self.index.pat.event() else {
-                        unreachable!("captured PAT")
+                        return crate::refuse(Error::SourceMismatch);
                     };
                     if self.carriers != 1
                         || table.header != original.header
