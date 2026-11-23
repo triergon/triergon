@@ -107,9 +107,6 @@ packet: `Packet::demux_times`, `Event::demux_pts`. `Player::set_clock_view` choo
 which of the two times delivery and seeking (`ClockChoice::Source`, the default,
 or `ClockChoice::Demux`). MP4 packets carry demux times only on a plan indexed by
 `compat::mov`; TS tracks only when selected through `compat::pes`.
-A forward MP4 fragment without `tfdt` starts where its track's indexed samples end,
-so source timestamps continue across fragments. A truncated fragment sample ends source delivery with a data refusal after
-the complete samples.
 
 **Seeking.** `Player::seek_and_select` seeks to a time on a video track: Matroska
 through its Cues, MP4 and TS by replaying from the start. MP4 plans a seek from
@@ -124,42 +121,13 @@ packet view FFmpeg's demuxer gives of the same bytes, reproduced by the
 `compat` modules: `compat::mov` (MP4 packet order and edit clocks) and
 `compat::pes` (PES of selected PIDs, with demux boundaries and clocks).
 
-`probe::Probe` accepts MP4 opening boxes `ftyp`, `styp`, `moov`, `free`, `wide`
+**Probing.** `probe::Probe` accepts MP4 opening boxes `ftyp`, `styp`, `moov`, `free`, `wide`
 and `mdat`. For TS, exactly one three-sync pattern must match in the
 389-byte prefix; a source that ends first is TS188 or M2TS192 when exactly one
 spacing has a sync byte at each of its offsets the source reaches, two at least
 (one packet and all or part of a second). `SelectedInput` replays the prefix
 before reading more.
 `triergon_raw_video::PlaybackProbe` also detects AVC and HEVC Annex B.
-
-The [probe comparison](../../harness/features/playback-probe/contract.json)
-checks that the selected format agrees with the handoff over fixed prefixes
-and checks the bytes delivered after selection. It also checks carrier-width
-evidence when a prefix supplies the three TS188 sync positions before the playback
-probe has enough bytes to select.
-The [probe lifecycle comparison](../../harness/features/playback-probe-lifecycle/contract.json)
-checks that a sequential source is never rewound and that handoff, failure
-and cancellation invalidate or close its source owner as specified.
-The [source-view comparison](../../harness/features/playback-source-view/contract.json)
-checks direct-player track metadata and complete forward packet streams. For
-Matroska it reads CodecID and effective language independently from TrackEntry
-and compares the native codec identity and configuration alongside them. The
-MP4 comparison pairs demux packets with exact sample-table or fragment byte
-ranges and reads source timing and sync flags from the tables. The MPEG-TS
-comparison checks the stream type from the selected PMT and the clocks from
-each complete PES header against the delivered bytes. MP4 source packets keep
-each track's decode order and merge the tracks by the byte position of their next
-packet. The opening MPEG-TS catalogue uses the
-first current PMT and keeps private descriptors opaque when the caller leaves
-the namespace unspecified. The comparison checks each ISO 639 descriptor tuple
-and the first language reported on the neutral track. The bounded timing-prefix
-controls use `TimingRunPolicy::BoundedPrefix`. The comparison checks each
-neutral track key against its source track and each neutral demux clock and
-trim against the underlying packet or MP4 occurrence.
-The [MP4 clock oracle](../../harness/features/mp4-source-clock/contract.json)
-checks sample decode and composition times before the movie's edit list. For
-surplus timing runs, it checks the default opener and the explicit bounded
-opener as separate operations.
 
 ## Supported
 
@@ -172,8 +140,8 @@ opener as separate operations.
 | MP4 / MOV | `mp4::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `mp4::Mp4IndexJob`, `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `mp4::Mp4RangeOpen` / `Mp4RangePlayer` |
 | MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` with `MovieSeekCommand::{demux_seek, sync_seek}` |
 | MP4 catalogue replacement | `mp4::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
-| TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs (1 to 0x1ffe, at most 64) or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup and program playback |
-| PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
+| TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs (1 to 0x1ffe, at most `compat::pes::MAXIMUM_SELECTIONS`) or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup and program playback |
+| PES feed | `pes_feed`: the feeds [`triergon-hls`](../hls/README.md) reads HLS segments (`open_segment_feed`) and progressive TS188 input (`ProgressiveFeed`) from |
 | Sink handoff | `pump::{Pump, Sink, CatalogueSink, Feed}` |
 
 Matroska feeds, packet bridges and subtitle receivers over these outputs are in
@@ -190,7 +158,7 @@ bytes. `triergon_core::blocking::{Blocking, Feed}` drive a `ContainerReader` or
 **Bounded work.** Every call takes a `WorkBudget` and a cancel flag, and all
 retained memory is charged to a `triergon_core::Budget`. `Backpressure` is
 retryable and keeps the pending request, packet and buffers. `PlayerPolicy`
-defaults to 16 FIFO slots (at most 64), 32 MiB queued payload, 128 MiB seek
+defaults to 16 FIFO slots (at most `PlayerPolicy::MAXIMUM_SLOTS`), 32 MiB queued payload, 128 MiB seek
 input and 10,000,000 events. `Player::new_direct` skips the FIFO for callers
 that use `Player::read_output` with one caller-owned slot. Transport carrier,
 section and PES outputs get their pool identity from their retained storage.
@@ -229,6 +197,9 @@ Data tracks such as RTP hints and timecode still have their sample extents check
 An all-track demux seek retains RTP hint samples, including a final sample with
 a zero decode delta when it belongs to the replay.
 Supply any edit plans in source track order, with `None` for each data track.
+A forward MP4 fragment without `tfdt` starts where its track's indexed samples end,
+so source timestamps continue across fragments; a truncated fragment sample ends
+source delivery with a data refusal after the complete samples.
 Progressive playback of a front-`moov` file continues through later
 `moof`/`mdat` pairs with at most 64 pending fragment slots. A size-zero
 terminal `mdat` ends only on a matching `SourceReply::End`. A track whose
@@ -296,7 +267,7 @@ source of unknown length may still hold that chunk in a later `mdat`: the
 view reads on and refuses it as outside the media extent (`Invalid`) at the
 physical end, or as an unsupported layout once the source passes its start.
 
-**MPEG-TS.** `compat::pes::open` selects up to 64 PIDs of one TS188 program.
+**MPEG-TS.** `compat::pes::open` selects PIDs of one TS188 program.
 Private stream type `0x06` is audio only after explicit AC-3/E-AC-3 or DVB
 admission, and a subtitle track when a DVB namespace names DVB subtitling or
 teletext; stream type `0x90` (PGS) is a subtitle track. M2TS prefix startup (`compat::pes::startup::Startup::new_m2ts_prefix`) needs an
@@ -310,47 +281,22 @@ remains valid while a caller retains an output after closing the player.
 Delivery without a seek uses the presence of the projected presentation
 timestamp directly.
 
-**Sinks.** `pump::Sink` owns accepted `Feed` envelopes until their callbacks
-retire; `Submission::Blocked` returns the same envelope. Threading and
-platform decoder configuration are the sink's responsibility; no `Send` bound
-is imposed.
+**Sinks.** `pump::Sink` owns an accepted `Feed` until it reports the feed's token
+complete; a full or failed sink hands the same feed back. Threading and the
+consumer's own configuration are the sink's; no `Send` bound is imposed.
 
 ## Conformance
 
 - MP4: ISO/IEC 14496-12 and the [QuickTime seek tables](https://developer.apple.com/documentation/quicktime-file-format/seeking_with_a_quicktime_file).
 - MPEG-TS: ITU-T H.222.0.
-- AVC/HEVC parameter sets: ITU-T H.264 §7.3 and Annex B, ITU-T H.265.
 
-Integration tests in `tests/it/` compare packet order, bytes, flags, PTS, DTS and
-duration with pinned FFprobe records. The terminal-media matrix covers 39
-inputs at up to 13 combinations of seekability, length, read size and work
-budget. `Mp4Open::new_recovery` matches all 499 rows (497 packet lists and two
-header refusals). `Mp4Open::new` matches 446 rows, with the 53 strict outcomes
-pinned separately.
-
-The MP4 range comparison includes two upstream samples, one with an initial
-non-sync AVC prefix and one with tracks shorter than the declared movie.
-It checks startup and backward seek through EOF for both.
-
-The [player seek comparison](../../harness/features/playback-mp4-seek/contract.json)
-checks video landing positions and packet suffixes for source-clock, demux-clock,
-movie-time and progressive seeks. It includes the full range playback corpus and
-a seek after releasing checkpoints. The
-[catalogue comparison](../../harness/features/playback-catalogue-replacement/contract.json)
-checks the packet prefix and suffix around an explicit source replacement.
-The [delivery comparison](../../harness/features/playback-delivery/contract.json)
-checks the packets returned by the FIFO and sink paths. Its Matroska seek
-operation includes the landing Cluster's packet prefix and retains the
-native timestamp and duration precision. The
-[track selection comparison](../../harness/features/playback-track-selection/contract.json)
-covers MP4, Matroska and MPEG-TS and includes an audio switch during a seek.
-The [MOV index comparison](../../harness/features/playback-mov-index/contract.json)
-includes every geometry from the terminal-media matrix, including recovery
-of a short final packet and confirmed EOF in a size-zero media box. The
-[TS opener comparison](../../harness/features/playback-ts-open/contract.json)
-checks demux PES from independent segments, explicit private audio and finite
-startup. Independent segment delivery compares supported video and audio PES.
-Other tracks remain visible as transport source events.
+Each behaviour above is compared with FFmpeg by a contract under
+[`harness/features`](../../harness/features) (`playback-probe`, `playback-probe-lifecycle`,
+`playback-source-view`, `mp4-source-clock`, `playback-mov-index`, `playback-mp4-seek`,
+`playback-catalogue-replacement`, `playback-delivery`, `playback-track-selection`,
+`playback-ts-open`); [docs/status.md](../../docs/status.md) has the results. The
+integration tests in `tests/it/` compare packet order, bytes, flags and clocks with
+pinned FFprobe records.
 
 Fixture provenance: [MP4](tests/fixtures/mp4/README.md),
 [AV1](tests/fixtures/av1/README.md),
