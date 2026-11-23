@@ -14,6 +14,7 @@ pub(crate) use exponents::ExpStrategy;
 
 use crate::bitalloc::{BaCache, BaParams, BaRerun, Dba};
 use crate::error::DecodeError;
+use crate::header::StreamType;
 use crate::imdct::Imdct;
 use crate::noise::Rng;
 use crate::quant::GroupTables;
@@ -106,7 +107,7 @@ pub struct FrameFeatures {
 pub(crate) struct Substream {
     // ---- frame configuration ----
     pub eac3: bool,
-    pub strmtyp: u8,
+    pub stream_type: StreamType,
     pub acmod: u8,
     pub lfeon: bool,
     pub nfchans: usize,
@@ -249,7 +250,7 @@ impl Substream {
     pub(crate) fn new() -> Self {
         Substream {
             eac3: false,
-            strmtyp: 0,
+            stream_type: StreamType::Independent,
             acmod: 0,
             lfeon: false,
             nfchans: 0,

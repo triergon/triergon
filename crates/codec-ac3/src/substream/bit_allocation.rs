@@ -2,6 +2,7 @@
 
 use super::{CPL, E, LFE, NCH, Substream, bad};
 use crate::bitalloc::{self, BaParams, BaRerun, MaskParams};
+use crate::header::StreamType;
 use crate::tables::FASTGAIN;
 use crate::trace::{BlockTrace, Trace};
 use triergon_bitstream::BitReader;
@@ -147,7 +148,7 @@ impl Substream {
                     self.ba_rerun[ch] = self.ba_rerun[ch].max(BaRerun::Mask);
                 }
             }
-            if self.strmtyp == 0 && br.bit() {
+            if self.stream_type == StreamType::Independent && br.bit() {
                 br.skip(10); // convsnroffst
             }
         }

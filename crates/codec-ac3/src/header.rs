@@ -74,6 +74,7 @@ pub enum Syntax {
 
 /// E-AC-3 stream type (Annex E Table E2.1); AC-3 frames report `Independent`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum StreamType {
     /// Independent substream (strmtyp 0), or an AC-3 syncframe.
     Independent,
@@ -81,6 +82,17 @@ pub enum StreamType {
     Dependent,
     /// Independent substream converted from AC-3 (strmtyp 2).
     Converted,
+}
+
+impl StreamType {
+    pub(crate) fn from_bits(bits: u8) -> Result<Self, DecodeError> {
+        match bits {
+            0 => Ok(Self::Independent),
+            1 => Ok(Self::Dependent),
+            2 => Ok(Self::Converted),
+            _ => Err(DecodeError::Unsupported(Feature::ReservedStreamType)),
+        }
+    }
 }
 
 /// Leading header fields of one syncframe.
@@ -172,12 +184,7 @@ pub fn parse_header(data: &[u8]) -> Result<FrameHeader, DecodeError> {
     } else {
         (SAMPLE_RATES[fscod as usize], [1, 2, 3, 6][code2 as usize])
     };
-    let stream_type = match strmtyp {
-        0 => StreamType::Independent,
-        1 => StreamType::Dependent,
-        2 => StreamType::Converted,
-        _ => return Err(DecodeError::Unsupported(Feature::ReservedStreamType)),
-    };
+    let stream_type = StreamType::from_bits(strmtyp)?;
     let acmod = (data[4] >> 1) & 7;
     let lfeon = data[4] & 1 != 0;
     let frame_bytes = (frmsiz + 1) * 2;

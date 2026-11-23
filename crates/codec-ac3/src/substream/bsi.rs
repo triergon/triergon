@@ -3,6 +3,7 @@
 
 use super::{CPL, DownmixCodes, E, ExpStrategy, LFE, NCH, NFCHANS, Substream, bad};
 use crate::error::{DecodeError, Feature};
+use crate::header::StreamType;
 use crate::tables::{DEF_SPX_BNDSTRC, FRM_EXPSTR};
 use crate::trace::Trace;
 use core::num::NonZeroU32;
@@ -70,7 +71,7 @@ impl Substream {
             br.skip((addbsil + 1) * 8);
         }
         self.eac3 = false;
-        self.strmtyp = 0;
+        self.stream_type = StreamType::Independent;
         let shift = crate::header::ac3_rate_shift(bsid);
         self.set_config(acmod, lfeon, fscod, (fscod as usize, shift), 6, bsid);
         self.dialnorm = dialnorm;
@@ -80,7 +81,7 @@ impl Substream {
     }
 
     pub(super) fn parse_bsi_eac3(&mut self, br: &mut BitReader<'_>) -> Result<(), E> {
-        let strmtyp = br.read(2) as u8;
+        let stream_type = StreamType::from_bits(br.read(2) as u8)?;
         let _substreamid = br.read(3);
         let _frmsiz = br.read(11);
         let fscod = br.read(2) as u8;
@@ -108,15 +109,15 @@ impl Substream {
             }
         }
         let mut chanmap = None;
-        if strmtyp == 1 && br.bit() {
+        if stream_type == StreamType::Dependent && br.bit() {
             chanmap = Some(br.read(16) as u16);
         }
-        let dm = Self::parse_mixing_metadata(br, acmod, lfeon, strmtyp, num_blocks);
+        let dm = Self::parse_mixing_metadata(br, acmod, lfeon, stream_type, num_blocks);
         Self::skip_information_metadata(br, acmod, fscod);
-        if strmtyp == 0 && numblkscod != 3 {
+        if stream_type == StreamType::Independent && numblkscod != 3 {
             br.skip(1); // convsync
         }
-        if strmtyp == 2 {
+        if stream_type == StreamType::Converted {
             let blkid = if numblkscod == 3 { true } else { br.bit() };
             if blkid {
                 br.skip(6); // frmsizecod
@@ -127,7 +128,7 @@ impl Substream {
             br.skip((addbsil + 1) * 8);
         }
         self.eac3 = true;
-        self.strmtyp = strmtyp;
+        self.stream_type = stream_type;
         self.set_config(acmod, lfeon, fscod, (hth_idx, 0), num_blocks, bsid);
         self.dialnorm = dialnorm;
         self.chanmap = chanmap;
@@ -141,7 +142,7 @@ impl Substream {
         br: &mut BitReader<'_>,
         acmod: u8,
         lfeon: bool,
-        strmtyp: u8,
+        stream_type: StreamType,
         num_blocks: usize,
     ) -> DownmixCodes {
         let mut dm = DownmixCodes::default();
@@ -160,7 +161,7 @@ impl Substream {
             if lfeon && br.bit() {
                 dm.lfemixlevcod = Some(br.read(5) as u8);
             }
-            if strmtyp == 0 {
+            if stream_type == StreamType::Independent {
                 if br.bit() {
                     br.skip(6); // pgmscl
                 }
@@ -297,7 +298,7 @@ impl Substream {
         let ncplblks = self.read_coupling_strategy(br, nblk);
         self.read_frame_exponents(br, expstre, nblk, nfch, ncplblks);
         // Converter exponent strategy.
-        if self.strmtyp == 0 {
+        if self.stream_type == StreamType::Independent {
             let convexpstre = if nblk != 6 { br.bit() } else { true };
             if convexpstre {
                 br.skip(5 * nfch);
