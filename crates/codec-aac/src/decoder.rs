@@ -5,7 +5,10 @@ use crate::cce::CouplingPoint;
 use crate::compat::ffmpeg::{extensions::Policy as ExtensionPolicy, layout::Policy};
 use crate::error::{DecodeError, Feature, Result};
 use crate::filterbank::Filterbank;
-use crate::ics::*;
+use crate::ics::{
+    ChannelData, CoreCfg, IcsInfo, MAX_SFB, ObjectType, WindowShape, apply_intensity, apply_ms,
+    apply_tns, parse_ics, parse_ics_info,
+};
 use crate::pce::{Pce, parse_pce};
 use crate::tables::SAMPLE_RATES;
 use crate::{ltp, pred, sbr};
