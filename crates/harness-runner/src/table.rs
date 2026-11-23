@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, Read, Write};
 use std::process::ExitCode;
 
-use crate::{ITERATIONS, Mode, Result, Totals, failed, measure_dyn};
+use crate::{ITERATIONS, Mode, Refusals, Result, Totals, failed, measure_dyn};
 
 /// The largest input file a table worker reads.
 const MAX_INPUT: u64 = 256 * 1024 * 1024;
@@ -86,15 +86,23 @@ pub fn dispatch(args: &[OsString], operations: &[(&str, Prepare)]) -> Result<()>
     let input = input(file)?;
     let mut operation = prepare(prefix, &input, arguments)?;
     let trace = mode == Mode::Trace;
-    measure_dyn(mode, iterations, operation.name, None, &[], &mut || {
-        let mut totals = Totals::default();
-        if trace {
-            (operation.run)(&mut totals, Some(&mut io::stdout().lock()))?;
-        } else {
-            (operation.run)(&mut totals, None)?;
-        }
-        Ok(totals)
-    })
+    measure_dyn(
+        mode,
+        iterations,
+        operation.name,
+        None,
+        &[],
+        Refusals::Stop,
+        &mut || {
+            let mut totals = Totals::default();
+            if trace {
+                (operation.run)(&mut totals, Some(&mut io::stdout().lock()))?;
+            } else {
+                (operation.run)(&mut totals, None)?;
+            }
+            Ok(totals)
+        },
+    )
 }
 
 /// A bench count: decimal digits for a number of [`ITERATIONS`].

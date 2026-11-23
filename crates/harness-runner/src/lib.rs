@@ -327,7 +327,7 @@ impl Totals {
 
 /// An operation that ended early: its error and the input event it is attributed
 /// to, as a JSON object.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Refusal {
     /// The error, printed as a JSON string.
     pub reason: String,
@@ -373,12 +373,14 @@ pub fn measure_with(
         name,
         held,
         fields,
+        Refusals::Stop,
         &mut operation,
     )
 }
 
-/// Measure a workload whose required outcome may be a deterministic refusal.
-/// Execute every planned repetition and retain the first refusal for reporting.
+/// Measure a workload whose required outcome may be a deterministic refusal: run
+/// every planned operation, each of which must end alike, and report the first
+/// refusal.
 ///
 /// # Errors
 ///
@@ -390,31 +392,24 @@ pub fn measure_repeated(
     held: Option<&Budget>,
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
-    let retained = held.map(Budget::used);
-    let mut runs = 0;
-    let mut first_refusal = None::<Box<Refusal>>;
-    measure(invocation, name, held, || {
-        let mut totals = operation()?;
-        let refusal = totals.refusal.take();
-        if runs == 0 {
-            first_refusal = refusal;
-        } else {
-            match (&first_refusal, refusal) {
-                (None, None) => {}
-                (Some(first), Some(next))
-                    if first.reason == next.reason && first.cause == next.cause => {}
-                _ => return Err("operation outcome changed across repetitions".into()),
-            }
-        }
-        runs += 1;
-        if runs == invocation.iterations && first_refusal.is_some() {
-            if held.map(Budget::used) != retained {
-                return Err("operation retained charged storage".into());
-            }
-            totals.refusal = first_refusal.take();
-        }
-        Ok(totals)
-    })
+    measure_dyn(
+        invocation.mode,
+        invocation.iterations,
+        name,
+        held,
+        &[],
+        Refusals::Repeat,
+        &mut operation,
+    )
+}
+
+/// What the measured loop does with an operation that ends in a refusal.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Refusals {
+    /// End the loop.
+    Stop,
+    /// Run the remaining operations, which must refuse alike.
+    Repeat,
 }
 
 /// [`measure_with`] with the operation behind a reference, so each worker binary
@@ -425,6 +420,7 @@ fn measure_dyn(
     name: &str,
     held: Option<&Budget>,
     fields: &[(&str, u64)],
+    refusals: Refusals,
     operation: &mut dyn FnMut() -> Result<Totals>,
 ) -> Result<()> {
     let retained = held.map(Budget::used);
@@ -443,9 +439,17 @@ fn measure_dyn(
         bytes += totals.bytes;
         fold(&mut digest, totals.digest);
         unsupported = unsupported.or(totals.unsupported);
-        if totals.refusal.is_some() {
-            refusal = totals.refusal;
-            break;
+        match refusals {
+            Refusals::Stop if totals.refusal.is_some() => {
+                refusal = totals.refusal;
+                break;
+            }
+            Refusals::Stop => {}
+            Refusals::Repeat if runs == 1 => refusal = totals.refusal,
+            Refusals::Repeat if totals.refusal != refusal => {
+                return Err("operation outcome changed across repetitions".into());
+            }
+            Refusals::Repeat => {}
         }
         if held.map(Budget::used) != retained {
             return Err("operation retained charged storage".into());
@@ -549,5 +553,33 @@ mod tests {
         })?;
         assert_eq!(executed, invocation.iterations);
         Ok(())
+    }
+
+    #[test]
+    fn a_refusal_that_changes_between_repetitions_fails() {
+        let invocation = Invocation {
+            mode: Mode::Fold,
+            path: "",
+            iterations: 3,
+            arguments: &[],
+        };
+        let mut executed = 0;
+        let error = measure_repeated(&invocation, "test-refusal", None, || {
+            executed += 1;
+            Ok(Totals {
+                refusal: (executed < 3).then(|| {
+                    Box::new(Refusal {
+                        reason: "control refusal".into(),
+                        cause: "{}".into(),
+                    })
+                }),
+                ..Totals::default()
+            })
+        })
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "operation outcome changed across repetitions"
+        );
     }
 }
