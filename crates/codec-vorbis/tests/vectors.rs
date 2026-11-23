@@ -12,7 +12,9 @@ fn stream(name: &str) -> Option<Vec<Vec<u8>>> {
         .join(name);
     let data = std::fs::read(path).ok()?;
     let pool = Budget::new(data.len().saturating_mul(4).max(1 << 20)).ok()?;
-    let packets = triergon::ogg::read_packets(&pool, &data).ok()?;
+    let packets =
+        triergon::ogg::read_packets(&pool, &data, triergon::ogg::Limits::default().packet_bytes)
+            .ok()?;
     Some(packets.iter().map(|packet| packet.data.to_vec()).collect())
 }
 

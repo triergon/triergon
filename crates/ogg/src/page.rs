@@ -382,8 +382,8 @@ impl PageReader {
     }
 }
 
-/// Write one page with lacing values `lacing` over `body`, computing its CRC; for tests
-/// and fixture tools.
+/// Append one version-zero page and compute its CRC. Supply at most 255 lacing values
+/// whose sum is `body.len()`, and use `-1` for an unset granule position.
 pub fn write_page(
     flags: u8,
     granule: i64,

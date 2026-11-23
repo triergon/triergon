@@ -32,8 +32,8 @@ sequential `Read`. Both return once every stream of the first link has read its 
 (or after `Limits::header_bytes` of other packets), so its tracks are configured.
 `Reader` is the push reader: it performs no I/O, accepts windows of any size down to one
 byte, steps under a `WorkBudget` and a cancellation flag, and charges its storage to the
-caller's `Budget`. `read_packets` reads every packet of a
-whole file in memory, headers included.
+caller's `Budget`. `read_packets` reads every packet of a whole file in memory,
+headers included, with a caller-supplied packet size limit.
 
 ## Supported
 

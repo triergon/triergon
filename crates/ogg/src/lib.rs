@@ -48,10 +48,14 @@ pub struct SlicePacket {
 /// Every packet of every logical stream of a complete Ogg file in memory, in page order,
 /// header packets included, charged to `pool`: one copy of the file, the packets that
 /// span pages and the packet list. Bytes that are not a page, pages with a bad CRC and
-/// a trailing partial page are skipped. For tests and tools; the reader is [`Reader`].
-pub fn read_packets(pool: &Budget, bytes: &[u8]) -> Result<BudgetVec<SlicePacket>> {
+/// a trailing partial page are skipped. A packet above `packet_bytes` fails with
+/// [`triergon_core::Error::Limit`].
+pub fn read_packets(
+    pool: &Budget,
+    bytes: &[u8],
+    packet_bytes: usize,
+) -> Result<BudgetVec<SlicePacket>> {
     let file = Bytes::copy_from_slice(pool, bytes)?;
-    let packet_bytes = Limits::default().packet_bytes;
     let mut streams: BudgetVec<(u32, Assembler)> = BudgetVec::new(pool);
     let mut packets = BudgetVec::new(pool);
     // At most one packet per lacing value of a page.
@@ -116,7 +120,7 @@ mod tests {
             &mut file,
         );
         let pool = Budget::new(1 << 20).unwrap();
-        let packets = read_packets(&pool, &file).unwrap();
+        let packets = read_packets(&pool, &file, big.len()).unwrap();
         assert_eq!(packets.len(), 3);
         assert_eq!(&packets[0].data[..], b"abc");
         assert_eq!(packets[0].granule, Some(0));
@@ -125,11 +129,18 @@ mod tests {
         assert_eq!(&packets[2].data[..], b"z");
         assert_eq!(packets[2].granule, Some(1234));
         assert!(packets[2].end_of_stream);
+        assert!(matches!(
+            read_packets(&pool, &file, big.len() - 1),
+            Err(triergon_core::Error::Limit {
+                requested: 600,
+                maximum: 599,
+            })
+        ));
         let page = &file[4..];
         let header = PageHeader::parse(page).unwrap();
         assert!(header.crc_ok(page));
         file[34] ^= 1;
         assert!(!PageHeader::parse(&file[4..]).unwrap().crc_ok(&file[4..]));
-        assert_eq!(read_packets(&pool, &file).unwrap().len(), 2);
+        assert_eq!(read_packets(&pool, &file, big.len()).unwrap().len(), 2);
     }
 }
