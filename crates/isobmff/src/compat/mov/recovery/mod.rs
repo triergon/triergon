@@ -12,6 +12,33 @@ mod direct;
 pub use description::*;
 pub use direct::*;
 
+impl SampleTableBuilder {
+    /// Run recovery's answer to a row check that failed because the decode runs end one
+    /// sample short of the sample count: the table is completed and the check goes on
+    /// (`true`). The last sample starts where the stated deltas end (ISO/IEC 14496-12
+    /// §8.6.1.2.1) and gets the zero delta FFmpeg's demuxer reports. `false` for any
+    /// other failure.
+    // Appending the run in the row check raises the instruction count by 0.66%.
+    #[cold]
+    #[inline(never)]
+    pub(super) fn complete_decode_runs(&mut self) -> Result<bool> {
+        let Stage::Validate { table, rows } = &mut self.stage else {
+            return Ok(false);
+        };
+        if !(self.acceptance.recovers_runs()
+            && rows.check == Check::Decode
+            && rows.row != 0
+            && rows.row == table.stts.count
+            && rows.total.checked_add(1) == Some(table.sample_count()))
+        {
+            return Ok(false);
+        }
+        table.stts = table.stts.with_row([1, 0], self.limits)?;
+        *rows = RowCheck::new(Check::Composition);
+        Ok(true)
+    }
+}
+
 /// The timing table a [`RunCoverage`] describes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RunKind {
