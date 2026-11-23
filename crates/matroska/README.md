@@ -28,7 +28,7 @@ let cancel = AtomicBool::new(false);
 let mut reader = BlockingReader::open(File::open(path)?, Limits::default())?;
 for track in reader.tracks() { /* number, kind, codec, codec_private, colour, languages … */ }
 let video = reader.tracks().iter().position(|t| t.kind == 1).ok_or("no video track")?;
-let receipt = reader.seek_for_playback(video, 1_000_000_000, &cancel)?; // SeekReceipt
+let receipt = reader.seek_for_playback(video, 1_000_000_000, &cancel)?; // MatroskaSeekReceipt
 while let Some(p) = reader.next_typed_packet(&cancel)? {
     // p.packet: track, pts_ns, duration_ns, keyframe, data, timing
     // p.configuration: active track configuration; p.group: BlockGroup side data
@@ -87,7 +87,7 @@ loop {
 ```
 
 `Reader::seek_previous` / `seek_for_playback` return the first `InputRequest`;
-the seek completes with `Event::Seek(SeekReceipt)` before any packet.
+the seek completes with `Event::Seek(MatroskaSeekReceipt)` before any packet.
 
 `Reader` also implements `triergon_core::container::ContainerReader`, so it works in
 generic code and inside `triergon::AnyReader`:
@@ -96,7 +96,7 @@ generic code and inside `triergon::AnyReader`:
 |---|---|
 | `PacketInfo` | `TypedPacket`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
 | `TrackInfo` | `Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `codec` from an exact CodecID match with any other CodecID as `CodecId::Other`, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
-| `Event::Seek` | `SeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
+| `Event::Seek` | `MatroskaSeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
 | `Event::Other` | the other `Event`s (Envelope, Configuration, Document) |
 
 `request_seek` maps the `TrackId` to a track index (`Error::Invalid` when absent),
@@ -174,7 +174,7 @@ target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
 replays the landing Cluster, including interleaved audio before the keyframe. A cue is
 checked against the real Cluster, track, timestamp and keyframe; a forged index fails
 instead of landing elsewhere, and the gap after the last cue is scanned for uncued
-keyframes. The `SeekReceipt` reports `actual_ns`, `used_index`, `scanned_bytes`,
+keyframes. The `MatroskaSeekReceipt` reports `actual_ns`, `used_index`, `scanned_bytes`,
 `preroll_ns`, `discard_until_ns` (decode, but do not present, earlier packets) and
 `replays_from_start` (so one-time start trimming is not repeated). Recovery can fail
 with `missing timed audio duration` if a timed packet has no duration. After any failure

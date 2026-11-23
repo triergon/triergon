@@ -7,8 +7,8 @@
 use crate::ebml_kit::{cluster, crc32, element as e, mkv, uint as u};
 use crate::timing::BlockTiming;
 use crate::{
-    Event, InitializationOrigin, Limits, PayloadOwnership, Reader, SeekReceipt, SourcePosition,
-    TypedPacket,
+    Event, InitializationOrigin, Limits, MatroskaSeekReceipt, PayloadOwnership, Reader,
+    SourcePosition, TypedPacket,
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
@@ -79,8 +79,8 @@ pub(crate) struct Receipt {
     pub(crate) from_start: bool,
 }
 
-impl From<SeekReceipt> for Receipt {
-    fn from(value: SeekReceipt) -> Self {
+impl From<MatroskaSeekReceipt> for Receipt {
+    fn from(value: MatroskaSeekReceipt) -> Self {
         Self {
             requested: value.requested_ns,
             actual: value.actual_ns,

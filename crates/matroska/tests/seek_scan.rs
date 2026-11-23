@@ -15,8 +15,8 @@ use seek_scan_kit::{
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Backpressure, Budget, Step, WorkBudget};
 use triergon_matroska::{
-    ElementEvent, Error, Event, InitializationOrigin, Limits, PayloadOwnership, Reader,
-    SeekReceipt, SourcePosition, TypedPacket, timing,
+    ElementEvent, Error, Event, InitializationOrigin, Limits, MatroskaSeekReceipt,
+    PayloadOwnership, Reader, SourcePosition, TypedPacket, timing,
 };
 
 struct Run {

@@ -41,7 +41,7 @@ pub use packet::block_group::{
 };
 pub use packet::{Packet, PacketData, TypedPacket};
 pub use reader::{BlockingReader, BlockingSource, Event, Reader};
-pub use seek::{SeekReceipt, SeekRequest};
+pub use seek::{SeekReceipt as MatroskaSeekReceipt, SeekRequest as MatroskaSeekRequest};
 pub use storage::{PayloadOwnership, SharedBytes, SharedText};
 pub use track::extensions::{MappingExtension, MappingView, TrackExtensions, TrackExtensionsJob};
 pub use track::{LegacyAacProfile, Track};
