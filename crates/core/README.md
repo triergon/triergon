@@ -67,12 +67,6 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 | Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, seek and colour types |
 | Errors | `Error`, `Result`, `Refused<T>` retains a value whose operation failed |
 
-## Features
-
-| Feature | Default | Effect |
-|---|---|---|
-| `reference-trace` | off | `Blocking::into_inner`, which hands back the source at its position so a comparison can check the reader's input handoff |
-
 ## Behaviour and limits
 
 **Time.** `Time` is an exact, always-reduced rational number of seconds. Unknown

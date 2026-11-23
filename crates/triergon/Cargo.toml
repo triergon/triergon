@@ -39,12 +39,12 @@ triergon-raster = { path = "../raster", optional = true }
 triergon-shape = { path = "../shape", optional = true }
 
 [dev-dependencies]
-# Exercise the full playback example in plain cargo test.
-triergon = { path = ".", default-features = false, features = ["isobmff", "ogg", "elementary", "playback", "codecs", "render", "reference-trace"] }
+# Plain `cargo test` builds every optional reader and the full playback example.
+triergon = { path = ".", features = ["isobmff", "mpegts", "ogg", "elementary", "subtitles", "playback", "codecs", "render"] }
+triergon-bitstream = { path = "../bitstream" }
 
 [features]
 default = ["matroska"]
-reference-trace = ["triergon-core/reference-trace"]
 matroska = ["dep:triergon-matroska"]
 isobmff = ["dep:triergon-isobmff"]
 mpegts = ["dep:triergon-mpegts"]

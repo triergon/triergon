@@ -7,8 +7,5 @@ edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 
-[features]
-reference-trace = []
-
 [lints]
 workspace = true

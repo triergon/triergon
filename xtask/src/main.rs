@@ -1369,11 +1369,9 @@ fn simd_tests(root: &Path) -> Task {
 }
 
 /// Crates whose comparison-only projections sit behind the `reference-trace` feature.
-const REFERENCE_TRACE_CRATES: [&str; 11] = [
-    "triergon",
+const REFERENCE_TRACE_CRATES: [&str; 9] = [
     "triergon-bridge",
     "triergon-codec-ac3",
-    "triergon-core",
     "triergon-font",
     "triergon-framing",
     "triergon-isobmff",
