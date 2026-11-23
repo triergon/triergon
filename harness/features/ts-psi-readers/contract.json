@@ -300,7 +300,7 @@
     {
       "reading": "A PAT version announced over two sections of which one arrives: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.6 applies version_number to the whole PAT and last_section_number gives its extent; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the standalone PAT and PMT readers waits for every section of a version before routing its programs, so no program comes from the partial PAT.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers waits for every section of a version before routing its programs, so no program comes from the partial PAT.",
       "reference": "Observed rule: routes the program from the first section although the second never arrives.",
       "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
@@ -310,7 +310,7 @@
     {
       "reading": "A PMT descriptor that runs past its loop: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.4.10 and 2.6.1: ES_info_length 6 encloses an ISO 639 descriptor of length 8; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the standalone PAT and PMT readers rejects the malformed PMT and exposes no stream from it.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers rejects the malformed PMT and exposes no stream from it.",
       "reference": "Observed rule: publishes the stream entry from the malformed PMT.",
       "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
@@ -320,7 +320,7 @@
     {
       "reading": "A PMT with section_number 1: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 requires section_number and last_section_number 0 in a PMT; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the standalone PAT and PMT readers rejects the PMT and exposes no stream from it.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the standalone PAT and PMT readers rejects the PMT and exposes no stream from it.",
       "reference": "Observed rule: publishes the stream from the PMT.",
       "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
@@ -330,7 +330,7 @@
     {
       "reading": "A final transport packet shorter than 188 bytes: a recovery policy no standard decides; no compat option exists",
       "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.1 and 2.4.3.2 fix the transport packet at 188 bytes; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the readers publish the catalogue read so far and report Truncated for the final carrier.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the readers publish the catalogue read so far and report Truncated for the final carrier.",
       "reference": "Observed rule: publishes the catalogue and ends cleanly.",
       "cases": [
         "physical-truncated-tail",

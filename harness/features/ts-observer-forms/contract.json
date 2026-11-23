@@ -1020,7 +1020,7 @@
     {
       "reading": "A PES in a carrier whose PCR extension is out of range: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 codes program_clock_reference_extension modulo 300; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict source walk rejects the carrier with its payload, so none of the three observers sees the PES.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the strict source walk rejects the carrier with its payload, so none of the three observers sees the PES.",
       "reference": "Observed rule: ignores the extension and returns the 27-byte PES at PTS 90000.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pcr-extension-invalid passes)",
       "cases": [
@@ -1032,7 +1032,7 @@
     {
       "reading": "A PES in a carrier that codes OPCR without PCR: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 allows OPCR only in a packet that carries PCR; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict source walk rejects the carrier with the unpaired OPCR, so no observer emits a packet.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the strict source walk rejects the carrier with the unpaired OPCR, so no observer emits a packet.",
       "reference": "Observed rule: ignores the OPCR and returns both 27-byte PES.",
       "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts opcr-without-pcr-invalid passes)",
       "cases": [
@@ -1174,40 +1174,6 @@
             "packets": 1,
             "bytes": 77,
             "digest": 2599403413553035900
-          }
-        }
-      ]
-    },
-    {
-      "reason": "DemuxObserver does not cross a signalled PCR discontinuity on a continuation carrier without an explicit clock-boundary policy (compat::pes::TransportFaultRecovery::confirm_source_timeline)",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 discontinuity_indicator with a new PCR starts a new system time base",
-      "detail": "PCR discontinuity requires an explicit PES clock boundary policy",
-      "cases": [
-        {
-          "id": "pcr-timeline-discontinuity-unregistered",
-          "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
-          "candidate": {
-            "packets": 2,
-            "bytes": 104,
-            "digest": 18333233967416508246
-          }
-        },
-        {
-          "id": "pcr-timeline-discontinuity-input-bound",
-          "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
-          "candidate": {
-            "packets": 2,
-            "bytes": 104,
-            "digest": 18333233967416508246
-          }
-        },
-        {
-          "id": "pcr-timeline-discontinuity-compact",
-          "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
-          "candidate": {
-            "packets": 2,
-            "bytes": 104,
-            "digest": 18333233967416508246
           }
         }
       ]

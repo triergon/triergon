@@ -644,15 +644,6 @@
       "cause": "Paired runtime, peak live heap and total RSS need isolated AArch64 and ARMv7 gate hosts."
     }
   ],
-  "pending_module_requirements": [
-    "Deliver a finite PES whose PES_packet_length is complete in its carriers and report payload that follows its declared extent as a separate source fault, instead of discarding the complete PES (H.222.0 \u00a72.4.3.7)."
-  ],
-  "open_cases": [
-    {
-      "id": "pes-finite-extra-payload",
-      "requirement": "Deliver a finite PES whose PES_packet_length is complete in its carriers and report payload that follows its declared extent as a separate source fault, instead of discarding the complete PES (H.222.0 \u00a72.4.3.7)."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "An AVC access-unit delimiter alone carries no picture",
@@ -716,6 +707,7 @@
         "transport-partial-final-packet",
         "transport-sync-loss",
         "carriage-hevc-direct",
+        "pes-finite-extra-payload",
         "pat-pointer-then-clean-pusi",
         "pmt-pointer-then-clean-pusi",
         "di-continuous-pes-payload",
@@ -736,7 +728,12 @@
         "third-middle-copy-then-clean",
         "duplicate-middle-low-occupancy-finite",
         "duplicate-middle-low-occupancy-unbounded",
-        "finite-continuation-body-400"
+        "finite-continuation-body-400",
+        "finite-continuation-body-401",
+        "finite-continuation-body-408",
+        "finite-continuation-body-409",
+        "finite-continuation-body-414",
+        "finite-continuation-body-415"
       ]
     },
     {
@@ -773,7 +770,7 @@
     {
       "reading": "End of input inside an ADTS frame or LOAS envelope: a recovery policy no standard decides",
       "clause": "ISO/IEC 13818-7 \u00a76.2.1 frame_length and ISO/IEC 14496-3 \u00a71.7.2 audioMuxLengthBytes declare more bytes than the input holds; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): unfinished audio at the end returns Truncated; the fold ends with that refusal.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): unfinished audio at the end returns Truncated; the fold ends with that refusal.",
       "reference": "Observed rule: returns the unfinished extent as a packet after any complete frames.",
       "compat": "ReaderLimits::audio_eof_policy = AudioEofPolicy::ReportIncomplete reports it in triergon-mpegts Reader; AnyReader::open uses the default limits; AnyReader::MpegTs over a triergon_mpegts::Reader built with that option opts in (triergon README, Behaviour and limits)",
       "cases": [
@@ -785,7 +782,7 @@
     {
       "reading": "An audio PES with PES_packet_length zero: a recovery policy no standard decides",
       "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 allows PES_packet_length 0 only for a video elementary stream in TS; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the unbounded audio PES is rejected; a later valid PES still delivers its 195-byte frame.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the unbounded audio PES is rejected; a later valid PES still delivers its 195-byte frame.",
       "reference": "Observed rule: returns the bytes as a 27- or 195-byte packet, 390 bytes with the following PES, or 208 bytes with the opaque prefix.",
       "compat": "ReaderLimits::adts_pes_policy = adts::PesPolicy::ReportUnbounded assembles it in triergon-mpegts Reader; AnyReader::open uses the default limits; AnyReader::MpegTs over a triergon_mpegts::Reader built with that option opts in (triergon README, Behaviour and limits)",
       "cases": [
@@ -810,9 +807,9 @@
     },
     {
       "reading": "Transport faults ahead of the access-unit framer: a recovery policy no standard decides",
-      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3, 2.4.3.5 and 2.4.3.7: a continuity gap, an invalid PCR extension, an unpaired OPCR, a transport error, a zero marker bit, PTS_DTS_flags 01, a finite PES that ends early or overruns its length; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
-      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict source view discards the faulted PES, so the facade publishes no access unit; the payloads are opaque, so a recovered PES would still meet the Annex B refusal.",
-      "reference": "Observed rule: recovers the PES bytes and publishes them as one packet of 24, 27, 54, 354 or 401 to 415 bytes.",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3, 2.4.3.5 and 2.4.3.7: a continuity gap, an invalid PCR extension, an unpaired OPCR, a transport error, a zero marker bit, PTS_DTS_flags 01, a finite PES that ends early; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Recovery from nonconforming input): the strict source view discards the faulted PES, so the facade publishes no access unit; the payloads are opaque, so a recovered PES would still meet the Annex B refusal.",
+      "reference": "Observed rule: recovers the PES bytes and publishes them as one packet of 24, 27, 54 or 354 bytes.",
       "compat": "compat::pes::TransportFaultRecovery and DemuxObserver recover these PES in triergon-mpegts; AnyReader::open uses the default limits; AnyReader::MpegTs over a triergon_mpegts::Reader built with that option opts in (triergon README, Behaviour and limits)",
       "cases": [
         "cc-loss-mid-pes",
@@ -821,12 +818,7 @@
         "pes-timestamp-marker",
         "pes-forbidden-time-flags",
         "pes-finite-truncated-eof",
-        "opcr-without-pcr-invalid",
-        "finite-continuation-body-401",
-        "finite-continuation-body-408",
-        "finite-continuation-body-409",
-        "finite-continuation-body-414",
-        "finite-continuation-body-415"
+        "opcr-without-pcr-invalid"
       ]
     }
   ]
