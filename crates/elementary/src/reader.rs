@@ -115,6 +115,7 @@ enum Phase<H> {
     Frame(Cut<H>),
     Trailing,
     End,
+    Failed(Error),
 }
 
 /// What follows a delimited unit.
@@ -222,7 +223,8 @@ enum Flow<T> {
 type Next = Flow<Option<Event<Packet, ReaderEvent>>>;
 
 /// A resumable reader of one elementary audio stream. It performs no I/O: it asks
-/// for byte ranges and accepts windows of any size.
+/// for byte ranges and accepts windows of any size. Errors other than backpressure
+/// are sticky until [`ContainerReader::reset`].
 #[derive(Debug)]
 pub struct Reader<F: Format> {
     input: Input,
@@ -347,6 +349,7 @@ impl<F: Format> Reader<F> {
                 Phase::Found(header) => self.found(header, work, cancel)?,
                 Phase::Frame(cut) => self.frame(cut, work, cancel)?,
                 Phase::Trailing => self.trailing(work, cancel)?,
+                Phase::Failed(error) => return Err(error),
                 Phase::End => {
                     if let Some(detail) = F::NEW_SEQUENCE
                         && self.new_sequence
@@ -1248,11 +1251,18 @@ impl<F: Format> ContainerReader for Reader<F> {
     }
     #[inline]
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
-        self.advance(work, cancel).or_else(Error::into_step)
+        self.advance(work, cancel).or_else(|error| {
+            error
+                .into_step()
+                .inspect_err(|&error| self.phase = Phase::Failed(error))
+        })
     }
     /// Seek the stream's track; a [`Event::Seek`] receipt arrives before the first packet
     /// at the landing point.
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
+        if let Phase::Failed(error) = self.phase {
+            return Err(error);
+        }
         self.start_seek(request)
     }
     fn track_count(&self) -> usize {

@@ -83,8 +83,8 @@ of eight 32-bit channels is about 2.2 MB), retained tags and metadata (4 MiB in 
 sync search (1 MiB), SEEKTABLE points (65536) and bisection jumps (64); `Reader::new`
 takes the largest input window (`BlockingReader` reads 64 KiB). Every input-dependent
 allocation is charged to the reader's `Budget`; exceeding a limit is a typed error. A
-full pool is `Step::Backpressure`, and the step resumes once output is released;
-`BlockingReader` returns it as `Error::Backpressure`, and its next call resumes.
+full pool is `Step::Backpressure`, and the step resumes once output is released.
+`BlockingReader` returns it as `Error::Backpressure`. Other step errors persist until reset.
 
 `probe` names the format a prefix starts, after any ID3v2 tag: native FLAC by its
 marker, MPEG audio, ADTS and AC-3 by two frames from the first byte (the second needs

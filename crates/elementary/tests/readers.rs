@@ -564,6 +564,39 @@ fn cancellation_is_sticky_until_reset() {
 }
 
 #[test]
+fn seeking_cannot_clear_a_reader_error() {
+    let file = mp3_stream(4);
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open::<MpegAudio>(&pool, &file, true);
+    let unreadable = vec![0; file.len()];
+    let error = read(&mut reader, &pool, &unreadable, 1 << 20, 4096).unwrap_err();
+    assert_eq!(error, Error::Invalid("no frame in the source"));
+    assert_eq!(
+        reader
+            .request_seek(SeekRequest {
+                track: triergon_elementary::TRACK,
+                target: Time::new(0, 1).unwrap(),
+                policy: SeekPolicy::PreviousRandomAccess,
+            })
+            .unwrap_err(),
+        error
+    );
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        reader.step(&mut WorkBudget::new(1), &cancel).unwrap_err(),
+        error
+    );
+    reader.reset().unwrap();
+    assert_eq!(
+        read(&mut reader, &pool, &file, 1 << 20, 4096)
+            .unwrap()
+            .packets
+            .len(),
+        4
+    );
+}
+
+#[test]
 fn the_blocking_reader_reads_and_seeks() {
     let file: Vec<u8> = (0..60).flat_map(ac3_frame).collect();
     let mut reader =
