@@ -82,7 +82,7 @@
       "clause": "RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
       "candidate": "Keeps DefaultDuration at native precision, for example 41666666 ns.",
       "reference": "Publishes 41000000 ns on the corresponding packets in its millisecond clock.",
-      "compat": "compat::matroska::demux_packet_duration for consumers needing the reference millisecond durations.",
+      "compat": "triergon_matroska::compat::clock::packet_timing",
       "cases": [
         "mkv-reordered-video"
       ]
@@ -92,7 +92,6 @@
       "clause": "RFC 9559 sections 5.1.4.1.25 and 11.2 subtract nanosecond CodecDelay from the exact Block presentation timestamp. RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
       "candidate": "Keeps DTS absent. First AAC PTS is -21333333 ns with duration 21333333 ns and the switch keeps the new track’s -23219955 ns delay.",
       "reference": "Fills AAC DTS from PTS. First AAC PTS is -21000000 ns with duration 21000000 ns and AAC times after the switch are on its millisecond grid.",
-      "compat": "compat::matroska::demux_packet_clocks for consumers using the reference DTS fill-in and duration quantization.",
       "cases": [
         "mkv-video-and-audio",
         "mkv-switch-audio"

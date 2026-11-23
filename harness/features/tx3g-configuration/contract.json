@@ -299,8 +299,7 @@
       "reading": "An absent TextSampleEntry does not supply a default style",
       "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, the default style and font table are fields of TextSampleEntry",
       "candidate": "reports no description",
-      "reference": "synthesizes an Arial 16 ASS Default style",
-      "compat": "compat::tx3g::missing_description_style",
+      "reference": "synthesizes an Arial 16 ASS Default style from an empty description",
       "cases": [
         "bad-two"
       ]
@@ -309,8 +308,7 @@
       "reading": "A cut TextSampleEntry cannot supply a complete default style",
       "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, TextSampleEntry fixed fields and counted FontTableBox records",
       "candidate": "refuses the incomplete description",
-      "reference": "opens with Arial 16 and default colors and alignment",
-      "compat": "compat::tx3g::truncated_description_style",
+      "reference": "opens with an Arial 16 Default style and default colors and alignment",
       "cases": [
         "config-invalid-font-size",
         "config-too-short",
@@ -363,11 +361,10 @@
       ]
     },
     {
-      "reading": "A default font identifier absent from the font table is unbound",
-      "clause": "ETSI TS 126 245 V19.0.0 \u00a7\u00a75.15\u20135.16, font-ID refers to a member of the complete font table",
-      "candidate": "keeps the supplied style with no declared font name",
-      "reference": "supplies Arial for the missing font",
-      "compat": "compat::tx3g::unbound_font_fallback",
+      "reading": "Projection policy the specification leaves open: a default font ID the font table does not bind",
+      "clause": "ETSI TS 126 245 V19.0.0 5.15 and 5.16 bind font-ID to a font table entry and 5.4 has a terminal substitute fonts it lacks, naming no substitute; the candidate keeps the source fact",
+      "candidate": "keeps the declared style with no bound font name (empty)",
+      "reference": "names Arial as the font",
       "cases": [
         "config-valid-empty-fonts",
         "authored-empty-fonts",
@@ -378,8 +375,7 @@
       "reading": "A BOM marks a UTF-16 font name",
       "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, the counted font name is UTF-16 when it begins with a byte-order mark",
       "candidate": "decodes the declared name to A",
-      "reference": "exposes the two BOM bytes FE FF before the first zero byte",
-      "compat": "compat::tx3g::font_name_c_string",
+      "reference": "exposes the two BOM bytes FE FF before the first zero byte as the name",
       "cases": [
         "font-utf16"
       ]
@@ -389,7 +385,6 @@
       "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, TextSampleEntry declares a single FontTableBox",
       "candidate": "refuses the duplicate table",
       "reference": "publishes an Arial 16 style",
-      "compat": "compat::tx3g::duplicate_font_table",
       "cases": [
         "authored-duplicate-table"
       ]
@@ -399,7 +394,6 @@
       "clause": "ETSI TS 126 245 V19.0.0 \u00a75.15, both offsets are zero in a sample description",
       "candidate": "refuses a nonzero default style range",
       "reference": "publishes an Arial 16 style",
-      "compat": "compat::tx3g::invalid_default_style_range",
       "cases": [
         "authored-default-range"
       ]
@@ -409,7 +403,6 @@
       "clause": "ETSI TS 126 245 V19.0.0 \u00a75.16, horizontal and vertical justification table",
       "candidate": "refuses horizontal justification 2",
       "reference": "writes ASS alignment 0 and Arial 16",
-      "compat": "compat::tx3g::reserved_justification",
       "cases": [
         "authored-bad-justification"
       ]
