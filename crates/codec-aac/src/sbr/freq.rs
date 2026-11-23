@@ -36,14 +36,11 @@ impl std::ops::Deref for Bands {
     }
 }
 
+/// The band tables of one SBR header, at the output rate.
 #[derive(Clone, Default, Debug)]
-#[allow(dead_code)] // k0 / k2 / master kept for diagnostics
 pub(crate) struct FreqTables {
-    pub k0: usize,
-    pub k2: usize,
     pub kx: usize,
     pub m: usize,
-    pub master: Bands,
     pub high: Bands,
     pub low: Bands,
     pub noise: Bands,
@@ -294,11 +291,8 @@ pub(crate) fn compute(h: &Header, fs: u32) -> Result<FreqTables> {
     let lim = limiter_table(h.limiter_bands, &low, kx, &patch_num)?;
     let n_lim = lim.len() - 1;
     Ok(FreqTables {
-        k0,
-        k2,
         kx,
         m,
-        master: Bands::from_slice(&master)?,
         high: Bands::from_slice(&high)?,
         low: Bands::from_slice(&low)?,
         noise: Bands::from_slice(&noise)?,
