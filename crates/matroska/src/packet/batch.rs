@@ -288,24 +288,33 @@ impl Staged {
             Self::Laced(packets) => packets.len(),
         }
     }
-    /// Keep the complete packet on any capacity rejection.
+    /// Keep the restored bytes on a capacity rejection so the frame can be retried.
     #[inline(always)]
     fn push(
         &mut self,
         packet: Packet,
-    ) -> std::result::Result<(), triergon_core::Refused<Option<Packet>>> {
+    ) -> std::result::Result<(), triergon_core::Refused<SharedBytes>> {
         match self {
             Self::Single(slot) => {
                 if slot.is_some() {
                     return Err(triergon_core::Refused {
-                        value: Some(packet),
+                        value: packet.data.storage,
                         error: Error::Invalid("single packet already staged"),
                     });
                 }
                 *slot = Some(packet);
                 Ok(())
             }
-            Self::Laced(packets) => packets.try_push(Some(packet)),
+            Self::Laced(packets) => {
+                packets
+                    .try_push(Some(packet))
+                    .map_err(|rejected| triergon_core::Refused {
+                        value: rejected
+                            .value
+                            .map_or_else(SharedBytes::default, |packet| packet.data.storage),
+                        error: rejected.error,
+                    })
+            }
         }
     }
 
@@ -778,9 +787,7 @@ impl PacketBatchJob {
                         let range = 0..storage.len();
                         let packet = fields.finish(PacketData { storage, range });
                         if let Err(rejected) = self.staged.push(packet) {
-                            self.ready = rejected
-                                .value
-                                .map_or_else(SharedBytes::default, |packet| packet.data.storage);
+                            self.ready = rejected.value;
                             return Err(rejected.error);
                         }
                         self.decoded_capacity = capacity;
