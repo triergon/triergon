@@ -532,11 +532,139 @@ struct TrackBuild {
     description_at: usize,
 }
 
+/// An opened track as a fragment's admission sees it: the opener holds one bare, the
+/// neutral reader inside its reading state.
+pub(crate) trait FragmentTrack {
+    fn opened(&self) -> &MovieTrack;
+    fn opened_mut(&mut self) -> &mut MovieTrack;
+}
+impl FragmentTrack for MovieTrack {
+    fn opened(&self) -> &MovieTrack {
+        self
+    }
+    fn opened_mut(&mut self) -> &mut MovieTrack {
+        self
+    }
+}
+
+/// The fragment defaults of the track `id` among a movie's `trex` boxes.
+pub(crate) fn fragment_defaults(trex: &[Trex], id: u32) -> Result<Trex> {
+    trex.iter()
+        .find(|defaults| defaults.track_id == id)
+        .copied()
+        .ok_or(Error::Invalid("fragment missing trex"))
+}
+
+/// Admits the `traf` boxes of one `moof` to their tracks, in file order: each becomes
+/// the next [`FragmentIndex`] of its track and moves the track's next ordinal past its
+/// samples.
 #[derive(Debug)]
-struct MoofWalk {
+pub(crate) struct MoofWalk {
     children: BoxChildren,
     previous_traf: Option<u64>,
     traf: TrafStage,
+}
+impl MoofWalk {
+    pub(crate) fn new(moof: &BoxView, limits: Limits) -> Result<Self> {
+        Ok(Self {
+            children: moof.children(0, limits)?,
+            previous_traf: None,
+            traf: TrafStage::Next,
+        })
+    }
+    /// One bounded step; `true` once the `moof` holds no further box. `defaults` gives a
+    /// track's `trex` by its `track_ID`. With `recovery` a zero-size sample is refused, as
+    /// the recovery opener does.
+    #[inline(always)]
+    pub(crate) fn poll<T: FragmentTrack>(
+        &mut self,
+        tracks: &mut [T],
+        defaults: impl FnOnce(u32) -> Result<Trex>,
+        pool: &Budget,
+        limits: Limits,
+        recovery: bool,
+        w: &mut WorkBudget,
+    ) -> Result<bool> {
+        match &mut self.traf {
+            TrafStage::Next => match self.children.poll(w)? {
+                Next::Yield => {}
+                Next::Item(raw) if raw.header().kind == *b"traf" => {
+                    self.traf = TrafStage::Scan {
+                        children: raw.children(0, limits)?,
+                        raw,
+                    };
+                }
+                Next::Item(_) => {}
+                Next::End => return Ok(true),
+            },
+            TrafStage::Scan { raw, children } => match children.poll(w)? {
+                Next::Yield => {}
+                Next::Item(header) if header.header().kind == *b"tfhd" => {
+                    let id = fields::u32_at(header.payload(), 4)?;
+                    let track = tracks
+                        .iter()
+                        .position(|t| t.opened().header.track_id == id)
+                        .ok_or(Error::Invalid("fragment unknown source track"))?;
+                    let t = tracks[track].opened();
+                    let defaults = defaults(id)?;
+                    let first = t.next_ordinal;
+                    let context = FragmentContext {
+                        moof_start: self.children.parent().header().start,
+                        implicit_base: self
+                            .previous_traf
+                            .map_or(ImplicitBase::FirstTraf, ImplicitBase::PreviousTraf),
+                        decode_origin: None,
+                        first_ordinal: first,
+                        description_count: u32::try_from(t.table.descriptions().len())
+                            .map_err(|_| Error::Overflow)?,
+                    };
+                    let build = if recovery {
+                        FragmentBuilder::new_header_open
+                    } else {
+                        FragmentBuilder::new_with_inherited_decode_end
+                    };
+                    let inherited = t.decode_end()?;
+                    self.traf = TrafStage::Build {
+                        track,
+                        builder: build(
+                            raw.clone(),
+                            defaults,
+                            context,
+                            pool.clone(),
+                            limits,
+                            inherited,
+                        )?,
+                    };
+                }
+                Next::Item(_) => {}
+                Next::End => return Err(Error::Invalid("traf missing tfhd")),
+            },
+            TrafStage::Build { track, builder } => {
+                if !builder.is_ready() {
+                    builder.poll(w)?;
+                    return Ok(false);
+                }
+                if !w.try_charge(1) {
+                    return Ok(false);
+                }
+                let (count, end) = builder.opening_extent()?;
+                let track = tracks[*track].opened_mut();
+                let next = track
+                    .next_ordinal
+                    .checked_add(count)
+                    .ok_or(Error::Overflow)?;
+                track.fragments.try_reserve_exact(1)?;
+                if let TrafStage::Build { builder, .. } =
+                    std::mem::replace(&mut self.traf, TrafStage::Next)
+                {
+                    push(&mut track.fragments, builder.finish()?)?;
+                }
+                track.next_ordinal = next;
+                self.previous_traf = Some(end);
+            }
+        }
+        Ok(false)
+    }
 }
 
 #[derive(Debug)]
@@ -1025,105 +1153,28 @@ impl MovieOpen {
         Ok(OpenStep::Yield)
     }
     fn fragment(&mut self, w: &mut WorkBudget) -> Result<OpenStep> {
-        let moof = &self.moofs.as_slice()[self.fragment_moof];
         let walk = match &mut self.fragment_walk {
             Some(walk) => walk,
-            None => self.fragment_walk.insert(MoofWalk {
-                children: moof.children(0, self.limits.format)?,
-                previous_traf: None,
-                traf: TrafStage::Next,
-            }),
+            None => self.fragment_walk.insert(MoofWalk::new(
+                &self.moofs.as_slice()[self.fragment_moof],
+                self.limits.format,
+            )?),
         };
-        match &mut walk.traf {
-            TrafStage::Next => match walk.children.poll(w)? {
-                Next::Yield => {}
-                Next::Item(raw) if raw.header().kind == *b"traf" => {
-                    walk.traf = TrafStage::Scan {
-                        children: raw.children(0, self.limits.format)?,
-                        raw,
-                    };
-                }
-                Next::Item(_) => {}
-                Next::End => {
-                    self.fragment_walk = None;
-                    self.fragment_moof += 1;
-                }
-            },
-            TrafStage::Scan { raw, children } => match children.poll(w)? {
-                Next::Yield => {}
-                Next::Item(header) if header.header().kind == *b"tfhd" => {
-                    let id = fields::u32_at(header.payload(), 4)?;
-                    let track = self
-                        .tracks
-                        .as_slice()
-                        .iter()
-                        .position(|t| t.header.track_id == id)
-                        .ok_or(Error::Invalid("fragment unknown source track"))?;
-                    let t = &self.tracks.as_slice()[track];
-                    let defaults = *self
-                        .walk
-                        .as_ref()
-                        .ok_or(Error::Invalid("walk missing"))?
-                        .trex
-                        .as_slice()
-                        .iter()
-                        .find(|r| r.track_id == id)
-                        .ok_or(Error::Invalid("fragment missing trex"))?;
-                    let first = t.next_ordinal;
-                    let context = FragmentContext {
-                        moof_start: moof.header().start,
-                        implicit_base: walk
-                            .previous_traf
-                            .map_or(ImplicitBase::FirstTraf, ImplicitBase::PreviousTraf),
-                        decode_origin: None,
-                        first_ordinal: first,
-                        description_count: u32::try_from(t.table.descriptions().len())
-                            .map_err(|_| Error::Overflow)?,
-                    };
-                    let build = if self.recovery {
-                        FragmentBuilder::new_header_open
-                    } else {
-                        FragmentBuilder::new_with_inherited_decode_end
-                    };
-                    let inherited = t.decode_end()?;
-                    walk.traf = TrafStage::Build {
-                        track,
-                        builder: build(
-                            raw.clone(),
-                            defaults,
-                            context,
-                            self.pool.clone(),
-                            self.limits.format,
-                            inherited,
-                        )?,
-                    };
-                }
-                Next::Item(_) => {}
-                Next::End => return Err(Error::Invalid("traf missing tfhd")),
-            },
-            TrafStage::Build { track, builder } => {
-                if !builder.is_ready() {
-                    builder.poll(w)?;
-                    return Ok(OpenStep::Yield);
-                }
-                if !w.try_charge(1) {
-                    return Ok(OpenStep::Yield);
-                }
-                let (count, end) = builder.opening_extent()?;
-                let track = &mut self.tracks.as_mut_slice()[*track];
-                let next = track
-                    .next_ordinal
-                    .checked_add(count)
-                    .ok_or(Error::Overflow)?;
-                track.fragments.try_reserve_exact(1)?;
-                if let TrafStage::Build { builder, .. } =
-                    std::mem::replace(&mut walk.traf, TrafStage::Next)
-                {
-                    push(&mut track.fragments, builder.finish()?)?;
-                }
-                track.next_ordinal = next;
-                walk.previous_traf = Some(end);
-            }
+        let movie = &self.walk;
+        let defaults = |id| {
+            let movie = movie.as_ref().ok_or(Error::Invalid("walk missing"))?;
+            fragment_defaults(movie.trex.as_slice(), id)
+        };
+        if walk.poll(
+            self.tracks.as_mut_slice(),
+            defaults,
+            &self.pool,
+            self.limits.format,
+            self.recovery,
+            w,
+        )? {
+            self.fragment_walk = None;
+            self.fragment_moof += 1;
         }
         Ok(OpenStep::Yield)
     }
