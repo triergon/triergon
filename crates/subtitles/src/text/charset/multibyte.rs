@@ -100,46 +100,28 @@ impl MultibyteCharset {
         Self::ReceiverEucKrC1,
     ];
 
-    // Sorted fixed-width DATA records: two-byte wire code, two-byte scalar.
-    // At most 16 binary-search comparisons for a mapping; no allocation.
-    fn lookup(self, code: u16) -> Option<char> {
-        let data: &[u8] = match self {
+    /// The profile's mapping table: sorted fixed-width records of a two-byte
+    /// wire code and a two-byte scalar.
+    const fn table(self) -> &'static [u8] {
+        match self {
             Self::GbkCp936 => include_bytes!("mapping-data/gbk.bin"),
             Self::Big5 => include_bytes!("mapping-data/big5.bin"),
             Self::ShiftJisUnicode => include_bytes!("mapping-data/shift_jis.bin"),
-            Self::EucKr | Self::ReceiverEucKrC1 => {
-                if let Ok(byte) = u8::try_from(code) {
-                    // ASCII in every profile, plus the receiver profiles' C1 controls.
-                    let last = if self == Self::EucKr { 0x7f } else { 0x9f };
-                    return (byte <= last).then(|| char::from(byte));
-                }
-                include_bytes!("mapping-data/euc_kr.bin")
-            }
-            Self::Windows932 => {
-                include_bytes!("mapping-data/windows932.bin")
-            }
+            Self::EucKr | Self::ReceiverEucKrC1 => include_bytes!("mapping-data/euc_kr.bin"),
+            Self::Windows932 => include_bytes!("mapping-data/windows932.bin"),
             Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
             Self::Windows950 => include_bytes!("mapping-data/windows950.bin"),
             Self::ReceiverBig5 => include_bytes!("mapping-data/receiver_big5.bin"),
-        };
-        let mut low = 0;
-        let mut high = data.len() / 4;
-        while low < high {
-            let mid = low + (high - low) / 2;
-            let at = mid * 4;
-            let key = u16::from_be_bytes([data[at], data[at + 1]]);
-            match key.cmp(&code) {
-                std::cmp::Ordering::Less => low = mid + 1,
-                std::cmp::Ordering::Greater => high = mid,
-                std::cmp::Ordering::Equal => {
-                    return char::from_u32(u32::from(u16::from_be_bytes([
-                        data[at + 2],
-                        data[at + 3],
-                    ])));
-                }
-            }
         }
-        None
+    }
+
+    /// The last byte the profile decodes as itself although its table does
+    /// not hold it: ASCII's, or the receiver EUC-KR's C1 control 0x9F.
+    const fn as_itself(self) -> u8 {
+        match self {
+            Self::ReceiverEucKrC1 => 0x9f,
+            _ => 0x7f,
+        }
     }
 
     /// The character of a [`Big5`](Self::Big5) code in plane 2.
@@ -178,9 +160,47 @@ impl MultibyteCharset {
         }
     }
 
-    /// Whether `byte` may lead a pair.
-    // Out of line, as is `trail`: inlined, a test of the profile makes the
+    // The decoder asks for no ASCII byte. A byte beyond it is searched for
+    // among the profile's records of such bytes and a pair among its pairs: at
+    // most 16 binary-search comparisons; no allocation.
+    //
+    // Out of line, as are `lead` and `trail`: inlined, any of them makes the
     // decoder's step dearer for every character, ASCII included.
+    #[inline(never)]
+    fn lookup(self, code: u16) -> Option<char> {
+        let Span {
+            as_itself,
+            bytes,
+            pairs,
+            end,
+        } = SPANS[self as usize];
+        let (mut low, mut high) = if let Ok(byte) = u8::try_from(code) {
+            if byte <= as_itself {
+                return Some(char::from(byte));
+            }
+            (bytes, pairs)
+        } else {
+            (pairs, end)
+        };
+        while low < high {
+            let mid = low + (high - low) / 2;
+            let at = mid * 4;
+            let key = u16::from_be_bytes([TABLES[at], TABLES[at + 1]]);
+            match key.cmp(&code) {
+                std::cmp::Ordering::Less => low = mid + 1,
+                std::cmp::Ordering::Greater => high = mid,
+                std::cmp::Ordering::Equal => {
+                    return char::from_u32(u32::from(u16::from_be_bytes([
+                        TABLES[at + 2],
+                        TABLES[at + 3],
+                    ])));
+                }
+            }
+        }
+        None
+    }
+
+    /// Whether `byte` may lead a pair.
     #[inline(never)]
     fn lead(self, byte: u8) -> bool {
         CLASSES[self as usize][usize::from(byte)] & LEAD != 0
@@ -194,6 +214,111 @@ impl MultibyteCharset {
 }
 
 const PROFILES: usize = MultibyteCharset::ALL.len();
+
+/// Every profile's table, each table once, one after another. A profile's
+/// records are found by an index into it, which needs neither a jump on the
+/// profile nor a relocation of the binary, as a slice per profile would.
+static TABLES: [u8; LAYOUT.len] = {
+    let mut tables = [0; LAYOUT.len];
+    let mut index = 0;
+    while index < PROFILES {
+        let table = MultibyteCharset::ALL[index].table();
+        let (_, rest) = tables.split_at_mut(LAYOUT.starts[index]);
+        rest.split_at_mut(table.len()).0.copy_from_slice(table);
+        index += 1;
+    }
+    tables
+};
+
+/// Each profile's [`Span`], in [`MultibyteCharset::ALL`]'s order.
+static SPANS: [Span; PROFILES] = LAYOUT.spans;
+
+/// Where a profile's records lie in [`TABLES`], counted in records: those of
+/// ASCII bytes, those of bytes beyond ASCII and those of pairs follow each
+/// other.
+#[derive(Clone, Copy)]
+struct Span {
+    /// [`MultibyteCharset::as_itself`].
+    as_itself: u8,
+    /// The first record of a byte beyond ASCII.
+    bytes: usize,
+    /// The first record of a pair.
+    pairs: usize,
+    /// The end of the profile's records.
+    end: usize,
+}
+
+/// Where each profile's table starts in [`TABLES`], and the length of it.
+struct Layout {
+    spans: [Span; PROFILES],
+    /// The byte at which each profile's table starts.
+    starts: [usize; PROFILES],
+    len: usize,
+}
+
+const LAYOUT: Layout = {
+    let mut layout = Layout {
+        spans: [Span {
+            as_itself: 0,
+            bytes: 0,
+            pairs: 0,
+            end: 0,
+        }; PROFILES],
+        starts: [0; PROFILES],
+        len: 0,
+    };
+    let mut index = 0;
+    while index < PROFILES {
+        let profile = MultibyteCharset::ALL[index];
+        assert!(
+            profile as usize == index,
+            "MultibyteCharset::ALL out of order"
+        );
+        let table = profile.table();
+        let mut earlier = 0;
+        while earlier < index && !same_bytes(MultibyteCharset::ALL[earlier].table(), table) {
+            earlier += 1;
+        }
+        let start = if earlier < index {
+            layout.starts[earlier]
+        } else {
+            layout.len += table.len();
+            layout.len - table.len()
+        };
+        let (first, records) = (start / 4, table.len() / 4);
+        let mut bytes = 0;
+        while bytes < records && table[bytes * 4] == 0 && table[bytes * 4 + 1] < 0x80 {
+            bytes += 1;
+        }
+        let mut pairs = bytes;
+        while pairs < records && table[pairs * 4] == 0 {
+            pairs += 1;
+        }
+        layout.starts[index] = start;
+        layout.spans[index] = Span {
+            as_itself: profile.as_itself(),
+            bytes: first + bytes,
+            pairs: first + pairs,
+            end: first + records,
+        };
+        index += 1;
+    }
+    layout
+};
+
+const fn same_bytes(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut at = 0;
+    while at < a.len() {
+        if a[at] != b[at] {
+            return false;
+        }
+        at += 1;
+    }
+    true
+}
 
 /// Each profile's classes of every byte, [`LEAD`] and [`TRAIL`], in
 /// [`MultibyteCharset::ALL`]'s order: a test of a byte is a load, whichever
