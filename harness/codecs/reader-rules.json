@@ -289,7 +289,7 @@
   {
    "id": "flac-last-frame-at-previous-end",
    "clause": "RFC 9639 §9.1.5, coded sample or frame number",
-   "reason": "FFmpeg's FLAC parser times the last frame of a stream at the previous packet's end (its time plus its duration as FFmpeg reports it), not from the frame's own number; this shows where block sizes vary under the fixed-blocking flag and where FFmpeg's durations differ from the frames' (a sample rate change, a time base taken from leading bytes); the reader times every frame from its frame number",
+   "reason": "FFmpeg's FLAC parser times the last frame of a stream at the previous packet's end (its time plus its duration as FFmpeg reports it), not from the frame's own number; this shows where FFmpeg's durations differ from the frames' (a sample rate change, a time base taken from leading bytes); the reader times every frame from its frame number",
    "scope": [
     {
      "views": [
@@ -300,6 +300,24 @@
       "dts"
      ],
      "packets": "last-of-stream",
+     "reference": "any"
+    }
+   ]
+  },
+  {
+   "id": "flac-old-format-sample-numbers",
+   "clause": "RFC 9639 §9.1.5 and Appendix B.1, the coded number of a stream written before the blocking strategy bit",
+   "reason": "A stream whose STREAMINFO declares a range of block sizes while its frames leave the blocking strategy bit clear was written before that bit existed, and its coded numbers are sample numbers; FFmpeg multiplies each by the frame's block size, as for a frame number, and times the last frame at the previous packet's end; the reader times every frame from its sample number",
+   "scope": [
+    {
+     "views": [
+      "native"
+     ],
+     "fields": [
+      "pts",
+      "dts"
+     ],
+     "packets": "any",
      "reference": "any"
     }
    ]

@@ -3045,11 +3045,19 @@
     "session-vorbis:.research/fate-samples/vorbis/test-short2_small.ogg",
     "session-vorbis:.research/fate-samples/vorbis/vorbis_chapter_extension_demo.ogg"
    ]
+  },
+  {
+   "reading": "A stream written before the FLAC blocking strategy bit numbers its frames by their first sample",
+   "clause": "RFC 9639 Appendix B.1: before the blocking strategy bit existed, a stream whose STREAMINFO minimum and maximum block sizes differ was a variable block size stream, whose coded number is a sample number; section 9.1.5: a coded sample number equals the samples before the frame",
+   "candidate": "Times every block from its coded sample number, from 0 to 25.6 s for this 25.7 s stream, with the reference's PCM.",
+   "reference": "Multiplies each coded number by the frame's block size, as for a frame number, so the 390 blocks run between 0 and 117483 s out of order, and times the last block at the previous block's end.",
+   "cases": [
+    "session-flac:.research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac"
+   ]
   }
  ],
  "open_cases": [
-  "rate-change-lc-to-implicit-sbr.adts",
-  "session-flac:.research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac"
+  "rate-change-lc-to-implicit-sbr.adts"
  ],
- "open_case_readings": {"session-flac:.research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac": "The last block of this fixed-blocksize stream is stamped 105728 s, before the block at 117483.3 s that precedes it: the reader scales the final short frame's coded number by that frame's own 4130-sample size instead of the 4608-sample block size of the stream (RFC 9639 §9.1.5 numbers a fixed-blocksize stream in frames of the nominal block size). The reference continues the sequence at 117483.4 s (crates/elementary, Flac::fixed_block_size).", "rate-change-lc-to-implicit-sbr.adts": "The ADTS reader reads one sequence: where the coded sampling frequency index changes, a new sequence of ISO/IEC 13818-7 section 6.2.1, it refuses with Unsupported after the last frame before the change, and the session ends with that error after 432 blocks and 442368 samples. The reference decodes the next sequence too (1186 frames, 1861095 samples). Reading a stream whose sequences change their sampling frequency is not implemented (crates/elementary, Syntax::NEW_SEQUENCE)."}
+ "open_case_readings": {"rate-change-lc-to-implicit-sbr.adts": "The ADTS reader reads one sequence: where the coded sampling frequency index changes, a new sequence of ISO/IEC 13818-7 section 6.2.1, it refuses with Unsupported after the last frame before the change, and the session ends with that error after 432 blocks and 442368 samples. The reference decodes the next sequence too (1186 frames, 1861095 samples). Reading a stream whose sequences change their sampling frequency is not implemented (crates/elementary, Syntax::NEW_SEQUENCE)."}
 }

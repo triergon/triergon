@@ -210,6 +210,30 @@ fn a_damaged_flac_frame_ends_at_the_header_that_numbers_on() {
 }
 
 #[test]
+fn frames_of_a_stream_written_before_the_blocking_bit_are_timed_by_sample_number() {
+    // STREAMINFO declares block sizes 256 to 4096 while every frame leaves the blocking
+    // strategy bit clear: the coded numbers are sample numbers (RFC 9639 Appendix B.1).
+    let sizes = [(12, 4096), (11, 2048), (12, 4096), (10, 1024)];
+    let mut file = flac_head(11264, &[]);
+    file[8..12].copy_from_slice(&[0x01, 0x00, 0x10, 0x00]);
+    let mut first = 0;
+    for (i, (code, samples)) in sizes.into_iter().enumerate() {
+        file.extend(flac_frame_coded(first, code, 400 + i));
+        first += samples;
+    }
+    let reading = invariant::<Flac>(&file);
+    let times: Vec<_> = reading
+        .packets
+        .iter()
+        .map(|p| (p.pts, p.duration))
+        .collect();
+    assert_eq!(
+        times,
+        [(0, 4096), (4096, 2048), (6144, 4096), (10240, 1024)]
+    );
+}
+
+#[test]
 fn adts_frames_drop_junk_and_keep_a_truncated_tail() {
     let mut file = id3v2(4);
     for i in 0..8 {

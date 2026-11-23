@@ -1591,8 +1591,8 @@
       "decoder.ours_rate": 44100,
       "decoder.ours_rc": 0,
       "decoder.ours_samples": 1133090,
-      "decoder.timeline.ours_at_difference.nb_samples": 4130,
-      "decoder.timeline.ours_at_difference.pts_ns": 105728000000000,
+      "decoder.timeline.ours_at_difference.nb_samples": 2304,
+      "decoder.timeline.ours_at_difference.pts_ns": 104489796,
       "decoder.timeline.ours_blocks": 390,
       "output.ours_rc": 0,
       "output.samples_ours": 1133090
@@ -1604,15 +1604,15 @@
       "decoder.ffmpeg_rate": 44100,
       "decoder.ffmpeg_rc": 0,
       "decoder.ffmpeg_samples": 1133090,
-      "decoder.timeline.reference_at_difference.nb_samples": 4130,
-      "decoder.timeline.reference_at_difference.pts_ns": 117483415510204,
+      "decoder.timeline.reference_at_difference.nb_samples": 2304,
+      "decoder.timeline.reference_at_difference.pts_ns": 240744489796,
       "decoder.timeline.reference_frames": 390,
       "output.reference_rc": 0,
       "output.samples_ref": 1133090
      },
      "comparison": {
       "decoder.status": "fail",
-      "decoder.timeline.first_difference": 389,
+      "decoder.timeline.first_difference": 1,
       "decoder.timeline.status": "fail",
       "output.status": "pass"
      },
@@ -3176,16 +3176,23 @@
     },
     "skip-flip-27 - old format variable blocksize file created with Flake 0.11.flac": {
      "candidate": {
-      "decoder.ours_channels": null,
-      "decoder.ours_layout": null,
-      "decoder.ours_pcm_bytes": 0,
-      "decoder.ours_rate": null,
-      "decoder.ours_rc": 1,
-      "decoder.ours_samples": null,
-      "decoder.timeline.ours_at_difference": null,
-      "decoder.timeline.ours_blocks": 0,
-      "output.ours_rc": 1,
-      "output.samples_ours": 0
+      "decoder.ours_channels": 2,
+      "decoder.ours_info.channels": 2,
+      "decoder.ours_info.errors": 19,
+      "decoder.ours_info.frames": 226,
+      "decoder.ours_info.layout": "stereo",
+      "decoder.ours_info.sample_rate": 44100,
+      "decoder.ours_info.samples_per_channel": 779426,
+      "decoder.ours_layout": "stereo",
+      "decoder.ours_pcm_bytes": 6235408,
+      "decoder.ours_rate": 44100,
+      "decoder.ours_rc": 0,
+      "decoder.ours_samples": 779426,
+      "decoder.timeline.ours_at_difference.nb_samples": 4608,
+      "decoder.timeline.ours_at_difference.pts_ns": 6373877551,
+      "decoder.timeline.ours_blocks": 226,
+      "output.ours_rc": 0,
+      "output.samples_ours": 779426
      },
      "reference": {
       "decoder.ffmpeg_channels": 2,
@@ -3209,7 +3216,7 @@
      "exact": {
       "aarch64-unknown-linux-gnu": {
        "decoder.ffmpeg_pcm_sha256": "a41cf8f8e06bc8ea86909c94b423fbd8911406d299b8f37b1ed0b3ca4deb3a5f",
-       "decoder.ours_pcm_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+       "decoder.ours_pcm_sha256": "5cdc0d45d87a42abc67fef3356b85151c718479fd1915c5bcc56fd61ad9421ac"
       }
      }
     },

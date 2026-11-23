@@ -53,8 +53,10 @@ SEEKTABLE and STREAMINFO are read; a stream whose first block is not STREAMINFO 
 refused, as FFmpeg refuses it. A stream without the `fLaC` marker (joined mid-way)
 starts at the first frame header that a CRC-16-confirmed frame follows, after any bytes
 before it; its track comes from that header and its configuration is empty.
-Fixed-blocking frame numbers count the first frame's block size, or each frame's own
-when STREAMINFO declares a range of sizes, as FFmpeg counts them.
+A frame number counts frames of the first frame's block size (RFC 9639 section 9.1.5). A
+stream whose STREAMINFO declares a range of block sizes while its frames leave the
+blocking strategy bit clear was written before that bit existed, and numbers its frames
+by their first sample, as RFC 9639 Appendix B.1 describes; its frames are timed so.
 
 MPEG audio follows FFmpeg 9.0.2 where the specification leaves room: a first Layer III
 frame with a Xing, Info or VBRI description is not delivered; a LAME tag written by
