@@ -148,8 +148,8 @@ impl<'a> PlainScan<'a> {
         }
     }
 
-    // Out of line, entered once per poll of the seek: the walks keep their own
-    // registers, so their loops do not change with the seek's entry loop.
+    // Out of line: keeps the walks' loops out of the seek's entry loop, whose register
+    // assignment they would share (up to 1.7% of a fragmented seek, AArch64).
     #[inline(never)]
     pub(super) fn poll(&mut self, work: &mut WorkBudget) -> PlainStep<'a> {
         let state = &mut self.state;
@@ -183,8 +183,8 @@ impl<'a> PlainScan<'a> {
 }
 
 impl<'a> State<'a> {
-    // Compiled by itself: beside the other walks a table with composition offsets
-    // takes 0.07% more instructions per seek.
+    // Out of line: keeps the regular walk's loop apart from the fragment and edit walks,
+    // whose registers it would share (up to 1.4% of a regular seek, AArch64).
     #[inline(never)]
     fn poll_regular(
         &mut self,

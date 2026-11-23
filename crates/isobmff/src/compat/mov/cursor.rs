@@ -2117,6 +2117,9 @@ impl<'a> PacketCursor<'a> {
 }
 
 /// Whether `range` lies in the extent that holds its start.
+// Out of line, as the compiler leaves it at its size: stated, so that the seek and the
+// packet loop that call it do not change when it grows or shrinks past the inliner's limit.
+#[inline(never)]
 fn within_one_extent(media: &[Range<u64>], range: &Range<u64>) -> bool {
     let end = media.partition_point(|extent| extent.start <= range.start);
     end.checked_sub(1)

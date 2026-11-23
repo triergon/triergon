@@ -58,9 +58,6 @@ impl Words {
     /// A copy of a table of two-word rows with `row` appended, in storage of its own
     /// charged to the table's budget, at the table's place in the file. `Error::Limit`
     /// when the copy has more rows than `limits` admits.
-    // Out of line: inlined into run recovery's completion it changes the code of the
-    // seek job's entry loop (+0.14% on six seek workloads).
-    #[inline(never)]
     pub(crate) fn with_row(&self, row: [u32; 2], limits: Limits) -> Result<Self> {
         let count = self.count.checked_add(1).ok_or(Error::Overflow)?;
         policy(count, limits.max_records)?;
