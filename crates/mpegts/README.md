@@ -396,8 +396,10 @@ and where it resumes is fixed per fault:
 | A final partial carrier | `Transport`, `Truncated` | the partial carrier | — |
 | Reserved `adaptation_field_control`, an adaptation field longer than the packet, invalid PCR reserved bits or extension (unless `ReaderLimits::pcr_policy` ignores the reserved bits), an OPCR without a PCR | `Transport` | that carrier, every partial section and PES | the next carrier |
 | A set transport error indicator, a scrambled payload | `Transport` on the PID | that carrier and the PID's partial PES or section | the next payload unit start of the PID |
-| A continuity counter gap, a third copy of a packet | `Continuity` on the PID | the PID's partial PES or section | the next payload unit start |
+| A continuity counter gap, or a repeated counter on a packet that is not a copy of the one before it (H.222.0 §2.4.3.3: byte for byte, its PCR apart; a changed OPCR is a change) | `Continuity` on the PID | the PID's partial PES or section | that packet when it starts a payload unit, else the next payload unit start |
+| A third copy of a packet | `Continuity` on the PID | the copy and the PID's partial PES or section | the next payload unit start |
 | A second copy of a packet (H.222.0 §2.4.3.3) | none | the copy | — |
+| A counter break that `discontinuity_indicator` announces (§2.4.3.5) | none; `Continuity` `SignalledDiscontinuity` | the PID's partial PES or section | that packet |
 | A PES without the start code, with forbidden `PTS_DTS_flags`, zero marker bits, a header beyond its declared length, or zero length on a non-video stream | `Pes` on the PID | the whole PES | the next payload unit start |
 | A finite PES whose last carrier holds bytes past its declared length (H.222.0 §2.4.3.7) | `Pes` on the PID, after the PES itself | the bytes past the declared length | the next payload unit start |
 | A PES or section cut off at the end of the source | `Pes` or `Psi`, `Truncated` | the partial PES or section | — |
