@@ -29,7 +29,6 @@
       "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (aac_frame_length includes header, CRC when present and payload)",
       "candidate": "refuses a final frame that ends before its declared byte extent",
       "reference": "returns the short final payload through the AAC demuxer and filter",
-      "compat": "compat::aac::return_truncated_adts_tail",
       "cases": [
         "truncated-crc-10",
         "truncated-8",
@@ -37,8 +36,8 @@
       ]
     },
     {
-      "reading": "Only one raw_data_block belongs to the selected frame parser",
-      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (number_of_raw_data_blocks_in_frame)",
+      "reading": "The frame parser implements one raw_data_block per frame",
+      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (number_of_raw_data_blocks_in_frame); the field allows up to four raw data blocks, so the frame is valid and the reference returns it whole",
       "candidate": "refuses a header declaring two raw blocks",
       "reference": "returns the unprotected payload without splitting the two declared blocks",
       "cases": [
@@ -55,8 +54,8 @@
       ]
     },
     {
-      "reading": "The frame parser selects the AAC-LC profile",
-      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (adts_fixed_header profile, profile_ObjectType) and AacAdtsParser's selected grammar",
+      "reading": "The frame parser implements the AAC-LC profile alone",
+      "clause": "ISO/IEC 13818-7 clause 6.2 (ADTS syntax), from the repository's ADTS wire parser and framing README (adts_fixed_header profile, profile_ObjectType) and AacAdtsParser's selected grammar; profile values 0 (Main), 2 (SSR) and 3 (LTP) are defined, so the streams are valid and the reference returns their frames",
       "candidate": "refuses non-LC profiles before emitting a source frame",
       "reference": "emits other MPEG audio object types and returns payloads",
       "cases": [

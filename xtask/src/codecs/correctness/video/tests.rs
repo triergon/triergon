@@ -270,6 +270,7 @@ echo '{"frame":1,"poc":27}' >&2"#;
                 run.to_str().unwrap(),
                 &tmp.0.join("summary.json"),
                 true,
+                false,
             );
             assert_eq!(result.is_ok(), accepted, "{row:?}: {result:?}");
         }

@@ -29,41 +29,47 @@
   "iterations": 1,
   "open_deviations": [
     {
-      "reading": "Interpret only the supported vpcC version",
-      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (version 1, version 0 deprecated)",
+      "reading": "A vpcC box of a version other than 1, or with no version, is refused here and ignored by the reference",
+      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (version 1, version 0 deprecated); the binding defines version 1 alone, and skipping a box of an unrecognised version is the general practice of ISO base media readers, so neither result departs from a clause",
       "candidate": "refuses version 0 and version 2 without deriving colour fields",
-      "reference": "skips the box and opens the track with unknown range and unspecified CICP",
-      "compat": "compat::vp9::skip_unsupported_configuration",
+      "reference": "opens the entry and reports unknown range and unspecified colour: nothing is read from the box",
       "cases": [
         "vpcc-version-zero-unsupported",
-        "vpcc-future-version-unsupported"
+        "vpcc-future-version-unsupported",
+        "vpcc-short-fullbox-0"
       ]
     },
     {
-      "reading": "The initialization extent exhausts the vpcC record",
-      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (codecInitializationDataSize is zero for VP9)",
+      "reading": "A byte after the zero codecInitializationDataSize is refused here and ignored by the reference",
+      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (codecInitializationDataSize is zero for VP9); it does not say what a reader does with a byte that follows the zero size",
       "candidate": "refuses bytes after the zero-length initialization field",
-      "reference": "opens the track using the fixed colour fields despite trailing bytes",
+      "reference": "reports the colour fields the record codes",
       "cases": [
         "vpcc-extra-record-tail"
       ]
     },
     {
-      "reading": "All fixed vpcC fields stay within their box",
+      "reading": "The colour fields of a vpcC record lie inside its box",
       "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (4 FullBox bytes and 8 fixed record bytes)",
-      "candidate": "refuses the incomplete box or record",
-      "reference": "publishes default colour fields if the box is empty or publishes fields read beyond its recorded extent",
-      "compat": "compat::vp9::skip_incomplete_configuration for a consumer needing default fields",
+      "candidate": "refuses the record that ends before its matrix coefficients",
+      "reference": "reports a matrix value taken from the byte after the box",
       "cases": [
-        "vpcc-short-record-5",
-        "vpcc-short-record-6",
-        "vpcc-short-record-7",
-        "vpcc-short-fullbox-0"
+        "vpcc-short-record-5"
       ]
     },
     {
-      "reading": "Channel configurations supported by the AAC-LC reader",
-      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (channelConfiguration)",
+      "reading": "A vpcC record cut inside codecInitializationDataSize is refused here; the reference reports its complete colour fields",
+      "clause": "VP Codec ISO Media File Format Binding v1.0, VP Codec Configuration Box, Syntax and Semantics (4 FullBox bytes and 8 fixed record bytes); it does not say whether a reader may use the colour fields of a record that ends inside codecInitializationDataSize",
+      "candidate": "refuses the record as incomplete",
+      "reference": "reports the colour fields, all of which lie inside the box",
+      "cases": [
+        "vpcc-short-record-6",
+        "vpcc-short-record-7"
+      ]
+    },
+    {
+      "reading": "The AAC-LC configuration reader does not implement channel configuration 13",
+      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (channelConfiguration); ISO/IEC 14496-3:2009/Amd.4 Table 1.19 defines channelConfiguration 13 (22.2), so the input is valid",
       "candidate": "refuses configuration 13 in both scopes",
       "reference": "opens configuration 13 and publishes 24 channels",
       "cases": [
@@ -71,8 +77,8 @@
       ]
     },
     {
-      "reading": "AAC-LC source configuration subset",
-      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (audioObjectType and the object-specific grammar)",
+      "reading": "The AAC-LC configuration reader implements no other audio object type",
+      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig) and 4.4.1 (GASpecificConfig), as documented by AacAscParser (audioObjectType and the object-specific grammar); audio object types 1 (Main), 3 (SSR), 4 (LTP), 17 (ER LC) and 23 (ER LD) are defined there, so the inputs are valid",
       "candidate": "refuses the non-LC object type in both scopes",
       "reference": "opens AAC Main, SSR, LTP, ER LC and ER LD and publishes two channels each",
       "cases": [
@@ -93,26 +99,35 @@
       ]
     },
     {
-      "reading": "Aligned E-AC-3 cannot begin with reserved strmtyp 3",
-      "clause": "ATSC A/52:2018 Annex E, 2.3.1.1 and Table E2.1",
-      "candidate": "refuses at offset zero on the reserved stream type",
-      "reference": "recovers 157 decoded eight-channel packets from the unaligned stream",
-      "compat": "compat::ac3::recover_aligned_syncframes",
+      "reading": "An explicit SBR extension that ends before sbrPresentFlag is an incomplete configuration",
+      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig syncExtensionType, extensionAudioObjectType and SBR/PS presence flags), as documented by AacAscParser: with 16 bits left the reader takes syncExtensionType 0x2b7 and extension object type 5, and sbrPresentFlag follows",
+      "candidate": "refuses the 32-bit configuration, whose last 16 bits are the extension type and object type",
+      "reference": "opens one channel",
       "cases": [
-        "the-great-wall-7-1"
+        "asc-sync-extent-32"
       ]
+    }
+  ],
+  "pending_module_requirements": [
+    "The E-AC-3 configuration view opens the frame reader with the E-AC-3 only selection and refuses a stream whose access units are an AC-3 syncframe (bsid 6) followed by an E-AC-3 dependent substream. ATSC A/52:2018 Annex E allows that pairing and the reference returns 157 access units of 4608 bytes. The view must read with either family selected and group the dependent substream with its independent AC-3 frame.",
+    "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
+  ],
+  "open_cases": [
+    {
+      "id": "the-great-wall-7-1",
+      "requirement": "The E-AC-3 configuration view opens the frame reader with the E-AC-3 only selection and refuses a stream whose access units are an AC-3 syncframe (bsid 6) followed by an E-AC-3 dependent substream. ATSC A/52:2018 Annex E allows that pairing and the reference returns 157 access units of 4608 bytes. The view must read with either family selected and group the dependent substream with its independent AC-3 frame."
     },
     {
-      "reading": "A selected ASC sync extension requires its advertised fields",
-      "clause": "ISO/IEC 14496-3 clause 1.6.2.1 (AudioSpecificConfig syncExtensionType, extensionAudioObjectType and SBR/PS presence flags), as documented by AacAscParser",
-      "candidate": "refuses the incomplete extension within the supplied bytes; the fractional-cut controls also verify truncation at the exact bit cutoff",
-      "reference": "opens the incomplete configuration and publishes the mono or stereo channel count",
-      "cases": [
-        "asc-sync-extent-27",
-        "asc-sync-extent-31",
-        "asc-sync-extent-32",
-        "asc-sync-extent-48"
-      ]
+      "id": "asc-sync-extent-27",
+      "requirement": "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
+    },
+    {
+      "id": "asc-sync-extent-31",
+      "requirement": "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
+    },
+    {
+      "id": "asc-sync-extent-48",
+      "requirement": "The AudioSpecificConfig reader looks for the 0x2b7 sync extension with 11 bits left and for the 0x548 parametric stereo extension with 11 bits left. The AudioSpecificConfig syntax of ISO/IEC 14496-3 clause 1.6.2.1 reads syncExtensionType only when bits_to_decode() is at least 16, and the second only when it is at least 12, so configurations with 11 or 15 bits after the base, or 11 after the SBR extension, are complete and the reader refuses them. The guards must be 16 and 12."
     }
   ],
   "open_unmeasured": [

@@ -1,6 +1,6 @@
 {
  "schema": "triergon.codecs.correctness-manifest.v1",
- "note": "Additional session operations over pinned inputs. Reset indices are zero-based within the selected track. Skip cases reuse every CRC-policy damage input.",
+ "note": "Additional session operations over pinned inputs. Reset indices are zero-based within the selected track. Skip cases reuse every CRC-policy damage input. At a reset index the reference decoder is flushed (avcodec_flush_buffers), the operation its API documents for a discontinuity.",
  "vectors": [
   {
    "lane": "session-flac",
@@ -2582,94 +2582,107 @@
   }
  ],
  "open_refusals": [
- {
-  "reason": "Flexible macroblock ordering (more than one slice group)",
-  "clause": "ITU-T H.264 (08/2024) §§7.4.2.2 and 8.2.2",
-  "detail": "flexible macroblock ordering (slice groups)",
-  "cases": [
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FM1_FT_E.264", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate_pictures": 103, "reference_pictures": 305}
-  ]
- },
- {
-  "reason": "4:2:2 and 4:4:4 chroma",
-  "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
-  "detail": "chroma format 4:2:2 / 4:4:4",
-  "cases": [
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR10_SONY_B.264", "sha256": "8aed60728f2b8be7dd4886a94e73702532941557d712e04680ce8c258be7ccec", "candidate_pictures": 0, "reference_pictures": 5},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR1_SONY_A.jsv", "sha256": "d0fcd8a6699d85f78eb80d8c2b2113ce6eb03347a0dc8ed19aa51b308986a589", "candidate_pictures": 0, "reference_pictures": 5}
-  ]
- },
- {
-  "reason": "Bit depth above 8",
-  "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
-  "detail": "bit depth > 8 (High 10 / High 4:2:2 / High 4:4:4)",
-  "cases": [
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR13_SONY_B.264", "sha256": "aa55f7064732a83c86fe228ba3cf8ab065b3129cf0f107c9fba469e57dd59881", "candidate_pictures": 0, "reference_pictures": 5},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR6_SONY_A.jsv", "sha256": "2ba847a7f9756eebd6a1204f9eecbb85628ebc6b424d5af2493bccb4fd0e2e61", "candidate_pictures": 0, "reference_pictures": 5},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I1_Panasonic_A.264", "sha256": "7c2f72b1091095840aed11dd659530531ad4d17ac59386145878fa51de6667f5", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I2_Panasonic_A.264", "sha256": "80a02559ed20f0e3cc54d84faf7d8f6d79530c10067e7e4bbc663ef6590838c9", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I3_Panasonic_A.264", "sha256": "66c5b426e66b97bb9951a590fc52435d5da03e73673a25bcfbdfddca72a9a117", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I4_Panasonic_A.264", "sha256": "fc9b9512027d6c6ae2034e583f12f109823fc1bab4cf6fa9fa8720975b4db37e", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I5_Panasonic_A.264", "sha256": "72d732367e063fcc619ab3aeea79f894ba6afa702bab9855824a6d338bb92ee4", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I6_Panasonic_A.264", "sha256": "eec1ad9774aa0d6844786980a83a2d8a0ffd16772c31e175dc6096396abc8afd", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I7_Panasonic_A.264", "sha256": "50046fc1758b1f6bc71e6bdb8f99f8b752f1d590579ebb62ea520f8960599700", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I1_Panasonic_A.264", "sha256": "c6b53da3735d92a98bbf4f363e5af00e821bc8f8debe1ec9999910c7511b964c", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I2_Panasonic_A.264", "sha256": "faca58ec834c82c63ddcf406374c7e76e112b3c5cc71adf0f016b1327f60bfbf", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I3_Panasonic_A.264", "sha256": "2fc5a02e724c6b726b489e45f08e17a0fb68f04fb0221bd30028776594e1677c", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I4_Panasonic_A.264", "sha256": "af882d0e6e8ad83d6e7f414b0378867125732df987fb0f364167cd998d6802bf", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I5_Panasonic_A.264", "sha256": "532df6d3e181bd8f4e148bca0489614d1f5b370dc0f2d4e2d933e1a72ebc1d62", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I6_Panasonic_A.264", "sha256": "3e462f2f89c0313b4a53121785a4ccf6a944bf7d9cacb9be48f6988f7a5bdf52", "candidate_pictures": 0, "reference_pictures": 10},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I7_Panasonic_A.264", "sha256": "b0d2b9fd99bc44033a9b22715644fd83fd563bdccabf6a092394a3e1f3507d4e", "candidate_pictures": 0, "reference_pictures": 10}
-  ]
- },
- {
-  "reason": "SP/SI slices",
-  "clause": "ITU-T H.264 (08/2024) §§7.4.3 and 8.6.2",
-  "detail": "SP/SI slices (Extended profile)",
-  "cases": [
-   {"id": "session-h264:.research/fate-samples/h264-conformance/sp1_bt_a.h264", "sha256": "2126d0489811e0bae6c3fd751506f883a673f9ecf1e4687d2cc1fbf791f6223f", "candidate_pictures": 6, "reference_pictures": 400},
-   {"id": "session-h264:.research/fate-samples/h264-conformance/sp2_bt_b.h264", "sha256": "6482a8a5a7f1c1600ed291dca5be8417b88dd4c6d47aa724afde17eafabe43bf", "candidate_pictures": 10, "reference_pictures": 400}
-  ]
- },
- {
-  "reason": "4:2:2 chroma",
-  "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
-  "detail": "chroma_format_idc 2 (4:2:2, RExt)",
-  "cases": [
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit", "sha256": "6063fb81c57d8596af226960f17b8dea06eb0661f97d76509ce331fa99e1ba46", "candidate_pictures": 0, "reference_pictures": 3},
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/IPCM_A_RExt_NEC.bit", "sha256": "0e707edd0d6c46427bddff2ded8dafe2420ffe1bc57a81501097d068ae293562", "candidate_pictures": 0, "reference_pictures": 1},
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin", "sha256": "91f796b1ef99c5391a4e1a2f3c5d64471290b642e272965201e7c7bb1bdac3be", "candidate_pictures": 0, "reference_pictures": 24},
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin", "sha256": "57f4ad77560ad1698218b181f09fa42059a45408e285283ab49ef74dad2f796c", "candidate_pictures": 0, "reference_pictures": 17}
-  ]
- },
- {
-  "reason": "4:4:4 chroma",
-  "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
-  "detail": "chroma_format_idc 3 (4:4:4, RExt)",
-  "cases": [
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/IPCM_B_RExt_NEC.bit", "sha256": "39f97b25079ce5f12340cce43c9dbd5821c5e23f44da58dd6f1942e135bc93b5", "candidate_pictures": 0, "reference_pictures": 1},
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit", "sha256": "e5e83ec018379e9bf83cad62a8f18ea7502261c8a554ab93cad16849154eca36", "candidate_pictures": 0, "reference_pictures": 2},
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit", "sha256": "5e1a69d29278e3e4cbd7695c7d3c229ac63c1e5e2b7af3b1c8f8062586ea1468", "candidate_pictures": 0, "reference_pictures": 2},
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit", "sha256": "74847e07f3298923da0e9b68b1f861930d227bd5ad83a834a8280cf042a7e78f", "candidate_pictures": 0, "reference_pictures": 20},
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/SAO_A_RExt_MediaTek_1.bit", "sha256": "6b0d45b5ca4d4919eaec5a98daf0eb4cebcc6d8b0a12b30b748386cc9358df13", "candidate_pictures": 0, "reference_pictures": 8}
-  ]
- },
- {
-  "reason": "Intra 4×4 transform-skip rotation",
-  "clause": "ITU-T H.265 (01/2026) §7.4.3.2.2 and §8.6",
-  "detail": "transform_skip_rotation_enabled_flag (RExt)",
-  "cases": [
-   {"id": "session-hevc:.research/fate-samples/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit", "sha256": "2b7110f868bfb62da8282a0a6300408d7abad70a5a940a6a0ba1fbc69536f870", "candidate_pictures": 0, "reference_pictures": 3}
-  ]
- }
+  {
+   "basis": "unimplemented",
+   "reference": "unimplemented",
+   "reason": "Flexible macroblock ordering (more than one slice group) is not implemented; the reference does not implement it either and conceals from the first such picture, so only the pictures before the refusal are compared",
+   "clause": "ITU-T H.264 (08/2024) §§7.4.2.2 and 8.2.2",
+   "detail": "flexible macroblock ordering (slice groups)",
+   "cases": [
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FM1_FT_E.264", "sha256": "09c66ef606be137cb001fd6f806deabdc493ce5a06469ed8ce6ae8811ce8fade", "candidate_pictures": 103}
+   ]
+  },
+  {
+   "basis": "unimplemented",
+   "reference": "decodes",
+   "reason": "4:2:2 and 4:4:4 chroma is not implemented; the reference decodes the stream, and the pictures before the refusal equal its first ones",
+   "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
+   "detail": "chroma format 4:2:2 / 4:4:4",
+   "cases": [
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR10_SONY_B.264", "sha256": "8aed60728f2b8be7dd4886a94e73702532941557d712e04680ce8c258be7ccec", "candidate_pictures": 0, "reference_pictures": 5},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR1_SONY_A.jsv", "sha256": "d0fcd8a6699d85f78eb80d8c2b2113ce6eb03347a0dc8ed19aa51b308986a589", "candidate_pictures": 0, "reference_pictures": 5}
+   ]
+  },
+  {
+   "basis": "unimplemented",
+   "reference": "decodes",
+   "reason": "Bit depth above 8 is not implemented; the reference decodes the stream, and the pictures before the refusal equal its first ones",
+   "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A",
+   "detail": "bit depth > 8 (High 10 / High 4:2:2 / High 4:4:4)",
+   "cases": [
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR13_SONY_B.264", "sha256": "aa55f7064732a83c86fe228ba3cf8ab065b3129cf0f107c9fba469e57dd59881", "candidate_pictures": 0, "reference_pictures": 5},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/Hi422FR6_SONY_A.jsv", "sha256": "2ba847a7f9756eebd6a1204f9eecbb85628ebc6b424d5af2493bccb4fd0e2e61", "candidate_pictures": 0, "reference_pictures": 5},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I1_Panasonic_A.264", "sha256": "7c2f72b1091095840aed11dd659530531ad4d17ac59386145878fa51de6667f5", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I2_Panasonic_A.264", "sha256": "80a02559ed20f0e3cc54d84faf7d8f6d79530c10067e7e4bbc663ef6590838c9", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I3_Panasonic_A.264", "sha256": "66c5b426e66b97bb9951a590fc52435d5da03e73673a25bcfbdfddca72a9a117", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I4_Panasonic_A.264", "sha256": "fc9b9512027d6c6ae2034e583f12f109823fc1bab4cf6fa9fa8720975b4db37e", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I5_Panasonic_A.264", "sha256": "72d732367e063fcc619ab3aeea79f894ba6afa702bab9855824a6d338bb92ee4", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I6_Panasonic_A.264", "sha256": "eec1ad9774aa0d6844786980a83a2d8a0ffd16772c31e175dc6096396abc8afd", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH10I7_Panasonic_A.264", "sha256": "50046fc1758b1f6bc71e6bdb8f99f8b752f1d590579ebb62ea520f8960599700", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I1_Panasonic_A.264", "sha256": "c6b53da3735d92a98bbf4f363e5af00e821bc8f8debe1ec9999910c7511b964c", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I2_Panasonic_A.264", "sha256": "faca58ec834c82c63ddcf406374c7e76e112b3c5cc71adf0f016b1327f60bfbf", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I3_Panasonic_A.264", "sha256": "2fc5a02e724c6b726b489e45f08e17a0fb68f04fb0221bd30028776594e1677c", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I4_Panasonic_A.264", "sha256": "af882d0e6e8ad83d6e7f414b0378867125732df987fb0f364167cd998d6802bf", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I5_Panasonic_A.264", "sha256": "532df6d3e181bd8f4e148bca0489614d1f5b370dc0f2d4e2d933e1a72ebc1d62", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I6_Panasonic_A.264", "sha256": "3e462f2f89c0313b4a53121785a4ccf6a944bf7d9cacb9be48f6988f7a5bdf52", "candidate_pictures": 0, "reference_pictures": 10},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/FRext/PPH422I7_Panasonic_A.264", "sha256": "b0d2b9fd99bc44033a9b22715644fd83fd563bdccabf6a092394a3e1f3507d4e", "candidate_pictures": 0, "reference_pictures": 10}
+   ]
+  },
+  {
+   "basis": "unimplemented",
+   "reference": "decodes",
+   "reason": "SP/SI slices are not implemented; the reference decodes the stream, and the pictures before the refusal equal its first ones",
+   "clause": "ITU-T H.264 (08/2024) §§7.4.3 and 8.6.2",
+   "detail": "SP/SI slices (Extended profile)",
+   "cases": [
+    {"id": "session-h264:.research/fate-samples/h264-conformance/sp1_bt_a.h264", "sha256": "2126d0489811e0bae6c3fd751506f883a673f9ecf1e4687d2cc1fbf791f6223f", "candidate_pictures": 6, "reference_pictures": 400},
+    {"id": "session-h264:.research/fate-samples/h264-conformance/sp2_bt_b.h264", "sha256": "6482a8a5a7f1c1600ed291dca5be8417b88dd4c6d47aa724afde17eafabe43bf", "candidate_pictures": 10, "reference_pictures": 400}
+   ]
+  },
+  {
+   "basis": "unimplemented",
+   "reference": "decodes",
+   "reason": "4:2:2 chroma is not implemented; the reference decodes the stream, and the pictures before the refusal equal its first ones",
+   "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
+   "detail": "chroma_format_idc 2 (4:2:2, RExt)",
+   "cases": [
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit", "sha256": "6063fb81c57d8596af226960f17b8dea06eb0661f97d76509ce331fa99e1ba46", "candidate_pictures": 0, "reference_pictures": 3},
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/IPCM_A_RExt_NEC.bit", "sha256": "0e707edd0d6c46427bddff2ded8dafe2420ffe1bc57a81501097d068ae293562", "candidate_pictures": 0, "reference_pictures": 1},
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin", "sha256": "91f796b1ef99c5391a4e1a2f3c5d64471290b642e272965201e7c7bb1bdac3be", "candidate_pictures": 0, "reference_pictures": 24},
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin", "sha256": "57f4ad77560ad1698218b181f09fa42059a45408e285283ab49ef74dad2f796c", "candidate_pictures": 0, "reference_pictures": 17}
+   ]
+  },
+  {
+   "basis": "unimplemented",
+   "reference": "decodes",
+   "reason": "4:4:4 chroma is not implemented; the reference decodes the stream, and the pictures before the refusal equal its first ones",
+   "clause": "ITU-T H.265 (01/2026) §7.4.3.2.1 and Annex A",
+   "detail": "chroma_format_idc 3 (4:4:4, RExt)",
+   "cases": [
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/IPCM_B_RExt_NEC.bit", "sha256": "39f97b25079ce5f12340cce43c9dbd5821c5e23f44da58dd6f1942e135bc93b5", "candidate_pictures": 0, "reference_pictures": 1},
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit", "sha256": "e5e83ec018379e9bf83cad62a8f18ea7502261c8a554ab93cad16849154eca36", "candidate_pictures": 0, "reference_pictures": 2},
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit", "sha256": "5e1a69d29278e3e4cbd7695c7d3c229ac63c1e5e2b7af3b1c8f8062586ea1468", "candidate_pictures": 0, "reference_pictures": 2},
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit", "sha256": "74847e07f3298923da0e9b68b1f861930d227bd5ad83a834a8280cf042a7e78f", "candidate_pictures": 0, "reference_pictures": 20},
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/SAO_A_RExt_MediaTek_1.bit", "sha256": "6b0d45b5ca4d4919eaec5a98daf0eb4cebcc6d8b0a12b30b748386cc9358df13", "candidate_pictures": 0, "reference_pictures": 8}
+   ]
+  },
+  {
+   "basis": "unimplemented",
+   "reference": "decodes",
+   "reason": "Intra 4×4 transform-skip rotation is not implemented; the reference decodes the stream, and the pictures before the refusal equal its first ones",
+   "clause": "ITU-T H.265 (01/2026) §7.4.3.2.2 and §8.6",
+   "detail": "transform_skip_rotation_enabled_flag (RExt)",
+   "cases": [
+    {"id": "session-hevc:.research/fate-samples/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit", "sha256": "2b7110f868bfb62da8282a0a6300408d7abad70a5a940a6a0ba1fbc69536f870", "candidate_pictures": 0, "reference_pictures": 3}
+   ]
+  }
  ],
  "open_deviations": [
   {
-   "reading": "Best-effort FLAC recovery preserves the admitted frame clock after CRC damage",
-   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave decoding of invalid data unspecified.",
-   "candidate": "Keeps the source clock of frames admitted by the numbered-header reader and skips decoder refusals. Device decode finishes with 27576 to 5033984 samples per channel across these inputs.",
-   "reference": "Native output admits a different damaged packet sequence, with the first differing frame clock earlier, later or absent. The device command terminates with an error after 80 to 86016 samples per channel.",
-   "compat": "compat::flac::damaged_stream_recovery",
+   "reading": "From a CRC-damaged FLAC stream the reader returns only the frames it can confirm; the reference returns damaged frames too",
+   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave the decoding of invalid data to the decoder, so no clause decides which frames of a damaged stream are returned",
+   "candidate": "Delivers the frames its numbered-header reader confirms, with their coded clocks: none where every frame is damaged, part of the stream elsewhere.",
+   "reference": "Admits damaged frames and publishes PCM decoded from them, with other packet extents and clocks; its device command may stop at its error-rate limit.",
    "cases": [
     "skip-flip-03 - blocksize 16.flac",
     "skip-flip-04 - blocksize 192.flac",
@@ -2686,459 +2699,357 @@
     "skip-flip-ff_s16_block16.flac",
     "skip-flip-ff_s16_block192.flac",
     "skip-flip-ff_s16_block576.flac",
-    "skip-flip-flac_s16_block16.flac"
+    "skip-flip-flac_s16_block16.flac",
+    "skip-flip-15 - only verbatim subframes.flac",
+    "skip-flip-27 - old format variable blocksize file created with Flake 0.11.flac",
+    "skip-flip-01 - blocksize 4096.flac",
+    "skip-flip-02 - blocksize 4608.flac",
+    "skip-flip-08 - blocksize 1000.flac",
+    "skip-flip-09 - blocksize 1937.flac",
+    "skip-flip-10 - blocksize 2304.flac",
+    "skip-flip-11 - partition order 8.flac",
+    "skip-flip-12 - qlp precision 15 bit.flac",
+    "skip-flip-13 - qlp precision 2 bit.flac",
+    "skip-flip-16 - partition order 8 containing escaped partitions.flac",
+    "skip-flip-17 - all fixed orders.flac",
+    "skip-flip-18 - precision search.flac",
+    "skip-flip-19 - samplerate 35467Hz.flac",
+    "skip-flip-20 - samplerate 39kHz.flac",
+    "skip-flip-21 - samplerate 22050Hz.flac",
+    "skip-flip-22 - 12 bit per sample.flac",
+    "skip-flip-23 - 8 bit per sample.flac",
+    "skip-flip-38 - 3 channels (3.0).flac",
+    "skip-flip-39 - 4 channels (4.0).flac",
+    "skip-flip-40 - 5 channels (5.0).flac",
+    "skip-flip-41 - 6 channels (5.1).flac",
+    "skip-flip-42 - 7 channels (6.1).flac",
+    "skip-flip-43 - 8 channels (7.1).flac",
+    "skip-flip-45 - no total number of samples set.flac",
+    "skip-flip-46 - no min-max framesize set.flac",
+    "skip-flip-47 - only STREAMINFO.flac",
+    "skip-flip-48 - Extremely large SEEKTABLE.flac",
+    "skip-flip-49 - Extremely large PADDING.flac",
+    "skip-flip-50 - Extremely large PICTURE.flac",
+    "skip-flip-51 - Extremely large VORBISCOMMENT.flac",
+    "skip-flip-52 - Extremely large APPLICATION.flac",
+    "skip-flip-54 - 1000x repeating VORBISCOMMENT.flac",
+    "skip-flip-56 - JPG PICTURE.flac",
+    "skip-flip-57 - PNG PICTURE.flac",
+    "skip-flip-58 - GIF PICTURE.flac",
+    "skip-flip-59 - AVIF PICTURE.flac",
+    "skip-flip-61 - predictor overflow check, 16-bit.flac",
+    "skip-flip-62 - predictor overflow check, 20-bit.flac",
+    "skip-flip-63 - predictor overflow check, 24-bit.flac",
+    "skip-flip-07 - 15 bit per sample.flac",
+    "skip-flip-08 - blocksize 65535.flac",
+    "skip-flip-09 - Rice partition order 15.flac",
+    "skip-flip-ff_s16_block16384.flac",
+    "skip-flip-ff_s16_block32768.flac",
+    "skip-flip-ff_s16_block4608.flac",
+    "skip-flip-ff_s16_ch1.flac",
+    "skip-flip-ff_s16_ch2.flac",
+    "skip-flip-ff_s16_ch3.flac",
+    "skip-flip-ff_s16_ch4.flac",
+    "skip-flip-ff_s16_ch5.flac",
+    "skip-flip-ff_s16_ch6.flac",
+    "skip-flip-ff_s16_ch7.flac",
+    "skip-flip-ff_s16_ch8.flac",
+    "skip-flip-ff_s16_exact_rice.flac",
+    "skip-flip-ff_s16_indep.flac",
+    "skip-flip-ff_s16_left_side.flac",
+    "skip-flip-ff_s16_level0.flac",
+    "skip-flip-ff_s16_level1.flac",
+    "skip-flip-ff_s16_level10.flac",
+    "skip-flip-ff_s16_level11.flac",
+    "skip-flip-ff_s16_level12.flac",
+    "skip-flip-ff_s16_level2.flac",
+    "skip-flip-ff_s16_level3.flac",
+    "skip-flip-ff_s16_level4.flac",
+    "skip-flip-ff_s16_level5.flac",
+    "skip-flip-ff_s16_level6.flac",
+    "skip-flip-ff_s16_level7.flac",
+    "skip-flip-ff_s16_level8.flac",
+    "skip-flip-ff_s16_level9.flac",
+    "skip-flip-ff_s16_lpc_cholesky.flac",
+    "skip-flip-ff_s16_lpc_fixed.flac",
+    "skip-flip-ff_s16_lpc_levinson.flac",
+    "skip-flip-ff_s16_lpc_none.flac",
+    "skip-flip-ff_s16_mid_side.flac",
+    "skip-flip-ff_s16_multi_dim_quant.flac",
+    "skip-flip-ff_s16_order_2level.flac",
+    "skip-flip-ff_s16_order_estimation.flac",
+    "skip-flip-ff_s16_order_log.flac",
+    "skip-flip-ff_s16_order_search.flac",
+    "skip-flip-ff_s16_partitions_0_0.flac",
+    "skip-flip-ff_s16_partitions_0_8.flac",
+    "skip-flip-ff_s16_partitions_8_8.flac",
+    "skip-flip-ff_s16_rate11025.flac",
+    "skip-flip-ff_s16_rate176400.flac",
+    "skip-flip-ff_s16_rate192000.flac",
+    "skip-flip-ff_s16_rate22050.flac",
+    "skip-flip-ff_s16_rate32000.flac",
+    "skip-flip-ff_s16_rate37800.flac",
+    "skip-flip-ff_s16_rate8000.flac",
+    "skip-flip-ff_s16_rate88200.flac",
+    "skip-flip-ff_s16_right_side.flac",
+    "skip-flip-ff_s16_wasted2.flac",
+    "skip-flip-ff_s24_ch1.flac",
+    "skip-flip-ff_s24_ch6.flac",
+    "skip-flip-ff_s24_indep.flac",
+    "skip-flip-ff_s24_left_side.flac",
+    "skip-flip-ff_s24_mid_side.flac",
+    "skip-flip-ff_s24_order1.flac",
+    "skip-flip-ff_s24_order12.flac",
+    "skip-flip-ff_s24_order32.flac",
+    "skip-flip-ff_s24_right_side.flac",
+    "skip-flip-ff_s24_wasted8.flac",
+    "skip-flip-ff_s32_ch1.flac",
+    "skip-flip-ff_s32_indep.flac",
+    "skip-flip-ff_s32_left_side.flac",
+    "skip-flip-ff_s32_mid_side.flac",
+    "skip-flip-ff_s32_order32.flac",
+    "skip-flip-ff_s32_right_side.flac",
+    "skip-flip-flac_5ch_back_mask.flac",
+    "skip-flip-flac_b12_ch7.flac",
+    "skip-flip-flac_b12_stereo.flac",
+    "skip-flip-flac_b15_stereo.flac",
+    "skip-flip-flac_b16_stereo.flac",
+    "skip-flip-flac_b20_ch7.flac",
+    "skip-flip-flac_b20_stereo.flac",
+    "skip-flip-flac_b24_stereo.flac",
+    "skip-flip-flac_b28_stereo.flac",
+    "skip-flip-flac_b31_stereo.flac",
+    "skip-flip-flac_b32_stereo.flac",
+    "skip-flip-flac_b4_stereo.flac",
+    "skip-flip-flac_b5_stereo.flac",
+    "skip-flip-flac_b8_ch7.flac",
+    "skip-flip-flac_b8_stereo.flac",
+    "skip-flip-flac_quad_side_mask.flac",
+    "skip-flip-flac_s16_adaptive_mid_side.flac",
+    "skip-flip-flac_s16_block65535.flac",
+    "skip-flip-flac_s16_ch1.flac",
+    "skip-flip-flac_s16_ch2.flac",
+    "skip-flip-flac_s16_ch3.flac",
+    "skip-flip-flac_s16_ch4.flac",
+    "skip-flip-flac_s16_ch5.flac",
+    "skip-flip-flac_s16_ch6.flac",
+    "skip-flip-flac_s16_ch7.flac",
+    "skip-flip-flac_s16_ch8.flac",
+    "skip-flip-flac_s16_exhaustive.flac",
+    "skip-flip-flac_s16_level0.flac",
+    "skip-flip-flac_s16_level3.flac",
+    "skip-flip-flac_s16_level5.flac",
+    "skip-flip-flac_s16_no_mid_side.flac",
+    "skip-flip-flac_s16_partition15.flac",
+    "skip-flip-flac_s16_precision5.flac",
+    "skip-flip-flac_s16_rate1.flac",
+    "skip-flip-flac_s16_wasted3.flac",
+    "skip-flip-flac_s24_lax_order32.flac",
+    "skip-flip-flac_s32_lax_order32.flac"
    ]
   },
   {
-   "reading": "A terminal source error is distinct from a refused FLAC access unit",
-   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave decoding of invalid data unspecified.",
+   "reading": "After CRC damage the FLAC reader ends the stream with Invalid where the reference decodes on",
+   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave the decoding of invalid data to the decoder, so no clause decides which frames of a damaged stream are returned",
    "candidate": "Delivers 93056 samples per channel before the reader fails Invalid. The second block starts at 1451247 ns.",
    "reference": "Native decode emits 1014345 samples per channel with the second block untimestamped. The device command gives 3904 samples per channel before terminating with an error.",
-   "compat": "compat::flac::damaged_stream_recovery",
-   "cases": [
-    "skip-flip-25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac"
-   ]
+   "cases": ["skip-flip-25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac"]
   },
   {
-   "reading": "FLAC recovery admits only the numbered extents confirmed by the reader",
-   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave decoding of invalid data unspecified.",
-   "candidate": "Emits 191582 samples per channel, with the first admitted 4096-sample block at 650158730 ns.",
-   "reference": "Emits 224350 samples per channel and starts the first 4096-sample block at zero. Both device paths finish.",
-   "compat": "compat::flac::damaged_stream_recovery",
-   "cases": [
-    "skip-flip-15 - only verbatim subframes.flac"
-   ]
-  },
-  {
-   "reading": "Report-only E-AC-3 recovery forwards the decoded block clock",
-   "clause": "ATSC A/52:2018 Annex E §3.2 requires checked concealment after a failed syncframe CRC. These sessions use the decoder's separately documented report-only CRC policy and preserve caller packet time.",
-   "candidate": "Emits the report-only decoder output with the first 1536-sample block at zero and equal total device sample counts.",
-   "reference": "Leaves the first block untimestamped. The device reports syntax errors while emitting audio, with maximum device differences of 17957 to 49597 LSB.",
-   "compat": "compat::eac3::damaged_stream_recovery",
+   "reading": "After a failed E-AC-3 CRC the report-only decoder and the reference recover different PCM, and only the session stamps the first block",
+   "clause": "ATSC A/52:2018 Annex E §3.2 has a decoder conceal after a failed syncframe CRC; these sessions run the report-only CRC policy instead, and no clause defines what either side returns from a damaged frame",
+   "candidate": "Emits the report-only decode with the first block at 0 ns and the same sample counts on both paths.",
+   "reference": "Leaves the first block untimestamped and decodes other PCM from the damaged frames: up to 3.2 of full scale on the planar path and 49597 LSB on the device path, and 256 fewer device samples in one stream.",
    "cases": [
     "skip-flip-csi_miami_5.1_256_spx_small.eac3",
     "skip-flip-csi_miami_stereo_128_spx.eac3",
     "skip-flip-csi_miami_stereo_128_spx_small.eac3",
-    "skip-flip-matrix2_commentary1_stereo_192_small.eac3"
-   ]
-  },
-  {
-   "reading": "Report-only E-AC-3 recovery retains decoded one-block units",
-   "clause": "ATSC A/52:2018 Annex E §3.2 requires checked concealment after a failed syncframe CRC. These sessions use the decoder's separately documented report-only CRC policy and preserve caller packet time.",
-   "candidate": "Emits a 256-sample block at zero and 24832 samples per channel on both output paths.",
-   "reference": "Leaves the first block untimestamped. Native output also emits 24832 samples per channel, while the device path emits 24576.",
-   "compat": "compat::eac3::damaged_stream_recovery",
-   "cases": [
+    "skip-flip-matrix2_commentary1_stereo_192_small.eac3",
     "skip-flip-serenity_english_5.1_1536_small.eac3"
    ]
   },
   {
-   "reading": "Recovery after a reserved E-AC-3 stream type in a compound packet",
-   "clause": "ATSC A/52:2018 Annex E §§2.3.1.1–2.3.1.3 reserve stream type 3, require independent substream 0 first, and define each syncframe extent. Section 3.2 defines checked CRC concealment.",
-   "candidate": "Recovers from a reserved leading header with a 2588-byte extent crossing the next sync at offset 2304. Delivers 241152 samples per channel.",
-   "reference": "Delivers 241152 samples per channel with the same block clock sequence and reports damaged block syntax. Device PCM differs by up to 185 LSB.",
-   "compat": "compat::eac3::damaged_stream_recovery",
+   "reading": "After CRC damage to an AC-3 frame followed by an E-AC-3 dependent substream the report-only decoder and the reference recover different PCM",
+   "clause": "ATSC A/52:2018 Annex E §§2.3.1.1–2.3.1.3 define an access unit of an independent substream and its dependents, here an AC-3 syncframe (bsid 6) of 2304 bytes and a dependent E-AC-3 syncframe; §3.2 defines checked concealment, which the report-only policy does not apply, and no clause defines the PCM of a damaged frame",
+   "candidate": "Delivers 157 blocks and 241152 samples per channel with the reference's block clocks.",
+   "reference": "Delivers the same counts and clocks and reports damaged block syntax; planar PCM differs by up to 0.0273 and device PCM by up to 185 LSB.",
+   "cases": ["skip-flip-the_great_wall_7.1.eac3"]
+  },
+  {
+   "reading": "The Opus drain tail has no independent caller packet timestamp",
+   "clause": "RFC 7845 §§4.3–4.4 describe the 48 kHz PCM position and end trimming; AudioSession timestamps output from the first input unit",
+   "candidate": "emits the final 24 samples at 48000 Hz as a drain-only untimestamped block; planar PCM and device output match",
+   "reference": "emits the same 24 samples with the preceding block's PTS, although the samples follow that block",
    "cases": [
-    "skip-flip-the_great_wall_7.1.eac3"
+    "session-opus:.research/opus-generated/silk_nb_10.opus",
+    "session-opus:.research/opus-generated/silk_nb_20.opus",
+    "session-opus:.research/opus-generated/silk_nb_40.opus",
+    "session-opus:.research/opus-generated/silk_nb_60.opus"
    ]
   },
- {
-  "reading": "The Opus drain tail has no independent caller packet timestamp",
-  "clause": "RFC 7845 §§4.3–4.4 describe the 48 kHz PCM position and end trimming; AudioSession timestamps output from the first input unit",
-  "candidate": "emits the final 24 samples at 48000 Hz as a drain-only untimestamped block; planar PCM and device output match",
-  "reference": "emits the same 24 samples with the preceding block's PTS, although the samples follow that block",
-  "compat": "compat::opus::repeat_last_packet_pts_at_drain",
-  "cases": [
-   "session-opus:.research/opus-generated/silk_nb_10.opus",
-   "session-opus:.research/opus-generated/silk_nb_20.opus",
-   "session-opus:.research/opus-generated/silk_nb_40.opus",
-   "session-opus:.research/opus-generated/silk_nb_60.opus"
-  ]
- },
- {
-  "reading": "A Matroska Opus drain tail has no independent Block time",
-  "clause": "RFC 9559 §§10.1, 11.2 and Matroska codec mapping draft §3.4.32 (A_OPUS): the Block timestamp comes from the source; decoder drain emits no Block",
-  "candidate": "emits 24 drain-only samples with an absent PTS after the source block at 25020000000 ns",
-  "reference": "reuses 25020000000 ns for the final 24 samples; PCM and device output match",
-  "compat": "compat::opus::repeat_last_packet_pts_at_drain",
-  "cases": [
-   "session-opus:.research/fate-samples/opus/testvector02.mka"
-  ]
- },
- {
-  "reading": "AAC history reset starts from a fresh signal state",
-  "clause": "ISO/IEC 14496-3 subpart 4, AAC filterbank and PNS (see codec-aac README); TrackDecoder::reset drops signal history, including overlap and noise",
-  "candidate": "session ADTS and configured MOV resets match the reference reopened at the same packet indices within 5.97e-8 and 2.24e-8 maximum absolute planar error, respectively",
-  "reference": "decoder buffer flush differs from fresh open at the reset packets, by up to 0.02064 on ADTS and 0.00967 on MOV",
-  "compat": "compat::aac::retain_signal_history_on_flush",
-  "cases": [
-   "reset-aac-aac-lc-stereo.aac",
-   "reset-track-reset-avc-aac-quicktime-7-1.mov"
-  ]
- },
- {
-  "reading": "AC-3 history reset restarts synthesis and its noise sequence",
-  "clause": "ATSC A/52:2018 §§7.3.4 and 7.9 describe dither and synthesis overlap; TrackDecoder::reset drops signal history",
-  "candidate": "the session and track decoders give identical PCM and match a freshly reopened reference within 4.48e-8 maximum absolute planar error",
-  "reference": "flushing at packets 12 and 24 differs from fresh open by up to 0.279032, with the same sample count",
-  "compat": "compat::ac3::retain_signal_history_on_flush",
-  "cases": [
-   "reset-ac3-millers_crossing_4.0.ac3",
-   "reset-track-reset-millers_crossing_4.0.ac3"
-  ]
- },
- {
-  "reading": "A decoder reset in the middle of an AVC GOP removes required references",
-  "clause": "ITU-T H.264 (08/24) §§8.2.4 and 8.2.5 define reference lists and decoded reference picture marking, including the DPB reset at IDR",
-  "candidate": "publishes ten pictures before reset and reports Invalid for an unavailable reference index when decoding continues",
-  "reference": "publishes the same ten pictures and reports unavailable co-located POCs in the log while the command returns success",
-  "compat": "compat::h264::finish_after_missing_reference",
-  "cases": [
-   "reset-h264-h264-high-720p.h264"
-  ]
- },
- {
-  "reading": "The final short FLAC frame keeps its coded fixed-block sample position after a rate change",
-  "clause": "RFC 9639 §§9, 9.1.1, 9.1.2 and 9.1.5: this stream codes frame number 135 with a nominal fixed block size of 4096 samples",
-  "candidate": "retains sample index 552960, or 17280000000 ns on the track's 32000 Hz tick base; the short block has 2787 samples",
-  "reference": "uses 551594 ticks, or 17237312500 ns; PCM and the block size match",
-  "compat": "compat::flac::retime_short_frame_after_rate_change",
-  "cases": [
-   "session-flac:.research/flac-test-files/uncommon/01 - changing samplerate.flac"
-  ]
- },
- {
-  "reading": "A historical Flake frame number retains the source clock interpretation",
-  "clause": "RFC 9639 §§9.1 and 9.1.5 specify fixed-size frame numbering; this stream instead encodes nonconsecutive numbers with the fixed flag. The elementary reader documents its handling of an advertised block-size range",
-  "candidate": "uses the last header's coded number and 4130-sample size, producing 105728000000000 ns",
-  "reference": "infers 117483415510204 ns from the preceding packet's end; both return 390 blocks and 1133090 samples per channel",
-  "compat": "compat::flac::infer_final_clock_from_previous_frame",
-  "cases": [
-   "session-flac:.research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac"
-  ]
- },
- {
-  "reading": "Markerless FLAC takes its clock from the first confirmed frame",
-  "clause": "RFC 9639 §§6 and 9.1.2–9.1.5 define the marker and coded frame facts; the elementary reader documents joining a stream without STREAMINFO at a confirmed frame",
-  "candidate": "publishes the first valid 4096-sample block at 1200657414966 ns on the 44100 Hz clock stated in its header",
-  "reference": "reports the same PCM using a 32000 Hz time base and publishes 1654656000000 ns for the first decoded block",
-  "compat": "compat::flac::guess_markerless_time_base",
-  "cases": [
-   "session-flac:.research/flac-test-files/uncommon/11 - file starting with unparsable data.flac"
-  ]
- },
- {
-  "reading": "The damaged Flake stream has no confirmed complete frame",
-  "clause": "RFC 9639 §§9.1, 9.1.5, 9.1.8 and 9.3: coded numbering and header and footer integrity establish the frame; all 390 original extents fail the frame CRC after damage",
-  "candidate": "refuses with Invalid before publishing a block",
-  "reference": "decodes 354 blocks and 1024704 samples per channel",
-  "compat": "compat::flac::admit_crc_failed_legacy_frames",
-  "cases": [
-   "skip-flip-27 - old format variable blocksize file created with Flake 0.11.flac"
-  ]
- },
- {
-  "reading": "Recovered FLAC frames keep their coded positions after a damaged interval",
-  "clause": "RFC 9639 §§9.1, 9.1.5 and 9.3: a FLAC frame supplies a coded position and ends at its frame CRC",
-  "candidate": "admits 216 decoded blocks and starts block 98 at 2275555556 ns in both streams; the stereo path also finishes all 220500 samples per channel",
-  "reference": "decodes identical planar PCM, leaves block 98 untimestamped after merging source packets, and stops the stereo path at 104448 samples per channel on the inserted-junk stream",
-  "compat": "compat::flac::merge_packets_over_damage",
-  "cases": [
-   "skip-flac_corrupt.flac",
-   "skip-flac_mid_junk.flac"
-  ]
- },
- {
-  "reading": "A terminal ID3v1 tag is outside the FLAC frame extent",
-  "clause": "RFC 9639 §§6, 9.1 and 9.3: FLAC audio consists of complete frames ending at their CRC",
-  "candidate": "finishes the 220500 samples per channel, agreeing on the native PCM and all block clocks, with a clean stereo EOF",
-  "reference": "appends 128 tag bytes to the last packet; the stereo decoder therefore reports invalid data after emitting 220500 samples per channel",
-  "compat": "compat::flac::append_id3v1_to_last_frame",
-  "cases": [
-   "skip-flac_id3.flac"
-  ]
- },
- {
-  "reading": "Raw E-AC-3 time starts at the first confirmed syncframe",
-  "clause": "ATSC A/52:2018 §3.4 and Annex E §§2.2.1 and 2.3.1.4–2.3.1.5: sync word, sample rate and blocks per syncframe",
-  "candidate": "starts the 651 decoded blocks at 0 ns, after discarding the 352-byte prefix without a sync word",
-  "reference": "starts the same 651 decoded blocks at 32000000 ns after publishing the prefix as a packet; PCM comparisons match under the existing bounds",
-  "compat": "compat::ac3::reference_junk_packet_clock",
-  "cases": [
-   "session-eac3:.research/codec-derived/ac3/csi_miami_stereo_128_spx.eac3",
-   "session-eac3:.research/fate-samples/eac3/csi_miami_stereo_128_spx.eac3"
-  ]
- },
- {
-  "reading": "FLAC channel masks can name top speakers in the source layout",
-  "clause": "RFC 9639 §8.6.2: an explicit WAVEFORMATEXTENSIBLE_CHANNEL_MASK supplies channel meaning and order",
-  "candidate": "publishes 52920 samples per channel in FL+TBC+TBR and the same number of stereo device samples per channel",
-  "reference": "matches the native PCM and timeline but the stereo converter refuses the decoded layout and produces zero device samples",
-  "cases": [
-   "session-flac:.research/flac-generated/flac_3ch_odd_mask.flac"
-  ]
- },
- {
-  "reading": "A damaged FLAC stream with no confirmed frame",
-  "clause": "RFC 9639 §§6, 9.1 and 9.3: frame synchronization and CRC checks, with decoder behavior on invalid data unspecified",
-  "candidate": "the elementary reader finds no confirmed frame; the session delivers no PCM",
-  "reference": "admits packets and publishes decoded PCM from the damaged stream",
-  "compat": "compat::flac::admit_unconfirmed_frames",
-  "cases": [
-   "skip-flip-01 - blocksize 4096.flac",
-   "skip-flip-02 - blocksize 4608.flac",
-   "skip-flip-08 - blocksize 1000.flac",
-   "skip-flip-09 - blocksize 1937.flac",
-   "skip-flip-10 - blocksize 2304.flac",
-   "skip-flip-11 - partition order 8.flac",
-   "skip-flip-12 - qlp precision 15 bit.flac",
-   "skip-flip-13 - qlp precision 2 bit.flac",
-   "skip-flip-16 - partition order 8 containing escaped partitions.flac",
-   "skip-flip-17 - all fixed orders.flac",
-   "skip-flip-18 - precision search.flac",
-   "skip-flip-19 - samplerate 35467Hz.flac",
-   "skip-flip-20 - samplerate 39kHz.flac",
-   "skip-flip-21 - samplerate 22050Hz.flac",
-   "skip-flip-22 - 12 bit per sample.flac",
-   "skip-flip-23 - 8 bit per sample.flac",
-   "skip-flip-38 - 3 channels (3.0).flac",
-   "skip-flip-39 - 4 channels (4.0).flac",
-   "skip-flip-40 - 5 channels (5.0).flac",
-   "skip-flip-41 - 6 channels (5.1).flac",
-   "skip-flip-42 - 7 channels (6.1).flac",
-   "skip-flip-43 - 8 channels (7.1).flac",
-   "skip-flip-45 - no total number of samples set.flac",
-   "skip-flip-46 - no min-max framesize set.flac",
-   "skip-flip-47 - only STREAMINFO.flac",
-   "skip-flip-48 - Extremely large SEEKTABLE.flac",
-   "skip-flip-49 - Extremely large PADDING.flac",
-   "skip-flip-50 - Extremely large PICTURE.flac",
-   "skip-flip-51 - Extremely large VORBISCOMMENT.flac",
-   "skip-flip-52 - Extremely large APPLICATION.flac",
-   "skip-flip-54 - 1000x repeating VORBISCOMMENT.flac",
-   "skip-flip-56 - JPG PICTURE.flac",
-   "skip-flip-57 - PNG PICTURE.flac",
-   "skip-flip-58 - GIF PICTURE.flac",
-   "skip-flip-59 - AVIF PICTURE.flac",
-   "skip-flip-61 - predictor overflow check, 16-bit.flac",
-   "skip-flip-62 - predictor overflow check, 20-bit.flac",
-   "skip-flip-63 - predictor overflow check, 24-bit.flac",
-   "skip-flip-07 - 15 bit per sample.flac",
-   "skip-flip-08 - blocksize 65535.flac",
-   "skip-flip-09 - Rice partition order 15.flac",
-   "skip-flip-ff_s16_block16384.flac",
-   "skip-flip-ff_s16_block32768.flac",
-   "skip-flip-ff_s16_block4608.flac",
-   "skip-flip-ff_s16_ch1.flac",
-   "skip-flip-ff_s16_ch2.flac",
-   "skip-flip-ff_s16_ch3.flac",
-   "skip-flip-ff_s16_ch4.flac",
-   "skip-flip-ff_s16_ch5.flac",
-   "skip-flip-ff_s16_ch6.flac",
-   "skip-flip-ff_s16_ch7.flac",
-   "skip-flip-ff_s16_ch8.flac",
-   "skip-flip-ff_s16_exact_rice.flac",
-   "skip-flip-ff_s16_indep.flac",
-   "skip-flip-ff_s16_left_side.flac",
-   "skip-flip-ff_s16_level0.flac",
-   "skip-flip-ff_s16_level1.flac",
-   "skip-flip-ff_s16_level10.flac",
-   "skip-flip-ff_s16_level11.flac",
-   "skip-flip-ff_s16_level12.flac",
-   "skip-flip-ff_s16_level2.flac",
-   "skip-flip-ff_s16_level3.flac",
-   "skip-flip-ff_s16_level4.flac",
-   "skip-flip-ff_s16_level5.flac",
-   "skip-flip-ff_s16_level6.flac",
-   "skip-flip-ff_s16_level7.flac",
-   "skip-flip-ff_s16_level8.flac",
-   "skip-flip-ff_s16_level9.flac",
-   "skip-flip-ff_s16_lpc_cholesky.flac",
-   "skip-flip-ff_s16_lpc_fixed.flac",
-   "skip-flip-ff_s16_lpc_levinson.flac",
-   "skip-flip-ff_s16_lpc_none.flac",
-   "skip-flip-ff_s16_mid_side.flac",
-   "skip-flip-ff_s16_multi_dim_quant.flac",
-   "skip-flip-ff_s16_order_2level.flac",
-   "skip-flip-ff_s16_order_estimation.flac",
-   "skip-flip-ff_s16_order_log.flac",
-   "skip-flip-ff_s16_order_search.flac",
-   "skip-flip-ff_s16_partitions_0_0.flac",
-   "skip-flip-ff_s16_partitions_0_8.flac",
-   "skip-flip-ff_s16_partitions_8_8.flac",
-   "skip-flip-ff_s16_rate11025.flac",
-   "skip-flip-ff_s16_rate176400.flac",
-   "skip-flip-ff_s16_rate192000.flac",
-   "skip-flip-ff_s16_rate22050.flac",
-   "skip-flip-ff_s16_rate32000.flac",
-   "skip-flip-ff_s16_rate37800.flac",
-   "skip-flip-ff_s16_rate8000.flac",
-   "skip-flip-ff_s16_rate88200.flac",
-   "skip-flip-ff_s16_right_side.flac",
-   "skip-flip-ff_s16_wasted2.flac",
-   "skip-flip-ff_s24_ch1.flac",
-   "skip-flip-ff_s24_ch6.flac",
-   "skip-flip-ff_s24_indep.flac",
-   "skip-flip-ff_s24_left_side.flac",
-   "skip-flip-ff_s24_mid_side.flac",
-   "skip-flip-ff_s24_order1.flac",
-   "skip-flip-ff_s24_order12.flac",
-   "skip-flip-ff_s24_order32.flac",
-   "skip-flip-ff_s24_right_side.flac",
-   "skip-flip-ff_s24_wasted8.flac",
-   "skip-flip-ff_s32_ch1.flac",
-   "skip-flip-ff_s32_indep.flac",
-   "skip-flip-ff_s32_left_side.flac",
-   "skip-flip-ff_s32_mid_side.flac",
-   "skip-flip-ff_s32_order32.flac",
-   "skip-flip-ff_s32_right_side.flac",
-   "skip-flip-flac_5ch_back_mask.flac",
-   "skip-flip-flac_b12_ch7.flac",
-   "skip-flip-flac_b12_stereo.flac",
-   "skip-flip-flac_b15_stereo.flac",
-   "skip-flip-flac_b16_stereo.flac",
-   "skip-flip-flac_b20_ch7.flac",
-   "skip-flip-flac_b20_stereo.flac",
-   "skip-flip-flac_b24_stereo.flac",
-   "skip-flip-flac_b28_stereo.flac",
-   "skip-flip-flac_b31_stereo.flac",
-   "skip-flip-flac_b32_stereo.flac",
-   "skip-flip-flac_b4_stereo.flac",
-   "skip-flip-flac_b5_stereo.flac",
-   "skip-flip-flac_b8_ch7.flac",
-   "skip-flip-flac_b8_stereo.flac",
-   "skip-flip-flac_quad_side_mask.flac",
-   "skip-flip-flac_s16_adaptive_mid_side.flac",
-   "skip-flip-flac_s16_block65535.flac",
-   "skip-flip-flac_s16_ch1.flac",
-   "skip-flip-flac_s16_ch2.flac",
-   "skip-flip-flac_s16_ch3.flac",
-   "skip-flip-flac_s16_ch4.flac",
-   "skip-flip-flac_s16_ch5.flac",
-   "skip-flip-flac_s16_ch6.flac",
-   "skip-flip-flac_s16_ch7.flac",
-   "skip-flip-flac_s16_ch8.flac",
-   "skip-flip-flac_s16_exhaustive.flac",
-   "skip-flip-flac_s16_level0.flac",
-   "skip-flip-flac_s16_level3.flac",
-   "skip-flip-flac_s16_level5.flac",
-   "skip-flip-flac_s16_no_mid_side.flac",
-   "skip-flip-flac_s16_partition15.flac",
-   "skip-flip-flac_s16_precision5.flac",
-   "skip-flip-flac_s16_rate1.flac",
-   "skip-flip-flac_s16_wasted3.flac",
-   "skip-flip-flac_s24_lax_order32.flac",
-   "skip-flip-flac_s32_lax_order32.flac"
-  ]
- },
- {
-  "reading": "A damaged FLAC stream without confirmed sync in the bounded scan",
-  "clause": "RFC 9639 §§6, 9.1 and 9.3; the elementary reader documents bounded frame confirmation",
-  "candidate": "the elementary reader refuses at its frame sync scan limit; the session delivers no PCM",
-  "reference": "finds packets and publishes decoded PCM",
-  "compat": "compat::flac::scan_past_unconfirmed_frames",
-  "cases": [
-   "skip-flip-26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
-   "skip-flip-28 - high resolution audio, default settings.flac",
-   "skip-flip-29 - high resolution audio, blocksize 16384.flac",
-   "skip-flip-30 - high resolution audio, blocksize 13456.flac",
-   "skip-flip-31 - high resolution audio, using only 32nd order predictors.flac",
-   "skip-flip-32 - high resolution audio, partition order 8 containing escaped partitions.flac",
-   "skip-flip-33 - samplerate 192kHz.flac",
-   "skip-flip-34 - samplerate 192kHz, using only 32nd order predictors.flac",
-   "skip-flip-35 - samplerate 134560Hz.flac",
-   "skip-flip-36 - samplerate 384kHz.flac",
-   "skip-flip-37 - 20 bit per sample.flac",
-   "skip-flip-44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
-   "skip-flip-05 - 32bps audio.flac",
-   "skip-flip-ff_s24_ch8.flac",
-   "skip-flip-ff_s32_ch6.flac",
-   "skip-flip-ff_s32_ch8.flac",
-   "skip-flip-flac_s20_rate768k.flac",
-   "skip-flip-flac-16-44k-stereo.flac",
-   "skip-flip-flac-24-96k-5.1.flac"
-  ]
- },
- {
-  "reading": "The session clocks AC-3 at the exact sample rate",
-  "clause": "ATSC A/52:2018 §§5.3, 5.4.1.3 and 5.4.1.4: six 256-sample blocks per syncframe and fscod signals 44.1 kHz",
-  "candidate": "second frame starts at 34829932 ns with 1536 samples",
-  "reference": "second frame starts at 34822222 ns with the same 1536 samples, after rounding to a 90 kHz clock",
-  "compat": "compat::ac3::reference_packet_clock",
-  "cases": [
-   "session-ac3:.research/codec-derived/ac3/diatonis.ac3",
-   "skip-flip-diatonis.ac3"
-  ]
- },
- {
-  "reading": "FLAC coded rate and sample position remain available at 768 kHz",
-  "clause": "RFC 9639 §§9.1.1–9.1.2 and 9.1.5: the frame header gives block size, explicit sample rate and coded position",
-  "candidate": "publishes the final block with the packet clock derived from its coded sample position",
-  "reference": "decodes the same PCM but leaves the final block timestamp absent",
-  "compat": "compat::flac::omit_768khz_packet_clock",
-  "cases": [
-   "session-flac:.research/flac-test-files/uncommon/06 - samplerate 768kHz.flac",
-   "session-flac:.research/flac-generated/flac_s20_rate768k.flac"
-  ]
- },
- {
-  "reading": "Matroska CodecDelay adjusts the PTS in nanoseconds",
-  "clause": "RFC 9559 §§5.1.4.1.25 and 11.2: subtract CodecDelay in nanoseconds from each block timestamp",
-  "candidate": "publishes the second Opus block at 14500000 ns",
-  "reference": "publishes the second block at 14000000 ns, with equal decoded samples",
-  "compat": "compat::matroska::millisecond_codec_delay_clock",
-  "cases": [
-   "session-opus:.research/fate-samples/opus/silk-lbrr-mono.mka"
-  ]
- },
- {
-  "reading": "ADTS does not extend a final frame past the source",
-  "clause": "ISO/IEC 13818-7:2004 §§6.2.2 and 8.1.1, frame_length counts all frame bytes including the header and error check",
-  "candidate": "decodes the complete prefix and reports Truncated when only 265 bytes remain of a 345-byte frame",
-  "reference": "finishes with its recovered PCM after admitting the short tail as a packet",
-  "compat": "compat::adts::decode_partial_tail",
-  "cases": [
-   "session-aac:.research/codec-derived/aac/foo.adts"
-  ]
- },
- {
-  "reading": "ADTS sampling_frequency_index is fixed over a sequence",
-  "clause": "ISO/IEC 13818-7:2004 §§6.2.1 and 8.1.1, Table 8 and adts_fixed_header semantics",
-  "candidate": "ends the 44.1 kHz sequence after 432 blocks when the coded frequency index changes from 4 to 6",
-  "reference": "continues with 2048-sample SBR frames at 48 kHz across the concatenation",
-  "compat": "compat::adts::concatenated_rate_changes",
-  "cases": [
-   "rate-change-lc-to-implicit-sbr.adts"
-  ]
- },
- {
-  "reading": "Vorbis output follows the completed-sample clock at a block size transition",
-  "clause": "Vorbis I §§1.3.2 and A.2: each lapped output spans the centers of successive windows; Ogg granules count finished PCM samples per channel",
-  "candidate": "matches the independently accumulated sample clock on all blocks, e.g. starts the 576-sample block at 407800454 ns in 1.0-test_small.ogg",
-  "reference": "publishes the same decoded counts and device PCM but starts that block at 417959184 ns and similarly shifts clocks at transitions in these inputs",
-  "compat": "compat::ogg::vorbis_reference_frame_clock",
-  "cases": [
-   "session-vorbis:.research/fate-samples/vorbis/1.0-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/1.0.1-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/6.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/beta3-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/beta4-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/chain-test2_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/highrate-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/lsp-test2_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/lsp-test3_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/lsp-test4_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/lsp-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/mono_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/moog_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/rc1-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/rc2-test2_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/rc2-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/rc3-test_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/sleepzor_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/test-short2_small.ogg",
-   "session-vorbis:.research/fate-samples/vorbis/vorbis_chapter_extension_demo.ogg"
-  ]
- }
-]
+  {
+   "reading": "A Matroska Opus drain tail has no independent Block time",
+   "clause": "RFC 9559 §§10.1, 11.2 and Matroska codec mapping draft §3.4.32 (A_OPUS): the Block timestamp comes from the source; decoder drain emits no Block",
+   "candidate": "emits 24 drain-only samples with an absent PTS after the source block at 25020000000 ns",
+   "reference": "reuses 25020000000 ns for the final 24 samples; PCM and device output match",
+   "cases": ["session-opus:.research/fate-samples/opus/testvector02.mka"]
+  },
+  {
+   "reading": "After a reset the AAC decoder starts without signal history; the reference keeps overlap and noise state across its flush",
+   "clause": "ISO/IEC 14496-3 subpart 4 defines the filterbank overlap and perceptual noise substitution of consecutive frames; no clause defines decoding across a discontinuity, where TrackDecoder::reset drops the history and avcodec_flush_buffers keeps it",
+   "candidate": "session ADTS and configured MOV resets match the reference reopened at the same packet indices within 5.97e-8 and 2.24e-8 maximum absolute planar error, respectively",
+   "reference": "decoder buffer flush differs from fresh open at the reset packets, by up to 0.02064 on ADTS and 0.00967 on MOV",
+   "cases": ["reset-aac-aac-lc-stereo.aac", "reset-track-reset-avc-aac-quicktime-7-1.mov"]
+  },
+  {
+   "reading": "After a reset the AC-3 decoder restarts synthesis and its noise sequence; the reference keeps both across its flush",
+   "clause": "ATSC A/52:2018 §§7.3.4 and 7.9 define dither and the synthesis overlap of consecutive blocks; no clause defines decoding across a discontinuity, where TrackDecoder::reset drops the history and avcodec_flush_buffers keeps it",
+   "candidate": "the session and track decoders give identical PCM and match a freshly reopened reference within 4.48e-8 maximum absolute planar error",
+   "reference": "flushing at packets 12 and 24 differs from fresh open by up to 0.279032, with the same sample count",
+   "cases": ["reset-ac3-millers_crossing_4.0.ac3", "reset-track-reset-millers_crossing_4.0.ac3"]
+  },
+  {
+   "reading": "A decoder reset in the middle of an AVC GOP removes required references",
+   "clause": "ITU-T H.264 (08/24) §§8.2.4 and 8.2.5 define reference lists and decoded reference picture marking, including the DPB reset at IDR",
+   "candidate": "publishes ten pictures before reset and reports Invalid for an unavailable reference index when decoding continues",
+   "reference": "publishes the same ten pictures and reports unavailable co-located POCs in the log while the command returns success",
+   "cases": ["reset-h264-h264-high-720p.h264"]
+  },
+  {
+   "reading": "The final short FLAC frame keeps its coded fixed-block sample position after a rate change",
+   "clause": "RFC 9639 §§9, 9.1.1, 9.1.2 and 9.1.5: this stream codes frame number 135 with a nominal fixed block size of 4096 samples",
+   "candidate": "retains sample index 552960, or 17280000000 ns on the track's 32000 Hz tick base; the short block has 2787 samples",
+   "reference": "uses 551594 ticks, or 17237312500 ns; PCM and the block size match",
+   "cases": ["session-flac:.research/flac-test-files/uncommon/01 - changing samplerate.flac"]
+  },
+  {
+   "reading": "Markerless FLAC takes its clock from the first confirmed frame",
+   "clause": "RFC 9639 §§6 and 9.1.2–9.1.5 define the marker and coded frame facts; the elementary reader documents joining a stream without STREAMINFO at a confirmed frame",
+   "candidate": "publishes the first valid 4096-sample block at 1200657414966 ns on the 44100 Hz clock stated in its header",
+   "reference": "reports the same PCM using a 32000 Hz time base and publishes 1654656000000 ns for the first decoded block",
+   "cases": ["session-flac:.research/flac-test-files/uncommon/11 - file starting with unparsable data.flac"]
+  },
+  {
+   "reading": "Recovered FLAC frames keep their coded positions after a damaged interval",
+   "clause": "RFC 9639 §§9.1, 9.1.5 and 9.3: a FLAC frame supplies a coded position and ends at its frame CRC",
+   "candidate": "admits 216 decoded blocks and starts block 98 at 2275555556 ns in both streams; the stereo path also finishes all 220500 samples per channel",
+   "reference": "decodes identical planar PCM, leaves block 98 untimestamped after merging source packets, and stops the stereo path at 104448 samples per channel on the inserted-junk stream",
+   "cases": ["skip-flac_corrupt.flac", "skip-flac_mid_junk.flac"]
+  },
+  {
+   "reading": "A terminal ID3v1 tag is outside the FLAC frame extent",
+   "clause": "RFC 9639 §§6, 9.1 and 9.3: FLAC audio consists of complete frames ending at their CRC",
+   "candidate": "finishes the 220500 samples per channel, agreeing on the native PCM and all block clocks, with a clean stereo EOF",
+   "reference": "appends 128 tag bytes to the last packet; the stereo decoder therefore reports invalid data after emitting 220500 samples per channel",
+   "cases": ["skip-flac_id3.flac"]
+  },
+  {
+   "reading": "Raw E-AC-3 time starts at the first confirmed syncframe",
+   "clause": "ATSC A/52:2018 §3.4 and Annex E §§2.2.1 and 2.3.1.4–2.3.1.5: sync word, sample rate and blocks per syncframe",
+   "candidate": "starts the 651 decoded blocks at 0 ns, after discarding the 352-byte prefix without a sync word",
+   "reference": "starts the same 651 decoded blocks at 32000000 ns after publishing the prefix as a packet; PCM comparisons match under the existing bounds",
+   "cases": [
+    "session-eac3:.research/codec-derived/ac3/csi_miami_stereo_128_spx.eac3",
+    "session-eac3:.research/fate-samples/eac3/csi_miami_stereo_128_spx.eac3"
+   ]
+  },
+  {
+   "reading": "A FLAC layout of front left, top back centre and top back right has no reference on the stereo device path",
+   "clause": "RFC 9639 §8.6.2 permits the channel mask; no clause defines a stereo downmix of these speakers, and the reference's converter refuses the layout",
+   "candidate": "publishes 52920 samples per channel in FL+TBC+TBR and the same number of stereo device samples per channel",
+   "reference": "matches the native PCM and timeline but the stereo converter refuses the decoded layout and produces zero device samples",
+   "cases": ["session-flac:.research/flac-generated/flac_3ch_odd_mask.flac"]
+  },
+  {
+   "reading": "From a CRC-damaged FLAC stream the reader finds no frame within its sync scan bound; the reference returns damaged frames",
+   "clause": "RFC 9639 §§5, 9.1.5, 9.1.8 and 9.3 define the frame clock and CRCs and leave the decoding of invalid data to the decoder, so no clause decides which frames of a damaged stream are returned; the bound is the reader's Limits::sync_scan_bytes",
+   "candidate": "the elementary reader refuses at its frame sync scan limit; the session delivers no PCM",
+   "reference": "finds packets and publishes decoded PCM",
+   "cases": [
+    "skip-flip-26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
+    "skip-flip-28 - high resolution audio, default settings.flac",
+    "skip-flip-29 - high resolution audio, blocksize 16384.flac",
+    "skip-flip-30 - high resolution audio, blocksize 13456.flac",
+    "skip-flip-31 - high resolution audio, using only 32nd order predictors.flac",
+    "skip-flip-32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+    "skip-flip-33 - samplerate 192kHz.flac",
+    "skip-flip-34 - samplerate 192kHz, using only 32nd order predictors.flac",
+    "skip-flip-35 - samplerate 134560Hz.flac",
+    "skip-flip-36 - samplerate 384kHz.flac",
+    "skip-flip-37 - 20 bit per sample.flac",
+    "skip-flip-44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
+    "skip-flip-05 - 32bps audio.flac",
+    "skip-flip-ff_s24_ch8.flac",
+    "skip-flip-ff_s32_ch6.flac",
+    "skip-flip-ff_s32_ch8.flac",
+    "skip-flip-flac_s20_rate768k.flac",
+    "skip-flip-flac-16-44k-stereo.flac",
+    "skip-flip-flac-24-96k-5.1.flac"
+   ]
+  },
+  {
+   "reading": "The session clocks AC-3 at the exact sample rate",
+   "clause": "ATSC A/52:2018 §§5.3, 5.4.1.3 and 5.4.1.4: six 256-sample blocks per syncframe and fscod signals 44.1 kHz",
+   "candidate": "second frame starts at 34829932 ns with 1536 samples",
+   "reference": "second frame starts at 34822222 ns with the same 1536 samples, after rounding to a 90 kHz clock",
+   "cases": ["session-ac3:.research/codec-derived/ac3/diatonis.ac3", "skip-flip-diatonis.ac3"]
+  },
+  {
+   "reading": "FLAC coded rate and sample position remain available at 768 kHz",
+   "clause": "RFC 9639 §§9.1.1–9.1.2 and 9.1.5: the frame header gives block size, explicit sample rate and coded position",
+   "candidate": "publishes the final block with the packet clock derived from its coded sample position",
+   "reference": "decodes the same PCM but leaves the final block timestamp absent",
+   "cases": [
+    "session-flac:.research/flac-test-files/uncommon/06 - samplerate 768kHz.flac",
+    "session-flac:.research/flac-generated/flac_s20_rate768k.flac"
+   ]
+  },
+  {
+   "reading": "Matroska CodecDelay adjusts the PTS in nanoseconds",
+   "clause": "RFC 9559 §§5.1.4.1.25 and 11.2: subtract CodecDelay in nanoseconds from each block timestamp",
+   "candidate": "publishes the second Opus block at 14500000 ns",
+   "reference": "publishes the second block at 14000000 ns, with equal decoded samples",
+   "cases": ["session-opus:.research/fate-samples/opus/silk-lbrr-mono.mka"]
+  },
+  {
+   "reading": "ADTS does not extend a final frame past the source",
+   "clause": "ISO/IEC 13818-7:2004 §§6.2.2 and 8.1.1, frame_length counts all frame bytes including the header and error check",
+   "candidate": "decodes the complete prefix and reports Truncated when only 265 bytes remain of a 345-byte frame",
+   "reference": "finishes with its recovered PCM after admitting the short tail as a packet",
+   "cases": ["session-aac:.research/codec-derived/aac/foo.adts"]
+  },
+  {
+   "reading": "Vorbis output follows the completed-sample clock at a block size transition",
+   "clause": "Vorbis I §§1.3.2 and A.2: each lapped output spans the centers of successive windows; Ogg granules count finished PCM samples per channel",
+   "candidate": "matches the independently accumulated sample clock on all blocks, e.g. starts the 576-sample block at 407800454 ns in 1.0-test_small.ogg",
+   "reference": "publishes the same decoded counts and device PCM but starts that block at 417959184 ns and similarly shifts clocks at transitions in these inputs",
+   "cases": [
+    "session-vorbis:.research/fate-samples/vorbis/1.0-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/1.0.1-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/6.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/beta3-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/beta4-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/chain-test2_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/highrate-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/lsp-test2_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/lsp-test3_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/lsp-test4_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/lsp-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/mono_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/moog_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/rc1-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/rc2-test2_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/rc2-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/rc3-test_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/sleepzor_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/test-short2_small.ogg",
+    "session-vorbis:.research/fate-samples/vorbis/vorbis_chapter_extension_demo.ogg"
+   ]
+  }
+ ],
+ "open_cases": [
+  "rate-change-lc-to-implicit-sbr.adts",
+  "session-flac:.research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac"
+ ],
+ "open_case_readings": {"session-flac:.research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac": "The last block of this fixed-blocksize stream is stamped 105728 s, before the block at 117483.3 s that precedes it: the reader scales the final short frame's coded number by that frame's own 4130-sample size instead of the 4608-sample block size of the stream (RFC 9639 §9.1.5 numbers a fixed-blocksize stream in frames of the nominal block size). The reference continues the sequence at 117483.4 s (crates/elementary, Flac::fixed_block_size).", "rate-change-lc-to-implicit-sbr.adts": "The ADTS session ends cleanly after 432 blocks and 442368 samples where the coded sampling frequency index changes, and drops the remaining 1418727 samples the reference decodes, without an error. A change of the fixed header must end the sequence with a typed outcome, or start the next sequence."}
 }

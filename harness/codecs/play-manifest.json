@@ -122,7 +122,6 @@
       "clause": "RFC 9559 sections 5.1.4.1.13, 5.1.4.1.25 and 11.2 give nanosecond durations and the Block presentation timestamp; a Block has no separate DTS field",
       "candidate": "Reports 41666666 ns for the video controls and -333333 ns for the selected AAC packet, with DTS absent; source presentation clocks agree with the independent EBML oracle",
       "reference": "Reports 41000000 ns for the video controls and zero PTS for the selected AAC packet; publishes DTS for pictures and audio where demux derives it",
-      "compat": "compat::matroska::demux_clock",
       "cases": [
         "three-tracks",
         "avc-high-b",
@@ -131,33 +130,22 @@
       ]
     },
     {
-      "reading": "Transport AVC and AAC packet fields retain the available source anchors",
-      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.5 to 2.4.3.7 Table 2-21 and 2.7.5 define timestamp anchors and transport random access; the AAC ADTS clock uses ISO/IEC 13818-7 section 6.2 as documented in the framing crate",
-      "candidate": "Keeps absent DTS in PTS-only PES and leaves unanchored AAC PTS absent; it reports no AVC duration or fractional 90 kHz AAC duration, and audio picture random access is unknown",
-      "reference": "Synthesizes DTS and fills intermediate AAC clocks, reports rounded AAC and derived AVC durations, and marks AAC packets key; packet count, bytes and order agree",
-      "compat": "compat::mpegts::demux_packet_fields",
+      "reading": "The transport packet view reports the timestamps and durations the stream codes; the reference reports derived decode times, durations and key flags",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.5 to 2.4.3.7 and Table 2-21 code a DTS only where it differs from the PTS and give a time stamp to the first access unit that begins in a PES packet; no clause requires a demultiplexer to publish derived times for the other access units, durations or key flags",
+      "candidate": "Leaves the DTS of a PTS-only PES and the times of units without a PES time stamp absent, reports the coded AAC and Enhanced AC-3 durations and no AVC duration, and flags no audio packet key.",
+      "reference": "Fills the DTS and the intermediate audio clocks, reports rounded AAC and derived AVC durations, and marks every audio packet key; packet count, bytes and order agree.",
       "cases": [
         "baseline-stereo",
-        "media-00"
-      ]
-    },
-    {
-      "reading": "Transport AVC and Dolby packet fields distinguish coded anchors from derived timing and key flags",
-      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.5 to 2.4.3.7 Table 2-21 and ATSC A/52:2018 Annex E sections 2.3.1.4 to 2.3.1.5 define PES clocks and Dolby frame lengths independently",
-      "candidate": "Keeps DTS absent and attaches PTS to the first eligible unit of each PES; its coded Enhanced AC-3 durations are 2880 or 4320 ticks, with audio picture random access unknown",
-      "reference": "Synthesizes DTS and flags every audio packet key; packet count, bytes and order agree",
-      "compat": "compat::mpegts::demux_packet_fields",
-      "cases": [
+        "media-00",
         "replay-avc-eac3-00",
         "dvb-hevc-eac3-32000"
       ]
     },
     {
-      "reading": "AVC and AC-3 access units retain their track decode order and coded PES anchors",
-      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.3 and 2.4.3.6–2.4.3.7 describe carrier multiplexing, contiguous per-stream PES data and timestamp anchoring. ContainerReader's Packet event promises decode order within a track.",
+      "reading": "The transport reader interleaves the AVC and AC-3 access units in another order than the reference, and reports coded time stamps only",
+      "clause": "ITU-T H.222.0 (08/2023) sections 2.4.3.3 and 2.4.3.6–2.4.3.7 describe carrier multiplexing, contiguous per-stream PES data and timestamp anchoring. ContainerReader's Packet event promises decode order within a track; the order of access units of different streams is set by no clause, and each track's own order agrees",
       "candidate": "Reports all 87 access units in track decode order with source clock presence. The lead AVC unit has PTS 126480 and absent DTS and duration. Its second AVC unit follows seven AC-3 units in the published sequence.",
       "reference": "Publishes the same 87 units in the same per-track sequences. It gives the lead AVC unit DTS 126480 and duration 7500 and returns its second AVC unit after six AC-3 units.",
-      "compat": "A consumer reproducing the native demux packet sequence and inferred metadata would use compat::mpegts::demux_access_unit_order.",
       "cases": [
         "replay-avc-ac3-00"
       ]

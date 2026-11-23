@@ -2,20 +2,21 @@
  "schema": "triergon.codecs.correctness-manifest.v1",
  "open_deviations": [
   {
-   "reading": "A valid FLAC speaker mask remains supported on the stereo device path",
-   "clause": "RFC 9639 section 8.6.2 defines the loudspeaker mask, including front left, top back centre and top back right",
+   "reading": "A FLAC layout of front left, top back centre and top back right has no reference on the stereo device path",
+   "clause": "RFC 9639 section 8.6.2 permits the channel mask; no clause defines a stereo downmix of these speakers, and the reference's converter refuses the layout",
    "candidate": "Matches the native decoded PCM and emits 52920 stereo samples per channel.",
    "reference": "Matches the native decoded PCM and refuses the FL+TBC+TBR layout on the stereo path with zero output.",
-   "compat": "compat::flac::stereo_layout_admission",
    "cases": ["flac_3ch_odd_mask.flac"]
   }
  ],
  "open_refusals": [
   {
+   "basis": "unimplemented",
+   "reference": "unimplemented",
    "kind": "video-grade",
    "clause": "ITU-T H.264 (08/2024) §§7.4.2.2, 8.2.2 and Annex A.2",
    "detail": "flexible macroblock ordering",
-   "reason": "The decoder supports one slice group. These inputs require multiple groups.",
+   "reason": "The decoder supports one slice group and refuses flexible macroblock ordering. The reference does not implement it either: it emits no picture for three streams and error concealment for the fourth, so its output is no reference and its picture count is not pinned.",
    "cases": [
     {"id": "FM1_BT_B.h264", "decoder": "failed-exit", "output": "fail", "pictures": [50, 0, 0]},
     {"id": "FM1_FT_E.264", "decoder": "decoder-error", "output": "fail", "pictures": [119, 305, 119]},
@@ -24,16 +25,20 @@
    ]
   },
   {
+   "basis": "unimplemented",
+   "reference": "decodes",
    "kind": "video-grade",
    "clause": "ITU-T H.264 (08/2024) §§7.4.3, 8.6.2 and Annex A.2.3",
    "detail": "SP/SI slices",
-   "reason": "The decoder supports I/P/B slice prediction and refuses the Extended-profile SP or SI slice.",
+   "reason": "The decoder supports I, P and B slice prediction and refuses the Extended-profile SP or SI slice, which it does not implement. The planar example decodes on after the refusal; only the ten pictures before it, which equal the reference's, are pinned.",
    "cases": [
-    {"id": "sp1_bt_a.h264", "decoder": "decoder-error", "output": "fail", "pictures": [361, 400, 10]},
-    {"id": "sp2_bt_b.h264", "decoder": "decoder-error", "output": "fail", "pictures": [361, 400, 10]}
+    {"id": "sp1_bt_a.h264", "decoder": "decoder-error", "output": "fail", "pictures": [10, 400, 10]},
+    {"id": "sp2_bt_b.h264", "decoder": "decoder-error", "output": "fail", "pictures": [10, 400, 10]}
    ]
   },
   {
+   "basis": "unimplemented",
+   "reference": "decodes",
    "kind": "video-grade",
    "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A.2",
    "detail": "chroma format 4:2:2 / 4:4:4",
@@ -44,6 +49,8 @@
    ]
   },
   {
+   "basis": "unimplemented",
+   "reference": "decodes",
    "kind": "video-grade",
    "clause": "ITU-T H.264 (08/2024) §7.4.2.1.1 and Annex A.2",
    "detail": "bit depth > 8",
@@ -68,6 +75,8 @@
    ]
   },
   {
+   "basis": "unimplemented",
+   "reference": "decodes",
    "kind": "video-grade",
    "clause": "ITU-T H.265 §7.4.3.2.1 and Annex A",
    "detail": "chroma_format_idc 2 (4:2:2, RExt)",
@@ -80,6 +89,8 @@
    ]
   },
   {
+   "basis": "unimplemented",
+   "reference": "decodes",
    "kind": "video-grade",
    "clause": "ITU-T H.265 §7.4.3.2.1 and Annex A",
    "detail": "chroma_format_idc 3 (4:4:4, RExt)",
@@ -93,6 +104,8 @@
    ]
   },
   {
+   "basis": "unimplemented",
+   "reference": "decodes",
    "kind": "video-grade",
    "clause": "ITU-T H.265 §§7.4.3.2.2, 8.6",
    "detail": "transform_skip_rotation_enabled_flag (RExt)",
@@ -102,24 +115,19 @@
    ]
   },
   {
-   "kind": "video-grade",
-   "clause": "ITU-T H.265 §§7.2, 7.3.1 and 7.4.1",
-   "detail": "bitstream overrun",
-   "reason": "The candidate reports a bitstream overrun on this extension stream. Both decoders emit zero pictures.",
-   "cases": [
-    {"id": "EXT_A_ericsson_3.bit", "decoder": "ffmpeg-refused", "output": "reference-produced-nothing", "pictures": [0, 0, 0]}
-   ]
-  },
-  {
+   "basis": "unimplemented",
+   "reference": "unimplemented",
    "kind": "video-grade",
    "clause": "ITU-T H.265 §7.4.3.2.1 and Annex A",
    "detail": "unequal luma/chroma bit depth",
-   "reason": "The candidate refuses unequal luma and chroma bit depths. Both decoders emit zero pictures.",
+   "reason": "The decoder refuses unequal luma and chroma bit depths, which it does not implement. The reference does not implement them either and emits no picture.",
    "cases": [
     {"id": "TSUNEQBD_A_MAIN10_Technicolor_2.bit", "decoder": "ffmpeg-refused", "output": "reference-produced-nothing", "pictures": [0, 0, 0]}
    ]
   }
  ],
+ "open_cases": ["EXT_A_ericsson_3.bit"],
+ "open_case_readings": {"EXT_A_ericsson_3.bit": "Neither decoder decodes this conformance stream: the candidate reports a bitstream overrun and the reference reports an overread SPS, and both emit no picture. Whether the stream conforms to the current edition of ITU-T H.265, and with it whether the refusal is right, is not established."},
  "vectors": [
   {
    "lane": "h264",

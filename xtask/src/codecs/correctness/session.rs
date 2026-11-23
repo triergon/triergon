@@ -16,7 +16,10 @@ pub(in crate::codecs) struct RegisteredRefusal<'a> {
     pub(in crate::codecs) reason: &'a str,
     detail: &'a str,
     candidate: i128,
-    reference: i128,
+    /// The reference's picture count; `None` where it does not decode the refused
+    /// feature either, so that what it emits past the candidate's pictures is not a
+    /// reference and is not pinned.
+    reference: Option<i128>,
 }
 
 pub(in crate::codecs) fn registered_refusals(
@@ -42,6 +45,7 @@ pub(in crate::codecs) fn registered_refusals(
         let reason = line("reason")?;
         let detail = line("detail")?;
         line("clause")?;
+        let reference_decodes = crate::codecs::summary::reference_decodes(group)?;
         let cases = group
             .get("cases")
             .and_then(Value::as_array)
@@ -68,12 +72,18 @@ pub(in crate::codecs) fn registered_refusals(
                     .and_then(python::int)
                     .ok_or_else(|| format!("{id}: registered refusal needs {key}"))
             };
-            let (candidate, reference) = (
-                pictures("candidate_pictures")?,
-                pictures("reference_pictures")?,
-            );
+            let candidate = pictures("candidate_pictures")?;
+            let reference = if reference_decodes {
+                Some(pictures("reference_pictures")?)
+            } else if case.get("reference_pictures").is_some() {
+                return Err(format!(
+                    "{id}: a reference that does not decode the feature pins no picture count"
+                ));
+            } else {
+                None
+            };
             if candidate < 0
-                || reference <= candidate
+                || reference.is_some_and(|reference| reference <= candidate)
                 || refusals
                     .insert(
                         id,
@@ -102,11 +112,15 @@ impl RegisteredRefusal<'_> {
             && !row.get("open_case").is_some_and(Value::truthy)
             && decoder.get("status").and_then(Value::as_str) == Some("fail")
             && number(decoder, "ours_blocks", self.candidate)
-            && number(decoder, "reference_frames", self.reference)
+            && self
+                .reference
+                .is_none_or(|reference| number(decoder, "reference_frames", reference))
             && number(decoder, "first_difference", self.candidate)
             && output.get("status").and_then(Value::as_str) == Some("failed-exit")
             && number(output, "pictures_ours", self.candidate)
-            && number(output, "pictures_ref", self.reference)
+            && self
+                .reference
+                .is_none_or(|reference| number(output, "pictures_ref", reference))
             && number(output, "pictures_equal", self.candidate)
             && number(output, "ours_rc", 1)
             && number(output, "reference_rc", 0)
@@ -479,7 +493,7 @@ mod tests {
     #[test]
     fn registered_refusal_requires_the_same_error_and_complete_prefix() {
         let manifest = crate::json::parse(
-            r#"{"open_refusals":[{"reason":"SP/SI slices","clause":"H.264 §8.6.2",
+            r#"{"open_refusals":[{"basis":"unimplemented","reference":"decodes","reason":"SP/SI slices","clause":"H.264 §8.6.2",
                 "detail":"SP/SI slices (Extended profile)",
                 "cases":[{"id":"session-h264:switching.h264",
                     "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
@@ -504,6 +518,46 @@ mod tests {
         ] {
             assert!(!refusal.matches(&row, &decoder, &crate::json::parse(&changed).unwrap()));
         }
+    }
+
+    #[test]
+    fn a_reference_that_does_not_decode_the_feature_pins_no_picture_count() {
+        let group = |fields: &str| {
+            crate::json::parse(&format!(
+                r#"{{"open_refusals":[{{{fields}"reason":"slice groups","clause":"H.264 §8.2.2",
+                "detail":"flexible macroblock ordering (slice groups)",
+                "cases":[{{"id":"session-h264:groups.264",
+                    "sha256":"0000000000000000000000000000000000000000000000000000000000000000",
+                    "candidate_pictures":103}}]}}]}}"#
+            ))
+            .unwrap()
+        };
+        assert!(registered_refusals(&group("")).is_err());
+        assert!(registered_refusals(&group(r#""basis":"unimplemented","#)).is_err());
+        assert!(
+            registered_refusals(&group(r#""basis":"unimplemented","reference":"decodes","#))
+                .is_err()
+        );
+        let manifest = group(r#""basis":"unimplemented","reference":"unimplemented","#);
+        let refusals = registered_refusals(&manifest).unwrap();
+        let refusal = &refusals["session-h264:groups.264"];
+        let row = Value::object([("sha256", Value::str(refusal.sha256))]);
+        let rows = |reference: u32, equal: u32| {
+            let decoder = crate::json::parse(&format!(
+                r#"{{"status":"fail","ours_blocks":103,"reference_frames":{reference},"first_difference":103}}"#
+            ))
+            .unwrap();
+            let output = crate::json::parse(&format!(
+                r#"{{"status":"failed-exit","pictures_ours":103,"pictures_ref":{reference},
+                "pictures_equal":{equal},"ours_rc":1,"reference_rc":0,"ours_partial_bytes":0,
+                "reference_partial_bytes":0,"ours_stderr_tail":"Error: Unsupported(\"flexible macroblock ordering (slice groups)\")\n"}}"#
+            ))
+            .unwrap();
+            refusal.matches(&row, &decoder, &output)
+        };
+        assert!(rows(305, 103));
+        assert!(rows(290, 103));
+        assert!(!rows(305, 102));
     }
 
     #[test]

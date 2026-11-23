@@ -1945,7 +1945,6 @@
       "clause": "ITU-T H.264 (08/2024) sections 7.3.3 and 7.4.3 require a complete slice header and a picture parameter set ID in the range 0 through 255. Annex B.2 defines NAL byte-stream framing.",
       "candidate": "reports truncation while framing the first damaged slice and emits no pictures through either NAL submission route",
       "reference": "diagnoses PPS ID 3199971767 and recovers 12 output pictures",
-      "compat": "compat::avc::recover_damaged_access_units",
       "cases": [
         "h264-damaged-slice-nal",
         "h264-damaged-slice-nals-split"

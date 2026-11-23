@@ -3,22 +3,20 @@
   "note": "The trace rewrites dither flags and CRCs. The candidate decodes the original with noise Off when the stripped stream is an equivalent computation. AHT/SPX cases compare both default decoders on the stripped stream.",
   "open_deviations": [
     {
-      "reading": "A/52 leaves transform word length and binary32 rounding to the decoder",
+      "reading": "Dither-free AC-3 PCM differs from the reference in the last bits of binary32, where A/52 fixes neither word length nor rounding",
       "clause": "ATSC A/52:2018 sections 7.3.4 and 7.9.4\u20135 define zero mantissas with dither disabled and the inverse transform while allowing different transform word lengths and scaling",
       "candidate": "Noise Off on the original and Normal on the stripped stream produce identical candidate PCM. Emits 64512 samples per channel on diatonis and 95232 on millers, without concealment.",
       "reference": "Emits the same sample counts and layouts. Its binary32 sample values differ by up to 9.31323e-10 and 5.21541e-8 respectively on AArch64.",
-      "compat": "A consumer matching binary32 gold files from this reference would use compat::ac3::reference_float_rounding.",
       "cases": [
         "nodither-diatonis.ac3",
         "nodither-millers_crossing_4.0.ac3"
       ]
     },
     {
-      "reading": "An incomplete AC-3 syncframe leaves concealment and diagnostics to the decoder",
+      "reading": "After an incomplete final AC-3 syncframe, dither-free PCM differs from the reference in the last bits of binary32, and A/52 leaves concealment to the decoder",
       "clause": "ATSC A/52:2018 sections 5.4.1.3\u20134 and Table 5.18 define complete syncframe extents. Sections 7.9.4\u20135 and 7.10 leave arithmetic word length and error treatment to the application.",
       "candidate": "Reports one concealed final frame and retains 201216, 86016, 7680 and 7680 samples per channel. Original with Noise Off and stripped with Normal produce identical PCM.",
       "reference": "Reports an incomplete frame and retains the same sample counts and layouts. Exact binary32 output differs by up to 2.98023e-8, 2.91039e-11, 2.98023e-8 and 4.47035e-8 respectively on AArch64.",
-      "compat": "A consumer comparing a damaged-input decode to reference golds would use compat::ac3::reference_incomplete_frame_pcm.",
       "cases": [
         "nodither-monsters_inc_2.0_192_small.ac3",
         "nodither-monsters_inc_5.1_448_small.ac3",
@@ -31,8 +29,9 @@
       "clause": "ATSC A/52:2018 section 5.4.1.1 and Annex E section 2.2.1 specify the syncword at the start of each frame",
       "candidate": "Skips 352 bytes before the first syncword on the original and rewritten input, then emits 999936 samples per channel without a packet error.",
       "reference": "Submits the same 352-byte prefix as a packet and reports an invalid input diagnostic. It emits 999936 samples per channel from the subsequent frames within the existing E-AC-3 PCM bounds.",
-      "compat": "compat::eac3::unsynchronised_prefix_packet",
-      "cases": ["nodither-csi_miami_stereo_128_spx.eac3"]
+      "cases": [
+        "nodither-csi_miami_stereo_128_spx.eac3"
+      ]
     }
   ],
   "vectors": [

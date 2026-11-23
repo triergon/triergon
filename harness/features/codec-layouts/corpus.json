@@ -5940,6 +5940,11 @@
         "packets": 1410,
         "bytes": 1410,
         "digest": 7931452472793997184
+      },
+      "candidate_expected": {
+        "packets": 1410,
+        "bytes": 4230,
+        "digest": 10450535738242148352
       }
     },
     {

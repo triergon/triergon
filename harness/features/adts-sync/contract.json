@@ -362,7 +362,6 @@
       "clause": "ISO/IEC 13818-7 sections 6.2.1–6.2.2 and ISO/IEC 14496-3 section 1.A.2.2 define aac_frame_length including fixed and variable headers and CRC, as described in crates/codec-aac/src/adts.rs.",
       "candidate": "skips length 6, protected length 8 and the length 3 prefix before the valid frames",
       "reference": "publishes all three short declarations as packets with a recognizable sync prefix",
-      "compat": "compat::adts::permissive_packet_headers",
       "cases": [
         "short-extent-unprotected",
         "short-extent-protected",
@@ -374,7 +373,6 @@
       "clause": "ISO/IEC 14496-3 section 1.A.2.2 sampling_frequency_index, as documented by AdtsHeader and find_frame in crates/codec-aac/src/adts.rs, reserves indices 13 through 15.",
       "candidate": "does not yield a frame for any of those indices",
       "reference": "publishes a nine-byte packet for each reserved index",
-      "compat": "compat::adts::permissive_packet_headers",
       "cases": [
         "frequency-13",
         "frequency-14",
@@ -386,7 +384,6 @@
       "clause": "ISO/IEC 13818-7 section 6.2.1 and ISO/IEC 14496-3 section 1.A.2.2 define the zero layer bits, as documented by AdtsHeader::parse.",
       "candidate": "reports no frame at the layer-1 header",
       "reference": "publishes the nine-byte packet carrying the reserved layer",
-      "compat": "compat::adts::permissive_packet_headers",
       "cases": [
         "layer-1"
       ]

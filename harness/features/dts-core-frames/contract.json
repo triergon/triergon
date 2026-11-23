@@ -35,44 +35,73 @@
       "candidate": "refuses the stream with Invalid at the frame whose header breaks the clause",
       "reference": "the dca parser returns the frame's bytes as a packet, with no clock, with the 48000 Hz and 512 samples it reads despite a RATE code, or with 96000 or 192000 Hz for SFREQ 14 and 15",
       "cases": [
-        "matrix-bitrate-25", "matrix-bitrate-26", "matrix-bitrate-27", "matrix-bitrate-28",
-        "matrix-bitrate-30", "matrix-bitrate-31", "matrix-sampling-code-0", "matrix-sampling-code-4",
-        "matrix-sampling-code-5", "matrix-sampling-code-9", "matrix-sampling-code-10", "matrix-sampling-code-14",
-        "matrix-sampling-code-15", "matrix-size-0", "matrix-size-94", "below-minimum-fsize",
-        "matrix-invalid-blocks-0", "matrix-invalid-blocks-4", "matrix-invalid-blocks-5", "matrix-invalid-blocks-6",
-        "matrix-normal-short-zero", "matrix-fixed-one", "matrix-lfe-invalid", "matrix-pcm-4",
+        "matrix-bitrate-25",
+        "matrix-bitrate-26",
+        "matrix-bitrate-27",
+        "matrix-bitrate-28",
+        "matrix-bitrate-30",
+        "matrix-bitrate-31",
+        "matrix-sampling-code-0",
+        "matrix-sampling-code-4",
+        "matrix-sampling-code-5",
+        "matrix-sampling-code-9",
+        "matrix-sampling-code-10",
+        "matrix-sampling-code-14",
+        "matrix-sampling-code-15",
+        "matrix-size-0",
+        "matrix-size-94",
+        "below-minimum-fsize",
+        "matrix-invalid-blocks-0",
+        "matrix-invalid-blocks-4",
+        "matrix-invalid-blocks-5",
+        "matrix-invalid-blocks-6",
+        "matrix-normal-short-zero",
+        "matrix-fixed-one",
+        "matrix-lfe-invalid",
+        "matrix-pcm-4",
         "matrix-pcm-7"
       ]
     },
     {
-      "reading": "Encoder revisions and extension codes the present document does not define",
-      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: VERNUM 8 to 15 are future revisions incompatible with the present document, which a decoder not designed for them mutes (Table 5-16), and EXT_AUDIO_ID 1, 3, 4, 5 and 7 are reserved (Table 5-11)",
+      "reading": "The core reader frames no frame of a later encoder revision or with a reserved extension code",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: Table 5-16 has a decoder not designed for VERNUM 8 to 15 mute its outputs and Table 5-11 reserves EXT_AUDIO_ID 1, 3, 4, 5 and 7; SYNC, FSIZE, SFREQ and NBLKS of such a frame stay defined, so no clause decides whether a framer returns it",
       "candidate": "refuses the stream with Unsupported at that frame",
       "reference": "the dca parser returns the frame's bytes as a packet with the 48000 Hz, 512-sample clock its header codes",
-      "compat": "a consumer that wants such frames passed on as opaque core frames would use a compat::dts policy that frames them (not built)",
       "cases": [
-        "matrix-version-8", "matrix-version-9", "matrix-version-10", "matrix-version-11",
-        "matrix-version-12", "matrix-version-13", "matrix-version-14", "matrix-version-15",
-        "matrix-extension-1", "matrix-extension-3", "matrix-extension-4", "matrix-extension-5",
+        "matrix-version-8",
+        "matrix-version-9",
+        "matrix-version-10",
+        "matrix-version-11",
+        "matrix-version-12",
+        "matrix-version-13",
+        "matrix-version-14",
+        "matrix-version-15",
+        "matrix-extension-1",
+        "matrix-extension-3",
+        "matrix-extension-4",
+        "matrix-extension-5",
         "matrix-extension-7"
       ]
     },
     {
-      "reading": "Bytes that are not a frame where one is due",
-      "clause": "ETSI TS 102 114 V1.6.1 clauses 5.3 and 5.4.2: a frame begins with SYNC 0x7FFE8001 and spans FSIZE + 1 bytes, so bytes without SYNC belong to no frame",
+      "reading": "The aligned core reader does not search for the next sync after bytes that are no frame",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 5.3 begins decoding with a search for SYNC and TS 102 114 V1.2.1 clause 5.3 searches again after losing it: stopping there is the scope the reader documents, not a departure of the reference",
       "candidate": "returns the frames before those bytes, then refuses with Invalid where a frame is due and SYNC is absent; the aligned reader documents that it does not search",
-      "reference": "the dca parser returns the bytes as a packet of their own or appends them to the previous frame's packet (112 and 100 bytes for 96-byte frames), then resumes at the next SYNC",
+      "reference": "the dca parser resumes at the next SYNC and returns the bytes between as a packet of their own or appended to the previous frame (112 and 100 bytes for 96-byte frames)",
       "cases": [
-        "matrix-bad-sync", "good-then-invalid", "interframe-garbage"
+        "matrix-bad-sync",
+        "good-then-invalid",
+        "interframe-garbage"
       ]
     },
     {
-      "reading": "A stream that begins with an extension substream has no core frame there",
-      "clause": "ETSI TS 102 114 V1.6.1 clauses 5.4.2 and 7.2: a core frame begins with SYNC 0x7FFE8001; an extension substream begins with 0x64582025 and may stand without a core substream",
+      "reading": "The core reader reads no stream that begins with an extension substream",
+      "clause": "ETSI TS 102 114 V1.6.1 clause 7.2: the audio stream may consist of extension substreams alone, so the input is valid and the refusal is a feature the reader does not implement",
       "candidate": "refuses with Unsupported at the extension substream sync word",
       "reference": "the dca parser returns the extension substream bytes as a packet with no clock or the 48000 Hz, 1024-sample clock of the XLL asset, and its dca_core filter then refuses the coreless one",
       "cases": [
-        "matrix-reserved-extension-sync", "xll_51_24_48_none"
+        "matrix-reserved-extension-sync",
+        "xll_51_24_48_none"
       ]
     },
     {
@@ -81,8 +110,14 @@
       "candidate": "returns each frame with the rate and duration SFREQ and NBLKS code: 48000 Hz and 512 samples",
       "reference": "the dca parser returns the same bytes with a zero rate and duration",
       "cases": [
-        "matrix-channel-10", "matrix-channel-11", "matrix-channel-12", "matrix-channel-13",
-        "matrix-channel-14", "matrix-channel-15", "matrix-channel-16", "matrix-channel-63",
+        "matrix-channel-10",
+        "matrix-channel-11",
+        "matrix-channel-12",
+        "matrix-channel-13",
+        "matrix-channel-14",
+        "matrix-channel-15",
+        "matrix-channel-16",
+        "matrix-channel-63",
         "user-defined-amode"
       ]
     },
@@ -90,14 +125,28 @@
       "reading": "A frame the source ends inside",
       "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: the header is 104 bits, 120 with HCRC, and FSIZE + 1 is the total byte size of the frame",
       "candidate": "refuses with Truncated where the source ends inside a header or before FSIZE + 1 bytes, after every complete frame",
-      "reference": "the dca parser flushes the incomplete bytes as a packet, with no clock or, once 95 bytes are present, the header's clock",
-      "compat": "a consumer that wants the incomplete tail passed on, as the reference does, would use a compat::dts policy that returns it as an incomplete frame (not built)",
+      "reference": "the dca parser flushes the incomplete bytes as a packet, with no clock, with the header's clock once 95 bytes are present, or after a complete frame with that frame's rate and no duration",
       "cases": [
-        "matrix-short-header-cpf-0-bytes-1", "matrix-short-header-cpf-0-bytes-10", "matrix-short-header-cpf-0-bytes-11", "matrix-short-header-cpf-0-bytes-12",
-        "matrix-short-header-cpf-0-bytes-2", "matrix-short-header-cpf-0-bytes-3", "matrix-short-header-cpf-0-bytes-4", "matrix-short-header-cpf-0-bytes-5",
-        "matrix-short-header-cpf-0-bytes-6", "matrix-short-header-cpf-0-bytes-7", "matrix-short-header-cpf-0-bytes-8", "matrix-short-header-cpf-0-bytes-9",
-        "matrix-short-header-cpf-1-bytes-10", "matrix-short-header-cpf-1-bytes-11", "matrix-short-header-cpf-1-bytes-12", "matrix-short-header-cpf-1-bytes-13",
-        "matrix-short-header-cpf-1-bytes-14", "good-then-short", "truncated-13", "truncated-14",
+        "matrix-short-header-cpf-0-bytes-1",
+        "matrix-short-header-cpf-0-bytes-10",
+        "matrix-short-header-cpf-0-bytes-11",
+        "matrix-short-header-cpf-0-bytes-12",
+        "matrix-short-header-cpf-0-bytes-2",
+        "matrix-short-header-cpf-0-bytes-3",
+        "matrix-short-header-cpf-0-bytes-4",
+        "matrix-short-header-cpf-0-bytes-5",
+        "matrix-short-header-cpf-0-bytes-6",
+        "matrix-short-header-cpf-0-bytes-7",
+        "matrix-short-header-cpf-0-bytes-8",
+        "matrix-short-header-cpf-0-bytes-9",
+        "matrix-short-header-cpf-1-bytes-10",
+        "matrix-short-header-cpf-1-bytes-11",
+        "matrix-short-header-cpf-1-bytes-12",
+        "matrix-short-header-cpf-1-bytes-13",
+        "matrix-short-header-cpf-1-bytes-14",
+        "good-then-short",
+        "truncated-13",
+        "truncated-14",
         "truncated-95"
       ]
     },
@@ -106,9 +155,9 @@
       "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: every frame header codes SFREQ, the core sampling frequency of that frame (Table 5-5), and NBLKS, its window of 32 x (NBLKS + 1) samples",
       "candidate": "reports the second frame's own 44100 Hz and 512 samples",
       "reference": "the dca parser keeps the first frame's 48000 Hz and rescales the second frame's duration to 557 samples",
-      "compat": "a consumer that needs one stream-wide rate, as the reference publishes, would use a compat::dts policy that latches the first frame's rate (not built)",
       "cases": [
-        "two-frames", "rate-change"
+        "two-frames",
+        "rate-change"
       ]
     },
     {

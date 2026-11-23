@@ -10,7 +10,9 @@
 //! A row of a vector its manifest lists in `open_cases` or `open_deviations` (`"open_case": true`)
 //! must fail, and is counted as `open`; it needs a disposition saying what is
 //! not recovered. A listed vector that no longer fails fails the summary, so
-//! the list only shrinks. Registered video refusals pin the input, the exact
+//! the list only shrinks. A listed vector must also show exactly what
+//! [`pins`](super::pins) recorded of both sides, so a difference that moves to
+//! another one fails. Registered video refusals pin the input, the exact
 //! disposition and picture counts. Strict video summaries require a registration
 //! for every non-pass from a pinned manifest.
 
@@ -22,6 +24,7 @@ use crate::json::{self, Value};
 use crate::python;
 
 use super::correctness::session;
+use super::pins::{PINS, Pins};
 
 /// Summary schema written by [`summarize`].
 pub const SUMMARY_SCHEMA: &str = "triergon.codecs.correctness-summary.v1";
@@ -86,12 +89,40 @@ fn disposition(key: &str) -> Option<&'static str> {
 
 pub(super) const VIDEO_REFUSAL_KIND: &str = "video-grade";
 
+/// The planar status of a decoder that reported an error and kept producing pictures.
+const CONTINUED: &str = "decoder-error";
+
+/// What a registered refusal rests on. Every one today is a feature the decoder's
+/// README lists as not implemented; the specification justifies none of them.
+pub(super) const UNIMPLEMENTED: &str = "unimplemented";
+
+/// Whether the reference decodes the refused feature (`"decodes"`) or does not
+/// implement it either (`"unimplemented"`), from a refusal group's `basis` and
+/// `reference`. Where it does not, what it emits is error concealment or nothing:
+/// no reference for the candidate, so its picture count is not pinned.
+pub(super) fn reference_decodes(group: &Value) -> Result<bool, String> {
+    if text(group.get("basis")) != Some(UNIMPLEMENTED) {
+        return Err(format!(
+            "a registered refusal states its basis: {UNIMPLEMENTED}"
+        ));
+    }
+    match text(group.get("reference")) {
+        Some("decodes") => Ok(true),
+        Some(UNIMPLEMENTED) => Ok(false),
+        _ => Err(format!(
+            "a registered refusal states whether the reference decodes the feature or leaves it {UNIMPLEMENTED}"
+        )),
+    }
+}
+
 struct VideoException<'a> {
     sha256: &'a str,
     decoder: &'a str,
     output: &'a str,
-    // Candidate, reference, and equal pictures, on both comparison paths.
-    pictures: [i128; 3],
+    // The candidate's pictures before its refusal, the reference's pictures, and how
+    // many of the candidate's equal the reference's first ones, on both comparison
+    // paths. The reference's count is `None` where it does not decode the feature.
+    pictures: [Option<i128>; 3],
     error: &'a str,
     reason: &'a str,
 }
@@ -114,6 +145,7 @@ fn video_refusals(manifest: &Value) -> Result<VideoRefusals<'_>, String> {
         let reading = |key| refusal_line(group, key);
         let (reason, error) = (reading("reason")?, reading("detail")?);
         reading("clause")?;
+        let reference_decodes = reference_decodes(group)?;
         let cases = group
             .get("cases")
             .and_then(Value::as_array)
@@ -141,10 +173,23 @@ fn video_refusals(manifest: &Value) -> Result<VideoRefusals<'_>, String> {
                     ])
                 })
                 .filter(|[a, b, equal]| *equal >= 0 && *equal <= (*a).min(*b))
+                .map(|[candidate, reference, equal]| {
+                    [
+                        Some(candidate),
+                        reference_decodes.then_some(reference),
+                        Some(equal),
+                    ]
+                })
                 .ok_or_else(|| format!("{id}: invalid picture counts"))?;
+            let decoder = refusal_line(case, "decoder")?;
+            if decoder == CONTINUED && pictures[0] != pictures[2] {
+                return Err(format!(
+                    "{id}: a decoder that goes on after its refusal pins the pictures before it"
+                ));
+            }
             let expected = VideoException {
                 sha256,
-                decoder: refusal_line(case, "decoder")?,
+                decoder,
                 output: refusal_line(case, "output")?,
                 pictures,
                 error,
@@ -166,10 +211,22 @@ fn refusal_line<'a>(row: &'a Value, key: &str) -> Result<&'a str, String> {
 
 impl VideoException<'_> {
     fn matches(&self, row: &Value, decoder: &Value, output: &Value) -> bool {
+        // The planar decoder that reports its refusal and decodes on: its pictures
+        // after the refusal are no decode of the stream, so only the equal ones before
+        // it are pinned.
+        let continued = self.decoder == CONTINUED;
         let counts = |section: &Value, keys: [&str; 3]| {
             keys.into_iter()
                 .zip(self.pictures)
-                .all(|(key, expected)| section.get(key) == Some(&Value::int(expected)))
+                .enumerate()
+                .all(|(side, (key, expected))| match expected {
+                    None => true,
+                    Some(expected) if side == 0 && continued => section
+                        .get(key)
+                        .and_then(python::int)
+                        .is_some_and(|pictures| pictures >= expected),
+                    Some(expected) => section.get(key) == Some(&Value::int(expected)),
+                })
         };
         let planar = if self.decoder == "ffmpeg-refused" {
             // Unframed output has no planar picture boundary. Both byte counts
@@ -318,47 +375,60 @@ fn numbers(section: &Value, keys: &[&str]) -> Value {
 }
 
 /// The class of a row: [`classify`]'s, or `open` for a listed open case that
-/// fails. A listed case that does not fail is returned as `Err` with its class.
+/// fails, a stream neither decoder decodes included. A listed case that does not
+/// fail is returned as `Err` with its class.
 fn class_of(row: &Value, lane: &str) -> Result<String, String> {
     let c = classify(row, lane);
     if !get(row, "open_case").is_some_and(Value::truthy) {
         Ok(c)
-    } else if c == "FAIL" {
+    } else if c == "FAIL" || c == "refused-by-both" {
         Ok("open".into())
     } else {
         Err(c)
     }
 }
 
-fn variant_reading<'a>(
+/// How a manifest lists an open vector: its one-line reading.
+struct Listed<'a> {
+    reading: &'a str,
+}
+
+/// The manifest a lane's vectors and their deviations are listed in.
+fn manifest_of(lane: &str) -> &'static str {
+    super::correctness::variant_manifest(lane).unwrap_or(super::derived::MANIFEST)
+}
+
+fn deviation_cases(document: &Value) -> impl Iterator<Item = (&Value, &str)> {
+    super::correctness::deviations(document)
+        .iter()
+        .flat_map(|deviation| {
+            deviation
+                .get("cases")
+                .and_then(Value::as_array)
+                .unwrap_or_default()
+                .iter()
+                .filter_map(move |case| Some((deviation, case.as_str()?)))
+        })
+}
+
+fn listing_of<'a>(
     documents: &'a mut BTreeMap<&'static str, Value>,
     lane: &str,
     name: &str,
-) -> Result<Option<&'a str>, String> {
-    let Some(path) = super::correctness::variant_manifest(lane)
-        .or_else(|| (lane == "flac").then_some(super::derived::MANIFEST))
-    else {
-        return Ok(None);
-    };
+) -> Result<Option<Listed<'a>>, String> {
+    let path = manifest_of(lane);
     let document = match documents.entry(path) {
         Entry::Occupied(entry) => entry.into_mut(),
-        Entry::Vacant(entry) => entry.insert(json::read(Path::new(path))?),
+        Entry::Vacant(entry) => entry.insert(json::read(&crate::root().join(path))?),
     };
-    if let Some(deviation) = super::correctness::deviations(document)
-        .iter()
-        .find(|item| {
-            item.get("cases")
-                .and_then(Value::as_array)
-                .is_some_and(|cases| cases.iter().any(|case| case.as_str() == Some(name)))
-        })
-    {
+    if let Some((deviation, _)) = deviation_cases(document).find(|(_, case)| *case == name) {
         return deviation
             .get("reading")
             .and_then(Value::as_str)
-            .map(Some)
+            .map(|reading| Some(Listed { reading }))
             .ok_or_else(|| format!("{path}: {name} needs a deviation reading"));
     }
-    let listed = document
+    let open = document
         .get("open_cases")
         .and_then(Value::as_array)
         .is_some_and(|cases| cases.iter().any(|case| case.as_str() == Some(name)));
@@ -367,20 +437,52 @@ fn variant_reading<'a>(
         .and_then(|readings| readings.get(name))
         .and_then(Value::as_str)
         .filter(|reading| !reading.trim().is_empty() && !reading.contains('\n'));
-    if listed && reading.is_some() {
-        Ok(reading)
-    } else {
-        Err(format!(
+    match reading {
+        Some(reading) if open => Ok(Some(Listed { reading })),
+        // An open case of a base lane without a reading in the manifest keeps the
+        // disposition recorded for its vector or lane.
+        _ if super::correctness::variant_manifest(lane).is_none() && lane != "flac" => Ok(None),
+        _ => Err(format!(
             "{path}: {name} needs a registered open-case disposition"
-        ))
+        )),
     }
+}
+
+/// Whether `manifest` still lists `name` under `open_deviations` or `open_cases`.
+fn lists(manifest: &str, name: &str) -> Result<bool, String> {
+    let document = json::read(&crate::root().join(manifest))?;
+    Ok(deviation_cases(&document).any(|(_, case)| case == name)
+        || document
+            .get("open_cases")
+            .and_then(Value::as_array)
+            .is_some_and(|cases| cases.iter().any(|case| case.as_str() == Some(name))))
 }
 
 /// `summarize RUN.jsonl OUT.json`: classify every row, write the summary and
 /// print the per-lane counts and each failure. Fails when a listed open case
-/// does not fail or has no disposition, and with `require_pass` when any other
-/// vector fails, after writing the summary.
-pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String> {
+/// does not fail or has no disposition, when a listed vector's row differs from
+/// its pin, and with `require_pass` when any other vector fails, after writing the
+/// summary. With `record_pins` the listed vectors of the run are recorded in
+/// [`PINS`] instead of compared with it, and the pins of vectors no manifest lists
+/// any more are dropped.
+pub fn summarize(
+    run: &str,
+    out: &Path,
+    require_pass: bool,
+    record_pins: bool,
+) -> Result<(), String> {
+    let pins = Pins::load(&crate::root())?;
+    summarize_with(run, out, require_pass, record_pins, Some(pins))
+}
+
+/// [`summarize`] against the given pins; without any, listed vectors are not pinned.
+fn summarize_with(
+    run: &str,
+    out: &Path,
+    require_pass: bool,
+    record_pins: bool,
+    mut pins: Option<Pins>,
+) -> Result<(), String> {
     let source = fs::read_to_string(run).map_err(|e| format!("{run}: {e}"))?;
     let mut rows = Vec::new();
     for line in python::splitlines(&source) {
@@ -391,7 +493,9 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
     let mut listed = Vec::new();
     let mut closed = Vec::new();
     let mut changed = Vec::new();
+    let mut moved = Vec::new();
     let mut variant_manifests = BTreeMap::new();
+    let target = super::memory::gate_target()?;
     let session_manifest = if rows.iter().any(|row| {
         matches!(
             text(get(row, "lane")),
@@ -423,6 +527,7 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
         let session_refusal = session_refusals
             .get(name.as_str().unwrap_or_default())
             .filter(|_| matches!(lane.as_str(), "session-h264" | "session-hevc"));
+        let mut reading = None;
         let c = if let Some(refusal) = session_refusal {
             if refusal.matches(row, decoder, output) {
                 "registered refusal".into()
@@ -439,7 +544,7 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
                 "registered refusal".into()
             } else {
                 changed.push(format!(
-                    "{} (expected input {}, {} / {} and {:?} candidate / reference / equal pictures)",
+                    "{} (expected input {}, {} / {} and {:?} candidate / reference / equal pictures; an unpinned count is None)",
                     python::str(&name),
                     expected.sha256,
                     expected.decoder,
@@ -453,8 +558,37 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
                 closed.push(format!("{} ({c})", python::str(&name)));
                 c
             });
-            if require_pass && video && text(get(row, "sha256")).is_some() && class != "pass" {
+            if require_pass
+                && video
+                && text(get(row, "sha256")).is_some()
+                && !matches!(class.as_str(), "pass" | "open")
+            {
                 "FAIL".into()
+            } else if class == "open" {
+                let name = name.as_str().unwrap_or_default();
+                let manifest = manifest_of(&lane);
+                let pinned = match &mut pins {
+                    None => true,
+                    Some(pins) if record_pins => {
+                        pins.record(manifest, &lane, name, row, target);
+                        true
+                    }
+                    Some(pins) => match pins.check(manifest, &lane, name, row, target) {
+                        Ok(note) => {
+                            if let Some(note) = note {
+                                println!("NOTE {note}");
+                            }
+                            true
+                        }
+                        Err(differences) => {
+                            moved.extend(differences);
+                            false
+                        }
+                    },
+                };
+                reading =
+                    listing_of(&mut variant_manifests, &lane, name)?.map(|listing| listing.reading);
+                if pinned { class } else { "FAIL".into() }
             } else {
                 class
             }
@@ -474,15 +608,6 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
         }
         let status = |v: &Value| get(v, "status").cloned().unwrap_or(Value::Null);
         if c == "FAIL" || c == "open" {
-            let reading = if c == "open" {
-                variant_reading(
-                    &mut variant_manifests,
-                    &lane,
-                    name.as_str().unwrap_or_default(),
-                )?
-            } else {
-                None
-            };
             let disposition = expected
                 .map(|expected| expected.reason)
                 .or(reading)
@@ -601,10 +726,31 @@ pub fn summarize(run: &str, out: &Path, require_pass: bool) -> Result<(), String
             python::str(&worst),
         );
     }
+    if record_pins && let Some(pins) = &mut pins {
+        let recorded: Vec<(String, String)> = pins
+            .recorded()
+            .map(|(manifest, _, name)| (manifest.to_owned(), name.to_owned()))
+            .collect();
+        let mut gone = Vec::new();
+        for (manifest, name) in recorded {
+            if !lists(&manifest, &name)? {
+                gone.push((manifest, name));
+            }
+        }
+        pins.retain(|manifest, name| !gone.iter().any(|(m, n)| m == manifest && n == name));
+        pins.write()?;
+        println!("recorded {} pins in {PINS}", pins.recorded().count());
+    }
     if !changed.is_empty() {
         return Err(format!(
             "registered video dispositions changed: {}",
             changed.join(", ")
+        ));
+    }
+    if !moved.is_empty() {
+        return Err(format!(
+            "listed vectors differ from their pins in {PINS}:\n{}",
+            moved.join("\n")
         ));
     }
     if !closed.is_empty() {
@@ -715,6 +861,9 @@ mod tests {
         assert_eq!(class_of(&row(passing), "aac").unwrap_err(), "pass");
         let unlisted = r#"{"decoder": {"status": "fail"}, "output": {"status": "pass"}}"#;
         assert_eq!(class_of(&row(unlisted), "aac").unwrap(), "FAIL");
+        let neither = r#"{"open_case": true, "decoder": {"status": "ffmpeg-refused", "ours_errors": [], "ours_frames": 1},
+            "output": {"status": "reference-produced-nothing"}}"#;
+        assert_eq!(class_of(&row(neither), "hevc").unwrap(), "open");
     }
 
     #[test]
@@ -723,7 +872,7 @@ mod tests {
             "../../../harness/codecs/correctness-manifest.json"
         ));
         let registered = video_refusals(&manifest).unwrap();
-        assert_eq!(registered.len(), 36);
+        assert_eq!(registered.len(), 35);
         assert_eq!(
             registered
                 .keys()
@@ -736,7 +885,7 @@ mod tests {
                 .keys()
                 .filter(|(lane, _)| *lane == "hevc")
                 .count(),
-            12
+            11
         );
     }
 
@@ -756,7 +905,7 @@ mod tests {
             .replace('\n', "")
             .replace("PIN", pin);
         fs::write(&run, &registered).unwrap();
-        summarize(run.to_str().unwrap(), &out, true).unwrap();
+        summarize(run.to_str().unwrap(), &out, true, false).unwrap();
         for changed in [
             registered.replace(pin, "wrong-input"),
             registered.replace("decoder-error", "failed-exit"),
@@ -764,7 +913,7 @@ mod tests {
             registered.replace("\"pictures_equal\":119", "\"pictures_equal\":118"),
         ] {
             fs::write(&run, changed).unwrap();
-            let error = summarize(run.to_str().unwrap(), &out, true).unwrap_err();
+            let error = summarize(run.to_str().unwrap(), &out, true, false).unwrap_err();
             assert!(
                 error.contains("registered video dispositions changed"),
                 "{error}"
@@ -775,7 +924,7 @@ mod tests {
             "output":{"status":"reference-produced-nothing"}}"#
             .replace('\n', "");
         fs::write(&run, unregistered).unwrap();
-        let error = summarize(run.to_str().unwrap(), &out, true).unwrap_err();
+        let error = summarize(run.to_str().unwrap(), &out, true, false).unwrap_err();
         assert!(error.contains("new.264"), "{error}");
         fs::remove_dir_all(dir).unwrap();
     }
@@ -792,9 +941,11 @@ mod tests {
             )
         };
         fs::write(&run, line("fail") + "\n").unwrap();
-        summarize(run.to_str().unwrap(), &out, true).unwrap();
+        summarize_with(run.to_str().unwrap(), &out, true, false, None).unwrap();
+        let unpinned = summarize(run.to_str().unwrap(), &out, true, false).unwrap_err();
+        assert!(unpinned.contains("has no pin"), "{unpinned}");
         fs::write(&run, line("pass") + "\n").unwrap();
-        let error = summarize(run.to_str().unwrap(), &out, false).unwrap_err();
+        let error = summarize(run.to_str().unwrap(), &out, false, false).unwrap_err();
         assert!(error.contains("no longer fail"), "{error}");
         fs::remove_dir_all(&dir).unwrap();
     }
@@ -811,11 +962,11 @@ mod tests {
             )
         };
         fs::write(&run, line("fail") + "\n").unwrap();
-        summarize(run.to_str().unwrap(), &out, false).unwrap();
-        let error = summarize(run.to_str().unwrap(), &out, true).unwrap_err();
+        summarize(run.to_str().unwrap(), &out, false, false).unwrap();
+        let error = summarize(run.to_str().unwrap(), &out, true, false).unwrap_err();
         assert!(error.contains("dts.core.dts"), "{error}");
         fs::write(&run, line("pass") + "\n").unwrap();
-        summarize(run.to_str().unwrap(), &out, true).unwrap();
+        summarize(run.to_str().unwrap(), &out, true, false).unwrap();
         fs::remove_dir_all(&dir).unwrap();
     }
 }

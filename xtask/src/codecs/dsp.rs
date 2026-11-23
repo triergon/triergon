@@ -1,4 +1,11 @@
 //! Numeric IMDCT comparison against the public transform and the cosine definition.
+//!
+//! A case the contract lists as a deviation on a target carries two pins for that
+//! target in the manifest: under `expected_by_target` the SHA-256 of the reference's
+//! raw output for each input (or that it refused it), and under
+//! `candidate_expected_by_target` the same of the candidate's. The deviation holds
+//! only while both sides still write exactly those bytes; `dsp --record-pins` records
+//! them from a run.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -97,6 +104,57 @@ fn listing(cases: &[Case]) -> Value {
             ),
         ),
     ])
+}
+
+/// The manifest fields that pin a listed case's two outputs per target.
+const PINS: [&str; 2] = ["expected_by_target", "candidate_expected_by_target"];
+
+/// The generated rows with the pins the manifest holds for the same ids.
+fn with_pins(generated: &Value, manifest: &Value) -> R<Value> {
+    let rows = |listing: &Value| {
+        listing
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default()
+            .to_vec()
+    };
+    let recorded = rows(manifest);
+    let mut cases = rows(generated);
+    for case in &mut cases {
+        let pinned = recorded.iter().find(|row| row.get("id") == case.get("id"));
+        for key in PINS {
+            if let Some(pin) = pinned.and_then(|row| row.get(key)) {
+                validation::put(case, key, pin.clone())?;
+            }
+        }
+    }
+    let mut listing = generated.clone();
+    validation::put(&mut listing, "cases", Value::Array(cases))?;
+    Ok(listing)
+}
+
+/// Both sides' output digests of one case, by input name.
+struct Outputs {
+    reference: Value,
+    candidate: Value,
+}
+
+impl Outputs {
+    /// Whether `row` pins exactly these outputs for `target`; `None` without a pin.
+    fn pinned(&self, row: Option<&Value>, target: &str) -> Option<bool> {
+        let pin = |key: &str| row?.get(key)?.get(target);
+        let (reference, candidate) = (pin(PINS[0])?, pin(PINS[1])?);
+        Some(reference == &self.reference && candidate == &self.candidate)
+    }
+
+    fn record(&self, row: &mut Value, target: &str) -> R<()> {
+        for (key, digests) in PINS.into_iter().zip([&self.reference, &self.candidate]) {
+            let mut by_target = row.get(key).cloned().unwrap_or(Value::Object(Vec::new()));
+            validation::put(&mut by_target, target, digests.clone())?;
+            validation::put(row, key, by_target)?;
+        }
+        Ok(())
+    }
 }
 
 fn normalized_output(center: &[f64]) -> Vec<f64> {
@@ -240,13 +298,14 @@ struct TransformComparison<'a> {
 }
 
 impl TransformComparison<'_> {
-    fn case(&self, case: &Case) -> R<(Value, bool, bool)> {
+    fn case(&self, case: &Case) -> R<(Value, bool, bool, Outputs)> {
         let directory = self.output.join(&case.id);
         fs::create_dir(&directory).map_err(|error| error.to_string())?;
         let mut details = Vec::new();
         let mut definition_ok = true;
         let mut reference_ok = true;
         let mut refused = 0;
+        let mut digests = (Vec::new(), Vec::new());
         let n = case.n;
         let mut definition_command = vec![
             crate::python::interpreter().into(),
@@ -306,10 +365,19 @@ impl TransformComparison<'_> {
             };
             let (passed, model) = check(&definition_samples);
             definition_ok &= passed;
+            digests
+                .1
+                .push((name.clone(), Value::str(crate::files::sha256(&actual)?)));
             let reference_result = if run(&self.reference, &input, &reference)? == 3 {
                 refused += 1;
+                digests
+                    .0
+                    .push((name.clone(), Value::str("reference-refused")));
                 Value::str("reference-refused")
             } else {
+                digests
+                    .0
+                    .push((name.clone(), Value::str(crate::files::sha256(&reference)?)));
                 let reference_samples = normalized_output(&floats(&reference, n / 2)?);
                 let (passed, row) = check(&reference_samples);
                 reference_ok &= passed;
@@ -336,19 +404,28 @@ impl TransformComparison<'_> {
             ]),
             definition_ok,
             reference_ok,
+            Outputs {
+                reference: Value::Object(digests.0),
+                candidate: Value::Object(digests.1),
+            },
         ))
     }
 }
 
-pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
+/// `dsp --record` writes the generated cases, keeping recorded pins; `dsp --output DIR`
+/// compares, and with `--record-pins` also records both outputs of every case listed as
+/// a deviation on this target.
+pub(super) fn main(root: &Path, output: &Path, record: bool, record_pins: bool) -> R<i32> {
     let cases = cases();
     let manifest = root.join(FEATURE).join("corpus.json");
     let generated = listing(&cases);
     if record {
-        json::write(&manifest, &generated)?;
+        let recorded = json::read(&manifest).unwrap_or(Value::Null);
+        json::write(&manifest, &with_pins(&generated, &recorded)?)?;
         return Ok(0);
     }
-    if json::read(&manifest)? != generated {
+    let mut pinned = json::read(&manifest)?;
+    if pinned != with_pins(&generated, &pinned)? {
         return Err("IMDCT cases differ from the pinned manifest".into());
     }
     let contract = json::read(&root.join(FEATURE).join("contract.json"))?;
@@ -382,11 +459,46 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
     let mut rows = Vec::new();
     let mut definitions_ok = true;
     for case in &cases {
-        let (mut row, definition, reference) = comparison.case(case)?;
-        // The transform comparison pins the reference side only.
+        let (mut row, definition, reference, outputs) = comparison.case(case)?;
         if open.is_deviation(&case.id) {
-            let parity = row.get("parity").cloned().unwrap_or(Value::Null);
-            validation::put(&mut row, "parity", report::unpinned_deviation(parity))?;
+            let listed = match &mut pinned {
+                Value::Object(members) => members
+                    .iter_mut()
+                    .find(|(key, _)| key == "cases")
+                    .and_then(|(_, rows)| match rows {
+                        Value::Array(rows) => rows
+                            .iter_mut()
+                            .find(|row| row.get("id").and_then(Value::as_str) == Some(&case.id)),
+                        _ => None,
+                    }),
+                _ => None,
+            };
+            if record_pins && let Some(listed) = listed {
+                outputs.record(listed, &target)?;
+            }
+            let listed = pinned
+                .get("cases")
+                .and_then(Value::as_array)
+                .and_then(|rows| {
+                    rows.iter()
+                        .find(|row| row.get("id").and_then(Value::as_str) == Some(&case.id))
+                });
+            let mut parity = row.get("parity").cloned().unwrap_or(Value::Null);
+            let differs = parity.get("status").and_then(Value::as_str) == Some("mismatch");
+            parity = match outputs.pinned(listed, &target) {
+                // Both sides write the bytes the deviation was recorded with.
+                Some(holds) if differs => {
+                    let status = if holds {
+                        report::DEVIATION
+                    } else {
+                        report::DEVIATION_CHANGED
+                    };
+                    validation::put(&mut parity, "status", Value::str(status))?;
+                    parity
+                }
+                _ => report::unpinned_deviation(parity),
+            };
+            validation::put(&mut row, "parity", parity)?;
         }
         println!(
             "{} definition={} reference={}",
@@ -425,6 +537,10 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
             ("rows", Value::Array(rows)),
         ]),
     )?;
+    // Last: the manifest belongs to the candidate's source graph, which is checked above.
+    if record_pins {
+        json::write(&manifest, &pinned)?;
+    }
     Ok(i32::from(!passed))
 }
 

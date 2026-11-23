@@ -13,6 +13,7 @@ pub mod equivalence;
 pub mod fuzz;
 pub mod isobmff_reader;
 pub mod memory;
+mod pins;
 pub mod readers;
 pub mod summary;
 pub mod timing;
@@ -25,7 +26,9 @@ pub(crate) const INITIALIZED_AAC_REFERENCE: &str = "ffmpeg-aac-initialized-pcm";
 
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
-  dsp --output DIR   compare inverse transforms with the public reference and the cosine definition
+  dsp --output DIR [--record-pins]
+                 compare inverse transforms with the public reference and the cosine definition;
+                 --record-pins records both outputs of each case listed as a deviation
   aac-access-units --out DIR [--record]
                  prepare the configured AAC-LC workloads and compare every native PCM plane
   aac-ps-tables [--check] [--ffmpeg FF] [--python PY] [--work DIR]
@@ -52,9 +55,11 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
   compare-hevc --decoder EXE --ffmpeg FF --ffprobe FP FILE...
                  stream individual files through the same planar decoder comparison as grade;
                  print one JSON row per file and return success only for exact matches
-  summarize RUN.jsonl OUT.json [--require-pass]
+  summarize RUN.jsonl OUT.json [--require-pass] [--record-pins]
                  classify a grading run against the declared lane selection; with
-                 --require-pass fail on any vector that fails and is not a listed open case
+                 --require-pass fail on any vector that fails and is not a listed open case;
+                 a listed vector must show what harness/codecs/open-pins.json pins of
+                 both sides, and --record-pins records the run's instead
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
           [--seeks S.json] [--views-worker W] [--only SUBSTR,...]
                  compare every packet the container readers emit, and Ogg's compat view,
@@ -403,14 +408,14 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             aac_sources::run(root, &a.path("out")?)?;
         }
         "dsp" => {
-            let a = Args::parse(rest, &["output"], &["record"])?;
+            let a = Args::parse(rest, &["output"], &["record", "record-pins"])?;
             let record = a.get("record").is_some();
             let output = if record {
                 PathBuf::new()
             } else {
                 a.path("output")?
             };
-            return dsp::main(root, &output, record);
+            return dsp::main(root, &output, record, a.get("record-pins").is_some());
         }
         "derive" => {
             let a = Args::parse(rest, &["ffmpeg"], &[])?;
@@ -586,10 +591,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             return gate.run(root, a.get("full").is_some(), || memory::run(&options));
         }
         "summarize" => {
-            let a = Args::parse(rest, &[], &["require-pass"])?;
+            let a = Args::parse(rest, &[], &["require-pass", "record-pins"])?;
             match a.positional.as_slice() {
                 [run, out] => {
-                    summary::summarize(run, Path::new(out), a.get("require-pass").is_some())?;
+                    summary::summarize(
+                        run,
+                        Path::new(out),
+                        a.get("require-pass").is_some(),
+                        a.get("record-pins").is_some(),
+                    )?;
                 }
                 _ => return Err(USAGE.to_owned()),
             }

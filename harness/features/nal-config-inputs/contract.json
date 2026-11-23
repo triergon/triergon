@@ -27,11 +27,10 @@
   "confidence": 0.95,
   "open_deviations": [
     {
-      "reading": "Caller-declared arrays preserve opaque wire values",
-      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array fields, as documented by DeclaredConfigParser; ITU-T H.265 Table 7-1",
+      "reading": "The declared-layout reader returns every declared array; the reference converts the record and refuses array types its definition does not allow",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array fields, as documented by DeclaredConfigParser; ITU-T H.265 Table 7-1; the record's NAL_unit_type is restricted to VPS, SPS, PPS and SEI, which the reference's conversion enforces, while the declared-layout reader answers another question: the ranges the record declares",
       "candidate": "retains the record and all declared ranges, including an unknown empty array",
       "reference": "retains the record but refuses conversion at an unknown array declaration",
-      "compat": "HvcDecoderConfigWriter for the decoder's restricted array selection",
       "cases": [
         "declared-hevc-config-unknown_empty",
         "declared-opaque-arrays"
@@ -51,7 +50,6 @@
       "clause": "ITU-T H.264 clause B.2 and H.265 clause B.3 (the start-code prefix precedes a NAL unit)",
       "candidate": "refuses the configuration ending in an unpaired prefix",
       "reference": "extracts the preceding parameter sets despite the trailing prefix",
-      "compat": "compat::nal::ignore_dangling_configuration_prefix",
       "cases": [
         "avc-aud0-dangling-prefix",
         "hevc-aud0-dangling-prefix",

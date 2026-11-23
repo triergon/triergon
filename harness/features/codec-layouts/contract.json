@@ -1367,11 +1367,11 @@
   ],
   "open_deviations": [
     {
-      "reading": "Fixed MPEG-4 AAC configuration 6 maps the surround pair to Ls and Rs",
-      "clause": "ISO/IEC 14496-3:2009/Amd.4 §1.6.3.5 and Table 1.19 name left and right surround. ISO/IEC 23001-8 Table 7 distinguishes Ls/Rs from rear Lsr/Rsr.",
+      "reading": "Fixed AAC channel configuration 6 names its surround pair side left and side right; the reference names it back left and back right",
+      "clause": "ISO/IEC 14496-3:2009/Amd.4 §1.6.3.5 and Table 1.19 name left and right surround. ISO/IEC 23001-8 Table 7 distinguishes Ls/Rs from rear Lsr/Rsr. An Ls and Rs pair at 110 degrees lies between the 90 degree side and the 135 degree rear positions the two labels stand for, so no clause decides the label; the PCM planes agree.",
       "candidate": "Publishes FL, FR, FC, LFE, SL and SR (mask 1551) in plane order.",
       "reference": "Publishes the corresponding PCM planes as FL, FR, FC, LFE, BL and BR (mask 63).",
-      "compat": "compat::layout::AdtsConventionalSurround",
+      "compat": "triergon_codec_aac::compat::layout::Policy::ConventionalSurround",
       "cases": [
         "aac-aac-lc-5.1.aac"
       ]

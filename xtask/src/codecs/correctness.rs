@@ -510,6 +510,13 @@ fn crc_reject(lane: &str) -> bool {
     )
 }
 
+/// FFmpeg's error detection in the CRC lanes. Those lanes compare decoders that refuse
+/// a frame whose embedded CRC fails (`CrcPolicy::Reject` on our side), so the reference
+/// runs with `crccheck` ("verify embedded CRCs") and `explode` ("abort decoding on minor
+/// error detection"), as `ffmpeg -h full` documents them. `crccheck` alone verifies and
+/// keeps the frame, which is the report-only policy and not what these lanes compare.
+const CRC_REJECTING_ERR_DETECT: &str = "crccheck+explode";
+
 fn reference_frames(
     a: &Grade,
     path: &str,
@@ -522,7 +529,7 @@ fn reference_frames(
         "-f",
         format,
         "-err_detect",
-        "crccheck",
+        CRC_REJECTING_ERR_DETECT,
         "-select_streams",
         "a:0",
         "-show_frames",
@@ -607,7 +614,7 @@ fn audio_decoder(
         reference_argv.extend(["-flags2".into(), "+skip_manual".into()]);
     }
     if reject {
-        reference_argv.extend(["-err_detect", "crccheck"].map(String::from));
+        reference_argv.extend(["-err_detect", CRC_REJECTING_ERR_DETECT].map(String::from));
     }
     reference_argv.extend(["-i", path].map(String::from));
     if lane == "aac-mov" {
@@ -1499,9 +1506,9 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 Some("operation-error" | "fixture-error" | "timeout")
             )
         });
-        if open.contains(&name.as_str())
-            && (variant_manifest(&lane).is_none() || comparison_started && !infrastructure_error)
-        {
+        // A listed difference is one both sides were observed to produce: a comparison
+        // that did not run, or whose tools failed, is a failure of the run.
+        if open.contains(&name.as_str()) && comparison_started && !infrastructure_error {
             row.push(("open_case".into(), Value::Bool(true)));
         }
         let row = Value::Object(row);

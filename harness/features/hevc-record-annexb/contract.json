@@ -31,18 +31,17 @@
       "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord lengthSizeMinusOne, as documented by HvcConfigFields and HvcConfigParser",
       "candidate": "refuses the record before writing parameter sets",
       "reference": "initializes it and writes VPS, SPS and PPS",
-      "compat": "compat::nal::ReceiverHevcConfigParser",
+      "compat": "triergon_framing::compat::nal::ReceiverHevcConfigParser",
       "cases": [
         "hvcc-hevc-width3-all",
         "hvcc-hevc-width3-decoder"
       ]
     },
     {
-      "reading": "All-array writing retains unsupported declaration types and their bytes",
-      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array syntax, as documented by HvcAnnexBWriter; ITU-T H.265 Table 7-1",
+      "reading": "The all-array writer writes arrays of types the record's definition does not allow; the reference refuses the record",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array syntax, as documented by HvcAnnexBWriter; ITU-T H.265 Table 7-1; the record's NAL_unit_type is restricted to VPS, SPS, PPS and SEI, which the reference enforces as the decoder writer (HvcDecoderConfigWriter) does, and the all-array writer is an opaque mode by choice",
       "candidate": "writes the available units in record order, including AUD or opaque types, and emits nothing for an empty array",
       "reference": "refuses the record as a whole on a disallowed array declaration, including empty declarations",
-      "compat": "HvcDecoderConfigWriter selects the existing decoder array policy",
       "cases": [
         "hvcc-hevc-config-unknown_empty-all",
         "hvcc-aud-array-all",
@@ -52,8 +51,8 @@
       ]
     },
     {
-      "reading": "Caller bounds on the hvcC record, array and NAL counts",
-      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord field widths, as documented by HvcConfigLimits and HvcConfigParser",
+      "reading": "A record above the configured HvcConfigLimits is refused; the reference converts it",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord field widths, as documented by HvcConfigLimits and HvcConfigParser; the 8-bit numOfArrays and the 16-bit numNalus and lengths make these records valid, and the refusal is the resource limit the caller sets",
       "candidate": "refuses limits of 131072 record bytes, 64 arrays or 256 NALs when exceeded",
       "reference": "emits the full output at the next size or count",
       "cases": [

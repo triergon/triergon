@@ -1079,6 +1079,11 @@
         "packets": 68,
         "bytes": 0,
         "digest": 8041639217159952612
+      },
+      "candidate_expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8041639217159952581
       }
     },
     {
@@ -1105,6 +1110,11 @@
         "packets": 68,
         "bytes": 0,
         "digest": 73015891439219371
+      },
+      "candidate_expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 73015891439219340
       }
     },
     {
@@ -1118,6 +1128,11 @@
         "packets": 68,
         "bytes": 0,
         "digest": 8008894045438603434
+      },
+      "candidate_expected": {
+        "packets": 68,
+        "bytes": 0,
+        "digest": 8008894045438603403
       }
     },
     {
