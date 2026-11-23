@@ -5,7 +5,7 @@ use std::num::NonZeroI32;
 use std::ops::{Index, IndexMut};
 
 use triergon_core::{Budget, Result};
-use triergon_raster::fp;
+use triergon_raster::compat::libass::float_max;
 
 use crate::number::{header_int, strtod};
 use crate::strings::Strings;
@@ -563,11 +563,11 @@ impl Style {
 
     /// The normalisation libass applies after reading a style line.
     pub(crate) fn finish_line(&mut self) {
-        self.scale_x = fp::max(self.scale_x, 0.0) / 100.0;
-        self.scale_y = fp::max(self.scale_y, 0.0) / 100.0;
-        self.spacing = fp::max(self.spacing, 0.0);
-        self.outline = fp::max(self.outline, 0.0);
-        self.shadow = fp::max(self.shadow, 0.0);
+        self.scale_x = float_max(self.scale_x, 0.0) / 100.0;
+        self.scale_y = float_max(self.scale_y, 0.0) / 100.0;
+        self.spacing = float_max(self.spacing, 0.0);
+        self.outline = float_max(self.outline, 0.0);
+        self.shadow = float_max(self.shadow, 0.0);
         self.bold = Bold(i32::from(self.bold.0 != 0));
         self.italic = Italic(i32::from(self.italic.0 != 0));
     }

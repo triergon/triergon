@@ -12,6 +12,7 @@ mod clip;
 mod compose;
 mod glyph;
 
+pub use crate::fp::max as float_max;
 pub use clip::{Clip, ClipFrame, ClipPart, Colour};
 pub use compose::{Border, Composite, Effects, EffectsKey, Shadow};
 pub use glyph::{

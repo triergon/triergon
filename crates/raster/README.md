@@ -85,7 +85,8 @@ through a handle of its own (`GlyphSource::Bitmap`; `Run::render` uses
 then keyed by its shape and its `BitmapTransform`, a stroked border by its
 glyph and its `BorderStroke`, and a composite by `Effects::key` and its glyphs'
 bitmaps and places in the run, whose origin `Composite::origin_of` gives before
-the composite exists, as libass keys them.
+the composite exists, as libass keys them. Use `compat::libass::float_max`
+when applying the same style policy to a pair of floating-point values.
 
 ## Supported
 

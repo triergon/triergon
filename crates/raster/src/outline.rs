@@ -25,7 +25,7 @@ pub enum SegmentKind {
 impl SegmentKind {
     /// The points the segment owns: its start and its control points. Its end is
     /// the next segment's start, or the contour's first point when it closes it.
-    pub const fn points(self) -> usize {
+    pub(crate) const fn points(self) -> usize {
         self as usize
     }
 }

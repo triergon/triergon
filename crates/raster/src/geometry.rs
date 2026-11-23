@@ -81,7 +81,7 @@ impl Rect {
 
     /// Grows the rectangle to cover `other`.
     #[inline]
-    pub fn include(&mut self, other: Self) {
+    pub(crate) fn include(&mut self, other: Self) {
         self.x_min = self.x_min.min(other.x_min);
         self.y_min = self.y_min.min(other.y_min);
         self.x_max = self.x_max.max(other.x_max);

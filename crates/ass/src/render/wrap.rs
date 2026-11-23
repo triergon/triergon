@@ -7,7 +7,7 @@
 use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
-use triergon_raster::fp;
+use triergon_raster::compat::libass::float_max;
 
 use super::from_26_6;
 use super::geometry::Scales;
@@ -241,8 +241,8 @@ impl Lines {
                 let (a, d, border) = chars.metrics(i);
                 asc = a.max(asc);
                 desc = d.max(desc);
-                border_y = fp::max(border_y, border[1]);
-                border_x = fp::max(border_x, border[0]);
+                border_y = float_max(border_y, border[1]);
+                border_x = float_max(border_x, border[0]);
                 newlines &= chars.symbol(i) == NEWLINE;
             }
             let scale = if newlines { 0.5 / 64.0 } else { 1.0 / 64.0 };

@@ -5,7 +5,8 @@
 //! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
-use triergon_raster::{Vector, fp, pixels_26_6};
+use triergon_raster::compat::libass::float_max;
+use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::Level;
 
 use super::fonts::Library;
@@ -429,7 +430,7 @@ impl Layout {
         max_text_width: f64,
     ) {
         let max_width = self.lines.lines.iter().fold(0.0, |max, line| {
-            fp::max(max, self.line_width(text, line.chars.clone()))
+            float_max(max, self.line_width(text, line.chars.clone()))
         });
         for line in self.lines.lines.iter() {
             let width = self.line_width(text, line.chars.clone());

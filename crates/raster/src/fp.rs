@@ -2,8 +2,7 @@
 //! is built from. The reference is compiled without floating-point contraction,
 //! and Rust never contracts, so expressions are written in the C source's order
 //! and grouping; these helpers cover the macros and library calls whose
-//! semantics differ from Rust's own. [`max`] and [`min`] are public for the
-//! renderer above this crate, which computes with the same macros.
+//! semantics differ from Rust's own.
 //! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 /// The larger value as C's `a > b ? a : b`: `b` when they are equal or
@@ -16,7 +15,7 @@ pub fn max(a: f64, b: f64) -> f64 {
 /// The smaller value as C's `a > b ? b : a`: `a` when they are equal or
 /// either is NaN.
 #[inline(always)]
-pub fn min(a: f64, b: f64) -> f64 {
+pub(crate) fn min(a: f64, b: f64) -> f64 {
     if a > b { b } else { a }
 }
 
