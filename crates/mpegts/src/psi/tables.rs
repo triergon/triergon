@@ -31,8 +31,10 @@ fn header(section: &Section, id: u8) -> Result<SectionHeader> {
     if data.len() < 12 || data[0] != id || section.crc_remainder() != Some(0) {
         return Err(Error::Invalid("PSI table identity/CRC"));
     }
-    if data[1] & 0xf0 != 0xb0 || data[5] & 0xc0 != 0xc0 || data[6] > data[7] {
-        return Err(Error::Invalid("PSI syntax/reserved/section number"));
+    // H.222.0 §2.4.4: `section_syntax_indicator` is 1 and the bit after it is '0'; the
+    // reserved bits are ignored, here and in every field below.
+    if data[1] & 0xc0 != 0x80 || data[6] > data[7] {
+        return Err(Error::Invalid("PSI syntax/section number"));
     }
     Ok(SectionHeader {
         table_id: id,
@@ -98,8 +100,8 @@ impl PatReader {
     /// A parser of `section`, charging its tables to `budget`.
     ///
     /// Fails with `Invalid` when the section uses another byte pool, is not a long-form PAT section
-    /// with a valid CRC and reserved bits, or has a partial program entry, and with `Limit` when it
-    /// lists more programs than `limits` allows.
+    /// with a valid CRC, or has a partial program entry, and with `Limit` when it lists more
+    /// programs than `limits` allows. Reserved bits are ignored.
     pub fn new(section: &Section, budget: &Budget, limits: ParseLimits) -> Result<Self> {
         limits.validate()?;
         if !section.bytes().belongs_to(budget) {
@@ -128,9 +130,8 @@ impl PatReader {
     }
     /// Parses program entries within `work` and returns the section once complete, then `Done`.
     ///
-    /// Fails with `Invalid` for a PID outside 0x0010..=0x1FFE, unset reserved bits or a duplicate
-    /// program number, with `Cancelled` when `cancel` is set, and when the budget refuses the
-    /// table.
+    /// Fails with `Invalid` for a PID outside 0x0010..=0x1FFE or a duplicate program number, with
+    /// `Cancelled` when `cancel` is set, and when the budget refuses the table.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -148,9 +149,9 @@ impl PatReader {
             }
             let data = &self.source.as_ref()[self.position..self.position + 4];
             let program_number = u16::from_be_bytes([data[0], data[1]]);
-            let pid = u16::from_be_bytes([data[2], data[3]]);
-            if pid & 0xe000 != 0xe000 || !pid::ELEMENTARY.contains(&(pid & pid::MASK)) {
-                return Err(Error::Invalid("PAT PID/reserved bits"));
+            let pid = u16::from_be_bytes([data[2], data[3]]) & pid::MASK;
+            if !pid::ELEMENTARY.contains(&pid) {
+                return Err(Error::Invalid("PAT PID"));
             }
             // At most the explicitly bounded number of programmes; no hash map.
             if self
@@ -164,7 +165,7 @@ impl PatReader {
             self.programs
                 .try_push(ProgramAssociation {
                     program_number,
-                    pid: pid & pid::MASK,
+                    pid,
                 })
                 .map_err(|error| error.error)?;
             self.position += 4;
@@ -277,8 +278,8 @@ impl PmtReader {
     /// [`new_with_namespace`](Self::new_with_namespace).
     ///
     /// Fails with `Invalid` when the section uses another byte pool, is not a valid PMT section 0
-    /// of 0
-    /// for a nonzero program, or has unset reserved bits or an overlong program info length.
+    /// of 0 for a nonzero program, or has a program info length beyond the section. Reserved bits
+    /// are ignored.
     pub fn new(section: &Section, budget: &Budget, limits: ParseLimits) -> Result<Self> {
         Self::new_with_namespace(
             section,
@@ -310,11 +311,8 @@ impl PmtReader {
             return Err(Error::Invalid(PMT_PROGRAM_IDENTITY));
         }
         let pcr = u16::from_be_bytes([data[8], data[9]]);
-        let length = u16::from_be_bytes([data[10], data[11]]);
-        if pcr & 0xe000 != 0xe000 || length & 0xfc00 != 0xf000 {
-            return Err(Error::Invalid("PMT reserved bits"));
-        }
-        let end = 12 + usize::from(length & 0x03ff);
+        // A 12-bit length whose first two bits are not '00' exceeds every PMT section.
+        let end = 12 + usize::from(u16::from_be_bytes([data[10], data[11]]) & 0x0fff);
         if end > data.len() - 4 {
             return Err(Error::Invalid("PMT program-info length"));
         }
@@ -444,15 +442,10 @@ impl PmtReader {
                 return Err(Error::Invalid("PMT elementary header"));
             }
             let data = &self.source.as_ref()[self.position..];
-            let pid = u16::from_be_bytes([data[1], data[2]]);
-            let length = u16::from_be_bytes([data[3], data[4]]);
-            if pid & 0xe000 != 0xe000
-                || length & 0xfc00 != 0xf000
-                || !pid::ELEMENTARY.contains(&(pid & pid::MASK))
-            {
-                return Err(Error::Invalid("PMT elementary PID/reserved bits"));
+            let pid = u16::from_be_bytes([data[1], data[2]]) & pid::MASK;
+            if !pid::ELEMENTARY.contains(&pid) {
+                return Err(Error::Invalid("PMT elementary PID"));
             }
-            let pid = pid & pid::MASK;
             if self
                 .streams
                 .as_slice()
@@ -462,7 +455,8 @@ impl PmtReader {
                 return Err(Error::Invalid("duplicate PMT elementary PID"));
             }
             let info_start = self.position + 5;
-            let info_end = info_start + usize::from(length & 0x03ff);
+            let info_end =
+                info_start + usize::from(u16::from_be_bytes([data[3], data[4]]) & 0x0fff);
             if info_end > end {
                 return Err(Error::Invalid("PMT elementary-info length"));
             }

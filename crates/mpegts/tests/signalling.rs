@@ -55,9 +55,15 @@ fn language_entries_keep_order_non_ascii_bytes_and_complete_audio_types() {
 }
 
 #[test]
-fn avc_fixed_body_retains_compatible_bits_and_rejects_length_or_reserved_damage() {
+fn avc_fixed_body_retains_compatible_bits_ignores_reserved_bits_and_rejects_length_damage() {
     let raw = [100, 0xa5, 42, 0xbf];
     let view = descriptor(0x28, &raw).avc_video().unwrap();
+    assert_eq!(
+        descriptor(0x28, &[100, 0xa5, 42, 0xa0])
+            .avc_video()
+            .unwrap(),
+        view
+    );
     assert_eq!(view.profile_idc, 100);
     assert_eq!(
         view.constraint_set_flags,
@@ -71,11 +77,6 @@ fn avc_fixed_body_retains_compatible_bits_and_rejects_length_or_reserved_damage(
     assert!(descriptor(0x28, &raw[..3]).avc_video().is_err());
     assert!(
         descriptor(0x28, &[100, 0xa5, 42, 0xbf, 0])
-            .avc_video()
-            .is_err()
-    );
-    assert!(
-        descriptor(0x28, &[100, 0xa5, 42, 0xbe])
             .avc_video()
             .is_err()
     );
@@ -113,16 +114,19 @@ fn hevc_temporal_ids_use_the_high_three_bits_and_do_not_swallow_trailing_bytes()
     let mut extra = raw.clone();
     extra.push(0);
     assert!(descriptor(0x38, &extra).hevc_video().is_err());
-    let mut bad = raw.clone();
-    bad[13] &= !1;
-    assert!(descriptor(0x38, &bad).hevc_video().is_err());
-    bad = raw.clone();
-    bad[12] &= !4;
-    assert!(descriptor(0x38, &bad).hevc_video().is_err());
-    bad[12] = raw[12];
-    bad[13] = 0xdf;
-    bad[14] = 0x3f;
-    assert!(descriptor(0x38, &bad).hevc_video().is_err());
+    // Reserved bits are ignored: cleared in the flags byte and below both temporal IDs.
+    let mut cleared = raw.clone();
+    cleared[12] &= !0x0c;
+    cleared[13] &= !0x1f;
+    cleared[14] &= !0x1f;
+    assert_eq!(
+        descriptor(0x38, &cleared).hevc_video().unwrap(),
+        descriptor(0x38, &raw).hevc_video().unwrap()
+    );
+    let mut inverted = raw.clone();
+    inverted[13] = 0xdf;
+    inverted[14] = 0x3f;
+    assert!(descriptor(0x38, &inverted).hevc_video().is_err());
 }
 
 #[test]

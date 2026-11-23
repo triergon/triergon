@@ -486,8 +486,7 @@ impl Catalogue {
                 || raw.len() > 1024
                 || (raw.len() - 12) % 4 != 0
                 || raw.len() != 3 + usize::from(u16::from_be_bytes([raw[1] & 15, raw[2]]))
-                || raw[1] & 0xf0 != 0xb0
-                || raw[5] & 0xc0 != 0xc0
+                || raw[1] & 0xc0 != 0x80
                 || raw[0] != 0
                 || raw[6] != section as u8
                 || raw[7] != h.last_section_number
@@ -603,10 +602,7 @@ impl Catalogue {
             || raw.len() < 16
             || raw.len() > 1024
             || raw.len() != 3 + usize::from(u16::from_be_bytes([raw[1] & 15, raw[2]]))
-            || raw[1] & 0xf0 != 0xb0
-            || raw[5] & 0xc0 != 0xc0
-            || raw[8] & 0xe0 != 0xe0
-            || raw[10] & 0xf0 != 0xf0
+            || raw[1] & 0xc0 != 0x80
             || raw[0] != 2
             || PsiCrc32::of(raw) != 0
             || u16::from_be_bytes([raw[3], raw[4]]) != h.extension

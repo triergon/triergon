@@ -217,8 +217,7 @@ fn common_header(section: &Section, id: u8, budget: &Budget) -> Result<SectionHe
         || b.len() > 1024
         || b[0] != id
         || b.len() != 3 + usize::from(u16::from_be_bytes([b[1] & 15, b[2]]))
-        || b[1] & 0xf0 != 0xb0
-        || b[5] & 0xc0 != 0xc0
+        || b[1] & 0xc0 != 0x80
         || b[6] > b[7]
         || section.crc_remainder() != Some(0)
         || PsiCrc32::of(b) != 0
@@ -429,10 +428,7 @@ fn decode_rejected_pmt(
         ));
     }
     let raw = input.section.bytes().as_ref();
-    if raw.len() < 16
-        || raw[8] & 0xe0 != 0xe0
-        || u16::from_be_bytes([raw[10], raw[11]]) & 0xfc00 != 0xf000
-    {
+    if raw.len() < 16 || raw[10] & 0x0c != 0 {
         return Err(Error::Invalid("PSI compatibility PMT header bounds"));
     }
     if raw[10] & 3 != 0 || raw[11] != 0 {
@@ -460,14 +456,11 @@ fn decode_rejected_pmt(
         let head = raw
             .get(at..at + 5)
             .ok_or(Error::Invalid("PSI compatibility ES header truncated"))?;
-        if head[1] & 0xe0 != 0xe0 || u16::from_be_bytes([head[3], head[4]]) & 0xfc00 != 0xf000 {
-            return Err(Error::Invalid("PSI compatibility ES reserved bits"));
-        }
         let pid = u16::from_be_bytes([head[1], head[2]]) & pid::MASK;
         let end = at
             .checked_add(5)
             .and_then(|n| {
-                n.checked_add(usize::from(u16::from_be_bytes([head[3], head[4]]) & 0x03ff))
+                n.checked_add(usize::from(u16::from_be_bytes([head[3], head[4]]) & 0x0fff))
             })
             .ok_or(Error::Overflow)?;
         if end > raw.len() - 4

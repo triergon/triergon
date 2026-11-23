@@ -437,6 +437,51 @@ fn avc_and_hevc_are_full_source_aus_across_pes_and_carriers() {
     }
 }
 
+#[test]
+fn tables_are_read_whatever_their_reserved_bits() {
+    // H.222.0 §2.1 asks an encoder to set reserved bits to '1'; a reader ignores them.
+    let raw = include_bytes!("../../framing/fixtures/raw-annex-b/avc-aud0.h264");
+    let read = |reserved: u8| {
+        let mut ts = Transport::new();
+        let syntax = 0x80 | (reserved & 0x30);
+        let version = (reserved & 0xc0) | 1;
+        let pid = |pid: u16| [(reserved & 0xe0) | (pid >> 8) as u8, pid as u8];
+        let length = |bytes: usize| [(reserved & 0xf0) | (bytes >> 8) as u8, bytes as u8];
+        let mut pat = vec![0, syntax, 13, 0, 9, version, 0, 0, 0, PROGRAM as u8];
+        pat.extend(pid(4096));
+        ts.section(0, pat);
+        // An AVC video descriptor whose five reserved bits follow the same pattern.
+        let avc = [0x28, 4, 100, 0, 42, 0xe0 | (reserved & 0x1f)];
+        let mut pmt = vec![2, syntax, 24, 0, PROGRAM as u8, version, 0, 0];
+        pmt.extend(pid(PID));
+        pmt.extend(length(0));
+        pmt.push(0x1b);
+        pmt.extend(pid(PID));
+        pmt.extend(length(avc.len()));
+        pmt.extend(avc);
+        ts.section(4096, pmt);
+        ts.pes(PID, 0xe0, raw, Some(90_000), None);
+        let mut drive = Drive::new(&ts.bytes, ReaderLimits::default(), 4096, 8192);
+        let mut packets = Vec::new();
+        while let Some(event) = drive.next().unwrap() {
+            if let Event::Packet(packet) = event {
+                let stream = packet.track_info().stream();
+                packets.push((
+                    packet.payload().to_vec(),
+                    packet.pts(),
+                    (stream.pid, stream.stream_type),
+                    stream.descriptor_bytes.as_ref()[..5].to_vec(),
+                ));
+            }
+        }
+        packets
+    };
+    let set = read(0xff);
+    assert_eq!(set.len(), 12);
+    assert_eq!(set[0].2, (PID, 0x1b));
+    assert_eq!(read(0), set);
+}
+
 fn adts(body: &[u8]) -> Vec<u8> {
     let length = body.len() + 7;
     let mut frame = vec![
