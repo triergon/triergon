@@ -105,36 +105,34 @@ pub(crate) fn vui_timing(
 }
 
 /// The payload of the last parameter set of a kind read, so that a repeated
-/// one is not read again.
+/// one is not read again; empty when none is remembered. An empty payload is
+/// never a repeat: no set is read from it.
 #[derive(Debug)]
 pub(crate) struct LastPayload {
     bytes: BudgetVec<u8>,
-    valid: bool,
 }
 
 impl LastPayload {
     pub(crate) fn new(pool: &Budget) -> Self {
         Self {
             bytes: BudgetVec::new(pool),
-            valid: false,
         }
     }
 
     /// True when `payload` repeats the last one remembered.
     pub(crate) fn repeats(&self, payload: &[u8]) -> bool {
-        self.valid && self.bytes.as_slice() == payload
+        !payload.is_empty() && self.bytes.as_slice() == payload
     }
 
+    /// Remembers `payload`; a payload the pool cannot hold leaves none
+    /// remembered.
     pub(crate) fn remember(&mut self, payload: &[u8]) -> triergon_core::Result<()> {
-        self.valid = false;
         self.bytes.clear();
-        self.bytes.try_extend_from_slice(payload)?;
-        self.valid = true;
-        Ok(())
+        self.bytes.try_extend_from_slice(payload)
     }
 
     pub(crate) fn forget(&mut self) {
-        self.valid = false;
+        self.bytes.clear();
     }
 }
 
