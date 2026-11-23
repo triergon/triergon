@@ -5,7 +5,7 @@ use std::sync::atomic::AtomicBool;
 
 use triergon::{
     Budget, Bytes, CodecId, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step,
-    WorkBudget,
+    TimeBase, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{CutPes, DemuxClock, PesCutter};
 use triergon_mpegts::compat::stream::{self, ProgramReader};
@@ -18,7 +18,7 @@ use triergon::{AnyReader, ContainerReader, PacketInfo, TrackInfo};
 use triergon_harness_runner::Operation;
 use triergon_subtitles::compat::dvb::{PesParser, PesProgress};
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, DvbPacket, PacketEnvelope, PacketIdentity, PacketTiming, SourceClock,
+    ClockOrigin, ClockValue, DvbPacket, PacketEnvelope, PacketIdentity, PacketTiming,
     SourceConfiguration,
 };
 
@@ -49,8 +49,8 @@ pub(super) fn operation<'a>(
                 2,
                 &[
                     0,
-                    clock.time_base().numerator(),
-                    clock.time_base().denominator(),
+                    clock.numerator(),
+                    clock.denominator(),
                     (5 * data.configuration.len()) as u64,
                 ],
                 &data
@@ -105,7 +105,7 @@ fn ts_source(input: &[u8]) -> triergon::Result<Source> {
                 &pool,
                 &original,
                 index,
-                SourceClock::new(1, 90_000)?,
+                TimeBase::new(1, 90_000)?,
                 PacketEnvelope::Segments,
             )
         })
@@ -171,7 +171,7 @@ fn mkv_source(input: &[u8]) -> triergon::Result<Source> {
     let config = SourceConfiguration::from_matroska_private(
         &pool,
         &private,
-        SourceClock::new(scale, 1_000_000_000)?,
+        TimeBase::new(scale, 1_000_000_000)?,
     )?;
     let track = track.id();
     let ticks = |ns: i64| clock_value(i128::from(ns).div_euclid(i128::from(scale)));

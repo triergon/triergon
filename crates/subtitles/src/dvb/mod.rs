@@ -12,7 +12,7 @@ pub(crate) mod receiver_decoder;
 
 pub use boundary::{
     ClockOrigin, ClockValue, ConfigurationSource, PacketIdentity, PacketSourceFacts, PacketTiming,
-    SourceClock, SourceConfiguration,
+    SourceConfiguration,
 };
 pub use boundary::{DvbPacket, PacketEnvelope, Service};
 pub use model::{Depth, Size};

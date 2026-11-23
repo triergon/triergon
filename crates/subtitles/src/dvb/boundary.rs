@@ -45,39 +45,6 @@ pub struct DvbPacket {
     pub source: Option<PacketSourceFacts>,
 }
 
-/// A source time base as declared, kept beside its exact reduced
-/// `TimeBase`: 1/90000 and 2/180000 stay distinct.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SourceClock {
-    numerator: u64,
-    denominator: u64,
-    exact: TimeBase,
-}
-
-impl SourceClock {
-    /// `numerator / denominator` seconds per tick. A zero in either is
-    /// `Error::Invalid`.
-    pub fn new(numerator: u64, denominator: u64) -> Result<Self> {
-        Ok(Self {
-            numerator,
-            denominator,
-            exact: TimeBase::new(numerator, denominator)?,
-        })
-    }
-    /// The numerator as declared, not reduced.
-    pub fn raw_numerator(self) -> u64 {
-        self.numerator
-    }
-    /// The denominator as declared, not reduced.
-    pub fn raw_denominator(self) -> u64 {
-        self.denominator
-    }
-    /// The exact reduced time base.
-    pub fn time_base(self) -> TimeBase {
-        self.exact
-    }
-}
-
 /// Where a clock value comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ClockOrigin {
@@ -91,7 +58,7 @@ pub enum ClockOrigin {
 /// A raw clock value and where it comes from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClockValue {
-    /// Ticks of the [`SourceClock`].
+    /// Ticks of the configuration's [`clock`](SourceConfiguration::clock).
     pub ticks: i128,
     /// Whether the source encodes the value.
     pub origin: ClockOrigin,
@@ -100,8 +67,8 @@ pub struct ClockValue {
 impl ClockValue {
     /// The exact time of `ticks` at `clock`; `Error::Overflow` when it does
     /// not fit.
-    pub(crate) fn to_time(self, clock: SourceClock) -> Result<Time> {
-        Time::from_ticks(self.ticks, clock.time_base())
+    pub(crate) fn to_time(self, clock: TimeBase) -> Result<Time> {
+        Time::from_ticks(self.ticks, clock)
     }
 }
 
@@ -148,7 +115,7 @@ pub struct SourceConfiguration {
     original: Bytes,
     source: ConfigurationSource,
     service: Service,
-    clock: SourceClock,
+    clock: TimeBase,
     envelope: PacketEnvelope,
 }
 
@@ -160,7 +127,7 @@ impl SourceConfiguration {
     pub fn from_matroska_private(
         budget: &Budget,
         original: &Bytes,
-        clock: SourceClock,
+        clock: TimeBase,
     ) -> Result<Self> {
         if !original.belongs_to(budget) {
             return Err(Error::ForeignPool);
@@ -196,7 +163,7 @@ impl SourceConfiguration {
         budget: &Budget,
         original: &Bytes,
         entry: usize,
-        clock: SourceClock,
+        clock: TimeBase,
         envelope: PacketEnvelope,
     ) -> Result<Self> {
         if !original.belongs_to(budget) {
@@ -252,7 +219,7 @@ impl SourceConfiguration {
         self.service
     }
     /// The clock of the packets' time stamps.
-    pub fn clock(&self) -> SourceClock {
+    pub fn clock(&self) -> TimeBase {
         self.clock
     }
     /// How the packets hold their segments.

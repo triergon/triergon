@@ -154,7 +154,7 @@ impl MatroskaBitmapTrack {
                 Codec::Dvb(dvb::SourceConfiguration::from_matroska_private(
                     output.pool(),
                     &raw,
-                    dvb::SourceClock::new(1, NS_PER_SECOND)?,
+                    TimeBase::new(1, NS_PER_SECOND)?,
                 )?)
             }
             _ => return Err(Error::Unsupported("Matroska bitmap subtitle codec")),

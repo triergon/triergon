@@ -13,7 +13,7 @@ use triergon_playback::Output;
 use triergon_subtitles::compat::dvb::{
     Options, PesPacket, PesParser, PesProgress, ReceiverDecoder, Rect, Status, Subtitle,
 };
-use triergon_subtitles::dvb::{PacketEnvelope, Size, SourceClock, SourceConfiguration};
+use triergon_subtitles::dvb::{PacketEnvelope, Size, SourceConfiguration};
 
 /// The most rectangles a queued picture carries.
 const MAX_RECTANGLES: usize = 8;
@@ -112,11 +112,9 @@ impl<'a> DvbQueueAction<'a> {
 }
 
 /// `ticks` of `clock` in microseconds, the decoder's clock.
-pub(crate) fn microseconds(ticks: i128, clock: SourceClock) -> Result<i64> {
+pub(crate) fn microseconds(ticks: i128, clock: TimeBase) -> Result<i64> {
     let ticks = i64::try_from(ticks).map_err(|_| Error::Overflow)?;
-    clock
-        .time_base()
-        .rescale(ticks, TimeBase::new(1, 1_000_000)?, Rounding::NearestAway)
+    clock.rescale(ticks, TimeBase::new(1, 1_000_000)?, Rounding::NearestAway)
 }
 
 /// What a poll did.
@@ -193,7 +191,7 @@ impl DvbTsBridge {
             pool,
             &descriptor,
             entry,
-            SourceClock::new(1, 90_000)?,
+            TimeBase::new(1, 90_000)?,
             PacketEnvelope::PesDataField,
         )?;
         let options = Options {
