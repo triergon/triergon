@@ -351,13 +351,26 @@ struct Seeking {
     requested: Time,
     /// The target in the track's ticks, rounded down, so `cts <= target` is exact.
     target: i128,
-    first: Option<(u64, i128)>,
-    best: Option<(u64, i128)>,
-    landing: Option<Landing>,
-    /// The next track to position, and the first tick it may resume at.
-    at: usize,
-    resume: Option<i128>,
-    skipped: bool,
+    stage: SeekStage,
+}
+
+/// What a seek is doing.
+#[derive(Debug)]
+enum SeekStage {
+    /// Scanning the sought track for its landing: the ordinal and composition time of
+    /// its first sync sample and of the latest one at or before the target.
+    Search {
+        first: Option<(u64, i128)>,
+        best: Option<(u64, i128)>,
+    },
+    /// Positioning every track at the landing: the next track to position, the first
+    /// tick it may resume at, and whether a sample was passed over on the way.
+    Position {
+        landing: Landing,
+        at: usize,
+        resume: Option<i128>,
+        skipped: bool,
+    },
 }
 
 type Output = Step<Neutral<Packet, ReaderEvent>, Backpressure>;
@@ -738,71 +751,86 @@ impl Seeking {
     /// Finds the landing on the sought track, then positions every track after it;
     /// `Some(Step::Ready)` with the receipt once done.
     fn poll(&mut self, tracks: &mut [Track], work: &mut WorkBudget) -> Result<Option<Output>> {
-        let Some(landing) = self.landing else {
-            let track = &mut tracks[self.track];
-            if !track.fill(work)? {
-                return Ok(Some(Step::Yield));
-            }
-            if let Some(sample) = track.head.take() {
-                if let (Access::ContainerSync, Some(cts)) = (sample.access, sample.cts_ticks) {
-                    self.first.get_or_insert((sample.ordinal, cts));
-                    if cts <= self.target && self.best.is_none_or(|(_, best)| cts >= best) {
-                        self.best = Some((sample.ordinal, cts));
+        match &mut self.stage {
+            SeekStage::Search { first, best } => {
+                let track = &mut tracks[self.track];
+                if !track.fill(work)? {
+                    return Ok(Some(Step::Yield));
+                }
+                if let Some(sample) = track.head.take() {
+                    if let (Access::ContainerSync, Some(cts)) = (sample.access, sample.cts_ticks) {
+                        first.get_or_insert((sample.ordinal, cts));
+                        if cts <= self.target && best.is_none_or(|(_, best)| cts >= best) {
+                            *best = Some((sample.ordinal, cts));
+                        }
                     }
+                    return Ok(None);
                 }
-                return Ok(None);
-            }
-            let (ordinal, ticks) = self.best.or(self.first).ok_or(Error::Unsupported(
-                "track states no timed random-access sample",
-            ))?;
-            self.landing = Some(Landing {
-                ordinal,
-                time: Time::from_ticks(ticks, tracks[self.track].base)?,
-            });
-            for track in tracks.iter_mut() {
-                track.rewind();
-            }
-            return Ok(None);
-        };
-        if let Some(track) = tracks.get_mut(self.at) {
-            if !track.fill(work)? {
-                return Ok(Some(Step::Yield));
-            }
-            if self.at != self.track && self.resume.is_none() {
-                self.resume = Some(landing.time.to_ticks(track.base, Rounding::Ceil)?);
-            }
-            let reached = track.head.as_ref().is_none_or(|head| {
-                if self.at == self.track {
-                    head.ordinal == landing.ordinal
-                } else {
-                    // A sample with no time cannot be placed, so it is not dropped.
-                    head.dts_ticks
-                        .or(head.cts_ticks)
-                        .zip(self.resume)
-                        .is_none_or(|(ticks, resume)| ticks >= resume)
+                let (ordinal, ticks) = best.or(*first).ok_or(Error::Unsupported(
+                    "track states no timed random-access sample",
+                ))?;
+                let landing = Landing {
+                    ordinal,
+                    time: Time::from_ticks(ticks, track.base)?,
+                };
+                for track in tracks.iter_mut() {
+                    track.rewind();
                 }
-            });
-            if reached {
-                self.at += 1;
-                self.resume = None;
-            } else {
-                track.head = None;
-                self.skipped = true;
+                self.stage = SeekStage::Position {
+                    landing,
+                    at: 0,
+                    resume: None,
+                    skipped: false,
+                };
+                Ok(None)
             }
-            return Ok(None);
+            SeekStage::Position {
+                landing,
+                at,
+                resume,
+                skipped,
+            } => {
+                if let Some(track) = tracks.get_mut(*at) {
+                    if !track.fill(work)? {
+                        return Ok(Some(Step::Yield));
+                    }
+                    if *at != self.track && resume.is_none() {
+                        *resume = Some(landing.time.to_ticks(track.base, Rounding::Ceil)?);
+                    }
+                    let reached = track.head.as_ref().is_none_or(|head| {
+                        if *at == self.track {
+                            head.ordinal == landing.ordinal
+                        } else {
+                            // A sample with no time cannot be placed, so it is not dropped.
+                            head.dts_ticks
+                                .or(head.cts_ticks)
+                                .zip(*resume)
+                                .is_none_or(|(ticks, resume)| ticks >= resume)
+                        }
+                    });
+                    if reached {
+                        *at += 1;
+                        *resume = None;
+                    } else {
+                        track.head = None;
+                        *skipped = true;
+                    }
+                    return Ok(None);
+                }
+                let discard_until = match self.policy {
+                    SeekPolicy::PreviousRandomAccess => landing.time,
+                    SeekPolicy::PlaybackPreroll => landing.time.max(self.requested),
+                };
+                Ok(Some(Step::Ready(Neutral::Seek(SeekReceipt {
+                    requested: self.requested,
+                    landing: landing.time,
+                    discard_until,
+                    method: SeekMethod::Index,
+                    scanned_bytes: 0,
+                    replays_from_start: !*skipped,
+                }))))
+            }
         }
-        let discard_until = match self.policy {
-            SeekPolicy::PreviousRandomAccess => landing.time,
-            SeekPolicy::PlaybackPreroll => landing.time.max(self.requested),
-        };
-        Ok(Some(Step::Ready(Neutral::Seek(SeekReceipt {
-            requested: self.requested,
-            landing: landing.time,
-            discard_until,
-            method: SeekMethod::Index,
-            scanned_bytes: 0,
-            replays_from_start: !self.skipped,
-        }))))
     }
 }
 
@@ -875,12 +903,10 @@ impl ContainerReader for Reader {
             policy: request.policy,
             requested: request.target,
             target,
-            first: None,
-            best: None,
-            landing: None,
-            at: 0,
-            resume: None,
-            skipped: false,
+            stage: SeekStage::Search {
+                first: None,
+                best: None,
+            },
         });
         Ok(position)
     }
