@@ -40,7 +40,16 @@ pub(crate) const fn block_path(geometry: Geometry) -> bool {
 #[derive(Debug)]
 pub struct Converter {
     scratch: Scratch,
-    filtered_only: bool,
+    paths: Paths,
+}
+
+/// Which paths a [`Converter`] takes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Paths {
+    /// The block or the filtered path, by the picture's width.
+    ByWidth,
+    /// The filtered path at every width.
+    Filtered,
 }
 
 #[derive(Debug)]
@@ -87,7 +96,7 @@ impl Converter {
     pub fn new(geometry: Geometry) -> Converter {
         Converter {
             scratch: Scratch::new(geometry, block_path(geometry)),
-            filtered_only: false,
+            paths: Paths::ByWidth,
         }
     }
 
@@ -95,7 +104,7 @@ impl Converter {
     pub fn filtered(geometry: Geometry) -> Converter {
         Converter {
             scratch: Scratch::new(geometry, false),
-            filtered_only: true,
+            paths: Paths::Filtered,
         }
     }
 
@@ -115,7 +124,7 @@ impl Converter {
                 actual: rgba.len(),
             });
         }
-        let use_blocks = !self.filtered_only && block_path(g);
+        let use_blocks = self.paths == Paths::ByWidth && block_path(g);
         if !self.scratch.fits(g, use_blocks) {
             self.scratch = Scratch::new(g, use_blocks);
         }
