@@ -835,7 +835,7 @@ impl<'a> PacketCursor<'a> {
                 maximum: limits.max_media_extents,
             });
         }
-        // At most64 tracks: bound constructor work independently of input size.
+        // At most 64 tracks: bound constructor work independently of input size.
         for (at, track) in tracks.iter().enumerate() {
             if tracks[..at]
                 .iter()

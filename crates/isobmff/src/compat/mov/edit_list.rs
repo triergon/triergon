@@ -252,7 +252,7 @@ impl<'a> EditCursor<'a> {
 
     fn edit_ticks(&self) -> Option<EditTicks> {
         // These starts were constructed in the media base. With its unit
-        // numerator, subtracting two signed64 ticks and adding a third fits
+        // numerator, subtracting two signed 64-bit ticks and adding a third fits
         // the exact-time representation. The end comparison uses the ceiling
         // since it is tested against integer source ticks.
         if self.media_base.numerator() != 1 {

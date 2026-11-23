@@ -395,8 +395,9 @@ impl PendingMedia {
     }
 }
 
-/// An opened movie: its tracks, the `mdat` extents and the retained root boxes; from
-/// Opened movie metadata, track indexes and media extents within [`Self::read_scope`].
+/// An opened movie: its header, its tracks with their indexes, the `mdat` extents and
+/// the retained root boxes, as far into the source as [`Self::read_scope`] says the
+/// open read.
 #[derive(Debug)]
 pub struct Movie {
     pub(crate) read_scope: MetadataReadScope,

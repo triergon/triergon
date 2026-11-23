@@ -584,7 +584,7 @@ impl<'a> RootWalkTransportBuilder<'a> {
                 }
                 3 => {
                     let movie_end = self.movie.header().end()?.ok_or(Error::Overflow)?;
-                    // At most16 headers. Each skipped metadata prefix header was
+                    // At most 16 headers. Each skipped metadata prefix header was
                     // already separately validated and paid during the root scan.
                     while self.tail_at < self.roots.len()
                         && self.roots[self.tail_at].end()?.ok_or(Error::Overflow)? <= movie_end
