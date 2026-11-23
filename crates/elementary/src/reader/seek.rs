@@ -30,6 +30,7 @@ pub(super) enum Progress {
     Bisect { low: (u64, u64), high: u64 },
     Estimate,
     Forward,
+    VerifyEstimate { offset: u64, sample: u64 },
 }
 
 impl<F: Format> Reader<F> {
@@ -47,7 +48,13 @@ impl<F: Format> Reader<F> {
                 (low.0, Progress::Forward)
             }
             Plan::Estimate { offset, .. } => (offset, Progress::Estimate),
-            Plan::Scan => (self.seek_context()?.audio_start, Progress::Forward),
+            Plan::Scan => (
+                self.seek_context()?.audio_start,
+                match seeking.progress {
+                    verify @ Progress::VerifyEstimate { .. } => verify,
+                    _ => Progress::Forward,
+                },
+            ),
         };
         // An estimate past the end lands on the last bytes and falls back from there.
         let offset = self
@@ -71,7 +78,7 @@ impl<F: Format> Reader<F> {
     pub(super) fn seek_found(&mut self, seeking: Seeking, header: F::Header) -> Result<Next> {
         let offset = self.input.position();
         match seeking.progress {
-            Progress::Forward => {
+            Progress::Forward | Progress::VerifyEstimate { .. } => {
                 self.phase = Phase::Frame(Cut::found(header));
                 Ok(Flow::Ready(None))
             }
@@ -100,20 +107,24 @@ impl<F: Format> Reader<F> {
                 let context = self.seek_context()?;
                 let mut sample = self.format.estimate(offset, context, basis);
                 let mut cut = Cut::found(header);
-                // An estimate past the target counted bytes before this sync that are no
-                // frame. They are the gap before it, which belongs to its packet: land on
-                // that packet, at the jump, whose estimate the plan put at or before the
-                // target.
-                if sample > seeking.target
-                    && F::GAP == Gap::PrependToNext
-                    && let Some(lead) = offset
-                        .checked_sub(seeking.probe)
-                        .and_then(|lead| usize::try_from(lead).ok())
-                        .filter(|&lead| lead > 0)
+                if sample > seeking.target && F::GAP == Gap::PrependToNext && offset > seeking.probe
                 {
-                    sample = self.format.estimate(seeking.probe, context, basis);
-                    self.input.reset(seeking.probe)?;
-                    cut = Cut::at(lead);
+                    if basis == SeekBasis::Bitrate {
+                        // Confirm whether the bitrate jump reached a packet boundary
+                        // or the middle of a frame by reading from the first frame.
+                        let mut seeking = seeking;
+                        seeking.progress = Progress::VerifyEstimate {
+                            offset: seeking.probe,
+                            sample: self.format.estimate(seeking.probe, context, basis),
+                        };
+                        let request = self.jump(seeking, Plan::Scan)?;
+                        return Ok(Flow::Wait(Wait::Step(Step::NeedInput(request))));
+                    }
+                    if let Ok(lead) = usize::try_from(offset - seeking.probe) {
+                        sample = self.format.estimate(seeking.probe, context, basis);
+                        self.input.reset(seeking.probe)?;
+                        cut = Cut::at(lead);
+                    }
                 }
                 self.next_pts = i64::try_from(sample).map_err(|_| Error::Overflow)?;
                 self.phase = Phase::Frame(cut);
@@ -134,7 +145,13 @@ impl<F: Format> Reader<F> {
     }
 
     /// Finish the seek at a unit starting at `landing`.
-    pub(super) fn land(&mut self, seeking: Seeking, landing: i64) -> Result<SeekReceipt> {
+    pub(super) fn land(&mut self, mut seeking: Seeking, landing: i64) -> Result<SeekReceipt> {
+        if let Progress::VerifyEstimate { offset, sample } = seeking.progress
+            && (self.input.position() != offset || u64::try_from(landing) != Ok(sample))
+        {
+            seeking.basis = SeekBasis::Exact;
+            seeking.method = SeekMethod::Restart;
+        }
         let time_base = self
             .stream()
             .map(Track::time_base)

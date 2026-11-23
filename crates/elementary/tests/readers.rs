@@ -427,6 +427,34 @@ fn a_bitrate_seek_across_junk_lands_on_the_packet_the_junk_starts() {
 }
 
 #[test]
+fn a_bitrate_seek_inside_a_frame_lands_on_a_complete_packet() {
+    let jump = 50 * 18_432_000 / 44_100;
+    for (padded, short, into_frame) in [(46, 0, 1), (47, 4, 208)] {
+        let mut file = Vec::new();
+        for index in 0..80 {
+            let pad = index < padded || index == 50;
+            let mut frame = mp3_frame(index, pad);
+            if (1..=short).contains(&index) {
+                frame[2] = (frame[2] & 0x0f) | 0x80; // 112 kbit/s
+                frame.truncate(365 + usize::from(pad));
+            }
+            file.extend(frame);
+        }
+        let linear = read_file::<MpegAudio>(&file, 1 << 30, usize::MAX, true).unwrap();
+        assert_eq!(jump - linear.packets[50].offset, into_frame);
+        let (reading, detail) = seek::<MpegAudio>(
+            &file,
+            (1_319_183, 1_000_000),
+            SeekPolicy::PreviousRandomAccess,
+        );
+        assert_eq!(detail.basis, SeekBasis::Exact);
+        assert_eq!(detail.receipt.method, SeekMethod::Restart);
+        assert_eq!(detail.receipt.landing, Time::new(50 * 1152, 44100).unwrap());
+        assert_eq!(reading.packets, linear.packets[50..]);
+    }
+}
+
+#[test]
 fn a_seek_to_zero_starts_after_the_mpeg_information_frame() {
     let audio = mp3_stream(20);
     let mut source = mp3_info(20, (audio.len() + 417) as u32, 576, 1260);

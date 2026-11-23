@@ -703,7 +703,7 @@ impl<F: Format> Reader<F> {
                     seeking.basis = SeekBasis::Exact;
                     Plan::Scan
                 }
-                Progress::Forward => {
+                Progress::Forward | Progress::VerifyEstimate { .. } => {
                     self.seeking = None;
                     return Ok(Flow::Wait(Wait::End));
                 }
@@ -1133,7 +1133,10 @@ impl<F: Format> Reader<F> {
         let duration = self.format.samples(&header);
         let (extra, then) = unit.after.then();
         if let Some(seeking) = self.seeking.as_mut()
-            && matches!(seeking.progress, Progress::Forward)
+            && matches!(
+                seeking.progress,
+                Progress::Forward | Progress::VerifyEstimate { .. }
+            )
         {
             let preroll = match seeking.policy {
                 SeekPolicy::PreviousRandomAccess => 0,
