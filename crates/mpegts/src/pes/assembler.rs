@@ -148,6 +148,8 @@ pub struct PesAssembler {
 }
 
 pub(crate) const UNBOUNDED_NON_VIDEO: Error = Error::Invalid("unbounded non-video PES");
+/// Payload after the declared end of a finite PES, in the carrier that completes it.
+pub(crate) const FINITE_SURPLUS: Error = Error::Invalid("bytes beyond finite PES");
 
 impl PesAssembler {
     /// An assembler for `pid`, charging retained tables to `budget` and bounded by `limits`.
@@ -473,6 +475,15 @@ impl PesAssembler {
         }
         result
     }
+    /// The carrier that completes a finite PES holds bytes past its declared length: the
+    /// PES is complete (H.222.0 §2.4.3.7) and is returned, and the bytes past it are the
+    /// fault every later poll reports.
+    #[cold]
+    #[inline(never)]
+    fn report_surplus(&mut self) {
+        self.fault = Some(FINITE_SURPLUS);
+    }
+
     fn emit<const RETAIN: bool>(&mut self) -> Result<AssemblyStep<Option<Pes>>> {
         let next = self
             .elementary_offset
@@ -705,7 +716,7 @@ impl PesAssembler {
                     .as_ref()
                     .is_some_and(|payload| payload.remaining() != 0)
                 {
-                    return Err(Error::Invalid("bytes beyond finite PES"));
+                    self.report_surplus();
                 }
                 // A completed finite PES consumes its current payload. Release the
                 // input slot before publishing, so the caller can supply the next.

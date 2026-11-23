@@ -522,6 +522,94 @@ fn incomplete_finite_pes_is_truncation_and_zero_length_audio_is_invalid() {
 }
 
 #[test]
+fn a_finite_pes_is_delivered_before_the_surplus_of_its_last_carrier_is_reported() {
+    let pool = pool();
+    let mut reader = PesAssembler::new(
+        PID,
+        true,
+        pool.clone(),
+        ParseLimits::default(),
+        SourceEpochs::default(),
+    )
+    .unwrap();
+    let mut source = pes(b"declared", Some(0), None, false);
+    source.extend_from_slice(b"surplus");
+    reader
+        .push(bytes(&pool, &source), true, SourceId(1), 0)
+        .unwrap();
+    let AssemblyStep::Output(pes) = reader.poll(&mut WorkBudget::new(100), &cancel()).unwrap()
+    else {
+        panic!("the declared PES is complete");
+    };
+    assert_eq!(
+        pes.payload().flatten().copied().collect::<Vec<_>>(),
+        b"declared"
+    );
+    for _ in 0..2 {
+        assert_eq!(
+            reader
+                .poll(&mut WorkBudget::new(100), &cancel())
+                .unwrap_err(),
+            Error::Invalid("bytes beyond finite PES")
+        );
+    }
+}
+
+#[test]
+fn the_source_view_publishes_a_finite_pes_before_the_surplus_of_its_last_carrier() {
+    use triergon_mpegts::stream::{FaultKind, TraceEvent, TransportStream};
+    let source: &[u8] = include_bytes!("data/pes-finite-extra-payload.ts");
+    let pool = pool();
+    let mut input = InputCursor::new(
+        &pool,
+        SourceId(1),
+        SourceCapabilities {
+            length: Some(source.len() as u64),
+            random_access: false,
+        },
+        4096,
+    )
+    .unwrap();
+    let mut stream =
+        TransportStream::new(pool.clone(), PacketFormat::Ts188, ParseLimits::default(), 1).unwrap();
+    let mut events = Vec::new();
+    loop {
+        match stream
+            .poll(&mut input, &mut WorkBudget::new(64), &cancel())
+            .unwrap()
+        {
+            Step::Ready(TraceEvent::Finished) => break,
+            Step::Ready(event @ (TraceEvent::Pes(_) | TraceEvent::Diagnostic(_))) => {
+                events.push(event);
+            }
+            Step::Ready(_) | Step::Yield => {}
+            Step::End(_) => stream.end_of_source().unwrap(),
+            Step::NeedInput(request) => {
+                if request.offset == source.len() as u64 {
+                    input.finish(request.source, request.token).unwrap();
+                } else {
+                    let window = InputWindow::new(
+                        request.source,
+                        request.token,
+                        request.offset,
+                        bytes(&pool, &source[request.offset as usize..]),
+                    )
+                    .unwrap();
+                    input.provide(&window).unwrap();
+                }
+            }
+        }
+    }
+    let [TraceEvent::Pes(pes), TraceEvent::Diagnostic(fault)] = events.as_slice() else {
+        panic!("expected the PES, then the surplus fault: {events:?}");
+    };
+    assert_eq!(pes.payload_len, 27);
+    assert_eq!(fault.kind, FaultKind::Pes);
+    assert_eq!(fault.pid, Some(pes.pid));
+    assert_eq!(fault.error, Error::Invalid("bytes beyond finite PES"));
+}
+
+#[test]
 fn cancellation_and_limits_leave_the_input_observable_for_explicit_recovery() {
     let pool = pool();
     let mut reader = PesAssembler::new(

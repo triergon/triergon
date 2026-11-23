@@ -9,7 +9,7 @@ use super::pes::{
     DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope, DemuxSpan,
     PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
-use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS, stream_id};
+use crate::pes::{FINITE_SURPLUS, FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS, stream_id};
 use crate::psi::{DescriptorNamespace, ProgramMap, stream_type};
 use crate::stream::{
     FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
@@ -58,7 +58,7 @@ impl RecoveryTrigger {
                 Proof::FinalCarrier
             }
             (FaultKind::Pes, Error::Truncated) => Proof::FiniteEof,
-            (FaultKind::Pes, Error::Invalid("bytes beyond finite PES")) => Proof::FiniteOverrun,
+            (FaultKind::Pes, FINITE_SURPLUS) => Proof::FiniteOverrun,
             _ => return None,
         };
         Some(Self {

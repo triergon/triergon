@@ -394,7 +394,8 @@ and where it resumes is fixed per fault:
 | A set transport error indicator, a scrambled payload | `Transport` on the PID | that carrier and the PID's partial PES or section | the next payload unit start of the PID |
 | A continuity counter gap, a third copy of a packet | `Continuity` on the PID | the PID's partial PES or section | the next payload unit start |
 | A second copy of a packet (H.222.0 §2.4.3.3) | none | the copy | — |
-| A PES without the start code, with forbidden `PTS_DTS_flags`, zero marker bits, a header beyond its declared length, a declared length its payload overruns, or zero length on a non-video stream | `Pes` on the PID | the whole PES, including the bytes of an overrunning one | the next payload unit start |
+| A PES without the start code, with forbidden `PTS_DTS_flags`, zero marker bits, a header beyond its declared length, or zero length on a non-video stream | `Pes` on the PID | the whole PES | the next payload unit start |
+| A finite PES whose last carrier holds bytes past its declared length (H.222.0 §2.4.3.7) | `Pes` on the PID, after the PES itself | the bytes past the declared length | the next payload unit start |
 | A PES or section cut off at the end of the source | `Pes` or `Psi`, `Truncated` | the partial PES or section | — |
 | A PSI section with a bad CRC, length, pointer or stuffing, a malformed PAT or PMT, a descriptor overrunning its loop, a PMT section other than 0 of 0 | `Psi` | the section | the next section |
 | A signalled PCR discontinuity | `TraceEvent::Timeline` (new clock epoch) | partial PES of the program | the carrier that brought the new PCR |

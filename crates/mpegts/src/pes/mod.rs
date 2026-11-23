@@ -5,7 +5,7 @@ mod header;
 pub mod stream_id;
 
 pub use assembler::PesAssembler;
-pub(crate) use assembler::UNBOUNDED_NON_VIDEO;
+pub(crate) use assembler::{FINITE_SURPLUS, UNBOUNDED_NON_VIDEO};
 #[cfg(feature = "reference-trace")]
 pub(crate) use header::timestamp;
 pub(crate) use header::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
