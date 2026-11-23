@@ -538,7 +538,7 @@ impl RecoveryObserver {
         cancel: &AtomicBool,
         input: Option<&triergon_core::InputCursor>,
     ) -> Result<AssemblyStep<DemuxObservation>> {
-        match self.pending.take() {
+        let mut pending = match self.pending.take() {
             None => {
                 return self
                     .inner
@@ -548,28 +548,68 @@ impl RecoveryObserver {
             Some(RecoveryPending::TransportFault(job)) => {
                 return self.poll_transport_fault(job, work, cancel);
             }
-            opcr => self.pending = opcr,
-        }
+            Some(RecoveryPending::Opcr(pending)) => pending,
+        };
+        let (encoded_header, position) = match self.poll_opcr(&mut pending, work, cancel) {
+            Ok(Some(output)) => output,
+            step => {
+                self.pending = Some(RecoveryPending::Opcr(pending));
+                return step.map(|_| AssemblyStep::Yield);
+            }
+        };
+        let scope = self.inner.scope();
+        let offset = pending.rejection.source_offset();
+        self.inner.note_recovered(
+            pending.rejection.envelope().cc,
+            offset,
+            pending.context.source_event_ordinal,
+        );
+        Ok(AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(
+            RecoveredPacket {
+                program: scope.program,
+                pid: scope.pid,
+                source_origin: SourceLocation {
+                    source: scope.entity,
+                    offset,
+                },
+                source_epochs: scope.epochs,
+                position,
+                flags: 0,
+                duration90_raw: 0,
+                stream_id: stream_id::VIDEO_FIRST,
+                payload_len: pending.spans.as_slice()[0].as_ref().len(),
+                rejection: pending.rejection,
+                context: pending.context,
+                encoded_header,
+                header_source_ranges: pending.header_ranges,
+                spans: pending.spans,
+            },
+        )))
+    }
+
+    fn poll_opcr(
+        &self,
+        pending: &mut Pending,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<(EncodedHeader, i64)>> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if !work.try_charge(1) {
-                return Ok(AssemblyStep::Yield);
+                return Ok(None);
             }
-            let Some(RecoveryPending::Opcr(p)) = self.pending.as_mut() else {
-                return Err(Error::Invalid("pending rejected carrier missing"));
-            };
-            let start = p.rejection.envelope().payload_start;
-            let body = &p.rejection.bytes().as_ref()[start..];
-            match p.stage {
+            let start = pending.rejection.envelope().payload_start;
+            let body = &pending.rejection.bytes().as_ref()[start..];
+            match pending.stage {
                 OpcrStage::Prefix => {
                     if body.len() < 14 || body[..4] != [0, 0, 1, stream_id::VIDEO_FIRST] {
                         return Err(Error::Unsupported(
                             "rejected carrier lacks a complete AVC PES header",
                         ));
                     }
-                    p.stage = OpcrStage::Length;
+                    pending.stage = OpcrStage::Length;
                 }
                 OpcrStage::Length => {
                     let total = usize::from(u16::from_be_bytes([body[4], body[5]])) + 6;
@@ -581,7 +621,7 @@ impl RecoveryObserver {
                     if total > self.inner.limits().pes_bytes {
                         return Err(crate::limit(total, self.inner.limits().pes_bytes));
                     }
-                    p.stage = OpcrStage::Flags;
+                    pending.stage = OpcrStage::Flags;
                 }
                 OpcrStage::Flags => {
                     if body[6..9] != [0x80, 0x80, 5] {
@@ -589,31 +629,32 @@ impl RecoveryObserver {
                             "rejected PES requires an MPEG-2 PTS-only header with no extra flags",
                         ));
                     }
-                    p.stage = OpcrStage::Timestamp;
+                    pending.stage = OpcrStage::Timestamp;
                 }
                 OpcrStage::Timestamp => {
                     let pts = crate::pes::timestamp(&body[9..14], 2).map_err(|_| {
                         Error::Invalid("invalid PTS prefix or marker bits in rejected PES")
                     })?;
-                    p.stage = OpcrStage::ReserveHeader { pts };
+                    pending.stage = OpcrStage::ReserveHeader { pts };
                 }
                 OpcrStage::ReserveHeader { pts } => {
-                    p.header_ranges.try_reserve_exact(1)?;
-                    p.stage = OpcrStage::PushHeader { pts };
+                    pending.header_ranges.try_reserve_exact(1)?;
+                    pending.stage = OpcrStage::PushHeader { pts };
                 }
                 OpcrStage::PushHeader { pts } => {
-                    p.header_ranges
+                    pending
+                        .header_ranges
                         .try_push(SourceRange {
                             entity: self.inner.scope().entity,
-                            offset: p.rejection.source_offset() + start as u64,
+                            offset: pending.rejection.source_offset() + start as u64,
                             bytes: 14,
                         })
                         .map_err(|e| e.error)?;
-                    p.stage = OpcrStage::ReserveSpan { pts };
+                    pending.stage = OpcrStage::ReserveSpan { pts };
                 }
                 OpcrStage::ReserveSpan { pts } => {
-                    p.spans.try_reserve_exact(1)?;
-                    p.stage = OpcrStage::PushSpan { pts };
+                    pending.spans.try_reserve_exact(1)?;
+                    pending.stage = OpcrStage::PushSpan { pts };
                 }
                 OpcrStage::PushSpan { pts } => {
                     if body.len() == 14 {
@@ -622,60 +663,36 @@ impl RecoveryObserver {
                         ));
                     }
                     let scope = self.inner.scope();
-                    p.spans
+                    pending
+                        .spans
                         .try_push(DemuxSpan {
-                            bytes: p
+                            bytes: pending
                                 .rejection
                                 .bytes()
-                                .slice(start + 14..p.rejection.bytes().len())?,
+                                .slice(start + 14..pending.rejection.bytes().len())?,
                             source: SourceRange {
                                 entity: scope.entity,
-                                offset: p.rejection.source_offset() + start as u64 + 14,
+                                offset: pending.rejection.source_offset() + start as u64 + 14,
                                 bytes: body.len() - 14,
                             },
-                            transport: p.rejection.source_range().ok_or(Error::SourceMismatch)?,
-                            context: p.context,
+                            transport: pending
+                                .rejection
+                                .source_range()
+                                .ok_or(Error::SourceMismatch)?,
+                            context: pending.context,
                         })
                         .map_err(|e| e.error)?;
-                    p.stage = OpcrStage::Emit { pts };
+                    pending.stage = OpcrStage::Emit { pts };
                 }
                 OpcrStage::Emit { pts } => {
-                    let scope = self.inner.scope();
-                    let offset = p.rejection.source_offset();
                     let header = EncodedHeader {
-                        bytes: p.rejection.bytes().slice(start..start + 14)?,
+                        bytes: pending.rejection.bytes().slice(start..start + 14)?,
                         pts,
                     };
-                    let position = self.inner.media_position(offset)?;
-                    let Some(RecoveryPending::Opcr(p)) = self.pending.take() else {
-                        return Err(Error::Invalid("pending rejected carrier missing"));
-                    };
-                    self.inner.note_recovered(
-                        p.rejection.envelope().cc,
-                        offset,
-                        p.context.source_event_ordinal,
-                    );
-                    return Ok(AssemblyStep::Output(DemuxObservation::FromRejectedCarrier(
-                        RecoveredPacket {
-                            program: scope.program,
-                            pid: scope.pid,
-                            source_origin: SourceLocation {
-                                source: scope.entity,
-                                offset,
-                            },
-                            source_epochs: scope.epochs,
-                            position,
-                            flags: 0,
-                            duration90_raw: 0,
-                            stream_id: stream_id::VIDEO_FIRST,
-                            payload_len: p.spans.as_slice()[0].as_ref().len(),
-                            rejection: p.rejection,
-                            context: p.context,
-                            encoded_header: header,
-                            header_source_ranges: p.header_ranges,
-                            spans: p.spans,
-                        },
-                    )));
+                    let position = self
+                        .inner
+                        .media_position(pending.rejection.source_offset())?;
+                    return Ok(Some((header, position)));
                 }
             }
         }
