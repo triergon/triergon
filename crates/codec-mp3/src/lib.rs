@@ -91,14 +91,22 @@ impl Decoder {
         }
     }
 
-    /// Decode one frame into `out`. A frame cut short decodes as if the missing bytes
-    /// were zero; bytes after the frame are ignored. A frame refused after its header
-    /// leaves `out` empty.
+    /// Decodes one MPEG audio frame. The output holds the rate, layout and sample count;
+    /// additional header fields are available from framing's `MpegAudioHeader`.
+    /// Replaces `out`; a refusal leaves `samples_per_channel == 0`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an invalid or free-format frame and a storage charge the pool cannot cover.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let header = MpegAudioHeader::from_bytes(au).ok_or(DecodeError::Invalid("frame header"))?;
-        let length = header
-            .frame_bytes()
-            .ok_or(DecodeError::Unsupported("free-format frame"))?;
+        let header = MpegAudioHeader::from_bytes(au).ok_or_else(|| {
+            out.clear();
+            DecodeError::Invalid("frame header")
+        })?;
+        let length = header.frame_bytes().ok_or_else(|| {
+            out.clear();
+            DecodeError::Unsupported("free-format frame")
+        })?;
         let decoded = self.decode_body(&header, &au[..length.min(au.len())], out);
         if decoded.is_err() {
             out.clear();

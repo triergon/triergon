@@ -149,16 +149,23 @@ fn a_shared_budget_carries_the_output_charge_until_the_decoder_drops() {
 fn free_format_and_garbage_headers_are_refused() {
     let mut decoder = Decoder::new();
     let mut out = AudioFrame::default();
+    let frame = silent_frame(LAYER3);
+    decoder.decode(&frame, &mut out).unwrap();
     let free = [0xff, 0xfb, 0x04, 0xc0, 0, 0, 0, 0];
     assert_eq!(
         decoder.decode(&free, &mut out),
         Err(DecodeError::Unsupported("free-format frame"))
     );
+    assert_eq!(out.samples_per_channel, 0);
+    assert!(out.planes.iter().all(Vec::is_empty));
     for au in [&[][..], &[0xff, 0xfb], &[0, 1, 2, 3, 4, 5]] {
+        decoder.decode(&frame, &mut out).unwrap();
         assert_eq!(
             decoder.decode(au, &mut out),
             Err(DecodeError::Invalid("frame header"))
         );
+        assert_eq!(out.samples_per_channel, 0);
+        assert!(out.planes.iter().all(Vec::is_empty));
     }
 }
 

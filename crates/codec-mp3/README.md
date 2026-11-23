@@ -55,6 +55,8 @@ Not supported: free-format frames (bit rate index 0), refused as
 
 ## Behaviour and limits
 
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
+
 - Output is FFmpeg's float decoders' (`mp1float`, `mp2float`, `mp3float`): every
   frame decodes to its full 384, 1152 or 576 samples per channel, with no delay
   removed. Encoder delay and padding (a LAME tag) are a container trim the reader
