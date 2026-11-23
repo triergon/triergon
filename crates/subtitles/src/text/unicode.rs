@@ -181,9 +181,9 @@ impl Cursor {
         }
     }
 
-    /// The next scalar of what the encoding's own tables hold: a step that
-    /// calls nothing, as a call in it, even one never made, costs every
-    /// character.
+    /// The next scalar of what the encoding's own tables hold. A multibyte
+    /// profile's byte tests and table lookups are calls out of it: inlined,
+    /// they cost every character, ASCII included.
     #[inline(never)]
     pub(super) fn step(
         &mut self,

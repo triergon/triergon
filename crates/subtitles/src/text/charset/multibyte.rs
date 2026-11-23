@@ -87,6 +87,19 @@ impl MultibyteCharset {
         Err(Error::Unsupported("explicit multibyte charset label"))
     }
 
+    /// Every profile, in declaration order.
+    const ALL: [Self; 9] = [
+        Self::GbkCp936,
+        Self::Big5,
+        Self::ShiftJisUnicode,
+        Self::EucKr,
+        Self::Windows932,
+        Self::Windows949,
+        Self::Windows950,
+        Self::ReceiverBig5,
+        Self::ReceiverEucKrC1,
+    ];
+
     // Sorted fixed-width DATA records: two-byte wire code, two-byte scalar.
     // At most 16 binary-search comparisons for a mapping; no allocation.
     fn lookup(self, code: u16) -> Option<char> {
@@ -141,37 +154,77 @@ impl MultibyteCharset {
         char::from_u32(0x2_0000 | u32::from(u16::from_be_bytes([high, low])))
     }
 
-    // Big5's lead bytes here are those of its standard part; the decoder takes
-    // the supplement's, 0x81 to 0xA0 and 0xFA to 0xFE, with what else lies
-    // outside its table.
-    fn lead(self, byte: u8) -> bool {
+    /// The inclusive ranges of the bytes that may lead a pair. Big5's are
+    /// those of its standard part; the decoder takes the supplement's, 0x81 to
+    /// 0xA0 and 0xFA to 0xFE, with what else lies outside its table.
+    const fn lead_ranges(self) -> &'static [(u8, u8)] {
         match self {
-            Self::ShiftJisUnicode => matches!(byte, 0x81..=0x9f | 0xe0..=0xef),
-            Self::Windows932 => {
-                matches!(byte, 0x81..=0x9f | 0xe0..=0xfc)
-            }
-            Self::Big5 | Self::ReceiverBig5 => matches!(byte, 0xa1..=0xf9),
-            Self::EucKr | Self::ReceiverEucKrC1 => {
-                matches!(byte, 0xa1..=0xfe)
-            }
-            Self::GbkCp936 | Self::Windows949 | Self::Windows950 => matches!(byte, 0x81..=0xfe),
+            Self::ShiftJisUnicode => &[(0x81, 0x9f), (0xe0, 0xef)],
+            Self::Windows932 => &[(0x81, 0x9f), (0xe0, 0xfc)],
+            Self::Big5 | Self::ReceiverBig5 => &[(0xa1, 0xf9)],
+            Self::EucKr | Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
+            Self::GbkCp936 | Self::Windows949 | Self::Windows950 => &[(0x81, 0xfe)],
         }
     }
 
-    fn trail(self, byte: u8) -> bool {
+    /// The inclusive ranges of the bytes that may follow a lead byte.
+    const fn trail_ranges(self) -> &'static [(u8, u8)] {
         match self {
-            Self::ShiftJisUnicode | Self::Windows932 => {
-                matches!(byte, 0x40..=0x7e | 0x80..=0xfc)
-            }
-            Self::GbkCp936 => matches!(byte, 0x40..=0x7e | 0x80..=0xfe),
-            Self::Big5 | Self::Windows950 | Self::ReceiverBig5 => {
-                matches!(byte, 0x40..=0x7e | 0xa1..=0xfe)
-            }
-            Self::EucKr | Self::ReceiverEucKrC1 => {
-                matches!(byte, 0xa1..=0xfe)
-            }
-            Self::Windows949 => matches!(byte, 0x41..=0x5a | 0x61..=0x7a | 0x81..=0xfe),
+            Self::ShiftJisUnicode | Self::Windows932 => &[(0x40, 0x7e), (0x80, 0xfc)],
+            Self::GbkCp936 => &[(0x40, 0x7e), (0x80, 0xfe)],
+            Self::Big5 | Self::Windows950 | Self::ReceiverBig5 => &[(0x40, 0x7e), (0xa1, 0xfe)],
+            Self::EucKr | Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
+            Self::Windows949 => &[(0x41, 0x5a), (0x61, 0x7a), (0x81, 0xfe)],
         }
+    }
+
+    /// Whether `byte` may lead a pair.
+    // Out of line, as is `trail`: inlined, a test of the profile makes the
+    // decoder's step dearer for every character, ASCII included.
+    #[inline(never)]
+    fn lead(self, byte: u8) -> bool {
+        CLASSES[self as usize][usize::from(byte)] & LEAD != 0
+    }
+
+    /// Whether `byte` may follow a lead byte.
+    #[inline(never)]
+    fn trail(self, byte: u8) -> bool {
+        CLASSES[self as usize][usize::from(byte)] & TRAIL != 0
+    }
+}
+
+const PROFILES: usize = MultibyteCharset::ALL.len();
+
+/// Each profile's classes of every byte, [`LEAD`] and [`TRAIL`], in
+/// [`MultibyteCharset::ALL`]'s order: a test of a byte is a load, whichever
+/// the profile.
+static CLASSES: [[u8; 256]; PROFILES] = {
+    let mut classes = [[0; 256]; PROFILES];
+    let mut index = 0;
+    while index < PROFILES {
+        let profile = MultibyteCharset::ALL[index];
+        mark(&mut classes[index], profile.lead_ranges(), LEAD);
+        mark(&mut classes[index], profile.trail_ranges(), TRAIL);
+        index += 1;
+    }
+    classes
+};
+
+/// The class of a byte that may lead a pair.
+const LEAD: u8 = 1;
+/// The class of a byte that may follow a lead byte.
+const TRAIL: u8 = 2;
+
+const fn mark(classes: &mut [u8; 256], ranges: &[(u8, u8)], class: u8) {
+    let mut range = 0;
+    while range < ranges.len() {
+        let (first, last) = ranges[range];
+        let mut byte = first as usize;
+        while byte <= last as usize {
+            classes[byte] |= class;
+            byte += 1;
+        }
+        range += 1;
     }
 }
 
