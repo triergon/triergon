@@ -159,13 +159,22 @@ impl AsMut<Slot> for Media {
 #[derive(Debug)]
 #[repr(C)]
 struct Current {
-    /// The page's logical stream, once looked up.
-    stream: Option<usize>,
+    stage: Stage,
     page: Page,
-    /// The first completed packet not yet handled.
-    next: usize,
-    /// Its packets are in [`Reader::completed`].
-    assembled: bool,
+}
+
+#[derive(Debug)]
+#[repr(u8)]
+enum Stage {
+    Unresolved,
+    Resolved {
+        stream: usize,
+    },
+    /// The page's packets are in `Reader::completed`. `next` is the first unhandled one.
+    Assembled {
+        stream: usize,
+        next: usize,
+    },
 }
 
 /// A resumable Ogg reader. Errors other than backpressure are sticky until
@@ -289,9 +298,7 @@ impl Reader {
                 Step::Ready(page) => {
                     self.current = Some(Current {
                         page,
-                        stream: None,
-                        assembled: false,
-                        next: 0,
+                        stage: Stage::Unresolved,
                     });
                 }
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
@@ -335,38 +342,45 @@ impl Reader {
     fn process_page(&mut self, current: &mut Current) -> Result<()> {
         let header = current.page.header;
         let offset = current.page.offset;
-        let found = match current.stream {
-            Some(stream) => Some(stream),
-            None => self.stream_for(&header, offset)?,
-        };
-        let Some(stream) = found else {
-            return self.resync_event(&mut current.page);
-        };
-        current.stream = Some(stream);
-        if !current.assembled {
-            let s = &mut self.streams[stream];
-            let continuity = s
-                .assembler
-                .push(&header, &current.page.bytes, &mut self.completed)?;
-            current.assembled = true;
-            if continuity == Continuity::Lost {
-                s.previous = Previous::Unknown;
-                s.clock = Clock::at(None);
-            }
-            let track = s.track;
-            self.resync_event(&mut current.page)?;
-            if let (Continuity::Lost, Some(track)) = (continuity, track) {
-                self.pending.push(Event::Other(ReaderEvent::Lost {
-                    track,
-                    page: offset,
-                }))?;
+        loop {
+            match &mut current.stage {
+                Stage::Unresolved => {
+                    let Some(stream) = self.stream_for(&header, offset)? else {
+                        return self.resync_event(&mut current.page);
+                    };
+                    current.stage = Stage::Resolved { stream };
+                }
+                Stage::Resolved { stream } => {
+                    let s = &mut self.streams[*stream];
+                    let continuity =
+                        s.assembler
+                            .push(&header, &current.page.bytes, &mut self.completed)?;
+                    current.stage = Stage::Assembled {
+                        stream: *stream,
+                        next: 0,
+                    };
+                    if continuity == Continuity::Lost {
+                        s.previous = Previous::Unknown;
+                        s.clock = Clock::at(None);
+                    }
+                    let track = s.track;
+                    self.resync_event(&mut current.page)?;
+                    if let (Continuity::Lost, Some(track)) = (continuity, track) {
+                        self.pending.push(Event::Other(ReaderEvent::Lost {
+                            track,
+                            page: offset,
+                        }))?;
+                    }
+                }
+                Stage::Assembled { stream, next } => {
+                    while *next < self.completed.len() {
+                        self.packet(*stream, *next)?;
+                        *next += 1;
+                    }
+                    return self.finish_page(*stream, &current.page);
+                }
             }
         }
-        while current.next < self.completed.len() {
-            self.packet(stream, current.next)?;
-            current.next += 1;
-        }
-        self.finish_page(stream, &current.page)
     }
 
     /// Report the bytes skipped before a page, once.
