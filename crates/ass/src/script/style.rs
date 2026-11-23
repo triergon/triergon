@@ -1,6 +1,7 @@
 //! Styles and the values styles, override tags and glyphs share.
 //! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
+use std::num::NonZeroI32;
 use std::ops::{Index, IndexMut};
 
 use triergon_core::{Budget, Result};
@@ -8,6 +9,33 @@ use triergon_raster::fp;
 
 use crate::number::{header_int, strtod};
 use crate::strings::Strings;
+
+/// The charset named by a style's `Encoding` field or a `\fe` tag.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Encoding(Option<NonZeroI32>);
+
+impl Encoding {
+    /// Reads a script encoding. The value -1 selects paragraph bidi direction.
+    pub const fn from_raw(value: i32) -> Self {
+        // Complement the script value so -1 uses the zero niche.
+        Self(NonZeroI32::new(!value))
+    }
+
+    /// The script's charset number, or `None` for paragraph bidi direction.
+    pub const fn charset(self) -> Option<i32> {
+        match self.0 {
+            Some(value) => Some(!value.get()),
+            None => None,
+        }
+    }
+}
+
+impl From<Encoding> for i64 {
+    fn from(encoding: Encoding) -> Self {
+        i64::from(encoding.charset().unwrap_or(-1))
+    }
+}
 
 /// A colour: red in the top byte, then green and blue, and alpha in the low
 /// byte, where 0 is opaque. Scripts write `&HAABBGGRR`; the byte order is
@@ -336,7 +364,7 @@ pub struct Style {
     pub margins: Margins,
     /// The font charset, as Windows numbers it; the value -1 asks for the
     /// base direction to be found from the text.
-    pub encoding: i32,
+    pub encoding: Encoding,
     /// The default `\blur`; only a style override sets it.
     pub blur: f64,
     /// Justification within the event; only a style override sets it.
@@ -460,7 +488,7 @@ impl Style {
             shadow: 0.0,
             alignment: Alignment::from_bits(0),
             margins: Margins::default(),
-            encoding: 0,
+            encoding: Encoding::from_raw(0),
             blur: 0.0,
             justify: Justify::Auto,
         })
@@ -522,7 +550,7 @@ impl Style {
             Field::MarginL => self.margins.left = int(),
             Field::MarginR => self.margins.right = int(),
             Field::MarginV => self.margins.vertical = int(),
-            Field::Encoding => self.encoding = int(),
+            Field::Encoding => self.encoding = Encoding::from_raw(int()),
             Field::ScaleX => self.scale_x = float(),
             Field::ScaleY => self.scale_y = float(),
             Field::Outline => self.outline = float(),

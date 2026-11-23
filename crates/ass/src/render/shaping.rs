@@ -24,7 +24,7 @@ use triergon_shape::{
 use super::fonts::Library;
 use super::text::{Char, Text};
 use super::wrap::Line;
-use crate::{Info, charge};
+use crate::{Encoding, Info, charge};
 
 /// How an event's text is shaped and reordered.
 #[derive(Clone, Copy, Debug)]
@@ -41,9 +41,9 @@ pub(super) struct Shaping<'a> {
 
 impl<'a> Shaping<'a> {
     /// The settings for an event of `info` whose last `\fe` is `encoding`.
-    pub(super) fn new(encoding: i32, info: &'a Info) -> Self {
+    pub(super) fn new(encoding: Encoding, info: &'a Info) -> Self {
         Self {
-            whole_text: encoding == -1,
+            whole_text: encoding.charset().is_none(),
             kerning: info.kerning,
             language: info.language(),
         }

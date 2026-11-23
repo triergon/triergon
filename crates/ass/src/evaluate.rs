@@ -77,7 +77,7 @@ pub struct GlyphState<'s> {
     /// `\fay`.
     pub shear_y: f64,
     /// `\fe`: the font charset.
-    pub encoding: i32,
+    pub encoding: crate::Encoding,
 }
 
 /// The font a glyph asks for.
@@ -566,7 +566,7 @@ impl<'s> Context<'s> {
             Tag::Italic(v) => g.italic = v.unwrap_or(style.italic),
             Tag::Underline(v) => g.underline = v.unwrap_or(style.underline),
             Tag::StrikeOut(v) => g.strike_out = v.unwrap_or(style.strike_out),
-            Tag::Encoding(v) => g.encoding = v.unwrap_or(style.encoding),
+            Tag::Encoding(v) => g.encoding = v.map_or(style.encoding, crate::Encoding::from_raw),
             Tag::Reset(name) => {
                 let named = name
                     .and_then(|name| self.script.styles().iter().rev().find(|s| s.name() == name));

@@ -12,8 +12,8 @@ pub use event::Event;
 pub use fonts::EmbeddedFont;
 pub use info::{Info, ScriptType, WrapStyle, YCbCrMatrix};
 pub use style::{
-    Alignment, Bold, BorderStyle, ColourSlot, Colours, HAlign, Italic, Justify, Margins, Rgba,
-    Style, VAlign,
+    Alignment, Bold, BorderStyle, ColourSlot, Colours, Encoding, HAlign, Italic, Justify, Margins,
+    Rgba, Style, VAlign,
 };
 
 use std::sync::atomic::{AtomicU64, Ordering};

@@ -118,7 +118,8 @@ from numpad numbering, and SSA's `AlphaLevel` and back colour are converted as
 libass converts them. Values keep their meaning in their types: `Bold`, `Italic`
 and `BorderStyle` keep the integer libass keeps (glyph runs split where it
 changes), underline and strike-out are booleans, `Alignment` is its horizontal
-and vertical part, and `WrapStyle` and `Justify` are the values libass names.
+and vertical part, and `WrapStyle` and `Justify` are the values libass names. `Encoding::charset`
+returns no charset for `-1`, which determines bidi direction by paragraph.
 
 **Events.** `Dialogue:` lines with the event format (or the dialect's standard
 one), up to `Text`, which takes the rest of the line; `Comment:` lines are

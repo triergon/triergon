@@ -34,8 +34,9 @@ pub use render::{
     CacheLimits, Change, Fonts, Frame, FrameMargins, Image, ImageKind, Renderer, Settings, Size,
 };
 pub use script::{
-    Alignment, Bold, BorderStyle, ColourSlot, Colours, EmbeddedFont, Event, HAlign, Info, Italic,
-    Justify, Margins, Options, Rgba, Script, ScriptType, Style, VAlign, WrapStyle, YCbCrMatrix,
+    Alignment, Bold, BorderStyle, ColourSlot, Colours, EmbeddedFont, Encoding, Event, HAlign, Info,
+    Italic, Justify, Margins, Options, Rgba, Script, ScriptType, Style, VAlign, WrapStyle,
+    YCbCrMatrix,
 };
 pub use tags::{Clip, Fade, FontSize, Karaoke, Move, Tag, Tags, TransformTimes, VectorClip};
 
