@@ -1,7 +1,7 @@
 //! Admission of transport carriers: pushes, bounds, input binding and recovery hooks.
 #[cfg(feature = "reference-trace")]
 use super::DemuxScope;
-use super::{CarrierLayout, DemuxObserver, DemuxSpan, Pending, SourceContext};
+use super::{CarrierLayout, CarrierStep, DemuxObserver, DemuxSpan, Pending, SourceContext};
 use crate::SourceRange;
 use crate::pes::stream_id;
 use crate::psi::stream_type;
@@ -307,9 +307,7 @@ impl DemuxObserver {
             payload,
             context,
             position: 0,
-            counter_checked: false,
-            started: false,
-            body_drained: false,
+            step: CarrierStep::Arrived,
         });
     }
 

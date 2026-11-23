@@ -348,6 +348,16 @@ impl From<&TransportPacket> for CarrierLayout {
     }
 }
 
+/// The next stage for a carrier admitted to the observer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+enum CarrierStep {
+    Arrived = 0,
+    Counted = 1,
+    Started = 2,
+    Drained = 3,
+}
+
 #[repr(C)]
 #[derive(Debug)]
 struct Pending {
@@ -356,10 +366,7 @@ struct Pending {
     source: Bytes,
     payload: Option<Bytes>,
     position: usize,
-    // A single phase raised the transport total by 0.000216% even with writes only on transitions.
-    counter_checked: bool,
-    started: bool,
-    body_drained: bool,
+    step: CarrierStep,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -826,7 +833,7 @@ impl DemuxObserver {
             }
             if self.active && self.header.is_some() && self.body_limit == Some(self.payload_len()) {
                 if self.pending.as_ref().is_some_and(|pending| {
-                    pending.body_drained
+                    pending.step == CarrierStep::Drained
                         || pending
                             .payload
                             .as_ref()
@@ -847,11 +854,12 @@ impl DemuxObserver {
                 self.schedule(DemuxBoundary::LogicalEof, false, false)?;
                 continue;
             }
-            if !self
+            if self
                 .pending
                 .as_ref()
                 .ok_or(Error::Invalid("PES observer input missing"))?
-                .started
+                .step
+                < CarrierStep::Started
             {
                 if !self.poll_start(work)? {
                     return Ok(AssemblyStep::Yield);
@@ -1245,7 +1253,7 @@ mod tests {
         assert_eq!(payload.as_ref().as_ptr(), expected.as_ref().as_ptr());
         assert_eq!(payload.as_ref(), expected.as_ref());
         assert_eq!(pending.position, 9);
-        assert!(!pending.body_drained);
+        assert_ne!(pending.step, CarrierStep::Drained);
         assert_eq!(observer.payload_len(), 0);
         assert!(observer.spans.is_empty());
     }
@@ -1269,7 +1277,7 @@ mod tests {
         assert!(observer.poll_body(&mut work, &cancel).unwrap());
         assert_eq!(work.spent(), 1);
         let pending = observer.pending.as_ref().unwrap();
-        assert!(pending.body_drained);
+        assert_eq!(pending.step, CarrierStep::Drained);
         assert!(pending.payload.is_none());
         assert_eq!(pending.position, payload.len());
         assert_eq!(
@@ -1317,7 +1325,10 @@ mod tests {
             observer.poll(&mut WorkBudget::new(1), &AtomicBool::new(true)),
             Err(Error::Cancelled)
         ));
-        assert!(observer.pending.as_ref().unwrap().body_drained);
+        assert_eq!(
+            observer.pending.as_ref().unwrap().step,
+            CarrierStep::Drained
+        );
         let mut work = WorkBudget::new(1);
         assert!(matches!(
             observer.poll(&mut work, &cancel).unwrap(),
@@ -1351,7 +1362,10 @@ mod tests {
         let mut work = WorkBudget::new(1);
         assert!(observer.poll_body(&mut work, &cancel).unwrap());
         assert_eq!(work.spent(), 1);
-        assert!(observer.pending.as_ref().unwrap().body_drained);
+        assert_eq!(
+            observer.pending.as_ref().unwrap().step,
+            CarrierStep::Drained
+        );
         assert!(
             observer.spans.as_slice()[0]
                 .backing_bytes()
@@ -1407,7 +1421,7 @@ mod tests {
             assert!(observer.poll_body(&mut work, &cancel).unwrap());
             assert_eq!(work.spent(), 1);
             let pending = observer.pending.as_ref().unwrap();
-            assert_eq!(pending.body_drained, moved);
+            assert_eq!(pending.step == CarrierStep::Drained, moved);
             assert_eq!(pending.payload.is_none(), moved);
             assert_eq!(pending.position, payload.len());
             assert_eq!(

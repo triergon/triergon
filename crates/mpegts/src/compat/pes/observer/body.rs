@@ -1,5 +1,5 @@
 //! The start and body of the packet being cut.
-use super::{Arena, DEFAULT_PACKET_CAP, DemuxBoundary, DemuxObserver, DemuxSpan};
+use super::{Arena, CarrierStep, DEFAULT_PACKET_CAP, DemuxBoundary, DemuxObserver, DemuxSpan};
 use crate::{SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
@@ -18,7 +18,7 @@ impl DemuxObserver {
             .payload
             .as_ref()
             .is_some_and(|bytes| !bytes.is_empty());
-        if !pending.counter_checked {
+        if pending.step == CarrierStep::Arrived {
             if !work.try_charge(1) {
                 return Ok(false);
             }
@@ -37,7 +37,7 @@ impl DemuxObserver {
             self.pending
                 .as_mut()
                 .ok_or(Error::Invalid("PES observer input missing"))?
-                .counter_checked = true;
+                .step = CarrierStep::Counted;
         }
         if !has_payload {
             self.pending = None;
@@ -64,7 +64,7 @@ impl DemuxObserver {
         self.pending
             .as_mut()
             .ok_or(Error::Invalid("PES observer input missing"))?
-            .started = true;
+            .step = CarrierStep::Started;
         Ok(true)
     }
 
@@ -98,7 +98,7 @@ impl DemuxObserver {
             .pending
             .as_ref()
             .ok_or(Error::Invalid("PES observer input missing"))?;
-        if pending.body_drained {
+        if pending.step == CarrierStep::Drained {
             self.pending = None;
             return Ok(true);
         }
@@ -200,7 +200,11 @@ impl DemuxObserver {
         self.spans.try_push(span).map_err(|error| error.error)?;
         // A bounded <=184-byte admission per work unit, not a per-yield span.
         pending.position = next_position;
-        pending.body_drained = complete;
+        pending.step = if complete {
+            CarrierStep::Drained
+        } else {
+            CarrierStep::Started
+        };
         self.add_spans(1);
         self.set_payload_len(next);
         Ok(true)
