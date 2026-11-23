@@ -81,9 +81,11 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
   the last accepted SBR header or time grid. The core audio remains available.
   A Parametric Stereo mode change needs new frequency-differential parameters
   (ISO/IEC 14496-26:2024 7.18.1.2.1). On a malformed time-differential mode change
-  the decoder uses the last coded envelope and zeroes missing indices. To reproduce
-  the reference's differential history, select `compat::ffmpeg::extensions::Policy::Reference` with
-  `Decoder::with_extension_policy`.
+  the decoder uses the last coded envelope and zeroes missing indices. A malformed
+  Parametric Stereo payload also disables the phase extension until valid data enables
+  it again. `Decoder::with_extension_policy` accepts
+  `compat::ffmpeg::extensions::Policy::Reference` to retain the reference's differential
+  history and phase enable state.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
   `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.

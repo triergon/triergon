@@ -45,14 +45,14 @@
 //! - A frame without PS data repeats the last PS frame; a header-less frame uses the last
 //!   header; a header with IID or ICC disabled resets those values to index 0 (t04..t07,
 //!   t12, t17..t19).
-//! - A time-differential envelope reads the values kept per envelope index: each coded
+//! - With the reference policy, a time-differential envelope reads the values kept per envelope index: each coded
 //!   envelope writes the first entries of its band count into its index's array, and
 //!   envelope 0 reads the array of the previous frame's last coded envelope, whose entries
 //!   above that frame's band count come from the last frame that wrote them at that index
 //!   (t29, o41, o43).
 //! - A frame with an invalid value, a decreasing border, a reserved mode or more data than
 //!   its extension holds outputs the mono signal on both channels, keeps the signal state
-//!   and resets the values, IPD/OPD to index 0 with the last extension's enable bit kept;
+//!   and resets the values. The reference policy retains the last IPD/OPD enable bit;
 //!   PS stays off until the next header (t08, t09, t11, t20, t21, o41, o42).
 //! - A frame whose configuration differs from that of the frame read before it converts
 //!   its start matrices to the new layout, restarts the decorrelator and resets the
@@ -695,8 +695,7 @@ impl Ps {
         }
     }
 
-    /// An error frame: mono output, values reset (IPD/OPD to index 0 with their enable bit
-    /// kept, o41, o42), PS off until the next header.
+    /// Conceals an error frame as mono and resets the parameters until the next header.
     fn fault(&mut self, fault: Option<Fault>) {
         match fault {
             Some(Fault::Read(n)) => {
@@ -714,6 +713,9 @@ impl Ps {
         self.kept_icc = [[0; MAX_PAR]; 4];
         self.last_ipd = [[0; 17]; 2];
         self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
+        if self.policy == Policy::Conceal {
+            self.phase_on = false;
+        }
         self.active = false;
         self.status = Status::Mono;
     }

@@ -122,32 +122,32 @@ fn frame_with(header: Option<Header>, coded_env: usize, ipd: Option<PhaseData>) 
 }
 
 #[test]
-fn an_error_frame_resets_the_phases_and_keeps_them_enabled() {
-    // probes o41 and o42: after an error frame, a header without the extension runs
-    // IPD/OPD index 0 with the enable bit on, and a time-differential IPD/OPD envelope
-    // reads index 0
+fn an_error_frame_resets_the_phases_and_concealment_disables_them() {
     let header = Header {
         iid: Some(5),
         icc: Some(5),
         ext: true,
     };
-    let mut ps = Ps::new();
     // frequency-differential: the first band's index, then steps of 0
     let mut ipd = [0u8; 17];
     ipd[0] = 3;
     let mut env = [[(false, [0u8; 17]); 2]; 4];
     env[0] = [(false, ipd), (false, ipd)];
-    assert!(ps.apply_raw(&frame_with(Some(header), 1, Some((true, env))), false));
-    assert_eq!(ps.phase[0][0][..17], [3; 17]);
-    ps.fault(Some(Fault::Read(1)));
     let without_ext = Header {
         ext: false,
         ..header
     };
-    assert!(ps.apply_raw(&frame_with(Some(without_ext), 1, None), false));
-    assert!(ps.phase_on);
-    assert!(ps.phase.iter().flatten().flatten().all(|&v| v == 0));
-    assert_eq!(ps.last_ipd, [[0; 17]; 2]);
+    for policy in [Policy::Conceal, Policy::Reference] {
+        let mut ps = Ps::new();
+        ps.policy = policy;
+        assert!(ps.apply_raw(&frame_with(Some(header), 1, Some((true, env))), false));
+        assert_eq!(ps.phase[0][0][..17], [3; 17]);
+        ps.fault(Some(Fault::Read(1)));
+        assert!(ps.apply_raw(&frame_with(Some(without_ext), 1, None), false));
+        assert_eq!(ps.phase_on, policy == Policy::Reference);
+        assert!(ps.phase.iter().flatten().flatten().all(|&v| v == 0));
+        assert_eq!(ps.last_ipd, [[0; 17]; 2]);
+    }
 }
 
 #[test]
