@@ -1126,7 +1126,7 @@ fn collect_with_inputs(
     let contract_sha = crate::files::sha256(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
     let target = gate_target()?;
-    let open = open_cases(&contract, &manifest, &target)?;
+    let open = open(&contract, &manifest, &target)?;
     let fold_refusals = super::fold_refusal::read(&contract, &target)?;
     let unmeasured = super::bounds::Unmeasured::read(&contract, &manifest, &target)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
@@ -1208,9 +1208,7 @@ fn collect_with_inputs(
         .unwrap_or_default();
     for (id, refusal) in &fold_refusals {
         let case = cases.iter().find(|case| s(case, "id") == Some(id));
-        if open.iter().any(|open_id| open_id == id)
-            || !refusal.binds_input(case.and_then(|case| s(case, "sha256")))
-        {
+        if open.contains(id) || !refusal.binds_input(case.and_then(|case| s(case, "sha256"))) {
             return Err(format!(
                 "{id}: registered refusal overlaps an open case or has no pinned input"
             ));
@@ -1326,6 +1324,9 @@ fn collect_with_inputs(
                     return Err(format!("{id}: registered refusal has no reference fold"));
                 }
             }
+            let deviation = open.is_deviation(&id).then(|| parity::Deviation {
+                candidate: case.get("candidate_expected"),
+            });
             let ran = parity::feed_parity(
                 &run,
                 (prefix, reference_prefix.unwrap_or(prefix)),
@@ -1334,6 +1335,7 @@ fn collect_with_inputs(
                 &work_fields,
                 per_target,
                 refusal,
+                deviation,
             )?;
             if expected.is_some() {
                 ran
@@ -1392,7 +1394,7 @@ fn collect_with_inputs(
                     timeout,
                 },
             ));
-            if catalogue {
+            let parity = if catalogue {
                 parity::catalogue_parity(&run, true, comparison.as_ref(), content)?
             } else if colour {
                 parity::colour_parity(&run, true, comparison.as_ref(), content)?
@@ -1400,6 +1402,11 @@ fn collect_with_inputs(
                 parity::parity(&run, true, comparison.as_ref(), content, "")?
             } else {
                 parity::seek_parity(&run, true, comparison.as_ref(), content)?
+            };
+            if open.is_deviation(&id) {
+                unpinned_deviation(parity)
+            } else {
+                parity
             }
         };
         match s(&parity, "reason") {
@@ -1633,6 +1640,43 @@ fn publish_measurements(
     write_observed_case_report(output, &header, rows.iter().map(load_case))
 }
 
+/// The cases a contract lists as differing from their pins on one target.
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct Open {
+    /// Its `open_cases`: our defects, not yet fixed.
+    pub(crate) cases: Vec<String>,
+    /// The cases of its `open_deviations`: the reference departs from the
+    /// specification where the candidate keeps to it.
+    pub(crate) deviations: Vec<String>,
+}
+
+impl Open {
+    pub(crate) fn contains(&self, id: &str) -> bool {
+        self.cases
+            .iter()
+            .chain(&self.deviations)
+            .any(|open| open == id)
+    }
+
+    pub(crate) fn is_deviation(&self, id: &str) -> bool {
+        self.deviations.iter().any(|open| open == id)
+    }
+}
+
+/// The ids of [`open`], open cases first.
+pub(crate) fn open_cases(
+    contract: &Value,
+    manifest: &Value,
+    target: &str,
+) -> Result<Vec<String>, String> {
+    let Open {
+        mut cases,
+        deviations,
+    } = open(contract, manifest, target)?;
+    cases.extend(deviations);
+    Ok(cases)
+}
+
 /// The cases of a contract that differ from their pins on `target` as listed: its
 /// `open_cases`, each tied to one of its `pending_module_requirements`, and the
 /// cases of its `open_deviations`. A deviation is a decided reading: the reference
@@ -1642,11 +1686,7 @@ fn publish_measurements(
 /// the reference's result would use, and the `cases` it covers. An entry with
 /// `targets` is open on those of the contract's `required_targets` only, and must
 /// pass elsewhere. Every id must be a case of the manifest, listed once.
-pub(crate) fn open_cases(
-    contract: &Value,
-    manifest: &Value,
-    target: &str,
-) -> Result<Vec<String>, String> {
+pub(crate) fn open(contract: &Value, manifest: &Value, target: &str) -> Result<Open, String> {
     let list = |value: &Value, key: &str| -> Vec<Value> {
         value
             .get(key)
@@ -1657,7 +1697,7 @@ pub(crate) fn open_cases(
     let pending = list(contract, "pending_module_requirements");
     let required = list(contract, "required_targets");
     let cases = list(manifest, "cases");
-    let mut open = Vec::new();
+    let mut open = Open::default();
     let mut listed = std::collections::BTreeSet::new();
     // Whether `entry` is open on `target`, after checking `id` against the manifest.
     let mut admit = |entry: &Value, id: &str, what: &str| -> Result<bool, String> {
@@ -1686,7 +1726,7 @@ pub(crate) fn open_cases(
             return Err(format!("open case {id}: its requirement is not pending"));
         }
         if admit(&entry, id, "open case")? {
-            open.push(id.to_owned());
+            open.cases.push(id.to_owned());
         }
     }
     for entry in list(contract, "open_deviations") {
@@ -1718,49 +1758,104 @@ pub(crate) fn open_cases(
                 .as_str()
                 .ok_or_else(|| format!("deviation {reading}: a case is not an id"))?;
             if admit(&entry, id, "deviating case")? {
-                open.push(id.to_owned());
+                open.deviations.push(id.to_owned());
             }
         }
     }
     Ok(open)
 }
 
+/// The parity status of a case of `open_deviations` whose two complete runs each
+/// gave its pinned fold: the reference's `expected` and the candidate's
+/// `candidate_expected`.
+pub(crate) const DEVIATION: &str = "deviation";
+/// The parity status of a deviating case whose comparison pins only the reference's
+/// fold: it is reported, and stays open, until its candidate fold is recorded.
+pub(crate) const DEVIATION_UNPINNED: &str = "deviation-unpinned";
+/// The parity status of a deviating case whose candidate or reference fold differs
+/// from its pin.
+pub(crate) const DEVIATION_CHANGED: &str = "deviation-changed";
+/// The parity status of a deviating case one of whose workers exited with an error,
+/// timed out or did not finish: no registered deviation holds for it.
+pub(crate) const DEVIATION_RUN_FAILED: &str = "deviation-run-failed";
+
+/// Worker run statuses that end a run without a result.
+const RUN_FAILURES: [&str; 5] = [
+    "worker-error",
+    "worker-failure",
+    "timeout",
+    "invalid-worker-output",
+    "error",
+];
+
+/// The parity of a deviating case for a comparison that pins only the reference's
+/// output: [`DEVIATION_RUN_FAILED`] after a failed run, else
+/// [`DEVIATION_UNPINNED`]; a passing case keeps its status.
+pub(crate) fn unpinned_deviation(mut parity: Value) -> Value {
+    let status = match s(&parity, "status") {
+        Some("pass") => return parity,
+        Some(status) if RUN_FAILURES.contains(&status) => DEVIATION_RUN_FAILED,
+        _ => DEVIATION_UNPINNED,
+    };
+    if let Value::Object(members) = &mut parity {
+        members.retain(|(key, _)| key != "status");
+        members.insert(0, ("status".into(), Value::str(status)));
+    }
+    parity
+}
+
 /// Prints how many cases pass and which listed open cases still fail. Holds when
 /// every other case passes and every open case still fails: a listed case that
-/// starts to pass must leave the list, so the list only shrinks.
-pub(crate) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
+/// starts to pass must leave the list, so the list only shrinks. A deviating case
+/// holds only as [`DEVIATION`], or as [`DEVIATION_UNPINNED`], which is reported.
+pub(crate) fn ratchet(label: &str, rows: &[Value], open: &Open) -> bool {
     ratchet_with_skips(label, rows, open, false)
 }
 
 pub(super) fn ratchet_with_skips(
     label: &str,
     rows: &[Value],
-    open: &[String],
+    open: &Open,
     allow_skips: bool,
 ) -> bool {
-    let passed = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("pass");
-    let listed = |row: &Value| open.iter().any(|id| s(row, "id") == Some(id));
+    fn status(row: &Value) -> Option<&str> {
+        row.get("parity").and_then(|p| s(p, "status"))
+    }
+    let passed = |row: &Value| status(row) == Some("pass");
+    let listed = |row: &Value| s(row, "id").is_some_and(|id| open.contains(id));
     let ids = |keep: &dyn Fn(&Value) -> bool| -> Vec<&str> {
         rows.iter()
             .filter(|row| keep(row))
             .filter_map(|row| s(row, "id"))
             .collect()
     };
-    let unpinned = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("unpinned");
-    let skipped = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("skipped");
+    let unpinned = |row: &Value| status(row) == Some("unpinned");
+    let skipped = |row: &Value| status(row) == Some("skipped");
     let missing = |row: &Value| {
         matches!(
-            row.get("parity").and_then(|p| s(p, "status")),
+            status(row),
             Some("missing-sample" | "missing-entity" | "missing-companion")
         )
+    };
+    // A deviating case that differs other than as its registration pins it.
+    let broken = |row: &Value| {
+        s(row, "id").is_some_and(|id| open.is_deviation(id))
+            && !passed(row)
+            && !skipped(row)
+            && !missing(row)
+            && !unpinned(row)
+            && !matches!(status(row), Some(DEVIATION | DEVIATION_UNPINNED))
     };
     let failing = ids(&|row| {
         missing(row)
             || (skipped(row) && !allow_skips)
+            || broken(row)
             || (!passed(row) && !listed(row) && !unpinned(row) && !skipped(row))
     });
     let reported = ids(&unpinned);
-    let still_open = ids(&|row| !passed(row) && listed(row) && !skipped(row) && !missing(row));
+    let one_sided = ids(&|row| status(row) == Some(DEVIATION_UNPINNED));
+    let still_open =
+        ids(&|row| !passed(row) && listed(row) && !skipped(row) && !missing(row) && !broken(row));
     let closed = ids(&|row| passed(row) && listed(row));
     let refused = ids(&|row| {
         passed(row)
@@ -1788,6 +1883,13 @@ pub(super) fn ratchet_with_skips(
             "{label}: {} open failures, as listed: {}",
             still_open.len(),
             still_open.join(", ")
+        );
+    }
+    if !one_sided.is_empty() {
+        println!(
+            "{label}: {} deviations not pinned on the candidate's side, reported only: {}",
+            one_sided.len(),
+            one_sided.join(", ")
         );
     }
     if !reported.is_empty() {

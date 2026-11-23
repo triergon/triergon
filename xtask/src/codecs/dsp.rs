@@ -353,7 +353,7 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
     }
     let contract = json::read(&root.join(FEATURE).join("contract.json"))?;
     let target = report::gate_target()?;
-    let open = report::open_cases(&contract, &generated, &target)?;
+    let open = report::open(&contract, &generated, &target)?;
     let rule = json::read(&root.join(RULES))?;
     let maximum = rule
         .get("imdct_float")
@@ -382,7 +382,12 @@ pub(super) fn main(root: &Path, output: &Path, record: bool) -> R<i32> {
     let mut rows = Vec::new();
     let mut definitions_ok = true;
     for case in &cases {
-        let (row, definition, reference) = comparison.case(case)?;
+        let (mut row, definition, reference) = comparison.case(case)?;
+        // The transform comparison pins the reference side only.
+        if open.is_deviation(&case.id) {
+            let parity = row.get("parity").cloned().unwrap_or(Value::Null);
+            validation::put(&mut row, "parity", report::unpinned_deviation(parity))?;
+        }
         println!(
             "{} definition={} reference={}",
             case.id, definition, reference

@@ -727,6 +727,9 @@ pub fn seek_parity(
 /// C leaves to the target) passes only in a feature pinned per target
 /// (`pinned_per_target`), on a case whose pin for this target carries the same
 /// flag; elsewhere the case fails as `host-dependent-reference`.
+///
+/// `deviation` is set for a case of `open_deviations`; see [`judge_deviation`].
+#[allow(clippy::too_many_arguments)] // One case's comparison as the report describes it.
 pub(super) fn feed_parity(
     run: &Run<'_>,
     prefixes: (&str, &str),
@@ -735,6 +738,7 @@ pub(super) fn feed_parity(
     work_fields: &[String],
     per_target: bool,
     refusal: Option<&super::fold_refusal::Refusal<'_>>,
+    deviation: Option<Deviation<'_>>,
 ) -> Result<Value, String> {
     let (prefix, reference_prefix) = prefixes;
     let mode = format!("{prefix}fold");
@@ -753,6 +757,9 @@ pub(super) fn feed_parity(
         expected
     };
     let mut result = feed_result(&left, &right, expected, work_fields, per_target);
+    if let Some(deviation) = deviation {
+        judge_deviation(&mut result, (&left, &right), expected, deviation.candidate);
+    }
     if let Some(refusal) = refusal {
         let proof = refusal.proof(&left, &right, expected, work_fields);
         set(&mut result, "status", status_of(proof.is_some()));
@@ -790,6 +797,71 @@ pub(super) fn feed_parity(
         &Value::object([("candidate", left), ("reference", right)]),
     )?;
     Ok(result)
+}
+
+/// A case of `open_deviations`.
+pub(super) struct Deviation<'a> {
+    /// The candidate's pinned fold, the case's `candidate_expected`, when recorded.
+    pub(super) candidate: Option<&'a Value>,
+}
+
+/// The verdict on a case of `open_deviations` from its two runs (`runs`: the
+/// candidate's and the reference's outcome) and the parity `result` already made of
+/// them. A deviation is registered between two outputs, so it holds
+/// ([`super::report::DEVIATION`]) only when both workers ran to the end of the input
+/// and each side's fold equals its pin: the reference's `expected` and the
+/// candidate's `candidate_pin`. A run that exited with an error, timed out or did
+/// not finish never satisfies it ([`super::report::DEVIATION_RUN_FAILED`]); a fold
+/// that differs from its pin is [`super::report::DEVIATION_CHANGED`]; a case with no
+/// candidate pin is reported as [`super::report::DEVIATION_UNPINNED`]. A passing
+/// case keeps its status, so the report asks for its removal from the list.
+fn judge_deviation(
+    result: &mut Value,
+    (left, right): (&Value, &Value),
+    expected: &Value,
+    candidate_pin: Option<&Value>,
+) {
+    use super::report::{DEVIATION, DEVIATION_CHANGED, DEVIATION_RUN_FAILED, DEVIATION_UNPINNED};
+    // A pass is reported for removal; a host-dependent reference fails on its own.
+    if matches!(status(result), "pass" | "host-dependent-reference") {
+        return;
+    }
+    let finished =
+        |outcome: &Value| ok(outcome) && data(outcome).get("eof") == Some(&Value::Bool(true));
+    let mut pinned = expected.clone();
+    if let Value::Object(members) = &mut pinned {
+        members.retain(|(key, _)| key != crate::generators::HOST_DEPENDENT && key != "eof");
+    }
+    let side = |key: &str| result.get(key).cloned().unwrap_or(Value::Null);
+    let (status, reason) = if !finished(left) || !finished(right) {
+        (
+            DEVIATION_RUN_FAILED,
+            "a worker exited with an error or did not finish; a registered deviation \
+             holds only between two complete runs",
+        )
+    } else if let Some(pin) = candidate_pin {
+        if super::diff::equal(&side("candidate"), pin)
+            && super::diff::equal(&side("reference"), &pinned)
+        {
+            (
+                DEVIATION,
+                "both folds equal their pins, as the deviation registers them",
+            )
+        } else {
+            (
+                DEVIATION_CHANGED,
+                "the candidate's or the reference's fold differs from its pin",
+            )
+        }
+    } else {
+        (
+            DEVIATION_UNPINNED,
+            "no candidate_expected: the deviation pins the reference's fold only",
+        )
+    };
+    set(result, "status", Value::str(status));
+    set(result, "source_timing_status", Value::str(status));
+    set(result, "reason", Value::str(reason));
 }
 
 pub(super) fn pins_zero_output_refusal(expected: &Value) -> bool {
@@ -943,6 +1015,78 @@ mod feed_tests {
             feed_result(&good, &good, &success, &[], false).get("status"),
             Some(&Value::str("mismatch"))
         );
+    }
+
+    /// The work `{packets: n, bytes: 0, digest: 0}`.
+    fn work(packets: i64) -> Value {
+        Value::object([
+            ("packets", Value::int(packets)),
+            ("bytes", Value::int(0)),
+            ("digest", Value::int(0)),
+        ])
+    }
+
+    /// The verdict on a deviating case whose candidate gave `left` and reference
+    /// `right`, against the reference pin of one packet and `candidate_pin`.
+    fn deviation(left: &Value, right: &Value, candidate_pin: Option<&Value>) -> Value {
+        let Value::Object(mut expected) = work(1) else {
+            unreachable!()
+        };
+        expected.push(("eof".into(), Value::Bool(true)));
+        let expected = Value::Object(expected);
+        let mut result = feed_result(left, right, &expected, &[], false);
+        judge_deviation(&mut result, (left, right), &expected, candidate_pin);
+        result.get("status").cloned().unwrap_or(Value::Null)
+    }
+
+    #[test]
+    fn a_worker_that_exits_with_an_error_never_satisfies_a_deviation() {
+        use crate::harness::report::DEVIATION_RUN_FAILED;
+        let failed = Value::object([
+            ("status", Value::str("worker-error")),
+            ("exit_code", Value::int(1)),
+        ]);
+        let Value::Object(mut unfinished) = work(2) else {
+            unreachable!()
+        };
+        unfinished.push(("eof".into(), Value::Bool(false)));
+        let unfinished = Value::object([
+            ("status", Value::str("ok")),
+            ("data", Value::Object(unfinished)),
+        ]);
+        let (one, two) = (outcome(&work(1)), outcome(&work(2)));
+        for (left, right) in [(&failed, &one), (&two, &failed), (&unfinished, &one)] {
+            for pin in [Some(&work(2)), None] {
+                assert_eq!(
+                    deviation(left, right, pin),
+                    Value::str(DEVIATION_RUN_FAILED)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn a_deviation_holds_only_while_both_sides_give_their_pins() {
+        use crate::harness::report::{DEVIATION, DEVIATION_CHANGED, DEVIATION_UNPINNED};
+        let ran = |packets| outcome(&work(packets));
+        let pin = work(2);
+        assert_eq!(
+            deviation(&ran(2), &ran(1), Some(&pin)),
+            Value::str(DEVIATION)
+        );
+        // The candidate moved from its pin, or the reference from its own.
+        for (left, right) in [(ran(3), ran(1)), (ran(2), ran(4))] {
+            assert_eq!(
+                deviation(&left, &right, Some(&pin)),
+                Value::str(DEVIATION_CHANGED)
+            );
+        }
+        assert_eq!(
+            deviation(&ran(2), &ran(1), None),
+            Value::str(DEVIATION_UNPINNED)
+        );
+        // Agreement passes, and the report asks for the entry's removal.
+        assert_eq!(deviation(&ran(1), &ran(1), Some(&pin)), Value::str("pass"));
     }
 
     #[test]

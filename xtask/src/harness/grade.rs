@@ -1028,7 +1028,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
     let (contract, contract_sha) = document(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
     // Open cases scoped to targets are those of the target the reports measured.
-    let open = super::report::open_cases(&contract, &manifest, text(&timed, "target")?)?;
+    let open = super::report::open(&contract, &manifest, text(&timed, "target")?)?;
     let binding = Binding {
         contract: &contract,
         manifest: &manifest,
@@ -1103,7 +1103,7 @@ fn grade(root: &Path, options: &Options) -> R<i32> {
             }
             return Ok(clock);
         }
-        if open.iter().any(|listed| listed == id) {
+        if open.contains(id) {
             return open_case(&clock, &measured).map_err(|e| format!("{id}: {e}"));
         }
         for (bound, cause) in unmeasured.causes(id) {

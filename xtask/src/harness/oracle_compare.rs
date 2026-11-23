@@ -249,7 +249,7 @@ pub(crate) fn compare_with_inputs(
     let (listing, manifest_sha) = manifest::read(root, &manifest_file)?;
     manifest::validate_required(&contract, &listing)?;
     let corpus = corpus_directory(root, &contract, &listing).ok_or("no corpus directory")?;
-    let open = report::open_cases(&contract, &listing, &target)?;
+    let open = report::open(&contract, &listing, &target)?;
     let identity = json::read(&root.join("target/harness/identity.json"))?;
     let candidate = validation::candidate_worker(root, &identity, candidate_name)?;
     let binary_sha = crate::files::sha256(&candidate)?;
@@ -303,6 +303,12 @@ pub(crate) fn compare_with_inputs(
                     ("reason", Value::str(error)),
                 ])
             }
+        };
+        // The oracle comparison pins the reference side only.
+        let parity = if open.is_deviation(case_id) {
+            report::unpinned_deviation(parity)
+        } else {
+            parity
         };
         rows.push(Value::object([
             ("id", Value::str(case_id)),

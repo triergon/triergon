@@ -1,6 +1,7 @@
 use super::{
-    PrefixFeature, entity_input_failure, measure_pinned, open_cases, ratchet, recorded_corpus,
-    reviewed_inputs, rights_reviewed, s,
+    DEVIATION, DEVIATION_CHANGED, DEVIATION_RUN_FAILED, DEVIATION_UNPINNED, Open, PrefixFeature,
+    entity_input_failure, measure_pinned, open, open_cases, ratchet, recorded_corpus,
+    reviewed_inputs, rights_reviewed, s, unpinned_deviation,
 };
 use crate::json::{self, Value, parse};
 use std::collections::BTreeMap;
@@ -347,17 +348,20 @@ fn open_cases_only_shrink() {
             })
             .collect()
     };
-    let open = vec!["b".to_owned()];
-    assert!(ratchet("f", &rows(&[("a", true), ("b", false)]), &open));
+    let listed = Open {
+        cases: vec!["b".to_owned()],
+        deviations: Vec::new(),
+    };
+    assert!(ratchet("f", &rows(&[("a", true), ("b", false)]), &listed));
     assert!(
-        !ratchet("f", &rows(&[("a", false), ("b", false)]), &open),
+        !ratchet("f", &rows(&[("a", false), ("b", false)]), &listed),
         "unlisted failure"
     );
     assert!(
-        !ratchet("f", &rows(&[("a", true), ("b", true)]), &open),
+        !ratchet("f", &rows(&[("a", true), ("b", true)]), &listed),
         "listed case passes"
     );
-    assert!(ratchet("f", &rows(&[("a", true)]), &[]));
+    assert!(ratchet("f", &rows(&[("a", true)]), &Open::default()));
     let contract = |requirement: &str| {
         parse(&format!(
                 r#"{{"pending_module_requirements": ["x"], "open_cases": [{{"id": "b", "requirement": "{requirement}"}}]}}"#
@@ -365,7 +369,7 @@ fn open_cases_only_shrink() {
             .unwrap()
     };
     let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}]}"#).unwrap();
-    assert_eq!(open_cases(&contract("x"), &manifest, "t").unwrap(), open);
+    assert_eq!(open(&contract("x"), &manifest, "t").unwrap(), listed);
     assert!(
         open_cases(&contract("y"), &manifest, "t").is_err(),
         "requirement not pending"
@@ -385,7 +389,7 @@ fn open_cases_only_shrink() {
     };
     assert_eq!(
         open_cases(&scoped(r#"["t"]"#), &manifest, "t").unwrap(),
-        open
+        listed.cases
     );
     assert!(
         open_cases(&scoped(r#"["t"]"#), &manifest, "u")
@@ -443,4 +447,57 @@ fn a_deviation_states_its_reading_once_for_its_cases() {
             "{wrong}"
         );
     }
+}
+
+fn deviating(status: &str) -> Vec<Value> {
+    vec![
+        parse(r#"{"id": "a", "parity": {"status": "pass"}}"#).unwrap(),
+        parse(&format!(
+            r#"{{"id": "d", "parity": {{"status": "{status}"}}}}"#
+        ))
+        .unwrap(),
+    ]
+}
+
+fn deviation_list() -> Open {
+    Open {
+        cases: Vec::new(),
+        deviations: vec!["d".to_owned()],
+    }
+}
+
+#[test]
+fn a_failed_run_never_satisfies_a_registered_deviation() {
+    let open = deviation_list();
+    assert!(!ratchet("f", &deviating(DEVIATION_RUN_FAILED), &open));
+    // A difference the comparison did not judge as a deviation does not hold either.
+    assert!(!ratchet("f", &deviating("mismatch"), &open));
+    for failed in ["worker-error", "timeout", "worker-failure", "error"] {
+        let row = parse(&format!(r#"{{"status": "{failed}", "reason": "r"}}"#)).unwrap();
+        assert_eq!(
+            unpinned_deviation(row).get("status"),
+            Some(&Value::str(DEVIATION_RUN_FAILED)),
+            "{failed}"
+        );
+    }
+}
+
+#[test]
+fn a_registered_deviation_holds_only_as_both_pins() {
+    let open = deviation_list();
+    assert!(ratchet("f", &deviating(DEVIATION), &open));
+    assert!(!ratchet("f", &deviating(DEVIATION_CHANGED), &open));
+    // A comparison that pins one side only is reported, not failed.
+    assert!(ratchet("f", &deviating(DEVIATION_UNPINNED), &open));
+    let mismatch = parse(r#"{"status": "mismatch"}"#).unwrap();
+    assert_eq!(
+        unpinned_deviation(mismatch).get("status"),
+        Some(&Value::str(DEVIATION_UNPINNED))
+    );
+    let pass = parse(r#"{"status": "pass"}"#).unwrap();
+    assert_eq!(unpinned_deviation(pass.clone()), pass);
+    assert!(
+        !ratchet("f", &deviating("pass"), &open),
+        "a passing deviation must leave the list"
+    );
 }
