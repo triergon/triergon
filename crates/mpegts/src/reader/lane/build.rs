@@ -180,7 +180,9 @@ impl Lane {
         cancel: &AtomicBool,
     ) -> Result<LaneStep> {
         let Some(build) = self.build.as_mut() else {
-            return Err(Error::Invalid("MPEG-TS AU has no source extent"));
+            return Err(Error::Invalid(
+                "MPEG-TS access unit published without a build",
+            ));
         };
         let pieces = self.pieces.as_slice();
         // Track the same source extent and anchor as a delivered packet without
@@ -256,18 +258,17 @@ impl Lane {
         }))
     }
 
-    // Checking the build and unframed bytes at publication measured +0.005213573% across the transport workloads.
-    #[expect(
-        clippy::expect_used,
-        reason = "moving the build out of its slot to publish measured +0.35 to +0.72% more instructions"
-    )]
     pub(super) fn publish(
         &mut self,
         picture_delivery: PictureDelivery,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<LaneStep> {
-        let build = self.build.as_mut().expect("pending publication");
+        let Some(build) = self.build.as_mut() else {
+            return Err(Error::Invalid(
+                "MPEG-TS access unit published without a build",
+            ));
+        };
         let (range, anchor_offset) = build.unit.range_and_anchor();
         let probing = match picture_delivery {
             PictureDelivery::Full => false,
@@ -454,11 +455,14 @@ impl Lane {
                 let PayloadSources::Table(sources) = origins else {
                     unreachable!("unframed PES sources use a table");
                 };
+                let Some(bytes) = build.bytes else {
+                    return Err(Error::Invalid("MPEG-TS unframed access unit without bytes"));
+                };
                 let data = Shared::new(
                     UnframedData {
                         track,
                         range,
-                        bytes: build.bytes.expect("prepared unframed bytes"),
+                        bytes,
                         sources,
                         clock: build.clock,
                         epochs,
