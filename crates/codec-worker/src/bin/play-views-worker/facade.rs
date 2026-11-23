@@ -7,31 +7,31 @@ use std::io::{Cursor, Write};
 
 use triergon::mpegts::{AccessUnit, Packet};
 use triergon::{
-    AnyPacket, AnyReader, Blocking, Budget, ContainerReader, Event, PacketInfo, Probe,
-    RandomAccess, Rounding, SeekPolicy, SeekRequest, SourceCapabilities, SourceId, Time, TimeBase,
+    AnyPacket, AnyReader, Blocking, Budget, ContainerReader, Event, PacketInfo, RandomAccess,
+    Rounding, SeekPolicy, SeekRequest, SourceCapabilities, SourceFormat, SourceId, Time, TimeBase,
     TrackId,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, fold_framed, signed};
 
 use triergon_harness_runner::{Operation, Totals};
 
-fn reader(input: &[u8], pool: &Budget, format: Probe) -> Result<AnyReader, String> {
+fn reader(input: &[u8], pool: &Budget, format: SourceFormat) -> Result<AnyReader, String> {
     let capabilities = SourceCapabilities {
         length: Some(input.len() as u64),
         random_access: true,
     };
     let reader = AnyReader::open(input, pool, SourceId(1), capabilities)
         .map_err(|error| error.to_string())?;
-    if triergon::probe(input) != format {
+    if triergon::probe(input) != triergon::Probed::Format(format) {
         return Err("the requested format differs from the facade probe".into());
     }
     Ok(reader)
 }
 
-fn transport_size(text: &str) -> Result<(u64, Probe), String> {
+fn transport_size(text: &str) -> Result<(u64, SourceFormat), String> {
     match text {
-        "188" => Ok((188, Probe::Ts)),
-        "192" => Ok((192, Probe::M2ts)),
+        "188" => Ok((188, SourceFormat::Ts)),
+        "192" => Ok((192, SourceFormat::M2ts)),
         _ => Err("expected transport carrier size 188 or 192".into()),
     }
 }
@@ -326,17 +326,17 @@ enum ContainerSeek {
 
 fn container_seek<'a>(
     input: &'a [u8],
-    format: Probe,
+    format: SourceFormat,
     args: &[&str],
 ) -> Result<Operation<'a>, String> {
     let (selection, state) = match (format, args) {
-        (Probe::Matroska, [ticks, state]) => (
+        (SourceFormat::Matroska, [ticks, state]) => (
             ContainerSeek::Matroska {
                 ticks: ticks.parse().map_err(|_| "invalid seek time")?,
             },
             *state,
         ),
-        (Probe::Isobmff, [track, ticks, limit, state]) => (
+        (SourceFormat::Isobmff, [track, ticks, limit, state]) => (
             ContainerSeek::Mp4 {
                 track: TrackId(track.parse().map_err(|_| "invalid track ID")?),
                 ticks: ticks.parse().map_err(|_| "invalid seek ticks")?,
@@ -509,8 +509,8 @@ pub(super) fn operation<'a>(
         ("any-ts-controls-", [size]) => ts_controls::prepare(input, size),
         ("any-ts-controls-", [size, "boundary"]) => ts_controls::prepare_boundary(input, size),
         ("ts-seek-", args) | ("any-seek-", ["ts", args @ ..]) => transport_seek(input, args),
-        ("any-seek-", ["mkv", args @ ..]) => container_seek(input, Probe::Matroska, args),
-        ("any-seek-", ["mp4", args @ ..]) => container_seek(input, Probe::Isobmff, args),
+        ("any-seek-", ["mkv", args @ ..]) => container_seek(input, SourceFormat::Matroska, args),
+        ("any-seek-", ["mp4", args @ ..]) => container_seek(input, SourceFormat::Isobmff, args),
         ("any-source-control-", args) => source_control::prepare(input, args),
         _ => Err(format!(
             "usage: {prefix}{{fold,trace,memory}} FILE [ARG...] | {prefix}bench FILE ITERATIONS [ARG...]"

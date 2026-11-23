@@ -2,7 +2,7 @@
 
 use std::cell::Cell;
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
-use triergon::{AnyReader, Budget, Error, Probe, open_blocking, open_sequential};
+use triergon::{AnyReader, Budget, Error, Probed, SourceFormat, open_blocking, open_sequential};
 
 use triergon_harness_runner::{Operation, Totals};
 
@@ -111,7 +111,9 @@ fn run(
             }
             Err(Error::Unsupported("ISO BMFF reader needs random access")) => {
                 let consumed = high_water.get();
-                if consumed != 8 || triergon::probe(&input[..consumed]) != Probe::Isobmff {
+                if consumed != 8
+                    || triergon::probe(&input[..consumed]) != Probed::Format(SourceFormat::Isobmff)
+                {
                     return Err("ISO BMFF refusal did not follow its fixed signature".into());
                 }
                 if trace.is_some() {
@@ -191,18 +193,20 @@ fn refusal(error: Error, trace: bool) -> Result<(u64, u64, Option<usize>), Strin
     }
 }
 
-fn format(value: Probe) -> (u64, u64) {
-    match value {
-        Probe::Unknown => (0, 0),
-        Probe::Flac => (1, 0),
-        Probe::MpegAudio => (2, 0),
-        Probe::Adts => (3, 0),
-        Probe::Ac3 => (4, 0),
-        Probe::Matroska => (5, 0),
-        Probe::Isobmff => (6, 0),
-        Probe::Ogg => (7, 0),
-        Probe::Ts => (8, 188),
-        Probe::M2ts => (8, 192),
+fn format(value: Probed) -> (u64, u64) {
+    let Probed::Format(format) = value else {
+        return (0, 0);
+    };
+    match format {
+        SourceFormat::Flac => (1, 0),
+        SourceFormat::MpegAudio => (2, 0),
+        SourceFormat::Adts => (3, 0),
+        SourceFormat::Ac3 => (4, 0),
+        SourceFormat::Matroska => (5, 0),
+        SourceFormat::Isobmff => (6, 0),
+        SourceFormat::Ogg => (7, 0),
+        SourceFormat::Ts => (8, 188),
+        SourceFormat::M2ts => (8, 192),
     }
 }
 

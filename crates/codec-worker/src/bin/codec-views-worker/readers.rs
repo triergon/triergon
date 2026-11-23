@@ -1,9 +1,9 @@
 use std::ffi::OsString;
 use std::io::Write;
 
-use triergon::Probe;
 use triergon::elementary::{self, Kind};
 use triergon::ogg::page::{PageHeader, write_page};
+use triergon::{Probed, SourceFormat};
 
 use triergon_harness_runner::{Operation, Totals};
 
@@ -53,10 +53,10 @@ pub(super) fn operation<'a>(
                         }
                     } else {
                         match triergon::probe(prefix) {
-                            Probe::Matroska => 5,
-                            Probe::Isobmff => 6,
-                            Probe::Ogg => 7,
-                            Probe::Ts | Probe::M2ts => 8,
+                            Probed::Format(SourceFormat::Matroska) => 5,
+                            Probed::Format(SourceFormat::Isobmff) => 6,
+                            Probed::Format(SourceFormat::Ogg) => 7,
+                            Probed::Format(SourceFormat::Ts | SourceFormat::M2ts) => 8,
                             _ => 0,
                         }
                     };

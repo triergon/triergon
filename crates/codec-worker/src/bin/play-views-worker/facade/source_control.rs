@@ -4,8 +4,8 @@ use std::io::Write;
 use std::sync::atomic::AtomicBool;
 
 use triergon::{
-    AnyReader, Budget, ContainerReader, Error, InputRequest, Probe, SourceCapabilities,
-    SourceFailure, SourceId, Step, WorkBudget,
+    AnyReader, Budget, ContainerReader, Error, InputRequest, SourceCapabilities, SourceFailure,
+    SourceFormat, SourceId, Step, WorkBudget,
 };
 
 use super::{Operation, Totals};
@@ -72,13 +72,13 @@ fn record(
 
 pub(super) fn prepare<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, String> {
     let format = match args {
-        ["mkv"] => Probe::Matroska,
-        ["mp4"] => Probe::Isobmff,
-        ["188"] => Probe::Ts,
-        ["192"] => Probe::M2ts,
+        ["mkv"] => SourceFormat::Matroska,
+        ["mp4"] => SourceFormat::Isobmff,
+        ["188"] => SourceFormat::Ts,
+        ["192"] => SourceFormat::M2ts,
         _ => return Err("expected mkv, mp4, 188 or 192".into()),
     };
-    if triergon::probe(input) != format {
+    if triergon::probe(input) != triergon::Probed::Format(format) {
         return Err("unexpected source-control fixture format".into());
     }
     let pool = Budget::new(16 << 20).map_err(|error| error.to_string())?;
@@ -92,7 +92,7 @@ pub(super) fn prepare<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a
                         random_access,
                     };
                     let opened = AnyReader::open(input, &pool, SOURCE, caps);
-                    if format == Probe::Isobmff && !random_access {
+                    if format == SourceFormat::Isobmff && !random_access {
                         if !matches!(
                             opened,
                             Err(Error::Unsupported("ISO BMFF reader needs random access"))
