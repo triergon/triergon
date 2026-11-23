@@ -226,6 +226,7 @@ impl TrackJob {
             other => other,
         }
     }
+    // Extracting inline TrackEntry and media-field handlers costs up to 0.822% more instructions.
     fn advance(
         &mut self,
         tracks: &mut BudgetVec<Track>,

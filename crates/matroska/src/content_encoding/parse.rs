@@ -44,6 +44,7 @@ pub(crate) struct EncodingsJob {
     compression_range: Option<Range<usize>>,
     entries: [Entry; 8],
     count: usize,
+    // Occurrence bits for these scalars cost up to 0.103% more instructions.
     order: u64,
     scope: u64,
     kind: u64,
