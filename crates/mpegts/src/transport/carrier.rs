@@ -312,7 +312,8 @@ pub(crate) struct Envelope {
     extension: Option<Range<usize>>,
 }
 
-/// Opaque real rejection, including the entire original hidden storage owner.
+/// A transport carrier the inspector rejected: its original bytes, where it lies in the source
+/// and the faults found.
 #[derive(Clone, Debug)]
 pub struct RejectedTransport {
     bytes: Bytes,
@@ -404,8 +405,9 @@ enum Field {
     Stuffing,
 }
 
-/// One <=192-byte input. Fixed header/clock actions inspect at most six bytes;
-/// stuffing is scanned in bounded runs with one unit per inspected byte.
+/// Checks one 188- or 192-byte transport carrier field by field within a work grant and
+/// delivers a [`TransportInspection`]. Each fixed header or clock field costs one work unit and
+/// reads at most six bytes; stuffing costs one unit per byte.
 #[derive(Debug)]
 pub struct TransportInspector {
     bytes: Option<Bytes>,

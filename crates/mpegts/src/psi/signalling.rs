@@ -16,9 +16,9 @@ pub struct Registration<'a> {
 /// One entry of an ISO 639 language descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LanguageEntry {
-    /// Original ISO 639/ISO 8859-1 bytes, without UTF-8 conversion or lookup.
+    /// The ISO 639-2 language code as its three source bytes, unchecked.
     pub language_code: [u8; 3],
-    /// Includes user-private and reserved values; no role is silently inferred.
+    /// The 8-bit audio type (H.222.0 Table 2-61), user-private and reserved values included.
     pub audio_type: u8,
 }
 
@@ -112,7 +112,7 @@ pub struct DvbAc3<'a> {
     pub mainid: Option<u8>,
     /// Optional associated-service information byte.
     pub asvc: Option<u8>,
-    /// DVB recommends zero; retain the source bits rather than repair them.
+    /// The reserved low bits of the flags byte as encoded (EN 300 468 sets them to zero).
     pub reserved_flags: u8,
     /// The additional info bytes after the optional fields; may be empty.
     pub additional_info: &'a [u8],

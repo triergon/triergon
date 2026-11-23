@@ -4,7 +4,7 @@ use triergon_core::{Error, Result};
 /// A descriptor that overruns its loop.
 pub(crate) const DESCRIPTOR_LENGTH: &str = "descriptor length";
 
-/// Borrowed source view. Its storage is the charged section/descriptor Bytes.
+/// One descriptor of a descriptor loop, borrowed from the section's bytes.
 #[derive(Clone, Copy, Debug)]
 pub struct Descriptor<'a> {
     /// The 8-bit descriptor tag.

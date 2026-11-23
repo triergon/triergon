@@ -224,7 +224,9 @@ impl TransportFramer {
             && self.push_ack.is_none()
             && self.carry.as_ref().is_some_and(BudgetVec::is_empty)
     }
-    /// Take the real owned syntax rejection before advancing/discarding this framer.
+    /// The carrier whose inspection failed the last push or poll, with its original bytes and
+    /// faults; `None` once taken, after [`Self::discard`], or when that failure was not a
+    /// rejected carrier.
     pub fn take_rejection(&mut self) -> Option<RejectedTransport> {
         self.rejection.take()
     }
@@ -452,9 +454,13 @@ impl TransportFramer {
         }))
     }
 
-    /// Uses the shared cursor's source/pool/generation/request/failure contract.
-    /// A completed entity is surfaced as Step::End; the format coordinator decides
-    /// logical EOF versus continue_source. PES state is unaffected by this reader.
+    /// Reads the next transport packet from `input` within `work`: `Ready` with an accepted
+    /// packet, `NeedInput` with the request for the next window, `Yield` when `work` is spent, or
+    /// `End` where the entity ends (the caller decides whether the source ends or continues).
+    ///
+    /// Fails with `ForeignPool`, `StaleGeneration` or `StaleRequest` when `input` is not the
+    /// cursor and request the framer is bound to, with `Cancelled` when `cancel` is set, and
+    /// with the fault of a rejected carrier ([`Self::take_rejection`]).
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -658,9 +664,15 @@ impl TransportFramer {
             }
         }
     }
-    /// `offset` identifies `input[0]`, not the start of a previous partial packet.
-    /// Always honour consumed, including on a later freeze/parse error. Backpressure
-    /// retains a complete carry for retry and never consumes the next source packet.
+    /// Takes bytes of `input`, whose first byte is at source offset `offset`, into the partial
+    /// packet and inspects the packet once it is complete. [`FrameStep::consumed`] counts the
+    /// bytes taken on every state, errors included; supply the rest again. The last bytes of a
+    /// packet count only once its inspection ends, so `Yield` and a retryable error take none
+    /// of them.
+    ///
+    /// Fails (`FrameState::Error`) with `Invalid` for input that does not continue the last push
+    /// or for a framer that reads a cursor, with `Cancelled` when `cancel` is set, and with the
+    /// fault of a rejected carrier ([`Self::take_rejection`]).
     pub fn push(
         &mut self,
         input: &[u8],
@@ -757,7 +769,11 @@ impl TransportFramer {
         })();
         FrameStep { consumed, state }
     }
-    /// Only call for definitive source EOF, never for starvation/EndSegment/failure.
+    /// Checks, at the logical end of the source, that the input ended on a packet boundary; not
+    /// for input that is only late, a segment end or a failed source.
+    ///
+    /// Fails with `Truncated` when a partial packet is held and with `Invalid` while a packet's
+    /// inspection is pending.
     pub fn finish(&self) -> Result<()> {
         if self.inspection.is_some() || self.push_ack.is_some() {
             return Err(Error::Invalid("TS inspection pending"));

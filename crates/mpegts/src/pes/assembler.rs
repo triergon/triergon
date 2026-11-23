@@ -212,8 +212,14 @@ impl PesAssembler {
         Ok(())
     }
 
-    /// One TS payload at a time. Drain poll before supplying another. A rejected
-    /// input is returned intact; no bytes have been consumed from that input.
+    /// Supplies the payload of the PID's next transport packet: `bytes` at byte `offset` of
+    /// `entity`, with `pusi` when the packet starts a PES. Drain [`Self::poll`] before the next
+    /// push.
+    ///
+    /// Refuses the payload, returned unchanged and unread, with `Invalid` while a pushed
+    /// payload is not drained, after [`Self::end_of_source`] or for bytes of another pool, with
+    /// `Overflow` when the payload's end offset does not fit in a `u64`, and with the sticky
+    /// fault once assembly has failed.
     pub fn push(
         &mut self,
         bytes: Bytes,
@@ -252,7 +258,9 @@ impl PesAssembler {
         });
         Ok(())
     }
-    /// Definitive logical EOF only. An entity/segment end may retain a partial PES.
+    /// Declares the logical end of the source; a later poll finishes or reports the PES in
+    /// progress. The end of an entity or segment is not the end of the source: a PES continues
+    /// across it.
     pub fn end_of_source(&mut self) {
         self.ended = true;
     }
@@ -414,8 +422,10 @@ impl PesAssembler {
         Ok(Some(completed))
     }
 
-    /// Explicit continuity/configuration/clock recovery. Caller retains source
-    /// bytes if it intends to replay the current PUSI after this transition.
+    /// Drops the PES in progress, a pushed payload, the sticky fault and a declared end of the
+    /// source, as after a loss of continuity, a configuration change or a new time base, and
+    /// starts a new byte run ([`Pes::byte_run_epoch`]) at elementary offset 0 under `epochs`. A
+    /// caller that replays the current payload unit start afterwards keeps its bytes.
     pub fn discard(&mut self, epochs: SourceEpochs) {
         let next_run = self.byte_run_epoch.checked_add(1);
         self.payload = None;

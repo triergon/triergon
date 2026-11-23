@@ -57,7 +57,7 @@ pub struct Pcr {
     pub extension: u16,
 }
 impl Pcr {
-    /// Raw exact clock count, not PTS/DTS and not an unwrapped rational timestamp.
+    /// The clock count in 27 MHz ticks, `base` × 300 + `extension`, as encoded: not unwrapped.
     pub fn ticks_27mhz(self) -> u64 {
         self.base * 300 + u64::from(self.extension)
     }
@@ -87,7 +87,7 @@ pub struct Adaptation {
     pub splice_countdown: Option<i8>,
     /// The transport private data bytes, without their length byte, when present.
     pub private_data: Option<Bytes>,
-    /// Preserved raw extension. Full extension interpretation remains separate.
+    /// The adaptation field extension bytes, length byte excluded, uninterpreted; when present.
     pub extension: Option<Bytes>,
 }
 

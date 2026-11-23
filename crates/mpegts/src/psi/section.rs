@@ -89,8 +89,9 @@ struct Payload {
     offset: u64,
 }
 
-/// One known section PID. Caller routes PAT/PMT PIDs and resets this on continuity
-/// loss. Several complete sections can be returned from a single supplied payload.
+/// Assembles the PSI sections of one PID from its transport payloads in source order. The
+/// caller routes that PID's payloads here and calls [`Self::discard`] after a loss of
+/// continuity; one payload can complete several sections.
 #[derive(Debug)]
 pub struct SectionAssembler {
     pid: u16,
@@ -131,7 +132,14 @@ impl SectionAssembler {
         ranges.checked_add(data).ok_or(Error::Overflow)
     }
 
-    /// Rejection returns the exact supplied charged span; no input was accepted.
+    /// Supplies the payload of the PID's next transport packet: `bytes` at byte `offset` of
+    /// `entity`, with `pusi` when the packet starts a section (its first byte is then the
+    /// pointer field). Drain [`Self::poll`] before the next push.
+    ///
+    /// Refuses the payload, returned unchanged, with `Invalid` while a pushed payload is not
+    /// drained, after [`Self::end_of_source`], for bytes of another pool or a pointer field past
+    /// the payload, with `Overflow` when the payload's end offset does not fit in a `u64`, and
+    /// with the sticky fault once assembly has failed.
     pub fn push(
         &mut self,
         bytes: Bytes,
@@ -191,7 +199,9 @@ impl SectionAssembler {
             && !self.ended
             && self.buffer.as_ref().is_some_and(BudgetVec::is_empty)
     }
-    /// Explicit loss/recovery transition; normal EndSegment must not call this.
+    /// Drops the section in progress, a pushed payload, the sticky fault and a declared end of
+    /// the source, as after a loss of continuity. The end of an entity or segment needs no
+    /// discard: a section continues across it.
     pub fn discard(&mut self) {
         self.buffer = Some(BudgetVec::new(&self.budget));
         self.ranges = BudgetVec::new(&self.budget);

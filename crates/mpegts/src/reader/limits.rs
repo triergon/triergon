@@ -62,7 +62,8 @@ pub struct ReaderLimits {
     pub adts_packet_policy: PacketPolicy,
     /// Wire policy for ADTS PES with a zero packet-length field.
     pub adts_pes_policy: adts::PesPolicy,
-    /// LOAS envelope framing by default. PES preservation emits source events.
+    /// How LATM PES are delivered: framed from their LOAS envelopes (the default), or whole,
+    /// one observation per PES.
     pub latm_packet_policy: latm::PacketPolicy,
     /// Reporting of an overlong final DVB subtitle segment.
     pub dvb_subtitle_tail_policy: DvbSubtitleTailPolicy,
@@ -78,8 +79,9 @@ pub struct ReaderLimits {
     pub elementary_input_window: usize,
     /// Largest physical byte extent examined by a seek. Zero disables seeking.
     pub maximum_seek_scan_bytes: u64,
-    /// Period-zero timestamps by default. Every lifted value carries its
-    /// SourceTimeStatus; no missing DTS or per-frame timestamp is synthesized.
+    /// How packet timestamps are lifted to exact time; [`SourceTimePolicy::RelativeEpochZero`]
+    /// by default. Each carries its [`SourceTimeStatus`](crate::clock::SourceTimeStatus); a
+    /// missing DTS or a per-frame timestamp is never made up.
     pub time_policy: SourceTimePolicy,
 }
 

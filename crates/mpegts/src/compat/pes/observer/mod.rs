@@ -221,7 +221,7 @@ pub struct DemuxPacket {
     pub flags: u32,
     /// The demuxer's duration in 90 kHz ticks, or 0 when it reports none.
     pub duration90_raw: i64,
-    /// Explicit MPEGTS stream-ID side-data byte, retained on continuations.
+    /// The PES stream ID, kept on continuations.
     pub stream_id: u8,
     /// Why the packet ended.
     pub boundary: DemuxBoundary,
@@ -635,8 +635,14 @@ impl DemuxObserver {
             fault: None,
         })
     }
-    /// Install once, before any carrier. Sequential input, clock and PMT
-    /// epochs are separate; every bound push/poll must supply the actual cursor.
+    /// Binds the observer to the cursor `context` was read from, once and before any carrier;
+    /// every later push and poll then names that cursor ([`Self::push_with_input`],
+    /// [`Self::poll_with_input`]).
+    ///
+    /// Fails with `Invalid` once a carrier was pushed, the source ended or the observer failed
+    /// or was bound, with `ForeignPool` for a cursor of another entity or pool, and as
+    /// [`InputContext::validate_cursor`](crate::compat::input::InputContext::validate_cursor)
+    /// does.
     pub fn bind_input(
         &mut self,
         context: &crate::compat::input::InputContext,
@@ -697,8 +703,11 @@ impl DemuxObserver {
     pub fn limits(&self) -> ParseLimits {
         self.limits
     }
-    /// Logical EOF only. Segment/entity continuation is a distinct unproven
-    /// demux context and must not be silently mapped to this operation.
+    /// Declares the logical end of the source; a later poll ends the packet in progress there
+    /// ([`DemuxBoundary::LogicalEof`]). The end of an entity is not the end of the source: use
+    /// [`Self::continue_media_entity`].
+    ///
+    /// Fails with `Invalid` while a pushed carrier or an emission is not drained.
     pub fn end_of_source(&mut self) -> Result<()> {
         if self.pending.is_some() || self.emission.is_some() {
             return Err(Error::Invalid(

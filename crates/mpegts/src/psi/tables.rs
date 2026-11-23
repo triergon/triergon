@@ -237,7 +237,8 @@ pub struct ProgramMap {
     pub pcr_pid: u16,
     /// The program info descriptor loop bytes; may be empty.
     pub program_descriptors: Bytes,
-    /// Caller-supplied interpretation, distinct from raw on-wire facts.
+    /// The descriptor namespace the caller supplied and the map was parsed in; not read from
+    /// the wire.
     pub descriptor_namespace: super::DescriptorNamespace,
     /// The elementary stream entries in section order; their PIDs are unique.
     pub streams: BudgetVec<ElementaryStream>,

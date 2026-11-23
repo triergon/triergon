@@ -30,8 +30,9 @@ pub enum SourceClockSample {
     Pcr27(i128),
 }
 
-/// Caller admits this source relationship/bound; no anchor comes from demux
-/// peer output. PCR fractions remain exact rather than rounded to 90-kHz ticks.
+/// A clock reading the caller supplies for [`SourceTimePolicy::Bounded`]: timestamps of its
+/// clock are unwrapped to the instant nearest it, within `maximum_distance27`. The crate never
+/// derives one itself; a PCR sample keeps its 27 MHz precision.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceClockAnchor {
     /// The clock the anchor belongs to; timestamps of another clock stay unresolved.

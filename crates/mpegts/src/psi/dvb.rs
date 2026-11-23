@@ -27,7 +27,8 @@ pub enum DvbNamespaceEvidence {
     OutOfBandServiceContract,
 }
 
-/// Original descriptor TLV and body borrowed from charged PMT storage.
+/// A DVB subtitling descriptor (tag 0x59, EN 300 468 §6.2.41), borrowed from the PMT's
+/// descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSubtitling<'a> {
     /// The whole descriptor: tag, length and body.
@@ -53,9 +54,9 @@ impl<'a> DvbSubtitling<'a> {
 pub struct DvbSubtitlingService<'a> {
     /// The entry's 8 source bytes.
     pub source: &'a [u8],
-    /// Raw ISO 639-2/ISO 8859-1 bytes, including unrecognised/malformed codes.
+    /// The ISO 639-2 language code as its three source bytes, unchecked.
     pub language_code: [u8; 3],
-    /// Original byte, including reserved/unrecognised values.
+    /// The subtitling type byte (EN 300 468 Table 26), reserved values included.
     pub subtitling_type: u8,
     /// The 16-bit page identifier for this service's display composition.
     pub composition_page_id: u16,
@@ -73,8 +74,8 @@ impl<'a> DvbSubtitlingService<'a> {
             ancillary_page_id: u16::from_be_bytes([source[6], source[7]]),
         })
     }
-    /// Syntax annotation only; reserved types remain observable. This does not
-    /// validate the inner stream or establish that an ancillary page is present.
+    /// Whether `subtitling_type` lies in 0x10..=0x2F, the DVB subtitle types, reserved values in
+    /// that range included. It says nothing of the subtitle stream or of an ancillary page.
     pub fn has_dvb_subtitling_type(self) -> bool {
         (0x10..=0x2f).contains(&self.subtitling_type)
     }
@@ -117,7 +118,8 @@ impl<'a> Descriptor<'a> {
     }
 }
 
-/// Source signalling, not an assertion of payload/decoder conformance.
+/// What a stream's DVB signalling identifies ([`ElementaryStream::codec_identification`]),
+/// from the PMT alone; the payload is not inspected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CodecIdentification {
     /// The signalling does not identify the codec.
@@ -131,17 +133,17 @@ pub enum CodecIdentification {
 /// Counts of the DVB subtitling signalling on one elementary stream.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DvbSubtitlingSignalling {
-    /// All occurrences, including empty and duplicate descriptors.
+    /// Subtitling descriptors on the stream, empty and duplicate ones included.
     pub descriptors: usize,
-    /// All entries in source order, without deduplication/selection.
+    /// Service entries across those descriptors, duplicates included.
     pub services: usize,
     /// Whether the stream also carries a DVB AC-3 or E-AC-3 descriptor alongside subtitling
     /// services.
     pub audio_conflict: bool,
 }
 
-/// A partial demux view, not a complete container/decoder operation.
-/// Multi-service behaviour is unknown.
+/// Which streams [`ElementaryStream::dvb_single_service_view`] projects: only one that signals a
+/// single subtitling service.
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DvbViewProfile {
@@ -155,7 +157,8 @@ pub struct DvbSingleServiceView<'a> {
     profile: DvbViewProfile,
     /// The service entry the view is taken from.
     pub source: DvbSubtitlingService<'a>,
-    /// compID_be, ancillaryID_be, type. Raw language stays in `source`.
+    /// The composition and ancillary page IDs, big endian, then the subtitling type; the
+    /// language code stays in `source`.
     pub bytes: [u8; 5],
 }
 
@@ -193,8 +196,9 @@ impl ElementaryStream {
     pub fn descriptor_namespace(&self) -> DescriptorNamespace {
         self.namespace
     }
-    /// None means the operation did not establish DVB context, not no services.
-    /// Raw ordered TLVs (including private namespace changes) remain in descriptors().
+    /// Counts of this stream's DVB subtitling descriptors and services; `None` when the PMT was
+    /// not parsed in a DVB namespace, which says nothing of its services. The descriptors stay
+    /// in [`Self::descriptors`].
     pub fn dvb_subtitling_signalling(&self) -> Option<DvbSubtitlingSignalling> {
         if !matches!(self.namespace, DescriptorNamespace::Dvb(_)) {
             return None;

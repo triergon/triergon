@@ -49,8 +49,12 @@ impl MediaEntityEnd {
     pub fn epochs(&self) -> SourceEpochs {
         self.epochs
     }
-    /// A continuation must be the same core cursor's immediately next request,
-    /// before any byte from the new entity has been consumed.
+    /// Checks that `input` continues the source after this entity: the same cursor, its next
+    /// request, another entity, and no byte of it read yet.
+    ///
+    /// Fails with `ForeignPool`, `StaleGeneration` or `StaleRequest` for another pool, cursor
+    /// or request, with `SourceMismatch` when the entity is the same, and with `Invalid` once
+    /// a byte of the new entity was read.
     pub fn validate_continuation(&self, input: &InputCursor) -> Result<()> {
         if !self.budget.same_pool(input.budget()) {
             return Err(Error::ForeignPool);
