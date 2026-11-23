@@ -89,6 +89,7 @@ fn check(case: &Case<'_>, pool: &Budget, bytes: &Bytes, trace: bool) -> Result<T
             bytes: 0,
             digest: 0,
             refusal: None,
+            unsupported: None,
         },
         trace,
     };

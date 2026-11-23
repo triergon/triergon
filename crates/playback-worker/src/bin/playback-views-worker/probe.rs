@@ -269,5 +269,6 @@ fn record(verdict: u64, width: u64, replay: Option<Replay>, trace: bool) -> Tota
         bytes,
         digest,
         refusal: None,
+        unsupported: None,
     }
 }

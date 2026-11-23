@@ -63,6 +63,7 @@ fn smoke(args: &[String]) -> runner::Result<()> {
             bytes: 0,
             digest,
             refusal: None,
+            unsupported: None,
         })
     })
 }

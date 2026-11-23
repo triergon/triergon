@@ -508,6 +508,7 @@ pub(super) fn run(args: &[String]) -> Result<()> {
             bytes: work.bytes,
             digest: work.digest,
             refusal: None,
+            unsupported: None,
         })
     })
 }

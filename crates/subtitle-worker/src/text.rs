@@ -525,6 +525,7 @@ pub fn run(args: &[String]) -> Result<()> {
             digest: work.digest,
             // A refusal is folded into the transcript, as the reference folds it.
             refusal: None,
+            unsupported: None,
         })
     })
 }

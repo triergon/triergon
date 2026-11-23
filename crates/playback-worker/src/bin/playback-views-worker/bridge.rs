@@ -135,6 +135,7 @@ impl Records {
             bytes: self.bytes,
             digest: self.digest,
             refusal: None,
+            unsupported: None,
         }
     }
 }

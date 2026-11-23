@@ -99,6 +99,7 @@ impl Work {
             bytes: self.bytes as u64,
             digest: self.digest,
             refusal: None,
+            unsupported: None,
         }
     }
 }

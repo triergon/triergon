@@ -299,6 +299,8 @@ pub struct Totals {
     pub digest: u64,
     /// Why the operation ended without completing its work, if it did.
     pub refusal: Option<Box<Refusal>>,
+    /// An unsupported feature the operation met and reports while completing.
+    pub unsupported: Option<&'static str>,
 }
 
 /// An operation that ended early: its error and the input event it is attributed
@@ -343,7 +345,14 @@ pub fn measure_with(
     fields: &[(&str, u64)],
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
-    measure_dyn(invocation, name, held, fields, &mut operation)
+    measure_dyn(
+        invocation.mode,
+        invocation.iterations,
+        name,
+        held,
+        fields,
+        &mut operation,
+    )
 }
 
 /// Measure a workload whose required outcome may be a deterministic refusal.
@@ -389,27 +398,29 @@ pub fn measure_repeated(
 /// [`measure_with`] with the operation behind a reference, so each worker binary
 /// holds one copy of the loop and of the result line.
 fn measure_dyn(
-    invocation: &Invocation<'_>,
+    mode: Mode,
+    iterations: u64,
     name: &str,
     held: Option<&Budget>,
     fields: &[(&str, u64)],
     operation: &mut dyn FnMut() -> Result<Totals>,
 ) -> Result<()> {
     let retained = held.map(Budget::used);
-    let memory = invocation.mode == Mode::Memory;
+    let memory = mode == Mode::Memory;
     let mut out = io::stdout().lock();
     if memory {
         Boundary::Begin.mark(&mut out)?;
     }
-    let start = (invocation.mode == Mode::Bench).then(Instant::now);
+    let start = (mode == Mode::Bench).then(Instant::now);
     let (mut packets, mut bytes, mut digest) = (0, 0, 0);
-    let (mut runs, mut refusal) = (0, None);
-    while runs < invocation.iterations {
+    let (mut runs, mut refusal, mut unsupported) = (0, None, None);
+    while runs < iterations {
         let totals = operation()?;
         runs += 1;
         packets += totals.packets;
         bytes += totals.bytes;
         fold(&mut digest, totals.digest);
+        unsupported = unsupported.or(totals.unsupported);
         if totals.refusal.is_some() {
             refusal = totals.refusal;
             break;
@@ -432,6 +443,7 @@ fn measure_dyn(
             bytes,
             digest,
             refusal,
+            unsupported,
         },
         fields,
     )?;
@@ -466,6 +478,7 @@ fn write_result(
         bytes,
         digest,
         refusal,
+        unsupported,
     } = totals;
     let mut line = format!(
         "{{\"schema\":1,\"operation\":\"{name}\",\"iterations\":{runs},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"elapsed_ns\":{elapsed},\"eof\":{}",
@@ -473,6 +486,10 @@ fn write_result(
     );
     for (key, value) in fields {
         line.push_str(&format!(",\"{key}\":{value}"));
+    }
+    if let Some(detail) = unsupported {
+        line.push_str(",\"unsupported\":");
+        push_quoted(&mut line, detail);
     }
     if let Some(refusal) = refusal {
         line.push_str(",\"refusal\":");
