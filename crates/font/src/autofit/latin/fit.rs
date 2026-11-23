@@ -218,7 +218,7 @@ impl Fitter<'_> {
     /// of their end points, as the points hold them now.
     fn extent(&self, e: usize) -> (i64, i64) {
         let edge = self.edges[e];
-        let ends = [self.segments[edge.first], self.segments[edge.last]];
+        let ends = [self.segments[edge.first.0], self.segments[edge.last.0]];
         ends.iter()
             .flat_map(|s| [self.points[s.first].v, self.points[s.last].v])
             .fold((i64::MAX, i64::MIN), |(min, max), v| {
@@ -273,7 +273,7 @@ fn hint_edges(
             if fit.edges[e].flags.contains(EdgeFlags::DONE) {
                 continue;
             }
-            let mut link = fit.edges[e].link;
+            let mut link = fit.edges[e].link.map(|link| link.0);
             // A stem with a neutral and another blue zone keeps the other;
             // with two neutral ones, the first.
             if let Some(l) = link
@@ -318,7 +318,7 @@ fn hint_edges(
         if fit.edges[e].flags.contains(EdgeFlags::DONE) {
             continue;
         }
-        let Some(link) = fit.edges[e].link else {
+        let Some(link) = fit.edges[e].link.map(|link| link.0) else {
             has_non_stem_edges = true;
             continue;
         };
@@ -397,7 +397,7 @@ fn hint_edges(
             let delta = fit.edges[e3].pos - (2 * fit.edges[e2].pos - fit.edges[e1].pos);
             let shift = |edge: &mut Edge| edge.pos = wrap(edge.pos - delta);
             shift(&mut fit.edges[e3]);
-            if let Some(link) = fit.edges[e3].link {
+            if let Some(link) = fit.edges[e3].link.map(|link| link.0) {
                 shift(&mut fit.edges[link]);
             }
             // The serifs move with the stem.
@@ -406,7 +406,7 @@ fn hint_edges(
                 shift(&mut fit.edges[11]);
             }
             fit.edges[e3].flags.insert(EdgeFlags::DONE);
-            if let Some(link) = fit.edges[e3].link {
+            if let Some(link) = fit.edges[e3].link.map(|link| link.0) {
                 fit.edges[link].flags.insert(EdgeFlags::DONE);
             }
         }
@@ -420,7 +420,7 @@ fn hint_edges(
                 continue;
             }
             let mut delta = 1000;
-            if let Some(serif) = fit.edges[e].serif {
+            if let Some(serif) = fit.edges[e].serif.map(|serif| serif.0) {
                 delta = wrap(fit.edges[serif].opos - fit.edges[e].opos);
                 let (top, bottom) = if delta < 0 {
                     delta = wrap(-delta);
@@ -447,7 +447,7 @@ fn hint_edges(
             let opos = fit.edges[e].opos;
             if delta < 64 + 16 {
                 // A serif within 1.25 pixels of its base follows it.
-                let base = fit.edges[fit.edges[e].serif.unwrap_or(e)];
+                let base = fit.edges[fit.edges[e].serif.map_or(e, |serif| serif.0)];
                 fit.edges[e].pos = wrap(base.pos + (opos - base.opos));
             } else if let Some(a) = anchor {
                 let done = |i: &usize| fit.edges[*i].flags.contains(EdgeFlags::DONE);
@@ -499,87 +499,36 @@ mod tests {
     #[test]
     fn stems_are_quantized_lightly() {
         let h = Dimension::Horizontal;
+        let plain = EdgeFlags::EMPTY;
         let standard = axis(Some(100), false);
         // Near the standard width: snapped to it.
-        assert_eq!(
-            stem_width(&standard, h, 20, 120, 0, EdgeFlags::EMPTY, EdgeFlags::EMPTY),
-            100
-        );
-        assert_eq!(
-            stem_width(
-                &standard,
-                h,
-                20,
-                -120,
-                0,
-                EdgeFlags::EMPTY,
-                EdgeFlags::EMPTY
-            ),
-            -100
-        );
+        assert_eq!(stem_width(&standard, h, 20, 120, 0, plain, plain), 100);
+        assert_eq!(stem_width(&standard, h, 20, -120, 0, plain, plain), -100);
         // Under three pixels: whole pixels plus small fractions.
-        assert_eq!(
-            stem_width(&standard, h, 20, 150, 0, EdgeFlags::EMPTY, EdgeFlags::EMPTY),
-            128 + 10
-        );
-        assert_eq!(
-            stem_width(&standard, h, 20, 170, 0, EdgeFlags::EMPTY, EdgeFlags::EMPTY),
-            128 + 54
-        );
+        assert_eq!(stem_width(&standard, h, 20, 150, 0, plain, plain), 128 + 10);
+        assert_eq!(stem_width(&standard, h, 20, 170, 0, plain, plain), 128 + 54);
         // Above: rounded, less part of the base edge's move at 20 ppem.
         assert_eq!(
-            stem_width(
-                &standard,
-                h,
-                20,
-                300,
-                40,
-                EdgeFlags::EMPTY,
-                EdgeFlags::EMPTY
-            ),
+            stem_width(&standard, h, 20, 300, 40, plain, plain),
             (300 - 20 + 32) & !63
         );
         // Without standard widths only the minimum applies.
         assert_eq!(
-            stem_width(
-                &axis(None, false),
-                h,
-                20,
-                30,
-                0,
-                EdgeFlags::ROUND,
-                EdgeFlags::EMPTY
-            ),
+            stem_width(&axis(None, false), h, 20, 30, 0, EdgeFlags::ROUND, plain),
             64
         );
         assert_eq!(
-            stem_width(
-                &axis(None, false),
-                h,
-                20,
-                30,
-                0,
-                EdgeFlags::EMPTY,
-                EdgeFlags::EMPTY
-            ),
+            stem_width(&axis(None, false), h, 20, 30, 0, plain, plain),
             56
         );
         // Extra light axes and short vertical serifs keep their widths.
         assert_eq!(
-            stem_width(
-                &axis(Some(100), true),
-                h,
-                20,
-                30,
-                0,
-                EdgeFlags::EMPTY,
-                EdgeFlags::EMPTY
-            ),
+            stem_width(&axis(Some(100), true), h, 20, 30, 0, plain, plain),
             30
         );
         let v = Dimension::Vertical;
         assert_eq!(
-            stem_width(&standard, v, 20, 30, 0, EdgeFlags::EMPTY, EdgeFlags::SERIF),
+            stem_width(&standard, v, 20, 30, 0, plain, EdgeFlags::SERIF),
             30
         );
     }
@@ -590,16 +539,9 @@ mod tests {
         // pixel minimum, which then applies: -56, where 64 bits keep the width.
         let width = i64::from(i32::MIN);
         let h = Dimension::Horizontal;
+        let plain = EdgeFlags::EMPTY;
         assert_eq!(
-            stem_width(
-                &axis(None, false),
-                h,
-                20,
-                width,
-                0,
-                EdgeFlags::EMPTY,
-                EdgeFlags::EMPTY
-            ),
+            stem_width(&axis(None, false), h, 20, width, 0, plain, plain),
             -56
         );
     }

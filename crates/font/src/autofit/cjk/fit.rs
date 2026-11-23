@@ -188,7 +188,7 @@ fn hint_edges(
         if done(&fit.edges[e]) {
             continue;
         }
-        let mut link = fit.edges[e].link;
+        let mut link = fit.edges[e].link.map(|link| link.0);
         let (blued, blue) = if let Some(blue) = fit.edges[e].blue_edge {
             (e, blue)
         } else if let Some((l, blue)) = link.and_then(|l| fit.edges[l].blue_edge.map(|b| (l, b))) {
@@ -214,7 +214,7 @@ fn hint_edges(
         if done(&fit.edges[e]) {
             continue;
         }
-        let Some(link) = fit.edges[e].link else {
+        let Some(link) = fit.edges[e].link.map(|link| link.0) else {
             skipped += 1;
             continue;
         };
@@ -257,7 +257,7 @@ fn hint_edges(
         let span = abs(wrap(
             (fit.edges[e2].opos - fit.edges[e1].opos) - (fit.edges[e3].opos - fit.edges[e2].opos),
         ));
-        let stem = |e: usize| fit.edges[e].link == Some(e + 1);
+        let stem = |e: usize| fit.edges[e].link.is_some_and(|link| link.0 == e + 1);
         if stem(e1) && stem(e2) && stem(e3) && span < 8 {
             let delta = wrap(fit.edges[e3].pos - wrap(2 * fit.edges[e2].pos - fit.edges[e1].pos));
             let mut shift = |e: usize| fit.edges[e].pos = wrap(fit.edges[e].pos - delta);
@@ -281,7 +281,7 @@ fn hint_edges(
         if done(&fit.edges[e]) {
             continue;
         }
-        if let Some(serif) = fit.edges[e].serif {
+        if let Some(serif) = fit.edges[e].serif.map(|serif| serif.0) {
             fit.align_serif(serif, e);
             fit.edges[e].flags.insert(EdgeFlags::DONE);
             skipped -= 1;
@@ -328,7 +328,7 @@ fn align_edge_points(hints: &mut GlyphHints, dim: Dimension, work: &mut WorkBudg
         let delta = wrap(edge.pos - edge.opos);
         let mut s = edge.first;
         loop {
-            let segment = axis.segments[s];
+            let segment = axis.segments[s.0];
             let mut p = segment.first;
             loop {
                 charge(work, 1)?;
@@ -438,9 +438,9 @@ mod tests {
                 fpos: at,
                 opos: i64::from(at),
                 pos: i64::from(at),
-                link,
-                first: index,
-                last: index,
+                link: link.map(crate::autofit::hints::EdgeId),
+                first: crate::autofit::hints::SegmentId(index),
+                last: crate::autofit::hints::SegmentId(index),
                 ..Edge::default()
             };
             hints.axis[0].edges.try_push(edge).unwrap();

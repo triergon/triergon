@@ -191,6 +191,16 @@ pub(super) struct Point {
     pub(super) prev: usize,
 }
 
+/// Index in one axis's segment array.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct SegmentId(pub(in super::super) usize);
+
+/// Index in one axis's edge array.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct EdgeId(pub(in super::super) usize);
+
 /// A segment: consecutive points about aligned along a dimension.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Segment {
@@ -203,13 +213,13 @@ pub(super) struct Segment {
     pub(super) min_coord: i16,
     pub(super) max_coord: i16,
     pub(super) height: i16,
-    pub(super) edge: Option<usize>,
+    pub(super) edge: Option<EdgeId>,
     /// The next segment of the same edge, circularly.
-    pub(super) edge_next: Option<usize>,
+    pub(super) edge_next: Option<SegmentId>,
     /// The segment it forms a stem with.
-    pub(super) link: Option<usize>,
+    pub(super) link: Option<SegmentId>,
     /// The primary segment of a serif.
-    pub(super) serif: Option<usize>,
+    pub(super) serif: Option<SegmentId>,
     pub(super) score: i64,
     /// How far it overlaps the segment it links to, along the dimension;
     /// only the CJK writing system's linking keeps it.
@@ -246,7 +256,7 @@ struct PixelDelta(i32);
 
 impl PixelDelta {
     #[inline]
-    fn from_edge(self, edge: &Edge) -> i64 {
+    fn position_from(self, edge: &Edge) -> i64 {
         i64::from((edge.pos as i32).wrapping_add(self.0))
     }
 }
@@ -286,10 +296,10 @@ pub(super) struct Edge {
     pub(super) scale: EdgeScale,
     /// The fitted position of the blue zone edge it aligns to.
     pub(super) blue_edge: Option<i64>,
-    pub(super) link: Option<usize>,
-    pub(super) serif: Option<usize>,
-    pub(super) first: usize,
-    pub(super) last: usize,
+    pub(super) link: Option<EdgeId>,
+    pub(super) serif: Option<EdgeId>,
+    pub(super) first: SegmentId,
+    pub(super) last: SegmentId,
 }
 
 /// The segments and edges of one dimension.
@@ -588,7 +598,7 @@ impl GlyphHints {
             let Some(edge) = segment.edge else {
                 continue;
             };
-            let position = axis.edges[edge].pos;
+            let position = axis.edges[edge.0].pos;
             let mut p = segment.first;
             loop {
                 charge(work, 1)?;
@@ -655,7 +665,7 @@ impl GlyphHints {
                         before
                             .scale
                             .apply(u - i64::from(before.fpos))
-                            .from_edge(before)
+                            .position_from(before)
                     }
                 }
             };

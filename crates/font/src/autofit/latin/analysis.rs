@@ -5,7 +5,8 @@
 //! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{
-    AxisHints, Dimension, Edge, EdgeFlags, GlyphHints, Segment, Width, direction, point,
+    AxisHints, Dimension, Edge, EdgeFlags, EdgeId, GlyphHints, Segment, SegmentId, Width,
+    direction, point,
 };
 use super::{Axis, Metrics, blue, constant};
 use crate::fixed::wrap32::{abs, div_fix, mul_fix, wrap};
@@ -359,20 +360,20 @@ pub(super) fn link_segments(
             let score = dist_demerit + len_score / len;
             if score < segments[i].score {
                 segments[i].score = score;
-                segments[i].link = Some(j);
+                segments[i].link = Some(SegmentId(j));
             }
             if score < segments[j].score {
                 segments[j].score = score;
-                segments[j].link = Some(i);
+                segments[j].link = Some(SegmentId(i));
             }
         }
     }
     for i in 0..segments.len() {
         if let Some(link) = segments[i].link
-            && segments[link].link != Some(i)
+            && segments[link.0].link != Some(SegmentId(i))
         {
             segments[i].link = None;
-            segments[i].serif = segments[link].link;
+            segments[i].serif = segments[link.0].link;
         }
     }
     Ok(())
@@ -466,8 +467,8 @@ pub(in super::super) fn edge_properties(
     for (e, edge) in edges.iter().enumerate() {
         let mut s = edge.first;
         loop {
-            segments[s].edge = Some(e);
-            s = segments[s].edge_next.unwrap_or(edge.first);
+            segments[s.0].edge = Some(EdgeId(e));
+            s = segments[s.0].edge_next.unwrap_or(edge.first);
             if s == edge.first {
                 break;
             }
@@ -478,17 +479,19 @@ pub(in super::super) fn edge_properties(
         let (mut round, mut straight) = (0, 0);
         let mut s = edges[e].first;
         loop {
-            let segment = segments[s];
+            let segment = segments[s.0];
             if segment.flags.contains(EdgeFlags::ROUND) {
                 round += 1;
             } else {
                 straight += 1;
             }
             // A serif segment's link is ignored.
-            let serif = segment
-                .serif
-                .filter(|&serif| segments[serif].edge.is_some_and(|other| other != e));
-            let link = segment.link.filter(|&link| segments[link].edge.is_some());
+            let serif = segment.serif.filter(|&serif| {
+                segments[serif.0]
+                    .edge
+                    .is_some_and(|other| other != EdgeId(e))
+            });
+            let link = segment.link.filter(|&link| segments[link.0].edge.is_some());
             if let Some(other) = serif.or(link) {
                 let current = if serif.is_some() {
                     edges[e].serif
@@ -500,21 +503,21 @@ pub(in super::super) fn edge_properties(
                 let target = match current {
                     Some(found) => {
                         let edge_delta =
-                            (i64::from(edges[e].fpos) - i64::from(edges[found].fpos)).abs();
+                            (i64::from(edges[e].fpos) - i64::from(edges[found.0].fpos)).abs();
                         let seg_delta =
-                            (i64::from(segment.pos) - i64::from(segments[other].pos)).abs();
+                            (i64::from(segment.pos) - i64::from(segments[other.0].pos)).abs();
                         if seg_delta < edge_delta {
-                            segments[other].edge
+                            segments[other.0].edge
                         } else {
                             Some(found)
                         }
                     }
-                    None => segments[other].edge,
+                    None => segments[other.0].edge,
                 };
                 if serif.is_some() {
                     edges[e].serif = target;
                     if let Some(target) = target {
-                        edges[target].flags.insert(EdgeFlags::SERIF);
+                        edges[target.0].flags.insert(EdgeFlags::SERIF);
                     }
                 } else {
                     edges[e].link = target;
@@ -554,19 +557,19 @@ pub(in super::super) fn start_edge(
         opos,
         pos: opos,
         dir: segment.dir,
-        first: s,
-        last: s,
+        first: SegmentId(s),
+        last: SegmentId(s),
         ..Edge::default()
     };
-    axis.segments[s].edge_next = Some(s);
+    axis.segments[s].edge_next = Some(SegmentId(s));
     Ok(())
 }
 
 /// Adds segment `s` to the circular segment list of `edge`.
 pub(in super::super) fn add_to_edge(segments: &mut [Segment], edge: &mut Edge, s: usize) {
     segments[s].edge_next = Some(edge.first);
-    segments[edge.last].edge_next = Some(s);
-    edge.last = s;
+    segments[edge.last.0].edge_next = Some(SegmentId(s));
+    edge.last = SegmentId(s);
 }
 
 /// Finds the features of `dim`: segments, their links and edges.

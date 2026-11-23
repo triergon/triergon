@@ -114,11 +114,13 @@ impl Stems {
                 let mut count = 0;
                 for (index, segment) in segments.iter().enumerate() {
                     // Stems only: segments linked to each other, once.
-                    let Some(link) = segment.link.filter(|&l| l > index) else {
+                    let Some(link) = segment.link.filter(|l| l.0 > index) else {
                         continue;
                     };
-                    if segments[link].link == Some(index) && count < MAX_WIDTHS {
-                        let distance = i64::from(segment.pos) - i64::from(segments[link].pos);
+                    if segments[link.0].link.is_some_and(|back| back.0 == index)
+                        && count < MAX_WIDTHS
+                    {
+                        let distance = i64::from(segment.pos) - i64::from(segments[link.0].pos);
                         axis.widths[count].org = distance.abs();
                         count += 1;
                     }
