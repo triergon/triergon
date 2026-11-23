@@ -156,11 +156,10 @@
   ],
   "open_deviations": [
     {
-      "reading": "A fragment declares a sample past the available source",
-      "clause": "ISO/IEC 14496-12:2015 sections 8.1.1 and 8.8.8.2–8.8.8.3 define media data and the extent selected by the fragment run. The bridge opens a checked source sample plan before framing.",
-      "candidate": "Rejects the incomplete sample plan before publishing any access unit.",
-      "reference": "Publishes complete earlier packets and logs a partial file at sample offset 0xd25.",
-      "compat": "compat::mov::deliver_complete_fragment_prefix for a consumer recovering the available prefix from incomplete input.",
+      "reading": "Triergon refuses a fragment whose sample runs past the source (recovery policy)",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.8.8.2 and 8.8.8.3: a track run's samples lie in the media data; this file ends inside a declared sample.",
+      "candidate": "Checks the whole sample plan first and publishes no access unit.",
+      "reference": "Publishes the complete earlier packets, then logs a partial file at sample offset 0xd25.",
       "cases": [
         "forward-forward-fragment-aac-short-1-aac"
       ]

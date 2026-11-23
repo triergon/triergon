@@ -327,10 +327,13 @@ impl Generator {
                      name the features whose pins apply in cases_from"
                 ));
             }
-            if let Err(error) = self.manifest(root, feature) {
-                errors.push(error);
-                continue;
-            }
+            let manifest = match self.manifest(root, feature) {
+                Ok(manifest) => manifest,
+                Err(error) => {
+                    errors.push(error);
+                    continue;
+                }
+            };
             errors.extend(target_pins(root, feature));
             let path = pins_path(root, feature);
             if self.sources(root, feature).is_ok_and(|s| s != [feature]) {
@@ -356,7 +359,7 @@ impl Generator {
                 }
             };
             let committed = std::fs::read_to_string(&path).unwrap_or_default();
-            errors.extend(candidate_pin_errors(root, feature, &document));
+            errors.extend(candidate_pin_errors(root, feature, &document, &manifest));
             match pins(root, feature).and_then(|pins| {
                 let candidates = candidate_pins(root, feature)?;
                 Ok(canonical(
@@ -735,17 +738,18 @@ fn candidate_folds(
 }
 
 /// A candidate pin is only for a case the contract lists as open on each target it
-/// is recorded for.
-fn candidate_pin_errors(root: &Path, feature: &str, document: &Value) -> Vec<String> {
+/// is recorded for, among the cases of the feature's generated `manifest`.
+fn candidate_pin_errors(
+    root: &Path,
+    feature: &str,
+    document: &Value,
+    manifest: &Value,
+) -> Vec<String> {
     let Ok(candidates) = candidate_pins(root, feature) else {
         return vec![format!("{feature}: unreadable {CANDIDATE_PINS}")];
     };
     let open_on = |case: &str, target: &str| {
-        let listing = Value::object([(
-            "cases",
-            Value::Array(vec![Value::object([("id", Value::str(case))])]),
-        )]);
-        crate::harness::report::open_cases(document, &listing, target)
+        crate::harness::report::open_cases(document, manifest, target)
             .is_ok_and(|open| open.iter().any(|open| open == case))
     };
     let mut errors = Vec::new();
