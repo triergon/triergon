@@ -5,6 +5,20 @@ use crate::ebml_kit::ABC;
 use crate::storage::usage::{Owner, Storage};
 
 #[test]
+fn header_restoration_reports_the_total_bytes_over_its_limit() {
+    let pool = Budget::new(8192).unwrap();
+    let prefix = SharedBytes::copy_from_slice(&pool, b"ab").unwrap();
+    let input = SharedBytes::copy_from_slice(&pool, b"cde").unwrap();
+    assert_eq!(
+        CopyJob::new(prefix, input, 4, &pool).unwrap_err(),
+        Error::Limit {
+            requested: 5,
+            maximum: 4
+        }
+    );
+}
+
+#[test]
 fn stored_transform_has_exact_capacity_and_retains_owned_alias() {
     let pool = Budget::new(64 * 1024).unwrap();
     let source = SharedBytes::copy_from_slice(&pool, &ABC).unwrap();

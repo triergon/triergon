@@ -267,7 +267,7 @@ impl SimplePacketJob {
                 return Ok(SimpleProgress::Yield);
             }
             let track = &self.configuration(borrowed)?.tracks()[self.track];
-            validate_decoded_capacity(0, self.block_bytes)?;
+            crate::step::check_byte_limit(0, self.block_bytes)?;
             let fields = FrameParameters {
                 cluster_ticks: self.cluster_ticks,
                 offset: self.offset,

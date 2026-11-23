@@ -258,9 +258,7 @@ impl<'a> Hdr10Plus<'a> {
         let body = raw
             .strip_prefix(&T35_HEADER)
             .ok_or(Error::Invalid("HDR10+ terminal code"))?;
-        if body.len() > MAX_BODY {
-            return Err(Error::Policy("HDR10+ payload"));
-        }
+        crate::step::check_byte_limit(body.len(), MAX_BODY)?;
         Ok((raw.len() as u64) * 8)
     }
 

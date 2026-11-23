@@ -295,9 +295,7 @@ impl EncodingsJob {
                             return Ok(ParseStep::Yield);
                         }
                         let e = &self.entries[self.build - 1];
-                        if e.settings.len() > self.limit {
-                            return Err(Error::Policy("content encoding settings"));
-                        }
+                        crate::step::check_byte_limit(e.settings.len(), self.limit)?;
                         self.header = SharedBytes::default();
                         if e.algorithm == 3
                             && (e.scope & 2 != 0 || e.scope & 1 != 0 && !self.headers_only)
@@ -350,9 +348,7 @@ impl EncodingsJob {
                                 .prefix_size
                                 .checked_add(e.settings.len())
                                 .ok_or(Error::Overflow)?;
-                            if self.prefix_size > self.limit {
-                                return Err(Error::Policy("restored header bytes"));
-                            }
+                            crate::step::check_byte_limit(self.prefix_size, self.limit)?;
                         }
                         self.prefix_entry += 1;
                     }

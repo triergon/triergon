@@ -88,9 +88,7 @@ impl CopyJob {
             .len()
             .checked_add(input.len())
             .ok_or(Error::Overflow)?;
-        if size > limit {
-            return Err(Error::Policy("restored content bytes"));
-        }
+        crate::step::check_byte_limit(size, limit)?;
         Ok(Self {
             prefix,
             input,

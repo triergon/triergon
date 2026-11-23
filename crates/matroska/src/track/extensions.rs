@@ -217,9 +217,7 @@ impl TrackExtensionsJob {
         if !raw.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        if raw.len() > limits.metadata_bytes {
-            return Err(Error::Policy("track extension bytes"));
-        }
+        crate::step::check_byte_limit(raw.len(), limits.metadata_bytes)?;
         let length = raw.len();
         Ok(Self {
             raw,

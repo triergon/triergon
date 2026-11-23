@@ -148,7 +148,7 @@ impl Configuration {
     }
     /// A job that parses MaxBlockAdditionID and the BlockAdditionMappings of the
     /// TrackEntry at index `track`, charged to this configuration's pool. Fails with
-    /// [`Error::Invalid`] for an unknown index and [`Error::Policy`] when the
+    /// [`Error::Invalid`] for an unknown index and [`Error::Limit`] when the
     /// TrackEntry exceeds `limits.metadata_bytes`.
     pub fn track_extensions_job(
         &self,

@@ -141,8 +141,12 @@ and seeking on a non-video track.
 | `index_entries` | 16,384 | Cues entries |
 | `decompression_ratio` / `decompression_work` | 1024 / 128 Mi | expansion vs. input; work units per encoding |
 
-Exceeding a `Limits` field is `Error::Policy` naming what was exceeded, and storage the
-pool can never grant is `Error::Limit`; both are permanent for the input. Output that
+Header restoration, decoded block capacity, track parsing, track extensions
+and HDR10+ payload checks report byte excesses as `Error::Limit` with the
+requested and maximum counts. Element admission, catalogue storage, counts,
+nesting and scan work report named `Error::Policy` bounds. The pool returns
+`Error::Limit` for a storage request it can never grant. Both errors are
+permanent for the input. Output that
 fits once the caller drops retained packets is `Step::Backpressure` from `Reader::step`
 (`Error::Backpressure` from `BlockingReader`) and is retryable.
 `PayloadOwnership::OwnedExact` (default) gives each block payload storage of exactly its

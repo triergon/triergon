@@ -139,9 +139,7 @@ fn validate_batch_input(
     if !source.belongs_to(pool) || !configuration.belongs_to(pool) {
         return Err(Error::ForeignPool);
     }
-    if source.len() > limits.block_bytes {
-        return Err(Error::Policy("element bytes"));
-    }
+    crate::step::check_byte_limit(source.len(), limits.block_bytes)?;
     if scale == 0 {
         return Err(Error::Invalid("zero TimestampScale"));
     }
@@ -150,12 +148,6 @@ fn validate_batch_input(
 fn validate_track_lacing(flags: u8, track: &Track) -> Result<()> {
     if (flags >> 1) & 3 != 0 && !track.lacing {
         return Err(Error::Invalid("lacing forbidden by track"));
-    }
-    Ok(())
-}
-fn validate_decoded_capacity(capacity: usize, maximum: usize) -> Result<()> {
-    if capacity > maximum {
-        return Err(Error::Policy("decoded laced block capacity"));
     }
     Ok(())
 }
@@ -763,7 +755,7 @@ impl PacketBatchJob {
                         } else {
                             0
                         };
-                        validate_decoded_capacity(capacity, self.limits.block_bytes)?;
+                        crate::step::check_byte_limit(capacity, self.limits.block_bytes)?;
                         let fields = FrameParameters {
                             cluster_ticks: self.cluster_ticks,
                             offset: self.offset,

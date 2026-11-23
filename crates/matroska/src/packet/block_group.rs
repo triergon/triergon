@@ -437,9 +437,7 @@ impl GroupJob {
         if !raw.belongs_to(pool) {
             return Err(Error::ForeignPool);
         }
-        if raw.len() > limits.block_bytes {
-            return Err(Error::Policy("element bytes"));
-        }
+        crate::step::check_byte_limit(raw.len(), limits.block_bytes)?;
         if let Some(location) = location {
             location.validate(raw.len())?;
         }

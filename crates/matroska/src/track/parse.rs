@@ -552,9 +552,7 @@ impl TrackJob {
                         } else {
                             0
                         };
-                        if self.private_bytes > self.private_budget {
-                            return Err(Error::Policy("decoded private metadata capacity"));
-                        }
+                        crate::step::check_byte_limit(self.private_bytes, self.private_budget)?;
                         self.phase = TrackPhase::Number { at: 0 };
                     }
                     TrackPhase::Number { at } | TrackPhase::Uid { at } => {
@@ -680,9 +678,7 @@ impl TracksJob {
         if !source.belongs_to(pool) || previous.as_ref().is_some_and(|old| !old.belongs_to(pool)) {
             return Err(Error::ForeignPool);
         }
-        if source.len() > limits.metadata_bytes {
-            return Err(Error::Policy("metadata"));
-        }
+        crate::step::check_byte_limit(source.len(), limits.metadata_bytes)?;
         let end = source.len();
         Ok(Self {
             source,

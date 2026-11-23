@@ -84,6 +84,14 @@ pub(crate) fn pending<T, U>(step: ParseStep<T>) -> Result<ParseStep<U>> {
     })
 }
 
+#[inline(always)]
+pub(crate) fn check_byte_limit(requested: usize, maximum: usize) -> Result<()> {
+    if requested > maximum {
+        return Err(Error::Limit { requested, maximum });
+    }
+    Ok(())
+}
+
 pub(crate) fn check(cancel: &AtomicBool) -> Result<()> {
     if cancel.load(Ordering::Relaxed) {
         Err(Error::Cancelled)

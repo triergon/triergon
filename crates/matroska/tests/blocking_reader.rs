@@ -151,7 +151,10 @@ fn restored_header_is_bounded_by_the_decoded_packet_limit() {
     .unwrap();
     assert!(matches!(
         demux.next_packet(&AtomicBool::new(false)),
-        Err(Error::Policy(_))
+        Err(Error::Limit {
+            requested: 32,
+            maximum: 8
+        })
     ));
 }
 
