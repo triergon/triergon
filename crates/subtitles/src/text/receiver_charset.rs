@@ -18,47 +18,52 @@ use triergon_core::{Budget, Error, Result, WorkBudget};
 /// iso-8859-1, windows-1251 or windows-1252. `Error::Limit` for a label over
 /// 256 bytes, `Error::Unsupported` for any other. It differs from
 /// [`Charset::from_label`] and
-/// [`MultibyteCharset::from_label`](M::from_label): big5, euc-kr and cp932
-/// resolve to the `Receiver` profiles.
+/// [`MultibyteCharset::from_label`](M::from_label): big5 and euc-kr resolve
+/// to the `Receiver` profiles.
+#[inline]
 pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
+    // The decoders open with euc-kr most; its test is inlined into them.
+    if label.eq_ignore_ascii_case(b"euc-kr") {
+        return Ok(Charset::Multibyte(M::ReceiverEucKrC1));
+    }
+    other_receiver_charset(label)
+}
+
+/// [`receiver_charset`] for every label but euc-kr.
+fn other_receiver_charset(label: &[u8]) -> Result<Charset> {
     if label.len() > 256 {
         return Err(Error::Limit {
             requested: label.len(),
             maximum: 256,
         });
     }
-    for (name, profile) in [
-        ("gbk", M::GbkCp936),
-        ("cp936", M::GbkCp936),
-        ("windows-936", M::GbkCp936),
-        ("big5", M::ReceiverBig5Glibc239),
-        ("big-5", M::ReceiverBig5Glibc239),
-        ("shift_jis", M::ShiftJisUnicode),
-        ("shift-jis", M::ShiftJisUnicode),
-        ("sjis", M::ShiftJisUnicode),
-        ("euc-kr", M::ReceiverEucKrC1),
-        ("cp932", M::Windows932),
-        ("cp949", M::Windows949),
-        ("cp950", M::Windows950),
-    ] {
-        if label.eq_ignore_ascii_case(name.as_bytes()) {
-            return Ok(Charset::Multibyte(profile));
-        }
-    }
-    // The single-byte labels: Latin-1 keeps 0x80 to 0x9F as the C1 controls,
-    // and the Windows code pages refuse the bytes their tables leave undefined.
-    for (name, charset) in [
-        ("latin1", Charset::Latin1),
-        ("iso-8859-1", Charset::Latin1),
-        ("windows-1251", Charset::Windows1251),
-        ("windows-1252", Charset::Windows1252),
-    ] {
-        if label.eq_ignore_ascii_case(name.as_bytes()) {
-            return Ok(charset);
-        }
-    }
-    Err(Error::Unsupported("captured receiver charset label"))
+    let is = |name: &[u8]| label.eq_ignore_ascii_case(name);
+    let profile = if is(b"gbk") || is(b"cp936") || is(b"windows-936") {
+        M::GbkCp936
+    } else if is(b"big5") || is(b"big-5") {
+        M::ReceiverBig5Glibc239
+    } else if is(b"shift_jis") || is(b"shift-jis") || is(b"sjis") {
+        M::ShiftJisUnicode
+    } else if is(b"cp932") {
+        M::Windows932
+    } else if is(b"cp949") {
+        M::Windows949
+    } else if is(b"cp950") {
+        M::Windows950
+    } else if is(b"latin1") || is(b"iso-8859-1") {
+        // Latin-1 keeps 0x80 to 0x9F as the C1 controls; the Windows code
+        // pages below refuse the bytes their tables leave undefined.
+        return Ok(Charset::Latin1);
+    } else if is(b"windows-1251") {
+        return Ok(Charset::Windows1251);
+    } else if is(b"windows-1252") {
+        return Ok(Charset::Windows1252);
+    } else {
+        return Err(Error::Unsupported("charset label the receiver lacks"));
+    };
+    Ok(Charset::Multibyte(profile))
 }
+
 /// How a packet's conversion ended.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Outcome {
