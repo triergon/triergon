@@ -142,9 +142,9 @@ fn leaf_allowance(limits: &Limits, catalogue: &Catalogue, id: u64, left: usize) 
 // rather than the sum, and adds no per-packet heap allocation/pressure seam.
 // An explicit tag: kept in a niche of a job, it costs the demux step a decode on
 // every dispatch.
-#[expect(
+#[allow(
     clippy::large_enum_variant,
-    reason = "Exclusive bounded inline jobs; heap indirection adds allocation and retry state; host size guarded"
+    reason = "exclusive bounded inline jobs, whose sizes differ by target; boxing one would allocate"
 )]
 #[derive(Debug)]
 #[repr(u64)]
@@ -311,7 +311,7 @@ const RESERVE: usize = 6752 - size_of::<State>();
 const RESERVE: usize = 0;
 impl std::fmt::Debug for Reserve {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{RESERVE} reserved bytes")
+        write!(f, "{} reserved bytes", self.0.len())
     }
 }
 
