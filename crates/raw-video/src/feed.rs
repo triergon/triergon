@@ -164,24 +164,41 @@ impl<S: Source> Active<S> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.pending.is_none() {
-            let unit = match self.source.poll(work, cancel)? {
+        let unit = match self.pending.take() {
+            Some(unit) => unit,
+            None => match self.source.poll(work, cancel)? {
                 Step::Ready(unit) => unit,
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::Yield => return Ok(Step::Yield),
                 Step::End(at) => return Ok(Step::End(at)),
-            };
-            self.pending = Some(unit);
-        }
+            },
+        };
         if !work.try_charge(1) {
+            self.pending = Some(unit);
             return Ok(Step::Yield);
         }
-        // One bounded configuration pass over the reader's admitted NALs.
         // On pressure, the tracker and the pending packet are retryable.
-        let unit = self
-            .pending
-            .as_ref()
-            .ok_or(Error::Invalid("raw feed unit missing"))?;
+        let (changed, schedule) = match self.configure(&unit) {
+            Ok(configured) => configured,
+            Err(error) => {
+                self.pending = Some(unit);
+                return Err(error);
+            }
+        };
+        Ok(Step::Ready(RawVideoFeedPacket {
+            unit,
+            configuration: self.configuration.clone(),
+            configuration_revision: self.configuration.as_ref().map(|_| self.revision),
+            configuration_changed: changed,
+            submission_time: schedule.map(|(at, _)| at),
+            queue_timestamp_ns: schedule.map_or(0, |(_, nanos)| nanos),
+        }))
+    }
+
+    /// One bounded configuration pass over the unit's admitted NALs, then the
+    /// submission clock: whether the configuration changed, and the unit's submission
+    /// time with its nanoseconds. A failure changes neither the tracker nor the clock.
+    fn configure(&mut self, unit: &RawAccessUnit) -> Result<(bool, Option<(Time, i64)>)> {
         let schedule = if unit.has_vcl {
             self.clock
                 .as_ref()
@@ -206,18 +223,7 @@ impl<S: Source> Active<S> {
         if let (Some(clock), Some((_, _, next))) = (&mut self.clock, schedule) {
             clock.next = next;
         }
-        let unit = self
-            .pending
-            .take()
-            .ok_or(Error::Invalid("raw feed unit missing"))?;
-        Ok(Step::Ready(RawVideoFeedPacket {
-            unit,
-            configuration: self.configuration.clone(),
-            configuration_revision: self.configuration.as_ref().map(|_| self.revision),
-            configuration_changed: changed,
-            submission_time: schedule.map(|(at, _, _)| at),
-            queue_timestamp_ns: schedule.map_or(0, |(_, nanos, _)| nanos),
-        }))
+        Ok((changed, schedule.map(|(at, nanos, _)| (at, nanos))))
     }
 }
 
