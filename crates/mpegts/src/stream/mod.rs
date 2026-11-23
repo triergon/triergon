@@ -123,6 +123,10 @@ pub struct TransportStream {
     boundary_event: bool,
     descriptor_namespace: DescriptorNamespace,
 }
+// The field order above is load-bearing for the per-carrier loops; a change that moves it
+// shows here first.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<TransportStream>() == 3216 && align_of::<TransportStream>() == 8);
 
 impl TransportStream {
     /// A stream of `format` packets that demultiplexes `program`, with private

@@ -368,6 +368,8 @@ struct Pending {
     position: usize,
     step: CarrierStep,
 }
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Pending>() == 136 && align_of::<Pending>() == 8);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Arena {
@@ -425,7 +427,7 @@ enum PayloadFormat {
     Compact,
 }
 
-// Native payloads and their nonempty spans are bounded by DEFAULT_PACKET_CAP.
+// Owned and compact payloads and their nonempty spans are bounded by DEFAULT_PACKET_CAP.
 // Keep both counters in the ordinary byte-count word on 64-bit targets.
 #[derive(Debug, Default)]
 #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
@@ -481,6 +483,8 @@ pub struct DemuxObserver {
     private_audio: Option<PrivateAudioCarriage>,
     follow: Follow,
 }
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<DemuxObserver>() == 960 && align_of::<DemuxObserver>() == 8);
 impl DemuxObserver {
     fn payload_len(&self) -> usize {
         #[cfg(target_pointer_width = "64")]

@@ -436,6 +436,8 @@ pub(super) struct Lane {
     eof: bool,
     probe: Option<dts_probe::Probe>,
 }
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Lane>() == 7920 && align_of::<Lane>() == 16);
 
 impl Lane {
     pub(super) fn is_probing_dts(&self) -> bool {
