@@ -430,9 +430,16 @@ impl Pass {
 struct Plan {
     luma: Pass,
     chroma: [Pass; 2],
-    terms: Terms,
-    /// Odd fitted width: chroma at full width and the [`Wide`] output stage.
-    wide: bool,
+    output: Output,
+}
+
+/// How a [`Plan`] turns its scaled rows into RGBA.
+#[derive(Debug)]
+enum Output {
+    /// Chroma at half width, each sample's terms spread to its pixel pair.
+    Paired(Terms),
+    /// Odd fitted width: chroma at full width and the [`Wide`] stage.
+    Wide,
 }
 
 /// Scaled-path conversion constants: chroma offsets in luma steps,
@@ -530,13 +537,16 @@ impl Terms {
 impl Plan {
     fn new(width: usize, height: usize, f: Fit) -> Self {
         let (cw, ch) = (width.div_ceil(2), height.div_ceil(2));
-        let wide = f.width % 2 == 1;
-        let dst = (if wide { f.width } else { f.width / 2 }, f.height);
+        let (output, chroma_width) = if f.width % 2 == 1 {
+            (Output::Wide, f.width)
+        } else {
+            (Output::Paired(Terms::default()), f.width / 2)
+        };
+        let dst = (chroma_width, f.height);
         Self {
             luma: Pass::new((width, height), (f.width, f.height)),
             chroma: [Pass::new((cw, ch), dst), Pass::new((cw, ch), dst)],
-            terms: Terms::default(),
-            wide,
+            output,
         }
     }
 
@@ -549,23 +559,25 @@ impl Plan {
         for pass in &mut self.chroma {
             pass.next = 0;
         }
-        if self.wide {
-            let k = Wide::new(picture.colour);
-            for y in 0..f.height {
-                self.luma.row(&picture.planes[0], picture.width, shift, y);
-                self.chroma[0].row(&picture.planes[1], cw, shift, y);
-                self.chroma[1].row(&picture.planes[2], cw, shift, y);
-                let out = &mut rgba[((f.y + y) * width + f.x) * 4..][..f.width * 4];
-                k.row(
-                    &self.luma.acc,
-                    &self.chroma[0].acc,
-                    &self.chroma[1].acc,
-                    out,
-                );
+        let t = match &mut self.output {
+            Output::Paired(terms) => terms,
+            Output::Wide => {
+                let k = Wide::new(picture.colour);
+                for y in 0..f.height {
+                    self.luma.row(&picture.planes[0], picture.width, shift, y);
+                    self.chroma[0].row(&picture.planes[1], cw, shift, y);
+                    self.chroma[1].row(&picture.planes[2], cw, shift, y);
+                    let out = &mut rgba[((f.y + y) * width + f.x) * 4..][..f.width * 4];
+                    k.row(
+                        &self.luma.acc,
+                        &self.chroma[0].acc,
+                        &self.chroma[1].acc,
+                        out,
+                    );
+                }
+                return;
             }
-            return;
-        }
-        let t = &mut self.terms;
+        };
         t.resize(f.width);
         for y in 0..f.height {
             self.luma.row(&picture.planes[0], picture.width, shift, y);
