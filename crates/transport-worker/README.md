@@ -57,3 +57,9 @@ observers (`ts-source-`, `ts-pes-assembler-`, `ts-observer-`), fault facts and r
 (`ts-reader-views-`, `ts-reader-container-`, `ts-epoch-index-seek-`,
 `ts-bounded-time-`) and the writer (`ts-mux-`). Each prefix is the `worker_operation` of
 one feature under `harness/features/`, such as `ts-psi-` of `ts-psi-readers`.
+
+An operation that meets a library refusal ends its fold with one kind 8 record (the
+source, assembler and observer forms put the error's text in it); a failed check of the
+worker's own (a span that differs from its carrier, a binding with another scope) ends
+the worker with status 2. A trailing `--report-refusal`, which the report adds for a
+registered refusal, makes the result line name the refusal's detail as `unsupported`.
