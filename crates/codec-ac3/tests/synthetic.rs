@@ -1,11 +1,12 @@
 //! Self-authored synthetic syncframes: framing, CRC policy, truncation/concealment and
 //! typed errors. The frames are built bit by bit from the A/52:2018 syntax tables.
 
+use triergon_bitstream::crc::crc16_a52 as crc16;
 use triergon_codec::{Budget, Error};
 use triergon_codec_ac3::compat::ffmpeg::Policy;
 use triergon_codec_ac3::{
     AudioFrame, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, Limits, NoiseMode,
-    Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
+    Speaker, StreamType, Syntax, access_unit_len, parse_header,
 };
 
 #[derive(Default)]

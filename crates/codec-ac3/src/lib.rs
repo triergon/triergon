@@ -30,7 +30,6 @@ pub use substream::{DownmixCodes, FrameFeatures, NoiseMode};
 use trace::Trace;
 #[cfg(feature = "reference-trace")]
 pub use trace::{BlockTrace, FrameTrace, Trace};
-pub use triergon_bitstream::crc::crc16_a52 as crc16;
 pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
 use compat::ffmpeg::Policy;
@@ -90,7 +89,7 @@ impl Default for Limits {
 }
 
 /// Summary of one decoded access unit.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrameInfo {
     /// Syntax of independent substream 0.
     pub syntax: Syntax,

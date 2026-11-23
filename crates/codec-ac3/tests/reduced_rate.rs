@@ -4,10 +4,11 @@
 //! allocation); the expected samples were captured black-box from FFmpeg 9.0.2's decoder
 //! (`ffmpeg -i k.ac3 -f f32le`).
 
+use triergon_bitstream::crc::crc16_a52 as crc16;
 use triergon_codec_ac3::compat::ffmpeg::Policy;
 use triergon_codec_ac3::{
     AudioFrame, DecodeError, Decoder, DecoderOptions, Feature, Speaker, Syntax, access_unit_len,
-    crc16, parse_header,
+    parse_header,
 };
 
 /// `gen_reduced_rate.py k9.ac3 9 0 1 2 1`: bsid 9, fscod 0 (24 kHz), 1/0 + LFE, frmsizecod 37.
