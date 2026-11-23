@@ -265,9 +265,9 @@ fn worker_main() -> ExitCode {
             );
         }
         Operation::Bench => {
-            // `iterations` sessions, each from a fresh session and sink, timed
-            // together. Every session must produce the same stream; the counts
-            // are totals over the sessions, the digest that of the stream.
+            // The result carries the checked digest of one stream, not a fold of repetition digests.
+            // Time `iterations` fresh sessions and require each to produce that stream.
+            // Report the total counts across the sessions.
             let (Some(bitrate), Some(rgba), Some(iterations)) =
                 (parse(6), load(&args[7]), parse(8).filter(|&n| n > 0))
             else {

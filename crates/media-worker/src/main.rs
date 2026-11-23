@@ -329,8 +329,8 @@ fn trace<R: Read>(mut d: Demuxer<R>, initial_trim: bool, view: View) -> Outcome 
     Ok(())
 }
 
-/// Demuxes the input `iterations` times, after a block-start seek to `seek` when
-/// given, folding what `view` traces; returns the packets, payload bytes and digest.
+/// Demuxes the input `iterations` times, seeking to a block start when requested.
+// Reuse the input between repetitions and fold their packets into the reference's cumulative digest.
 #[expect(
     clippy::redundant_closure_for_method_calls,
     reason = "method paths change this measured loop's code"
