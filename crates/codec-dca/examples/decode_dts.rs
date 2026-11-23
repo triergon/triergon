@@ -80,6 +80,7 @@ fn main() {
         .iter()
         .map(String::as_str)
         .find(|&arg| arg != "--reference-prototype");
+    let null = output == Some("--null");
     let mut sink: Box<dyn Write> = match output {
         Some("--null") => Box::new(std::io::sink()),
         Some(path) => Box::new(std::io::BufWriter::new(
