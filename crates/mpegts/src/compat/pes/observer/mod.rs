@@ -32,9 +32,11 @@ pub use dvb::DvbSubtitlesDescriptors;
 pub(crate) use pes_list::ListGrowth;
 use pes_list::PesList;
 
-/// Explicit single-program/single-PID profile from validated source signalling.
-/// Plain pushes reject entity transitions; the explicit media transaction and
-/// selected lifecycle APIs admit only their checked boundary contracts.
+/// The one program and PID a `DemuxObserver` cuts, as the accepted PMT signals them.
+///
+/// Carriers from another entity or with other epochs are refused unless a method
+/// that crosses that boundary (`continue_media_entity`, the fault recovery's
+/// confirmations) admits it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DemuxScope {
     /// The program number whose PMT lists the PID; must be nonzero.
@@ -51,9 +53,8 @@ pub struct DemuxScope {
     pub epochs: SourceEpochs,
 }
 
-/// Explicit registered transport carriage, separate from the plain constructor's
-/// H264-only contract. These selected stream IDs are the observed narrow profile;
-/// this enum does not parse or identify codec access units/configuration.
+/// A carriage `DemuxObserver::new_registered` cuts: one PMT stream type with one PES
+/// stream ID. It names the PES carriage only; the payload is not parsed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RegisteredCarriage {
     /// AVC video: stream type 0x1B with stream ID 0xE0.
@@ -130,8 +131,9 @@ pub fn selected_track_kind(
     }
 }
 
-/// Caller links the original strict-source event. None is an unknown source byte
-/// run, never a demux-invented epoch. Event ordinals are not core I/O tokens.
+/// Where a carrier came from in the caller's `TransportStream`: the ordinal of the
+/// event that delivered it and the epochs then in force. Ordinals order carriers; they
+/// are not I/O tokens.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceContext {
     /// Ordinal of the strict-source event that delivered the carrier.
@@ -199,9 +201,9 @@ impl DemuxSpan {
     }
 }
 
-/// This may be a corrupt/partial/headerless demux packet, NEVER a complete
-/// strict-source `Pes` or a codec access unit. Demux position can name the last
-/// PES-start sync even when the physical payload starts in a later packet.
+/// One packet as the demuxer emits it: possibly partial, corrupt or headerless, so not
+/// a validated `Pes` and not an access unit. `position` can name the carrier of the last
+/// PES start even when the payload begins in a later carrier.
 #[derive(Debug)]
 pub struct DemuxPacket {
     /// The program number of the observed scope.
@@ -217,7 +219,7 @@ pub struct DemuxPacket {
     pub position: i64,
     /// The demuxer's packet flags: 2 marks a corrupt or incomplete packet, otherwise 0.
     pub flags: u32,
-    /// Demux raw90-kHz duration; zero is its unknown sentinel, not source time.
+    /// The demuxer's duration in 90 kHz ticks, or 0 when it reports none.
     pub duration90_raw: i64,
     /// Explicit MPEGTS stream-ID side-data byte, retained on continuations.
     pub stream_id: u8,
@@ -266,7 +268,7 @@ pub struct CompactDemuxPacket {
     pub position: i64,
     /// The demuxer's packet flags: 2 marks a corrupt or incomplete packet, otherwise 0.
     pub flags: u32,
-    /// The demuxer's duration in 90 kHz ticks; 0 is its unknown sentinel, not source time.
+    /// The demuxer's duration in 90 kHz ticks, or 0 when it reports none.
     pub duration90_raw: i64,
     /// The PES stream ID, kept on continuations.
     pub stream_id: u8,

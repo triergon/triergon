@@ -2,8 +2,9 @@
 use super::{Descriptor, ElementaryStream, descriptor_tag, stream_type};
 use triergon_core::{Error, Result};
 
-/// Out-of-band interpretation, kept separate from source descriptor bytes.
-/// Neither a tag, a filename, registration nor a private_data_specifier proves DVB.
+/// Which system's private descriptors and stream types the caller says the transport
+/// follows. The stream itself cannot prove it: neither a tag, a registration nor a
+/// private data specifier establishes DVB.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DescriptorNamespace {
     /// No out-of-band context: DVB and ATSC private descriptors stay opaque.
@@ -16,8 +17,8 @@ pub enum DescriptorNamespace {
     Atsc,
 }
 
-/// The coordinator must retain the actual service/profile evidence in its
-/// operation contract. These variants record its declaration, not on-wire proof.
+/// What the caller's DVB declaration rests on. Both values mean the same to the parser;
+/// they record the caller's reason, not anything on the wire.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DvbNamespaceEvidence {
     /// The caller declared a DVB transport profile for the input.

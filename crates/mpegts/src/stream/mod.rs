@@ -79,9 +79,10 @@ enum PcrSamples {
     Two = 2,
 }
 
-/// The caller selects the program explicitly or requests single-program
-/// discovery. All PAT associations and raw transport/section facts remain
-/// visible.
+/// The source view of one transport stream: frames packets, checks continuity, reads
+/// PAT and PMT and assembles the PES of one program, reporting every packet, section,
+/// table, PES and fault as a `TraceEvent` in source order. The program is given or
+/// discovered from a single-program PAT.
 #[repr(C)]
 #[derive(Debug)]
 pub struct TransportStream {
