@@ -1,11 +1,14 @@
-//! Matroska AAC initialization against FFmpeg revision `d32b387f`.
+//! ADTS parameters of the AAC-LC codec IDs that the Matroska codec mappings supersede
+//! by `A_AAC` (sections 3.4.2 to 3.4.10): they carry no initialization record.
 
 use triergon_core::container::TrackInfo;
 use triergon_core::{Error, Result};
 use triergon_framing::aac::{self, AacAdtsParameters};
 use triergon_matroska::{Configuration, InitializationOrigin, LegacyAacProfile, Track};
 
-pub(crate) fn legacy_aac_lc_parameters(
+/// The ADTS parameters of track `track` of `configuration` when it is superseded AAC-LC
+/// without a record; `None` for any other track.
+pub(crate) fn superseded_aac_lc_parameters(
     configuration: &Configuration,
     track: usize,
 ) -> Result<Option<AacAdtsParameters>> {
@@ -19,16 +22,16 @@ pub(crate) fn legacy_aac_lc_parameters(
     let init = configuration
         .initialization(track)
         .ok_or(Error::Invalid("missing Matroska AAC initialization"))?;
-    // The legacy IDs carry no initialization record; an empty CodecPrivate is none.
+    // These IDs carry no initialization record; an empty CodecPrivate is none.
     if !init.data.is_empty() || init.origin != InitializationOrigin::InitialTrackEntry {
         return Ok(None);
     }
     audio_parameters(descriptor).map(Some)
 }
 
-/// [`legacy_aac_lc_parameters`] of a track entry alone, whose CodecPrivate is its
+/// [`superseded_aac_lc_parameters`] of a track entry alone, whose CodecPrivate is its
 /// initialization.
-pub(crate) fn legacy_aac_lc_track_parameters(
+pub(crate) fn superseded_aac_lc_track_parameters(
     descriptor: &Track,
 ) -> Result<Option<AacAdtsParameters>> {
     if descriptor.legacy_aac_profile() != Some(LegacyAacProfile::LowComplexity)
@@ -39,7 +42,7 @@ pub(crate) fn legacy_aac_lc_track_parameters(
     audio_parameters(descriptor).map(Some)
 }
 
-/// The ADTS parameters of a legacy AAC-LC track's Audio element.
+/// The ADTS parameters of a superseded AAC-LC track's Audio element.
 fn audio_parameters(descriptor: &Track) -> Result<AacAdtsParameters> {
     if !descriptor.has_audio_settings() {
         return Err(Error::Unsupported(
@@ -54,7 +57,7 @@ fn audio_parameters(descriptor: &Track) -> Result<AacAdtsParameters> {
         .ok_or(Error::Unsupported("legacy Matroska AAC sampling frequency"))?;
     let channels = u8::try_from(descriptor.channels)
         .ok()
-        // The legacy track carries a count. Code 7 specifies an eight-channel
+        // The track carries a count. Code 7 specifies an eight-channel
         // layout, which cannot be inferred from a count alone.
         .filter(|count| (1..=6).contains(count))
         .ok_or(Error::Unsupported("legacy Matroska AAC channel layout"))?;
@@ -111,12 +114,12 @@ mod tests {
     }
 
     fn parameters(input: &[u8]) -> Result<Option<(u8, u8)>> {
-        legacy_aac_lc_parameters(&configuration(input), 0)
+        superseded_aac_lc_parameters(&configuration(input), 0)
             .map(|parameters| parameters.map(|p| (p.frequency_index, p.channel_configuration)))
     }
 
     #[test]
-    fn indexed_legacy_aac_tracks_supply_adts_parameters() {
+    fn indexed_superseded_aac_tracks_supply_adts_parameters() {
         for input in [
             LC,
             include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv"),
@@ -144,7 +147,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_aac_uses_default_rate_and_channels_only_with_audio_settings() {
+    fn superseded_aac_uses_default_rate_and_channels_only_with_audio_settings() {
         let audio = LC
             .windows(4)
             .position(|bytes| bytes == [0xe1, 0x8d, 0xb5, 0x88])

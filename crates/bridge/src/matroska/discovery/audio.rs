@@ -1,5 +1,5 @@
 //! Audio parameter observations for the admitted Matroska startup profiles.
-use crate::compat::matroska::legacy_aac_lc_parameters;
+use crate::matroska::superseded_aac::superseded_aac_lc_parameters;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_framing::{
@@ -76,7 +76,7 @@ impl AudioProbe {
         let configuration = &packet.configuration;
         let Some(raw) = configuration.initialization_bytes(packet.packet.track) else {
             let ready = matches!(
-                legacy_aac_lc_parameters(configuration, packet.packet.track),
+                superseded_aac_lc_parameters(configuration, packet.packet.track),
                 Ok(Some(_))
             );
             if !ready {

@@ -3,7 +3,7 @@
 //! first frame carrying the record's program config element when it has one), and
 //! other codecs pass through. Work and storage use the caller's budgets.
 use crate::aac::{opening_block, raw_block_program};
-use crate::compat::matroska::legacy_aac_lc_track_parameters;
+use crate::matroska::superseded_aac_lc_track_parameters;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{CodecId, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim};
 use triergon_core::{Budget, Bytes, Error, Result, SourceId, SourceLocation, TimeBase, WorkBudget};
@@ -122,19 +122,19 @@ impl AccessUnits {
         Self::with_record(pool, track, track.configuration(), limits)
     }
 
-    /// [`for_track`](Self::for_track) for a Matroska track. A legacy AAC-LC codec ID
-    /// (`A_AAC/MPEG2/LC`, `A_AAC/MPEG4/LC`) carries raw access units and no
+    /// [`for_track`](Self::for_track) for a Matroska track. An AAC-LC codec ID that
+    /// `A_AAC` supersedes (`A_AAC/MPEG2/LC`, `A_AAC/MPEG4/LC`) carries raw access units and no
     /// initialization record (a zero-length CodecPrivate is none): their ADTS headers
     /// take the indexed sampling frequency and a count of one to six channels from the
     /// track's Audio element, as [`MatroskaFeedSetup`](crate::matroska::MatroskaFeedSetup)'s
-    /// do. Fails with `Unsupported` for a legacy track whose rate or channel count ADTS
+    /// do. Fails with `Unsupported` for such a track whose rate or channel count ADTS
     /// cannot index, and as `for_track` does.
     pub fn for_matroska(
         pool: &Budget,
         track: &MatroskaTrack,
         limits: AccessUnitLimits,
     ) -> Result<AccessUnitsSetup> {
-        match legacy_aac_lc_track_parameters(track)? {
+        match superseded_aac_lc_track_parameters(track)? {
             Some(parameters) => Ok(AccessUnitsSetup {
                 pool: pool.clone(),
                 limits,

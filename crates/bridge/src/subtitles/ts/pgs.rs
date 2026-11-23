@@ -2,10 +2,10 @@
 //!
 //! [`PgsTsTrack`] takes the strict PES of one stream of type 0x90 from an
 //! active PMT and hands each data field to the
-//! [`PgsBridge`](crate::bitmap::PgsBridge) as a [`BitmapInput`], on
+//! [`PgsBridge`](crate::subtitles::bitmap::PgsBridge) as a [`BitmapInput`], on
 //! the player's 90 kHz timeline.
-use crate::bitmap::{BitmapInput, BitmapScope};
-use crate::ts::{PesBinding, PesData, Taken, TakenPes};
+use crate::subtitles::bitmap::{BitmapInput, BitmapScope};
+use crate::subtitles::ts::{PesBinding, PesData, Taken, TakenPes};
 use triergon_core::{Error, Result, TimeBase, WorkBudget};
 use triergon_mpegts::{clock::SourceTimestamp, psi::stream_type};
 use triergon_playback::Output;

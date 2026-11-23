@@ -4,8 +4,8 @@
 //! [`DvbTsBridge`] takes the strict PES of one selected service of an active
 //! PMT, cuts each into the codec packet FFmpeg's demuxer hands its decoder
 //! ([`PesParser`]) and decodes it. Matroska tracks feed the same decoder
-//! through [`MatroskaDvbPacket`](crate::matroska::MatroskaDvbPacket).
-use crate::ts::{PesBinding, PesData, Taken, TakenPes};
+//! through [`MatroskaDvbPacket`](crate::subtitles::matroska::MatroskaDvbPacket).
+use crate::subtitles::ts::{PesBinding, PesData, Taken, TakenPes};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, Rounding, TimeBase, WorkBudget};
 use triergon_mpegts::psi::{CodecIdentification, ElementaryStream, descriptor_tag};

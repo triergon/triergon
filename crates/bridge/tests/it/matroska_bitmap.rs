@@ -2,7 +2,9 @@ use crate::subtitle_receivers::dvd_next;
 use crate::support::sequential::*;
 use crate::support::*;
 use std::sync::atomic::AtomicBool;
-use triergon_bridge::{bitmap as bitmap_bridge, matroska as matroska_feed, ts::dvb as dvb_ts};
+use triergon_bridge::subtitles::{
+    bitmap as bitmap_bridge, matroska as matroska_feed, ts::dvb as dvb_ts,
+};
 use triergon_core::{Bytes, Error as C, SourceCapabilities, Time, WorkBudget};
 use triergon_playback::ByteSource;
 use triergon_playback::{SourceOwner, *};
@@ -138,7 +140,7 @@ fn vobsub_track_without_codec_private_decodes_with_the_receiver_defaults() {
 }
 
 #[test]
-fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
+fn matroska_bitmap_tracks_feed_their_receivers_without_copying_frames() {
     use bitmap_bridge::*;
     use matroska_feed::{
         MatroskaBitmapClockProbe, MatroskaBitmapCodec, MatroskaBitmapTrack, MatroskaDvbStep,

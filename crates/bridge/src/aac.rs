@@ -1,6 +1,5 @@
-//! An existing ASC record and a real source MP4 access unit -> bounded ADTS.
-//! The caller supplies the configuration association. Its raw source/provenance
-//! remains separate from packet-source generation and the constructed header.
+//! MP4 AAC access units as ADTS frames: an [`AacBridge`] is bound to one track and
+//! configuration revision of a plan, with the AudioSpecificConfig the caller read for it.
 use std::sync::atomic::AtomicBool;
 use triergon_bitstream::bits_at;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};

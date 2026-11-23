@@ -1,6 +1,6 @@
 use crate::support::sequential::*;
 use crate::support::*;
-use triergon_bridge::{bitmap as bitmap_bridge, text as text_bridge};
+use triergon_bridge::subtitles::{bitmap as bitmap_bridge, text as text_bridge};
 use triergon_core::{Budget, Bytes, Error as C, SourceCapabilities, Time, WorkBudget};
 use triergon_playback::{ByteSource, mp4::Mp4Event};
 use triergon_playback::{SourceOwner, mp4::ProgressiveLimits, *};
@@ -61,7 +61,7 @@ fn tx3g_real_reader_handoff_retains_source_sample_and_exact_clock_after_teardown
 }
 
 #[test]
-fn matroska_utf8_text_bridge_runs_real_reader_without_core_or_native_field_repair() {
+fn matroska_utf8_text_bridge_reads_the_real_reader_without_field_repair() {
     use text_bridge::*;
     use triergon_subtitles::text;
     let raw = include_bytes!("../../../playback/tests/fixtures/mkv/observed-11.mkv");

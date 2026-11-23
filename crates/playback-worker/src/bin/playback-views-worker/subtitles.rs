@@ -5,7 +5,7 @@ mod text_control;
 
 use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
-use triergon_bridge::text::{TextBridge, TextSource, TextStep};
+use triergon_bridge::subtitles::text::{TextBridge, TextSource, TextStep};
 use triergon_core::{
     Budget, Bytes, InputCursor, Rounding, SourceCapabilities, SourceId, Time, TimeBase, WorkBudget,
 };

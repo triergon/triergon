@@ -90,7 +90,7 @@ fn check<M>(pool: &Budget, scope: BitmapScope, input: &BitmapInput<M>) -> Result
 }
 
 fn packet_queue_start_ns(clock: pgs::PacketClock) -> Result<i64> {
-    // The packet ABI reserves the signed minimum as its missing sentinel.
+    // A packet clock marks a missing time with the signed minimum.
     let known = |tick: &i64| *tick != i64::MIN;
     let start = match clock.pts.filter(known).or_else(|| clock.dts.filter(known)) {
         Some(tick) => clock
@@ -132,8 +132,8 @@ fn allocate_owner<M>(
     pool: &Budget,
     input: BitmapInput<M>,
 ) -> std::result::Result<BitmapOwner<M>, BitmapRejection<M>> {
-    // Pinned std ArcInner is repr(C): two atomic counters, then aligned data.
-    // Include the padding imposed by caller metadata alignment before reserving.
+    // An `Arc` allocates two atomic counters, then the data at its alignment;
+    // the charge includes the padding the caller metadata's alignment adds.
     let layout = match std::alloc::Layout::new::<[std::sync::atomic::AtomicUsize; 2]>()
         .extend(std::alloc::Layout::new::<Data<M>>())
     {
@@ -523,7 +523,7 @@ impl<M> DvdOutput<M> {
         }))
     }
 
-    /// Match the existing bitmap queue: start at packet PTS, fall back to DTS,
+    /// The picture for a packet-clock bitmap queue: start at packet PTS, fall back to DTS,
     /// then zero. The queue ends a picture when its track is superseded or
     /// cleared. Use `presentation` for DVD's explicit display offsets. The
     /// canvas is the configuration's, when the queue can place pictures on it.
@@ -730,7 +730,7 @@ mod arc_layout_regression {
     #[repr(align(4096))]
     struct AlignedMetadata(u8);
 
-    // Independent layout witness for pinned std ArcInner's repr(C) allocation.
+    // The allocation an `Arc` makes: two counters, then the data.
     #[repr(C)]
     struct ArcStorageWitness<T> {
         _strong: AtomicUsize,
@@ -760,7 +760,7 @@ mod arc_layout_regression {
     }
 
     #[test]
-    fn overaligned_owner_charge_tracks_pinned_arc_storage_and_retention() {
+    fn overaligned_owner_charge_tracks_arc_storage_and_retention() {
         let pool = Budget::new(1 << 20).unwrap();
         let raw = Bytes::copy_from_slice(&pool, b"source owner layout proof").unwrap();
         let input = fixture(&pool, raw.clone());

@@ -1,6 +1,6 @@
 use super::{ABSENT, CANCEL, Case, Codec, GRANT, PACKET_LIMIT, Records, next};
 use playback_worker::runner::Result;
-use triergon_bridge::{
+use triergon_bridge::subtitles::{
     bitmap::{
         BitmapInput, DvdBridgeConfig, DvdReceiver, DvdReceiverStep, PgsBridge, PgsOutput,
         PgsQueueAction, PgsStep,
@@ -70,7 +70,7 @@ fn rectangle(
 fn pgs_receiver<M>(
     case: &Case<'_>,
     pool: &Budget,
-    scope: triergon_bridge::bitmap::BitmapScope,
+    scope: triergon_bridge::subtitles::bitmap::BitmapScope,
 ) -> Result<PgsBridge<M>> {
     Ok(PgsBridge::new(
         pool,

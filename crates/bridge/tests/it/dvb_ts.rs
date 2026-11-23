@@ -1,5 +1,7 @@
 use std::sync::atomic::AtomicBool;
-use triergon_bridge::ts::dvb::{DvbQueueAction, DvbServiceSelection, DvbStep, DvbTsBridge};
+use triergon_bridge::subtitles::ts::dvb::{
+    DvbQueueAction, DvbServiceSelection, DvbStep, DvbTsBridge,
+};
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence, PsiCrc32};
 use triergon_mpegts::stream::{FaultKind, TraceEvent, TraceFault};

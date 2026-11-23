@@ -1,9 +1,7 @@
 //! The bitmap subtitle clock for an explicitly buffered stream-probe prefix.
-use super::{
-    MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket,
-    probe_clock::{DemuxPacketTiming, PacketClock, ProbeTimeline, Timeline},
-};
-use crate::bitmap::BitmapInput;
+use super::{MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket};
+use crate::matroska::{DemuxPacketTiming, PacketClock, ProbeTimeline, Timeline};
+use crate::subtitles::bitmap::BitmapInput;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Error, Result, WorkBudget};
 use triergon_playback::Output;

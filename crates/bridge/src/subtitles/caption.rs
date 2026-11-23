@@ -8,9 +8,9 @@
 //! hands out the captioned frames in FFmpeg's output order and FFmpeg's
 //! `cc_dec` receiver ([`Decoder`]) decodes them. Every event line becomes
 //! an opaque ASS [`TextSource`] for the
-//! [`TextBridge`](crate::text::TextBridge), so captions arrive as the
+//! [`TextBridge`](crate::subtitles::text::TextBridge), so captions arrive as the
 //! cues of a Matroska ASS track do.
-use crate::text::{AssIdentity, TextSource, receiver_timing};
+use crate::subtitles::text::{AssIdentity, TextSource, receiver_timing};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, Result, Rounding, SourceId, TimeBase, WorkBudget};
 use triergon_subtitles::compat::cc::{

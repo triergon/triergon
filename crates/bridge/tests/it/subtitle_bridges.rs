@@ -2,7 +2,7 @@
 //! MP4 video, each through its playback bridge. Fixtures and expected values:
 //! `fixtures/subtitles/README.md`.
 use crate::support::{collect, off, run_open};
-use triergon_bridge::{
+use triergon_bridge::subtitles::{
     bitmap::{DvdReceiver, DvdReceiverStep, PgsBridge, PgsQueueAction, PgsStep},
     caption::{CaptionBridge, CaptionStep, CaptionUnit, CaptionVideo},
     mp4_dvd::Mp4DvdSetup,

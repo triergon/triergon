@@ -5,8 +5,8 @@
 //! information ([`ObjectTypeScan`]), as FFmpeg's MP4 demuxer hands it to its
 //! decoder ([`compat::dvd::mp4_configuration`]). The [`Mp4DvdTrack`] it
 //! makes turns the track's packets into [`BitmapInput`]s for the
-//! [`DvdReceiver`](crate::bitmap::DvdReceiver).
-use crate::bitmap::{BitmapInput, BitmapScope, DvdBridgeConfig};
+//! [`DvdReceiver`](crate::subtitles::bitmap::DvdReceiver).
+use crate::subtitles::bitmap::{BitmapInput, BitmapScope, DvdBridgeConfig};
 use triergon_core::{Error, Result, WorkBudget};
 use triergon_isobmff::config::{ConfigurationLimits, ObjectTypeScan};
 use triergon_playback::{

@@ -1,19 +1,12 @@
 //! Feed packets for an explicitly selected Matroska track.
 
 mod aac_clock;
-mod bitmap;
-mod bitmap_probe;
 mod discovery;
 mod hevc_dolby;
 mod probe_clock;
+mod superseded_aac;
 mod video_clock;
 mod video_seek;
-use crate::compat::matroska::legacy_aac_lc_parameters;
-pub use bitmap::{
-    MatroskaBitmapCodec, MatroskaBitmapSource, MatroskaBitmapTrack, MatroskaDvbPacket,
-    MatroskaDvbStep,
-};
-pub use bitmap_probe::{MatroskaBitmapClockProbe, MatroskaBitmapLiveClock};
 pub use discovery::{
     MatroskaCompactDiscovered, MatroskaCompactDiscovery, MatroskaDiscovered, MatroskaDiscovery,
     MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep, MatroskaReplayPrefix,
@@ -43,6 +36,10 @@ use triergon_matroska::{
 use triergon_playback::{Delivery, Event, Output};
 pub use video_clock::MatroskaAvcClock;
 pub use video_seek::MatroskaVideoSeekGate;
+// The demux clock and track binding the subtitle half reads Matroska packets with.
+pub(crate) use probe_clock::{DemuxPacketTiming, PacketClock, ProbeTimeline, Timeline};
+use superseded_aac::superseded_aac_lc_parameters;
+pub(crate) use superseded_aac::superseded_aac_lc_track_parameters;
 
 /// Bounds of a Matroska AVC or AAC feed.
 #[derive(Clone, Copy, Debug)]
@@ -64,14 +61,15 @@ fn check_limit(requested: usize, maximum: usize) -> Result<()> {
     Ok(())
 }
 
+/// A track of one Matroska configuration, which its packets must match.
 #[derive(Clone, Debug)]
-struct Association {
-    configuration: Configuration,
-    track: usize,
+pub(crate) struct Association {
+    pub(crate) configuration: Configuration,
+    pub(crate) track: usize,
 }
 
 impl Association {
-    fn matches(&self, packet: &Packet) -> bool {
+    pub(crate) fn matches(&self, packet: &Packet) -> bool {
         let a = &self.configuration;
         let b = &packet.configuration;
         self.track == packet.packet.track
@@ -150,7 +148,7 @@ impl MatroskaFeedSetup {
             .get(track)
             .ok_or(Error::Invalid("Matroska feed track index"))?;
         let codec = descriptor.codec.as_str();
-        let (maximum_record_bytes, legacy_aac) = match (descriptor.kind, codec) {
+        let (maximum_record_bytes, superseded_aac) = match (descriptor.kind, codec) {
             (1, "V_MPEG4/ISO/AVC") => (limits.avc_config.maximum_record_bytes, false),
             (2, "A_AAC") => (limits.aac_config.maximum_record_bytes, false),
             (2, _) if descriptor.legacy_aac_profile() == Some(LegacyAacProfile::LowComplexity) => {
@@ -158,8 +156,8 @@ impl MatroskaFeedSetup {
             }
             _ => return Err(Error::Unsupported("Matroska feed codec")),
         };
-        let derived = if legacy_aac {
-            legacy_aac_lc_parameters(configuration, track)?
+        let derived = if superseded_aac {
+            superseded_aac_lc_parameters(configuration, track)?
         } else {
             None
         };
@@ -204,8 +202,8 @@ impl MatroskaFeedSetup {
                         record,
                         limits.aac_config,
                     )?,
-                    // The reference leaves missing legacy durations unknown.
-                    infer_duration: !legacy_aac,
+                    // FFmpeg's Matroska demuxer leaves these IDs' missing durations unknown.
+                    infer_duration: !superseded_aac,
                 }
             }
         };

@@ -5,11 +5,14 @@ use triergon_bridge::{
     aac::AacBridge,
     access::{AccessUnitLimits, AccessUnits},
     av1::{Av1Bridge, Av1BridgeSetup, Av1Input},
-    bitmap::{PgsBridge, PgsStep},
     matroska::{
-        MatroskaBitmapTrack, MatroskaCompactDiscovery, MatroskaDiscovery, MatroskaDiscoveryLimits,
+        MatroskaCompactDiscovery, MatroskaDiscovery, MatroskaDiscoveryLimits,
         MatroskaDiscoveryStep, MatroskaFeedLimits, MatroskaFeedSetup, MatroskaHevcDolbyLimits,
         MatroskaHevcDolbySetup, MatroskaReplayPrefix, MatroskaTrackFeed, MatroskaVideoSeekGate,
+    },
+    subtitles::{
+        bitmap::{PgsBridge, PgsStep},
+        matroska::MatroskaBitmapTrack,
     },
 };
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};

@@ -2,7 +2,7 @@ use super::{
     ABSENT, CANCEL, Case, GRANT, PACKET_LIMIT, Records, cue_from, drain_text, micros, next,
 };
 use playback_worker::runner::Result;
-use triergon_bridge::{
+use triergon_bridge::subtitles::{
     caption::{CaptionBridge, CaptionStep, CaptionUnit, CaptionVideo},
     text::TextBridge,
     ts::teletext::{TeletextStep, TeletextTsBridge},

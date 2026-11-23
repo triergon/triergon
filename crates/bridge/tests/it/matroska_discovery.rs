@@ -12,9 +12,10 @@ use triergon_playback::{SourceOwner, *};
 #[test]
 fn matroska_discovery_stops_on_canvas_or_limits_and_replays_the_same_source() {
     use matroska_feed::{
-        MatroskaBitmapClockProbe, MatroskaBitmapTrack, MatroskaDiscovered, MatroskaDiscovery,
-        MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
+        MatroskaDiscovered, MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits,
+        MatroskaDiscoveryStep,
     };
+    use triergon_bridge::subtitles::matroska::{MatroskaBitmapClockProbe, MatroskaBitmapTrack};
     use triergon_matroska::Event as MkvEvent;
 
     struct Counted {

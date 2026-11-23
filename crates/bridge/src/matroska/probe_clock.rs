@@ -122,14 +122,14 @@ impl<F> MatroskaClock<'_, F> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct DemuxPacketTiming {
+pub(crate) struct DemuxPacketTiming {
     pub pts: Option<i64>,
     pub dts: Option<i64>,
     pub duration_ns: Option<u64>,
 }
 
 impl DemuxPacketTiming {
-    pub(super) fn demux(packet: &Packet) -> Result<Self> {
+    pub(crate) fn demux(packet: &Packet) -> Result<Self> {
         let timing = triergon_matroska::compat::clock::packet_timing(packet.packet.timing)?;
         Ok(Self {
             pts: timing
@@ -165,7 +165,7 @@ impl Stamp {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct PacketClock {
+pub(crate) struct PacketClock {
     stamp: Option<Stamp>,
     duration_ns: Option<u64>,
 }
@@ -193,14 +193,14 @@ impl PacketClock {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(super) struct Timeline {
+pub(crate) struct Timeline {
     next: i128,
     /// First absolute clock minus the relative elapsed time at that packet.
     shift: Option<i128>,
 }
 
 impl Timeline {
-    pub(super) fn push(&mut self, timing: DemuxPacketTiming) -> Result<PacketClock> {
+    pub(crate) fn push(&mut self, timing: DemuxPacketTiming) -> Result<PacketClock> {
         let stamp = if let Some(pts) = timing.pts {
             let pts = i128::from(pts);
             if self.shift.is_none() {
@@ -229,7 +229,7 @@ impl Timeline {
         })
     }
 
-    pub(super) fn resolve(self, clock: PacketClock) -> Result<DemuxPacketTiming> {
+    pub(crate) fn resolve(self, clock: PacketClock) -> Result<DemuxPacketTiming> {
         clock.resolve(self.shift)
     }
 }
@@ -257,7 +257,7 @@ impl InitialDuration {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(super) struct ProbeTimeline {
+pub(crate) struct ProbeTimeline {
     timeline: Timeline,
     leading: usize,
     untimed: usize,
@@ -266,7 +266,7 @@ pub(super) struct ProbeTimeline {
 }
 
 impl ProbeTimeline {
-    pub(super) fn push(&mut self, count: usize, timing: DemuxPacketTiming) -> Result<PacketClock> {
+    pub(crate) fn push(&mut self, count: usize, timing: DemuxPacketTiming) -> Result<PacketClock> {
         if !self.seen_duration {
             if let Some(duration_ns) = timing.duration_ns {
                 self.seen_duration = true;
@@ -314,7 +314,7 @@ impl ProbeTimeline {
         self.timeline.push(timing)
     }
 
-    pub(super) fn resolve(self, index: usize, original: PacketClock) -> Result<DemuxPacketTiming> {
+    pub(crate) fn resolve(self, index: usize, original: PacketClock) -> Result<DemuxPacketTiming> {
         let clock = match self.fill.filter(|fill| index < fill.packets) {
             Some(fill) => fill.clock(index)?,
             None => original,
@@ -322,7 +322,7 @@ impl ProbeTimeline {
         self.timeline.resolve(clock)
     }
 
-    pub(super) fn into_live(self) -> Timeline {
+    pub(crate) fn into_live(self) -> Timeline {
         self.timeline
     }
 }

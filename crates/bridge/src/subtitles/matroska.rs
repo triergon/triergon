@@ -1,9 +1,13 @@
-//! Matroska bitmap subtitle handoff to the existing bounded receivers.
-use super::{Association, probe_clock::DemuxPacketTiming};
-use crate::{
+//! Matroska bitmap subtitle tracks: their packets for the PGS, DVD and DVB
+//! receivers, on the Matroska demux clock.
+mod probe;
+
+use crate::matroska::{Association, DemuxPacketTiming};
+use crate::subtitles::{
     bitmap::{BitmapInput, BitmapScope},
     ts::dvb::{DvbQueueAction, microseconds},
 };
+pub use probe::{MatroskaBitmapClockProbe, MatroskaBitmapLiveClock};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, TimeBase, WorkBudget};
 use triergon_matroska::{Event as MkvEvent, TypedPacket as Packet};

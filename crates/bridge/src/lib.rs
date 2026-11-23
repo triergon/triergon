@@ -12,10 +12,5 @@
 pub mod aac;
 pub mod access;
 pub mod av1;
-pub mod bitmap;
-pub mod caption;
-pub mod compat;
 pub mod matroska;
-pub mod mp4_dvd;
-pub mod text;
-pub mod ts;
+pub mod subtitles;

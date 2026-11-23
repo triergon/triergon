@@ -4,15 +4,15 @@
 //! active PMT (stream type 0x06 with a teletext descriptor in a DVB namespace)
 //! and decodes each data field with FFmpeg's teletext decoder
 //! ([`Decoder`]). A page becomes an opaque ASS [`TextSource`] for the
-//! [`TextBridge`](crate::text::TextBridge); an empty page clears the
+//! [`TextBridge`](crate::subtitles::text::TextBridge); an empty page clears the
 //! screen.
 //!
 //! Subtitles take the PES time on the player's timeline, bounded by the
 //! program clock as FFmpeg's demuxer bounds it ([`pcr_bounded_pts`]): the
 //! bridge reads the PCR from the transport packets the player delivers
 //! ([`TeletextTsBridge::observe`]).
-use crate::text::{AssIdentity, TextSource, receiver_timing};
-use crate::ts::{PesBinding, PesData, Taken, TakenPes};
+use crate::subtitles::text::{AssIdentity, TextSource, receiver_timing};
+use crate::subtitles::ts::{PesBinding, PesData, Taken, TakenPes};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Bytes, Error, Result, Rounding, Time, TimeBase, WorkBudget, container::CodecId,

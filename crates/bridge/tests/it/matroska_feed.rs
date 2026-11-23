@@ -167,9 +167,9 @@ fn collect_with_work<S: triergon_playback::Source>(
     panic!("read stalled")
 }
 
-/// The legacy AAC-LC fixtures whose eight packets frame as `aac-lc.feed`: input,
+/// The superseded AAC-LC fixtures whose eight packets frame as `aac-lc.feed`: input,
 /// codec ID and whether the TrackEntry has a (zero-length) CodecPrivate.
-const LEGACY_AAC_LC: [(&[u8], &[u8], bool); 5] = [
+const SUPERSEDED_AAC_LC: [(&[u8], &[u8], bool); 5] = [
     (
         include_bytes!("../../../playback/tests/fixtures/mkv-feed/aac-mpeg2-lc.mkv"),
         b"A_AAC/MPEG2/LC",
@@ -198,13 +198,13 @@ const LEGACY_AAC_LC: [(&[u8], &[u8], bool); 5] = [
 ];
 
 #[test]
-fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
+fn superseded_aac_lc_tracks_discover_and_frame_every_packet() {
     use triergon_bridge::matroska::{
         MatroskaDiscovery, MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
     };
     use triergon_core::container::{CodecId, TrackInfo};
 
-    for (input, codec, private) in LEGACY_AAC_LC {
+    for (input, codec, private) in SUPERSEDED_AAC_LC {
         let (engine, source, pool) =
             matroska_source(input, 7, triergon_matroska::PayloadOwnership::OwnedExact);
         let cancel = AtomicBool::new(false);
@@ -223,7 +223,7 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
                     MatroskaDiscoveryStep::Progress(_) => None,
                 },
             )
-            .expect("legacy AAC discovery stalled");
+            .expect("superseded AAC discovery stalled");
         assert_eq!(cutoff, MatroskaDiscoveryCutoff::StreamsReady);
         let mut discovered = discovery.finish().unwrap();
         let tail = collect_with_work(&mut discovered.player, 1);
@@ -244,7 +244,7 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
                 Event::Matroska(MkvEvent::Packet(packet)) => {
                     let output = frame(feed.as_ref().unwrap(), output);
                     let MatroskaFeedPayload::Aac { header, raw } = output.payload else {
-                        panic!("legacy AAC did not produce ADTS");
+                        panic!("superseded AAC did not produce ADTS");
                     };
                     assert!(std::ptr::eq(raw, packet.packet.data.as_ref()));
                     let (want, rest) = gold.split_at(header.len() + raw.len());
@@ -262,13 +262,13 @@ fn legacy_aac_lc_tracks_discover_and_frame_every_packet() {
 }
 
 #[test]
-fn access_units_frame_legacy_aac_lc_from_the_matroska_track_or_a_supplied_record() {
+fn access_units_frame_superseded_aac_lc_from_the_matroska_track_or_a_supplied_record() {
     use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
     use triergon_core::container::PacketInfo;
 
     // The neutral track view has no Audio element; the Matroska configuration has.
     let cancel = AtomicBool::new(false);
-    for ((input, _, _), record) in LEGACY_AAC_LC
+    for ((input, _, _), record) in SUPERSEDED_AAC_LC
         .into_iter()
         .flat_map(|fixture| [(fixture, false), (fixture, true)])
     {
@@ -315,7 +315,7 @@ fn access_units_frame_legacy_aac_lc_from_the_matroska_track_or_a_supplied_record
 }
 
 #[test]
-fn legacy_aac_lc_refuses_a_channel_count_without_an_adts_layout() {
+fn superseded_aac_lc_refuses_a_channel_count_without_an_adts_layout() {
     use triergon_bridge::access::{AccessUnitLimits, AccessUnits};
 
     let input = include_bytes!(
