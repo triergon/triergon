@@ -852,6 +852,11 @@
         "packets": 13,
         "bytes": 1862,
         "digest": 15373755166668062844
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1862,
+        "digest": 327693084785323388
       }
     },
     {
@@ -870,6 +875,11 @@
         "packets": 13,
         "bytes": 1837,
         "digest": 8120302694448681400
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 14390264808220871352
       }
     },
     {
@@ -888,6 +898,11 @@
         "packets": 13,
         "bytes": 1871,
         "digest": 17454669043508806917
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1871,
+        "digest": 11610660818932009329
       }
     },
     {
@@ -924,6 +939,11 @@
         "packets": 13,
         "bytes": 1837,
         "digest": 8120302694448681400
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 14390264808220871352
       }
     },
     {
@@ -960,6 +980,11 @@
         "packets": 13,
         "bytes": 1051,
         "digest": 4280992160489678835
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1051,
+        "digest": 3796286148106379379
       }
     },
     {
@@ -978,6 +1003,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 11737519659862281505
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 14420510906863031389
       }
     },
     {
@@ -996,6 +1026,11 @@
         "packets": 13,
         "bytes": 1059,
         "digest": 16925660571099046149
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1059,
+        "digest": 9010704556302582877
       }
     },
     {
@@ -1014,6 +1049,11 @@
         "packets": 11,
         "bytes": 7840,
         "digest": 5046889894076106272
+      },
+      "candidate_expected": {
+        "packets": 11,
+        "bytes": 7840,
+        "digest": 16184583364930518316
       }
     },
     {
@@ -1032,6 +1072,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 2672068826024770465
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 10975879400371011489
       }
     },
     {
@@ -1050,6 +1095,11 @@
         "packets": 7,
         "bytes": 1905,
         "digest": 9917174220997194792
+      },
+      "candidate_expected": {
+        "packets": 7,
+        "bytes": 1905,
+        "digest": 16617373547941181696
       }
     },
     {
@@ -1068,6 +1118,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 2672068826024770465
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 10975879400371011489
       }
     },
     {
@@ -1086,6 +1141,11 @@
         "packets": 65,
         "bytes": 31096,
         "digest": 6079877907757236771
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 10299246555864349839
       }
     },
     {
@@ -1104,6 +1164,11 @@
         "packets": 65,
         "bytes": 31096,
         "digest": 6079877907757236771
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 10299246555864349839
       }
     },
     {
@@ -1119,9 +1184,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 24686,
-        "digest": 9256964333195946112
+        "digest": 16239815098077627500
       }
     },
     {
@@ -1137,9 +1207,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 24686,
-        "digest": 9256964333195946112
+        "digest": 16239815098077627500
       }
     },
     {
@@ -1155,9 +1230,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 16875,
-        "digest": 675540668616985827
+        "digest": 5152382163838989627
       }
     },
     {
@@ -1173,9 +1253,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 16875,
-        "digest": 675540668616985827
+        "digest": 5152382163838989627
       }
     },
     {
@@ -1191,9 +1276,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 4619,
-        "digest": 9630480647631896518
+        "digest": 4390098482291805194
       }
     },
     {
@@ -1209,9 +1299,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 4619,
-        "digest": 9630480647631896518
+        "digest": 4390098482291805194
       }
     },
     {
@@ -1230,6 +1325,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -1248,6 +1348,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -1263,9 +1368,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -1281,9 +1391,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -1299,9 +1414,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -1317,9 +1437,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -1335,9 +1460,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -1353,9 +1483,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -1374,6 +1509,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11543322743909777440
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 8896037929559670816
       }
     },
     {
@@ -1392,6 +1532,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11543322743909777440
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 8896037929559670816
       }
     },
     {
@@ -1407,9 +1552,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 1934818570916377524
+        "digest": 8051653256469248052
       }
     },
     {
@@ -1425,9 +1575,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 1934818570916377524
+        "digest": 8051653256469248052
       }
     },
     {
@@ -1443,9 +1598,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 11322649796837076154
+        "digest": 15234358184936691386
       }
     },
     {
@@ -1461,9 +1621,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 11322649796837076154
+        "digest": 15234358184936691386
       }
     },
     {
@@ -1479,9 +1644,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 5058375365543996966
+        "digest": 6963128298495186598
       }
     },
     {
@@ -1497,9 +1667,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 5058375365543996966
+        "digest": 6963128298495186598
       }
     },
     {
@@ -1518,6 +1693,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -1536,6 +1716,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -1551,9 +1736,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -1569,9 +1759,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -1587,9 +1782,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -1605,9 +1805,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -1623,9 +1828,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -1641,9 +1851,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -2496,6 +2711,11 @@
         "packets": 13,
         "bytes": 1862,
         "digest": 15373755166668062844
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1862,
+        "digest": 327693084785323388
       }
     },
     {
@@ -2514,6 +2734,11 @@
         "packets": 13,
         "bytes": 1837,
         "digest": 8120302694448681400
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 14390264808220871352
       }
     },
     {
@@ -2532,6 +2757,11 @@
         "packets": 13,
         "bytes": 1871,
         "digest": 17454669043508806917
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1871,
+        "digest": 11610660818932009329
       }
     },
     {
@@ -2568,6 +2798,11 @@
         "packets": 13,
         "bytes": 1837,
         "digest": 8120302694448681400
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 14390264808220871352
       }
     },
     {
@@ -2604,6 +2839,11 @@
         "packets": 13,
         "bytes": 1051,
         "digest": 4280992160489678835
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1051,
+        "digest": 3796286148106379379
       }
     },
     {
@@ -2622,6 +2862,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 11737519659862281505
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 14420510906863031389
       }
     },
     {
@@ -2640,6 +2885,11 @@
         "packets": 13,
         "bytes": 1059,
         "digest": 16925660571099046149
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1059,
+        "digest": 9010704556302582877
       }
     },
     {
@@ -2658,6 +2908,11 @@
         "packets": 11,
         "bytes": 7840,
         "digest": 5046889894076106272
+      },
+      "candidate_expected": {
+        "packets": 11,
+        "bytes": 7840,
+        "digest": 16184583364930518316
       }
     },
     {
@@ -2676,6 +2931,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 2672068826024770465
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 10975879400371011489
       }
     },
     {
@@ -2694,6 +2954,11 @@
         "packets": 7,
         "bytes": 1905,
         "digest": 9917174220997194792
+      },
+      "candidate_expected": {
+        "packets": 7,
+        "bytes": 1905,
+        "digest": 16617373547941181696
       }
     },
     {
@@ -2712,6 +2977,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 2672068826024770465
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 10975879400371011489
       }
     },
     {
@@ -2730,6 +3000,11 @@
         "packets": 65,
         "bytes": 31096,
         "digest": 6079877907757236771
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 10299246555864349839
       }
     },
     {
@@ -2748,6 +3023,11 @@
         "packets": 65,
         "bytes": 31096,
         "digest": 6079877907757236771
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 10299246555864349839
       }
     },
     {
@@ -2763,9 +3043,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 24686,
-        "digest": 9256964333195946112
+        "digest": 16239815098077627500
       }
     },
     {
@@ -2781,9 +3066,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 24686,
-        "digest": 9256964333195946112
+        "digest": 16239815098077627500
       }
     },
     {
@@ -2799,9 +3089,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 16875,
-        "digest": 675540668616985827
+        "digest": 5152382163838989627
       }
     },
     {
@@ -2817,9 +3112,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 16875,
-        "digest": 675540668616985827
+        "digest": 5152382163838989627
       }
     },
     {
@@ -2835,9 +3135,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 4619,
-        "digest": 9630480647631896518
+        "digest": 4390098482291805194
       }
     },
     {
@@ -2853,9 +3158,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 4619,
-        "digest": 9630480647631896518
+        "digest": 4390098482291805194
       }
     },
     {
@@ -2874,6 +3184,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -2892,6 +3207,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -2907,9 +3227,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -2925,9 +3250,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -2943,9 +3273,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -2961,9 +3296,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -2979,9 +3319,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -2997,9 +3342,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -3018,6 +3368,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11543322743909777440
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 8896037929559670816
       }
     },
     {
@@ -3036,6 +3391,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11543322743909777440
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 8896037929559670816
       }
     },
     {
@@ -3051,9 +3411,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 1934818570916377524
+        "digest": 8051653256469248052
       }
     },
     {
@@ -3069,9 +3434,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 1934818570916377524
+        "digest": 8051653256469248052
       }
     },
     {
@@ -3087,9 +3457,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 11322649796837076154
+        "digest": 15234358184936691386
       }
     },
     {
@@ -3105,9 +3480,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 11322649796837076154
+        "digest": 15234358184936691386
       }
     },
     {
@@ -3123,9 +3503,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 5058375365543996966
+        "digest": 6963128298495186598
       }
     },
     {
@@ -3141,9 +3526,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 5058375365543996966
+        "digest": 6963128298495186598
       }
     },
     {
@@ -3162,6 +3552,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -3180,6 +3575,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -3195,9 +3595,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -3213,9 +3618,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -3231,9 +3641,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -3249,9 +3664,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -3267,9 +3687,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -3285,9 +3710,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -4140,6 +4570,11 @@
         "packets": 13,
         "bytes": 1862,
         "digest": 15373755166668062844
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1862,
+        "digest": 327693084785323388
       }
     },
     {
@@ -4158,6 +4593,11 @@
         "packets": 13,
         "bytes": 1837,
         "digest": 8120302694448681400
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 14390264808220871352
       }
     },
     {
@@ -4176,6 +4616,11 @@
         "packets": 13,
         "bytes": 1871,
         "digest": 17454669043508806917
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1871,
+        "digest": 11610660818932009329
       }
     },
     {
@@ -4212,6 +4657,11 @@
         "packets": 13,
         "bytes": 1837,
         "digest": 8120302694448681400
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1837,
+        "digest": 14390264808220871352
       }
     },
     {
@@ -4248,6 +4698,11 @@
         "packets": 13,
         "bytes": 1051,
         "digest": 4280992160489678835
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1051,
+        "digest": 3796286148106379379
       }
     },
     {
@@ -4266,6 +4721,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 11737519659862281505
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 14420510906863031389
       }
     },
     {
@@ -4284,6 +4744,11 @@
         "packets": 13,
         "bytes": 1059,
         "digest": 16925660571099046149
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1059,
+        "digest": 9010704556302582877
       }
     },
     {
@@ -4302,6 +4767,11 @@
         "packets": 11,
         "bytes": 7840,
         "digest": 5046889894076106272
+      },
+      "candidate_expected": {
+        "packets": 11,
+        "bytes": 7840,
+        "digest": 16184583364930518316
       }
     },
     {
@@ -4320,6 +4790,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 2672068826024770465
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 10975879400371011489
       }
     },
     {
@@ -4338,6 +4813,11 @@
         "packets": 7,
         "bytes": 1905,
         "digest": 9917174220997194792
+      },
+      "candidate_expected": {
+        "packets": 7,
+        "bytes": 1905,
+        "digest": 16617373547941181696
       }
     },
     {
@@ -4356,6 +4836,11 @@
         "packets": 13,
         "bytes": 1041,
         "digest": 2672068826024770465
+      },
+      "candidate_expected": {
+        "packets": 13,
+        "bytes": 1041,
+        "digest": 10975879400371011489
       }
     },
     {
@@ -4374,6 +4859,11 @@
         "packets": 65,
         "bytes": 31096,
         "digest": 6079877907757236771
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 10299246555864349839
       }
     },
     {
@@ -4392,6 +4882,11 @@
         "packets": 65,
         "bytes": 31096,
         "digest": 6079877907757236771
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 31096,
+        "digest": 10299246555864349839
       }
     },
     {
@@ -4407,9 +4902,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 24686,
-        "digest": 9256964333195946112
+        "digest": 16239815098077627500
       }
     },
     {
@@ -4425,9 +4925,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 23582,
+        "digest": 13294066066626975719
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 24686,
-        "digest": 9256964333195946112
+        "digest": 16239815098077627500
       }
     },
     {
@@ -4443,9 +4948,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 16875,
-        "digest": 675540668616985827
+        "digest": 5152382163838989627
       }
     },
     {
@@ -4461,9 +4971,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 15596,
+        "digest": 17262869560907123825
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 16875,
-        "digest": 675540668616985827
+        "digest": 5152382163838989627
       }
     },
     {
@@ -4479,9 +4994,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 4619,
-        "digest": 9630480647631896518
+        "digest": 4390098482291805194
       }
     },
     {
@@ -4497,9 +5017,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 3471,
+        "digest": 2955908427346153084
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 4619,
-        "digest": 9630480647631896518
+        "digest": 4390098482291805194
       }
     },
     {
@@ -4518,6 +5043,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -4536,6 +5066,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -4551,9 +5086,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -4569,9 +5109,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -4587,9 +5132,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -4605,9 +5155,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -4623,9 +5178,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -4641,9 +5201,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -4662,6 +5227,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11543322743909777440
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 8896037929559670816
       }
     },
     {
@@ -4680,6 +5250,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11543322743909777440
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 8896037929559670816
       }
     },
     {
@@ -4695,9 +5270,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 1934818570916377524
+        "digest": 8051653256469248052
       }
     },
     {
@@ -4713,9 +5293,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 9613565512328703931
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 1934818570916377524
+        "digest": 8051653256469248052
       }
     },
     {
@@ -4731,9 +5316,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 11322649796837076154
+        "digest": 15234358184936691386
       }
     },
     {
@@ -4749,9 +5339,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 13428954033501877236
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 11322649796837076154
+        "digest": 15234358184936691386
       }
     },
     {
@@ -4767,9 +5362,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 5058375365543996966
+        "digest": 6963128298495186598
       }
     },
     {
@@ -4785,9 +5385,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 7277374472439711677
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 5058375365543996966
+        "digest": 6963128298495186598
       }
     },
     {
@@ -4806,6 +5411,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -4824,6 +5434,11 @@
         "packets": 65,
         "bytes": 22673,
         "digest": 11121402651723407264
+      },
+      "candidate_expected": {
+        "packets": 65,
+        "bytes": 22673,
+        "digest": 14226005112236962060
       }
     },
     {
@@ -4839,9 +5454,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -4857,9 +5477,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 49,
+        "bytes": 17726,
+        "digest": 16650894137281441851
+      },
+      "candidate_expected": {
         "packets": 53,
         "bytes": 18440,
-        "digest": 8176489897606898740
+        "digest": 2101852630838917064
       }
     },
     {
@@ -4875,9 +5500,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -4893,9 +5523,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 33,
+        "bytes": 11850,
+        "digest": 7360761262044476404
+      },
+      "candidate_expected": {
         "packets": 37,
         "bytes": 12603,
-        "digest": 15201489562240908474
+        "digest": 14490539003104168250
       }
     },
     {
@@ -4911,9 +5546,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     },
     {
@@ -4929,9 +5569,14 @@
         "matroska"
       ],
       "expected": {
+        "packets": 9,
+        "bytes": 2611,
+        "digest": 8789202913030219453
+      },
+      "candidate_expected": {
         "packets": 13,
         "bytes": 3418,
-        "digest": 14838000005493009702
+        "digest": 17793160032431190654
       }
     }
   ]

@@ -722,79 +722,7 @@ static int player_ebml_vint(const uint8_t *bytes, size_t end, size_t *at,
     return 0;
 }
 
-static int player_cluster_bounds(const PacketInput *reader, int64_t point, int64_t *begin)
-{
-    if (point < 0 || point >= reader->size)
-        return AVERROR_INVALIDDATA;
-    int in_segment = 0;
-    size_t end = (size_t)reader->size;
-    size_t at = 0;
-    while (at < end) {
-        uint64_t id, size;
-        size_t offset = at;
-        if (player_ebml_vint(reader->data, end, &at, 4, 1, &id) < 0 ||
-            player_ebml_vint(reader->data, end, &at, 8, 0, &size) < 0 ||
-            (size != UINT64_MAX && size > end - at))
-            return AVERROR_INVALIDDATA;
-        size_t next = size == UINT64_MAX ? end : at + (size_t)size;
-        if (!in_segment && id == UINT64_C(0x18538067)) {
-            end = next;
-            in_segment = 1;
-        } else {
-            if (in_segment && id == UINT64_C(0x1f43b675) &&
-                (size_t)point >= at && (size_t)point < next) {
-                *begin = (int64_t)offset;
-                return 0;
-            }
-            if (size == UINT64_MAX)
-                return AVERROR_INVALIDDATA;
-            at = next;
-        }
-    }
-    return AVERROR_INVALIDDATA;
-}
-
-/* Check the same physical cluster prefix on a fresh sequential demux pass.
- * The seek's first returned video packet is kept for the subsequent suffix. */
-static int player_matroska_prefix(const PacketInput *reader, AVPacket *landing, int video,
-                                const PlaybackPlayerCase *player, PacketWork *work)
-{
-    int64_t start;
-    int rc = player_cluster_bounds(reader, landing->pos, &start);
-    if (rc < 0)
-        return rc;
-    PacketInput sequence = *reader;
-    sequence.at = 0;
-    AVFormatContext *format = NULL;
-    AVPacket *packet = av_packet_alloc();
-    if (!packet)
-        return AVERROR(ENOMEM);
-    rc = player_open(&format, &sequence, player);
-    if (rc < 0)
-        goto done;
-    while ((rc = av_read_frame(format, packet)) >= 0) {
-        if (packet->stream_index == video && packet->pos >= start) {
-            if (packet->pos >= landing->pos) {
-                rc = packet->pos == landing->pos && packet->size == landing->size &&
-                     packet->pts == landing->pts && packet->flags == landing->flags &&
-                     (!packet->size || !memcmp(packet->data, landing->data, (size_t)packet->size))
-                    ? 0 : AVERROR_INVALIDDATA;
-                break;
-            }
-            rc = player_packet(work, player, format->streams[video], packet);
-            if (rc < 0)
-                break;
-        }
-        av_packet_unref(packet);
-    }
-done:
-    av_packet_free(&packet);
-    packet_close(&format);
-    return rc;
-}
-
 static int player_matroska_delivery(AVFormatContext *format, AVPacket *packet,
-                                    const PacketInput *reader,
                                     const PlaybackPlayerCase *player, PacketWork *work)
 {
     int video = player_stream(format, PLAYER_MKV, AVMEDIA_TYPE_VIDEO, -1);
@@ -807,21 +735,8 @@ static int player_matroska_delivery(AVFormatContext *format, AVPacket *packet,
             return rc;
         int64_t target = av_rescale_q(player->timestamp, (AVRational){1, 1000},
                                      format->streams[video]->time_base);
+        /* The reference's own backward seek: its video packets from the landing on. */
         rc = av_seek_frame(format, video, target, AVSEEK_FLAG_BACKWARD);
-        if (rc < 0)
-            return rc;
-        do {
-            rc = av_read_frame(format, packet);
-            if (rc < 0)
-                return rc;
-            if (packet->stream_index == video)
-                break;
-            av_packet_unref(packet);
-        } while (1);
-        rc = player_matroska_prefix(reader, packet, video, player, work);
-        if (rc >= 0)
-            rc = player_packet(work, player, format->streams[video], packet);
-        av_packet_unref(packet);
         if (rc < 0)
             return rc;
     }
@@ -896,7 +811,7 @@ static int player_demux(const ViewCase *input, const PlaybackPlayerCase *player,
         break;
     case PLAYER_DELIVERY:
         if (player->format == PLAYER_MKV) {
-            result = player_matroska_delivery(format, packet, &reader, player, work);
+            result = player_matroska_delivery(format, packet, player, work);
             break;
         }
         /* MP4 delivery and index comparison use the same packet reader. */
