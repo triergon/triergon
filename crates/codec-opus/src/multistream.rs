@@ -20,13 +20,6 @@ pub(crate) struct Mapping {
     gain: Option<f32>,
 }
 
-/// Channels in coded order without speaker positions (FFmpeg's unspecified order),
-/// `channels <= ChannelLayout::CAPACITY`.
-fn unordered(channels: usize) -> (ChannelLayout, [u8; ChannelLayout::CAPACITY]) {
-    let layout = ChannelLayout::unspecified(channels).unwrap_or_default();
-    (layout, core::array::from_fn(|i| i as u8))
-}
-
 impl Mapping {
     pub(crate) fn new(head: &OpusHead) -> Result<Mapping, DecodeError> {
         let channels = usize::from(head.channels);
@@ -42,7 +35,11 @@ impl Mapping {
                 .ok_or(DecodeError::Invalid(
                     "Vorbis channel mapping beyond 8 channels",
                 ))?,
-            255 => unordered(channels),
+            255 => (
+                ChannelLayout::unspecified(channels)
+                    .ok_or(DecodeError::Unsupported("more than 93 output channels"))?,
+                core::array::from_fn(|i| i as u8),
+            ),
             _ => return Err(DecodeError::Unsupported("Opus channel mapping family")),
         };
         let mut source = [SILENT; ChannelLayout::CAPACITY];
