@@ -15,7 +15,8 @@
 //! Each operation is a function of its own ([`session`] once for each codec,
 //! and [`document`]), called from the measured loop and never inlined into
 //! it: a change to one decoder's code then leaves the code, and so the
-//! instruction counts, of the other operations as they were.
+//! instruction counts, of the other operations as they were. A session's
+//! decoder is built where it is used and never moved.
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, TimeBase, WorkBudget};
@@ -37,11 +38,14 @@ const INVALID_DATA: i32 = -1_094_995_529;
 const TEXT_FORMAT: u32 = 1;
 const ASS_RECTANGLE: u32 = 3;
 
+/// A decoder open and what the capsule does with that decoder.
 struct Open {
     timebase: Option<TimeBase>,
     width: u32,
     height: u32,
     extradata: Option<Bytes>,
+    /// The packets and flushes until the next open.
+    ops: Vec<Op>,
 }
 
 struct Packet {
@@ -50,14 +54,13 @@ struct Packet {
 }
 
 enum Op {
-    Open(Open),
     Packet(Packet),
     Flush,
 }
 
 struct Session {
     label: Option<Bytes>,
-    ops: Vec<Op>,
+    opens: Vec<Open>,
 }
 
 enum Prepared {
@@ -164,9 +167,11 @@ fn parse(pool: &Budget, raw: &[u8]) -> Result<Prepared> {
     if count > 4096 {
         return Err("capsule operation limit".into());
     }
-    let mut ops = Vec::with_capacity(count as usize);
+    let mut opens: Vec<Open> = Vec::new();
+    // An operation before the first open.
+    let mut unopened = false;
     for _ in 0..count {
-        ops.push(match c.byte()? {
+        let op = match c.byte()? {
             b'O' => {
                 let numerator = c.u32()?;
                 let denominator = c.u32()?;
@@ -181,14 +186,16 @@ fn parse(pool: &Budget, raw: &[u8]) -> Result<Prepared> {
                     1 => Some(Bytes::copy_from_slice(pool, c.take(size)?)?),
                     _ => None,
                 };
-                Op::Open(Open {
+                opens.push(Open {
                     timebase: (numerator != 0)
                         .then(|| TimeBase::new(u64::from(numerator), u64::from(denominator)))
                         .transpose()?,
                     width,
                     height,
                     extradata,
-                })
+                    ops: Vec::new(),
+                });
+                continue;
             }
             b'P' => {
                 let pts = c.known()?;
@@ -205,12 +212,16 @@ fn parse(pool: &Budget, raw: &[u8]) -> Result<Prepared> {
             }
             b'F' => Op::Flush,
             _ => return Err("capsule operation".into()),
-        });
+        };
+        match opens.last_mut() {
+            Some(open) => open.ops.push(op),
+            None => unopened = true,
+        }
     }
-    if c.at != raw.len() || !matches!(ops.first(), Some(Op::Open(_))) {
+    if c.at != raw.len() || opens.is_empty() || unopened {
         return Err("capsule must start with an open and end with its last operation".into());
     }
-    let session = Session { label, ops };
+    let session = Session { label, opens };
     Ok(if codec == mov_text::Decoder::CODEC {
         Prepared::MovText(session)
     } else {
@@ -426,6 +437,7 @@ fn fold_clock(work: &mut Work, subtitle: &mov_text::Subtitle) {
 }
 
 /// One measured session of codec `R`: every open, packet and flush in order.
+/// Each open's decoder lives until the next open; the last one's input is ended.
 #[inline(never)]
 fn session<R: Receiver>(
     pool: &Budget,
@@ -436,41 +448,40 @@ fn session<R: Receiver>(
     let mut work = Work::new(quantum);
     work.data(b"TXT1");
     work.byte(R::CODEC);
-    let mut current: Option<(&Open, R)> = None;
-    let mut failed = false;
-    for op in &session.ops {
-        match op {
-            Op::Open(open) => {
-                drop(current.take());
-                failed = false;
-                work.byte(b'O');
-                current = R::open(pool, session.label.as_ref(), open, &work, cancel)
-                    .map(|decoder| (open, decoder));
-                work.byte(u8::from(current.is_some()));
-                if let Some((_, decoder)) = &current {
-                    decoder.fold_open(&mut work);
+    let mut opens = session.opens.iter().peekable();
+    while let Some(open) = opens.next() {
+        work.byte(b'O');
+        let mut decoder = R::open(pool, session.label.as_ref(), open, &work, cancel);
+        work.byte(u8::from(decoder.is_some()));
+        if let Some(decoder) = &decoder {
+            decoder.fold_open(&mut work);
+        }
+        let mut failed = false;
+        for op in &open.ops {
+            match op {
+                Op::Flush => {
+                    work.byte(b'F');
+                    if let Some(decoder) = &mut decoder {
+                        failed |= !decoder.flush(cancel);
+                    }
                 }
-            }
-            Op::Flush => {
-                work.byte(b'F');
-                if let Some((_, decoder)) = &mut current {
-                    failed |= !decoder.flush(cancel);
-                }
-            }
-            Op::Packet(packet) => {
-                let Some((open, decoder)) = current.as_mut().filter(|_| !failed) else {
-                    continue;
-                };
-                work.byte(b'P');
-                if decoder.packet(open, packet, cancel, &mut work).is_err() {
-                    work.byte(b'X');
-                    failed = true;
+                Op::Packet(packet) => {
+                    let Some(decoder) = decoder.as_mut().filter(|_| !failed) else {
+                        continue;
+                    };
+                    work.byte(b'P');
+                    if decoder.packet(open, packet, cancel, &mut work).is_err() {
+                        work.byte(b'X');
+                        failed = true;
+                    }
                 }
             }
         }
-    }
-    if let Some((_, decoder)) = &mut current {
-        decoder.finish(cancel);
+        if opens.peek().is_none()
+            && let Some(decoder) = &mut decoder
+        {
+            decoder.finish(cancel);
+        }
     }
     work.byte(b'Z');
     work
