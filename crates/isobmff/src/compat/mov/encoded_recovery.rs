@@ -277,13 +277,6 @@ impl RecoveryWalk {
                             *row += 1;
                             continue;
                         }
-                        if *covered != self.facts.samples {
-                            return source_result(
-                                Err(Error::Unsupported("encoded incomplete recovery coverage")),
-                                source.raw(),
-                                &mut self.error_backing,
-                            );
-                        }
                     }
                 }
                 match self

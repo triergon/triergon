@@ -286,11 +286,13 @@ fn too_many_source_samples_in_map_is_rejected() {
     );
 }
 #[test]
-fn incomplete_source_coverage_remains_explicitly_unadmitted() {
-    assert_eq!(
-        Source::new(fixture("coverage-under")).plan(1).unwrap_err(),
-        Error::Unsupported("encoded incomplete recovery coverage")
-    );
+fn samples_after_the_last_group_run_have_no_association() {
+    let s = Source::new(fixture("coverage-under"));
+    let plan = s.plan(1).unwrap();
+    let tail = selection(&plan, RecoveryKind::Roll, 2);
+    assert_eq!(tail.raw_mapping_index, None);
+    assert!(tail.description.is_none());
+    assert_eq!(rows(&s, plan).len(), 2);
 }
 #[test]
 fn fragment_namespace_cannot_resolve_as_regular_track_description() {

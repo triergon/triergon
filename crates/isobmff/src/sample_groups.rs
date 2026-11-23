@@ -663,9 +663,9 @@ impl<'a> RecoveryLookup<'a> {
             failed: None,
         })
     }
-    /// Advances the lookup. Fails with `Error::Unsupported` when the runs cover fewer
-    /// samples than the scope or the default index that applies is ambiguous,
-    /// `Error::Invalid` when they cover more or name a missing entry, and as
+    /// Advances the lookup. Samples outside the runs use the scope's default, if any.
+    /// Fails with `Error::Unsupported` for an ambiguous default, with
+    /// `Error::Invalid` when runs exceed the scope or name a missing entry, and as
     /// [`RecoveryDescriptionLookup::poll`]. An error is kept and returned by every
     /// later poll.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<BuildStatus> {
@@ -690,9 +690,6 @@ impl<'a> RecoveryLookup<'a> {
                         .mappings
                         .ok_or(Error::Invalid("missing recovery mapping"))?;
                     if self.row == mappings.count {
-                        if self.total < self.scope.sample_count {
-                            return Err(Error::Unsupported("partial recovery map coverage"));
-                        }
                         self.phase = Phase::Select;
                         continue;
                     }
@@ -720,10 +717,7 @@ impl<'a> RecoveryLookup<'a> {
                     if !work.try_charge(1) {
                         return Ok(BuildStatus::Yield);
                     }
-                    let (origin, selected) = if self.scope.mappings.is_some() {
-                        let raw = self
-                            .raw_index
-                            .ok_or(Error::Invalid("recovery target mapping missing"))?;
+                    let (origin, selected) = if let Some(raw) = self.raw_index {
                         if raw == 0 {
                             if default_mapping(self.scope)?.1.is_some() {
                                 return Err(Error::Unsupported(

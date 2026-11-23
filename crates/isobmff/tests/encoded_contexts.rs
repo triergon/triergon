@@ -279,8 +279,9 @@ macro_rules! wave_case {
     };
 }
 macro_rules! recovery_case {
-($name:ident,$file:literal)=>{#[test]fn $name(){
- let s=Source::new(include_bytes!(concat!("fixtures/encoded-recovery/",$file,".mp4")));assert!(strict_plan(&s).is_err(),"original source/default strict profile remains refused");let plan=s.plan(1).unwrap();let report=plan.recovery_observation().expect("owned source recovery result");assert!(report.ignored_group_boxes()>0);assert_eq!(report.raw_source_table().header(),s.table.raw().header());
+ ($name:ident,$file:literal) => { recovery_case!($name, $file, true); };
+ ($name:ident,$file:literal,$refused:literal)=>{#[test]fn $name(){
+ let s=Source::new(include_bytes!(concat!("fixtures/encoded-recovery/",$file,".mp4")));assert_eq!(strict_plan(&s).is_err(), $refused);let plan=s.plan(1).unwrap();let report=plan.recovery_observation().expect("owned source recovery result");assert!(report.ignored_group_boxes()>0);assert_eq!(report.raw_source_table().header(),s.table.raw().header());
  match report.source_result(){Ok(_facts)=>{#[cfg(feature = "reference-trace")]assert_eq!(_facts.cause(),triergon_isobmff::reference_trace::mov::encoded::RecoveryReceiverCause::RollProlNotAppliedByOpenIndex);},Err(fault)=>{assert!(matches!(fault.error,Error::Invalid(_)|Error::Unsupported(_)|Error::Truncated));assert!(matches!(&fault.raw.header().kind,b"sgpd"|b"sbgp"));assert!(fault.raw.bytes().belongs_to(&s.pool));}}
  let packets=rows(&s,Some(plan));assert_eq!(packets.len(),2);assert_eq!((packets[0].demux.pts,packets[1].demux.pts),(Some(0),Some(40)));assert_eq!((packets[0].demux.flags,packets[1].demux.flags),(1,0));for p in packets{assert_eq!(p.demux.source_range,p.source.range);}
 }};}
@@ -370,7 +371,7 @@ fn range_playback_keeps_the_base_config_for_dolby_vision_hevc_entries() {
 recovery_case!(recovery_dangling_description, "dangling-description");
 recovery_case!(recovery_empty_run, "empty-run");
 recovery_case!(recovery_coverage_over, "coverage-over");
-recovery_case!(recovery_coverage_under, "coverage-under");
+recovery_case!(recovery_coverage_under, "coverage-under", false);
 recovery_case!(recovery_fragment_namespace, "fragment-namespace");
 recovery_case!(recovery_grouping_parameter, "grouping-parameter");
 recovery_case!(
