@@ -610,15 +610,13 @@
       "cause": "comparison-only projections have no equivalent measured library operation"
     }
   ],
-  "open_deviations": [
+  "pending_module_requirements": [
+    "RootWalkTransportBuilder, the comparison model of the demuxer's reads, stops at its 16-root bound (Limit: requested 17, maximum 16) on a valid file with 17 root boxes, 14 of them free boxes (ISO/IEC 14496-12:2015 4.2 and 8.1.2 allow any number); the reference walks every root box and ends at logical position 859. Raise the bound to cover the corpus or take it from the caller."
+  ],
+  "open_cases": [
     {
-      "reading": "Transport model stops at its root-box bound",
-      "clause": "ISO/IEC 14496-12:2015 §§4.2 and 8.1.2.1 allow any number of free-space boxes. RootWalkTransportBuilder sets a documented 16-root resource limit for this comparison model",
-      "candidate": "refuses at 17 roots",
-      "reference": "walks all roots and produces 945 callback/access rows, ending at logical position 859",
-      "cases": [
-        "transport-footer-0-14"
-      ]
+      "id": "transport-footer-0-14",
+      "requirement": "RootWalkTransportBuilder, the comparison model of the demuxer's reads, stops at its 16-root bound (Limit: requested 17, maximum 16) on a valid file with 17 root boxes, 14 of them free boxes (ISO/IEC 14496-12:2015 4.2 and 8.1.2 allow any number); the reference walks every root box and ends at logical position 859. Raise the bound to cover the corpus or take it from the caller."
     }
   ]
 }

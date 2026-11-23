@@ -106,13 +106,30 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
+  "pending_module_requirements": [
+    "compat::mov::pcm::PcmCursor refuses 8-bit twos samples in a version 0 description (Unsupported: QT v0 PCM other than 8-bit raw or 16-bit twos), which the demuxer reads. Version 0 admits twos with 8 or 16 bits per sample, and QuickTime File Format (2001) Table 3-3 gives twos 8-bit samples the range -128 to 127.",
+    "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
+  ],
+  "open_cases": [
+    {
+      "id": "twos-8bit-1ch",
+      "requirement": "compat::mov::pcm::PcmCursor refuses 8-bit twos samples in a version 0 description (Unsupported: QT v0 PCM other than 8-bit raw or 16-bit twos), which the demuxer reads. Version 0 admits twos with 8 or 16 bits per sample, and QuickTime File Format (2001) Table 3-3 gives twos 8-bit samples the range -128 to 127."
+    },
+    {
+      "id": "sound-v1",
+      "requirement": "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
+    },
+    {
+      "id": "sound-v2",
+      "requirement": "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
+    }
+  ],
   "open_deviations": [
     {
-      "reading": "Version 0 descriptions outside the QuickTime PCM layout",
-      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’: version 0 describes raw 8-bit offset-binary or twos 16-bit two’s complement PCM with one or two channels",
-      "candidate": "refuses the out-of-layout version 0 description",
-      "reference": "publishes PCM for wider layouts and other encodings, including 16-, 24- and 32-bit sowt and 8-, 24- and 32-bit twos",
-      "compat": "compat::mov::pcm extended_version_zero_pcm would accept wider layouts as the demuxer does",
+      "reading": "A version 0 description outside the version 0 layout",
+      "clause": "Apple QuickTime File Format 'Sound sample description version 0 (stsd)': version 0 is uncompressed raw or twos audio with one or two channels, 8 or 16 bits per sample and compression ID 0; this description lies outside it (more than two channels, or sowt byte order)",
+      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2; Unsupported: QT v0 PCM other than 8-bit raw or 16-bit twos)",
+      "reference": "reads it as PCM: 3 to 8 channels, 16- to 32-bit sowt and 24- and 32-bit twos",
       "cases": [
         "raw-16bit-4ch",
         "raw-8bit-3ch",
@@ -120,14 +137,13 @@
         "sowt-24bit-7ch",
         "sowt-32bit-8ch",
         "twos-24bit-5ch",
-        "twos-32bit-6ch",
-        "twos-8bit-1ch"
+        "twos-32bit-6ch"
       ]
     },
     {
       "reading": "Zero channels in a version 0 description",
       "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’: the supported channel counts are 1 and 2",
-      "candidate": "refuses the zero-channel description",
+      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2)",
       "reference": "reports a zero channel count and reads 16 payload bytes",
       "cases": [
         "raw-8bit-0ch"
@@ -136,7 +152,7 @@
     {
       "reading": "Compressed-audio fields carried in a version 0 PCM entry",
       "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’ requires compression ID zero; Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ uses -2 for redefined sample tables",
-      "candidate": "refuses version 0 compression ID -2 with packet size 7",
+      "candidate": "refuses the description (Unsupported: QT v0 compressed/nonzero packet layout)",
       "reference": "reads 32 bytes as ordinary PCM",
       "cases": [
         "compression-and-packet-size"
@@ -145,30 +161,17 @@
     {
       "reading": "A sample that ends inside a PCM frame",
       "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’ defines the sample width and interleaved layout; Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ defines one frame as one sample from each channel; ISO/IEC 14496-12:2015 §8.7.3.2.2 fixes each sample extent",
-      "candidate": "refuses the one-byte sample in a 16-bit mono track",
-      "reference": "reads a full configured width and emits 32 PCM bytes from the file",
-      "compat": "compat::mov::pcm configured_width_reads would use the configured width in place of the source sample extent",
+      "candidate": "refuses the track (Unsupported: PCM source samples are not consecutive one-tick sync frames)",
+      "reference": "reads the configured two-byte width over the one-byte sample and emits 32 bytes, one past the declared extent",
       "cases": [
         "partial-frame"
       ]
     },
     {
-      "reading": "PCM sound descriptions version 1 and 2",
-      "clause": "Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ and Apple QuickTime File Format ‘Sound sample description version 2 (stsd)’ extend the layout. The version 0 PCM API only admits the version 0 layout",
-      "candidate": "refuses the two versions as unsupported by the PCM reader or packet profile",
-      "reference": "opens both and reads 32 bytes of PCM per case",
-      "compat": "compat::mov::pcm extended_sound_descriptions would admit uncompressed versions 1 and 2",
-      "cases": [
-        "sound-v1",
-        "sound-v2"
-      ]
-    },
-    {
-      "reading": "Version 0 metadata and a fractional rate in the integer-clock packet profile",
-      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’: sample rate is unsigned 16.16, and the Vendor field is set to zero. PcmPacketCursor documents its zero revision and vendor and integral-clock preconditions",
-      "candidate": "refuses revision 37 and vendor test before projecting the 48000.5 Hz clock",
-      "reference": "reports integer 48000 Hz and reads 32 bytes as PCM",
-      "compat": "compat::mov::pcm rounded_sound_rate would admit this metadata and expose the demux integer rate",
+      "reading": "Version 0 revision and vendor fields that must be zero",
+      "clause": "Apple QuickTime File Format 'Sound sample description version 0 (stsd)': revision level and vendor must be set to 0; this entry has revision 37 and vendor test",
+      "candidate": "refuses the description (Unsupported: PCM description revision, vendor or data reference other than 0, 0 and 1)",
+      "reference": "reads 32 bytes as PCM at an integer 48000 Hz from the 48000.5 Hz rate field",
       "cases": [
         "fractional-rate"
       ]
