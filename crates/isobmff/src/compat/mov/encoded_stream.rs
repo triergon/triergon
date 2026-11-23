@@ -244,7 +244,8 @@ impl<'a> EncodedStreamJob<'a> {
     /// Vision HEVC, AV1, VP9, Opus and DTS core entries, video entries of `qt  ` files,
     /// AAC in a QuickTime sound description version 2 and the unspecified QuickTime
     /// language (`und`). An `mp4a` entry whose `esds` names a DTS object type is read as
-    /// DTS; an AAC `wave` box outside a QuickTime sound description is unsupported.
+    /// DTS. An AAC `wave` box outside a QuickTime sound description is unsupported.
+    /// Range playback requires the format atom in a version 1 AAC `wave`.
     pub fn new_range_playback(
         header: &'a TrackHeader,
         table: &SampleTable,
@@ -634,9 +635,12 @@ impl<'a> EncodedStreamJob<'a> {
                         }
                     }
                     Next::End => {
+                        // QuickTime recommends a format atom. Range playback requires it.
                         if w.terminator.is_none()
                             || (self.sound_source.is_some()
-                                && (w.format.is_none() || w.marker.is_none()))
+                                && (w.marker.is_none()
+                                    || (self.view == DescriptionView::RangePlayback
+                                        && w.format.is_none())))
                         {
                             let error = Error::Unsupported("encoded incomplete mp4a wave context");
                             if let Some(report) = &mut self.wave_source {

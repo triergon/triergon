@@ -328,7 +328,20 @@ macro_rules! refused {
     };
 }
 refused!(duplicate_frma_is_not_first_wins, "qt-v1-duplicate-frma");
-refused!(missing_frma_is_not_guessed_from_entry, "qt-v1-missing-frma");
+#[test]
+fn wave_without_optional_format_atom_keeps_aac_configuration() {
+    let s = Source::new(include_bytes!(
+        "fixtures/encoded-metadata/qt-v1-missing-frma.mov"
+    ));
+    let mut input = s.input();
+    let result = finish(&mut s.job(&input).unwrap(), &mut input, 1).unwrap();
+    assert_eq!(result.demux().codec, "aac");
+    assert_eq!(
+        result.demux().extradata.as_ref(),
+        [0x11, 0x88, 0x56, 0xe5, 0]
+    );
+    assert_eq!(result.configuration_box().header().kind, *b"esds");
+}
 refused!(conflicting_frma_is_not_relabelled, "qt-v1-wrong-frma");
 refused!(
     missing_terminator_remains_explicit,

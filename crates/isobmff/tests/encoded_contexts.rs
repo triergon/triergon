@@ -236,6 +236,9 @@ fn strict_plan(s: &Source) -> Result<EncodedEditPlan, Error> {
 }
 macro_rules! wave_case {
     ($name:ident,$file:literal) => {
+        wave_case!($name, $file, true);
+    };
+    ($name:ident,$file:literal,$fault:literal) => {
         #[test]
         fn $name() {
             let s = Source::new(include_bytes!(concat!(
@@ -243,10 +246,7 @@ macro_rules! wave_case {
                 $file,
                 ".mov"
             )));
-            assert!(
-                strict_config(&s).is_err(),
-                "original strict operation must stay strict"
-            );
+            assert_eq!(strict_config(&s).is_err(), $fault);
             let mut i = s.input();
             let configs = s.configs(&mut i);
             let demux = configs[0].demux();
@@ -254,8 +254,8 @@ macro_rules! wave_case {
             assert_eq!(demux.extradata.as_ref(), [0x11, 0x88, 0x56, 0xe5, 0]);
             let report = configs[0].wave_source().expect("owned source wave report");
             assert_eq!(report.raw.header().kind, *b"wave");
-            assert!(report.first_default_profile_fault.is_some());
-            assert!(report.fault_count > 0);
+            assert_eq!(report.first_default_profile_fault.is_some(), $fault);
+            assert_eq!(report.fault_count > 0, $fault);
             assert!(report.raw.bytes().belongs_to(&s.pool));
             let packets = rows(&s, None);
             assert_eq!(packets.len(), 2);
@@ -278,13 +278,14 @@ macro_rules! wave_case {
         }
     };
 }
-macro_rules! recovery_case {($name:ident,$file:literal)=>{#[test]fn $name(){
+macro_rules! recovery_case {
+($name:ident,$file:literal)=>{#[test]fn $name(){
  let s=Source::new(include_bytes!(concat!("fixtures/encoded-recovery/",$file,".mp4")));assert!(strict_plan(&s).is_err(),"original source/default strict profile remains refused");let plan=s.plan(1).unwrap();let report=plan.recovery_observation().expect("owned source recovery result");assert!(report.ignored_group_boxes()>0);assert_eq!(report.raw_source_table().header(),s.table.raw().header());
  match report.source_result(){Ok(_facts)=>{#[cfg(feature = "reference-trace")]assert_eq!(_facts.cause(),triergon_isobmff::reference_trace::mov::encoded::RecoveryReceiverCause::RollProlNotAppliedByOpenIndex);},Err(fault)=>{assert!(matches!(fault.error,Error::Invalid(_)|Error::Unsupported(_)|Error::Truncated));assert!(matches!(&fault.raw.header().kind,b"sgpd"|b"sbgp"));assert!(fault.raw.bytes().belongs_to(&s.pool));}}
  let packets=rows(&s,Some(plan));assert_eq!(packets.len(),2);assert_eq!((packets[0].demux.pts,packets[1].demux.pts),(Some(0),Some(40)));assert_eq!((packets[0].demux.flags,packets[1].demux.flags),(1,0));for p in packets{assert_eq!(p.demux.source_range,p.source.range);}
 }};}
 wave_case!(wave_duplicate_frma, "qt-v1-duplicate-frma");
-wave_case!(wave_missing_frma, "qt-v1-missing-frma");
+wave_case!(wave_missing_frma, "qt-v1-missing-frma", false);
 wave_case!(wave_wrong_frma, "qt-v1-wrong-frma");
 wave_case!(wave_missing_terminator, "qt-v1-missing-terminator");
 wave_case!(wave_terminator_body, "qt-v1-terminator-body");
