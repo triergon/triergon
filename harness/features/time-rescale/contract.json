@@ -1004,7 +1004,6 @@
       "clause": "The TimeBase::rescale and TickScale::rescale contracts in crates/core/README.md return every representable rounded integer. Multiplying -4611686018427387904 by two gives exactly -9223372036854775808 in all five modes.",
       "candidate": "returns -9223372036854775808 as a successful result",
       "reference": "returns the same bits as its overflow sentinel, which the reference projection reports as overflow",
-      "compat": "compat::time::sentinel_rescale",
       "cases": [
         "clock-07-02-direct",
         "clock-07-02-prepared",
@@ -1019,7 +1018,6 @@
       "clause": "The TimeBase::rescale and TickScale::rescale contracts in crates/core/README.md preserve every representable rounded tick. The identity has no fractional remainder in any rounding mode.",
       "candidate": "returns -9223372036854775808 unchanged",
       "reference": "returns -9223372036854775807",
-      "compat": "compat::time::sentinel_rescale",
       "cases": [
         "minimum-identity-direct",
         "minimum-identity-prepared"

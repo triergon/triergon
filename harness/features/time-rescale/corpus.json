@@ -2703,6 +2703,11 @@
         "packets": 55,
         "bytes": 0,
         "digest": 12545922627931841619
+      },
+      "candidate_expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10977765060720398882
       }
     },
     {
@@ -2720,6 +2725,11 @@
         "packets": 55,
         "bytes": 0,
         "digest": 12545922627931841619
+      },
+      "candidate_expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10977765060720398882
       }
     },
     {
@@ -3111,6 +3121,11 @@
         "packets": 55,
         "bytes": 0,
         "digest": 12545922627931841619
+      },
+      "candidate_expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10977765060720398882
       }
     },
     {
@@ -3128,6 +3143,11 @@
         "packets": 55,
         "bytes": 0,
         "digest": 12545922627931841619
+      },
+      "candidate_expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10977765060720398882
       }
     },
     {
@@ -5253,6 +5273,11 @@
         "packets": 55,
         "bytes": 0,
         "digest": 12545922627931841619
+      },
+      "candidate_expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10977765060720398882
       }
     },
     {
@@ -5270,6 +5295,11 @@
         "packets": 55,
         "bytes": 0,
         "digest": 12545922627931841619
+      },
+      "candidate_expected": {
+        "packets": 55,
+        "bytes": 0,
+        "digest": 10977765060720398882
       }
     },
     {
@@ -5287,6 +5317,11 @@
         "packets": 5,
         "bytes": 0,
         "digest": 17227037357956633036
+      },
+      "candidate_expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 3776685124761167559
       }
     },
     {
@@ -5304,6 +5339,11 @@
         "packets": 5,
         "bytes": 0,
         "digest": 17227037357956633036
+      },
+      "candidate_expected": {
+        "packets": 5,
+        "bytes": 0,
+        "digest": 3776685124761167559
       }
     },
     {
