@@ -203,3 +203,43 @@ fn a_repeated_colour_keeps_the_first() {
     };
     assert_eq!(config.tracks()[0].colour.unwrap().range, 1);
 }
+
+#[test]
+fn a_repeated_track_field_keeps_the_first() {
+    // CodecDelay, FlagLacing, Language and the Video master and its PixelWidth, each
+    // written twice (RFC 8794 §12).
+    let video = |width: u64| element(0xe0, &uint(0xb0, width));
+    let raw = track(
+        1,
+        1,
+        &[
+            uint(0x56aa, 5),
+            uint(0x56aa, 9),
+            uint(0x9c, 0),
+            uint(0x9c, 1),
+            element(0x22b59c, b"fre"),
+            element(0x22b59c, b"ger"),
+            video(320),
+            video(640),
+        ]
+        .concat(),
+    );
+    let pool = Budget::new(64 * 1024).unwrap();
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let mut job = TracksJob::new(source, None, Limits::default(), 4096, &pool, 1, 1).unwrap();
+    let config = loop {
+        match job
+            .step(&mut WorkBudget::new(1 << 20), &AtomicBool::new(false))
+            .unwrap()
+        {
+            ParseStep::Yield => (),
+            ParseStep::Event(value) => break value,
+            other => panic!("repeated fields: {other:?}"),
+        }
+    };
+    let track = &config.tracks()[0];
+    assert_eq!(track.codec_delay_ns, 5);
+    assert!(!track.lacing);
+    assert_eq!(&*track.language, "fre");
+    assert_eq!(track.width, 320);
+}

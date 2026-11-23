@@ -147,8 +147,13 @@ impl SeekHeadJob {
                 )? {
                     ParseStep::Yield => return Ok(ParseStep::Yield),
                     ParseStep::Event(Some(child)) => match child.id {
-                        0x53ab => self.identifier = Some(ebml::uint(&self.source[child.payload])?),
-                        0x53ac => self.position = Some(ebml::uint(&self.source[child.payload])?),
+                        // A repeated SeekID or SeekPosition is passed over (RFC 8794 §12).
+                        0x53ab if self.identifier.is_none() => {
+                            self.identifier = Some(ebml::uint(&self.source[child.payload])?);
+                        }
+                        0x53ac if self.position.is_none() => {
+                            self.position = Some(ebml::uint(&self.source[child.payload])?);
+                        }
                         _ => (),
                     },
                     ParseStep::Event(None) => {

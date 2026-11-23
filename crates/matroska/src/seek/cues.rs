@@ -147,14 +147,10 @@ impl CuesJob {
                         self.phase = Phase::ReserveMerge;
                     }
                     ParseStep::Event(Some(child)) => match child.id {
+                        // A repeated child is passed over (RFC 8794 §12).
                         0xb3 => {
-                            if self
-                                .ticks
-                                .replace(ebml::uint(&self.source[child.payload])?)
-                                .is_some()
-                            {
-                                return Err(Error::Invalid("duplicate CueTime"));
-                            }
+                            let ticks = ebml::uint(&self.source[child.payload])?;
+                            self.ticks.get_or_insert(ticks);
                         }
                         0xb7 => {
                             if self
@@ -192,12 +188,8 @@ impl CuesJob {
                             0xea => 4,
                             _ => continue,
                         };
-                        if self.fields[index]
-                            .replace(ebml::uint(&self.source[child.payload])?)
-                            .is_some()
-                        {
-                            return Err(Error::Invalid("duplicate cue position field"));
-                        }
+                        let value = ebml::uint(&self.source[child.payload])?;
+                        self.fields[index].get_or_insert(value);
                     }
                     ParseStep::Event(None) => {
                         let track = self.fields[0]

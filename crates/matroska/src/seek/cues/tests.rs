@@ -163,3 +163,38 @@ fn cue_arena_peak_work_and_pressure_match_the_preimage() {
         );
     }
 }
+
+#[test]
+fn a_repeated_cue_time_or_position_field_keeps_the_first() {
+    let raw = element(
+        0xbb,
+        &[
+            uint(0xb3, 5),
+            uint(0xb3, 9),
+            element(
+                0xb7,
+                &[uint(0xf7, 1), uint(0xf1, 10), uint(0xf1, 20), uint(0xf7, 2)].concat(),
+            ),
+        ]
+        .concat(),
+    );
+    let pool = Budget::new(64 * 1024).unwrap();
+    let source = SharedBytes::copy_from_slice(&pool, &raw).unwrap();
+    let mut job = CuesJob::new(source, 100, Some(1000), 4, &pool).unwrap();
+    let result = loop {
+        match job
+            .step(&mut WorkBudget::new(1 << 20), &AtomicBool::new(false))
+            .unwrap()
+        {
+            ParseStep::Yield => (),
+            ParseStep::Event(value) => break value,
+            other => panic!("repeated cue fields: {other:?}"),
+        }
+    };
+    let entries = result.entries.as_slice();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(
+        (entries[0].ticks, entries[0].track, entries[0].cluster),
+        (5, 1, 110)
+    );
+}

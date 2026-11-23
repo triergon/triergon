@@ -30,6 +30,15 @@ enum TrackPhase {
     Finish,
     Done,
 }
+/// Whether this is the first occurrence of the child that owns `bit`. A child that
+/// may occur once is read at its first occurrence and passed over after it
+/// (RFC 8794 §12).
+#[inline(always)]
+fn once(seen: &mut u16, bit: u16) -> bool {
+    let first = *seen & (1 << bit) == 0;
+    *seen |= 1 << bit;
+    first
+}
 #[derive(Debug)]
 pub(crate) struct TrackResult {
     pub track: Track,
@@ -54,6 +63,8 @@ struct TrackJob {
     prefixes: Encodings,
     flags_seen: u16,
     languages_seen: u8,
+    // The single-occurrence children read so far, one bit each (`once`).
+    seen: u16,
     private: Option<RestoreJob>,
     compressed_private: bool,
     has_extensions: bool,
@@ -122,6 +133,7 @@ impl TrackJob {
             prefixes: Encodings::default(),
             flags_seen: 0,
             languages_seen: 0,
+            seen: 0,
             private: None,
             compressed_private: false,
             has_extensions: false,
@@ -170,19 +182,26 @@ impl TrackJob {
                         let t = self.out.as_mut().required("missing TrackEntry builder")?;
                         let bytes = &self.source[child.payload.clone()];
                         match child.id {
-                            0xd7 => t.number = ebml::uint(bytes)?,
-                            0x73c5 => t.uid = ebml::uint(bytes)?,
-                            0x83 => t.kind = ebml::uint(bytes)?,
-                            0x63a2 => {
+                            0xd7 if once(&mut self.seen, 0) => t.number = ebml::uint(bytes)?,
+                            0x73c5 if once(&mut self.seen, 1) => t.uid = ebml::uint(bytes)?,
+                            0x83 if once(&mut self.seen, 2) => t.kind = ebml::uint(bytes)?,
+                            0x63a2 if once(&mut self.seen, 3) => {
                                 t.codec_private = self.source.slice(child.payload)?;
                                 t.codec_private_present = true;
                             }
                             0x55ee | 0x41e4 => self.has_extensions = true,
                             0x86 | 0x536e | 0x22b59c | 0x22b59d => {
+                                if matches!(child.id, 0x86 | 0x536e)
+                                    && !once(&mut self.seen, if child.id == 0x86 { 4 } else { 5 })
+                                {
+                                    continue;
+                                }
                                 if matches!(child.id, 0x22b59c | 0x22b59d) {
+                                    // A repeated Language or LanguageBCP47 is passed over
+                                    // (RFC 8794 §12).
                                     let mask = if child.id == 0x22b59c { 1 } else { 2 };
                                     if self.languages_seen & mask != 0 {
-                                        return Err(Error::Invalid("duplicate track language"));
+                                        continue;
                                     }
                                     self.languages_seen |= mask;
                                     if child.id == 0x22b59c && bytes.is_empty() {
@@ -215,7 +234,7 @@ impl TrackJob {
                                 };
                                 let bit = 1 << index;
                                 if self.flags_seen & bit != 0 {
-                                    return Err(Error::Invalid("duplicate track flag"));
+                                    continue;
                                 }
                                 self.flags_seen |= bit;
                                 let value =
@@ -240,17 +259,25 @@ impl TrackJob {
                                     _ => t.commentary = Some(value),
                                 }
                             }
-                            0x23e383 => t.default_duration_ns = Some(ebml::uint(bytes)?),
-                            0x56aa => t.codec_delay_ns = ebml::uint(bytes)?,
-                            0x56bb => t.seek_preroll_ns = ebml::uint(bytes)?,
+                            0x23e383 if once(&mut self.seen, 6) => {
+                                t.default_duration_ns = Some(ebml::uint(bytes)?);
+                            }
+                            0x56aa if once(&mut self.seen, 7) => {
+                                t.codec_delay_ns = ebml::uint(bytes)?;
+                            }
+                            0x56bb if once(&mut self.seen, 8) => {
+                                t.seek_preroll_ns = ebml::uint(bytes)?;
+                            }
                             0x23314f
-                                if bytes != 1_f64.to_be_bytes() && bytes != 1_f32.to_be_bytes() =>
+                                if once(&mut self.seen, 9)
+                                    && bytes != 1_f64.to_be_bytes()
+                                    && bytes != 1_f32.to_be_bytes() =>
                             {
                                 return Err(Error::Unsupported("TrackTimestampScale"));
                             }
                             0x6d80 => {
                                 if self.encoded {
-                                    return Err(Error::Invalid("duplicate ContentEncodings"));
+                                    continue;
                                 }
                                 self.encoded = true;
                                 self.encodings = Some(EncodingsJob::new(
@@ -261,7 +288,9 @@ impl TrackJob {
                                 )?);
                                 self.phase = TrackPhase::Encodings;
                             }
-                            0xe0 | 0xe1 => {
+                            0xe0 | 0xe1
+                                if once(&mut self.seen, if child.id == 0xe0 { 10 } else { 11 }) =>
+                            {
                                 self.inner = Some(ChildCursor::new(child.payload));
                                 self.phase = if child.id == 0xe0 {
                                     TrackPhase::Video
@@ -314,8 +343,8 @@ impl TrackJob {
                         let bytes = &self.source[child.payload.clone()];
                         if matches!(self.phase, TrackPhase::Video) {
                             match child.id {
-                                0xb0 => t.width = ebml::uint(bytes)?,
-                                0xba => t.height = ebml::uint(bytes)?,
+                                0xb0 if once(&mut self.seen, 12) => t.width = ebml::uint(bytes)?,
+                                0xba if once(&mut self.seen, 13) => t.height = ebml::uint(bytes)?,
                                 // A repeated Colour is ignored (RFC 8794 §12).
                                 0x55b0 if t.colour.is_none() => {
                                     self.colour =
@@ -326,8 +355,8 @@ impl TrackJob {
                             }
                         } else {
                             match child.id {
-                                0x9f => t.channels = ebml::uint(bytes)?,
-                                0xb5 => {
+                                0x9f if once(&mut self.seen, 14) => t.channels = ebml::uint(bytes)?,
+                                0xb5 if once(&mut self.seen, 15) => {
                                     t.sample_rate = match bytes.len() {
                                         4 => f64::from(f32::from_be_bytes(
                                             bytes

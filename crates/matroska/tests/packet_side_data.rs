@@ -454,6 +454,48 @@ fn mapping_fields_are_reported_as_written_without_judging_their_values() {
 }
 
 #[test]
+fn a_repeated_single_occurrence_child_keeps_its_first_occurrence() {
+    // RFC 8794 §12: occurrences past the one a schema allows are passed over, in a
+    // TrackEntry, a BlockAdditionMapping and a BlockGroup alike.
+    let mapping = e(
+        0x41e4,
+        &[u(0x41f0, 2), u(0x41f0, 3), u(0x41e7, 4), u(0x41e7, 5)].concat(),
+    );
+    let group = [
+        block(),
+        u(0x9b, 7),
+        u(0x9b, 9),
+        e(0x75a2, &[1]),
+        e(0x75a2, &[2]),
+        e(0xa1, &[0x81, 0, 0, 0, b'W']),
+    ]
+    .concat();
+    let raw = file(
+        &[u(0x55ee, 12), u(0x55ee, 1), mapping].concat(),
+        &[e(0xa0, &group)],
+    );
+    let mut reader = BlockingReader::open(Cursor::new(raw), Limits::default()).unwrap();
+    let packet = reader
+        .next_typed_packet(&AtomicBool::new(false))
+        .unwrap()
+        .unwrap();
+    assert_eq!(packet.packet.data.as_ref(), b"V");
+    let group = packet.group.as_ref().unwrap();
+    assert_eq!(group.duration_ticks(), Some(7));
+    assert_eq!(group.discard_padding_ns(), Some(1));
+    let extensions = finish_mapping(
+        packet
+            .configuration
+            .track_extensions_job(0, Limits::default())
+            .unwrap(),
+    );
+    assert_eq!(extensions.max_block_addition_id(), 12);
+    let mappings: Vec<_> = extensions.mappings().collect();
+    assert_eq!(mappings.len(), 1);
+    assert_eq!((mappings[0].value(), mappings[0].kind()), (Some(2), 4));
+}
+
+#[test]
 fn state_revisions_are_track_local_and_do_not_change_parser_generation_or_clocks() {
     let entry2 = e(
         0xae,

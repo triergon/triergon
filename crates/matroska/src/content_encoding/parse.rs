@@ -177,10 +177,9 @@ impl EncodingsJob {
                         0x5031 => self.order = ebml::uint(&self.source[child.payload])?,
                         0x5032 => self.scope = ebml::uint(&self.source[child.payload])?,
                         0x5033 => self.kind = ebml::uint(&self.source[child.payload])?,
+                        // A repeated ContentCompression is passed over (RFC 8794 §12).
                         0x5034 => {
-                            if self.compression_range.replace(child.payload).is_some() {
-                                return Err(Error::Invalid("duplicate ContentCompression"));
-                            }
+                            self.compression_range.get_or_insert(child.payload);
                         }
                         0x5035 => return Err(Error::Unsupported("encrypted track")),
                         _ => (),

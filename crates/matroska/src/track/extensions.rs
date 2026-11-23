@@ -312,11 +312,12 @@ impl TrackExtensionsJob {
                             end: child.payload.end,
                         };
                         match child.id {
+                            // A repeated child is passed over (RFC 8794 §12).
                             0x55ee => {
-                                if self.maximum.is_some() {
-                                    return Err(Error::Invalid("duplicate MaxBlockAdditionID"));
+                                if self.maximum.is_none() {
+                                    self.maximum =
+                                        Some((span, ebml::uint(&self.raw[span.payload()])?));
                                 }
-                                self.maximum = Some((span, ebml::uint(&self.raw[span.payload()])?));
                             }
                             0x41e4 => {
                                 if self.mappings.len() >= self.limit {
@@ -358,29 +359,27 @@ impl TrackExtensionsJob {
                         let record = self.record.as_mut().required("missing mapping record")?;
                         match child.id {
                             0x41f0 => {
-                                if record.value.is_some() {
-                                    return Err(Error::Invalid("duplicate BlockAddIDValue"));
+                                if record.value.is_none() {
+                                    record.value =
+                                        Some((span, ebml::uint(&self.raw[span.payload()])?));
                                 }
-                                record.value = Some((span, ebml::uint(&self.raw[span.payload()])?));
                             }
                             0x41e7 => {
-                                if record.kind.is_some() {
-                                    return Err(Error::Invalid("duplicate BlockAddIDType"));
+                                if record.kind.is_none() {
+                                    record.kind =
+                                        Some((span, ebml::uint(&self.raw[span.payload()])?));
                                 }
-                                record.kind = Some((span, ebml::uint(&self.raw[span.payload()])?));
                             }
                             0x41a4 => {
-                                if record.name.replace(span).is_some() {
-                                    return Err(Error::Invalid("duplicate BlockAddIDName"));
+                                if record.name.is_none() {
+                                    record.name = Some(span);
+                                    self.text =
+                                        Some(TextJob::new(self.raw.clone(), span.payload(), true)?);
+                                    self.phase = Phase::Name;
                                 }
-                                self.text =
-                                    Some(TextJob::new(self.raw.clone(), span.payload(), true)?);
-                                self.phase = Phase::Name;
                             }
                             0x41ed => {
-                                if record.extra.replace(span).is_some() {
-                                    return Err(Error::Invalid("duplicate BlockAddIDExtraData"));
-                                }
+                                record.extra.get_or_insert(span);
                             }
                             _ => {
                                 let count = self

@@ -510,22 +510,20 @@ impl GroupJob {
             return Ok(());
         }
         match (scope, child.id) {
+            // A child that may occur once is read at its first occurrence; a later one
+            // is passed over (RFC 8794 §12).
             (Scope::Group, 0xa1) => {
-                if self.block.replace(span).is_some() {
-                    return Err(Error::Invalid("duplicate Block"));
-                }
+                self.block.get_or_insert(span);
             }
             (Scope::Group, 0x9b) => {
-                if self.duration.is_some() {
-                    return Err(Error::Invalid("duplicate BlockDuration"));
+                if self.duration.is_none() {
+                    self.duration = Some((span, ebml::uint(&self.raw[span.payload()])?));
                 }
-                self.duration = Some((span, ebml::uint(&self.raw[span.payload()])?));
             }
             (Scope::Group, 0x75a2) => {
-                if self.discard.is_some() {
-                    return Err(Error::Invalid("duplicate DiscardPadding"));
+                if self.discard.is_none() {
+                    self.discard = Some((span, ebml::sint(&self.raw[span.payload()])?));
                 }
-                self.discard = Some((span, ebml::sint(&self.raw[span.payload()])?));
             }
             (Scope::Group, 0xfb) => {
                 let value = ebml::sint(&self.raw[span.payload()])?;
@@ -533,16 +531,13 @@ impl GroupJob {
                 self.queue(Pending::Reference(value))?;
             }
             (Scope::Group, 0xa4) => {
-                if self.state.replace(span).is_some() {
-                    return Err(Error::Invalid("duplicate CodecState"));
-                }
+                self.state.get_or_insert(span);
             }
             (Scope::Group, 0x75a1) => {
-                if self.additions_seen {
-                    return Err(Error::Invalid("duplicate BlockAdditions"));
+                if !self.additions_seen {
+                    self.additions_seen = true;
+                    self.push_frame(Scope::Additions, span)?;
                 }
-                self.additions_seen = true;
-                self.push_frame(Scope::Additions, span)?;
             }
             (Scope::Additions, 0xa6) => {
                 self.more = Some(More {
@@ -555,29 +550,24 @@ impl GroupJob {
             }
             (Scope::More(_), 0xee) => {
                 let more = self.more.as_mut().required("missing BlockMore")?;
-                if more.id_field.replace(span).is_some() {
-                    return Err(Error::Invalid("duplicate BlockAddID"));
-                }
-                more.id = if span.data == span.end {
-                    1
-                } else {
-                    ebml::uint(&self.raw[span.payload()])?
-                };
-                if more.id == 0 {
-                    return Err(Error::Invalid("zero BlockAddID"));
+                if more.id_field.is_none() {
+                    more.id_field = Some(span);
+                    more.id = if span.data == span.end {
+                        1
+                    } else {
+                        ebml::uint(&self.raw[span.payload()])?
+                    };
+                    if more.id == 0 {
+                        return Err(Error::Invalid("zero BlockAddID"));
+                    }
                 }
             }
             (Scope::More(_), 0xa5) => {
-                if self
-                    .more
+                self.more
                     .as_mut()
                     .required("missing BlockMore")?
                     .data
-                    .replace(span)
-                    .is_some()
-                {
-                    return Err(Error::Invalid("duplicate BlockAdditional"));
-                }
+                    .get_or_insert(span);
             }
             _ => {
                 let scope = match scope {

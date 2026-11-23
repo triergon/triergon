@@ -180,9 +180,8 @@ subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering va
 exact `f64`. Zero-length numbers take the schema default. Values are reported as written:
 RFC 9559 gives chromaticity the range [0, 1] and luminance a lower bound of 0, but
 neither it nor RFC 8794 (§11.1.6.6) tells a reader to refuse a value outside a range,
-so a non-finite, negative or out-of-range value is reported, not judged. A repeated
-Colour, Colour child or MasteringMetadata child is ignored after its first occurrence
-(RFC 8794 §12). A number wider than its type allows fails the track.
+so a non-finite, negative or out-of-range value is reported, not judged. A number wider
+than its type allows fails the track.
 
 **Block addition mappings.** `TrackExtensions` reports MaxBlockAdditionID and each
 BlockAdditionMapping as written. A mapping field the reader does not need to read blocks
@@ -190,8 +189,19 @@ is not judged: a BlockAddIDValue below 2 (RFC 9559 §5.1.4.1.17.1 allows 2 and a
 reported and describes no BlockAddID, and BlockAddIDExtraData is the BlockAddIDType's
 private data (§5.1.4.1.17.4), however short for that type. Neither RFC 9559 nor
 RFC 8794 tells a reader to refuse a value outside its range. What blocks depend on still
-fails the input: a BlockAddID above the track's MaxBlockAdditionID, a repeated mapping
-child and malformed EBML.
+fails the input: a BlockAddID above the track's MaxBlockAdditionID and malformed EBML.
+
+**Repeated children.** A child a schema allows once is read at its first occurrence and
+passed over after it (RFC 8794 §12): in a TrackEntry (its scalar fields, flags, languages,
+Video, Audio, Colour and ContentEncodings), a BlockAdditionMapping, MaxBlockAdditionID, a
+ContentEncoding's ContentCompression, a BlockGroup (Block, BlockDuration, DiscardPadding,
+CodecState, BlockAdditions, and a BlockMore's BlockAddID and BlockAdditional), a CuePoint
+and its CueTrackPositions, and a Seek entry. Three rules are of another kind and still
+fail the input: two tracks with one TrackNumber or TrackUID, two additions with one
+BlockAddID in a BlockGroup, and two ContentEncodings with one ContentEncodingOrder. A
+repeated single-occurrence child inside an Info, Chapters, Tags or Attachments document
+also still fails it (`duplicate metadata field`), as does a second Cues or Attachments
+element.
 
 **Reference compatibility.** The reader follows the specifications. The `compat`
 modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
