@@ -7,6 +7,7 @@ worker mode is `{prefix}fold FILE ARGS`, `{prefix}bench FILE ITERATIONS ARGS`,
 
 [`Invocation`] parses the command line. Each measurement function checks that
 completed operations release their budget charges and writes one result line.
+A refusal identifies the input event with a [`RefusalCause`] JSON object.
 
 | Function | Result |
 |---|---|

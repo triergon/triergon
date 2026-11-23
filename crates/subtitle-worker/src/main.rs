@@ -46,7 +46,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use triergon_core::Budget;
-use triergon_harness_runner::{Invocation, Mode, Refusal, Totals, measure_with};
+use triergon_harness_runner::{Invocation, Mode, Refusal, RefusalCause, Totals, measure_with};
 
 /// The words after the file: KIND and its arguments.
 const USAGE: &str = " KIND [ARG...]";
@@ -273,7 +273,10 @@ fn run(words: &[String]) -> Result<()> {
                     let refused = error.downcast::<Refused>()?;
                     Some(Box::new(Refusal {
                         reason: refused.error.to_string(),
-                        cause: format!("{{\"packet\":{}}}", refused.packet),
+                        cause: RefusalCause::from_json(format!(
+                            "{{\"packet\":{}}}",
+                            refused.packet
+                        )),
                     }))
                 }
             };

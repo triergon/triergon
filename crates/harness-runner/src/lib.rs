@@ -358,7 +358,24 @@ pub struct Refusal {
     /// The error, printed as a JSON string.
     pub reason: String,
     /// The input event it is attributed to, a JSON object.
-    pub cause: String,
+    pub cause: RefusalCause,
+}
+
+/// The JSON object that identifies the input event responsible for a refusal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct RefusalCause(String);
+
+impl RefusalCause {
+    /// Wrap an encoded JSON object supplied by the operation.
+    pub fn from_json(object: String) -> Self {
+        Self(object)
+    }
+
+    /// Borrow the encoded object for inclusion in a result line.
+    pub fn as_json(&self) -> &str {
+        &self.0
+    }
 }
 
 /// Run `operation` as often as the invocation asks and print the result line: the
@@ -581,7 +598,7 @@ fn write_result(
         line.push_str(",\"refusal\":");
         push_quoted(&mut line, &refusal.reason);
         line.push_str(",\"cause\":");
-        line.push_str(&refusal.cause);
+        line.push_str(refusal.cause.as_json());
     }
     line.push('}');
     writeln!(out, "{line}")?;
@@ -606,7 +623,7 @@ mod tests {
             Ok(Totals {
                 refusal: Some(Box::new(Refusal {
                     reason: "control refusal".into(),
-                    cause: "{}".into(),
+                    cause: RefusalCause::from_json("{}".into()),
                 })),
                 ..Totals::default()
             })
@@ -630,7 +647,7 @@ mod tests {
                 refusal: (executed < 3).then(|| {
                     Box::new(Refusal {
                         reason: "control refusal".into(),
-                        cause: "{}".into(),
+                        cause: RefusalCause::from_json("{}".into()),
                     })
                 }),
                 ..Totals::default()

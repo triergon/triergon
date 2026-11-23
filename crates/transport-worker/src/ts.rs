@@ -30,6 +30,7 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceId, Step, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+use triergon_harness_runner::RefusalCause;
 use triergon_mpegts::compat::pes::{
     DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DvbSubtitlesDescriptors,
     MalformedInputCompletion, MalformedSourceDisposition, NoMediaConfirmation, PacketCompletion,
@@ -191,7 +192,7 @@ impl Cause {
         let null = |value: Option<u64>| value.map_or("null".into(), |value| value.to_string());
         Refusal {
             reason: error.to_string(),
-            cause: format!(
+            cause: RefusalCause::from_json(format!(
                 "{{\"phase\":\"{}\",\"source_event_ordinal\":{},\"source\":{},\"offset\":{},\"clock_epoch\":{},\"configuration_epoch\":{}}}",
                 self.phase,
                 null(self.ordinal),
@@ -199,7 +200,7 @@ impl Cause {
                 null(self.offset),
                 self.epochs.clock,
                 self.epochs.configuration,
-            ),
+            )),
         }
     }
 }

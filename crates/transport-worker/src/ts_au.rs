@@ -20,6 +20,7 @@ use triergon_framing::{
     mpeg_audio::MpegLayer,
 };
 use triergon_harness_protocol::digest::signed;
+use triergon_harness_runner::RefusalCause;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
 use triergon_mpegts::compat::input::PositionBasis;
@@ -221,10 +222,10 @@ fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation
     totals.refusal.get_or_insert_with(|| {
         Box::new(Refusal {
             reason: error.to_string(),
-            cause: format!(
+            cause: RefusalCause::from_json(format!(
                 "{{\"phase\":\"access_units\",\"source\":{},\"input_window_offset\":{}}}",
                 at.source.0, at.offset,
-            ),
+            )),
         })
     });
     totals
@@ -463,10 +464,10 @@ fn fold_packet<Policy: Observation>(
 fn diagnostic_refusal(fault: &triergon_mpegts::stream::TraceFault) -> Refusal {
     Refusal {
         reason: format!("source diagnostic: {:?}", fault.kind),
-        cause: format!(
+        cause: RefusalCause::from_json(format!(
             "{{\"phase\":\"diagnostic\",\"source\":{},\"offset\":{}}}",
             fault.location.source.0, fault.location.offset,
-        ),
+        )),
     }
 }
 
@@ -1199,7 +1200,7 @@ mod tests {
             assert_eq!(totals.packets, 0);
             let refusal = totals.refusal.unwrap();
             assert!(refusal.reason.starts_with("source diagnostic:"));
-            assert!(refusal.cause.contains("\"phase\":\"diagnostic\""));
+            assert!(refusal.cause.as_json().contains("\"phase\":\"diagnostic\""));
         }
     }
 
