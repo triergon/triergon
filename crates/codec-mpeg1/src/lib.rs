@@ -34,6 +34,50 @@ pub use triergon_core::Budget;
 use triergon_core::{BudgetVec, Reservation};
 use triergon_pixel::{CodedPicture, MacroblockGeometry, PictureView};
 
+/// Picture rates carried by the sequence header's frame rate code (ISO/IEC 11172-2
+/// Table 2-D.4).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub enum FrameRate {
+    /// 24,000/1,001 pictures per second.
+    Fps24Ntsc = 1,
+    /// 24 pictures per second.
+    Fps24 = 2,
+    /// 25 pictures per second.
+    Fps25 = 3,
+    /// 30,000/1,001 pictures per second.
+    Fps30Ntsc = 4,
+    /// 30 pictures per second.
+    Fps30 = 5,
+    /// 50 pictures per second.
+    Fps50 = 6,
+    /// 60,000/1,001 pictures per second.
+    Fps60Ntsc = 7,
+    /// 60 pictures per second.
+    Fps60 = 8,
+}
+
+impl FrameRate {
+    const fn ratio(self) -> (u32, u32) {
+        match self {
+            Self::Fps24Ntsc => (24_000, 1_001),
+            Self::Fps24 => (24, 1),
+            Self::Fps25 => (25, 1),
+            Self::Fps30Ntsc => (30_000, 1_001),
+            Self::Fps30 => (30, 1),
+            Self::Fps50 => (50, 1),
+            Self::Fps60Ntsc => (60_000, 1_001),
+            Self::Fps60 => (60, 1),
+        }
+    }
+
+    /// Picture count in one second of non-drop-frame time code.
+    pub(crate) const fn time_code_rate(self) -> u64 {
+        let (numerator, denominator) = self.ratio();
+        numerator.div_ceil(denominator) as u64
+    }
+}
+
 /// The parameters of one coded sequence. [`Encoder::new`] refuses values outside the
 /// ranges given here.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -47,12 +91,13 @@ pub struct EncoderConfig {
     /// value marks a variable bit rate stream).
     pub max_rate: u32,
     /// VBV buffer size in bits, signalled rounded up to 16,384-bit units; from one
-    /// picture at the average rate (`bit_rate` / 30: no picture can be larger than
-    /// the buffer, so a smaller one cannot carry the average rate) to 16,760,832
-    /// (1023 units).
+    /// picture at the average rate (`bit_rate` divided by the picture rate) to
+    /// 16,760,832 (1023 units).
     pub vbv_bits: u32,
     /// Intra period: an I picture at least every `gop` pictures; nonzero.
     pub gop: u32,
+    /// Picture rate signalled in the sequence and used by the VBV model.
+    pub frame_rate: FrameRate,
 }
 
 /// Storage limits of one encoder.
@@ -74,9 +119,6 @@ impl Default for Limits {
         }
     }
 }
-
-/// The picture rate the sequence header signals (frame_rate_code 5).
-const FPS: f64 = 30.0;
 
 /// Bits one macroblock can take: an 11-bit address increment, a 6-bit type, a 5-bit
 /// quantiser, two 14-bit vector components, a 9-bit coded_block_pattern and six
@@ -137,8 +179,8 @@ pub struct Encoder {
     /// tells a repeated picture.
     previous_chroma: BudgetVec<u8>,
     /// Per macroblock, the quantiser at which the previous picture skipped it
-    /// after its residual quantised to zero; 0 (no quantiser) where it did not. A
-    /// byte rather than an `Option`, which spilled registers in the macroblock loop.
+    /// after its residual quantised to zero; 0 (no quantiser) where it did not.
+    // Option<NonZeroU8> spilled macroblock-loop registers and added up to 0.37% instructions.
     skipped_at: BudgetVec<u8>,
     /// Macroblocks skipped again from `skipped_at` without coding a residual.
     #[cfg(test)]
@@ -180,6 +222,8 @@ impl Encoder {
         let g = cfg.geometry;
         let mbs = g.macroblock_width() * g.macroblock_height();
         let picture_bound = picture_bound(&cfg)?;
+        let (numerator, denominator) = cfg.frame_rate.ratio();
+        let fps = f64::from(numerator) / f64::from(denominator);
         Ok(Encoder {
             cfg,
             reference: Planes::try_new(budget, g)?,
@@ -191,7 +235,7 @@ impl Encoder {
                 (g.macroblock_width() * MB_BITS).div_ceil(8) + 8,
             )?),
             quant: Quantizer::new(),
-            rc: RateControl::new(cfg.bit_rate, cfg.max_rate, cfg.vbv_bits, cfg.gop, FPS),
+            rc: RateControl::new(cfg.bit_rate, cfg.max_rate, cfg.vbv_bits, cfg.gop, fps),
             analysis: BudgetVec::try_filled(budget, Decision::default(), mbs)?,
             row_activity: BudgetVec::try_filled(budget, 0.0, g.macroblock_height())?,
             previous_mvs: BudgetVec::try_filled(budget, Mv::ZERO, mbs)?,
@@ -268,8 +312,10 @@ fn validate(cfg: &EncoderConfig) -> Result<()> {
         return Err(EncodeError::BitRate(cfg.max_rate));
     }
     // Each picture leaves the VBV whole at its decode time (Annex C), so pictures
-    // averaging bit_rate / 30 bits need a buffer of at least that.
-    if u64::from(cfg.vbv_bits) * (FPS as u64) < u64::from(cfg.bit_rate)
+    // need a buffer that can hold one average picture at the configured rate.
+    let (numerator, denominator) = cfg.frame_rate.ratio();
+    if u64::from(cfg.vbv_bits) * u64::from(numerator)
+        < u64::from(cfg.bit_rate) * u64::from(denominator)
         || cfg.vbv_bits.div_ceil(16384) > 1023
     {
         return Err(EncodeError::VbvBuffer(cfg.vbv_bits));
@@ -301,6 +347,7 @@ mod tests {
     #[test]
     fn the_default_limit_holds_the_largest_configuration() {
         let cfg = EncoderConfig {
+            frame_rate: FrameRate::Fps30,
             geometry: MacroblockGeometry::new(4094, 4094).unwrap(),
             bit_rate: 100_000_000,
             max_rate: 100_000_000,

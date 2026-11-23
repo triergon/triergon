@@ -48,7 +48,7 @@ impl Encoder {
                 self.probe_intra(input, scratch)?;
             }
             syntax::write_sequence_header(&mut self.writer, &self.cfg);
-            syntax::write_gop_header(&mut self.writer, self.index);
+            syntax::write_gop_header(&mut self.writer, self.index, self.cfg.frame_rate);
         }
         let temporal_reference = ((self.index - self.gop_start) % 1024) as u32;
         syntax::write_picture_header(&mut self.writer, temporal_reference, picture_type, f_code);

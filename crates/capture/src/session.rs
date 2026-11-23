@@ -1,7 +1,7 @@
 //! One capture session: RGBA in, MPEG-1-in-TS bytes out.
 
 use crate::{CaptureError, Result};
-use triergon_codec_mpeg1::{EncodedPicture, Encoder, EncoderConfig};
+use triergon_codec_mpeg1::{EncodedPicture, Encoder, EncoderConfig, FrameRate};
 use triergon_mpegts::mux::{MuxConfig, Muxer};
 #[cfg(feature = "reference-trace")]
 use triergon_pixel::PictureView;
@@ -114,6 +114,7 @@ impl Session {
     ) -> Result<Session> {
         let geometry = MacroblockGeometry::new(cfg.width, cfg.height)?;
         let encoder = Encoder::new(EncoderConfig {
+            frame_rate: FrameRate::Fps30,
             geometry,
             bit_rate: cfg.bit_rate,
             max_rate: cfg.max_rate,

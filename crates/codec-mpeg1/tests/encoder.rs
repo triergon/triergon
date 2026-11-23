@@ -1,7 +1,8 @@
-use triergon_codec_mpeg1::{Budget, EncodeError, Encoder, EncoderConfig, Limits};
+use triergon_codec_mpeg1::{Budget, EncodeError, Encoder, EncoderConfig, FrameRate, Limits};
 use triergon_pixel::{CodedPicture, MacroblockGeometry};
 fn cfg() -> EncoderConfig {
     EncoderConfig {
+        frame_rate: FrameRate::Fps30,
         geometry: MacroblockGeometry::new(16, 16).unwrap(),
         bit_rate: 1_000_000,
         max_rate: 1_400_000,
@@ -170,4 +171,50 @@ fn repeated_luma_needs_no_motion_scratch_even_when_chroma_changes() {
     let picture = encoder.encode(&input, &mut out).unwrap();
     assert_eq!(picture.index, 1);
     assert!(!picture.key);
+}
+
+#[test]
+fn configured_picture_rate_sets_sequence_and_gop_timing() {
+    let config = EncoderConfig {
+        frame_rate: FrameRate::Fps25,
+        gop: 1,
+        ..cfg()
+    };
+    let mut encoder = Encoder::new(config).unwrap();
+    let input = CodedPicture::new(config.geometry);
+    let mut bytes = Vec::new();
+    for _ in 0..=25 {
+        encoder.encode(&input, &mut bytes).unwrap();
+    }
+
+    assert_eq!(&bytes[..4], &[0, 0, 1, 0xb3]);
+    assert_eq!(bytes[7] & 15, 3);
+    let gop = bytes
+        .windows(4)
+        .position(|window| window == [0, 0, 1, 0xb8])
+        .unwrap();
+    let time_code = u32::from_be_bytes(bytes[gop + 4..gop + 8].try_into().unwrap());
+    assert_eq!((time_code >> 13) & 63, 1); // second
+    assert_eq!((time_code >> 7) & 63, 0); // picture within the second
+}
+
+#[test]
+fn fractional_picture_rate_validates_the_exact_vbv_boundary() {
+    let config = EncoderConfig {
+        frame_rate: FrameRate::Fps30Ntsc,
+        bit_rate: 30_000,
+        vbv_bits: 1_000,
+        ..cfg()
+    };
+    assert!(matches!(
+        Encoder::new(config),
+        Err(EncodeError::VbvBuffer(1_000))
+    ));
+    assert!(
+        Encoder::new(EncoderConfig {
+            vbv_bits: 1_001,
+            ..config
+        })
+        .is_ok()
+    );
 }

@@ -3,7 +3,7 @@
 //! was not measured) may teach the model.
 
 use super::*;
-use crate::{Encoder, EncoderConfig};
+use crate::{Encoder, EncoderConfig, FrameRate};
 use triergon_pixel::{CodedPicture, MacroblockGeometry};
 
 /// A controller at 30 kbit/s whose intra model is seeded at α = 3200.
@@ -20,6 +20,7 @@ fn finish(rc: &mut RateControl, bits: f64, texture: f64, q: f64, censored: bool)
 /// A 16×16 encoder at 30 kbit/s with a VBV buffer of `vbv_bits`.
 fn encoder(vbv_bits: u32) -> Encoder {
     Encoder::new(EncoderConfig {
+        frame_rate: FrameRate::Fps30,
         geometry: MacroblockGeometry::new(16, 16).unwrap(),
         bit_rate: 30_000,
         max_rate: 42_000,
@@ -198,6 +199,7 @@ fn an_intra_picture_under_the_vbv_guard_underflows_and_keeps_the_seeded_model() 
     // its headers and DC-only macroblocks alone are larger.
     let geometry = MacroblockGeometry::new(64, 64).unwrap();
     let mut e = Encoder::new(EncoderConfig {
+        frame_rate: FrameRate::Fps30,
         geometry,
         bit_rate: 3_000,
         max_rate: 4_200,
@@ -334,6 +336,7 @@ fn a_predicted_picture_models_all_its_texture_bits() {
 fn the_trial_pass_measures_the_side_bits_of_the_whole_picture() {
     let geometry = MacroblockGeometry::new(480, 272).unwrap();
     let mut e = Encoder::new(EncoderConfig {
+        frame_rate: FrameRate::Fps30,
         geometry,
         bit_rate: 600_000,
         max_rate: 840_000,
@@ -376,6 +379,7 @@ fn luma_error(e: &Encoder, input: &CodedPicture) -> u64 {
 fn a_static_scene_is_refined_by_its_first_repeated_picture() {
     let geometry = MacroblockGeometry::new(480, 272).unwrap();
     let mut e = Encoder::new(EncoderConfig {
+        frame_rate: FrameRate::Fps30,
         geometry,
         bit_rate: 450_000,
         max_rate: 630_000,

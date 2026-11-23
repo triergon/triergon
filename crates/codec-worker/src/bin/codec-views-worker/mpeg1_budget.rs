@@ -4,7 +4,7 @@ use std::ffi::OsString;
 use std::io::Write;
 
 use triergon::Budget;
-use triergon_codec_mpeg1::{EncodeError, Encoder, EncoderConfig, Limits};
+use triergon_codec_mpeg1::{EncodeError, Encoder, EncoderConfig, FrameRate, Limits};
 use triergon_pixel::{CodedPicture, MacroblockGeometry};
 
 use triergon_harness_runner::{Operation, Totals};
@@ -29,6 +29,7 @@ pub(super) fn operation<'a>(
         return Err("expected only the coded width and height".into());
     }
     let cfg = EncoderConfig {
+        frame_rate: FrameRate::Fps30,
         geometry,
         bit_rate: 240_000,
         max_rate: 320_001,

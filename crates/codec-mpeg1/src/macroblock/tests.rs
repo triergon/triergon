@@ -2,11 +2,12 @@
 //! reused for a repeated picture against the computed path.
 
 use super::*;
-use crate::EncoderConfig;
+use crate::{EncoderConfig, FrameRate};
 
 /// The capture rate rule at 1 Mbit/s for pictures of `geometry`.
 fn config(geometry: MacroblockGeometry) -> EncoderConfig {
     EncoderConfig {
+        frame_rate: FrameRate::Fps30,
         geometry,
         bit_rate: 1_000_000,
         max_rate: 1_400_000,

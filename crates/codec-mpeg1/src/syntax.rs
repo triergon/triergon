@@ -3,20 +3,17 @@
 //! DC differentials and run/level coefficients of the block layer. The variable-length
 //! codes are those of Annex B ([`tables`](crate::tables)).
 
-use crate::EncoderConfig;
 use crate::bits::BitWriter;
 use crate::block::bits;
 use crate::tables::{
     COEFFICIENTS, DC_SIZE_CHROMA, DC_SIZE_LUMA, DCT_ESCAPE, END_OF_BLOCK, MOTION_CODE, SCAN_BIT,
     ZIGZAG,
 };
+use crate::{EncoderConfig, FrameRate};
 
 /// The bit_rate value that identifies variable bit rate operation (§2.4.3.2): a rate the
 /// header states is coded below it.
 pub(crate) const VARIABLE_BIT_RATE: u32 = 0x3FFFF;
-
-/// Picture rate 30 Hz: frame_rate_code 5 in Table 2-D.4.
-const FRAME_RATE_CODE: u32 = 5;
 
 /// The coding types of the pictures the encoder writes (picture_coding_type, §2.4.3.4).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,7 +22,7 @@ pub(crate) enum PictureType {
     Predicted,
 }
 
-/// The sequence header of `cfg` (§2.4.2.3): square samples at 30 Hz, the default
+/// The sequence header of `cfg` (§2.4.2.3): square samples, the default
 /// quantiser matrices, and the configured rate and VBV buffer in their units.
 pub(crate) fn write_sequence_header(w: &mut BitWriter, cfg: &EncoderConfig) {
     let g = cfg.geometry;
@@ -33,7 +30,7 @@ pub(crate) fn write_sequence_header(w: &mut BitWriter, cfg: &EncoderConfig) {
     w.put(g.width() as u32, 12);
     w.put(g.height() as u32, 12);
     w.put(1, 4); // pel_aspect_ratio: 1.0 (square)
-    w.put(FRAME_RATE_CODE, 4);
+    w.put(cfg.frame_rate as u32, 4);
     w.put(cfg.max_rate.div_ceil(400), 18);
     w.put(1, 1); // marker
     w.put(cfg.vbv_bits.div_ceil(16384), 10);
@@ -43,19 +40,20 @@ pub(crate) fn write_sequence_header(w: &mut BitWriter, cfg: &EncoderConfig) {
 }
 
 /// The group of pictures header (§2.4.2.4) of a GOP starting at picture `index`:
-/// its time code at 30 Hz.
-pub(crate) fn write_gop_header(w: &mut BitWriter, index: u64) {
-    let n = index;
+/// its non-drop-frame time code at `frame_rate`.
+pub(crate) fn write_gop_header(w: &mut BitWriter, index: u64, frame_rate: FrameRate) {
+    let rate = frame_rate.time_code_rate();
+    let seconds = index / rate;
     w.start_code(0xB8);
     w.put(0, 1); // drop_frame_flag
-    w.put(((n / (30 * 3600)) % 24) as u32, 5);
-    w.put(((n / 1800) % 60) as u32, 6);
+    w.put(((seconds / 3600) % 24) as u32, 5);
+    w.put(((seconds / 60) % 60) as u32, 6);
     w.put(1, 1); // marker
-    w.put(((n / 30) % 60) as u32, 6);
-    w.put((n % 30) as u32, 6);
+    w.put((seconds % 60) as u32, 6);
+    w.put((index % rate) as u32, 6);
     // closed_gop: set on the session's first GOP only, as the reference
     // does; with no B pictures the flag has no decoding consequence.
-    w.put((n == 0) as u32, 1);
+    w.put((index == 0) as u32, 1);
     w.put(0, 1); // broken_link
 }
 
