@@ -3,19 +3,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, WorkBudget,
 };
-use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
+use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep, PositionBasis};
 use triergon_mpegts::compat::pes::{DemuxObserver, DemuxScope, SourceContext};
 use triergon_mpegts::pes::stream_id;
 use triergon_mpegts::psi::stream_type;
-#[cfg(feature = "reference-trace")]
-use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::transport::parse_transport;
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits, SourceEpochs};
 
 const LONG: &[u8] = include_bytes!("../data/native-input-v1/original-valid-rebind-192.m2ts");
-#[cfg(feature = "reference-trace")]
 const SHORT: &[u8] = include_bytes!("../data/native-input-v1/opaque-PES-1-carrier-192-tail-3.m2ts");
-#[cfg(feature = "reference-trace")]
 const TS: &[u8] = include_bytes!("../data/native-input-v1/original-valid-rebind-188.ts");
 
 fn setup(bytes: &[u8], known: bool) -> (Budget, InputCursor, InputWindow) {
@@ -118,7 +114,6 @@ fn actual_original_long_m2ts_first_pes_uses_carrier_start_with_real_context() {
         "demux packet positions match the recorded carrier starts"
     );
 }
-#[cfg(feature = "reference-trace")]
 #[test]
 fn short_192_stays_sync_start() {
     let (_, i, w) = setup(SHORT, true);
@@ -127,7 +122,6 @@ fn short_192_stays_sync_start() {
         PositionBasis::SyncStart
     );
 }
-#[cfg(feature = "reference-trace")]
 #[test]
 fn ordinary_188_stays_carrier_start() {
     let (_, i, w) = setup(TS, true);
@@ -188,7 +182,6 @@ fn cancellation_does_no_inspection_and_preserves_retry() {
     ));
     assert_eq!(j.inspected_bytes(), 1);
 }
-#[cfg(feature = "reference-trace")]
 #[test]
 fn unknown_declared_size_can_use_actual_eof() {
     let (_, i, w) = setup(LONG, false);

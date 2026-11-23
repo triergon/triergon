@@ -14,6 +14,7 @@ use triergon_framing::mpeg_audio::MpegLayer;
 use triergon_mpegts::compat::annex_b::{
     ContinuityEvent, ContinuityReader, ContinuityResidue, VideoEofPolicy,
 };
+use triergon_mpegts::compat::input::PositionBasis;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::pes::{DemuxClock, PrivateAudioCarriage, UnframedAudioPolicy};
 use triergon_mpegts::compat::{adts, latm};
@@ -22,7 +23,6 @@ use triergon_mpegts::psi::{DescriptorNamespace, DvbNamespaceEvidence};
 use triergon_mpegts::reader::{
     AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, PacketClock,
 };
-use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::transport::ContinuityOutcome;
 use triergon_mpegts::{

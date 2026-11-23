@@ -4,8 +4,8 @@
 //! traces byte for byte. They are not behaviour a consumer selects outside a
 //! comparison, and they are absent from default builds. The feature also exposes
 //! [`DemuxClock::project_encoded_header`](crate::compat::pes::DemuxClock::project_encoded_header),
-//! [`DemuxClock::project_diagnostic_header`](crate::compat::pes::DemuxClock::project_diagnostic_header),
-//! [`InputContext::basis`](crate::compat::input::InputContext::basis) and
+//! [`DemuxClock::project_diagnostic_header`](crate::compat::pes::DemuxClock::project_diagnostic_header)
+//! and
 //! [`ElementaryStream::dvb_single_service_view`](crate::psi::ElementaryStream::dvb_single_service_view).
 
 pub mod recovery;
@@ -21,11 +21,4 @@ pub mod dvb {
     //!
     //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
     pub use crate::psi::dvb::{DvbSingleServiceView, DvbViewProfile};
-}
-
-pub mod input {
-    //! Which carrier offset the demuxer reports positions from.
-    //!
-    //! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
-    pub use crate::compat::input::basis::PositionBasis;
 }

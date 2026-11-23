@@ -8,6 +8,8 @@
 //!
 //! The discovered grid determines compatibility byte positions. Each carrier
 //! still undergoes transport validation when the source reader consumes it.
+//!
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 use crate::PacketFormat;
 use crate::transport::SYNC;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -15,21 +17,14 @@ use triergon_core::{
     Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
 };
 
-pub(crate) mod basis {
-    /// Byte position origin for each carrier on an admitted transport grid.
-    #[cfg_attr(
-        not(feature = "reference-trace"),
-        allow(unreachable_pub, reason = "exported only with reference-trace")
-    )]
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    pub enum PositionBasis {
-        /// Packet positions point at each sync byte, after any M2TS prefix.
-        SyncStart,
-        /// Packet positions point at each carrier's first byte, prefix included.
-        CarrierStart,
-    }
+/// Which byte of a carrier the demuxer's packet positions point at.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PositionBasis {
+    /// The sync byte, after the four-byte M2TS prefix.
+    SyncStart,
+    /// The carrier's first byte, the M2TS prefix included.
+    CarrierStart,
 }
-use basis::PositionBasis;
 
 #[derive(Clone, Copy, Debug)]
 enum Extent {
@@ -57,12 +52,14 @@ pub struct InputContext {
     inspected_bytes: usize,
 }
 impl InputContext {
-    /// Reports whether packet byte positions include an M2TS carrier’s four-byte prefix.
-    #[cfg(feature = "reference-trace")]
+    /// Which byte of each carrier the demuxer's positions for this input point at:
+    /// `SyncStart` for a finite M2TS input with fewer than seven sync bytes on its
+    /// 192-byte grid, `CarrierStart` otherwise.
     pub fn basis(&self) -> PositionBasis {
         self.basis
     }
-    /// True when the carrier grid is known and physical reads can continue past the initial prefix.
+    /// True when the context came from an M2TS prefix window rather than a whole finite
+    /// input, so reads may continue past the inspected bytes.
     pub fn is_prefix(&self) -> bool {
         matches!(self.extent, Extent::Prefix(_))
     }
@@ -70,12 +67,15 @@ impl InputContext {
     pub fn inspected_bytes(&self) -> usize {
         self.inspected_bytes
     }
-    /// The original charged prefix or whole-entity window supplied for grid detection.
+    /// The charged initial window the grid was found in: a prefix or the whole entity.
     pub fn backing_bytes(&self) -> &Bytes {
         &self.backing
     }
-    /// Sequential consumption retains the request token. A range/reset/entity
-    /// transaction invalidates it independently of clock/configuration epochs.
+    /// Checks that `input` still reads the request this context was found for.
+    ///
+    /// Fails with `SourceMismatch` for another source, `Invalid` for another request token
+    /// (a range request, reset or entity change makes a new one) or a position past a finite
+    /// input's end, and `ForeignPool` when the window belongs to another byte pool.
     pub fn validate_cursor(&self, input: &InputCursor) -> Result<()> {
         if input.source() != self.source {
             return Err(Error::SourceMismatch);
@@ -104,8 +104,8 @@ impl InputContext {
     }
 }
 
-/// Sealed scalar facts retained by assembly. No input allocation is kept alive
-/// after startup inspection merely to remember its position interpretation.
+/// The request, grid and basis an observer computes positions against, without the
+/// inspected window.
 #[derive(Clone, Debug)]
 pub(crate) struct InputBinding {
     source: SourceId,
@@ -194,9 +194,9 @@ pub enum InputStep {
     Ready(InputContext),
 }
 
-/// One borrowed, already core-validated initial window. No allocation/copy,
-/// second cursor, byte consumption, source reset or retained output queue.
-/// The prefix profile can use a caller-assembled initial window.
+/// Finds the carrier grid in the window an [`InputCursor`] holds at offset 0, without
+/// consuming it: the whole of a finite input ([`Self::new`]) or an 8192-byte M2TS prefix
+/// ([`Self::new_m2ts_prefix`]).
 #[derive(Debug)]
 pub struct InputBootstrap {
     source: SourceId,
@@ -232,8 +232,10 @@ impl InputBootstrap {
         )
     }
 
-    /// Inspect a complete initial M2TS probe window already provided to the
-    /// actual cursor. The selected grid must be decisive within that window.
+    /// A bootstrap over the first [`M2TS_PREFIX_BYTES`](Self::M2TS_PREFIX_BYTES) of an M2TS
+    /// input, which `input` has buffered at offset 0; the grid must be decided within them.
+    ///
+    /// Fails with `Invalid` for a window of another size, and as [`Self::new`] otherwise.
     pub fn new_m2ts_prefix(input: &InputCursor, window: &InputWindow) -> Result<Self> {
         if window.bytes().len() != Self::M2TS_PREFIX_BYTES {
             return Err(Error::Invalid("M2TS prefix requires an 8192-byte window"));
@@ -305,9 +307,13 @@ impl InputBootstrap {
         }
         Ok(())
     }
-    /// Caller reports an actual positive-size read returning EOF, never a
-    /// declared length or zero-size request. Core finish is deferred until the
-    /// real prefix has drained, preserving strict-source error/progress order.
+    /// Records that a read past the window found the end of the finite input at `end`.
+    /// Report a read that returned end of input, not a declared length; finish the cursor
+    /// only once the window's bytes have been read.
+    ///
+    /// Fails with `SourceMismatch` for another source, `Invalid` for another request token, a
+    /// prefix bootstrap or an `end` other than the window's length, and `Unsupported` when
+    /// `end` contradicts the declared source length.
     pub fn observe_entity_eof(
         &mut self,
         input: &InputCursor,
@@ -339,8 +345,7 @@ impl InputBootstrap {
     /// Scores sync bytes within `work` until the grid is decided.
     ///
     /// Returns `NeedEntityEof` until a finite input's EOF is observed, `Yield` when `work` is
-    /// spent,
-    /// and the context once found, again on every later poll. Fails with `Unsupported` when the
+    /// spent, and the context once found, again on every later poll. Fails with `Unsupported` when the
     /// input is not a whole number of packets, a sync byte is missing or another packet size
     /// competes with the format's grid; with `Cancelled` when `cancel` is set; and when `input` is
     /// not the bootstrap's source and request.

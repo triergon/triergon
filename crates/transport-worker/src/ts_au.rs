@@ -21,6 +21,7 @@ use triergon_framing::{
 use triergon_harness_protocol::digest::signed;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
+use triergon_mpegts::compat::input::PositionBasis;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::latm;
 use triergon_mpegts::compat::pes::{DemuxClock, UnframedAudioPolicy};
@@ -28,7 +29,6 @@ use triergon_mpegts::reader::{
     AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, IncompleteVideo, PacketClock,
     PayloadSource, UnframedAudio,
 };
-use triergon_mpegts::reference_trace::input::PositionBasis;
 use triergon_mpegts::stream::{FaultKind, TraceEvent};
 use triergon_mpegts::{AccessUnit, Packet, PacketFormat, ReaderEvent, ReaderLimits, SourceEpochs};
 

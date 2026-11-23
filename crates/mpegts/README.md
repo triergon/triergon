@@ -23,7 +23,7 @@ The crate exposes two views:
   rewrites source facts.
 
 The non-default `reference-trace` feature adds `reference_trace`: comparison-only
-projections (`recovery`, `catalogue`, `dvb`, `input`).
+projections (`recovery`, `catalogue`, `dvb`).
 
 ## Usage
 
@@ -89,7 +89,7 @@ file.
 | FFmpeg-compatible PES | `compat::pes::DemuxObserver::{new_registered, new_private_audio, new_hls_private_audio, new_dvb_subtitles}`; `compat::pes::PesCutter` → `CutPes` for one PID of any stream type |
 | FFmpeg-compatible streams | `compat::stream::{ProgramReader, codec, configuration, is_video}`: programs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration |
 | FFmpeg-compatible clock | `compat::pes::DemuxClock::{project_header, place}`, `compat::pes::pcr_bounded_pts` (teletext PTS) |
-| FFmpeg-compatible start position | `compat::input::InputBootstrap` |
+| FFmpeg-compatible start position | `compat::input::InputBootstrap` → `InputContext::basis` (`PositionBasis`) |
 
 A PMT track reports the codec named by its stream type or, for private PES data in
 a DVB namespace, by the first descriptor that names one; others stay
