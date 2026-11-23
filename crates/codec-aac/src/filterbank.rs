@@ -2,7 +2,7 @@
 //! (ISO/IEC 14496-3 4.6.11), plus the forward MDCT used by LTP.
 
 use crate::fft::Mdct;
-use crate::ics::WindowSequence;
+use crate::ics::{WindowSequence, WindowShape};
 
 /// Rising half (n < N/2) of the KBD window of length `n2 * 2` (ISO/IEC 14496-3 4.6.11.3.2).
 fn kbd_window(n2: usize, alpha: f64) -> Vec<f32> {
@@ -108,8 +108,8 @@ impl Filterbank {
         &mut self,
         coef: &[f32],
         seq: WindowSequence,
-        shape: u8,
-        prev_shape: u8,
+        shape: WindowShape,
+        prev_shape: WindowShape,
         overlap: &mut [f32],
         out: &mut [f32],
     ) {
@@ -211,8 +211,8 @@ impl Filterbank {
         &mut self,
         time: &[f32],
         seq: WindowSequence,
-        shape: u8,
-        prev_shape: u8,
+        shape: WindowShape,
+        prev_shape: WindowShape,
         out: &mut [f32],
     ) {
         let wl_prev = &self.win.long[prev_shape as usize];

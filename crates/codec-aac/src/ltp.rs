@@ -6,7 +6,7 @@
 //! analysis filtered when TNS is active, and added to the bands flagged in ltp_long_used.
 
 use crate::filterbank::Filterbank;
-use crate::ics::{ChannelData, CoreCfg, TNS_ANALYSIS, WindowSequence};
+use crate::ics::{ChannelData, CoreCfg, TNS_ANALYSIS, WindowSequence, WindowShape};
 use crate::tables::{LTP_COEF, MAX_LTP_LONG_SFB};
 use triergon_codec::{Budget, BudgetVec, Error};
 
@@ -37,7 +37,7 @@ pub(crate) fn apply(
     l: &mut LtpState,
     fb: &mut Filterbank,
     cd: &mut ChannelData,
-    prev_shape: u8,
+    prev_shape: WindowShape,
     cfg: &CoreCfg,
 ) {
     let info = cd.info;

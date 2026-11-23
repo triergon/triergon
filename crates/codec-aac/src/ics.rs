@@ -64,6 +64,15 @@ impl Default for Ltp {
     }
 }
 
+/// Window family of `ics_info()` (ISO/IEC 14496-3 4.6.11.3.2).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum WindowShape {
+    #[default]
+    Sine = 0,
+    KaiserBessel = 1,
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub(crate) struct IcsInfo {
@@ -77,7 +86,7 @@ pub(crate) struct IcsInfo {
     pub predictor_data_present: bool,
     pub prediction_used: [bool; 41],
     pub window_sequence: WindowSequence,
-    pub window_shape: u8,
+    pub window_shape: WindowShape,
     /// 0 = no reset, else predictor_reset_group_number.
     pub predictor_reset_group: u8,
 }
@@ -86,7 +95,7 @@ impl Default for IcsInfo {
     fn default() -> Self {
         IcsInfo {
             window_sequence: WindowSequence::OnlyLong,
-            window_shape: 0,
+            window_shape: WindowShape::Sine,
             max_sfb: 0,
             num_windows: 1,
             num_window_groups: 1,
@@ -191,7 +200,11 @@ pub(crate) fn parse_ics_info(
         return Err(DecodeError::Invalid("ics_reserved_bit"));
     }
     info.window_sequence = WindowSequence::from_bits(br.read(2));
-    info.window_shape = br.read(1) as u8;
+    info.window_shape = if br.bit() {
+        WindowShape::KaiserBessel
+    } else {
+        WindowShape::Sine
+    };
     info.predictor_data_present = false;
     info.predictor_reset_group = 0;
     info.ltp[0].present = false;

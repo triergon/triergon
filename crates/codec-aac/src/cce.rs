@@ -7,7 +7,7 @@
 use crate::decoder::{Core, ElementId};
 use crate::error::{DecodeError, Result};
 use crate::huffman::books;
-use crate::ics::{ChannelData, CoreCfg, MAX_SFB, ZERO_HCB, parse_ics};
+use crate::ics::{ChannelData, CoreCfg, MAX_SFB, WindowShape, ZERO_HCB, parse_ics};
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{Budget, BudgetVec, Charged};
 
@@ -37,7 +37,7 @@ pub(crate) struct CceState {
     pub gains: BudgetVec<[f32; 8 * MAX_SFB]>,
     pub cd: Charged<Box<ChannelData>>,
     pub overlap: [f32; 1024],
-    pub prev_shape: u8,
+    pub prev_shape: WindowShape,
     pub time: [f32; 1024],
     pub decoded: bool,
 }
@@ -52,7 +52,7 @@ impl CceState {
             gains: BudgetVec::try_filled(budget, [0.0; 8 * MAX_SFB], 16)?,
             cd: Charged::boxed(budget, ChannelData::new())?,
             overlap: [0.0; 1024],
-            prev_shape: 0,
+            prev_shape: WindowShape::Sine,
             time: [0.0; 1024],
             decoded: false,
         })
@@ -60,7 +60,7 @@ impl CceState {
 
     pub(crate) fn reset(&mut self, _aot: u8) {
         self.overlap.fill(0.0);
-        self.prev_shape = 0;
+        self.prev_shape = WindowShape::Sine;
     }
 }
 

@@ -58,7 +58,7 @@ pub(crate) enum FixedLayout {
 #[derive(Debug)]
 pub(crate) struct ChannelState {
     pub overlap: [f32; 1024],
-    pub prev_shape: u8,
+    pub prev_shape: WindowShape,
     pub pred: Option<pred::PredState>,
     pub ltp: Option<ltp::LtpState>,
 }
@@ -67,7 +67,7 @@ impl ChannelState {
     fn new(budget: &Budget, aot: u8) -> Result<ChannelState> {
         Ok(ChannelState {
             overlap: [0.0; 1024],
-            prev_shape: 0,
+            prev_shape: WindowShape::Sine,
             pred: if aot == AOT_MAIN {
                 Some(pred::PredState::new(budget)?)
             } else {
@@ -83,7 +83,7 @@ impl ChannelState {
 
     fn reset(&mut self) {
         self.overlap.fill(0.0);
-        self.prev_shape = 0;
+        self.prev_shape = WindowShape::Sine;
         if let Some(p) = &mut self.pred {
             p.reset();
         }
@@ -1438,7 +1438,7 @@ pub(crate) mod tests {
                 };
                 let mut e = fresh();
                 e.ch[0].overlap.fill(1.0);
-                e.ch[1].prev_shape = 1;
+                e.ch[1].prev_shape = WindowShape::KaiserBessel;
                 e.out[1][7] = 2.0;
                 (e.decoded, e.nch, e.bs_tag, e.ch_decoded) = (true, 2, 9, [true; 2]);
                 e.cd[0].global_gain = 120;
