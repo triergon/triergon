@@ -93,6 +93,7 @@ The feed preserves PES event positions. `HlsMediaVideoUnit::feed_spans`
 borrows the complete AVC or HEVC Annex B feed, including inserted parameter sets,
 for the lifetime of the unit. The reader releases units after EOF and after both
 assemblers drain. Defaults are 64 MiB source, 64 MiB feed and 8,192 access units.
+A segment that exceeds its access-unit count fails with `Error::Policy`.
 A failed reader releases its source. Retry with a new reader.
 
 **Progressive TS188.** One sequential input with a stable PAT, PMT and clock,

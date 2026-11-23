@@ -1003,10 +1003,7 @@ fn media_audio_matches(
 fn reserve_one<T>(list: &mut BudgetVec<T>, maximum: usize) -> Result<()> {
     let needed = list.len().checked_add(1).ok_or(Error::Overflow)?;
     if needed > maximum {
-        return Err(Error::Limit {
-            requested: needed,
-            maximum,
-        });
+        return Err(Error::Policy("HLS access unit count"));
     }
     if needed > list.capacity() {
         let target = list.capacity().saturating_mul(2).max(4).min(maximum);
@@ -1186,10 +1183,7 @@ mod tests {
                 &mut WorkBudget::new(4096),
                 &AtomicBool::new(false)
             ),
-            Err(Error::Limit {
-                requested: 2,
-                maximum: 1
-            })
+            Err(Error::Policy("playback event count"))
         ));
         assert!(slot.is_none());
     }

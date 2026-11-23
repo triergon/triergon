@@ -199,10 +199,7 @@ fn partial_entity_and_source_feed_limits_cannot_publish_a_segment() {
                 maximum_access_units: 4,
                 ..default
             },
-            Error::Limit {
-                requested: 5,
-                maximum: 4,
-            },
+            Error::Policy("HLS access unit count"),
         ),
         (
             RAW,
