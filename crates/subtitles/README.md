@@ -58,8 +58,9 @@ changes nothing. A DVB receiver rectangle carries its region depth's `palette`, 
 FFmpeg reports it, and `colours`, the colour of every pixel value. With
 `AutomaticPalette::WithoutClutOnce` (FFmpeg's `compute_clut` −2) a region's automatic
 palette is computed when the region is first presented and kept until a new epoch. The
-PGS receiver is polled: `push(&mut packet, clock, &cancel)`, then `poll` until
-`OutputReady` and `take_output`.
+PGS receiver takes ownership with `push(packet, &clock, &cancel)`. A refusal
+returns the original bytes in `Refused<Bytes>`. After admission, call `poll`
+until `OutputReady`, then `take_output`.
 
 | Module | Entry points |
 | --- | --- |

@@ -349,8 +349,7 @@ impl<M> PgsBridge<M> {
                     return Ok(PgsStep::Yield);
                 }
                 let p = input.input();
-                let mut raw = Some(p.raw.clone());
-                self.decoder.push(&mut raw, p.clock, c)?;
+                self.decoder.push(p.raw.clone(), &p.clock, c)?;
                 self.pushed = true;
                 return Ok(PgsStep::Yield);
             }

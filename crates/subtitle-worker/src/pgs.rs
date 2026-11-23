@@ -99,7 +99,8 @@ impl Prepared for Pgs {
                 continue;
             }
             decoder
-                .push(&mut Some(payload.clone()), *clock, &cancel)
+                .push(payload.clone(), clock, &cancel)
+                .map_err(|refused| refused.error)
                 .at(index)?;
             let out = loop {
                 match decoder

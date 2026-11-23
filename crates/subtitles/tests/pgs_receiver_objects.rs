@@ -34,8 +34,8 @@ fn presented(packets: &[&str], limits: Limits) -> Vec<Option<Vec<Rectangle>>> {
                 dts: None,
                 timebase: TimeBase::new(1, 90_000).unwrap(),
             };
-            let mut raw = Some(Bytes::copy_from_slice(&budget, &hex(packet)).unwrap());
-            decoder.push(&mut raw, clock, &cancel).unwrap();
+            let raw = Bytes::copy_from_slice(&budget, &hex(packet)).unwrap();
+            decoder.push(raw, &clock, &cancel).unwrap();
             let packet = loop {
                 match decoder
                     .poll(&mut WorkBudget::new(quantum), &cancel)

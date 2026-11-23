@@ -237,8 +237,9 @@ fn decode(
             dts: record.dts,
             timebase,
         };
-        let mut owned = Some(record.payload.clone());
-        decoder.push(&mut owned, clock, cancel).map_err(drop)?;
+        decoder
+            .push(record.payload.clone(), &clock, cancel)
+            .map_err(drop)?;
         let mut output = None;
         for _ in 0..MAX_POLLS {
             let status = decoder

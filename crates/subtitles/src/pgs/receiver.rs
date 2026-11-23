@@ -15,7 +15,8 @@ use state::{PaletteWords, Receiver, Reference};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
-    Budget, BudgetVec, Bytes, BytesWriter, Error, Result, Rounding, Time, TimeBase, WorkBudget,
+    Budget, BudgetVec, Bytes, BytesWriter, Error, Refused, Result, Rounding, Time, TimeBase,
+    WorkBudget,
 };
 use work::Work;
 
@@ -463,12 +464,12 @@ impl ReceiverDecoder {
         })
     }
 
-    /// Makes the packet in `raw`, taken from it, the active packet, with its
-    /// `clock`. A refused packet stays in `raw`.
+    /// Makes `packet` the active packet with its `clock`. Returns the bytes
+    /// unchanged if the decoder cannot accept them.
     ///
     /// # Errors
     ///
-    /// `Error::Invalid` for an absent or empty packet, while a packet is
+    /// `Error::Invalid` for an empty packet, while a packet is
     /// active or its output not taken, and after
     /// [`finish_input`](Self::finish_input); `Error::ForeignPool` for bytes
     /// of another budget; `Error::Limit` beyond
@@ -477,31 +478,41 @@ impl ReceiverDecoder {
     /// decoder returns its failure.
     pub fn push(
         &mut self,
-        raw: &mut Option<Bytes>,
-        clock: PacketClock,
+        packet: Bytes,
+        clock: &PacketClock,
         cancel: &AtomicBool,
-    ) -> Result<()> {
+    ) -> std::result::Result<(), Refused<Bytes>> {
         if let State::Failed(error) = self.state {
-            return Err(error);
+            return Err(Refused {
+                error,
+                value: packet,
+            });
         }
         if cancel.load(Ordering::Relaxed) {
-            return Err(self.poison(Error::Cancelled));
+            return Err(Refused {
+                error: self.poison(Error::Cancelled),
+                value: packet,
+            });
         }
         if !matches!(self.state, State::Idle) {
-            return Err(Error::Invalid(
-                "PGS packet pushed while one is active or after the end of input",
-            ));
+            return Err(Refused {
+                error: Error::Invalid(
+                    "PGS packet pushed while one is active or after the end of input",
+                ),
+                value: packet,
+            });
         }
-        let packet = raw.take().ok_or(Error::Invalid("PGS packet absent"))?;
         if let Err(error) = self.core.admit(&packet) {
-            *raw = Some(packet);
-            return Err(error);
+            return Err(Refused {
+                error,
+                value: packet,
+            });
         }
         self.state = State::Packet(Packet {
             raw: packet,
-            clock,
+            clock: *clock,
             at: 0,
-            subtitle_pts: state::microseconds(clock),
+            subtitle_pts: state::microseconds(*clock),
             refusal: None,
             step: Step::Segment,
             display: Display::Pending,

@@ -50,8 +50,8 @@ fn clock() -> PacketClock {
 
 fn decode(d: &mut ReceiverDecoder, b: &Budget, raw: &[u8]) -> ReceiverPacket {
     let cancel = AtomicBool::new(false);
-    let mut input = Some(Bytes::copy_from_slice(b, raw).unwrap());
-    d.push(&mut input, clock(), &cancel).unwrap();
+    let input = Bytes::copy_from_slice(b, raw).unwrap();
+    d.push(input, &clock(), &cancel).unwrap();
     loop {
         if d.poll(&mut WorkBudget::new(4096), &cancel).unwrap() == Status::OutputReady {
             return d.take_output(&cancel).unwrap();
@@ -93,8 +93,8 @@ fn pressure_at_every_allocation_retries_without_repeating_work() {
     let b = Budget::new(1 << 20).unwrap();
     let mut d = receiver(&b, false);
     let cancel = AtomicBool::new(false);
-    let mut input = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-    d.push(&mut input, clock(), &cancel).unwrap();
+    let input = Bytes::copy_from_slice(&b, &raw).unwrap();
+    d.push(input, &clock(), &cancel).unwrap();
     let mut pressured = 0;
     let out = loop {
         let hold = b.reserve(b.available()).unwrap();

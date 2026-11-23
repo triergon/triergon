@@ -63,10 +63,8 @@ fn decoder(b: &Budget, forced: bool) -> ReceiverDecoder {
 }
 
 fn push(d: &mut ReceiverDecoder, b: &Budget, raw: &[u8]) {
-    let mut owned = Some(Bytes::copy_from_slice(b, raw).unwrap());
-    d.push(&mut owned, clock(), &AtomicBool::new(false))
-        .unwrap();
-    assert!(owned.is_none());
+    let owned = Bytes::copy_from_slice(b, raw).unwrap();
+    d.push(owned, &clock(), &AtomicBool::new(false)).unwrap();
 }
 
 fn ready(d: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
@@ -244,17 +242,14 @@ fn rejected_foreign_busy_and_oversized_input_preserve_the_exact_caller_owner() {
     let c = AtomicBool::new(false);
     let mut d = decoder(&b, false);
     let held = Bytes::copy_from_slice(&foreign, &picture()).unwrap();
-    let mut owned = Some(held.clone());
-    assert_eq!(d.push(&mut owned, clock(), &c), Err(Error::ForeignPool));
-    assert!(owned.as_ref().unwrap().shares_storage_with(&held));
+    let refused = d.push(held.clone(), &clock(), &c).unwrap_err();
+    assert_eq!(refused.error, Error::ForeignPool);
+    assert!(refused.value.shares_storage_with(&held));
     push(&mut d, &b, &picture());
     let held = Bytes::copy_from_slice(&b, &picture()).unwrap();
-    let mut owned = Some(held.clone());
-    assert!(matches!(
-        d.push(&mut owned, clock(), &c),
-        Err(Error::Invalid(_))
-    ));
-    assert!(owned.as_ref().unwrap().shares_storage_with(&held));
+    let refused = d.push(held.clone(), &clock(), &c).unwrap_err();
+    assert!(matches!(refused.error, Error::Invalid(_)));
+    assert!(refused.value.shares_storage_with(&held));
     drop(ready(&mut d, 4096));
     let mut limited = ReceiverDecoder::new(
         &b,
@@ -265,11 +260,9 @@ fn rejected_foreign_busy_and_oversized_input_preserve_the_exact_caller_owner() {
         Options::default(),
     )
     .unwrap();
-    assert!(matches!(
-        limited.push(&mut owned, clock(), &c),
-        Err(Error::Limit { .. })
-    ));
-    assert!(owned.as_ref().unwrap().shares_storage_with(&held));
+    let refused = limited.push(refused.value, &clock(), &c).unwrap_err();
+    assert!(matches!(refused.error, Error::Limit { .. }));
+    assert!(refused.value.shares_storage_with(&held));
 }
 
 #[test]
@@ -302,12 +295,12 @@ fn cancelled_push_preserves_input_and_cancelled_take_discards_unpublished_output
     let c = AtomicBool::new(true);
     let mut d = decoder(&b, false);
     let held = Bytes::copy_from_slice(&b, &picture()).unwrap();
-    let mut owned = Some(held.clone());
-    assert_eq!(d.push(&mut owned, clock(), &c), Err(Error::Cancelled));
-    assert!(owned.as_ref().unwrap().shares_storage_with(&held));
+    let refused = d.push(held.clone(), &clock(), &c).unwrap_err();
+    assert_eq!(refused.error, Error::Cancelled);
+    assert!(refused.value.shares_storage_with(&held));
     c.store(false, Ordering::Relaxed);
     d.reset(&c).unwrap();
-    d.push(&mut owned, clock(), &c).unwrap();
+    d.push(refused.value, &clock(), &c).unwrap();
     let mut ready = false;
     for _ in 0..1_000_000 {
         if d.poll(&mut WorkBudget::new(4096), &c).unwrap() == Status::OutputReady {
@@ -407,10 +400,9 @@ fn end_of_input_presents_nothing_pending() {
     assert_eq!(zero.spent(), 0);
     assert_eq!(d.work_spent(), before + 1);
     assert!(d.take_output(&c).is_err());
-    let mut next = Some(Bytes::copy_from_slice(&b, &picture()).unwrap());
-    let held = next.as_ref().unwrap().clone();
-    assert!(d.push(&mut next, clock(), &c).is_err());
-    assert!(next.as_ref().unwrap().shares_storage_with(&held));
+    let held = Bytes::copy_from_slice(&b, &picture()).unwrap();
+    let refused = d.push(held.clone(), &clock(), &c).unwrap_err();
+    assert!(refused.value.shares_storage_with(&held));
 }
 
 #[test]
@@ -421,9 +413,8 @@ fn unknown_pts_retains_raw_dts_without_a_presentation_time() {
         pts: None,
         ..clock()
     };
-    let mut owned = Some(Bytes::copy_from_slice(&b, &picture()).unwrap());
-    d.push(&mut owned, raw_clock, &AtomicBool::new(false))
-        .unwrap();
+    let owned = Bytes::copy_from_slice(&b, &picture()).unwrap();
+    d.push(owned, &raw_clock, &AtomicBool::new(false)).unwrap();
     let out = ready(&mut d, 7);
     assert_eq!(out.clock, raw_clock);
     assert_eq!(out.subtitle().unwrap().pts_microseconds, None);

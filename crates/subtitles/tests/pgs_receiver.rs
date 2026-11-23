@@ -80,8 +80,8 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
             // An empty packet is a drain call, not a packet to decode.
             continue;
         }
-        let mut raw = Some(Bytes::copy_from_slice(&budget, data).unwrap());
-        decoder.push(&mut raw, *clock, &cancel).unwrap();
+        let raw = Bytes::copy_from_slice(&budget, data).unwrap();
+        decoder.push(raw, clock, &cancel).unwrap();
         let packet = loop {
             let mut work = WorkBudget::new(quantum);
             match decoder.poll(&mut work, &cancel).unwrap() {

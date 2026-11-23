@@ -81,10 +81,8 @@ fn ready(decoder: &mut ReceiverDecoder, quantum: u64) -> ReceiverPacket {
 fn run(raw: &[u8], quantum: u64) -> ReceiverPacket {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
-    let mut bytes = Some(Bytes::copy_from_slice(&b, raw).unwrap());
-    d.push(&mut bytes, stamp(), &AtomicBool::new(false))
-        .unwrap();
-    assert!(bytes.is_none());
+    let bytes = Bytes::copy_from_slice(&b, raw).unwrap();
+    d.push(bytes, &stamp(), &AtomicBool::new(false)).unwrap();
     ready(&mut d, quantum)
 }
 
@@ -198,12 +196,12 @@ fn an_epoch_start_without_definitions_presents_nothing() {
     let c = AtomicBool::new(false);
     let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
     let first = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
-    let mut bytes = Some(Bytes::copy_from_slice(&b, &first).unwrap());
-    d.push(&mut bytes, stamp(), &c).unwrap();
+    let bytes = Bytes::copy_from_slice(&b, &first).unwrap();
+    d.push(bytes, &stamp(), &c).unwrap();
     let old = ready(&mut d, 1);
     let raw = [pcs(0x80, false), segment(0x80, &[])].concat();
-    let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-    d.push(&mut bytes, stamp(), &c).unwrap();
+    let bytes = Bytes::copy_from_slice(&b, &raw).unwrap();
+    d.push(bytes, &stamp(), &c).unwrap();
     let out = ready(&mut d, 1);
     assert!(out.subtitle().is_none());
     assert_eq!(
@@ -217,16 +215,18 @@ fn cancellation_is_sticky_and_busy_foreign_rejections_preserve_owners() {
     let foreign = Budget::new(4096).unwrap();
     let c = AtomicBool::new(false);
     let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
-    let mut wrong = Some(Bytes::copy_from_slice(&foreign, &[0x80, 0, 0]).unwrap());
-    assert_eq!(d.push(&mut wrong, stamp(), &c), Err(Error::ForeignPool));
-    assert!(wrong.is_some());
+    let wrong = Bytes::copy_from_slice(&foreign, &[0x80, 0, 0]).unwrap();
+    let held = wrong.clone();
+    let refused = d.push(wrong, &stamp(), &c).unwrap_err();
+    assert_eq!(refused.error, Error::ForeignPool);
+    assert!(refused.value.shares_storage_with(&held));
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
-    let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-    d.push(&mut bytes, stamp(), &c).unwrap();
-    let mut other = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-    let ptr = other.as_ref().unwrap().as_ptr();
-    assert!(d.push(&mut other, stamp(), &c).is_err());
-    assert_eq!(other.as_ref().unwrap().as_ptr(), ptr);
+    let bytes = Bytes::copy_from_slice(&b, &raw).unwrap();
+    d.push(bytes, &stamp(), &c).unwrap();
+    let other = Bytes::copy_from_slice(&b, &raw).unwrap();
+    let ptr = other.as_ptr();
+    let refused = d.push(other, &stamp(), &c).unwrap_err();
+    assert_eq!(refused.value.as_ptr(), ptr);
     c.store(true, Ordering::Relaxed);
     assert_eq!(d.poll(&mut WorkBudget::new(0), &c), Err(Error::Cancelled));
     c.store(false, Ordering::Relaxed);
@@ -239,10 +239,9 @@ fn work_zero_preserves_every_observed_allocation_boundary_for_valid_and_recovery
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
-        let mut bytes = Some(
-            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, end, false)).unwrap(),
-        );
-        d.push(&mut bytes, stamp(), &c).unwrap();
+        let bytes =
+            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, end, false)).unwrap();
+        d.push(bytes, &stamp(), &c).unwrap();
         let mut complete = false;
         for _ in 0..100_000 {
             let before = (b.used(), d.work_spent());
@@ -267,8 +266,8 @@ fn allocation_pressure_retry_keeps_paid_work_and_owners() {
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
     let owner = Bytes::copy_from_slice(&b, &raw).unwrap();
     let ptr = owner.as_ptr();
-    let mut bytes = Some(owner.clone());
-    d.push(&mut bytes, stamp(), &c).unwrap();
+    let bytes = owner.clone();
+    d.push(bytes, &stamp(), &c).unwrap();
     let mut pressure = 0;
     let mut complete = false;
     for _ in 0..100_000 {
@@ -316,8 +315,8 @@ fn cancellation_before_during_and_after_ready_releases_private_graph_and_is_stic
         let c = AtomicBool::new(false);
         let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
         let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false);
-        let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-        d.push(&mut bytes, stamp(), &c).unwrap();
+        let bytes = Bytes::copy_from_slice(&b, &raw).unwrap();
+        d.push(bytes, &stamp(), &c).unwrap();
         for _ in 0..steps {
             if d.poll(&mut WorkBudget::new(1), &c).unwrap() == Status::OutputReady {
                 break;
@@ -352,10 +351,9 @@ fn exceeded_limits_are_errors_not_refusals() {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d = ReceiverDecoder::new(&b, limits, Options::default()).unwrap();
-        let mut bytes = Some(
-            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false)).unwrap(),
-        );
-        d.push(&mut bytes, stamp(), &c).unwrap();
+        let bytes =
+            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[1], false)).unwrap();
+        d.push(bytes, &stamp(), &c).unwrap();
         let error = loop {
             match d.poll(&mut WorkBudget::new(4096), &c) {
                 Err(e) => break e,
@@ -381,22 +379,21 @@ fn packet_byte_limits_and_empty_input_reject_without_consuming_the_callers_owner
         Options::default(),
     )
     .unwrap();
-    let mut raw = Some(Bytes::copy_from_slice(&b, &[0x80, 0, 0]).unwrap());
-    let ptr = raw.as_ref().unwrap().as_ptr();
+    let raw = Bytes::copy_from_slice(&b, &[0x80, 0, 0]).unwrap();
+    let ptr = raw.as_ptr();
+    let refused = d.push(raw, &stamp(), &c).unwrap_err();
     assert_eq!(
-        d.push(&mut raw, stamp(), &c),
-        Err(Error::Limit {
+        refused.error,
+        Error::Limit {
             requested: 3,
             maximum: 2
-        })
+        }
     );
-    assert_eq!(raw.as_ref().unwrap().as_ptr(), ptr);
-    let mut empty = Some(Bytes::copy_from_slice(&b, &[]).unwrap());
-    assert!(matches!(
-        d.push(&mut empty, stamp(), &c),
-        Err(Error::Invalid(_))
-    ));
-    assert!(empty.is_some());
+    assert_eq!(refused.value.as_ptr(), ptr);
+    let empty = Bytes::copy_from_slice(&b, &[]).unwrap();
+    let refused = d.push(empty, &stamp(), &c).unwrap_err();
+    assert!(matches!(refused.error, Error::Invalid(_)));
+    assert!(refused.value.is_empty());
 }
 #[test]
 fn one_and_two_byte_packets_are_refused_and_decoding_continues() {
@@ -404,16 +401,16 @@ fn one_and_two_byte_packets_are_refused_and_decoding_continues() {
     let c = AtomicBool::new(false);
     let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
     for raw in [&[0x16][..], &[0x16, 0][..]] {
-        let mut bytes = Some(Bytes::copy_from_slice(&b, raw).unwrap());
-        d.push(&mut bytes, stamp(), &c).unwrap();
+        let bytes = Bytes::copy_from_slice(&b, raw).unwrap();
+        d.push(bytes, &stamp(), &c).unwrap();
         let out = ready(&mut d, 1);
         assert_eq!(out.raw_packet().as_ref(), raw);
         assert_eq!(out.refusal(), Some(Refusal::ShortPacket));
         assert!(out.subtitle().is_none());
     }
     let raw = packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false);
-    let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-    d.push(&mut bytes, stamp(), &c).unwrap();
+    let bytes = Bytes::copy_from_slice(&b, &raw).unwrap();
+    d.push(bytes, &stamp(), &c).unwrap();
     let out = ready(&mut d, 7);
     assert_eq!(out.refusal(), None);
     let rect = &out.subtitle().unwrap().rectangles()[0];
@@ -424,9 +421,9 @@ fn subtitle_survives_decoder_teardown() {
     let b = Budget::new(4 * 1024 * 1024).unwrap();
     let c = AtomicBool::new(false);
     let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
-    let mut bytes =
-        Some(Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap());
-    d.push(&mut bytes, stamp(), &c).unwrap();
+    let bytes =
+        Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap();
+    d.push(bytes, &stamp(), &c).unwrap();
     let out = ready(&mut d, 1);
     drop(d);
     assert_eq!(
@@ -447,10 +444,9 @@ fn hard_reset_keeps_old_outputs() {
         if generation != 0 {
             d.reset(&c).unwrap();
         }
-        let mut bytes = Some(
-            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap(),
-        );
-        d.push(&mut bytes, stamp(), &c).unwrap();
+        let bytes =
+            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap();
+        d.push(bytes, &stamp(), &c).unwrap();
         let out = ready(&mut d, 1);
         retained.push(out);
     }
@@ -467,11 +463,10 @@ fn unknown_and_sentinel_clocks_are_never_relabelled_known_zero() {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
-        let mut bytes = Some(
-            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap(),
-        );
+        let bytes =
+            Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, &[], false)).unwrap();
         let clock = PacketClock { pts, ..stamp() };
-        d.push(&mut bytes, clock, &c).unwrap();
+        d.push(bytes, &clock, &c).unwrap();
         let out = ready(&mut d, 1);
         assert_eq!(out.clock, clock);
         if pts == Some(i64::MIN) {
@@ -523,11 +518,10 @@ fn combined_work_and_outputs_are_invariant_across_quanta_for_valid_and_recovered
             let b = Budget::new(4 * 1024 * 1024).unwrap();
             let c = AtomicBool::new(false);
             let mut d = ReceiverDecoder::new(&b, Limits::default(), Options::default()).unwrap();
-            let mut bytes = Some(
+            let bytes =
                 Bytes::copy_from_slice(&b, &packet_with(&[1, 2, 0, 0], 0xc0, 8, end, false))
-                    .unwrap(),
-            );
-            d.push(&mut bytes, stamp(), &c).unwrap();
+                    .unwrap();
+            d.push(bytes, &stamp(), &c).unwrap();
             let out = ready(&mut d, quantum);
             assert_eq!(
                 out.subtitle().unwrap().rectangles()[0].pixels().as_ref(),
@@ -563,8 +557,8 @@ fn limits_still_apply_after_a_packet_without_a_display() {
         let b = Budget::new(4 * 1024 * 1024).unwrap();
         let c = AtomicBool::new(false);
         let mut d = ReceiverDecoder::new(&b, limits, Options::default()).unwrap();
-        let mut bytes = Some(Bytes::copy_from_slice(&b, &segment(0x80, &[])).unwrap());
-        d.push(&mut bytes, stamp(), &c).unwrap();
+        let bytes = Bytes::copy_from_slice(&b, &segment(0x80, &[])).unwrap();
+        d.push(bytes, &stamp(), &c).unwrap();
         let first = ready(&mut d, 1);
         drop(first);
         let raw = [
@@ -575,8 +569,8 @@ fn limits_still_apply_after_a_packet_without_a_display() {
             segment(0x80, &[]),
         ]
         .concat();
-        let mut bytes = Some(Bytes::copy_from_slice(&b, &raw).unwrap());
-        d.push(&mut bytes, stamp(), &c).unwrap();
+        let bytes = Bytes::copy_from_slice(&b, &raw).unwrap();
+        d.push(bytes, &stamp(), &c).unwrap();
         let error = loop {
             match d.poll(&mut WorkBudget::new(4096), &c) {
                 Err(e) => break e,
