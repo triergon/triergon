@@ -1,5 +1,6 @@
 //! The packet fold shared by the per-input playback profile runners (`mkv-audio-`,
-//! `mp4-forward-`, `ts-program-` and `raw-video-`).
+//! `mp4-forward-`, `ts-program-` and `raw-video-`) and the views worker's packet
+//! operations.
 //!
 //! Each runner opens one preloaded input per operation, produces every selected
 //! packet through the playback engine and folds it with [`Work::packet`]. The FFmpeg

@@ -36,7 +36,7 @@ mod worker {
         hevc_startup::{self, StartupNal},
     };
 
-    use super::super::packet_fold::{Packet as PacketRow, Work};
+    use playback_worker::packet_fold::{Packet as PacketRow, Work};
 
     const WINDOW: usize = 32768;
     const SOURCE: SourceId = SourceId(1);

@@ -2,22 +2,12 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
 
-// The reader lanes share the measured reader's packet and track output.
 mod audio;
 mod audio_session_lifecycle;
 mod blocks;
 mod core_reader_protocol;
-#[allow(
-    dead_code,
-    reason = "The shared packet module also dispatches MOV reads."
-)]
-#[path = "../../isobmff_packets.rs"]
-mod isobmff_packets;
 mod mpeg1_budget;
 mod oracles;
-#[allow(dead_code, reason = "Reader operations do not emit packet rows yet.")]
-#[path = "../../packets.rs"]
-mod packets;
 mod readers;
 mod video;
 

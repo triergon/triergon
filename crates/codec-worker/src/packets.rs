@@ -4,7 +4,7 @@
 //! FORMAT names the reader as FFmpeg is told the demuxer: `ogg` opens
 //! `triergon_ogg::BlockingReader`; `flac`, `mp3`, `aac`, `ac3` and `eac3` open the
 //! `triergon_elementary` reader of that format; `mov` opens the neutral ISO BMFF reader
-//! and prints what [`super::isobmff_packets`] describes. Each packet line holds exactly what the
+//! and prints what the `isobmff_packets` module describes. Each packet line holds exactly what the
 //! reader reports: the track index, `pts`, `dts`, `duration` and `trim_start`/`trim_end`
 //! in the packet's time base, the payload size, the source position (Ogg: the page that
 //! completes the packet; elementary streams: the first byte) and whether the access unit
@@ -102,15 +102,18 @@ impl Row {
     }
 }
 
-pub(super) fn field(line: &mut String, name: &str, value: &str) {
+/// Append `,"name":value` to a JSON object being written, `value` already encoded.
+pub fn field(line: &mut String, name: &str, value: &str) {
     let _ = write!(line, ",\"{name}\":{value}");
 }
 
-pub(super) fn number(value: Option<i64>) -> String {
+/// A JSON number, or `null` for an absent value.
+pub fn number(value: Option<i64>) -> String {
     value.map_or_else(|| "null".to_owned(), |v| v.to_string())
 }
 
-pub(super) fn time_base(base: TimeBase) -> String {
+/// A time base as the JSON pair `[numerator,denominator]`.
+pub fn time_base(base: TimeBase) -> String {
     format!("[{},{}]", base.numerator(), base.denominator())
 }
 
@@ -132,7 +135,9 @@ pub(super) fn string(text: &str) -> String {
     out
 }
 
-pub(super) fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
+/// One track of the final line: its index, codec and codec tag, then `extra`, a run
+/// of `,"name":value` fields.
+pub fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
     // An unnamed codec prints with its tag.
     let codec = match track.codec() {
         CodecId::Other => format!("Other({:?})", track.codec_tag()),
@@ -145,7 +150,12 @@ pub(super) fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> St
     )
 }
 
-pub(super) fn finish(
+/// The final line: the tracks and how reading ended.
+///
+/// # Errors
+///
+/// When `out` fails.
+pub fn finish(
     out: &mut impl Write,
     tracks: &[String],
     end: Result<(), triergon::Error>,

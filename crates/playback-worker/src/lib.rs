@@ -9,7 +9,7 @@ mod matroska_audio;
 mod matroska_video;
 mod mp4_forward;
 mod mp4_range;
-mod packet_fold;
+pub mod packet_fold;
 mod progressive;
 mod raw_video;
 pub mod runner;

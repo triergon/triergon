@@ -8,7 +8,8 @@ use triergon::{
     SeekMethod, SeekPolicy, SeekRequest, SourceCapabilities, SourceId, Step, Time, WorkBudget,
 };
 
-use crate::packets::{field, finish, number, time_base, track_line};
+// The reader lanes print the measured reader's packet and track lines.
+use codec_worker::packets::{field, finish, number, time_base, track_line};
 
 /// Emit the established packet row format without changing the measured worker.
 fn row(

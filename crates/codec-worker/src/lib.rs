@@ -26,7 +26,7 @@
 // same units. Consumers frame access units with triergon-framing.
 mod aac_access_units;
 mod isobmff_packets;
-mod packets;
+pub mod packets;
 
 use std::io::Write;
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};

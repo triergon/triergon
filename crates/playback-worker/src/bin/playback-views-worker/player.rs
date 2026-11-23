@@ -9,7 +9,7 @@ pub(super) fn run(_: &[String]) -> playback_worker::runner::Result<()> {
 
 #[cfg(not(test))]
 mod worker {
-    use super::super::packet_fold::{Packet, Work};
+    use playback_worker::packet_fold::{Packet, Work};
     use playback_worker::runner::{Invocation, MAX_INPUT, Mode, Result, Totals, measure};
     use std::{path::Path, sync::atomic::AtomicBool};
     use triergon_core::{

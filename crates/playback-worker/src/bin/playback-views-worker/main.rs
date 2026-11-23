@@ -4,13 +4,6 @@
 
 mod bridge;
 mod hls;
-#[cfg(not(test))]
-#[allow(
-    dead_code,
-    reason = "Playback views share the packet fold for packet operations."
-)]
-#[path = "../../packet_fold.rs"]
-mod packet_fold;
 mod player;
 mod probe;
 mod source_view;
