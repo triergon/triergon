@@ -83,9 +83,10 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
   (ISO/IEC 14496-26:2024 7.18.1.2.1). On a malformed time-differential mode change
   the decoder uses the last coded envelope and zeroes missing indices. A malformed
   Parametric Stereo payload also disables the phase extension until valid data enables
-  it again. `Decoder::with_extension_policy` accepts
+  it again. A frame with missing SBR uses only its core bands and resets the carried
+  envelope border. `Decoder::with_extension_policy` accepts
   `compat::ffmpeg::extensions::Policy::Reference` to retain the reference's differential
-  history and phase enable state.
+  history, phase enable state and carried envelope border.
 - On error `out` is empty and the decoder stays usable. Errors are typed:
   `Unsupported(Feature)`, `InvalidData(&str)` naming the syntax element,
   `ResourceLimit(&str)`, `Truncated`, `Budget(StorageError)`.

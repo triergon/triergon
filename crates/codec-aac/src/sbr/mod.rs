@@ -18,6 +18,7 @@ pub(crate) mod tables;
 
 pub(crate) use qmf::Modulation;
 
+use crate::compat::ffmpeg::extensions::Policy;
 use crate::error::{DecodeError, Result};
 use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
@@ -686,6 +687,7 @@ impl Sbr {
     ) {
         let ready = self.have_header && self.data_ok;
         let reset = self.reset && ready;
+        let conceal_missing = !ready && self.ps.policy == Policy::Conceal;
         if ready {
             for c in 0..nch {
                 dequant(&mut self.ch[..], c, &self.ft, self.coupling, nch);
@@ -694,6 +696,11 @@ impl Sbr {
         for c in 0..nch {
             let buf: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
             let ch = &mut self.ch[c];
+            if conceal_missing {
+                ch.prev_t_env_last = NUM_TIME_SLOTS;
+                ch.kx_prev = 32;
+                ch.m_prev = 0;
+            }
             // QMF analysis of the core output (float scale -> 16-bit domain)
             let mut bands = [Cpx::default(); 32];
             for (t, input) in buf[..1024].as_chunks::<32>().0.iter().enumerate() {
@@ -735,11 +742,7 @@ impl Sbr {
                 }
                 let hf = kxi.min(64)..(kxi + mi).min(64);
                 row[low..hf.start].fill(Cpx::default());
-                // slots before i_temp take the previous frame's high band, whose last
-                // envelope ended after the frame border; a frame without its SBR element
-                // has no high band, that one included (observed behaviour, HE-AAC v1 and v2
-                // alike: probe o31 in harness/codecs/aac/ps/signal/open, kx = 32 in both
-                // frames)
+                // Early slots take the previous high band only when this frame has SBR data.
                 if ready {
                     let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
                     row[hf.clone()].copy_from_slice(&high[hf.clone()]);
@@ -765,11 +768,7 @@ impl Sbr {
                 ch.kx_prev = kx;
                 ch.m_prev = m;
             } else {
-                // a frame without its SBR element leaves the last envelope border and the
-                // band limits of the frame before it, and the high band it carries into the
-                // next frame, the slots before `i_temp` there, is zero (observed behaviour:
-                // `ps-open-sbr-after-missing` in harness/codecs/aac, a FIXVAR envelope 3
-                // slots past the border, kx = 32)
+                // The reference policy retains the previous border and band limits with a zero high band.
                 ch.y_prev[..i_temp].fill([Cpx::default(); 64]);
             }
             if let (0, true, Some(stereo)) = (c, ps, &mut self.stereo) {
@@ -1579,34 +1578,37 @@ mod tests {
     }
 
     #[test]
-    fn a_frame_without_sbr_data_keeps_the_border_and_drops_the_carried_high_band() {
-        // `ps-open-sbr-after-missing`: the frame before ended its last envelope 3 slots
-        // past the border with M = 12; the frame after the missing one still starts from
-        // that border and those limits, with a zero high band
+    fn a_frame_without_sbr_data_retains_the_border_only_in_reference_mode() {
         let budget = Budget::new(1 << 30).unwrap();
-        let mut sbr = Sbr::new(24_000, false, &budget).unwrap();
-        let ch = &mut sbr.ch[0];
-        (ch.prev_t_env_last, ch.kx_prev, ch.m_prev) = (NUM_TIME_SLOTS + 3, 32, 12);
-        ch.y_prev[0][40].re = 1.0;
-        let (mut left, mut right) = ([0f32; 2048], [0f32; 2048]);
-        sbr.process(
-            &mut left,
-            &mut right,
-            1,
-            false,
-            false,
-            &mut Modulation::new(),
-        );
-        let ch = &sbr.ch[0];
-        assert_eq!(
-            (ch.prev_t_env_last, ch.kx_prev, ch.m_prev),
-            (NUM_TIME_SLOTS + 3, 32, 12)
-        );
-        assert!(
-            ch.y_prev
-                .iter()
-                .flatten()
-                .all(|v| v.re == 0.0 && v.im == 0.0)
-        );
+        for kx in [20, 32] {
+            for policy in [Policy::Conceal, Policy::Reference] {
+                let mut sbr = Sbr::new(24_000, false, &budget).unwrap();
+                sbr.ps.policy = policy;
+                let ch = &mut sbr.ch[0];
+                let previous = (NUM_TIME_SLOTS + 3, kx, 12);
+                (ch.prev_t_env_last, ch.kx_prev, ch.m_prev) = previous;
+                ch.y_prev[0][kx].re = 1.0;
+                ch.xl[24][T_HFADJ].re = 1.0;
+                let (mut left, mut right) = ([0f32; 2048], [0f32; 2048]);
+                sbr.process(
+                    &mut left,
+                    &mut right,
+                    1,
+                    false,
+                    false,
+                    &mut Modulation::new(),
+                );
+                assert_eq!(
+                    left.iter().any(|&sample| sample != 0.0),
+                    kx == 32 || policy == Policy::Conceal
+                );
+                let ch = &sbr.ch[0];
+                let expected = match policy {
+                    Policy::Conceal => (NUM_TIME_SLOTS, 32, 0),
+                    Policy::Reference => previous,
+                };
+                assert_eq!((ch.prev_t_env_last, ch.kx_prev, ch.m_prev), expected);
+            }
+        }
     }
 }
