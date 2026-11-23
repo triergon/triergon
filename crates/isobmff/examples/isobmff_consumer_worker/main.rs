@@ -145,10 +145,14 @@ fn output_stats(stats: &Stats, iterations: u64, elapsed: u128) -> Result<()> {
 fn main_result(mut args: Vec<String>) -> Result<()> {
     let mut policy = OpenPolicy::default();
     let mut range_plan = false;
+    let mut bounded_timing = false;
     loop {
         match args.get(1).map(String::as_str) {
             Some("--range-plan") => range_plan = true,
-            Some("--bounded-timing") => policy.tables.timing_runs = TimingRunPolicy::BoundedPrefix,
+            Some("--bounded-timing") => {
+                bounded_timing = true;
+                policy.tables.timing_runs = TimingRunPolicy::BoundedPrefix;
+            }
             Some("--bounded-sync") => {
                 policy.tables.sync_samples = SyncSamplePolicy::BoundedPrefix;
             }
@@ -165,7 +169,8 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
         .map(String::as_str)
         .ok_or(Error::Invalid("missing worker mode"))?;
     if policy.regular_recovery {
-        if policy.tables != SampleTablePolicy::default()
+        if bounded_timing
+            || policy.tables != SampleTablePolicy::default()
             || policy.media_data != MediaDataPolicy::Strict
         {
             return Err(Error::Invalid("regular table recovery is a standalone profile").into());
@@ -195,6 +200,7 @@ fn main_result(mut args: Vec<String>) -> Result<()> {
     if range_plan
         && (!seek
             || policy.regular_recovery
+            || bounded_timing
             || policy.tables != SampleTablePolicy::default()
             || policy.media_data != MediaDataPolicy::Strict)
     {
