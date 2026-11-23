@@ -43,12 +43,10 @@ const WORK: u64 = 4096;
 enum SourceProof {
     ControlOnly,
     ReportedMalformed(malformed::Diagnostic),
-    /// A recovery replay, and the observation that ended the reader's attempt when that
-    /// is the refusal should the replay fail too.
-    OpaqueRecovery(
-        au_recovery::Trigger,
-        Option<Box<(ReaderEvent, SourceLocation)>>,
-    ),
+    OpaqueRecovery(au_recovery::Trigger),
+    /// A recovery replay after an access-unit observation ended the reader's attempt:
+    /// should the replay fail, the refusal names that observation.
+    ObservedRecovery(au_recovery::Trigger),
 }
 
 struct TrackProjection {
@@ -477,7 +475,7 @@ fn fold_continuity<const TRACE: bool>(
 }
 
 // One function on purpose: the timed loop of every access-unit workload; a split is a hot-path change not yet measured.
-fn operation<const TRACE: bool>(
+fn operation<const TRACE: bool, const EXPLAIN: bool>(
     pool: &Budget,
     request: &Request,
     cancel: &AtomicBool,
@@ -526,7 +524,7 @@ fn operation<const TRACE: bool>(
     let mut deferred_continuity = None;
     let mut recovered = None;
     let mut observed_media = false;
-    let (mut proof, reader_refusal) = loop {
+    let (proof, reader_refusal) = loop {
         let step = match reader.step_with_carriers(&mut WorkBudget::new(WORK), cancel, |_| ()) {
             Ok(step) => step,
             Err(error) => {
@@ -723,7 +721,7 @@ fn operation<const TRACE: bool>(
                             && totals.packets == 0
                             && let Some(trigger) = au_recovery::Trigger::from_fault(fault)
                         {
-                            break (SourceProof::OpaqueRecovery(trigger, None), totals);
+                            break (SourceProof::OpaqueRecovery(trigger), totals);
                         }
                         if single_entity && !observed_media {
                             match fault.kind {
@@ -803,17 +801,23 @@ fn operation<const TRACE: bool>(
                     }
                     _ => None,
                 };
-                if let Some(trigger) = recovery {
-                    // The observation's text is the refusal only when the replay
-                    // fails, so it is written then.
-                    let unproved = Some(Box::new((event, at)));
-                    break (SourceProof::OpaqueRecovery(trigger, unproved), totals);
+                // The observation's text is the refusal only when the replay fails: a
+                // timed run leaves it to the rerun that explains that failure.
+                if !TRACE
+                    && !EXPLAIN
+                    && let Some(trigger) = recovery
+                {
+                    break (SourceProof::ObservedRecovery(trigger), totals);
                 }
-                return Ok(refused(
+                let refusal = refused(
                     totals,
                     &format!("incomplete access-unit observation: {event:?}"),
                     at,
-                ));
+                );
+                if !EXPLAIN && let Some(trigger) = recovery {
+                    break (SourceProof::OpaqueRecovery(trigger), refusal);
+                }
+                return Ok(refusal);
             }
             Step::Ready(_) => return Err("unexpected container event".into()),
             Step::Yield => (),
@@ -909,21 +913,21 @@ fn operation<const TRACE: bool>(
     // completed reader attempt before reserving storage for the replay.
     drop(reader);
     drop(tracks);
-    let unproved = match &mut proof {
-        SourceProof::OpaqueRecovery(_, unproved) => unproved.take(),
-        _ => None,
-    };
-    Ok(match prove_source(pool, request, proof, cancel)? {
-        Some(totals) => totals,
-        None => match unproved.map(|unproved| *unproved) {
-            Some((event, at)) => refused(
-                reader_refusal,
-                &format!("incomplete access-unit observation: {event:?}"),
-                at,
-            ),
-            None => reader_refusal,
-        },
-    })
+    let observed = matches!(proof, SourceProof::ObservedRecovery(_));
+    match prove_source(pool, request, proof, cancel)? {
+        Some(totals) => Ok(totals),
+        None if observed => explain(pool, request, cancel),
+        None => Ok(reader_refusal),
+    }
+}
+
+/// The reader's attempt run again without its recovery, for the refusal of an
+/// observation whose recovery replay failed: the refusal the attempt writes when it does
+/// not recover.
+#[cold]
+#[inline(never)]
+fn explain(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
+    operation::<false, true>(pool, request, cancel)
 }
 
 #[cold]
@@ -941,7 +945,7 @@ fn prove_source(
         SourceProof::ReportedMalformed(diagnostic) => {
             Ok(malformed::confirm(pool, request, diagnostic, cancel)?.map(|_| Totals::default()))
         }
-        SourceProof::OpaqueRecovery(trigger, _) => {
+        SourceProof::OpaqueRecovery(trigger) | SourceProof::ObservedRecovery(trigger) => {
             au_recovery::project(pool, request, trigger, cancel)
         }
     }
@@ -970,9 +974,9 @@ pub fn run(args: &[String]) -> Result<()> {
         ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
     // Select a monomorphization before measurement; ordinary folds carry no trace flag.
     let operation = if invocation.mode == triergon_harness_runner::Mode::Trace {
-        operation::<true>
+        operation::<true, false>
     } else {
-        operation::<false>
+        operation::<false, false>
     };
     let name = if eac3 {
         "mpegts-atsc-eac3-six-block"
@@ -1022,7 +1026,7 @@ mod tests {
             following: BudgetVec::new(&pool),
         };
         let baseline = pool.used();
-        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<false, false>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(pool.used(), baseline);
         totals
     }
@@ -1052,7 +1056,8 @@ mod tests {
         let retained = pool.used();
         let mut first = None;
         for _ in 0..50 {
-            let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+            let totals =
+                operation::<false, false>(&pool, &request, &AtomicBool::new(false)).unwrap();
             assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
             let refusal = totals.refusal.expect("malformed DTS remains unsupported");
             assert!(
@@ -1108,7 +1113,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<false, false>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(totals.packets, 0);
         assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Psi");
     }
