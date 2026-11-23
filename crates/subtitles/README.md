@@ -130,20 +130,22 @@ there is no detection from content, language or file name.
 | --- | --- |
 | Unicode | UTF-8, UTF-16 with BOM, UTF-16BE, UTF-16LE, tx3g in-band (UTF-8 or FEFF UTF-16BE) |
 | Single-byte | ASCII, ISO-8859-1, Windows-1251, Windows-1252 (`Charset::from_label`) |
-| Multibyte | GBK/CP936, Big5, Shift-JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
+| Multibyte | GBK (with GB18030's four-byte codes), Big5, Shift_JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
 | FFmpeg/glibc labels | `compat::charset::receiver_charset` maps ASS charset labels to the repertoire the reference build accepts |
 
 A strict profile (`Charset::from_label`, `MultibyteCharset::from_label`) converts as the
-current definition of its charset does: `big5` as the decoder of the WHATWG Encoding
-Standard, with the Hong Kong supplement, and a Windows code page (`cp932`, `cp949`,
+current definition of its charset does: `big5`, `shift_jis`, `euc-kr` and `gbk` as the
+decoders of the WHATWG Encoding Standard (with the Hong Kong supplement, Windows-31J,
+UHC and the four-byte codes of GB18030), and a Windows code page (`cp932`, `cp949`,
 `cp950`) as Windows converts it, its user-defined areas included.
 `compat::charset::receiver_charset` converts as the C library of the reference build
 does (glibc 2.39 `iconv`), and whatever a comparison pins of the reference's conversion
-runs through it: there `big5` and `cp950` are both glibc's Big5 charmap, and `euc-kr`
-has the C1 controls. The strict `shift_jis`, `euc-kr` and `gbk` profiles hold the
-national standards' repertoires (JIS X 0201 with JIS X 0208, KS X 1001:2002, GBK as
-CP936 has it) and are narrower than the Encoding Standard's decoders of those labels,
-which also decode Windows-31J, UHC and GB18030.
+runs through it: there `big5` and `cp950` are both glibc's Big5 charmap, `gbk` is CP936
+without four-byte codes, `shift_jis` the historical Shift-JIS with yen and overline,
+and `euc-kr` KS X 1001 with the C1 controls. The strict Big5 and GBK tables are written
+from the standard's index files (<https://encoding.spec.whatwg.org/>), which are not in
+the repository, by `cargo xtask subtitle-views charset-tables`; its Shift_JIS and EUC-KR
+are code pages 932 and 949, which the same command checks against their indexes.
 
 `charset::CharsetJob` counts the output first, allocates it exactly, then encodes.
 

@@ -120,14 +120,18 @@ Translated from libass 0.17.5, stage by stage:
 ## Elsewhere
 
 - `triergon-subtitles` carries Unicode and Microsoft mapping data, a GNU Big5 mapping and
-  the WHATWG Encoding Standard's Big5 index, with their notices in
-  [crates/subtitles/LICENSE](../crates/subtitles/LICENSE). The strict Big5 profile's
-  tables (`src/text/charset/mapping-data/big5.bin` and `big5_plane2.bin`) hold
-  `index-big5.txt` (https://encoding.spec.whatwg.org/index-big5.txt), which the
-  standard licenses under the BSD 3-Clause License when it is incorporated into source
-  code. They were written from the tables `encoding_rs` 0.8.35 generates from that file
-  (Mozilla Foundation, Apache-2.0 or MIT), not from the file itself:
-  `cargo xtask subtitle-views charset-tables big5 FILE` compares them with the file,
-  and with `--write` writes them from it.
+  tables of the WHATWG Encoding Standard's indexes, with their notices in
+  [crates/subtitles/LICENSE](../crates/subtitles/LICENSE). The strict Big5 and GBK
+  profiles' tables (`src/text/charset/mapping-data/big5.bin`, `big5_plane2.bin`,
+  `gbk.bin`, `gb18030_ranges.bin`) hold `index-big5.txt`, `index-gb18030.txt` and
+  `index-gb18030-ranges.txt` of https://encoding.spec.whatwg.org/; the strict Shift_JIS
+  and EUC-KR profiles decode the code page 932 and 949 tables, whose records beyond
+  ASCII `index-jis0208.txt` and `index-euc-kr.txt` give. The indexes are of the edition
+  dated 2024-09-18 (identifiers `8dfc7710…`, `cbaa91f3…`, `1d97134c…`, `ff1c9a92…`
+  and `f963aaa1…`, in full in `tests/multibyte-mapping-data/SOURCE-LOCK.json`), which
+  the standard licenses under the BSD 3-Clause License when they are incorporated into
+  source code. The index files are not in the repository: `cargo xtask subtitle-views
+  charset-tables ENCODING FILE...` compares the tables with them, and with `--write`
+  writes them from them.
 - `xtask`, which no library links, has a zlib-derived deflate encoder and an MT19937
   generator; see [xtask/THIRD-PARTY.md](../xtask/THIRD-PARTY.md).

@@ -3,48 +3,64 @@
 //!
 //! The mapping data and licences are described in `MULTIBYTE-CONTRACT.md`.
 //! A profile follows the current definition of its charset: the Encoding
-//! Standard's decoder, a Windows code page as Windows converts it, or a
-//! national standard. The `Receiver` profiles follow the C library of the
+//! Standard's decoder of its label, or for a `cp` label the Windows code page
+//! as Windows converts it. The `Receiver` profiles follow the C library of the
 //! reference build instead, for
 //! [`receiver_charset`](crate::compat::charset::receiver_charset).
-use std::{ops::Range, sync::atomic::AtomicBool};
+use std::{num::NonZeroU8, ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 
 use crate::cancelled;
 
 /// A multibyte charset profile: its lead and trail bytes and its mapping
 /// table. Standalone ASCII bytes decode as themselves except where noted.
+// By charset, `ReceiverGbk` first: naming the value 0 costs nothing, and the
+// reference's gbk is the label most packets carry. `Gbk` and `Big5`, which
+// decode outside their tables, are one range.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MultibyteCharset {
-    /// Microsoft CP936 table 2.01, including its single-byte euro mapping.
-    GbkCp936,
+    /// Microsoft CP936 table 2.01 with its single-byte euro, the GBK glibc
+    /// 2.39 converts.
+    ReceiverGbk,
+    /// GBK as the Encoding Standard decodes it: its index gb18030 for the
+    /// two-byte codes, the single byte 0x80 as U+20AC, and the four-byte codes
+    /// of GB18030 by its index of ranges.
+    Gbk,
     /// Big5 as the Encoding Standard decodes it: its index, with the Hong Kong
     /// supplement and its plane 2 characters. The codes 88 62, 88 64, 88 A3
     /// and 88 A5 are each two characters, a letter and a combining mark.
     Big5,
-    /// Unicode historical Shift-JIS table 2.0, which decodes 0x5C as yen and
-    /// 0x7E as overline, with 81 5F, JIS X 0208's reverse solidus, as
-    /// U+FF3C as JIS0208.TXT maps it.
-    ShiftJisUnicode,
-    /// KS X 1001:2002 in EUC-KR: CP949 table 2.01 restricted to A1–FE byte
-    /// pairs, plus A2 E8 as U+327E, which KS X 1001:2002 adds, and ASCII; the
-    /// UHC extension pairs are refused.
-    EucKr,
-    /// Microsoft CP932 table 2.01 plus the 1,880 user-defined codes
-    /// F040–F9FC as U+E000–U+E757, as Windows converts them.
-    Windows932,
-    /// Microsoft CP949 table 2.01, including the UHC extension pairs.
-    Windows949,
+    /// The GNU Big5 charmap 0.92 as glibc 2.39 has it, which its `iconv`
+    /// converts both `big5` and `cp950` with: the repertoire FFmpeg decodes.
+    ReceiverBig5,
     /// Code page 950 as Windows converts it: Microsoft CP950 table 2.01, the
     /// 6,217 user-defined codes FA40–FEFE, 8E40–A0FE, 8140–8DFE and C6A1–C8FE
     /// as U+E000–U+F848 in that order, and the single bytes 0x80 and 0xFF as
     /// U+0080 and U+F8F8.
     Windows950,
-    /// The GNU Big5 charmap 0.92 as glibc 2.39 has it, which its `iconv`
-    /// converts both `big5` and `cp950` with: the repertoire FFmpeg decodes.
-    ReceiverBig5,
-    /// [`EucKr`](Self::EucKr) plus bytes 0x80–0x9F as the C1 controls: the
-    /// glibc 2.39 EUC-KR charmap.
+    /// Shift_JIS as the Encoding Standard decodes it: its index jis0208, the
+    /// user-defined codes F040–F9FC as U+E000–U+E757, and the single bytes 0x80
+    /// as U+0080 and A1–DF as the halfwidth katakana. That is
+    /// [`Windows932`](Self::Windows932) with 0x80.
+    ShiftJis,
+    /// Microsoft CP932 table 2.01 plus the 1,880 user-defined codes
+    /// F040–F9FC as U+E000–U+E757, as Windows converts them.
+    Windows932,
+    /// Unicode historical Shift-JIS table 2.0, which decodes 0x5C as yen and
+    /// 0x7E as overline, with 81 5F, JIS X 0208's reverse solidus, as
+    /// U+FF3C: the SJIS glibc 2.39 converts.
+    ReceiverShiftJis,
+    /// EUC-KR as the Encoding Standard decodes it: its index euc-kr, which
+    /// holds KS X 1001 and the UHC extension pairs, the pairs of
+    /// [`Windows949`](Self::Windows949); no single byte beyond ASCII. Any byte
+    /// from 0x41 to 0xFE may follow a lead byte, so a pair in the gaps
+    /// 0x5B–0x60 and 0x7B–0x80 is unmapped rather than a refused trail.
+    EucKr,
+    /// Microsoft CP949 table 2.01, including the UHC extension pairs.
+    Windows949,
+    /// KS X 1001:2002 in EUC-KR, A1–FE byte pairs (CP949 table 2.01 so
+    /// restricted, plus A2 E8 as U+327E), and the bytes 0x80–0x9F as the C1
+    /// controls: the glibc 2.39 EUC-KR charmap.
     ReceiverEucKrC1,
 }
 
@@ -63,14 +79,14 @@ impl MultibyteCharset {
             });
         }
         for (name, profile) in [
-            ("gbk", Self::GbkCp936),
-            ("cp936", Self::GbkCp936),
-            ("windows-936", Self::GbkCp936),
+            ("gbk", Self::Gbk),
+            ("cp936", Self::Gbk),
+            ("windows-936", Self::Gbk),
             ("big5", Self::Big5),
             ("big-5", Self::Big5),
-            ("shift_jis", Self::ShiftJisUnicode),
-            ("shift-jis", Self::ShiftJisUnicode),
-            ("sjis", Self::ShiftJisUnicode),
+            ("shift_jis", Self::ShiftJis),
+            ("shift-jis", Self::ShiftJis),
+            ("sjis", Self::ShiftJis),
             ("euc-kr", Self::EucKr),
             ("euc_kr", Self::EucKr),
             ("cp932", Self::Windows932),
@@ -88,15 +104,17 @@ impl MultibyteCharset {
     }
 
     /// Every profile, in declaration order.
-    const ALL: [Self; 9] = [
-        Self::GbkCp936,
+    const ALL: [Self; 11] = [
+        Self::ReceiverGbk,
+        Self::Gbk,
         Self::Big5,
-        Self::ShiftJisUnicode,
-        Self::EucKr,
-        Self::Windows932,
-        Self::Windows949,
-        Self::Windows950,
         Self::ReceiverBig5,
+        Self::Windows950,
+        Self::ShiftJis,
+        Self::Windows932,
+        Self::ReceiverShiftJis,
+        Self::EucKr,
+        Self::Windows949,
         Self::ReceiverEucKrC1,
     ];
 
@@ -104,36 +122,27 @@ impl MultibyteCharset {
     /// wire code and a two-byte scalar.
     const fn table(self) -> &'static [u8] {
         match self {
-            Self::GbkCp936 => include_bytes!("mapping-data/gbk.bin"),
+            Self::Gbk => include_bytes!("mapping-data/gbk.bin"),
             Self::Big5 => include_bytes!("mapping-data/big5.bin"),
-            Self::ShiftJisUnicode => include_bytes!("mapping-data/shift_jis.bin"),
-            Self::EucKr | Self::ReceiverEucKrC1 => include_bytes!("mapping-data/euc_kr.bin"),
-            Self::Windows932 => include_bytes!("mapping-data/windows932.bin"),
-            Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
+            Self::ShiftJis | Self::Windows932 => include_bytes!("mapping-data/windows932.bin"),
+            Self::EucKr | Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
             Self::Windows950 => include_bytes!("mapping-data/windows950.bin"),
             Self::ReceiverBig5 => include_bytes!("mapping-data/receiver_big5.bin"),
+            Self::ReceiverEucKrC1 => include_bytes!("mapping-data/receiver_euc_kr.bin"),
+            Self::ReceiverGbk => include_bytes!("mapping-data/receiver_gbk.bin"),
+            Self::ReceiverShiftJis => include_bytes!("mapping-data/receiver_shift_jis.bin"),
         }
     }
 
     /// The last byte the profile decodes as itself although its table does
-    /// not hold it: ASCII's, or the receiver EUC-KR's C1 control 0x9F.
+    /// not hold it: ASCII's, Shift_JIS's 0x80, or the receiver EUC-KR's C1
+    /// control 0x9F.
     const fn as_itself(self) -> u8 {
         match self {
+            Self::ShiftJis => 0x80,
             Self::ReceiverEucKrC1 => 0x9f,
             _ => 0x7f,
         }
-    }
-
-    /// The character of a [`Big5`](Self::Big5) code in plane 2.
-    fn big5_plane2(code: u16) -> Option<char> {
-        let (records, _) = include_bytes!("mapping-data/big5_plane2.bin").as_chunks::<4>();
-        let at = records
-            .binary_search_by_key(&code, |&[lead, trail, ..]| {
-                u16::from_be_bytes([lead, trail])
-            })
-            .ok()?;
-        let [_, _, high, low] = records[at];
-        char::from_u32(0x2_0000 | u32::from(u16::from_be_bytes([high, low])))
     }
 
     /// The inclusive ranges of the bytes that may lead a pair. Big5's are
@@ -141,22 +150,27 @@ impl MultibyteCharset {
     /// 0xA0 and 0xFA to 0xFE, with what else lies outside its table.
     const fn lead_ranges(self) -> &'static [(u8, u8)] {
         match self {
-            Self::ShiftJisUnicode => &[(0x81, 0x9f), (0xe0, 0xef)],
-            Self::Windows932 => &[(0x81, 0x9f), (0xe0, 0xfc)],
+            Self::ShiftJis | Self::Windows932 => &[(0x81, 0x9f), (0xe0, 0xfc)],
+            Self::ReceiverShiftJis => &[(0x81, 0x9f), (0xe0, 0xef)],
             Self::Big5 | Self::ReceiverBig5 => &[(0xa1, 0xf9)],
-            Self::EucKr | Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
-            Self::GbkCp936 | Self::Windows949 | Self::Windows950 => &[(0x81, 0xfe)],
+            Self::Gbk | Self::ReceiverGbk | Self::EucKr | Self::Windows949 | Self::Windows950 => {
+                &[(0x81, 0xfe)]
+            }
+            Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
         }
     }
 
     /// The inclusive ranges of the bytes that may follow a lead byte.
     const fn trail_ranges(self) -> &'static [(u8, u8)] {
         match self {
-            Self::ShiftJisUnicode | Self::Windows932 => &[(0x40, 0x7e), (0x80, 0xfc)],
-            Self::GbkCp936 => &[(0x40, 0x7e), (0x80, 0xfe)],
+            Self::ShiftJis | Self::Windows932 | Self::ReceiverShiftJis => {
+                &[(0x40, 0x7e), (0x80, 0xfc)]
+            }
             Self::Big5 | Self::Windows950 | Self::ReceiverBig5 => &[(0x40, 0x7e), (0xa1, 0xfe)],
-            Self::EucKr | Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
+            Self::Gbk | Self::ReceiverGbk => &[(0x40, 0x7e), (0x80, 0xfe)],
+            Self::EucKr => &[(0x41, 0xfe)],
             Self::Windows949 => &[(0x41, 0x5a), (0x61, 0x7a), (0x81, 0xfe)],
+            Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
         }
     }
 
@@ -211,6 +225,45 @@ impl MultibyteCharset {
     fn trail(self, byte: u8) -> bool {
         CLASSES[self as usize][usize::from(byte)] & TRAIL != 0
     }
+
+    /// The character of a [`Big5`](Self::Big5) code in plane 2.
+    fn big5_plane2(code: u16) -> Option<char> {
+        let (records, _) = include_bytes!("mapping-data/big5_plane2.bin").as_chunks::<4>();
+        let at = records
+            .binary_search_by_key(&code, |&[lead, trail, ..]| {
+                u16::from_be_bytes([lead, trail])
+            })
+            .ok()?;
+        let [_, _, high, low] = records[at];
+        char::from_u32(0x2_0000 | u32::from(u16::from_be_bytes([high, low])))
+    }
+
+    /// Whether the profile decodes some input its table and lead bytes
+    /// refuse, which [`MultibyteDecoder::outside_table`] takes.
+    pub(crate) fn decodes_outside_table(self) -> bool {
+        matches!(self, Self::Big5 | Self::Gbk)
+    }
+}
+
+/// The code point of a four-byte GB18030 pointer, by the Encoding Standard's
+/// index of ranges: pointer 7457 is U+E7C7, the pointers from 189000 to 1237575
+/// are U+10000 onwards, and those between 39420 and 188999 or beyond are none.
+fn gb18030_ranges(pointer: u32) -> Option<char> {
+    if pointer == 7457 {
+        return Some('\u{e7c7}');
+    }
+    if (39_420..189_000).contains(&pointer) || pointer > 1_237_575 {
+        return None;
+    }
+    if pointer >= 189_000 {
+        return char::from_u32(0x1_0000 + pointer - 189_000);
+    }
+    let (ranges, _) = include_bytes!("mapping-data/gb18030_ranges.bin").as_chunks::<4>();
+    let at = ranges
+        .partition_point(|&[high, low, ..]| u32::from(u16::from_be_bytes([high, low])) <= pointer);
+    let [high, low, code_high, code_low] = ranges[at.checked_sub(1)?];
+    let offset = u32::from(u16::from_be_bytes([high, low]));
+    char::from_u32(u32::from(u16::from_be_bytes([code_high, code_low])) + pointer - offset)
 }
 
 const PROFILES: usize = MultibyteCharset::ALL.len();
@@ -359,6 +412,11 @@ const fn mark(classes: &mut [u8; 256], ranges: &[(u8, u8)], class: u8) {
 const MACRON_DUE: u8 = 0x80;
 const CARON_DUE: u8 = 0xff;
 
+/// Lead bytes that stand for a four-byte [`MultibyteCharset::Gbk`] code whose
+/// third or fourth byte is due. Neither is a GBK lead byte.
+const THIRD_DUE: u8 = 0x80;
+const FOURTH_DUE: u8 = 0xff;
+
 /// A decoded character and the bytes it was decoded from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DecodedScalar {
@@ -390,7 +448,11 @@ pub enum DecodeStep {
 pub struct MultibyteDecoder {
     profile: MultibyteCharset,
     position: usize,
-    lead: Option<u8>,
+    /// The lead byte whose trail byte is due, or [`MACRON_DUE`] or
+    /// [`CARON_DUE`]; no lead byte is zero.
+    lead: Option<NonZeroU8>,
+    /// The part of a four-byte GB18030 pointer its bytes so far give.
+    four_byte: u32,
     finished: bool,
     failed: Option<Error>,
 }
@@ -412,6 +474,7 @@ impl MultibyteDecoder {
             profile,
             position: offset,
             lead: None,
+            four_byte: 0,
             finished: false,
             failed: None,
         }
@@ -425,7 +488,8 @@ impl MultibyteDecoder {
     /// Decodes `byte`, the byte at [`position`](Self::position). The trail
     /// byte of a [`MultibyteCharset::Big5`] code that is two characters gives
     /// the letter and stays the next byte to push; pushed again it gives the
-    /// combining mark. `Error::Invalid` for input after
+    /// combining mark. The first three bytes of a four-byte
+    /// [`MultibyteCharset::Gbk`] code need input. `Error::Invalid` for input after
     /// [`finish`](Self::finish), a trail byte the profile refuses, or a byte
     /// or pair its table does not map; `Error::Overflow` when the position
     /// does not fit `usize`.
@@ -443,8 +507,9 @@ impl MultibyteDecoder {
     }
 
     /// [`push`](Self::push) for what the profile's table and lead bytes hold;
-    /// what else [`MultibyteCharset::Big5`] decodes is refused here and taken
-    /// by [`outside_table`](Self::outside_table).
+    /// what else [`MultibyteCharset::Big5`] and [`MultibyteCharset::Gbk`]
+    /// decode is refused here and taken by
+    /// [`outside_table`](Self::outside_table).
     pub(crate) fn push_table(
         &mut self,
         byte: u8,
@@ -474,7 +539,7 @@ impl MultibyteDecoder {
             if !self.profile.trail(byte) {
                 return Err(Error::Invalid("invalid multibyte trail"));
             }
-            let code = u16::from_be_bytes([lead, byte]);
+            let code = u16::from_be_bytes([lead.get(), byte]);
             let value = self
                 .profile
                 .lookup(code)
@@ -490,8 +555,8 @@ impl MultibyteDecoder {
         // Historical Shift-JIS maps 0x5C to yen and 0x7E to overline.
         let single = if byte.is_ascii() {
             Some(match (self.profile, byte) {
-                (MultibyteCharset::ShiftJisUnicode, b'\\') => '\u{00a5}',
-                (MultibyteCharset::ShiftJisUnicode, b'~') => '\u{203e}',
+                (MultibyteCharset::ReceiverShiftJis, b'\\') => '\u{00a5}',
+                (MultibyteCharset::ReceiverShiftJis, b'~') => '\u{203e}',
                 _ => char::from(byte),
             })
         } else {
@@ -506,7 +571,7 @@ impl MultibyteDecoder {
             }));
         }
         if self.profile.lead(byte) {
-            self.lead = Some(byte);
+            self.lead = NonZeroU8::new(byte);
             self.position = next;
             return Ok(DecodeStep::NeedInput);
         }
@@ -514,22 +579,27 @@ impl MultibyteDecoder {
     }
 
     /// The step for `byte`, which [`push_table`](Self::push_table) has just
-    /// refused, where [`MultibyteCharset::Big5`] decodes it all the same: a
-    /// lead byte of the supplement, a plane 2 character, or one of the codes
-    /// that are two characters. `None` leaves the refusal standing.
+    /// refused, where the profile decodes it all the same:
+    /// [`MultibyteCharset::Big5`] a lead byte of the supplement, a plane 2
+    /// character or one of the codes that are two characters,
+    /// [`MultibyteCharset::Gbk`] a byte of a four-byte code. `None` leaves the
+    /// refusal standing.
     #[cold]
     pub(crate) fn outside_table(&mut self, byte: u8) -> Option<DecodeStep> {
-        if self.profile != MultibyteCharset::Big5 || self.finished {
+        if !self.profile.decodes_outside_table() || self.finished {
             return None;
         }
         self.failed?;
         let next = self.position.checked_add(1)?;
+        if self.profile == MultibyteCharset::Gbk {
+            return self.four_byte(byte, next);
+        }
         let Some(lead) = self.lead else {
             if !matches!(byte, 0x81..=0xa0 | 0xfa..=0xfe) {
                 return None;
             }
             self.failed = None;
-            self.lead = Some(byte);
+            self.lead = NonZeroU8::new(byte);
             self.position = next;
             return Some(DecodeStep::NeedInput);
         };
@@ -537,7 +607,7 @@ impl MultibyteDecoder {
             return None;
         }
         let start = self.position.checked_sub(1)?;
-        let (value, range, lead) = match [lead, byte] {
+        let (value, range, lead) = match [lead.get(), byte] {
             // The mark of a letter already given: the trail byte's second turn.
             [MACRON_DUE, _] => ('\u{304}', self.position..next, None),
             [CARON_DUE, _] => ('\u{30c}', self.position..next, None),
@@ -553,9 +623,41 @@ impl MultibyteDecoder {
             ),
         };
         self.failed = None;
-        self.lead = lead;
+        self.lead = lead.and_then(NonZeroU8::new);
         self.position = range.end;
         Some(DecodeStep::Scalar(DecodedScalar { value, range }))
+    }
+
+    /// A byte of a four-byte GB18030 code after its lead byte: a second byte
+    /// 0x30 to 0x39, a third 0x81 to 0xFE, a fourth 0x30 to 0x39. The pointer
+    /// is ((first − 0x81) × 10 + second − 0x30) × 1260 + (third − 0x81) × 10 +
+    /// fourth − 0x30.
+    fn four_byte(&mut self, byte: u8, next: usize) -> Option<DecodeStep> {
+        let (pointer, lead) = match (self.lead?.get(), byte) {
+            (FOURTH_DUE, 0x30..=0x39) => {
+                let pointer = self.four_byte * 10 + u32::from(byte - 0x30);
+                let value = gb18030_ranges(pointer)?;
+                let start = self.position.checked_sub(3)?;
+                self.failed = None;
+                self.lead = None;
+                self.position = next;
+                return Some(DecodeStep::Scalar(DecodedScalar {
+                    value,
+                    range: start..next,
+                }));
+            }
+            (THIRD_DUE, 0x81..=0xfe) => (self.four_byte * 126 + u32::from(byte - 0x81), FOURTH_DUE),
+            (first @ 0x81..=0xfe, 0x30..=0x39) => (
+                u32::from(first - 0x81) * 10 + u32::from(byte - 0x30),
+                THIRD_DUE,
+            ),
+            _ => return None,
+        };
+        self.four_byte = pointer;
+        self.failed = None;
+        self.lead = NonZeroU8::new(lead);
+        self.position = next;
+        Some(DecodeStep::NeedInput)
     }
 
     /// Ends the input. A pending lead byte is a sticky `Error::Truncated`;

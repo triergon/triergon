@@ -4,10 +4,12 @@ Independently authored source in this package is available under your choice
 of MIT or Apache-2.0. The two complete license texts follow.
 
 The Unicode mapping data, the GNU Big5 receiver mapping and the WHATWG Encoding
-Standard's Big5 index have separate notices. Those notices apply to the mapping
-data under src/text/charset and the corresponding mapping fixtures under tests.
-The Big5 index tables were written from those encoding_rs 0.8.35 (copyright
-Mozilla Foundation, Apache-2.0 or MIT) generates from the index.
+Standard's indexes (index-big5, index-gb18030 and index-gb18030-ranges) have
+separate notices. Those notices apply to the mapping data under src/text/charset
+and the corresponding mapping fixtures under tests. The Big5 fixture
+tests/multibyte-mapping-data/INDEX-BIG5.TXT was written from the tables
+encoding_rs 0.8.35 (copyright Mozilla Foundation, Apache-2.0 or MIT) generates
+from the index.
 
 --- MIT for independently authored source ---
 
@@ -301,7 +303,7 @@ authorization of the copyright holder.
 %
 % alias BIG5-CP950
 
---- WHATWG Encoding Standard index-big5 notice ---
+--- WHATWG Encoding Standard indexes notice ---
 
 Copyright © WHATWG (Apple, Google, Mozilla, Microsoft).
 

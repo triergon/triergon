@@ -77,11 +77,11 @@ fn euc_c1_controls_are_explicit_not_cp949_alias() {
             format!("{}A", char::from(b)).as_bytes()
         );
     }
-    assert!(decode(&p, &[0x81, 0x41], M::EucKr).is_err());
-    assert_eq!(
-        decode(&p, &[0x81, 0x41], M::Windows949).unwrap(),
-        "갂".as_bytes()
-    );
+    // The receiver's EUC-KR has no UHC pairs; the Encoding Standard's has.
+    assert!(decode(&p, &[0xa1, 0x41], M::ReceiverEucKrC1).is_err());
+    for profile in [M::EucKr, M::Windows949] {
+        assert_eq!(decode(&p, &[0x81, 0x41], profile).unwrap(), "갂".as_bytes());
+    }
 }
 #[test]
 fn cp932_user_defined_area_maps_all_1880_codes_to_private_use() {
@@ -472,16 +472,17 @@ fn absent_receiver_declaration_remains_unknown_while_source_is_retained() {
 }
 
 #[test]
-fn every_euc_kr_profile_maps_a2e8_as_ks_x_1001_2002_does() {
+fn the_receiver_euc_kr_maps_a2e8_as_ks_x_1001_2002_does() {
     let p = Budget::new(1 << 20).unwrap();
-    for profile in [M::EucKr, M::ReceiverEucKrC1] {
-        assert_eq!(
-            decode(&p, &[0xa2, 0xe8], profile).unwrap(),
-            "\u{327e}".as_bytes()
-        );
+    assert_eq!(
+        decode(&p, &[0xa2, 0xe8], M::ReceiverEucKrC1).unwrap(),
+        "\u{327e}".as_bytes()
+    );
+    // The Encoding Standard's index, as Windows' CP949 table, leaves it
+    // unmapped.
+    for profile in [M::EucKr, M::Windows949] {
+        assert!(decode(&p, &[0xa2, 0xe8], profile).is_err());
     }
-    // Windows' CP949 table leaves it unmapped.
-    assert!(decode(&p, &[0xa2, 0xe8], M::Windows949).is_err());
     assert_eq!(
         receiver_charset(b"euc-kr").unwrap(),
         Charset::Multibyte(M::ReceiverEucKrC1)

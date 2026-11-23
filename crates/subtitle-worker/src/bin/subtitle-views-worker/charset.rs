@@ -51,6 +51,8 @@ pub(super) fn operation<'a>(
         }
         Some("kr-c1" | "kr-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverEucKrC1),
         Some("cp932-receiver") => Charset::Multibyte(MultibyteCharset::Windows932),
+        Some("gbk-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverGbk),
+        Some("shift_jis-receiver") => Charset::Multibyte(MultibyteCharset::ReceiverShiftJis),
         Some(profile) => Charset::from_label(profile.as_bytes())
             .or_else(|_| MultibyteCharset::from_label(profile.as_bytes()).map(Charset::Multibyte))
             .map_err(|error| error.to_string())?,

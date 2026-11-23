@@ -424,11 +424,11 @@ impl CharsetJob {
     }
     /// After [`Cursor::step`] failed: takes what the reader's profile decodes
     /// although its table refused it, as [`inner`](Self::inner) takes a
-    /// character; `false` when the refusal stands. Only Big5 decodes anything
-    /// its table refuses.
+    /// character; `false` when the refusal stands. Only Big5 and GBK decode
+    /// anything their tables refuse.
     #[cold]
     fn outside_table(&mut self) -> Result<bool> {
-        if self.charset != Charset::Multibyte(MultibyteCharset::Big5) {
+        if !matches!(self.charset, Charset::Multibyte(profile) if profile.decodes_outside_table()) {
             return Ok(false);
         }
         let Reader::Scalars(cursor) = &mut self.reader else {

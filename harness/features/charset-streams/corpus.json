@@ -578,6 +578,11 @@
         "packets": 65536,
         "bytes": 99014,
         "digest": 7365534381433240032
+      },
+      "candidate_expected": {
+        "packets": 65536,
+        "bytes": 105460,
+        "digest": 13226708438505400253
       }
     },
     {
@@ -756,6 +761,11 @@
         "packets": 256,
         "bytes": 320,
         "digest": 12518258771777805836
+      },
+      "candidate_expected": {
+        "packets": 256,
+        "bytes": 319,
+        "digest": 13455961228240529783
       }
     },
     {
@@ -773,6 +783,11 @@
         "packets": 65536,
         "bytes": 142752,
         "digest": 13785562036370117045
+      },
+      "candidate_expected": {
+        "packets": 65536,
+        "bytes": 151186,
+        "digest": 279654731344999016
       }
     },
     {
@@ -866,8 +881,8 @@
       },
       "candidate_expected": {
         "packets": 65536,
-        "bytes": 57278,
-        "digest": 4737837360175430795
+        "bytes": 83741,
+        "digest": 12145640398453203031
       }
     },
     {
@@ -1614,6 +1629,176 @@
         "packets": 1,
         "bytes": 69819,
         "digest": 13344678681017818779
+      }
+    },
+    {
+      "id": "gbk-receiver-bytes",
+      "profile": "gbk-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk-receiver",
+        "GBK",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 131,
+        "digest": 4198597673088014402
+      }
+    },
+    {
+      "id": "gbk-receiver-pairs",
+      "profile": "gbk-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk-receiver",
+        "GBK",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 99014,
+        "digest": 7365534381433240032
+      }
+    },
+    {
+      "id": "gbk-receiver-1024",
+      "profile": "gbk-receiver",
+      "file": "harness/features/charset-streams/inputs/gbk-1024.bin",
+      "sha256": "98d6add2a01d937b48c080516b101c924f1c98f8810db140b16843d44019685c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk-receiver",
+        "GBK",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1065,
+        "digest": 16103108549359855582
+      }
+    },
+    {
+      "id": "gbk-receiver-8192",
+      "profile": "gbk-receiver",
+      "file": "harness/features/charset-streams/inputs/gbk-8192.bin",
+      "sha256": "dbf2b16300cf1058be76b84aaad448c8ba1f5b2c511c157cce8566e6edc1b6f0",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk-receiver",
+        "GBK",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8459,
+        "digest": 2646922419665643957
+      }
+    },
+    {
+      "id": "gbk-receiver-65536",
+      "profile": "gbk-receiver",
+      "file": "harness/features/charset-streams/inputs/gbk-65536.bin",
+      "sha256": "4ce154e824a4577b974c7e8e69217fed27f8d1add06fdb93ba12ee7e6385269e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "gbk-receiver",
+        "GBK",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 67814,
+        "digest": 6460195700035601611
+      }
+    },
+    {
+      "id": "shift_jis-receiver-bytes",
+      "profile": "shift_jis-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis-receiver",
+        "SHIFT_JIS",
+        "bytes"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 320,
+        "digest": 12518258771777805836
+      }
+    },
+    {
+      "id": "shift_jis-receiver-pairs",
+      "profile": "shift_jis-receiver",
+      "file": "harness/features/charset-streams/inputs/matrix.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis-receiver",
+        "SHIFT_JIS",
+        "pairs"
+      ],
+      "expected": {
+        "packets": 65536,
+        "bytes": 142752,
+        "digest": 13785562036370117045
+      }
+    },
+    {
+      "id": "shift_jis-receiver-1024",
+      "profile": "shift_jis-receiver",
+      "file": "harness/features/charset-streams/inputs/shift_jis-1024.bin",
+      "sha256": "67765f2a5aa6d248ea7da991771479e717bddb85de2e06df57b078bb7f5d7561",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis-receiver",
+        "SHIFT_JIS",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 1063,
+        "digest": 12369212635676326285
+      }
+    },
+    {
+      "id": "shift_jis-receiver-8192",
+      "profile": "shift_jis-receiver",
+      "file": "harness/features/charset-streams/inputs/shift_jis-8192.bin",
+      "sha256": "d41be30af5c646442c0490a2e76ccb049b818ff9b34bbc097a76838e0d1923cb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis-receiver",
+        "SHIFT_JIS",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 8444,
+        "digest": 3277762086197320230
+      }
+    },
+    {
+      "id": "shift_jis-receiver-65536",
+      "profile": "shift_jis-receiver",
+      "file": "harness/features/charset-streams/inputs/shift_jis-65536.bin",
+      "sha256": "b05738a0071b66ce4c1d2852d046be181b0189b641a21e4fa925d1d72f66b5a3",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "shift_jis-receiver",
+        "SHIFT_JIS",
+        "stream"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 67807,
+        "digest": 11677920899890020371
       }
     },
     {

@@ -131,11 +131,56 @@
         "# (lead - 0x81) * 157 + (trail - 0x40, or trail - 0x62 from 0xA1). The codes 8862, 8864, 88A3 and",
         "# 88A5 decode to two code points and are listed last, as comments."
       ],
-      "written_from": "the tables encoding_rs 0.8.35 generates from the index (BIG5_LOW_BITS, BIG5_ASTRALNESS), not the index file; the sha256 is this file's"
+      "written_from": "the tables encoding_rs 0.8.35 generates from the index; its records equal index-big5.txt (identifier 8dfc7710..., 2024-09-18), which the generator checks; the sha256 is this file's"
+    },
+    "index-big5.txt": {
+      "url": "https://encoding.spec.whatwg.org/index-big5.txt",
+      "sha256": "08e24270c8e95d998c994c03f907e972480dc01f58743e078654cc466203c8ff",
+      "bytes": 688943,
+      "identifier": "8dfc771062e7be0810919082c2c06baa2236147909e0ecc235b1cb9ad782ac82",
+      "date": "2024-09-18",
+      "in_repository": false,
+      "use": "`cargo xtask subtitle-views charset-tables` reads it from a path and compares the tables with it, or with --write writes them from it"
+    },
+    "index-jis0208.txt": {
+      "url": "https://encoding.spec.whatwg.org/index-jis0208.txt",
+      "sha256": "341dcde7e8b984e9c7bbf5ed75c8da7c6087d47083a1a2b3ed558bfd5bef9468",
+      "bytes": 275768,
+      "identifier": "cbaa91f3deb7d0841faf5c33041fc15a285da0e87e64ab802c4bf04b7c4da861",
+      "date": "2024-09-18",
+      "in_repository": false,
+      "use": "`cargo xtask subtitle-views charset-tables` reads it from a path and checks that it gives the code page table the profile decodes"
+    },
+    "index-euc-kr.txt": {
+      "url": "https://encoding.spec.whatwg.org/index-euc-kr.txt",
+      "sha256": "89af20dd867c84cefb710b1790229786cfef2bf11916361a210d81b90381e267",
+      "bytes": 671621,
+      "identifier": "1d97134cbf187263585bc8f593ca4196654ed4c7a673f5672eaad4f5d9fdc4ba",
+      "date": "2024-09-18",
+      "in_repository": false,
+      "use": "`cargo xtask subtitle-views charset-tables` reads it from a path and checks that it gives the code page table the profile decodes"
+    },
+    "index-gb18030.txt": {
+      "url": "https://encoding.spec.whatwg.org/index-gb18030.txt",
+      "sha256": "746b3c55f1a8ec4b90b451f384437a17fd37cd51cd668456a28071a758d10784",
+      "bytes": 843967,
+      "identifier": "ff1c9a923b5d24f9761b3a2de2c0f07b395f9f6f36519508944de4f0415be81c",
+      "date": "2024-09-18",
+      "in_repository": false,
+      "use": "`cargo xtask subtitle-views charset-tables` reads it from a path and compares the tables with it, or with --write writes them from it"
+    },
+    "index-gb18030-ranges.txt": {
+      "url": "https://encoding.spec.whatwg.org/index-gb18030-ranges.txt",
+      "sha256": "874c6b6f6f74cf7d427ad228d5b41ddd9354fffd92a2259bf429f86e6baa7a1e",
+      "bytes": 3110,
+      "identifier": "f963aaa1653f630c523e7b04729fb4e4458f35806c45eb5c179445623138f0c0",
+      "date": "2024-09-18",
+      "in_repository": false,
+      "use": "`cargo xtask subtitle-views charset-tables` reads it from a path and compares the tables with it, or with --write writes them from it"
     }
   },
   "profiles": {
-    "gbk": {
+    "receiver_gbk": {
       "source": "CP936.TXT",
       "source_sha256": "b86f601c575e9ab457380b6f7abef03c75499cc6075bdc8b4b27f3f2de74bf6a",
       "original_records": 21920,
@@ -143,7 +188,8 @@
       "added_identity_controls": [],
       "explicit_unmapped": [],
       "binary_sha256": "21b9fc1f2bac99caccc8c00dbb20dcd74764db94dcb83dc285b192b08dfd75fe",
-      "binary_bytes": 87680
+      "binary_bytes": 87680,
+      "binary": "receiver_gbk.bin"
     },
     "big5": {
       "source": "INDEX-BIG5.TXT",
@@ -163,7 +209,7 @@
         34981
       ]
     },
-    "shift_jis": {
+    "receiver_shift_jis": {
       "source": "SHIFTJIS.TXT",
       "source_sha256": "52d6467329db0753c4a658591a3b2b2efdf9bef39ea11d6d1c0c4187917a2368",
       "original_records": 7037,
@@ -208,9 +254,10 @@
       "binary_bytes": 28280,
       "changed": {
         "815F": "U+FF3C (JIS X 0208 1-32)"
-      }
+      },
+      "binary": "receiver_shift_jis.bin"
     },
-    "euc_kr": {
+    "receiver_euc_kr": {
       "source": "CP949.TXT",
       "source_sha256": "f57e6fef9d1ed44f445e319a8e1b879ce6b6064520ab571c341e47b892e32abc",
       "original_records": 17176,
@@ -350,7 +397,8 @@
       "binary_bytes": 33420,
       "added": {
         "A2E8": "U+327E (KS X 1001:2002)"
-      }
+      },
+      "binary": "receiver_euc_kr.bin"
     },
     "windows932": {
       "source": "CP932.TXT",
@@ -389,13 +437,44 @@
         "80": "U+0080",
         "FF": "U+F8F8"
       }
+    },
+    "gbk": {
+      "source": "index-gb18030.txt",
+      "source_sha256": "746b3c55f1a8ec4b90b451f384437a17fd37cd51cd668456a28071a758d10784",
+      "original_records": 23940,
+      "profile_records": 23941,
+      "added": {
+        "80": "U+20AC"
+      },
+      "binary_sha256": "66e0496d285e8b85d9c2f8967999c41460924c272b212c7a3d935f7c4268110d",
+      "binary_bytes": 95764,
+      "ranges_source": "index-gb18030-ranges.txt",
+      "ranges_source_sha256": "874c6b6f6f74cf7d427ad228d5b41ddd9354fffd92a2259bf429f86e6baa7a1e",
+      "ranges_records": 206,
+      "ranges_binary_sha256": "92e55ad4a6ae480e70ff7e6c288eb5002d9b8612a24981fe5bab1922bdb9192b",
+      "ranges_binary_bytes": 824
+    },
+    "shift_jis": {
+      "source": "index-jis0208.txt",
+      "source_sha256": "341dcde7e8b984e9c7bbf5ed75c8da7c6087d47083a1a2b3ed558bfd5bef9468",
+      "original_records": 7724,
+      "decodes": "windows932.bin, whose records beyond ASCII are the index's with the user-defined codes F040-F9FC as U+E000-U+E757 and A1-DF as U+FF61-U+FF9F",
+      "as_itself": {
+        "80": "U+0080"
+      }
+    },
+    "euc_kr": {
+      "source": "index-euc-kr.txt",
+      "source_sha256": "89af20dd867c84cefb710b1790229786cfef2bf11916361a210d81b90381e267",
+      "original_records": 17048,
+      "decodes": "windows949.bin, whose records beyond ASCII are the index's"
     }
   },
   "reuse": "mapping DATA only; original decoder; no runtime dependency",
   "licences": [
     "Unicode License V3",
     "KSC5601 original file-specific permission retained",
-    "BSD 3-Clause (WHATWG index-big5)"
+    "BSD 3-Clause (the WHATWG Encoding Standard indexes)"
   ],
   "normative_conformance_claim": false
 }

@@ -18,8 +18,9 @@ use triergon_core::{Budget, Error, Result, WorkBudget};
 /// iso-8859-1, windows-1251 or windows-1252. `Error::Limit` for a label over
 /// 256 bytes, `Error::Unsupported` for any other. It differs from
 /// [`Charset::from_label`] and
-/// [`MultibyteCharset::from_label`](M::from_label): big5, cp950 and euc-kr
-/// resolve to the `Receiver` profiles.
+/// [`MultibyteCharset::from_label`](M::from_label): gbk, cp936, windows-936,
+/// big5, big-5, shift_jis, shift-jis, sjis, cp950 and euc-kr resolve to the
+/// `Receiver` profiles.
 #[inline]
 pub fn receiver_charset(label: &[u8]) -> Result<Charset> {
     // The decoders open with euc-kr most; its test is inlined into them.
@@ -39,11 +40,11 @@ fn other_receiver_charset(label: &[u8]) -> Result<Charset> {
     }
     let is = |name: &[u8]| label.eq_ignore_ascii_case(name);
     let profile = if is(b"gbk") || is(b"cp936") || is(b"windows-936") {
-        M::GbkCp936
+        M::ReceiverGbk
     } else if is(b"big5") || is(b"big-5") {
         M::ReceiverBig5
     } else if is(b"shift_jis") || is(b"shift-jis") || is(b"sjis") {
-        M::ShiftJisUnicode
+        M::ReceiverShiftJis
     } else if is(b"cp932") {
         M::Windows932
     } else if is(b"cp949") {
