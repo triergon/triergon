@@ -1281,59 +1281,7 @@ impl<F: Format> ContainerReader for Reader<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::MpegAudio;
-    use triergon_core::Bytes;
-
-    #[test]
-    fn a_tag_entry_is_retried_after_backpressure() {
-        let tag = b"ID3\x04\x00\x00\x00\x00\x00\x01x";
-        let mut frame = vec![0xff, 0xfb, 0x90, 0x64];
-        frame.resize(417, 0);
-        let file = [tag.as_slice(), &frame, &frame, &frame].concat();
-        let cancel = AtomicBool::new(false);
-        for retained_metadata_bytes in [0, tag.len()] {
-            let limits = Limits {
-                retained_metadata_bytes,
-                ..Limits::default()
-            };
-            let pool = Budget::new(4096).unwrap();
-            let mut reader = Reader::<MpegAudio>::new(
-                &pool,
-                SourceId(1),
-                SourceCapabilities {
-                    length: Some(file.len() as u64),
-                    random_access: true,
-                },
-                limits,
-                4096,
-            )
-            .unwrap();
-            let request = reader.request();
-            let bytes = Bytes::copy_from_slice(&pool, &file).unwrap();
-            let window = InputWindow::new(request.source, request.token, 0, bytes).unwrap();
-            reader.provide(&window).unwrap();
-            let held = pool.reserve(pool.available()).unwrap();
-            assert!(matches!(
-                reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
-                Step::Backpressure(_)
-            ));
-            assert!(reader.tags().is_empty());
-            drop(held);
-            assert!(matches!(
-                reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
-                Step::Ready(Event::Other(ReaderEvent::Opened))
-            ));
-            let [entry] = reader.tags() else {
-                panic!("expected one tag")
-            };
-            assert_eq!((entry.offset, entry.len), (0, tag.len() as u64));
-            assert_eq!(
-                entry.bytes.as_deref(),
-                (retained_metadata_bytes != 0).then_some(tag.as_slice())
-            );
-        }
-    }
+    use super::find;
 
     #[test]
     fn find_agrees_with_a_byte_search_at_every_offset_and_length() {

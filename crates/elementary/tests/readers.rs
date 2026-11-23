@@ -86,6 +86,50 @@ fn mpeg_audio_frames_follow_their_headers_after_tags() {
 }
 
 #[test]
+fn a_tag_entry_is_retried_after_backpressure() {
+    let tag = id3v2(1);
+    let audio = mp3_stream(3);
+    let file = [tag.as_slice(), audio.as_slice()].concat();
+    let cancel = AtomicBool::new(false);
+    for retained_metadata_bytes in [0, tag.len()] {
+        let limits = Limits {
+            retained_metadata_bytes,
+            ..Limits::default()
+        };
+        let pool = Budget::new(4096).unwrap();
+        let mut reader = Reader::<MpegAudio>::new(
+            &pool,
+            triergon_core::SourceId(1),
+            capabilities(&file, true),
+            limits,
+            4096,
+        )
+        .unwrap();
+        let request = reader.request();
+        supply(&mut reader, &pool, &file, &request, 4096);
+        let held = pool.reserve(pool.available()).unwrap();
+        assert!(matches!(
+            reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
+            Step::Backpressure(_)
+        ));
+        assert!(reader.tags().is_empty());
+        drop(held);
+        assert!(matches!(
+            reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
+            Step::Ready(Event::Other(triergon_elementary::ReaderEvent::Opened))
+        ));
+        let [entry] = reader.tags() else {
+            panic!("expected one tag")
+        };
+        assert_eq!((entry.offset, entry.len), (0, tag.len() as u64));
+        assert_eq!(
+            entry.bytes.as_deref(),
+            (retained_metadata_bytes != 0).then_some(tag.as_slice())
+        );
+    }
+}
+
+#[test]
 fn mpeg_audio_junk_joins_the_next_packet_and_a_short_tail_is_incomplete() {
     let frames: Vec<Vec<u8>> = (0..12).map(|i| mp3_frame(i, false)).collect();
     let mut file = noise(1, 700); // leading junk is dropped
