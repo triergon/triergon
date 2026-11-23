@@ -108,29 +108,29 @@ pub struct Decoder {
 
 /// Everything but the RBSP buffer: parameter sets, DPB, current picture and its state.
 #[derive(Debug)]
+#[repr(C)]
 struct Context {
-    sps: Vec<Option<Shared<Sps>>>,
-    pps: Vec<Option<Shared<Pps>>>,
-    layout_cache: Option<(Shared<Sps>, Shared<Pps>, Arc<Layout>)>,
-    dpb: DecodedPictures<DpbPic>,
-    out: VecDeque<Picture>,
+    /// The timestamp the next picture started takes.
+    pending_pts: Option<i64>,
     /// The picture the last [`VideoDecoder::receive`] view borrows.
     held: Option<Picture>,
     cur: Option<CurPic>,
+    sps: Vec<Option<Shared<Sps>>>,
+    pps: Vec<Option<Shared<Pps>>>,
+    dpb: DecodedPictures<DpbPic>,
+    out: VecDeque<Picture>,
     st: PicState,
     scratch8: Scratch<u8>,
     scratch16: Scratch<u16>,
     pool: Arc<FramePool>,
     /// The pool every stream-sized buffer of this decoder is charged to.
     budget: Budget,
-    // POC / IRAP state
+    layout_cache: Option<(Shared<Sps>, Shared<Pps>, Arc<Layout>)>,
     prev_tid0_poc: i32,
     first_picture: bool,
     after_eos: bool,
     no_rasl_output: bool,
     seen_irap: bool,
-    /// The timestamp the next picture started takes.
-    pending_pts: Option<i64>,
 }
 
 impl Default for Decoder {
