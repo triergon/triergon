@@ -1112,7 +1112,10 @@ fn hdr10_plus_preserves_wire_values_and_borrowed_grid() {
     oversized.resize(914, 0);
     assert!(matches!(
         Hdr10Plus::parse_t35(&oversized, &mut WorkBudget::new(8192), &cancel),
-        Err(Error::Policy("HDR10+ payload"))
+        Err(Error::Limit {
+            requested: 908,
+            maximum: 907
+        })
     ));
 }
 
