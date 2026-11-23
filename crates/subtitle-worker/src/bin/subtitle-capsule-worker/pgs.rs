@@ -16,7 +16,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
 use triergon_harness_protocol::digest::fold_bytes;
 use triergon_harness_runner::{Invocation, Result, Totals, measure};
-use triergon_subtitles::compat::pgs::{Limits, Options, Decoder, Status};
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Status};
 use triergon_subtitles::pgs::Clock;
 
 pub const PREFIX: &str = "pgs-";

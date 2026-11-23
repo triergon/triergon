@@ -18,7 +18,7 @@ use std::sync::atomic::AtomicBool;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_mpegts::PacketFormat;
-use triergon_subtitles::compat::pgs::{Limits, Options, Decoder, Rect, Refusal, Status};
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Rect, Refusal, Status};
 use triergon_subtitles::pgs::Clock;
 
 /// The candidate's pool limit: the prepared packets and one display set.

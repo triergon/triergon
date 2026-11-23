@@ -17,8 +17,8 @@ use std::path::Path;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, BudgetVec, WorkBudget};
 use triergon_subtitles::compat::dvd::{
-    Decoder, Limits, Options as DecoderOptions, Status, SubpictureParser, SubpictureStreams, VobSubIndex,
-    mp4_configuration,
+    Decoder, Limits, Options as DecoderOptions, Status, SubpictureParser, SubpictureStreams,
+    VobSubIndex, mp4_configuration,
 };
 use triergon_subtitles::dvd::program_stream::{Pes, Unit, Units};
 

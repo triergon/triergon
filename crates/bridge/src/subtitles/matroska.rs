@@ -12,7 +12,7 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, SourceLocation, TimeBase, WorkBudget};
 use triergon_matroska::{Event as MkvEvent, TypedPacket as Packet};
 use triergon_playback::{Delivery, Event, Output, TrackKey};
-use triergon_subtitles::compat::dvb::{Options, Decoder, Status};
+use triergon_subtitles::compat::dvb::{Decoder, Options, Status};
 use triergon_subtitles::{compat, dvb, pgs::Clock};
 
 const NS_PER_SECOND: u64 = 1_000_000_000;

@@ -11,7 +11,7 @@ use triergon_core::{Budget, Bytes, Error, Result, Rounding, TimeBase, WorkBudget
 use triergon_mpegts::psi::{CodecIdentification, ElementaryStream, descriptor_tag};
 use triergon_playback::Output;
 use triergon_subtitles::compat::dvb::{
-    Options, PesPacket, PesParser, PesProgress, Decoder, Rect, Status, Subtitle,
+    Decoder, Options, PesPacket, PesParser, PesProgress, Rect, Status, Subtitle,
 };
 use triergon_subtitles::dvb::{PacketEnvelope, Size, SourceConfiguration};
 
