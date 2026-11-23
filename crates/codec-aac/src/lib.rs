@@ -155,6 +155,15 @@ impl AudioDecoder for Decoder {
     }
 }
 
+/// Fixed index fields from an AAC-LC AudioSpecificConfig.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RawLcConfig {
+    /// Sampling frequency index from 0 through 12.
+    pub frequency_index: u8,
+    /// Fixed channel configuration (1–7, 11, 12 or 14).
+    pub channel_configuration: u8,
+}
+
 /// Decoder for one raw AAC-LC access unit per packet.
 /// Supply the indexed core rate and layout from a checked AudioSpecificConfig
 /// with 1024 core samples and no core dependency.
@@ -167,35 +176,55 @@ impl RawLcDecoder {
     /// Maximum raw block size, including ancillary and fill data.
     pub const MAX_ACCESS_UNIT_BYTES: usize = 64 << 10;
 
-    /// Set up the fixed layout and charge its decoder state to `budget`.
-    pub fn new_in(
-        frequency_index: u8,
-        channel_configuration: u8,
-        budget: &Budget,
-    ) -> Result<Self, DecodeError> {
+    /// Creates a decoder with a pool of the default limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
+    pub fn new(config: RawLcConfig) -> Result<Self, DecodeError> {
+        Self::with_limits(config, Limits::default())
+    }
+
+    /// Creates a decoder with a pool of `limits.live_storage_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
+    pub fn with_limits(config: RawLcConfig, limits: Limits) -> Result<Self, DecodeError> {
+        Self::new_in(config, &Budget::new(limits.live_storage_bytes)?)
+    }
+
+    /// Creates a decoder with the fixed layout, charging its state to `budget`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
+    pub fn new_in(config: RawLcConfig, budget: &Budget) -> Result<Self, DecodeError> {
         Self::with_layout_in(
-            frequency_index,
-            channel_configuration,
+            config,
             compat::ffmpeg::layout::Policy::Specification,
             budget,
         )
     }
 
-    /// Set up the configured decoder with an explicit speaker mapping.
+    /// Creates a decoder with an explicit speaker mapping.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
     pub fn with_layout_in(
-        frequency_index: u8,
-        channel_configuration: u8,
+        config: RawLcConfig,
         layout: compat::ffmpeg::layout::Policy,
         budget: &Budget,
     ) -> Result<Self, DecodeError> {
-        if !matches!(channel_configuration, 1..=7 | 11 | 12 | 14) {
+        if !matches!(config.channel_configuration, 1..=7 | 11 | 12 | 14) {
             return Err(DecodeError::Invalid("raw AAC channel configuration"));
         }
         let mut core = decoder::Core::new(budget);
         core.configure(
             ics::ObjectType::Lc,
-            frequency_index,
-            channel_configuration,
+            config.frequency_index,
+            config.channel_configuration,
             decoder::FixedLayout::Raw(layout),
         )?;
         Ok(Self { core })

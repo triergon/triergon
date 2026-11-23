@@ -33,8 +33,9 @@ dec.reset(); // after a seek: drops overlap, prediction, PNS, SBR and PS history
 `examples/decode_aac.rs IN.aac OUT.f32` writes interleaved f32le and prints a JSON summary.
 
 `RawLcDecoder` decodes one complete raw data block of at most 64 KiB to 1024 samples
-per channel, configured from a checked AudioSpecificConfig. `new_in` takes the indexed
-core rate and fixed channel configuration 1–7, 11, 12 or 14, whose audible elements
+per channel, configured from a checked AudioSpecificConfig. `RawLcConfig` holds the indexed
+core rate and fixed channel configuration 1–7, 11, 12 or 14. `new`, `with_limits` and
+`new_in` take that configuration. Its audible elements
 follow Table 1.19, including the distinct 7.1 Front, Back and Top layouts
 ([ISO/IEC 14496-3:2009/Amd.4](https://standards.iteh.ai/catalog/standards/iso/c0071f4c-5db7-4cf4-a32e-6b75c874d46d/iso-iec-14496-3-2009-amd-4-2013)).
 `with_layout_in` with `compat::ffmpeg::layout::Policy::ConventionalSurround` gives FFmpeg's

@@ -174,8 +174,10 @@ impl AacAccessUnitConfig {
         budget: &Budget,
     ) -> Result<Box<DynAudioDecoder>, Error> {
         let decoder = triergon_codec_aac::RawLcDecoder::with_layout_in(
-            self.frequency_index,
-            self.channel_configuration,
+            triergon_codec_aac::RawLcConfig {
+                frequency_index: self.frequency_index,
+                channel_configuration: self.channel_configuration,
+            },
             layout,
             budget,
         )?;

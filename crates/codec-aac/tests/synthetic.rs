@@ -1,7 +1,12 @@
 //! Self-contained ADTS tests with synthetic (self-authored) bitstreams.
 use triergon_codec::Budget;
 use triergon_codec_aac::{
-    AudioFrame, DecodeError, Decoder, Feature, Limits, RawLcDecoder, Speaker,
+    AudioFrame, DecodeError, Decoder, Feature, Limits, RawLcConfig, RawLcDecoder, Speaker,
+};
+
+const MONO: RawLcConfig = RawLcConfig {
+    frequency_index: 4,
+    channel_configuration: 1,
 };
 
 struct Bw {
@@ -218,7 +223,14 @@ fn raw_fixed_layouts_follow_the_speaker_configuration() {
             silent_ics(&mut bits);
         }
         bits.put(7, 3); // END
-        let mut decoder = RawLcDecoder::new_in(4, config, &budget).unwrap();
+        let mut decoder = RawLcDecoder::new_in(
+            RawLcConfig {
+                frequency_index: 4,
+                channel_configuration: config,
+            },
+            &budget,
+        )
+        .unwrap();
         let mut frame = AudioFrame::default();
         decoder.decode(&bits.bytes(), &mut frame).unwrap();
         assert_eq!(frame.layout.speakers(), speakers);
@@ -231,8 +243,7 @@ fn raw_fixed_layouts_follow_the_speaker_configuration() {
 
 #[test]
 fn raw_lc_refuses_sbr_and_bytes_after_its_single_block() {
-    let budget = Budget::new(4 << 20).unwrap();
-    let mut decoder = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut decoder = RawLcDecoder::new(MONO).unwrap();
     let mut frame = AudioFrame::default();
     assert_eq!(
         decoder.decode(
@@ -384,8 +395,8 @@ fn raw_program_refuses_ambiguous_speaker_positions() {
 #[test]
 fn raw_output_capacity_is_charged_before_overlap_advances() {
     let budget = Budget::new(4 << 20).unwrap();
-    let mut tested = RawLcDecoder::new_in(4, 1, &budget).unwrap();
-    let mut reference = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut tested = RawLcDecoder::new_in(MONO, &budget).unwrap();
+    let mut reference = RawLcDecoder::new_in(MONO, &budget).unwrap();
     let packet = noise_block(false, false, false);
     let mut expected = AudioFrame::default();
     let mut actual = AudioFrame::default();
@@ -411,7 +422,7 @@ fn raw_output_capacity_is_charged_before_overlap_advances() {
 #[test]
 fn a_truncated_raw_coupling_element_releases_its_charge() {
     let budget = Budget::new(4 << 20).unwrap();
-    let mut decoder = RawLcDecoder::new_in(4, 1, &budget).unwrap();
+    let mut decoder = RawLcDecoder::new_in(MONO, &budget).unwrap();
     let mut frame = AudioFrame::default();
     let packet = block(false);
     decoder.decode(&packet, &mut frame).unwrap();
