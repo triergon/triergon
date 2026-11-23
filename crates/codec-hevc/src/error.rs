@@ -2,7 +2,7 @@
 
 use core::fmt;
 use triergon_bitstream::cabac::InvalidOffset;
-use triergon_codec::StorageError;
+use triergon_codec::Error;
 
 /// Why the decoder refused an access unit: the classes of [`triergon_codec::DecodeError`]
 /// and a missing parameter set. Unsupported features are named so callers can tell a gap
@@ -18,7 +18,7 @@ pub enum DecodeError {
     /// A referenced parameter set has not been received.
     MissingParameterSet(&'static str),
     /// Storage the stream needs does not fit the decoder's budget.
-    Budget(StorageError),
+    Budget(Error),
 }
 
 impl From<InvalidOffset> for DecodeError {
@@ -27,13 +27,13 @@ impl From<InvalidOffset> for DecodeError {
     }
 }
 
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
+impl From<Error> for DecodeError {
+    fn from(error: Error) -> Self {
         DecodeError::Budget(error)
     }
 }
 
-impl From<DecodeError> for triergon_codec::Error {
+impl From<DecodeError> for Error {
     /// The workspace error of the same class. A missing parameter set is invalid data
     /// named by the set; a refused storage charge is the budget's own error.
     fn from(error: DecodeError) -> Self {

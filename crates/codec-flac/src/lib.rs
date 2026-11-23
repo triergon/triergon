@@ -24,7 +24,7 @@ mod subframe;
 
 pub use error::DecodeError;
 pub use output::IntegerFrame;
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Speaker, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
 use frame::FrameDecoder;
 use output::{FloatOutput, IntegerOutput};

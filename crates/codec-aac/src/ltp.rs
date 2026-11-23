@@ -8,7 +8,7 @@
 use crate::filterbank::Filterbank;
 use crate::ics::{ChannelData, CoreCfg, TNS_ANALYSIS, WindowSequence};
 use crate::tables::{LTP_COEF, MAX_LTP_LONG_SFB};
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 #[derive(Debug)]
 pub(crate) struct LtpState {
@@ -18,7 +18,7 @@ pub(crate) struct LtpState {
 }
 
 impl LtpState {
-    pub(crate) fn new(budget: &Budget) -> Result<LtpState, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<LtpState, Error> {
         Ok(LtpState {
             hist: BudgetVec::try_filled(budget, 0.0, 3072)?,
             time: BudgetVec::try_filled(budget, 0.0, 2048)?,

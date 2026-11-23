@@ -2,7 +2,7 @@
 
 use crate::cabac::ctx;
 use crate::picture::PuMotion;
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 pub(crate) const F_INTRA: u8 = 1;
 pub(crate) const F_SKIP: u8 = 2;
@@ -109,7 +109,7 @@ impl PicState {
         height: usize,
         num_ctb: usize,
         ctb_rows: usize,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         let w4 = width / 4;
         let h4 = height / 4;
         let (bs_v_stride, bs_h_stride) = (width / 8 + 1, w4);
@@ -151,7 +151,7 @@ impl PicState {
 
     /// Make room for one more slice segment's `SliceInfo` (doubling), so that it is
     /// charged before the slice header changes any picture state.
-    pub(crate) fn reserve_slice(&mut self) -> Result<(), StorageError> {
+    pub(crate) fn reserve_slice(&mut self) -> Result<(), Error> {
         if self.slices.len() < self.slices.capacity() {
             return Ok(());
         }
@@ -161,11 +161,7 @@ impl PicState {
 
 /// New storage of `n` copies of `value` when `v` does not hold `n` elements, so a size
 /// change in either direction moves the charge; `None` keeps `v` (the steady state).
-fn resized<T: Clone>(
-    v: &BudgetVec<T>,
-    n: usize,
-    value: T,
-) -> Result<Option<BudgetVec<T>>, StorageError> {
+fn resized<T: Clone>(v: &BudgetVec<T>, n: usize, value: T) -> Result<Option<BudgetVec<T>>, Error> {
     if v.len() == n {
         return Ok(None);
     }

@@ -1,6 +1,6 @@
 //! Behaviour through the public API: output shape, budgets, and malformed input.
 
-use triergon_codec::{AudioDecoder, AudioFrame, Budget, Speaker, StorageError};
+use triergon_codec::{AudioDecoder, AudioFrame, Budget, Error, Speaker};
 use triergon_codec_mp3::{DecodeError, Decoder, Limits};
 use triergon_framing::mpeg_audio::MpegAudioHeader;
 
@@ -91,7 +91,7 @@ fn a_budget_too_small_is_a_typed_error_that_leaves_the_frame_empty() {
     let error = decoder.decode(&silent_frame(LAYER3), &mut out).unwrap_err();
     assert!(matches!(
         error,
-        DecodeError::Budget(StorageError::Backpressure { .. })
+        DecodeError::Budget(Error::Backpressure { .. })
     ));
     assert_eq!(out.samples_per_channel, 0);
     decoder.decode(&silent_frame(LAYER3_LSF), &mut out).unwrap();
@@ -103,7 +103,7 @@ fn a_budget_too_small_is_a_typed_error_that_leaves_the_frame_empty() {
     for header in [LAYER3_LSF, LAYER1] {
         assert!(matches!(
             decoder.decode(&silent_frame(header), &mut out),
-            Err(DecodeError::Budget(StorageError::Limit { .. }))
+            Err(DecodeError::Budget(Error::Limit { .. }))
         ));
     }
 }
@@ -122,7 +122,7 @@ fn decoding_resumes_after_a_refused_charge() {
     let held = budget.reserve(budget.available()).unwrap();
     assert!(matches!(
         decoder.decode(&frame, &mut out),
-        Err(DecodeError::Budget(StorageError::Backpressure { .. }))
+        Err(DecodeError::Budget(Error::Backpressure { .. }))
     ));
     drop(held);
     decoder.decode(&frame, &mut out).unwrap();

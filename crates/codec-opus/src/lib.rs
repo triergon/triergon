@@ -22,7 +22,7 @@ use multistream::Mapping;
 use packet::Packet;
 use stream::{Staging, StreamDecoder, Workspace};
 use triergon_codec::{AudioDecoder, BudgetVec, Charged, DownmixLevels, Reservation};
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
 use triergon_framing::opus::{self, OpusHead};
 
 /// Storage limits of one decoder.

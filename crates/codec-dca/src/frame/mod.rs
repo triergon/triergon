@@ -10,7 +10,7 @@ use crate::lfe::{Lfe2x, LfeFir, LfeState};
 use crate::qmf::{Qmf, QmfState};
 use crate::subframe::{self, SideInfo, SubBuf, SubframeParams};
 use crate::{AudioFrame, DecodeError, Speaker, pr_table, tables, x96};
-use triergon_codec::{Budget, BudgetVec, Charged, Reservation, StorageError};
+use triergon_codec::{Budget, BudgetVec, Charged, Error, Reservation};
 
 /// Maximum coded primary channels (core 5 + extension channels).
 const MAX_SLOTS: usize = 8;
@@ -73,7 +73,7 @@ pub(crate) struct FrameDecoder {
 }
 
 impl X96Bank {
-    fn new(budget: &Budget) -> Result<Charged<Box<Self>>, StorageError> {
+    fn new(budget: &Budget) -> Result<Charged<Box<Self>>, Error> {
         let state = BudgetVec::try_filled(budget, QmfState::new(), MAX_SLOTS)?;
         Charged::boxed(
             budget,

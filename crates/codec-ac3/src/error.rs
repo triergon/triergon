@@ -1,7 +1,7 @@
 //! Typed decoder errors.
 
 use core::fmt;
-use triergon_codec::StorageError;
+use triergon_codec::Error;
 
 /// A bitstream feature this decoder recognises but does not implement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,16 +50,16 @@ pub enum DecodeError {
     /// The first syncframe of an E-AC-3 access unit is not independent substream 0.
     MissingIndependentSubstream,
     /// Storage the access unit needs does not fit the decoder's budget.
-    Budget(StorageError),
+    Budget(Error),
 }
 
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
+impl From<Error> for DecodeError {
+    fn from(error: Error) -> Self {
         DecodeError::Budget(error)
     }
 }
 
-impl From<DecodeError> for triergon_codec::Error {
+impl From<DecodeError> for Error {
     /// The workspace error of the same class. A short or empty access unit is
     /// [`Truncated`](triergon_codec::Error::Truncated) without its byte counts, an unsupported feature keeps its
     /// name and loses the number it carries, and a refused storage charge is the

@@ -6,7 +6,7 @@ use super::{CoreFrame, FrameDecoder, MAX_SLOTS, X96Bank};
 use crate::qmf::{Qmf, QmfState};
 use crate::subframe::{HIST, SubBuf};
 use crate::{AudioFrame, ChannelLayout, DecodeError, Speaker};
-use triergon_codec::StorageError;
+use triergon_codec::Error;
 
 impl FrameDecoder {
     /// Allocates the 64-band filter bank on first use and sizes the synthesis scratch,
@@ -18,7 +18,7 @@ impl FrameDecoder {
         f: &CoreFrame<'_>,
         nslots: usize,
         have_x96: bool,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         let blocks = f.h.blocks;
         if have_x96 && self.x96.is_none() {
             self.x96 = Some(X96Bank::new(&self.budget)?);

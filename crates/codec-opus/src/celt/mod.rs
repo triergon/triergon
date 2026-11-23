@@ -20,7 +20,7 @@ use postfilter::{MAX_REACH, Pitch};
 use pvq::Spread;
 use synthesis::{MAX_FRAME, OVERLAP, Synthesis};
 use tables::{BANDS, EBANDS, SPREAD_ICDF, TF_SELECT, TRIM_ICDF, WINDOW};
-use triergon_codec::{Budget, StorageError};
+use triergon_codec::{Budget, Error};
 
 /// The first band a hybrid frame codes in CELT (8 kHz and up).
 pub(crate) const HYBRID_START_BAND: usize = 17;
@@ -64,7 +64,7 @@ pub(crate) struct Workspace {
 
 impl Workspace {
     /// The buffers, and the transforms with their tables charged to `budget`.
-    pub(crate) fn new(budget: &Budget) -> Result<Workspace, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<Workspace, Error> {
         Ok(Workspace {
             synthesis: Synthesis::new(budget)?,
             shapes: [0.0; 2 * MAX_FRAME],

@@ -1,6 +1,6 @@
 //! NAL unit header and RBSP extraction (clauses 7.3.1, 7.4.1).
 
-use triergon_codec::{BudgetVec, StorageError};
+use triergon_codec::{BudgetVec, Error};
 
 /// Zero bytes kept after an RBSP, for `BitReader`'s eight-byte loads.
 pub(crate) const RBSP_PAD: usize = 16;
@@ -28,7 +28,7 @@ pub(crate) fn parse_header(nal: &[u8]) -> Option<NalHeader> {
 /// Remove emulation_prevention_three_byte (clause 7.4.1) from `src` into `dst`, append
 /// zero padding, and return the RBSP length (trailing zero bytes trimmed). `dst` is
 /// charged for the whole payload before the pieces are copied.
-pub(crate) fn unescape(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<usize, StorageError> {
+pub(crate) fn unescape(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<usize, Error> {
     dst.clear();
     dst.try_reserve_exact(src.len() + RBSP_PAD)?;
     for run in triergon_bitstream::runs(src) {

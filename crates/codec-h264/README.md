@@ -61,7 +61,7 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   carried it through reordering.
 - Errors are `triergon_codec::DecodeError`: `Unsupported(&str)` names the feature,
   `Invalid(&str)` the failed check, `Policy(&str)` the exceeded cap, and
-  `Budget(StorageError)` a refused storage charge. The decoder does not panic on
+  `Budget(triergon_core::Error)` a refused storage charge. The decoder does not panic on
   malformed input.
 - Refused with `Unsupported`: bit depth above 8, 4:2:2 and 4:4:4, lossless transform
   bypass, flexible macroblock ordering (more than one slice group), SP/SI slices, data

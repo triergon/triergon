@@ -24,7 +24,7 @@ use super::kernels;
 use super::tables::QMF_WINDOW;
 use crate::fft::{Cpx, Dct4};
 use std::sync::OnceLock;
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// Prototype window c[n], n < 640, of the analysis (c[2n]) and synthesis (c[n]) banks:
 /// ETSI TS 101 980 V1.1.1 Annex I Table I.1 read in reverse order, c[n] = c_DRM[639 - n]
@@ -128,7 +128,7 @@ impl Modulation {
 
 impl Analysis {
     /// An analysis bank, or with `used` false an empty one that never runs.
-    pub(crate) fn new(budget: &Budget, used: bool) -> Result<Analysis, StorageError> {
+    pub(crate) fn new(budget: &Budget, used: bool) -> Result<Analysis, Error> {
         Ok(Analysis {
             x: BudgetVec::try_filled(budget, 0.0, if used { 640 } else { 0 })?,
             pos: 320,
@@ -182,7 +182,7 @@ impl Analysis {
 }
 
 impl Synthesis {
-    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, Error> {
         Ok(Synthesis {
             v: BudgetVec::try_filled(budget, 0.0, 2560)?,
             pos: 1280,

@@ -1,6 +1,6 @@
 //! Per-channel vectors of one block, stored back to back.
 
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// One vector of `len` values per channel.
 ///
@@ -18,13 +18,9 @@ pub(crate) struct Spectra {
 const PAD: usize = 16;
 
 impl Spectra {
-    pub(crate) fn new(
-        channels: usize,
-        len: usize,
-        budget: &Budget,
-    ) -> Result<Spectra, StorageError> {
+    pub(crate) fn new(channels: usize, len: usize, budget: &Budget) -> Result<Spectra, Error> {
         let stride = len + PAD;
-        let size = channels.checked_mul(stride).ok_or(StorageError::Overflow)?;
+        let size = channels.checked_mul(stride).ok_or(Error::Overflow)?;
         Ok(Spectra {
             data: BudgetVec::try_filled(budget, 0.0, size)?,
             len,

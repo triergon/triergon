@@ -30,7 +30,7 @@ pub use error::{Error, Result};
 use motion::Mv;
 use planes::Planes;
 use rate::RateControl;
-pub use triergon_core::{Budget, Error as StorageError};
+pub use triergon_core::Budget;
 use triergon_core::{BudgetVec, Reservation};
 use triergon_pixel::{Geometry, Picture, PictureView};
 
@@ -287,7 +287,7 @@ fn picture_bound(cfg: &EncoderConfig) -> Result<usize> {
     let mbs = g.macroblock_width() * g.macroblock_height();
     let bits = (cfg.vbv_bits as usize)
         .checked_add(HEADER_BITS + MB_BITS + mbs * GUARDED_MB_BITS)
-        .ok_or(StorageError::Overflow)?;
+        .ok_or(triergon_core::Error::Overflow)?;
     Ok(bits.div_ceil(8))
 }
 

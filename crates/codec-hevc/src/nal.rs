@@ -3,7 +3,7 @@
 //! splitter (clause 7.4.2.4.4) for elementary-stream input.
 
 use triergon_bitstream::runs;
-use triergon_codec::{BudgetVec, StorageError};
+use triergon_codec::{BudgetVec, Error};
 use triergon_framing::{
     hevc,
     nal::{self as framing, start_code},
@@ -39,7 +39,7 @@ impl NalHeader {
 /// Remove emulation prevention bytes (clause 7.3.1.1) from `src` (a NAL unit including its
 /// two header bytes) into `dst` (header bytes are dropped). `dst` is cleared first and
 /// charged for the whole payload before it grows.
-pub(crate) fn unescape_rbsp(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<(), StorageError> {
+pub(crate) fn unescape_rbsp(src: &[u8], dst: &mut BudgetVec<u8>) -> Result<(), Error> {
     let ebsp = src.get(2..).unwrap_or(&[]);
     dst.clear();
     dst.try_reserve_exact(ebsp.len())?;

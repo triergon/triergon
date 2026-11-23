@@ -1,7 +1,7 @@
 //! Self-authored synthetic syncframes: framing, CRC policy, truncation/concealment and
 //! typed errors. The frames are built bit by bit from the A/52:2018 syntax tables.
 
-use triergon_codec::{Budget, StorageError};
+use triergon_codec::{Budget, Error};
 use triergon_codec_ac3::{
     AudioFrame, Compat, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, Limits,
     NoiseMode, Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
@@ -378,7 +378,7 @@ fn a_refused_output_charge_is_a_typed_error_and_decoding_resumes() {
     let held = budget.reserve(budget.available() - 1024).unwrap();
     assert!(matches!(
         decoder.decode(&mono_frame(0), &mut out),
-        Err(DecodeError::Budget(StorageError::Backpressure { .. }))
+        Err(DecodeError::Budget(Error::Backpressure { .. }))
     ));
     drop(held);
     out.clear();
@@ -395,10 +395,7 @@ fn a_limit_below_the_frame_refuses_and_a_shared_pool_returns_to_idle() {
     .unwrap()
     .decode(&mono_frame(0), &mut out)
     .unwrap_err();
-    assert!(matches!(
-        error,
-        DecodeError::Budget(StorageError::Limit { .. })
-    ));
+    assert!(matches!(error, DecodeError::Budget(Error::Limit { .. })));
     let budget = Budget::new(1 << 20).unwrap();
     let idle = budget.used();
     let mut decoder = Decoder::new_in(&budget);

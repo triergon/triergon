@@ -1,5 +1,4 @@
 use std::fmt;
-use triergon_core::Error as StorageError;
 use triergon_pixel::Geometry;
 
 /// The result of building an encoder or coding a picture.
@@ -26,11 +25,11 @@ pub enum Error {
     },
     /// Storage the encoder needs does not fit its budget: a limit when it is built,
     /// backpressure before a picture is coded.
-    Budget(StorageError),
+    Budget(triergon_core::Error),
 }
 
-impl From<StorageError> for Error {
-    fn from(error: StorageError) -> Self {
+impl From<triergon_core::Error> for Error {
+    fn from(error: triergon_core::Error) -> Self {
         Error::Budget(error)
     }
 }

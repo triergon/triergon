@@ -7,7 +7,7 @@ use crate::stream::Stream;
 use crate::{CrcPolicy, DecodeError, FrameInfo, subframe};
 use triergon_bitstream::CachedBitReader;
 use triergon_bitstream::crc::crc16_a52;
-use triergon_codec::{Budget, StorageError};
+use triergon_codec::{Budget, Error};
 use triergon_framing::flac::FlacFrameHeader;
 
 /// Everything a frame decodes against: the stream parameters, the channel buffers and
@@ -43,7 +43,7 @@ impl FrameDecoder {
 
     fn decode_into(&mut self, au: &[u8], out: &mut impl Output) -> Result<FrameInfo, DecodeError> {
         let header = FlacFrameHeader::parse(au).map_err(|error| match error {
-            StorageError::Invalid(what) => DecodeError::Invalid(what),
+            Error::Invalid(what) => DecodeError::Invalid(what),
             _ => DecodeError::Invalid("truncated frame header"),
         })?;
         let frame = self.stream.frame(&header)?;

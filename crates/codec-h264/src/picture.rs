@@ -1,7 +1,7 @@
 //! Frame buffers, per-picture motion storage, the frame stores of the decoded picture
 //! buffer, and fixed-size views of their rows.
 
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 use triergon_framing::picture_output::Parity;
 
 /// The `N` elements of `s` from `at`; a range past the end panics as indexing does.
@@ -62,11 +62,7 @@ impl FrameBuf {
     }
 
     /// Monochrome streams keep the 128-filled chroma planes.
-    pub(crate) fn new(
-        width: usize,
-        height: usize,
-        budget: &Budget,
-    ) -> Result<FrameBuf, StorageError> {
+    pub(crate) fn new(width: usize, height: usize, budget: &Budget) -> Result<FrameBuf, Error> {
         let (cw, ch) = (width / 2, height / 2);
         Ok(FrameBuf {
             y: BudgetVec::try_filled(budget, 0, width * height)?,
@@ -79,7 +75,7 @@ impl FrameBuf {
         })
     }
 
-    pub(crate) fn try_clone(&self) -> Result<FrameBuf, StorageError> {
+    pub(crate) fn try_clone(&self) -> Result<FrameBuf, Error> {
         Ok(FrameBuf {
             y: self.y.try_clone()?,
             cb: self.cb.try_clone()?,
@@ -123,7 +119,7 @@ impl Motion {
 
     /// Arrays for `mbs` macroblocks, all blocks unreferenced. The current arrays are freed
     /// before the new ones are charged.
-    fn reset(&mut self, mbs: usize, corners: bool) -> Result<(), StorageError> {
+    fn reset(&mut self, mbs: usize, corners: bool) -> Result<(), Error> {
         let budget = self.mb_flags.budget().clone();
         *self = Motion::empty(&budget);
         let (mvs, blocks) = (mbs * if corners { 4 } else { 16 }, mbs * 4);
@@ -147,7 +143,7 @@ impl Motion {
         Ok(())
     }
 
-    pub(crate) fn alloc(&mut self, mbs: usize) -> Result<(), StorageError> {
+    pub(crate) fn alloc(&mut self, mbs: usize) -> Result<(), Error> {
         if self.mbs != mbs || self.corners {
             self.reset(mbs, false)?;
         }
@@ -168,7 +164,7 @@ impl Motion {
     }
 
     /// Store `full` into `self` keeping only corner motion vectors (allocation reused).
-    pub(crate) fn compact_from(&mut self, full: &Motion) -> Result<(), StorageError> {
+    pub(crate) fn compact_from(&mut self, full: &Motion) -> Result<(), Error> {
         if !self.corners || self.mbs != full.mbs {
             self.reset(full.mbs, true)?;
         }

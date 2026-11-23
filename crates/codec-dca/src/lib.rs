@@ -32,7 +32,7 @@ extern crate self as triergon_codec_dca;
 mod synthetic;
 
 pub use pack::Packing;
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
 
 use frame::FrameDecoder;
 use triergon_codec::{AudioDecoder, BudgetVec, DownmixLevels};

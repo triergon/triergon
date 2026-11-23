@@ -30,7 +30,7 @@ use trace::Trace;
 #[cfg(feature = "reference-trace")]
 pub use trace::{BlockTrace, FrameTrace, Trace};
 pub use triergon_bitstream::crc::crc16_a52 as crc16;
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Speaker, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
 use downmix::downmix_info;
 use header::{check_crc, peek_chanmap};
@@ -710,7 +710,7 @@ mod tests {
         let mut deps: Vec<Option<Dependent>> = (0..8).map(|_| None).collect();
         assert!(matches!(
             dependent(&mut deps, &budget, 3),
-            Err(DecodeError::Budget(StorageError::Limit { .. }))
+            Err(DecodeError::Budget(Error::Limit { .. }))
         ));
         assert!(deps[3].is_none());
         let budget = Budget::new(1 << 20).unwrap();

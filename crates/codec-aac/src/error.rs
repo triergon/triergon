@@ -1,7 +1,7 @@
 //! Typed decoder errors.
 
 use std::fmt;
-use triergon_codec::StorageError;
+use triergon_codec::Error;
 
 /// A named feature the decoder deliberately does not implement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -36,16 +36,16 @@ pub enum DecodeError {
     /// The access unit is shorter than its header requires.
     Truncated,
     /// Storage the access unit needs does not fit the decoder's budget.
-    Budget(StorageError),
+    Budget(Error),
 }
 
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
+impl From<Error> for DecodeError {
+    fn from(error: Error) -> Self {
         DecodeError::Budget(error)
     }
 }
 
-impl From<DecodeError> for triergon_codec::Error {
+impl From<DecodeError> for Error {
     /// The workspace error of the same class. An unsupported feature keeps its name and
     /// loses the number it carries; a refused storage charge is the budget's own error.
     fn from(error: DecodeError) -> Self {

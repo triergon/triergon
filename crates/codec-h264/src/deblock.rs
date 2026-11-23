@@ -5,7 +5,7 @@ use crate::mbinfo::{Kind, MbInfo, MbWidth, SliceDbk};
 use crate::picture::{FrameBuf, Motion, Structure, array, array_mut, copied};
 use crate::slicedec::CurPic;
 use crate::tables::{ALPHA, BETA, TC0};
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// What the filter reads of the picture, borrowed beside its sample planes and the
 /// motion summaries it writes.
@@ -727,7 +727,7 @@ impl Progress {
     }
 
     /// Restarts for a picture of `w` x `h` macroblocks, reusing the arrays.
-    pub(crate) fn reset(&mut self, w: usize, h: usize, mbaff: bool) -> Result<(), StorageError> {
+    pub(crate) fn reset(&mut self, w: usize, h: usize, mbaff: bool) -> Result<(), Error> {
         let (unit, rows) = if mbaff { (2 * w, h / 2) } else { (w, h) };
         self.left.clear();
         self.left.try_resize(rows, unit as u32)?;

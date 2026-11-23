@@ -48,7 +48,7 @@ extension substreams and writes interleaved f32le.
 - 14-bit packings are normalized to 16-bit big endian; FSIZE counts bytes of the 16-bit
   equivalent stream, as in FFmpeg.
 - Errors are `triergon_codec::DecodeError`: `Unsupported(&str)` names the feature,
-  `Invalid(&str)` the failed check, and `Budget(StorageError)` is a refused charge.
+  `Invalid(&str)` the failed check, and `Budget(triergon_core::Error)` is a refused charge.
   Refused: AMODE 10–15, deficit samples (SHORT ≠ 31), XXCh inside the core frame, XCh with
   more than one channel. A DSYNC mismatch is `Invalid`.
 - A failed frame is dropped without touching any history, so the next frame continues

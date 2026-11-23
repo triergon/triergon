@@ -16,7 +16,7 @@ mod layer3;
 mod subband;
 mod synthesis;
 
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
 
 use triergon_codec::{AudioDecoder, Charged, DownmixLevels, Reservation};
 use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer};

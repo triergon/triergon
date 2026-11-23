@@ -6,7 +6,7 @@ use crate::celt::{self, CeltDecoder, Emphasis, FrameLayout, HYBRID_START_BAND};
 use crate::packet::{Mode, Packet, Toc};
 use crate::range::{Position, RangeDecoder};
 use crate::silk::{MAX_PACKET_PULSES, SilkConfig, SilkDecoder, SilkLayer};
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// Samples per channel of the longest packet (120 ms) plus what the SILK resampler may
 /// release with it.
@@ -33,7 +33,7 @@ pub(crate) struct Workspace {
 
 impl Workspace {
     /// The buffers and the CELT transforms, charging `budget` for what they allocate.
-    pub(crate) fn new(budget: &Budget) -> Result<Workspace, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<Workspace, Error> {
         let buffer = |len| BudgetVec::try_filled(budget, 0.0, len);
         Ok(Workspace {
             celt: celt::Workspace::new(budget)?,
@@ -64,12 +64,8 @@ pub(crate) struct Staging {
 }
 
 impl Staging {
-    pub(crate) fn new(streams: usize, budget: &Budget) -> Result<Staging, StorageError> {
-        let room = |per_stream: usize| {
-            streams
-                .checked_mul(per_stream)
-                .ok_or(StorageError::Overflow)
-        };
+    pub(crate) fn new(streams: usize, budget: &Budget) -> Result<Staging, Error> {
+        let room = |per_stream: usize| streams.checked_mul(per_stream).ok_or(Error::Overflow);
         Ok(Staging {
             frames: BudgetVec::try_filled(budget, StagedFrame::default(), room(MAX_SILK_FRAMES)?)?,
             pulses: BudgetVec::try_filled(budget, 0, room(MAX_PACKET_PULSES)?)?,

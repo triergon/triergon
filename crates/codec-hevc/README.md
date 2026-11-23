@@ -67,7 +67,7 @@ identical output.
 - Errors are the crate's `DecodeError`: `Unsupported(&str)` names the tool,
   `Invalid(&str)` the failed check, `Policy(&str)` the exceeded cap,
   `MissingParameterSet(&str)` the parameter set a slice refers to, and
-  `Budget(StorageError)` a refused storage charge. It converts to
+  `Budget(triergon_core::Error)` a refused storage charge. It converts to
   `triergon_core::Error`. The decoder does not panic on malformed input.
 - Refused with `Unsupported`: monochrome, 4:2:2, 4:4:4, separate colour planes, bit depth
   above 10, unequal luma and chroma bit depth, every SPS range-extension tool, PPS

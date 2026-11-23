@@ -2,7 +2,7 @@
 //! lossless integer samples.
 use crate::{DecodeError, FrameInfo};
 use triergon_codec::{
-    AudioFrame, Budget, BudgetVec, ChannelLayout, Reservation, SampleFormat, StorageError,
+    AudioFrame, Budget, BudgetVec, ChannelLayout, Error, Reservation, SampleFormat,
 };
 
 /// A destination for one frame, plane by plane.
@@ -172,7 +172,7 @@ impl Output for IntegerOutput<'_> {
             .layout
             .channels()
             .checked_mul(len)
-            .ok_or(StorageError::Overflow)?;
+            .ok_or(Error::Overflow)?;
         self.frame.samples.try_resize(total, 0)?;
         self.frame.sample_rate = frame.sample_rate;
         self.frame.layout = frame.layout;

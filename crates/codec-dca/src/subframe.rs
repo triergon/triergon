@@ -8,7 +8,7 @@ use crate::books;
 use crate::header::{MAX_SET_CH, SetHeader};
 use crate::tables::{JOINT_SCALE, SCALE_6BIT, SCALE_7BIT, STEP_LOSSLESS, STEP_LOSSY};
 use crate::vq::{ADPCM_VQ, HF_VQ};
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// ADPCM history length (NumADPCMCoeff).
 pub(crate) const HIST: usize = 4;
@@ -46,7 +46,7 @@ impl SubBuf {
     /// changes the row layout, which is only valid before any row of the frame is
     /// written (the first `start_frame` of a frame); more slots only append rows.
     /// A refused charge changes nothing.
-    fn reserve(&mut self, slots: usize, samples: usize) -> Result<(), StorageError> {
+    fn reserve(&mut self, slots: usize, samples: usize) -> Result<(), Error> {
         if self.saved.is_empty() {
             self.saved.try_resize(self.slots * self.bands * HIST, 0.0)?;
         }
@@ -97,7 +97,7 @@ impl SubBuf {
         slots: core::ops::Range<usize>,
         samples: usize,
         keep: bool,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         self.reserve(slots.end, samples)?;
         let (rows, stride) = (
             slots.start * self.bands..slots.end * self.bands,

@@ -1,4 +1,4 @@
-use triergon_codec_mpeg1::{Budget, Encoder, EncoderConfig, Error, Limits, StorageError};
+use triergon_codec_mpeg1::{Budget, Encoder, EncoderConfig, Error, Limits};
 use triergon_pixel::{Geometry, Picture};
 fn cfg() -> EncoderConfig {
     EncoderConfig {
@@ -78,7 +78,7 @@ fn a_budget_too_small_for_the_pictures_is_a_typed_error() {
     };
     assert!(matches!(
         Encoder::with_limits(cfg(), limits),
-        Err(Error::Budget(StorageError::Limit { .. }))
+        Err(Error::Budget(triergon_core::Error::Limit { .. }))
     ));
 }
 #[test]
@@ -91,7 +91,7 @@ fn a_refused_output_charge_changes_no_state_and_the_pool_drains_on_drop() {
     let held = budget.reserve(budget.available()).unwrap();
     assert!(matches!(
         e.encode(&p, &mut out),
-        Err(Error::Budget(StorageError::Backpressure { .. }))
+        Err(Error::Budget(triergon_core::Error::Backpressure { .. }))
     ));
     drop(held);
     let first = e.encode(&p, &mut out).unwrap();
@@ -124,7 +124,7 @@ fn motion_scratch_backpressure_retries_the_same_picture_exactly() {
     for _ in 0..2 {
         assert!(matches!(
             retry.encode(&input, &mut out),
-            Err(Error::Budget(StorageError::Backpressure { .. }))
+            Err(Error::Budget(triergon_core::Error::Backpressure { .. }))
         ));
         assert_eq!(out, expected);
     }

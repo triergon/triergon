@@ -24,7 +24,7 @@ use triergon_bitstream::LsbReader;
 use triergon_codec::layout::{native_order, vorbis_order};
 use triergon_codec::mdct::Imdct;
 use triergon_codec::{AudioDecoder, BudgetVec, DownmixLevels, Reservation};
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Speaker, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
 use triergon_framing::vorbis::{VorbisHeaders, VorbisIdentification};
 
 use floor0::Coefficients;
@@ -59,7 +59,7 @@ pub(crate) fn ilog(x: u32) -> u32 {
 }
 
 /// Appends `value` to `list`, charging room for it unless reserved.
-pub(crate) fn push<T>(list: &mut BudgetVec<T>, value: T) -> Result<(), StorageError> {
+pub(crate) fn push<T>(list: &mut BudgetVec<T>, value: T) -> Result<(), Error> {
     list.try_push(value).map_err(|refused| refused.error)
 }
 
@@ -149,7 +149,7 @@ impl Decoder {
         budget: &Budget,
     ) -> Result<Decoder, DecodeError> {
         let id = VorbisIdentification::parse(identification).map_err(|error| match error {
-            StorageError::Unsupported(what) => DecodeError::Unsupported(what),
+            Error::Unsupported(what) => DecodeError::Unsupported(what),
             _ => DecodeError::Invalid("identification header"),
         })?;
         if !comment.starts_with(b"\x03vorbis") {

@@ -1,5 +1,5 @@
 //! Decoder errors.
-use triergon_codec::StorageError;
+use triergon_codec::Error;
 
 /// Why a decoder refused a configuration or an access unit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -11,16 +11,16 @@ pub enum DecodeError {
     /// The frame's CRC-16 does not match (only with [`CrcPolicy::Reject`](crate::CrcPolicy::Reject)).
     CrcMismatch,
     /// The storage budget refused an allocation.
-    Budget(StorageError),
+    Budget(Error),
 }
 
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
+impl From<Error> for DecodeError {
+    fn from(error: Error) -> Self {
         DecodeError::Budget(error)
     }
 }
 
-impl From<DecodeError> for triergon_codec::Error {
+impl From<DecodeError> for Error {
     /// The workspace error of the same class. A frame CRC mismatch is invalid data; a
     /// refused storage charge is the budget's own error.
     fn from(error: DecodeError) -> Self {

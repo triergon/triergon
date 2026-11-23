@@ -21,9 +21,6 @@ mod window;
 pub use division::{Divisor, divide, divide_u32};
 pub use error::DecodeError;
 pub use layout::{ChannelLayout, Speaker};
-/// [`Error`] where a decoder names a refused storage charge, as in
-/// [`DecodeError::Budget`].
-pub use triergon_core::Error as StorageError;
 pub use triergon_core::{Budget, BudgetVec, Charged, Error, Reservation};
 pub use triergon_pixel::{Colour, PictureView, Plane};
 pub use window::{kbd_window, vorbis_window};

@@ -46,7 +46,7 @@ use std::sync::Arc;
 use tables::*;
 use triergon_bitstream::BitReader;
 pub use triergon_codec::DecodeError;
-use triergon_codec::{Budget, BudgetVec, Colour, PictureView, StorageError, VideoDecoder};
+use triergon_codec::{Budget, BudgetVec, Colour, Error, PictureView, VideoDecoder};
 use triergon_framing::nal::AnnexBUnits;
 use triergon_framing::picture_output::levels::max_dpb_mbs;
 use triergon_framing::picture_output::{
@@ -360,7 +360,7 @@ fn recycle_buf(
     w: usize,
     h: usize,
     budget: &Budget,
-) -> Result<FrameBuf, StorageError> {
+) -> Result<FrameBuf, Error> {
     if let Some(i) = spare
         .iter()
         .position(|b| Arc::strong_count(b) == 1 && b.width == w && b.height == h)

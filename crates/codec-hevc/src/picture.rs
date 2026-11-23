@@ -2,7 +2,7 @@
 
 use std::sync::{Arc, Mutex, Weak};
 
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// Sample storage type: u8 for 8-bit streams, u16 for 9..10-bit streams.
 pub(crate) trait Pixel:
@@ -71,9 +71,9 @@ impl<P: Pixel> Plane<P> {
         width: usize,
         height: usize,
         fill: P,
-    ) -> Result<Self, StorageError> {
+    ) -> Result<Self, Error> {
         let stride = (width + 31) & !31;
-        let len = stride.checked_mul(height).ok_or(StorageError::Overflow)?;
+        let len = stride.checked_mul(height).ok_or(Error::Overflow)?;
         Ok(Plane {
             data: BudgetVec::try_filled(budget, fill, len)?,
             stride,
@@ -105,7 +105,7 @@ impl<P: Pixel> Frame<P> {
         width: usize,
         height: usize,
         fill: P,
-    ) -> Result<Self, StorageError> {
+    ) -> Result<Self, Error> {
         let chroma = (width / 2, height / 2);
         Self::with_planes(budget, [(width, height), chroma, chroma], fill)
     }
@@ -114,7 +114,7 @@ impl<P: Pixel> Frame<P> {
         budget: &Budget,
         sizes: [(usize, usize); 3],
         fill: P,
-    ) -> Result<Self, StorageError> {
+    ) -> Result<Self, Error> {
         let [(w0, h0), (w1, h1), (w2, h2)] = sizes;
         Ok(Frame {
             planes: [
@@ -281,14 +281,10 @@ pub(crate) struct ColMotion {
 
 impl ColMotion {
     /// Default (unused) motion for a picture of this luma size.
-    pub(crate) fn try_new(
-        budget: &Budget,
-        width: usize,
-        height: usize,
-    ) -> Result<Self, StorageError> {
+    pub(crate) fn try_new(budget: &Budget, width: usize, height: usize) -> Result<Self, Error> {
         let w16 = width.div_ceil(16);
         let h16 = height.div_ceil(16);
-        let len = w16.checked_mul(h16).ok_or(StorageError::Overflow)?;
+        let len = w16.checked_mul(h16).ok_or(Error::Overflow)?;
         Ok(ColMotion {
             w16,
             data: BudgetVec::try_filled(budget, ColMv::default(), len)?,

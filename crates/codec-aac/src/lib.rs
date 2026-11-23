@@ -30,7 +30,7 @@ mod tables;
 
 pub use adts::AdtsHeader;
 pub use error::{DecodeError, Feature};
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Speaker, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{AudioDecoder, DownmixLevels};

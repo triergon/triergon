@@ -14,7 +14,7 @@ mod scenarios;
 mod synth;
 
 use crate::{AudioFrame, DecodeError, Decoder, Limits, Packing};
-use triergon_codec::{Budget, StorageError};
+use triergon_codec::{Budget, Error};
 
 fn scenario(name: &str) -> Vec<u8> {
     let mut meta = String::new();
@@ -256,7 +256,7 @@ fn a_budget_too_small_for_the_frame_is_a_typed_error() {
     let mut out = AudioFrame::default();
     assert!(matches!(
         dec.decode(frames[0], &mut out),
-        Err(DecodeError::Budget(StorageError::Limit { .. }))
+        Err(DecodeError::Budget(Error::Limit { .. }))
     ));
 }
 
@@ -300,7 +300,7 @@ fn decoding_resumes_after_a_refused_charge() {
     let held = budget.reserve(budget.available()).unwrap();
     assert!(matches!(
         dec.decode(frames[0], &mut out),
-        Err(DecodeError::Budget(StorageError::Backpressure { .. }))
+        Err(DecodeError::Budget(Error::Backpressure { .. }))
     ));
     drop(held);
     dec.decode(frames[0], &mut out).unwrap();
