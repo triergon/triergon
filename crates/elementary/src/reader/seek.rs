@@ -167,7 +167,7 @@ impl<F: Format> Reader<F> {
             discard_until,
             method: seeking.method,
             scanned_bytes: seeking.scanned,
-            replays_from_start: false,
+            replays_from_start: self.audio_start == Some(self.input.position()),
         };
         self.last_seek = Some(SeekDetail {
             receipt,

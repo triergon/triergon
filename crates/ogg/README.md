@@ -99,7 +99,8 @@ that link, following into links reading has not reached yet. Seekable sources of
 length are bisected by granule position within that link, each probe reading at most
 `Limits::seek_probe_bytes` (a Theora target that is not a keyframe is bisected again
 for the keyframe its granule positions name); other sources are read again from the
-start (`SeekMethod::Restart`).
+start (`SeekMethod::Restart`). The receipt sets `replays_from_start` when delivery
+starts at the first media packet.
 
 ## Behaviour and limits
 

@@ -294,6 +294,10 @@ impl Reader {
                             let offset = bisection.resume();
                             if let Some(landing) = self.landing.as_mut() {
                                 landing.scanned += bisection.scanned;
+                                landing.replays_from_start &= self
+                                    .links
+                                    .get(self.link)
+                                    .is_some_and(|link| link.start == offset);
                             }
                             self.resume(offset)?;
                         }
@@ -799,8 +803,8 @@ impl Reader {
         {
             self.start_end_scan()?;
         }
-        if again && let Some(landing) = self.landing.take() {
-            let searched = self.search(&landing);
+        if again && let Some(mut landing) = self.landing.take() {
+            let searched = self.search(&mut landing);
             self.landing = Some(landing);
             searched?;
         }
@@ -899,7 +903,7 @@ impl Reader {
     /// Start delivery toward `landing`: bisect the link of its track for its threshold
     /// on a random-access source of known length, or read the source again from its
     /// start.
-    fn search(&mut self, landing: &Landing) -> Result<InputRequest> {
+    fn search(&mut self, landing: &mut Landing) -> Result<InputRequest> {
         let track = &self.tracks[landing.track];
         let capabilities = self.input.capabilities();
         let link = track.link as usize;
@@ -908,8 +912,10 @@ impl Reader {
             .filter(|_| capabilities.random_access)
             .zip(self.links.get(link).copied());
         let Some((length, start)) = bounds else {
+            landing.replays_from_start = true;
             return self.restart();
         };
+        landing.replays_from_start = link == 0;
         let end = self.links.get(link + 1).map_or(length, |next| next.start);
         let timeline = *track.timeline();
         // The bisection's goal only bounds the search, so it saturates.
@@ -935,7 +941,11 @@ impl Reader {
                 self.phase = Phase::Bisect(bisection);
                 Ok(request)
             }
-            None => self.resume(bisection.resume()),
+            None => {
+                let offset = bisection.resume();
+                landing.replays_from_start &= offset == start.start;
+                self.resume(offset)
+            }
         }
     }
 
@@ -1029,12 +1039,12 @@ impl ContainerReader for Reader {
         } else {
             SeekMethod::Restart
         };
-        let landing = Landing::new(index, track, request.target, request.policy, method)?;
+        let mut landing = Landing::new(index, track, request.target, request.policy, method)?;
         self.pending
             .retain(|output| matches!(output, Event::Other(_)));
         self.current = None;
         self.media.clear();
-        let next = self.search(&landing)?;
+        let next = self.search(&mut landing)?;
         self.landing = Some(landing);
         Ok(next)
     }

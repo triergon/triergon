@@ -465,6 +465,7 @@ fn a_seek_to_zero_starts_after_the_mpeg_information_frame() {
     assert_eq!(reading.packets[0].pts, 0);
     assert_eq!(reading.packets[0].start_trim, Some(1105));
     assert_eq!(detail.basis, SeekBasis::Exact);
+    assert!(detail.receipt.replays_from_start);
 }
 
 #[test]
@@ -477,6 +478,7 @@ fn an_adts_seek_counts_frames_from_the_start() {
     assert_eq!(reading.packets[0].pts, 42 * 1024);
     assert_eq!(detail.receipt.method, SeekMethod::Restart);
     assert_eq!(detail.basis, SeekBasis::Exact);
+    assert!(!detail.receipt.replays_from_start);
 }
 
 #[test]

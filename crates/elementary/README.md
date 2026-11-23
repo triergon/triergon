@@ -82,7 +82,8 @@ start to land on a complete packet. It keeps the estimated seek basis if the jum
 was at that packet's start and its estimated time agrees with the count. ADTS and AC-3 count
 frames from the start (`SeekMethod::Restart`). A playback seek lands
 `Format::PREROLL` frames early (two for MPEG audio, one for ADTS and AC-3, none for
-FLAC).
+FLAC). The receipt sets `replays_from_start` when delivery starts at the first
+audio packet.
 
 `Limits` bounds the largest access unit (4 MiB: a verbatim FLAC frame of 65535 samples
 of eight 32-bit channels is about 2.2 MB), retained tags and metadata (4 MiB in all),

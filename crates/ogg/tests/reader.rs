@@ -710,6 +710,7 @@ fn seeks_land_before_the_target_and_resume_the_linear_packets() {
                 SeekMethod::Restart
             };
             assert_eq!(receipt.method, method);
+            assert_eq!(receipt.replays_from_start, target <= 1);
             let packets = summary(&after);
             if target >= 48_000 * 100 {
                 assert!(packets.is_empty());
