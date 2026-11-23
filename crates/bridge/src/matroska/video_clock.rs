@@ -126,7 +126,10 @@ impl DecodeClock {
         let mut picture = false;
         for (index, nal) in nals.enumerate() {
             if index == 128 {
-                return Err(Error::Policy("Matroska video clock NAL count"));
+                return Err(Error::Limit {
+                    requested: index + 1,
+                    maximum: 128,
+                });
             }
             if !picture && repeated_parameter_set(nal)? {
                 continue;

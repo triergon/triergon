@@ -119,7 +119,10 @@ impl Readiness {
     fn new(configuration: &Configuration, probe_subtitles: bool) -> Result<Self> {
         let tracks = configuration.tracks();
         if tracks.len() > 64 {
-            return Err(Error::Policy("Matroska discovery track count"));
+            return Err(Error::Limit {
+                requested: tracks.len(),
+                maximum: 64,
+            });
         }
         let mut waiting = 0;
         let mut pgs = 0;

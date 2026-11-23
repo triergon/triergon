@@ -409,9 +409,7 @@ impl<'a> DolbyJob<'a> {
                 return Ok(BuildStep::Yield);
             }
             self.frames = self.frames.checked_add(1).ok_or(Error::Overflow)?;
-            if self.frames > self.maximum_syncframes {
-                return Err(Error::Policy("Matroska Dolby syncframe count"));
-            }
+            check_limit(self.frames, self.maximum_syncframes)?;
             let header = ac3::probe_header(remaining)?;
             if header.family != self.codec.family()
                 || matches!(self.codec, DolbyCodec::Ac3Bsid(bsid) if bsid != header.bsid)
@@ -517,7 +515,10 @@ mod tests {
                     maximum_syncframes: 1,
                     ..LIMITS
                 },
-                Error::Policy("Matroska Dolby syncframe count"),
+                Error::Limit {
+                    requested: 2,
+                    maximum: 1,
+                },
             ),
         ];
         for (codec, data, limits, expected) in cases {
