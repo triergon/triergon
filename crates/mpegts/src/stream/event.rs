@@ -44,6 +44,18 @@ pub struct TraceFault {
     pub rejected: Option<crate::transport::RejectedTransport>,
 }
 
+impl TraceFault {
+    /// Whether the input left the packet grid its format declares: a packet position
+    /// without a sync byte, or a final partial carrier.
+    pub fn breaks_packet_grid(&self) -> bool {
+        self.kind == FaultKind::Transport
+            && matches!(
+                self.error,
+                Error::Invalid(crate::transport::SYNC_BYTE) | Error::Truncated
+            )
+    }
+}
+
 /// A carrier or ordinary continuity event that can be inspected in place.
 #[derive(Clone, Copy, Debug)]
 pub enum CarrierObservation<'a> {
