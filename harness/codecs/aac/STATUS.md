@@ -41,10 +41,11 @@ binary.
   `crates/codec-aac/src/huffman_probed.rs` and `crates/codec-aac/src/sbr/ps/tables.rs`;
   `--check` compares them. Three crafted streams of paths no FATE vector takes (a 20/34
   change registered while PS is off, IPD/OPD across a 34 -> 20 change, a PS frame without
-  its SBR element) are vectors of the aac lane, in [ps/vectors](ps/vectors). Not
-  recovered: the four open cases of [ps-open-manifest.json](ps-open-manifest.json), graded
-  with `codecs grade` like the other manifests and listed in its `open_cases`, so
-  `codecs summarize` fails once one of them matches (see the crate's known differences).
+  its SBR element) are vectors of the aac lane, in [ps/vectors](ps/vectors). Four more
+  (IPD/OPD after an error frame, the time-differential reference per envelope index, SBR
+  after a frame without its SBR element, an SBR payload that does not parse) are in
+  [ps-open-manifest.json](ps-open-manifest.json), graded with `codecs grade` like the
+  other manifests; its `open_cases` list is empty.
 
 Confirmed black-box: PNS noise LCG (1664525, 1013904223, seed `0x1f2e3d4c`), PCE speaker
 mapping (`tools/probe_layout.py`), the libfaac fill-element skip, the implicit PS stereo

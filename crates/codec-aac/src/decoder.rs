@@ -847,7 +847,14 @@ impl Core {
             Some(ref mut sbr) => sbr,
             None => e.sbr.insert(new_sbr(&self.budget, self.sf_index, e.kind)?),
         };
-        sbr.parse(br, crc, bits, is_cpe)?;
+        let start = br.position();
+        if sbr.parse(br, crc, bits, is_cpe).is_err() {
+            // A payload that does not parse is skipped, as a decoder without SBR skips the
+            // extension: the core is output through the SBR banks as in a frame without
+            // SBR data (observed behaviour: `ps-open-sbr-truncated` in harness/codecs/aac,
+            // a payload cut to its first 30 bits, matches the reference bit-identically).
+            br.seek(start + bits);
+        }
         if to_stereo {
             self.ps_active = true;
             self.rebuild_layout()?;

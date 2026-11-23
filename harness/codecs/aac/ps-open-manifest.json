@@ -30,7 +30,5 @@
    "sha256": "1cde1e039a43011f9c3e35cfab033c76bc6b3263eab5e12cc57d466095f9a5b0"
   }
  ],
- "open_cases": [
-  "ps-open-sbr-truncated.adts"
- ]
+ "open_cases": []
 }

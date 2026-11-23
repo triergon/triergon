@@ -783,3 +783,24 @@ fn a_refused_ps_start_leaves_the_decoder_as_it_was() {
     let units = [&sbr, &plain, &plain].map(Vec::clone);
     a_refusal_with_spare_is_as_if_the_access_unit_never_arrived(&units, 0, first);
 }
+
+#[test]
+fn an_sbr_payload_that_does_not_parse_leaves_the_frame_without_sbr_data() {
+    // harness/codecs/aac/ps/open/ps-open-sbr-truncated.adts: one frame's SBR payload is
+    // cut to its first 30 bits; the frame still decodes, as one without SBR data
+    let stream = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../harness/codecs/aac/ps/open/ps-open-sbr-truncated.adts"
+    ))
+    .unwrap();
+    let mut decoder = Decoder::new();
+    let mut frame = AudioFrame::default();
+    let (mut at, mut samples) = (0, 0);
+    while let Some((offset, header)) = triergon_codec_aac::adts::find_frame(&stream, at) {
+        let end = offset + header.frame_length;
+        decoder.decode(&stream[offset..end], &mut frame).unwrap();
+        samples += frame.samples_per_channel;
+        at = end;
+    }
+    assert_eq!(samples, 4 * 2048);
+}

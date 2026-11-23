@@ -108,10 +108,6 @@ unit follows IEEE 754 (AArch64); ARMv7 NEON flushes subnormals to zero.
 
 - A configuration-2 frame that carries a single SCE: FFmpeg leaves FR unwritten (stale
   buffer contents); this decoder outputs silence on FR.
-- An SBR payload cut short, with and without Parametric Stereo: refused here, output by
-  FFmpeg. The case is listed in
-  [ps-open-manifest.json](../../harness/codecs/aac/ps-open-manifest.json); the
-  [PS README](../../harness/codecs/aac/ps/README.md) has what is known of each cause.
 
 ## Standards
 

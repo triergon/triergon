@@ -208,21 +208,22 @@ a frame that overran its extension.
   bit-identically with this rule; with the border reset by the missing frame, as before,
   it missed by 81 LSB in that frame, and with the border kept and the earlier high band
   kept as well by 59 LSB. With and without PS alike.
+- **An SBR payload that does not parse.** The payload is skipped and the frame is output
+  as one without SBR data (the core through the SBR banks, no high band), as a decoder
+  without SBR skips the extension; the access unit is not refused. The reference reports
+  reading past the SBR data and an invalid envelope value and outputs the frame;
+  `ps-open-sbr-truncated` (the first 30 bits kept, neutral PS) then matches it
+  bit-identically. Refusing the access unit had left the output a frame short from there.
 
 The crafted streams of the other paths are vectors of the aac lane
 ([../correctness-manifest.json](../../correctness-manifest.json), files in `vectors/`).
 
 ## Not recovered
 
-- An SBR payload cut short (`ps-open-sbr-truncated`: the first 30 bits kept, neutral PS).
-  The reference reports reading past the SBR data and an invalid envelope value, and still
-  outputs the frame. This decoder refuses the access unit, so its output is one frame short
-  from there, which accounts for the 2.4e-2 rms and more. What the reference outputs in that
-  frame is not probed. The same holds without PS (o31 trunc).
 - IPD/OPD in frames without the PS extension mixed with multi-envelope frames and mode
-  changes (o22 with `PSW=0`, up to 8.5e-3). The first case above is
-  one shape of it; the others are not reduced.
+  changes (o22 with `PSW=0`, up to 8.5e-3). `ps-open-noext-after-error` was one shape of
+  it; the others are not reduced.
 
-The crafted streams of these cases are the open cases of
-[../ps-open-manifest.json](../ps-open-manifest.json) (files in `open/`); a stream whose
-path is recovered stays there as a vector.
+[../ps-open-manifest.json](../ps-open-manifest.json) holds the crafted streams of the
+paths recovered last (files in `open/`); its `open_cases` list is empty, and an open case
+found later is registered there.

@@ -65,15 +65,6 @@ fn disposition(key: &str) -> Option<&'static str> {
         "aac-sce-in-stereo.adts" => {
             "FFmpeg leaves the FR plane of SCE-only frames unwritten (stale pooled buffer); ours is silent there (harness/codecs/STATUS.md)"
         }
-        "ps-open-dt-envelope-reference.adts" => {
-            "a time-differential IID envelope after a 4-envelope 10-band frame; FFmpeg's reference values differ from this decoder's above the 10 coded bands (harness/codecs/aac/ps/README.md)"
-        }
-        "ps-open-sbr-after-missing.adts" => {
-            "the frame after a missing SBR element whose previous frame's envelope crossed the frame border; an SBR matter, with or without Parametric Stereo (harness/codecs/aac/ps/README.md)"
-        }
-        "ps-open-sbr-truncated.adts" => {
-            "an SBR payload cut short; this decoder drops the frame, FFmpeg outputs it (harness/codecs/aac/ps/README.md)"
-        }
         "ac3" | "eac3" => {
             "AC-3/E-AC-3 dither and SPX/AHT noise: FFmpeg random generator (harness/codecs/STATUS.md)"
         }

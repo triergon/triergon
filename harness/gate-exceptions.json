@@ -135,12 +135,6 @@
       "harness/codecs/correctness-manifest.json": {"open_deviations": {"aarch64-unknown-linux-gnu": 1, "thumbv7neon-unknown-linux-gnueabihf": 1}, "open_refusals": {"aarch64-unknown-linux-gnu": 36, "thumbv7neon-unknown-linux-gnueabihf": 36}},
       "harness/capture/contract.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 33, "thumbv7neon-unknown-linux-gnueabihf": 33}},
       "harness/codecs/gate-lanes.json": {"open_unmeasured": {"aarch64-unknown-linux-gnu": 99, "thumbv7neon-unknown-linux-gnueabihf": 99}},
-      "harness/codecs/aac/ps-open-manifest.json": {
-        "open_cases": {
-          "aarch64-unknown-linux-gnu": 1,
-          "thumbv7neon-unknown-linux-gnueabihf": 1
-        }
-      },
       "harness/features/ass-parse-host/contract.json": {
         "open_deviations": {
           "aarch64-unknown-linux-gnu": 4,
