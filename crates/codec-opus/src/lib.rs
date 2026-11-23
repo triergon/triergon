@@ -141,13 +141,17 @@ impl Decoder {
         Ok(())
     }
 
-    /// Decode one (multistream) packet into `out`. Everything that can refuse it, from
-    /// the framing of each sub-packet to the output frame's charge, comes before the
-    /// first stream decodes, so a refused packet leaves every stream as it was.
+    /// Decodes one Opus packet, including every stream of a multistream packet.
+    /// Replaces `out`; a refusal leaves `samples_per_channel == 0`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed or inconsistent packets and storage charges the pool cannot
+    /// cover. A refusal leaves each stream's signal history intact.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        out.samples_per_channel = 0;
-        let (samples, emphasis) = self.check(au)?;
-        out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)?;
+        let (samples, emphasis) = self.check(au).inspect_err(|_| out.clear())?;
+        out.try_resize(self.mapping.channels(), samples, &mut self.output_charge)
+            .inspect_err(|_| out.clear())?;
         // `check` parsed every sub-packet.
         let packets = sub_packets(au, self.streams.len()).map_while(Result::ok);
         for (index, (stream, packet)) in self.streams.iter_mut().zip(packets).enumerate() {

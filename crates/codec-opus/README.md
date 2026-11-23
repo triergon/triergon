@@ -62,6 +62,8 @@ the pre-skip or other container trims.
 
 ## Behaviour and limits
 
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
+
 - The header's output gain is applied after de-emphasis, once per packet. Its pre-skip
   is not: the decoder reports it as its start delay (`AudioDecoder::delay`), which a
   consumer discards together with the container's trims (Ogg's granule positions,

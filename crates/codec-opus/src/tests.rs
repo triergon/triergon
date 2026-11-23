@@ -38,6 +38,8 @@ fn assert_refusal_keeps_state(config: &[u8], before: &[&[u8]], refused: &[u8], n
         }
         if index == 1 {
             assert!(decoder.decode(refused, &mut frame).is_err());
+            assert_eq!(frame.samples_per_channel, 0);
+            assert!(frame.planes.iter().all(Vec::is_empty));
         }
         for packet in next {
             decoder.decode(packet, &mut frame).unwrap();
