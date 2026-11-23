@@ -77,6 +77,9 @@ enum Phase {
     Admit,
     /// The source ended after its last root.
     Finished,
+    /// The source view's rows leave the order they lie in: hold their media. Last, so
+    /// that the other phases dispatch as without it.
+    HoldSource,
 }
 /// Borrow the MP4 fields needed to continue reading the source.
 pub(crate) struct Continuation<'a> {
@@ -87,28 +90,34 @@ pub(crate) struct Continuation<'a> {
     pub(crate) empty_run: &'a mut Option<(Mp4EmptyPacket, u32)>,
 }
 
-pub(crate) fn prepare_media_replay(
-    input: &InputCursor,
-    plan: &mut PreparedMp4,
-) -> Result<PendingMedia> {
+/// Starts holding the plan's one media extent, which a nonseekable source is about to
+/// read, so that its samples can be delivered in another order than they lie in.
+fn hold_media(input: &InputCursor, plan: &mut PreparedMp4) -> Result<PendingMedia> {
     let [extent] = plan.media.as_slice() else {
-        return Err(Error::Unsupported(
-            "demux replay needs one finite media extent",
-        ));
+        return Err(Error::Unsupported("replay needs one finite media extent"));
     };
     if input.position() != extent.start || input.capabilities().random_access {
         return Err(Error::Invalid(
-            "demux replay requires a nonseekable source at the start of the media extent",
+            "replay requires a nonseekable source at the start of the media extent",
         ));
     }
     let length = extent.end - extent.start;
     if !(1..=RETAINED_MEDIA_BYTES as u64).contains(&length) {
         return Err(Error::Unsupported(
-            "demux replay media extent is empty or exceeds the cache limit",
+            "replay media extent is empty or exceeds the cache limit",
         ));
     }
     let pending = PendingMedia::new(extent.start, length as usize, input.budget())?;
     plan.media_cache.try_reserve_exact(1)?;
+    Ok(pending)
+}
+
+/// Holds the media extent and has the engine deliver the demux view's rows from it.
+pub(crate) fn prepare_media_replay(
+    input: &InputCursor,
+    plan: &mut PreparedMp4,
+) -> Result<PendingMedia> {
+    let pending = hold_media(input, plan)?;
     plan.demux_order_replay = true;
     Ok(pending)
 }
@@ -234,6 +243,7 @@ impl ProgressiveState {
             Phase::SortSource => self.sort_source(engine, w),
             Phase::Admit => self.admit(engine, w),
             Phase::Finished => Ok(EngineStep::End),
+            Phase::HoldSource => self.hold_source(engine),
         }
     }
 
@@ -387,7 +397,6 @@ impl ProgressiveState {
                 self.best = None;
                 self.blocked_in_extent = false;
                 self.needs_reorder = false;
-                self.demux_next.fill(0);
                 if engine.plan.demux_front && engine.plan.front_boundary.is_none() {
                     for (next, track) in self
                         .demux_next
@@ -503,6 +512,12 @@ impl ProgressiveState {
             self.retained += 1;
             self.previous_traf = Some(end);
             let track = &mut engine.plan.tracks.as_mut_slice()[self.track];
+            // A track's samples leave in decode order, wherever their bytes lie
+            // (ISO/IEC 14496-12 sections 8.8.4.1 and 8.8.8): its first fragment's
+            // first sample is the first to leave.
+            if self.demux_next[self.track] == 0 {
+                self.demux_next[self.track] = track.next_ordinal;
+            }
             track.next_ordinal = next;
             track.decode_end = decode_end.and_then(|end| i64::try_from(end).ok());
             self.scan = None;
@@ -547,10 +562,7 @@ impl ProgressiveState {
                         let trex = track
                             .trex
                             .ok_or(Error::Invalid("progressive fragment missing trex"))?;
-                        let raw = self
-                            .traf
-                            .take()
-                            .ok_or(Error::Invalid("progressive traf"))?;
+                        let raw = self.traf.take().ok_or(Error::Invalid("progressive traf"))?;
                         let context = FragmentContext {
                             moof_start: self
                                 .moof
@@ -667,7 +679,7 @@ impl ProgressiveState {
                 && let Some(head) = cursor.head.as_ref()
             {
                 let expected = self.demux_next[usize::from(self.cursor_tracks[at])];
-                if expected != 0 && head.sample.ordinal != expected {
+                if head.sample.ordinal != expected {
                     self.blocked_in_extent |= self.extent.as_ref().is_none_or(|extent| {
                         head.sample.range.start < extent.end
                             || (head.sample.range.start == extent.end
@@ -720,25 +732,16 @@ impl ProgressiveState {
                 front: cursor.front.take(),
             };
             let track = usize::from(self.cursor_tracks[at]);
-            let next = if self.demux_next[track] == 0 {
-                0
-            } else {
-                row.source
-                    .sample
-                    .ordinal
-                    .checked_add(1)
-                    .ok_or(Error::Overflow)?
-            };
-            let backwards = self.rows.as_slice().last().is_some_and(|last| {
-                let before = &last.source.sample.range;
-                let after = &row.source.sample.range;
-                after.start
-                    < if self.demux_next[track] == 0 {
-                        before.start
-                    } else {
-                        before.end
-                    }
-            });
+            let next = row
+                .source
+                .sample
+                .ordinal
+                .checked_add(1)
+                .ok_or(Error::Overflow)?;
+            let backwards =
+                self.rows.as_slice().last().is_some_and(|last| {
+                    row.source.sample.range.start < last.source.sample.range.end
+                });
             if let Err(error) = self.rows.try_push(row) {
                 let cursor = self.cursors.as_mut_slice()[at]
                     .as_mut()
@@ -790,7 +793,7 @@ impl ProgressiveState {
         Ok(EngineStep::Yield)
     }
 
-    /// Sorts the rows into physical order in budgeted steps.
+    /// Sorts the demux replay's source rows into physical order in budgeted steps.
     #[inline(always)]
     fn sort_source(
         &mut self,
@@ -801,19 +804,24 @@ impl ProgressiveState {
             .sort
             .as_mut()
             .ok_or(Error::Invalid("media order sort missing"))?;
-        let done = if engine.plan.demux_order_replay {
-            sort.poll(
-                engine.plan.source_rows.as_mut_slice(),
-                SourceRow::physical_key,
-                w,
-            )
-        } else {
-            sort.poll(self.rows.as_mut_slice(), |row| row.source.physical_key(), w)
-        };
-        if done {
+        if sort.poll(
+            engine.plan.source_rows.as_mut_slice(),
+            SourceRow::physical_key,
+            w,
+        ) {
             self.sort = None;
             self.phase = Phase::Admit;
         }
+        Ok(EngineStep::Yield)
+    }
+
+    /// Has a source that cannot go back hold the media extent, whose rows are
+    /// delivered in each track's decode order.
+    fn hold_source(&mut self, engine: &mut Continuation<'_>) -> Result<EngineStep> {
+        if !engine.input.capabilities().random_access {
+            *engine.media_cache_fill = Some(hold_media(engine.input, engine.plan)?);
+        }
+        self.phase = Phase::Admit;
         Ok(EngineStep::Yield)
     }
 
@@ -919,8 +927,7 @@ impl ProgressiveState {
         } else if plan.demux_front && plan.front_boundary.is_none() {
             Phase::PrepareReplay
         } else {
-            self.sort = Some(SampleSort::new(self.rows.len()));
-            Phase::SortSource
+            Phase::HoldSource
         };
         Ok(())
     }

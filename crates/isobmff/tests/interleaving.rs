@@ -59,7 +59,37 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
     movie[635..639].copy_from_slice(&1256u32.to_be_bytes());
     movie.extend_from_slice(&original[1184..1196]);
 
-    for quantum in [1, 4096] {
+    // Track by track, or merged with each track in decode order: track 1's third
+    // sample, moved behind everything else, holds back the track's later samples.
+    let track_order = [
+        (1, 1, 1151, Some(0)),
+        (1, 2, 1163, Some(1000)),
+        (1, 3, 1256, Some(2000)),
+        (1, 4, 1203, Some(3000)),
+        (1, 5, 1215, Some(4000)),
+        (1, 6, 1227, Some(5000)),
+        (2, 1, 1175, Some(0)),
+        (2, 2, 1182, Some(1000)),
+        (2, 3, 1196, Some(2000)),
+        (2, 4, 1239, Some(3000)),
+        (2, 5, 1244, Some(4000)),
+        (2, 6, 1250, Some(5000)),
+    ];
+    let decode_order = [
+        (1, 1, 1151, Some(0)),
+        (1, 2, 1163, Some(1000)),
+        (2, 1, 1175, Some(0)),
+        (2, 2, 1182, Some(1000)),
+        (2, 3, 1196, Some(2000)),
+        (2, 4, 1239, Some(3000)),
+        (2, 5, 1244, Some(4000)),
+        (2, 6, 1250, Some(5000)),
+        (1, 3, 1256, Some(2000)),
+        (1, 4, 1203, Some(3000)),
+        (1, 5, 1215, Some(4000)),
+        (1, 6, 1227, Some(5000)),
+    ];
+    for (quantum, merged) in [(1, false), (4096, false), (1, true), (4096, true)] {
         let budget = Budget::new(1024 * 1024).unwrap();
         let tables = regular_tables_from_bytes(&budget, &movie);
         let tracks: Vec<_> = tables
@@ -81,7 +111,11 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
             ))
         );
         assert_eq!(cursor.validated_samples(), 12);
-        assert!(cursor.resume_in_track_order());
+        assert!(if merged {
+            cursor.resume_in_decode_order()
+        } else {
+            cursor.resume_in_track_order()
+        });
         let mut samples = Vec::new();
         loop {
             match poll_until_physical_decision(&mut cursor, quantum).unwrap() {
@@ -98,23 +132,7 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
                 CursorStatus::Yield => unreachable!(),
             }
         }
-        assert_eq!(
-            samples,
-            [
-                (1, 1, 1151, Some(0)),
-                (1, 2, 1163, Some(1000)),
-                (1, 3, 1256, Some(2000)),
-                (1, 4, 1203, Some(3000)),
-                (1, 5, 1215, Some(4000)),
-                (1, 6, 1227, Some(5000)),
-                (2, 1, 1175, Some(0)),
-                (2, 2, 1182, Some(1000)),
-                (2, 3, 1196, Some(2000)),
-                (2, 4, 1239, Some(3000)),
-                (2, 5, 1244, Some(4000)),
-                (2, 6, 1250, Some(5000)),
-            ]
-        );
+        assert_eq!(samples, if merged { decode_order } else { track_order });
         assert_eq!(&movie[1256..1268], &original[1184..1196]);
     }
 }

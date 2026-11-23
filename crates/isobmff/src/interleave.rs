@@ -279,9 +279,10 @@ enum Phase<'a> {
 /// Before the first sample, a work-bounded pass over the metadata checks that each track's
 /// samples start at nondecreasing offsets with increasing ordinals, the sample limit and,
 /// with media extents, that every sample lies in an `mdat`. A track whose samples go
-/// backwards in the file is valid but cannot be merged: polling returns
+/// backwards in the file is valid but cannot be read one after another: polling returns
 /// `Error::Unsupported` before any sample, and a cursor with media extents can then
-/// continue track by track with [`resume_in_track_order`](Self::resume_in_track_order).
+/// continue the merge with [`resume_in_decode_order`](Self::resume_in_decode_order) or
+/// track by track with [`resume_in_track_order`](Self::resume_in_track_order).
 ///
 /// The merge then keeps one sample per track and one ready sample, charged to the budget,
 /// and sorts nothing by time. Equal start offsets, zero-size samples included, follow the
@@ -474,6 +475,17 @@ impl<'a> PhysicalSampleCursor<'a> {
     /// checked against media extents and no media is deferred. Returns `false` without
     /// advancing in any other state.
     pub fn resume_in_track_order(&mut self) -> bool {
+        self.resume(Phase::TrackOrder)
+    }
+    /// Continues the merge after a backward-layout refusal, on the conditions of
+    /// [`resume_in_track_order`](Self::resume_in_track_order): every track stays in
+    /// decode order and the next sample is the one that starts first among the tracks,
+    /// so a backward track's samples are not in ascending byte order (ISO/IEC 14496-12
+    /// puts no order on where samples lie).
+    pub fn resume_in_decode_order(&mut self) -> bool {
+        self.resume(Phase::Fill)
+    }
+    fn resume(&mut self, phase: Phase<'a>) -> bool {
         if !matches!(self.phase, Phase::ValidateEnter)
             || self.index != self.slots.len()
             || self.layout_error.is_none()
@@ -484,7 +496,7 @@ impl<'a> PhysicalSampleCursor<'a> {
         }
         self.failed = None;
         self.index = 0;
-        self.phase = Phase::TrackOrder;
+        self.phase = phase;
         true
     }
     /// The sample a [`CursorStatus::Ready`] poll announced; `Error::Invalid` when none is

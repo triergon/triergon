@@ -280,9 +280,11 @@ Limits of the reader:
   `mdat` payload extent; `PhysicalSampleCursor::new_with_media_extents` checks every
   track first and returns `Unsupported` for valid backward-ordered layouts. Physical
   order and per-track decode order cannot both be maintained in such a track. After
-  this refusal, `resume_in_track_order` can traverse the validated samples in track
-  order; payload access may require backward range requests. It cannot resume when
-  media validation was deferred.
+  this refusal, `resume_in_decode_order` continues the merge with every track in
+  decode order, taking the track whose next sample starts first, and
+  `resume_in_track_order` traverses the validated samples track by track; payload
+  access may require backward range requests. Neither can resume when media validation
+  was deferred.
 - **Edits.** Source edit lists are parsed and mapped at rate one only; non-unit
   rates and dwell edits are refused. The source view never repeats or shifts
   packets; the FFmpeg-compatible view does, including AAC and Opus trim for range

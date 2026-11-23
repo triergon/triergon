@@ -474,15 +474,6 @@
       "cause": "the VUI view uses full reference stream discovery and times no equivalent workload"
     }
   ],
-  "pending_module_requirements": [
-    "The progressive MP4 source view sorts one track's fragment samples by byte position when a later fragment's data precedes an earlier one's in the media, so it delivers decode times 6000 to 8000 before 3000 to 5000. Packets must keep per-track decode order (ISO/IEC 14496-12 sections 8.8.4.1 and 8.8.8)."
-  ],
-  "open_cases": [
-    {
-      "id": "mp4-forward-progressive-pending-reverse-ranges",
-      "requirement": "The progressive MP4 source view sorts one track's fragment samples by byte position when a later fragment's data precedes an earlier one's in the media, so it delivers decode times 6000 to 8000 before 3000 to 5000. Packets must keep per-track decode order (ISO/IEC 14496-12 sections 8.8.4.1 and 8.8.8)."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "The MP4 source view retains explicitly declared zero-length fragment samples",

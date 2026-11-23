@@ -3,7 +3,6 @@
 use crate::{
     Result,
     mp4::open::{CachedMedia, Movie, RETAINED_MEDIA_BYTES},
-    mp4::sample_sort::SampleSort,
 };
 use std::{
     alloc::Layout,
@@ -38,7 +37,8 @@ fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
 /// Which packets a plan delivers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum PlanView {
-    /// Source samples in physical order.
+    /// Source samples: each track in decode order, the tracks merged by where their
+    /// next sample lies.
     Source,
     /// The MOV demux packet view.
     Demux,
@@ -326,8 +326,10 @@ impl PreparedMp4 {
     pub fn terminal_mdat(&self) -> Option<iso::payload::TerminalMdat> {
         self.terminal_mdat
     }
-    /// The samples the tables declare, in physical order. A forward plan checks a
-    /// row against the `mdat` that follows before it reads or delivers its payload.
+    /// The samples the tables declare: each track in decode order, the tracks merged
+    /// by where their next sample starts, which is ascending byte order unless a track's
+    /// samples go backwards in the file. A forward plan checks a row against the `mdat`
+    /// that follows before it reads or delivers its payload.
     pub fn source_rows(&self) -> &[SourceRow] {
         self.source_rows.as_slice()
     }
@@ -432,8 +434,6 @@ pub struct Mp4IndexJob<'a> {
     extent: usize,
     pending_source: Option<SourceRow>,
     pending_demux: Option<PacketOccurrence>,
-    source_track_order: bool,
-    source_sort: Option<SampleSort>,
     zero_scale_clock: Option<MediaClock>,
     first_sample_probe: Option<(SampleCursor<'a>, Error)>,
     edits: Option<Box<iso::compat::mov::edits::DemuxEditsJob<'a>>>,
@@ -479,7 +479,8 @@ impl<'a> Mp4IndexJob<'a> {
         }
         Self::new_inner(movie, PlanView::Demux, limits, true, None, None)
     }
-    /// Index `movie` for playback of its source samples in physical order.
+    /// Index `movie` for playback of its source samples, each track in decode order and
+    /// the tracks merged by byte position.
     pub fn new(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
         Self::new_inner(movie, PlanView::Source, limits, false, None, None)
     }
@@ -861,8 +862,6 @@ impl<'a> Mp4IndexJob<'a> {
             extent: 0,
             pending_source: None,
             pending_demux: None,
-            source_track_order: false,
-            source_sort: None,
             zero_scale_clock,
             first_sample_probe: None,
             edits: None,
@@ -1123,12 +1122,6 @@ impl<'a> Mp4IndexJob<'a> {
                 _ => return Err(*refusal),
             }
         }
-        if let Some(sort) = self.source_sort.as_mut() {
-            if sort.poll(p.source_rows.as_mut_slice(), SourceRow::physical_key, w) {
-                self.phase = IndexPhase::RangeCheck;
-            }
-            return Ok(false);
-        }
         if self.pending_source.is_some() && !w.try_charge(1) {
             return Ok(false);
         }
@@ -1154,9 +1147,10 @@ impl<'a> Mp4IndexJob<'a> {
         let step = match source.poll(w, c) {
             Err(_)
                 if p.read_scope == crate::mp4::open::MetadataReadScope::CompleteEntity
-                    && source.resume_in_track_order() =>
+                    && source.resume_in_decode_order() =>
             {
-                self.source_track_order = true;
+                // A track whose samples go backwards in the file keeps its decode
+                // order; a complete source reads its ranges wherever they lie.
                 return Ok(false);
             }
             Err(error)
@@ -1199,11 +1193,7 @@ impl<'a> Mp4IndexJob<'a> {
             CursorStatus::End => {
                 p.forward_regular_extents =
                     source.deferred_media().then_some(self.limits.media_extents);
-                if self.source_track_order {
-                    self.source_sort = Some(SampleSort::new(p.source_rows.len()));
-                } else {
-                    self.phase = IndexPhase::RangeCheck;
-                }
+                self.phase = IndexPhase::RangeCheck;
             }
         }
         Ok(false)

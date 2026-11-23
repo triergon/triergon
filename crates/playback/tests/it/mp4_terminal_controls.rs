@@ -1245,7 +1245,7 @@ fn reversed_fragment_ranges_keep_native_decode_order_on_a_forward_source() {
 }
 
 #[test]
-fn reversed_fragment_ranges_keep_physical_source_order_on_a_seekable_source() {
+fn reversed_fragment_ranges_keep_decode_order_on_a_seekable_source() {
     let c = gold::case("progressive--pending-reverse-ranges");
     let (mut native, _, _) =
         try_make_source_mode(c.raw, true, 7, 1, true, TestView::Native, true).unwrap();
@@ -1269,7 +1269,7 @@ fn reversed_forward_fragments_require_a_complete_bounded_extent() {
     assert!(matches!(
         collect(&mut native, 13),
         Err(Error::Unsupported(
-            "demux replay media extent is empty or exceeds the cache limit"
+            "replay media extent is empty or exceeds the cache limit"
         ))
     ));
 
@@ -1287,7 +1287,7 @@ fn check_reversed_fragment_source(native: &[Output], literal: &[Output]) {
             .iter()
             .map(|p| p.source.sample.ordinal)
             .collect::<Vec<_>>(),
-        [1, 2, 3, 7, 8, 9, 4, 5, 6]
+        [1, 2, 3, 4, 5, 6, 7, 8, 9]
     );
     for (at, packet) in packets(native).into_iter().enumerate() {
         assert_eq!(packet.source.sample.ordinal, at as u64 + 1);

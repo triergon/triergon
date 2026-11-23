@@ -147,8 +147,9 @@ and compares the native codec identity and configuration alongside them. The
 MP4 comparison pairs demux packets with exact sample-table or fragment byte
 ranges and reads source timing and sync flags from the tables. The MPEG-TS
 comparison checks the stream type from the selected PMT and the clocks from
-each complete PES header against the delivered bytes. MP4 source packets use
-ascending byte position across tracks. The opening MPEG-TS catalogue uses the
+each complete PES header against the delivered bytes. MP4 source packets keep
+each track's decode order and merge the tracks by the byte position of their next
+packet. The opening MPEG-TS catalogue uses the
 first current PMT and keeps private descriptors opaque when the caller leaves
 the namespace unspecified. The comparison checks each ISO 639 descriptor tuple
 and the first language reported on the neutral track. The bounded timing-prefix
@@ -230,8 +231,10 @@ a zero decode delta when it belongs to the replay.
 Supply any edit plans in source track order, with `None` for each data track.
 Progressive playback of a front-`moov` file continues through later
 `moof`/`mdat` pairs with at most 64 pending fragment slots. A size-zero
-terminal `mdat` ends only on a matching `SourceReply::End`. Forward-only
-reordering retains at most 32 KiB of media. An in-band second `moov` is not
+terminal `mdat` ends only on a matching `SourceReply::End`. A track whose
+later fragment lies before an earlier one in the file still leaves in decode order:
+a forward-only source holds that media extent, at most 32 KiB, and refuses a
+larger one. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
