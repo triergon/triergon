@@ -4,7 +4,61 @@ use triergon_core::{
     Budget, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,
     WorkBudget,
 };
-use triergon_isobmff::boxes::{BoxEvent, BoxReader};
+use triergon_isobmff::{
+    boxes::{BoxEvent, BoxReader},
+    open::{MovieOpen, OpenLimits, OpenStep},
+};
+
+#[test]
+fn opener_retries_a_retained_root_after_pool_backpressure() {
+    let file = common::atom(b"ftyp", b"isom\0\0\0\0");
+    let pool = Budget::new(64 * 1024).unwrap();
+    let mut input = InputCursor::new(
+        &pool,
+        SourceId(7),
+        SourceCapabilities {
+            length: Some(file.len() as u64),
+            random_access: true,
+        },
+        64,
+    )
+    .unwrap();
+    let mut opener = MovieOpen::new(&input, OpenLimits::default()).unwrap();
+    let request = input.request();
+    input
+        .provide(
+            &InputWindow::new(
+                request.source,
+                request.token,
+                0,
+                common::bytes(&pool, &file),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let cancel = AtomicBool::new(false);
+    for _ in 0..3 {
+        assert!(matches!(
+            opener.advance(&mut input, &mut WorkBudget::new(64), &cancel),
+            Ok(OpenStep::Yield)
+        ));
+    }
+    assert_eq!(input.position(), file.len() as u64);
+    let hold = pool.reserve(pool.available()).unwrap();
+    assert!(matches!(
+        opener.advance(&mut input, &mut WorkBudget::new(64), &cancel),
+        Err(Error::Backpressure { .. })
+    ));
+    drop(hold);
+    assert!(matches!(
+        opener.advance(&mut input, &mut WorkBudget::new(0), &cancel),
+        Ok(OpenStep::Yield)
+    ));
+    assert!(matches!(
+        opener.advance(&mut input, &mut WorkBudget::new(64), &cancel),
+        Ok(OpenStep::Root(header)) if header.kind == *b"ftyp" && header.size == Some(file.len() as u64)
+    ));
+}
 
 #[test]
 fn one_byte_windows_and_internal_ranges_keep_the_logical_generation() {
