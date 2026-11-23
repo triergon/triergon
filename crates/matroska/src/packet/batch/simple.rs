@@ -129,17 +129,17 @@ impl SimplePacketJob {
     /// Caller has observed Promote after the Header/Track admissions.
     /// Infallible assembly only; no source parsing, allocation or charged work.
     pub(crate) fn take_batch(&mut self, limits: Limits) -> PacketBatchJob {
-        let len = self.source.len();
         PacketBatchJob {
             source: std::mem::take(&mut self.source),
             configuration: self.configuration.take(),
             limits,
             simple: true,
             phase: Phase::StartLace,
-            job: BatchWork::Idle,
+            side: SideJob::Idle,
+            lace: None,
+            frames: 0,
             group: None,
             configuration_change: None,
-            block: Some(0..len),
             duration: None,
             reference: false,
             discard: 0,

@@ -256,30 +256,27 @@ impl CueValidationJob {
                                         reader.block_replay_location(header, self.cluster_time)?,
                                     );
                                     self.first = true;
+                                    let location = match (header.id, self.segment_data) {
+                                        (BLOCK_GROUP, Some(segment_data)) => {
+                                            Some(crate::packet::block_group::GroupLocation {
+                                                source: reader.request().source,
+                                                segment_data,
+                                                header: header.start,
+                                                data: header.data,
+                                            })
+                                        }
+                                        _ => None,
+                                    };
                                     self.batch = Some(PacketBatchJob::new(
                                         data,
                                         header.id == SIMPLE_BLOCK,
+                                        location,
                                         ticks,
                                         self.scale,
                                         self.configuration.clone(),
                                         self.limits,
                                         &self.pool,
                                     )?);
-                                    if let (BLOCK_GROUP, Some(segment_data)) =
-                                        (header.id, self.segment_data)
-                                    {
-                                        self.batch
-                                            .as_mut()
-                                            .required("missing cue packet batch")?
-                                            .set_location(
-                                            crate::packet::block_group::GroupLocation {
-                                                source: reader.request().source,
-                                                segment_data,
-                                                header: header.start,
-                                                data: header.data,
-                                            },
-                                        )?;
-                                    }
                                     self.phase = Phase::Batch;
                                 }
                                 _ => (),

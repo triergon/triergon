@@ -17,9 +17,17 @@ fn hidden_parent_identity_packet_keeps_exact_seven_work_units_and_full_owner() {
         let capacity = source.retained_capacity();
         drop(owner);
         let before = pool.used();
-        let mut job =
-            PacketBatchJob::new(source, true, 5, 1_000_000, config, Limits::default(), &pool)
-                .unwrap();
+        let mut job = PacketBatchJob::new(
+            source,
+            true,
+            None,
+            5,
+            1_000_000,
+            config,
+            Limits::default(),
+            &pool,
+        )
+        .unwrap();
         assert!(matches!(
             job.step(&mut WorkBudget::new(0), &AtomicBool::new(false))
                 .unwrap(),
@@ -75,8 +83,17 @@ fn identity_publication_waits_for_its_work_unit_and_cancel_keeps_the_pending_own
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x80, b'V']).unwrap();
     let before = pool.used();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     for _ in 0..6 {
         let mut work = WorkBudget::new(1);
         assert!(matches!(
@@ -113,8 +130,17 @@ fn identity_handoff_under_external_pressure_needs_no_new_output_allocation() {
     let baseline = pool.used();
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x80, b'V']).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let blocker = pool.reserve(pool.available()).unwrap();
     let before = pool.used();
     let packet = match job
@@ -140,6 +166,7 @@ fn packet_timing_failure_retains_owned_frame_until_failed_job_is_replaced() {
     let mut job = PacketBatchJob::new(
         source,
         true,
+        None,
         u64::MAX,
         u64::MAX,
         config,
@@ -167,8 +194,17 @@ fn restored_laces_retry_real_pressure_and_keep_independent_decoded_capacity() {
     let baseline = pool.used();
     let config = seed_configuration(&pool, &zlib_encoding(1));
     let source = SharedBytes::copy_from_slice(&pool, &abc_laces(false)).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let blocker = pool.reserve(pool.available()).unwrap();
     let mut blocked = false;
     for _ in 0..1000 {
@@ -232,9 +268,17 @@ fn plain_lace_keeps_exact_work_and_independent_frames_across_quanta() {
             SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x84, 1, b'A', b'B', b'C', b'D'])
                 .unwrap();
         let original = source.clone();
-        let mut job =
-            PacketBatchJob::new(source, true, 5, 1_000_000, config, Limits::default(), &pool)
-                .unwrap();
+        let mut job = PacketBatchJob::new(
+            source,
+            true,
+            None,
+            5,
+            1_000_000,
+            config,
+            Limits::default(),
+            &pool,
+        )
+        .unwrap();
         let mut packets = Vec::new();
         let mut spent = 0;
         let cancel = AtomicBool::new(false);

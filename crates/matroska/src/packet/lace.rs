@@ -53,26 +53,31 @@ impl LaceJob {
             failed: false,
         })
     }
+    /// Reads the lace's frame sizes within `work`; its event is the frame count.
     pub(crate) fn step_descriptors(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep<()>> {
+    ) -> Result<ParseStep<usize>> {
         if self.failed {
             return Err(Error::Invalid("lace requires replacement after error"));
         }
-        let result = self.advance(work, cancel);
-        if result.is_err() {
-            self.failed = true;
+        match self.advance(work, cancel) {
+            Ok(ParseStep::Event(())) => Ok(ParseStep::Event(self.count)),
+            Ok(other) => crate::step::pending(other),
+            Err(error) => {
+                self.failed = true;
+                Err(error)
+            }
         }
-        result
     }
+
+    /// The frame count, once the descriptors are read.
+    #[cfg(test)]
     pub(crate) fn frame_count(&self) -> Option<usize> {
         matches!(self.phase, Phase::Done).then_some(self.count)
     }
 
-    /// Validate every descriptor before replaying the immutable header under the
-    /// same work budget. The cached range survives frame-allocation pressure.
     pub(crate) fn frame_range(
         &mut self,
         index: usize,

@@ -54,7 +54,7 @@ fn all_lace_modes_keep_empty_frames_and_last_frame_bounds_under_work_one() {
                     "descriptors need no separate allocation"
                 );
                 match step {
-                    ParseStep::Event(()) => {
+                    ParseStep::Event(_) => {
                         done = true;
                         break;
                     }
@@ -162,6 +162,7 @@ fn group_retry_keeps_owned_source_and_needs_work_before_parse() {
     let mut job = PacketBatchJob::new(
         source,
         false,
+        None,
         0,
         1_000_000,
         config,
@@ -242,6 +243,7 @@ fn exclusive_metadata_transitions_keep_owner_graph_and_configuration_atomic() {
     let mut job = PacketBatchJob::new(
         source,
         false,
+        None,
         0,
         1_000_000,
         config,

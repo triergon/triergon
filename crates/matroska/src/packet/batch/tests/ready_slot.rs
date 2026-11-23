@@ -29,9 +29,17 @@ fn ready_slot_keeps_hidden_owner_and_exact_seven_units_until_synchronous_take() 
         let pointer = source[4..].as_ptr();
         let capacity = source.retained_capacity();
         drop(owner);
-        let mut job =
-            PacketBatchJob::new(source, true, 5, 1_000_000, config, Limits::default(), &pool)
-                .unwrap();
+        let mut job = PacketBatchJob::new(
+            source,
+            true,
+            None,
+            5,
+            1_000_000,
+            config,
+            Limits::default(),
+            &pool,
+        )
+        .unwrap();
         let blocker = pool.reserve(pool.available()).unwrap();
         let used = pool.used();
         let cancel = AtomicBool::new(false);
@@ -93,8 +101,17 @@ fn cancellation_observed_by_ready_poll_poisoning_cannot_be_bypassed_by_take() {
     let baseline = pool.used();
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x80, b'V']).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let used = pool.used();
     assert!(matches!(
         job.step_ready(None, &mut WorkBudget::new(7), &AtomicBool::new(false))
@@ -123,8 +140,17 @@ fn premature_take_poisoning_preserves_the_exact_source_until_drop() {
     let baseline = pool.used();
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x80, b'V']).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let used = pool.used();
     assert!(matches!(
         job.take_ready(),
@@ -158,6 +184,7 @@ fn ready_laces_observe_configuration_change_before_any_publication_and_keep_last
     let mut job = PacketBatchJob::new(
         source,
         false,
+        None,
         0,
         1_000_000,
         config,
@@ -225,8 +252,17 @@ fn recovery_prefix_still_drops_early_video_and_keeps_unknown_second_lace() {
     let baseline = pool.used();
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x84, 1, b'A', b'B']).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let mut packets = Vec::new();
     let mut finished = false;
     for _ in 0..1000 {

@@ -102,6 +102,7 @@ fn group_and_state_batch_work_zero_is_inert_and_cancellation_precedes_publicatio
     let mut batch = PacketBatchJob::new(
         source.clone(),
         false,
+        None,
         3,
         1_000_000,
         configuration.clone(),
@@ -136,6 +137,7 @@ fn retained_external_pressure_keeps_a_real_group_job_pending_and_retries_same_ba
     let mut batch = PacketBatchJob::new(
         source,
         false,
+        None,
         3,
         1_000_000,
         configuration,

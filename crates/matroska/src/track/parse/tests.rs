@@ -156,8 +156,17 @@ fn raw_tracks_job_preserves_mixed_encoding_order_and_all_hdr_source_floats() {
     assert_eq!(mastering.luminance_min, Some(0.005));
     let source =
         SharedBytes::copy_from_slice(&pool, &[&[0x81, 0, 0, 0x80][..], &ABC].concat()).unwrap();
-    let mut packets =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut packets = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let mut payload = None;
     for _ in 0..10_000 {
         match packets

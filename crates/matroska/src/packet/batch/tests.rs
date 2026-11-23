@@ -60,8 +60,17 @@ fn packet_batch_rejects_a_bad_last_crc_without_publishing_any_lace() {
     let pool = Budget::new(64 * 1024).unwrap();
     let config = seed_configuration(&pool, &zlib_encoding(1));
     let source = SharedBytes::copy_from_slice(&pool, &abc_laces(true)).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let mut failed = false;
     for _ in 0..10_000 {
         let mut work = WorkBudget::new(1);
@@ -93,7 +102,8 @@ fn packet_batch_preserves_exact_laced_capacity_and_old_configuration_lifetime() 
         ..Limits::default()
     };
     let source = SharedBytes::copy_from_slice(&pool, &abc_laces(false)).unwrap();
-    let mut job = PacketBatchJob::new(source, true, 2, 1_000_000, config, limits, &pool).unwrap();
+    let mut job =
+        PacketBatchJob::new(source, true, None, 2, 1_000_000, config, limits, &pool).unwrap();
     let mut packets = Vec::new();
     for _ in 0..10_000 {
         let mut work = WorkBudget::new(1);
@@ -129,8 +139,17 @@ fn nonlaced_stored_packet_keeps_borrowed_block_owner_and_its_capacity() {
     let source =
         SharedBytes::copy_from_slice(&pool, &[&[0x81, 0, 0, 0x80][..], &ABC].concat()).unwrap();
     let original = source.clone();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let mut packet = None;
     for _ in 0..10_000 {
         match job
@@ -159,8 +178,17 @@ fn packet_batch_keeps_pending_output_across_pressure_and_checks_cancel_before_pu
     let pool = Budget::new(64 * 1024).unwrap();
     let config = seed_configuration(&pool, &zlib_encoding(1));
     let source = SharedBytes::copy_from_slice(&pool, &abc_laces(false)).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let blocker = pool.reserve(pool.available()).unwrap();
     let mut saw_pressure = false;
     for _ in 0..1000 {
@@ -198,8 +226,17 @@ fn packet_batch_retries_pending_allocation_without_losing_either_lace() {
     let pool = Budget::new(64 * 1024).unwrap();
     let config = seed_configuration(&pool, &zlib_encoding(1));
     let source = SharedBytes::copy_from_slice(&pool, &abc_laces(false)).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let blocker = pool.reserve(pool.available()).unwrap();
     let mut blocked = false;
     for _ in 0..1000 {
@@ -261,6 +298,7 @@ fn block_group_waits_for_trailing_timing_and_accepts_empty_codec_state_before_pu
         let mut job = PacketBatchJob::new(
             source,
             false,
+            None,
             10,
             1_000_000,
             configuration.clone(),
@@ -362,8 +400,17 @@ fn unlaced_batch_needs_no_heap_pointer_arena() {
     let pool = Budget::new(128 * 1024).unwrap();
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x80, b'V']).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let before = pool.used();
     println!(
         "Packet={} PacketBatch={}",

@@ -7,7 +7,7 @@ fn lace(data: &[u8], mode: u8) -> Result<Vec<Vec<u8>>> {
     let mut job = LaceJob::new(source, 0..data.len(), mode)?;
     loop {
         match job.step_descriptors(&mut WorkBudget::new(u64::MAX), &AtomicBool::new(false))? {
-            ParseStep::Event(()) => break,
+            ParseStep::Event(_) => break,
             ParseStep::Yield => continue,
             other => panic!("unexpected lace step {other:?}"),
         }
@@ -52,7 +52,7 @@ fn xiph_range_resumes_each_octet_and_checks_cancellation_when_cached() {
     assert!(matches!(
         job.step_descriptors(&mut WorkBudget::new(32), &running)
             .unwrap(),
-        ParseStep::Event(())
+        ParseStep::Event(_)
     ));
     for _ in 0..3 {
         assert!(
@@ -110,7 +110,7 @@ fn lace_job_resumes_descriptors_and_exposes_checked_source_ranges() {
                 .unwrap()
             {
                 ParseStep::Yield => (),
-                ParseStep::Event(()) => {
+                ParseStep::Event(_) => {
                     completed = true;
                     break;
                 }

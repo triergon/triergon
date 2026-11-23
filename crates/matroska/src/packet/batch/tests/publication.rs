@@ -10,8 +10,17 @@ fn only_publication_finishes_without_work_and_retains_configuration_after_job_dr
     let generation = config.generation();
     let revision = config.revision();
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x80, b'V']).unwrap();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     let blocker = pool.reserve(pool.available()).unwrap();
     let mut work = WorkBudget::new(7);
     let packet = match job.step(&mut work, &AtomicBool::new(false)).unwrap() {
@@ -57,6 +66,7 @@ fn final_laced_group_keeps_configuration_state_and_raw_source_after_earlier_pack
     let mut job = PacketBatchJob::new(
         source,
         false,
+        None,
         0,
         1_000_000,
         config,
@@ -132,15 +142,33 @@ fn constructor_keeps_foreign_pool_rejection_and_pending_publication_cancel_owner
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&foreign, &[0x81, 0, 0, 0x80, b'V']).unwrap();
     assert!(matches!(
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool),
+        PacketBatchJob::new(
+            source,
+            true,
+            None,
+            0,
+            1_000_000,
+            config,
+            Limits::default(),
+            &pool
+        ),
         Err(Error::ForeignPool)
     ));
     assert_eq!(pool.used(), baseline);
     let config = seed_configuration(&pool, &[]);
     let source = SharedBytes::copy_from_slice(&pool, &[0x81, 0, 0, 0x80, b'V']).unwrap();
     let before = pool.used();
-    let mut job =
-        PacketBatchJob::new(source, true, 0, 1_000_000, config, Limits::default(), &pool).unwrap();
+    let mut job = PacketBatchJob::new(
+        source,
+        true,
+        None,
+        0,
+        1_000_000,
+        config,
+        Limits::default(),
+        &pool,
+    )
+    .unwrap();
     for _ in 0..6 {
         assert!(matches!(
             job.step(&mut WorkBudget::new(1), &AtomicBool::new(false))

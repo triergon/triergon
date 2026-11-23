@@ -1154,21 +1154,18 @@ impl Stream {
         self.state = State::Packet(PacketBatchJob::new(
             data,
             false,
+            Some(crate::packet::block_group::GroupLocation {
+                source: self.envelope.request().source,
+                segment_data: self.segment_data,
+                header: header.start,
+                data: header.data,
+            }),
             time,
             self.scale,
             configuration,
             self.limits,
             &self.pool,
         )?);
-        let State::Packet(job) = &mut self.state else {
-            return Err(Error::Invalid("missing installed packet batch"));
-        };
-        job.set_location(crate::packet::block_group::GroupLocation {
-            source: self.envelope.request().source,
-            segment_data: self.segment_data,
-            header: header.start,
-            data: header.data,
-        })?;
         Ok(())
     }
     // Header/Track validation and all fallibility precede this infallible

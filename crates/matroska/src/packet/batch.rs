@@ -266,12 +266,10 @@ impl TypedPacket {
             .transpose()
     }
 }
-#[derive(Debug)]
+/// Where the block's own steps stand: its header, its track, its lace and then each
+/// frame, before the packets are handed out.
+#[derive(Clone, Copy, Debug)]
 enum Phase {
-    Group,
-    Extensions,
-    StateCopy,
-    StateChange,
     Header,
     Track,
     StartLace,
@@ -364,19 +362,23 @@ impl Staged {
         slot.take().required("missing staged packet")
     }
 }
-/// Only one of these progress jobs is live at a time. Lace stays live while
-/// a frame is restored, so RestoreJob deliberately remains a separate field.
-/// This union needs no allocation of its own and keeps the pool minima.
+/// A job that must finish before the block's own steps continue: the BlockGroup's
+/// children before the Block header, the track's extensions before the lace, and a
+/// CodecState's copy and the configuration it changes before the packets are handed
+/// out. It is one inline workspace, with no allocation of its own.
+// An explicit tag byte: with the tag in a niche of the group job the frame loop ran
+// up to 0.12% more instructions.
 #[derive(Debug)]
 #[allow(
     clippy::large_enum_variant,
     reason = "variant sizes vary by target and one inline workspace preserves the packet budget"
 )]
-enum BatchWork {
+#[repr(u8)]
+enum SideJob {
+    /// No side job: the block's own steps run.
     Idle,
     Group(GroupJob),
     Extensions(TrackExtensionsJob),
-    Lace(LaceJob),
     StateCopy(StateCopyJob),
     StateChange(StateChangeJob),
 }
@@ -387,10 +389,12 @@ pub(crate) struct PacketBatchJob {
     limits: Limits,
     simple: bool,
     phase: Phase,
-    job: BatchWork,
+    side: SideJob,
+    // `None` for a block of one frame; `frames` is set once the lace is read.
+    lace: Option<LaceJob>,
+    frames: usize,
     group: Option<BlockGroupSource>,
     configuration_change: Option<Configuration>,
-    block: Option<Range<usize>>,
     duration: Option<u64>,
     reference: bool,
     discard: i64,
@@ -410,10 +414,17 @@ pub(crate) struct PacketBatchJob {
     failed: bool,
 }
 impl PacketBatchJob {
+    /// A batch over one SimpleBlock (`simple`) or BlockGroup payload; `location` is
+    /// where a BlockGroup lies in its source, when its side data is to say so.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one block's bytes, kind, place, clock, configuration and bounds"
+    )]
     #[inline(always)]
     pub(crate) fn new(
         source: SharedBytes,
         simple: bool,
+        location: Option<GroupLocation>,
         cluster_ticks: u64,
         scale: u64,
         configuration: Configuration,
@@ -421,22 +432,28 @@ impl PacketBatchJob {
         pool: &Budget,
     ) -> Result<Self> {
         validate_batch_input(&source, &configuration, limits, scale, pool)?;
-        let len = source.len();
-        let job = if simple {
-            BatchWork::Idle
+        let side = if simple {
+            SideJob::Idle
         } else {
-            BatchWork::Group(GroupJob::new(source.clone(), u64::MAX, None, limits, pool)?)
+            SideJob::Group(GroupJob::new(
+                source.clone(),
+                u64::MAX,
+                location,
+                limits,
+                pool,
+            )?)
         };
         Ok(Self {
             source,
             configuration: Some(configuration),
             limits,
             simple,
-            phase: if simple { Phase::Header } else { Phase::Group },
-            job,
+            phase: Phase::Header,
+            side,
+            lace: None,
+            frames: 0,
             group: None,
             configuration_change: None,
-            block: simple.then_some(0..len),
             duration: None,
             reference: false,
             discard: 0,
@@ -457,16 +474,6 @@ impl PacketBatchJob {
         })
     }
     #[inline(always)]
-    pub(crate) fn set_location(&mut self, location: GroupLocation) -> Result<()> {
-        if !self.simple {
-            let BatchWork::Group(job) = &mut self.job else {
-                return Err(Error::Invalid("missing group source job"));
-            };
-            job.set_location(location)?;
-        }
-        Ok(())
-    }
-    #[inline(always)]
     pub(crate) fn take_configuration_change(&mut self) -> Option<Configuration> {
         self.configuration_change.take()
     }
@@ -476,27 +483,15 @@ impl PacketBatchJob {
             .as_ref()
             .required("missing packet configuration")
     }
-    fn frame_count(&self) -> Result<usize> {
-        if (self.flags >> 1) & 3 == 0 {
-            return Ok(1);
-        }
-        let BatchWork::Lace(job) = &self.job else {
-            return Err(Error::Invalid("missing frame plan"));
-        };
-        job.frame_count().required("missing frame plan")
-    }
     fn frame_range(
         &mut self,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<Range<usize>>> {
-        if (self.flags >> 1) & 3 == 0 {
-            return Ok(Some(self.payload.clone()));
+        match &mut self.lace {
+            None => Ok(Some(self.payload.clone())),
+            Some(lace) => lace.frame_range(self.frame, work, cancel),
         }
-        let BatchWork::Lace(job) = &mut self.job else {
-            return Err(Error::Invalid("missing frame range"));
-        };
-        job.frame_range(self.frame, work, cancel)
     }
     pub(crate) fn step(
         &mut self,
@@ -543,323 +538,318 @@ impl PacketBatchJob {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<ParseStep<()>> {
-        loop {
-            check(cancel)?;
-            match self.phase {
-                Phase::Group => {
-                    let BatchWork::Group(job) = &mut self.job else {
-                        return Err(Error::Invalid("missing group source job"));
-                    };
-                    match job.step(work, cancel)? {
+        'side: loop {
+            if !matches!(self.side, SideJob::Idle) {
+                check(cancel)?;
+                match &mut self.side {
+                    SideJob::Idle => {}
+                    SideJob::Group(job) => match job.step(work, cancel)? {
                         ParseStep::Event(group) => {
-                            self.block = Some(group.block());
                             self.duration = group.duration_ticks();
                             self.reference = !group.references().is_empty();
                             self.discard = group.discard_padding_ns().unwrap_or(0);
                             self.group = Some(group);
-                            self.job = BatchWork::Idle;
-                            self.phase = Phase::Header;
+                            self.side = SideJob::Idle;
                         }
                         other => return crate::step::pending(other),
-                    }
-                }
-                Phase::Extensions => {
-                    let BatchWork::Extensions(job) = &mut self.job else {
-                        return Err(Error::Invalid("missing track extension job"));
-                    };
-                    match job.step_job(work, cancel)? {
+                    },
+                    SideJob::Extensions(job) => match job.step_job(work, cancel)? {
                         ParseStep::Event(extensions) => {
-                            self.live_configuration()?.validate_additions(
-                                self.track,
-                                self.group.as_ref().required("missing source group")?,
-                                &extensions,
-                            )?;
-                            self.job = BatchWork::Idle;
-                            self.phase = Phase::StartLace;
+                            // Extensions are read for a group that carries additions.
+                            if let Some(group) = &self.group {
+                                self.live_configuration()?.validate_additions(
+                                    self.track,
+                                    group,
+                                    &extensions,
+                                )?;
+                            }
+                            self.side = SideJob::Idle;
                         }
                         other => return crate::step::pending(other),
-                    }
-                }
-                Phase::StateCopy => {
-                    let BatchWork::StateCopy(job) = &mut self.job else {
-                        return Err(Error::Invalid("missing state copy job"));
-                    };
-                    match job.step(work, cancel)? {
+                    },
+                    SideJob::StateCopy(job) => match job.step(work, cancel)? {
                         ParseStep::Event(state) => {
-                            self.job = BatchWork::StateChange(StateChangeJob::new(
+                            self.side = SideJob::StateChange(StateChangeJob::new(
                                 self.live_configuration()?.clone(),
                                 self.track,
                                 Some(state),
                                 self.live_configuration()?.budget(),
                             )?);
-                            self.phase = Phase::StateChange;
                         }
                         other => return crate::step::pending(other),
-                    }
-                }
-                Phase::StateChange => {
-                    let BatchWork::StateChange(job) = &mut self.job else {
-                        return Err(Error::Invalid("missing state change job"));
-                    };
-                    match job.step(work, cancel)? {
+                    },
+                    SideJob::StateChange(job) => match job.step(work, cancel)? {
                         ParseStep::Event(configuration) => {
                             self.configuration = Some(configuration.clone());
                             self.configuration_change = Some(configuration);
-                            self.job = BatchWork::Idle;
-                            self.phase = Phase::Publish;
+                            self.side = SideJob::Idle;
                             // All laces, checksums and configuration allocations
                             // succeeded before this transaction handoff.
                             return Ok(ParseStep::Yield);
                         }
                         other => return crate::step::pending(other),
-                    }
+                    },
                 }
-                Phase::Header => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                continue;
+            }
+            // The block's own steps: the frame loop dispatches on `phase` alone and
+            // leaves only when a step starts a side job.
+            loop {
+                check(cancel)?;
+                match self.phase {
+                    Phase::Header => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let block = match &self.group {
+                            Some(group) => group.block(),
+                            None => 0..self.source.len(),
+                        };
+                        let b = &self.source[block.clone()];
+                        let prefix = block_prefix(b)?;
+                        self.number = prefix.number;
+                        self.offset = prefix.offset;
+                        self.flags = prefix.flags;
+                        self.payload = block
+                            .start
+                            .checked_add(prefix.payload_start)
+                            .ok_or(Error::Overflow)?
+                            ..block.end;
+                        self.phase = Phase::Track;
                     }
-                    let block = self.block.as_ref().required("BlockGroup without Block")?;
-                    let b = &self.source[block.clone()];
-                    let prefix = block_prefix(b)?;
-                    self.number = prefix.number;
-                    self.offset = prefix.offset;
-                    self.flags = prefix.flags;
-                    self.payload = block
-                        .start
-                        .checked_add(prefix.payload_start)
-                        .ok_or(Error::Overflow)?..block.end;
-                    self.phase = Phase::Track;
-                }
-                Phase::Track => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let Some(track) =
-                        block_track(self.live_configuration()?, self.track, self.number)?
-                    else {
-                        self.track += 1;
-                        continue;
-                    };
-                    validate_track_lacing(self.flags, track)?;
-                    if self
-                        .group
-                        .as_ref()
-                        .is_some_and(|group| group.max_addition_id() != 0)
-                    {
-                        self.job = BatchWork::Extensions(
-                            self.live_configuration()?
-                                .track_extensions_job(self.track, self.limits)?,
-                        );
-                        self.phase = Phase::Extensions;
-                    } else {
-                        self.phase = Phase::StartLace;
-                    }
-                }
-                Phase::StartLace => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let mode = (self.flags >> 1) & 3;
-                    if mode == 0 {
-                        self.phase = Phase::Reserve;
-                    } else {
-                        self.job = BatchWork::Lace(LaceJob::new(
-                            self.source.clone(),
-                            self.payload.clone(),
-                            mode,
-                        )?);
-                        self.phase = Phase::Lace;
-                    }
-                }
-                Phase::Lace => {
-                    let BatchWork::Lace(job) = &mut self.job else {
-                        return Err(Error::Invalid("missing lace job"));
-                    };
-                    match job.step_descriptors(work, cancel)? {
-                        ParseStep::Event(()) => self.phase = Phase::Reserve,
-                        other => return crate::step::pending(other),
-                    }
-                }
-                Phase::Reserve => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let frames = self.frame_count()?;
-                    if frames != 1 {
-                        let mut staged = BudgetVec::new(self.live_configuration()?.budget());
-                        staged.try_reserve_exact(frames)?;
-                        self.staged = Staged::Laced(staged);
-                    }
-                    self.phase = Phase::StartFrame;
-                }
-                Phase::StartFrame => {
-                    let frames = self.frame_count()?;
-                    if self.frame == frames {
-                        self.source = SharedBytes::default();
-                        self.job = BatchWork::Idle;
-                        if let Some(group) = self
+                    Phase::Track => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let Some(track) =
+                            block_track(self.live_configuration()?, self.track, self.number)?
+                        else {
+                            self.track += 1;
+                            continue;
+                        };
+                        validate_track_lacing(self.flags, track)?;
+                        if self
                             .group
                             .as_ref()
-                            .filter(|group| group.codec_state().is_some())
+                            .is_some_and(|group| group.max_addition_id() != 0)
                         {
-                            self.job = BatchWork::StateCopy(StateCopyJob::new(
-                                group,
-                                self.limits.block_bytes,
-                                self.live_configuration()?.budget(),
-                            )?);
-                            self.phase = Phase::StateCopy;
-                        } else {
-                            self.phase = Phase::Publish;
+                            self.side = SideJob::Extensions(
+                                self.live_configuration()?
+                                    .track_extensions_job(self.track, self.limits)?,
+                            );
+                            self.phase = Phase::StartLace;
+                            continue 'side;
                         }
-                        continue;
+                        self.phase = Phase::StartLace;
                     }
-                    let Some(range) = self.frame_range(work, cancel)? else {
-                        return Ok(ParseStep::Yield);
-                    };
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                    Phase::StartLace => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let mode = (self.flags >> 1) & 3;
+                        if mode == 0 {
+                            self.frames = 1;
+                            self.phase = Phase::Reserve;
+                        } else {
+                            self.lace = Some(LaceJob::new(
+                                self.source.clone(),
+                                self.payload.clone(),
+                                mode,
+                            )?);
+                            self.phase = Phase::Lace;
+                        }
                     }
-                    let track = &self.live_configuration()?.tracks()[self.track];
-                    let laced = frames != 1;
-                    let plain = scan_track_is_plain(track);
-                    if !laced && plain {
-                        // Exactly RestorePlan::identity's immutable source view.
-                        // The same one-unit StartFrame admission and subsequent
-                        // loop cancellation/Store work gate remain in force.
-                        self.ready = Some(std::mem::take(&mut self.source).into_slice(range)?);
-                        self.phase = Phase::Store;
-                        continue;
+                    Phase::Lace => match &mut self.lace {
+                        Some(lace) => match lace.step_descriptors(work, cancel)? {
+                            ParseStep::Event(frames) => {
+                                self.frames = frames;
+                                self.phase = Phase::Reserve;
+                            }
+                            other => return crate::step::pending(other),
+                        },
+                        None => self.phase = Phase::Reserve,
+                    },
+                    Phase::Reserve => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let frames = self.frames;
+                        if frames != 1 {
+                            let mut staged = BudgetVec::new(self.live_configuration()?.budget());
+                            staged.try_reserve_exact(frames)?;
+                            self.staged = Staged::Laced(staged);
+                        }
+                        self.phase = Phase::StartFrame;
                     }
-                    let limit = if laced {
-                        self.limits
-                            .block_bytes
-                            .checked_sub(self.decoded_capacity)
-                            .ok_or(Error::Policy("decoded laced block bytes"))?
-                    } else {
-                        self.limits.block_bytes
-                    };
-                    let size = range.len();
-                    if plain
-                        && size <= limit.min(COPY_CHUNK_BYTES)
-                        && work.remaining() >= size as u64 + 3
-                        && let Some(input) = self.source.get(range.clone())
-                    {
-                        check(cancel)?;
-                        if let Ok(bytes) =
-                            Bytes::copy_from_slice(self.live_configuration()?.budget(), input)
-                        {
-                            // Charge transform admission, reserve, bytes and freeze.
-                            // Each lace still owns exactly its restored payload.
-                            work.take(size as u64 + 3);
-                            self.ready = Some(SharedBytes::from_core(bytes));
+                    Phase::StartFrame => {
+                        let frames = self.frames;
+                        if self.frame == frames {
+                            self.source = SharedBytes::default();
+                            self.lace = None;
+                            if let Some(group) = self
+                                .group
+                                .as_ref()
+                                .filter(|group| group.codec_state().is_some())
+                            {
+                                self.side = SideJob::StateCopy(StateCopyJob::new(
+                                    group,
+                                    self.limits.block_bytes,
+                                    self.live_configuration()?.budget(),
+                                )?);
+                                self.phase = Phase::Publish;
+                                continue 'side;
+                            }
+                            self.phase = Phase::Publish;
+                            continue;
+                        }
+                        let Some(range) = self.frame_range(work, cancel)? else {
+                            return Ok(ParseStep::Yield);
+                        };
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let track = &self.live_configuration()?.tracks()[self.track];
+                        let laced = frames != 1;
+                        let plain = scan_track_is_plain(track);
+                        if !laced && plain {
+                            // Exactly RestorePlan::identity's immutable source view.
+                            // The same one-unit StartFrame admission and subsequent
+                            // loop cancellation/Store work gate remain in force.
+                            self.ready = Some(std::mem::take(&mut self.source).into_slice(range)?);
                             self.phase = Phase::Store;
                             continue;
                         }
-                    }
-                    let plan = if let Some(decoder) = &track.packet_decoder {
-                        RestorePlan::from_decoder(decoder)
-                            .borrow_single_stored(!laced && decoder.is_zlib_only())
-                    } else {
-                        RestorePlan::header(track.packet_prefix.clone())
-                    };
-                    self.restore = Some(RestoreJob::new(
-                        self.source.slice(range)?,
-                        plan,
-                        self.limits,
-                        limit,
-                        self.live_configuration()?.budget(),
-                    )?);
-                    self.phase = Phase::Frame;
-                }
-                Phase::Frame => match self
-                    .restore
-                    .as_mut()
-                    .required("missing frame restore")?
-                    .step(work, cancel)?
-                {
-                    ParseStep::Event(bytes) => {
-                        self.ready = Some(bytes);
-                        self.restore = None;
-                        self.phase = Phase::Store;
-                    }
-                    other => return crate::step::pending(other),
-                },
-                Phase::Store => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let frames = self.frame_count()?;
-                    let track = &self.live_configuration()?.tracks()[self.track];
-                    let storage = self.ready.as_ref().required("missing restored frame")?;
-                    let capacity = if frames != 1 {
-                        self.decoded_capacity
-                            .checked_add(storage.retained_capacity())
-                            .ok_or(Error::Overflow)?
-                    } else {
-                        0
-                    };
-                    validate_decoded_capacity(capacity, self.limits.block_bytes)?;
-                    let fields = FrameParameters {
-                        cluster_ticks: self.cluster_ticks,
-                        offset: self.offset,
-                        scale: self.scale,
-                        duration_ticks: self.duration,
-                        frame: self.frame as u16,
-                        frames: frames as u16,
-                    }
-                    .fields(
-                        self.track,
-                        track,
-                        if self.simple {
-                            self.flags & 0x80 != 0
+                        let limit = if laced {
+                            self.limits
+                                .block_bytes
+                                .checked_sub(self.decoded_capacity)
+                                .ok_or(Error::Policy("decoded laced block bytes"))?
                         } else {
-                            !self.reference
-                        },
-                        self.discard,
-                    )?;
-                    self.staged.prepare()?;
-                    // Timing, limits and capacity are now validated. Consume
-                    // the handle without an Arc clone/drop pair.
-                    let storage = self.ready.take().required("missing restored frame")?;
-                    let range = 0..storage.len();
-                    let mut packet = Some(fields.finish(PacketData { storage, range }));
-                    if let Err(error) = self.staged.push(&mut packet) {
-                        // A core rejection returns the exact uncommitted value;
-                        // keep the same restored owner pending for retry.
-                        self.ready = packet.map(|packet| packet.data.storage);
-                        return Err(error);
+                            self.limits.block_bytes
+                        };
+                        let size = range.len();
+                        if plain
+                            && size <= limit.min(COPY_CHUNK_BYTES)
+                            && work.remaining() >= size as u64 + 3
+                            && let Some(input) = self.source.get(range.clone())
+                        {
+                            check(cancel)?;
+                            if let Ok(bytes) =
+                                Bytes::copy_from_slice(self.live_configuration()?.budget(), input)
+                            {
+                                // Charge transform admission, reserve, bytes and freeze.
+                                // Each lace still owns exactly its restored payload.
+                                work.take(size as u64 + 3);
+                                self.ready = Some(SharedBytes::from_core(bytes));
+                                self.phase = Phase::Store;
+                                continue;
+                            }
+                        }
+                        let plan = if let Some(decoder) = &track.packet_decoder {
+                            RestorePlan::from_decoder(decoder)
+                                .borrow_single_stored(!laced && decoder.is_zlib_only())
+                        } else {
+                            RestorePlan::header(track.packet_prefix.clone())
+                        };
+                        self.restore = Some(RestoreJob::new(
+                            self.source.slice(range)?,
+                            plan,
+                            self.limits,
+                            limit,
+                            self.live_configuration()?.budget(),
+                        )?);
+                        self.phase = Phase::Frame;
                     }
-                    self.decoded_capacity = capacity;
-                    self.frame += 1;
-                    self.phase = Phase::StartFrame;
-                }
-                Phase::Publish => {
-                    if self.publish == self.staged.len() {
-                        self.phase = Phase::Done;
-                        continue;
+                    Phase::Frame => match self
+                        .restore
+                        .as_mut()
+                        .required("missing frame restore")?
+                        .step(work, cancel)?
+                    {
+                        ParseStep::Event(bytes) => {
+                            self.ready = Some(bytes);
+                            self.restore = None;
+                            self.phase = Phase::Store;
+                        }
+                        other => return crate::step::pending(other),
+                    },
+                    Phase::Store => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let frames = self.frames;
+                        let track = &self.live_configuration()?.tracks()[self.track];
+                        let storage = self.ready.as_ref().required("missing restored frame")?;
+                        let capacity = if frames != 1 {
+                            self.decoded_capacity
+                                .checked_add(storage.retained_capacity())
+                                .ok_or(Error::Overflow)?
+                        } else {
+                            0
+                        };
+                        validate_decoded_capacity(capacity, self.limits.block_bytes)?;
+                        let fields = FrameParameters {
+                            cluster_ticks: self.cluster_ticks,
+                            offset: self.offset,
+                            scale: self.scale,
+                            duration_ticks: self.duration,
+                            frame: self.frame as u16,
+                            frames: frames as u16,
+                        }
+                        .fields(
+                            self.track,
+                            track,
+                            if self.simple {
+                                self.flags & 0x80 != 0
+                            } else {
+                                !self.reference
+                            },
+                            self.discard,
+                        )?;
+                        self.staged.prepare()?;
+                        // Timing, limits and capacity are now validated. Consume
+                        // the handle without an Arc clone/drop pair.
+                        let storage = self.ready.take().required("missing restored frame")?;
+                        let range = 0..storage.len();
+                        let mut packet = Some(fields.finish(PacketData { storage, range }));
+                        if let Err(error) = self.staged.push(&mut packet) {
+                            // A core rejection returns the exact uncommitted value;
+                            // keep the same restored owner pending for retry.
+                            self.ready = packet.map(|packet| packet.data.storage);
+                            return Err(error);
+                        }
+                        self.decoded_capacity = capacity;
+                        self.frame += 1;
+                        self.phase = Phase::StartFrame;
                     }
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    if let Some(cutoff) = prefix {
-                        let packet = self.staged.peek(self.publish)?;
-                        let kind = self.live_configuration()?.tracks()[packet.track].kind;
-                        // Consumer recovery selection at the real replay input
-                        // boundary. Every subtitle packet in this prefix is kept,
-                        // including known ends before the cutoff. This is not a visibility test:
-                        // None and every source timestamp/duration stay intact.
-                        let keep = keep_recovery_packet(kind, packet, cutoff)?;
-                        if !keep {
-                            drop(self.staged.take(self.publish)?);
-                            self.publish += 1;
+                    Phase::Publish => {
+                        if self.publish == self.staged.len() {
+                            self.phase = Phase::Done;
                             continue;
                         }
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        if let Some(cutoff) = prefix {
+                            let packet = self.staged.peek(self.publish)?;
+                            let kind = self.live_configuration()?.tracks()[packet.track].kind;
+                            // Consumer recovery selection at the real replay input
+                            // boundary. Every subtitle packet in this prefix is kept,
+                            // including known ends before the cutoff. This is not a visibility test:
+                            // None and every source timestamp/duration stay intact.
+                            let keep = keep_recovery_packet(kind, packet, cutoff)?;
+                            if !keep {
+                                drop(self.staged.take(self.publish)?);
+                                self.publish += 1;
+                                continue;
+                            }
+                        }
+                        self.phase = Phase::Ready;
+                        return Ok(ParseStep::Event(()));
                     }
-                    self.phase = Phase::Ready;
-                    return Ok(ParseStep::Event(()));
+                    Phase::Ready => return Ok(ParseStep::Event(())),
+                    Phase::Done => return Ok(ParseStep::Finished),
                 }
-                Phase::Ready => return Ok(ParseStep::Event(())),
-                Phase::Done => return Ok(ParseStep::Finished),
             }
         }
     }
@@ -912,13 +902,15 @@ impl PacketBatchJob {
     }
 }
 
+// At most one of the side job and the lace is live: the same slots as one job.
 crate::storage::usage::storage!(PacketBatchJob, |s| [
     s.source,
     s.configuration,
     s.staged,
     s.restore,
     s.ready,
-    s.job,
+    s.side,
+    s.lace,
     s.group,
     s.configuration_change
 ]);
@@ -942,13 +934,12 @@ impl crate::storage::usage::Storage for Staged {
 
 // An inline union owns only its active variant. Every nested unique allocation
 // and shared retained owner still joins the same bounded deduplication proof.
-impl crate::storage::usage::Storage for BatchWork {
+impl crate::storage::usage::Storage for SideJob {
     fn storage_slots(&self) -> Result<usize> {
         match self {
             Self::Idle => Ok(0),
             Self::Group(job) => crate::storage::usage::Storage::storage_slots(job),
             Self::Extensions(job) => crate::storage::usage::Storage::storage_slots(job),
-            Self::Lace(job) => crate::storage::usage::Storage::storage_slots(job),
             Self::StateCopy(job) => crate::storage::usage::Storage::storage_slots(job),
             Self::StateChange(job) => crate::storage::usage::Storage::storage_slots(job),
         }
@@ -958,7 +949,6 @@ impl crate::storage::usage::Storage for BatchWork {
             Self::Idle => Ok(None),
             Self::Group(job) => crate::storage::usage::Storage::storage_owner(job, index),
             Self::Extensions(job) => crate::storage::usage::Storage::storage_owner(job, index),
-            Self::Lace(job) => crate::storage::usage::Storage::storage_owner(job, index),
             Self::StateCopy(job) => crate::storage::usage::Storage::storage_owner(job, index),
             Self::StateChange(job) => crate::storage::usage::Storage::storage_owner(job, index),
         }

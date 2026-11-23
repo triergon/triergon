@@ -462,11 +462,6 @@ impl GroupJob {
             failed: false,
         })
     }
-    pub(crate) fn set_location(&mut self, location: GroupLocation) -> Result<()> {
-        location.validate(self.raw.len())?;
-        self.location = Some(location);
-        Ok(())
-    }
     fn queue(&mut self, pending: Pending) -> Result<()> {
         let count = self
             .additions
