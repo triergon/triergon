@@ -155,12 +155,20 @@ impl FramePool {
             .filter(|f| f.same_geometry(width, height))
     }
 
-    fn put(&self, frame: AnyFrame) {
-        fn keep<P>(slot: &Mutex<Option<Frame<P>>>, frame: Frame<P>) {
+    fn put(&self, frame: &mut AnyFrame) {
+        fn keep<P>(slot: &Mutex<Option<Frame<P>>>, frame: &mut Frame<P>) {
             if let Ok(mut spare) = slot.lock()
                 && spare.is_none()
             {
-                *spare = Some(frame);
+                *spare = Some(Frame {
+                    planes: frame.planes.each_mut().map(|plane| {
+                        let empty = BudgetVec::new(plane.data.budget());
+                        Plane {
+                            data: std::mem::replace(&mut plane.data, empty),
+                            ..*plane
+                        }
+                    }),
+                });
             }
         }
         match frame {
@@ -173,15 +181,14 @@ impl FramePool {
 /// A frame shared by the DPB and the output pictures that show it.
 #[derive(Debug)]
 pub(crate) struct SharedFrame {
-    /// Taken only by `drop`.
-    frame: Option<AnyFrame>,
+    frame: AnyFrame,
     pool: Weak<FramePool>,
 }
 
 impl SharedFrame {
     pub(crate) fn new(frame: AnyFrame, pool: &Arc<FramePool>) -> Arc<Self> {
         Arc::new(SharedFrame {
-            frame: Some(frame),
+            frame,
             pool: Arc::downgrade(pool),
         })
     }
@@ -192,15 +199,14 @@ impl core::ops::Deref for SharedFrame {
 
     #[inline]
     fn deref(&self) -> &AnyFrame {
-        #[expect(clippy::expect_used, reason = "only drop takes the frame")]
-        self.frame.as_ref().expect("frame present until dropped")
+        &self.frame
     }
 }
 
 impl Drop for SharedFrame {
     fn drop(&mut self) {
-        if let (Some(frame), Some(pool)) = (self.frame.take(), self.pool.upgrade()) {
-            pool.put(frame);
+        if let Some(pool) = self.pool.upgrade() {
+            pool.put(&mut self.frame);
         }
     }
 }
