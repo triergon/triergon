@@ -25,7 +25,7 @@
         "mp4"
       ],
       "expected": {
-        "trace_sha256": "db71b3e0c700b22b1e6ad5421fe7803bb4a09ddedee7650f503021ce92d8558d"
+        "trace_sha256": "48cf85a3a8f1f9771d618694362fdc3c92c8a11341a447eb9c2810d7a53c288e"
       }
     },
     {

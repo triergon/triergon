@@ -82,16 +82,13 @@ def views_smoke(path):
     return [f"3 {len(data)} {zlib.adler32(data)}"]
 
 
-def facade_source_control(path, container):
+def facade_source_control(path, _container):
     """The source capabilities and failure responses promised by ContainerReader."""
     size = path.stat().st_size
     rows = []
     for length in (0, size):
-        if container == "mp4":
-            rows.append(f"3 {length} 0")
-        else:
-            rows.extend((f"1 {length} 0", f"2 {length} 0"))
-        rows.extend((f"1 {length} 1", f"2 {length} 1"))
+        for random_access in (0, 1):
+            rows.extend(f"{kind} {length} {random_access}" for kind in (1, 2))
     return rows
 
 

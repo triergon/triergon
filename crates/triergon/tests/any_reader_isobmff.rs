@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicBool;
 use triergon::{
     AnyOther, AnyPacket, AnyReader, Budget, CodecId, ContainerReader, Error, Event, MediaKind,
     PacketInfo, SeekPolicy, SeekRequest, SourceCapabilities, SourceId, Step, Time, TrackId,
-    WorkBudget, isobmff::ReaderEvent,
+    WorkBudget, isobmff::ReaderEvent, open_blocking, open_sequential,
 };
 
 const FILE: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-config/creation-all.mp4");
@@ -85,14 +85,45 @@ fn any_reader_seeks_isobmff() {
 }
 
 #[test]
-fn a_forward_only_isobmff_source_is_refused_at_open() {
-    let pool = Budget::new(1 << 20).unwrap();
-    let forward = SourceCapabilities {
-        length: None,
-        random_access: false,
-    };
-    assert!(matches!(
-        AnyReader::open(&FILE[..16], &pool, SourceId(1), forward),
-        Err(Error::Unsupported(_))
-    ));
+fn a_sequential_isobmff_source_delivers_the_packets_of_a_seekable_one() {
+    // The movie box first: one file with its samples in one `mdat`, one in fragments.
+    for file in [
+        &include_bytes!("../../isobmff/tests/fixtures/r-multitrack.mov")[..],
+        &include_bytes!("../../isobmff/tests/fixtures/f-multitrack.mp4")[..],
+    ] {
+        let pool = Budget::new(16 << 20).unwrap();
+        let mut seekable = open_blocking(std::io::Cursor::new(file), &pool).unwrap();
+        let mut pipe = open_sequential(file, &pool).unwrap();
+        assert_eq!(
+            pipe.reader().capabilities(),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            }
+        );
+        let mut packets = 0;
+        while let Some(expected) = seekable.next_packet().unwrap() {
+            let packet = pipe.next_packet().unwrap().unwrap();
+            assert_eq!(packet.track(), expected.track());
+            assert_eq!(packet.pts(), expected.pts());
+            assert_eq!(packet.dts(), expected.dts());
+            assert_eq!(packet.payload(), expected.payload());
+            packets += 1;
+        }
+        assert!(pipe.next_packet().unwrap().is_none());
+        assert_eq!(packets, 12);
+    }
+}
+
+#[test]
+fn media_before_the_movie_is_refused_on_a_sequential_source() {
+    // `FILE` holds `mdat` before `moov`: only a source that can go back reads it.
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut seekable = open_blocking(std::io::Cursor::new(FILE), &pool).unwrap();
+    assert!(seekable.next_packet().unwrap().is_some());
+    let mut pipe = open_sequential(FILE, &pool).unwrap();
+    assert_eq!(
+        pipe.next_packet().unwrap_err(),
+        Error::Unsupported("progressive MP4 needs front metadata")
+    );
 }

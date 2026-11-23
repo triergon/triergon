@@ -159,9 +159,8 @@ impl AnyReader {
     /// ([`probe`]).
     ///
     /// Fails with [`Error::Unsupported`] when the prefix selects no format, including one
-    /// [`probe`] needs more bytes of, a format whose reader feature is not enabled, or ISO
-    /// BMFF on a source without random access; and with the reader's error when the budget
-    /// cannot hold its state.
+    /// [`probe`] needs more bytes of, or a format whose reader feature is not enabled; and
+    /// with the reader's error when the budget cannot hold its state.
     // Out of line: inlined, the probe's code cost a caller's packet loop around it up to
     // 0.065% of its instructions (subtitle worker, Matroska inputs).
     #[inline(never)]

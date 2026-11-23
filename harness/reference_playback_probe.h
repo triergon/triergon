@@ -154,11 +154,79 @@ static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mod
     return score;
 }
 
+/* An ISO BMFF movie read from a sequential source: the MOV demuxer over a context that
+ * cannot seek, without parsers, timestamp fill-in or edit lists, so that its packets are
+ * the samples and its times the media clock, as the facade's reader states them. Folds
+ * `5 id numerator denominator` for each stream's track_ID and time base, `4 id size pts
+ * dts` with the payload for each packet, and `6 status`: 0 where the demuxer read to the
+ * end of the source, 1 where it refused the input or a read failed. */
+static int playback_probe_movie(const ViewCase *input, const PlaybackProbeCase *probe,
+                                const AVInputFormat *format, ViewWork *work)
+{
+    PlaybackProbeInput source = {input->data, probe->length, 0, probe->window};
+    const int buffer_size = 4096;
+    uint8_t *buffer = av_malloc(buffer_size);
+    AVIOContext *io = buffer ? avio_alloc_context(buffer, buffer_size, 0, &source,
+                                                  playback_probe_read, NULL, NULL) : NULL;
+    AVFormatContext *movie = avformat_alloc_context();
+    AVPacket *packet = av_packet_alloc();
+    AVDictionary *options = NULL;
+    int result = 2;
+    if (!io || !movie || !packet || av_dict_set(&options, "ignore_editlist", "1", 0) < 0)
+        goto done;
+    movie->pb = io;
+    movie->flags |= AVFMT_FLAG_NOPARSE | AVFMT_FLAG_NOFILLIN;
+    /* A refused input frees the context. */
+    int status = avformat_open_input(&movie, "", format, &options);
+    if (status >= 0) {
+        for (unsigned i = 0; i < movie->nb_streams; ++i) {
+            const AVStream *stream = movie->streams[i];
+            const uint64_t words[] = {(uint64_t)stream->id, (uint64_t)stream->time_base.num,
+                                      (uint64_t)stream->time_base.den};
+            view_record(work, 5, words, 3, NULL, 0);
+            if (work->trace)
+                printf("5 %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", words[0], words[1], words[2]);
+        }
+        while ((status = av_read_frame(movie, packet)) >= 0) {
+            const uint64_t words[] = {(uint64_t)movie->streams[packet->stream_index]->id,
+                                      (uint64_t)packet->size, (uint64_t)packet->pts,
+                                      (uint64_t)packet->dts};
+            view_record(work, 4, words, 4, packet->data, (size_t)packet->size);
+            if (work->trace)
+                printf("4 %" PRIu64 " %" PRIu64 " %" PRIu64 " %" PRIu64 "\n", words[0],
+                       words[1], words[2], words[3]);
+            av_packet_unref(packet);
+        }
+        if (status == AVERROR_EOF)
+            status = 0;
+    }
+    const uint64_t ended = status < 0;
+    view_record(work, 6, &ended, 1, NULL, 0);
+    if (work->trace) {
+        printf("6 %" PRIu64 "\n", ended);
+        if (status < 0)
+            fprintf(stderr, "movie read ended: %s\n", av_err2str(status));
+    }
+    result = 0;
+done:
+    av_dict_free(&options);
+    av_packet_free(&packet);
+    avformat_close_input(&movie);
+    if (io) {
+        av_freep(&io->buffer);
+        avio_context_free(&io);
+    } else {
+        av_free(buffer);
+    }
+    return result;
+}
+
 /* Bytes mode folds `3 verdict width retry`: for the whole input the opener's selection
  * (retry 0); for a shorter prefix the best-scoring format of av_probe_input_format3 and
  * whether its score is at most AVPROBE_SCORE_RETRY, at which the public header
  * recommends a retry with a larger probe buffer. Every other mode opens the prefix as a
- * whole stream and folds `3 verdict width replay [length [md5]]`. */
+ * whole stream and folds `3 verdict width replay [length [md5]]`; a sequential source
+ * the opener names ISO BMFF is then read as a movie. */
 static int playback_probe_run(const ViewCase *input, ViewWork *work)
 {
     const PlaybackProbeCase *probe = input->prepared;
@@ -219,6 +287,8 @@ static int playback_probe_run(const ViewCase *input, ViewWork *work)
         fprintf(stderr, "probe %s name=%s score=%d\n", prefix ? "prefix" : "opener", name,
                 score);
     }
+    if (probe->mode == PROBE_SEQUENTIAL && verdict == 6)
+        return playback_probe_movie(input, probe, format, work);
     return 0;
 }
 

@@ -26,7 +26,9 @@ pub fn open_blocking<S: Read + Seek>(
 /// The reader sees a pipe with unknown length and no random access, as `SourceId(1)`.
 ///
 /// Returns an error if the budget cannot hold the probe or reader, reading fails,
-/// or the prefix cannot select an enabled reader that supports sequential input.
+/// or the prefix selects no enabled reader. What a reader cannot read without going
+/// back, such as an ISO BMFF file whose media precedes its movie box, fails when it
+/// is reached.
 pub fn open_sequential<S: Read>(
     mut source: S,
     pool: &Budget,

@@ -191,10 +191,34 @@ across windows use a bounded packet buffer.
 
 ## Container reader
 
-`Reader::new` takes a seekable source, runs `open::MovieOpen` over it and then
-delivers samples in ascending byte order across tracks, each track in decode order.
-It retains `moov` and each `moof` under `ReaderLimits` (largest sample 64 MiB by
-default) and shares a sample's window where the whole sample fits in one.
+`Reader::new` runs `open::MovieOpen` over the source and then delivers samples in
+ascending byte order across tracks, each track in decode order. It reads under
+`ReaderLimits` (largest sample 64 MiB by default) and shares a sample's window where
+the whole sample fits in one. How it reads is chosen once, from the source's
+capabilities:
+
+| Source | The open reads | Samples are read |
+|---|---|---|
+| With random access | every root box, wherever `moov` lies; `moov` and each `moof` are retained | by a range request each |
+| Without (a pipe) | through the header of the first `mdat`, which `moov` must precede | as their bytes arrive; the bytes between two samples are passed over, and each later `moof` is indexed when the cursor reaches it |
+
+Without random access:
+
+- An `mdat` before `moov` is refused at its header
+  (`Error::Unsupported("progressive MP4 needs front metadata")`): its samples would
+  lie behind the cursor once `moov` named them. So is a `moof` before `moov`.
+- A sample that starts before the read position is
+  `Error::Unsupported("sample before the read position needs random access")`: a
+  track whose chunks go back in the file, two samples that share bytes, a fragment
+  whose samples precede its `moof`. A sample without bytes is delivered wherever the
+  cursor is.
+- A `moof` and its index are held until their samples are delivered, so memory does
+  not grow with the source, and `OpenLimits::roots` and `fragments` bound the open,
+  not the boxes after it. `Reader::media_extents` is the first `mdat`.
+- `ReaderEvent::Box` for an `mdat` follows its samples; one of size zero is passed at
+  the end of the source, which the reader reads to.
+- `request_seek` fails with the cursor's `Error::Unsupported("random-access input")`
+  and delivery goes on. `reset` restarts at offset zero.
 
 | Neutral item | ISO BMFF source |
 |---|---|
@@ -221,7 +245,6 @@ own decode and presentation clocks.
 
 Limits of the reader:
 
-- Forward-only sources are refused, because `mdat` can precede the metadata.
 - Edit lists are not applied: times are media times and the list is on
   `Track::edits`. `compat::mov` gives FFmpeg's edited packets.
 - `TrackInfo` describes the first sample entry; `Packet::sample` names each

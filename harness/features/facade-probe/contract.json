@@ -9,7 +9,7 @@
     "Probe the supplied prefix as bytes, and open it through the seekable and sequential adapters with the same read quantum as the reference AVIO callback. Use the FFmpeg 9.0.2 decode profile.",
     "Bytes mode: a whole input is decided by triergon::probe_whole and by the format the reference's opener selects (av_probe_input_buffer2 over a non-seekable stream that ends with the input, at the default probe size); a shorter prefix by triergon::probe and the best-scoring format of av_probe_input_format3 over the zero-padded prefix whatever its score. Fold kind 3, the verdict (0 none, 1 FLAC, 2 MPEG audio, 3 ADTS, 4 AC-3 family, 5 Matroska, 6 ISO BMFF, 7 Ogg, 8 MPEG-TS), the carrier width, and 1 when the side asks for more bytes (the facade's Need, a reference score at most AVPROBE_SCORE_RETRY), else 0. FFmpeg names MPEG-TS without a packet spacing; for that verdict the reference worker folds the spacing the sync bytes of the first three packets inside the input follow, 0 if both or neither do.",
     "Adapters: both sides read the prefix as a whole stream through EOF. The facade decides with probe while bytes arrive and with probe_whole at the end; the reference opener probes at most 64 KiB, the facade's documented limit. Fold kind 3, the verdict, width 0 and replay presence; for an opened source read every byte back through EOF, check it against the prefix and fold its length. Report the bytes consumed before handoff as a trace diagnostic.",
-    "On a sequential source the reference folds what its MOV demuxer does, a replay of every byte. The facade refuses ISO BMFF there after the eight-byte signature; the candidate checks that exact construction error and folds verdict 6, no replay and refusal code 1.",
+    "A sequential source both sides name ISO BMFF is then read as a movie through the adapter: the facade's reader on a source without random access, the reference's MOV demuxer on a context that cannot seek, without parsers, timestamp fill-in or edit lists, so that its packets are the samples and its times the media clock. Fold kind 5 with each track's track_ID and time base, kind 4 with each packet's track_ID, size, presentation time and decode time followed by its bytes, and kind 6 with 0 where the source was read to its end and 1 where the read was refused or failed.",
     "No standard decides how much of a prefix a probe needs, which of two signatures wins, whether a probe searches for a displaced sync grid, or whether it names a format before it is sure: such a difference is entered by its cause with the rule each side follows. A deviation is entered only where the wire syntax decides that the input is not the format the reference names."
   ],
   "required_profiles": [
@@ -28081,1783 +28081,6 @@
       "cause": "collect on isolated AArch64 and ARMv7 gate hosts after parity triage"
     }
   ],
-  "pending_module_requirements": [
-    "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-  ],
-  "open_cases": [
-    {
-      "id": "sequential-101-avc-aac-program-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-101-avc-aac-program-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-101-avc-aac-program-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-101-avc-aac-program-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-101-avc-aac-program-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-101-avc-aac-program-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-102-avc-aac-quicktime-7-1-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-102-avc-aac-quicktime-7-1-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-102-avc-aac-quicktime-7-1-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-102-avc-aac-quicktime-7-1-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-102-avc-aac-quicktime-7-1-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-102-avc-aac-quicktime-7-1-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-103-avc-aac-quicktime-fragmented-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-103-avc-aac-quicktime-fragmented-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-103-avc-aac-quicktime-fragmented-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-103-avc-aac-quicktime-fragmented-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-103-avc-aac-quicktime-fragmented-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-103-avc-aac-quicktime-fragmented-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-104-avc-aac-quicktime-minimal-wave-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-104-avc-aac-quicktime-minimal-wave-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-104-avc-aac-quicktime-minimal-wave-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-104-avc-aac-quicktime-minimal-wave-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-104-avc-aac-quicktime-minimal-wave-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-104-avc-aac-quicktime-minimal-wave-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-105-avc-aac-quicktime-reordered-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-105-avc-aac-quicktime-reordered-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-105-avc-aac-quicktime-reordered-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-105-avc-aac-quicktime-reordered-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-105-avc-aac-quicktime-reordered-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-105-avc-aac-quicktime-reordered-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-106-avc-aac-quicktime-surround-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-106-avc-aac-quicktime-surround-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-106-avc-aac-quicktime-surround-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-106-avc-aac-quicktime-surround-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-106-avc-aac-quicktime-surround-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-106-avc-aac-quicktime-surround-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-107-avc-aac-rtp-hints-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-107-avc-aac-rtp-hints-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-107-avc-aac-rtp-hints-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-107-avc-aac-rtp-hints-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-107-avc-aac-rtp-hints-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-107-avc-aac-rtp-hints-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-108-avc-leading-edit-short-reordered-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-108-avc-leading-edit-short-reordered-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-108-avc-leading-edit-short-reordered-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-108-avc-leading-edit-short-reordered-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-108-avc-leading-edit-short-reordered-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-108-avc-leading-edit-short-reordered-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-109-avc-leading-edit-trimmed-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-109-avc-leading-edit-trimmed-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-109-avc-leading-edit-trimmed-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-109-avc-leading-edit-trimmed-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-109-avc-leading-edit-trimmed-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-109-avc-leading-edit-trimmed-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-110-avc-leading-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-110-avc-leading-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-110-avc-leading-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-110-avc-leading-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-110-avc-leading-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-110-avc-leading-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-111-avc-opus-cropped-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-111-avc-opus-cropped-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-111-avc-opus-cropped-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-111-avc-opus-cropped-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-111-avc-opus-cropped-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-111-avc-opus-cropped-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-112-avc-opus-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-112-avc-opus-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-112-avc-opus-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-112-avc-opus-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-112-avc-opus-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-112-avc-opus-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-113-avc-opus-long-roll-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-113-avc-opus-long-roll-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-113-avc-opus-long-roll-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-113-avc-opus-long-roll-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-113-avc-opus-long-roll-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-113-avc-opus-long-roll-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-114-avc-opus-rescaled-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-114-avc-opus-rescaled-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-114-avc-opus-rescaled-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-114-avc-opus-rescaled-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-114-avc-opus-rescaled-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-114-avc-opus-rescaled-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-115-avc-opus-seek-boundary-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-115-avc-opus-seek-boundary-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-115-avc-opus-seek-boundary-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-115-avc-opus-seek-boundary-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-115-avc-opus-seek-boundary-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-115-avc-opus-seek-boundary-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-116-avc-opus-trimmed-end-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-116-avc-opus-trimmed-end-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-116-avc-opus-trimmed-end-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-116-avc-opus-trimmed-end-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-116-avc-opus-trimmed-end-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-116-avc-opus-trimmed-end-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-117-avc-opus-video-composition-offset-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-117-avc-opus-video-composition-offset-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-117-avc-opus-video-composition-offset-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-117-avc-opus-video-composition-offset-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-117-avc-opus-video-composition-offset-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-117-avc-opus-video-composition-offset-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-118-avc-signed-endpoint-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-118-avc-signed-endpoint-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-118-avc-signed-endpoint-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-118-avc-signed-endpoint-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-118-avc-signed-endpoint-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-118-avc-signed-endpoint-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-119-avc-unrepresentable-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-119-avc-unrepresentable-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-119-avc-unrepresentable-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-119-avc-unrepresentable-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-119-avc-unrepresentable-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-119-avc-unrepresentable-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-120-dav1-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-120-dav1-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-120-dav1-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-120-dav1-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-120-dav1-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-120-dav1-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-121-dvh1-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-121-dvh1-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-121-dvh1-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-121-dvh1-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-121-dvh1-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-121-dvh1-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-122-dvhe-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-122-dvhe-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-122-dvhe-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-122-dvhe-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-122-dvhe-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-122-dvhe-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-124-fragmented-aac-media-clock-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-124-fragmented-aac-media-clock-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-124-fragmented-aac-media-clock-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-124-fragmented-aac-media-clock-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-124-fragmented-aac-media-clock-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-124-fragmented-aac-media-clock-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-125-fragmented-avc-aac-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-125-fragmented-avc-aac-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-125-fragmented-avc-aac-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-125-fragmented-avc-aac-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-125-fragmented-avc-aac-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-125-fragmented-avc-aac-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-126-fragmented-subtitle-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-126-fragmented-subtitle-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-126-fragmented-subtitle-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-126-fragmented-subtitle-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-126-fragmented-subtitle-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-126-fragmented-subtitle-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-127-fragmented-subtitles-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-127-fragmented-subtitles-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-127-fragmented-subtitles-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-127-fragmented-subtitles-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-127-fragmented-subtitles-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-127-fragmented-subtitles-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-128-mov-stream-shorter-than-movie-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-128-mov-stream-shorter-than-movie-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-128-mov-stream-shorter-than-movie-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-128-mov-stream-shorter-than-movie-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-128-mov-stream-shorter-than-movie-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-128-mov-stream-shorter-than-movie-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-129-mp4-init-nonkeyframe-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-129-mp4-init-nonkeyframe-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-129-mp4-init-nonkeyframe-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-129-mp4-init-nonkeyframe-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-129-mp4-init-nonkeyframe-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-129-mp4-init-nonkeyframe-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-130-regular-avc-aac-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-130-regular-avc-aac-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-130-regular-avc-aac-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-130-regular-avc-aac-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-130-regular-avc-aac-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-130-regular-avc-aac-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-131-variable-aac-duration-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-131-variable-aac-duration-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-131-variable-aac-duration-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-131-variable-aac-duration-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-131-variable-aac-duration-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-131-variable-aac-duration-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-240-encoded-avc-aac-front-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-240-encoded-avc-aac-front-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-240-encoded-avc-aac-front-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-240-encoded-avc-aac-front-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-240-encoded-avc-aac-front-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-240-encoded-avc-aac-front-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-241-encoded-avc-aac-indexed-seek-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-241-encoded-avc-aac-indexed-seek-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-241-encoded-avc-aac-indexed-seek-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-241-encoded-avc-aac-indexed-seek-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-241-encoded-avc-aac-indexed-seek-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-241-encoded-avc-aac-indexed-seek-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-242-encoded-avc-aac-native-seek-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-242-encoded-avc-aac-native-seek-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-242-encoded-avc-aac-native-seek-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-242-encoded-avc-aac-native-seek-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-242-encoded-avc-aac-native-seek-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-242-encoded-avc-aac-native-seek-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-243-encoded-hevc-aac-front-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-243-encoded-hevc-aac-front-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-243-encoded-hevc-aac-front-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-243-encoded-hevc-aac-front-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-243-encoded-hevc-aac-front-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-243-encoded-hevc-aac-front-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-244-f-ctts-v1-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-244-f-ctts-v1-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-244-f-ctts-v1-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-244-f-ctts-v1-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-244-f-ctts-v1-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-244-f-ctts-v1-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-245-f-description-change-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-245-f-description-change-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-245-f-description-change-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-245-f-description-change-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-245-f-description-change-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-245-f-description-change-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-246-f-explicit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-246-f-explicit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-246-f-explicit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-246-f-explicit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-246-f-explicit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-246-f-explicit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-247-f-multitrack-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-247-f-multitrack-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-247-f-multitrack-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-247-f-multitrack-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-247-f-multitrack-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-247-f-multitrack-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-248-f-no-second-tfdt-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-248-f-no-second-tfdt-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-248-f-no-second-tfdt-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-248-f-no-second-tfdt-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-248-f-no-second-tfdt-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-248-f-no-second-tfdt-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-249-forward-aac-fractional-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-249-forward-aac-fractional-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-249-forward-aac-fractional-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-249-forward-aac-fractional-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-249-forward-aac-fractional-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-249-forward-aac-fractional-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-250-forward-aac-priming-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-250-forward-aac-priming-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-250-forward-aac-priming-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-250-forward-aac-priming-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-250-forward-aac-priming-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-250-forward-aac-priming-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-251-forward-aac-tail-trim-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-251-forward-aac-tail-trim-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-251-forward-aac-tail-trim-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-251-forward-aac-tail-trim-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-251-forward-aac-tail-trim-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-251-forward-aac-tail-trim-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-253-forward-avc-empty-edit-rounded-end-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-253-forward-avc-empty-edit-rounded-end-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-253-forward-avc-empty-edit-rounded-end-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-253-forward-avc-empty-edit-rounded-end-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-253-forward-avc-empty-edit-rounded-end-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-253-forward-avc-empty-edit-rounded-end-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-254-forward-avc-empty-edit-single-sync-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-254-forward-avc-empty-edit-single-sync-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-254-forward-avc-empty-edit-single-sync-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-254-forward-avc-empty-edit-single-sync-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-254-forward-avc-empty-edit-single-sync-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-254-forward-avc-empty-edit-single-sync-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-255-forward-avc-empty-edit-trimmed-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-255-forward-avc-empty-edit-trimmed-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-255-forward-avc-empty-edit-trimmed-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-255-forward-avc-empty-edit-trimmed-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-255-forward-avc-empty-edit-trimmed-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-255-forward-avc-empty-edit-trimmed-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-256-forward-avc-empty-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-256-forward-avc-empty-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-256-forward-avc-empty-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-256-forward-avc-empty-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-256-forward-avc-empty-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-256-forward-avc-empty-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-257-forward-fragment-aac-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-257-forward-fragment-aac-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-257-forward-fragment-aac-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-257-forward-fragment-aac-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-257-forward-fragment-aac-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-257-forward-fragment-aac-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-258-forward-fragment-aac-late-track-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-258-forward-fragment-aac-late-track-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-258-forward-fragment-aac-late-track-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-258-forward-fragment-aac-late-track-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-258-forward-fragment-aac-late-track-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-258-forward-fragment-aac-late-track-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-259-forward-fragment-aac-short-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-259-forward-fragment-aac-short-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-259-forward-fragment-aac-short-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-259-forward-fragment-aac-short-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-259-forward-fragment-aac-short-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-259-forward-fragment-aac-short-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-260-forward-fragment-mp3-edit-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-260-forward-fragment-mp3-edit-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-260-forward-fragment-mp3-edit-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-260-forward-fragment-mp3-edit-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-260-forward-fragment-mp3-edit-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-260-forward-fragment-mp3-edit-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-261-r-ctts-v1-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-261-r-ctts-v1-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-261-r-ctts-v1-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-261-r-ctts-v1-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-261-r-ctts-v1-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-261-r-ctts-v1-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-262-r-description-change-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-262-r-description-change-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-262-r-description-change-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-262-r-description-change-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-262-r-description-change-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-262-r-description-change-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-263-r-edits-repeat-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-263-r-edits-repeat-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-263-r-edits-repeat-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-263-r-edits-repeat-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-263-r-edits-repeat-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-263-r-edits-repeat-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-264-r-end-co64-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-264-r-end-co64-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-264-r-end-co64-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-264-r-end-co64-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-264-r-end-co64-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-264-r-end-co64-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-265-r-front-stco-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-265-r-front-stco-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-265-r-front-stco-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-265-r-front-stco-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-265-r-front-stco-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-265-r-front-stco-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-266-r-multiple-mdats-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-266-r-multiple-mdats-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-266-r-multiple-mdats-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-266-r-multiple-mdats-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-266-r-multiple-mdats-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-266-r-multiple-mdats-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-267-r-multitrack-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-267-r-multitrack-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-267-r-multitrack-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-267-r-multitrack-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-267-r-multitrack-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-267-r-multitrack-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-268-r-negative-cts-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-268-r-negative-cts-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-268-r-negative-cts-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-268-r-negative-cts-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-268-r-negative-cts-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-268-r-negative-cts-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-269-r-subtitle-tx3g-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-269-r-subtitle-tx3g-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-269-r-subtitle-tx3g-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-269-r-subtitle-tx3g-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-269-r-subtitle-tx3g-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-269-r-subtitle-tx3g-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-270-r-unknown-movie-duration-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-270-r-unknown-movie-duration-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-270-r-unknown-movie-duration-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-270-r-unknown-movie-duration-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-270-r-unknown-movie-duration-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-270-r-unknown-movie-duration-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-271-first-source-clock-unknown-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-271-first-source-clock-unknown-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-271-first-source-clock-unknown-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-271-first-source-clock-unknown-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-271-first-source-clock-unknown-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-271-first-source-clock-unknown-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-272-opaque-tail-terminal-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-272-opaque-tail-terminal-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-272-opaque-tail-terminal-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-272-opaque-tail-terminal-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-272-opaque-tail-terminal-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-272-opaque-tail-terminal-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-273-pending-terminal-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-273-pending-terminal-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-273-pending-terminal-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-273-pending-terminal-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-273-pending-terminal-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-273-pending-terminal-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-274-regular-terminal-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-274-regular-terminal-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-274-regular-terminal-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-274-regular-terminal-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-274-regular-terminal-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-274-regular-terminal-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-275-unknown-clock-terminal-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-275-unknown-clock-terminal-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-275-unknown-clock-terminal-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-275-unknown-clock-terminal-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-275-unknown-clock-terminal-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-275-unknown-clock-terminal-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-276-pending-description-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-276-pending-description-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-276-pending-description-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-276-pending-description-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-276-pending-description-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-276-pending-description-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-277-pending-pair-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-277-pending-pair-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-277-pending-pair-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-277-pending-pair-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-277-pending-pair-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-277-pending-pair-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-278-pending-reverse-ranges-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-278-pending-reverse-ranges-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-278-pending-reverse-ranges-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-278-pending-reverse-ranges-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-278-pending-reverse-ranges-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-278-pending-reverse-ranges-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-279-pending-two-mdats-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-279-pending-two-mdats-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-279-pending-two-mdats-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-279-pending-two-mdats-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-279-pending-two-mdats-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-279-pending-two-mdats-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-280-pending-unknown-clock-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-280-pending-unknown-clock-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-280-pending-unknown-clock-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-280-pending-unknown-clock-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-280-pending-unknown-clock-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-280-pending-unknown-clock-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-281-ten-sequential-batches-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-281-ten-sequential-batches-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-281-ten-sequential-batches-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-281-ten-sequential-batches-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-281-ten-sequential-batches-mp4-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-281-ten-sequential-batches-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-349-moof-first-mp4-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-349-moof-first-mp4-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-349-moof-first-mp4-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-349-moof-first-mp4-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-349-moof-first-mp4-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-362-wide-first-mov-188",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-362-wide-first-mov-2048",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-362-wide-first-mov-377",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-362-wide-first-mov-389",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-362-wide-first-mov-8",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    },
-    {
-      "id": "sequential-362-wide-first-mov-whole",
-      "requirement": "Open ISO BMFF from a source without random access, as the reference reads MOV from a pipe; the facade's ISO BMFF reader needs random access (crates/triergon/README.md, Behaviour and limits) and refuses after the eight-byte signature."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "A transport stream whose packets all carry their sync byte is not an MPEG program stream",
@@ -31283,12 +29506,391 @@
     {
       "reading": "No standard decides whether a first box type alone identifies ISO BMFF; ours selects it from an 8-byte moof header, the reference names no format",
       "clause": "ISO/IEC 14496-12:2015 \u00a74.2 defines the box header and \u00a78.8.4 the movie fragment box; neither says what a probe answers from 8 bytes. Our rule: crates/triergon/README.md (Behaviour and limits), a first box type selects ISO BMFF.",
-      "candidate": "Selects ISO BMFF: decided in bytes mode, opened on the 8 bytes by the seekable adapter, refused for random access by the sequential adapter.",
+      "candidate": "Selects ISO BMFF: decided in bytes mode, opened on the 8 bytes by both adapters; the movie read that follows on the sequential one fails as truncated.",
       "reference": "Names no format: the bytes probe scores 0, the opener refuses the 8-byte stream.",
       "cases": [
         "blocking-349-moof-first-mp4-8",
         "bytes-349-moof-first-mp4-8",
         "sequential-349-moof-first-mp4-8"
+      ]
+    },
+    {
+      "reading": "A source that ends inside a box holds no such box: a movie box cut short states no track",
+      "clause": "ISO/IEC 14496-12:2015 \u00a74.2: a box's size is the number of bytes of the box, its fields and the boxes it contains; these streams end before the bytes their moov states.",
+      "candidate": "Fails with truncated input when the source ends inside moov: no track and no packet.",
+      "reference": "Opens with the tracks the received part of moov names, some without a timescale, delivers no packet and reports the end of the source.",
+      "cases": [
+        "sequential-101-avc-aac-program-mov-188",
+        "sequential-101-avc-aac-program-mov-377",
+        "sequential-101-avc-aac-program-mov-389",
+        "sequential-102-avc-aac-quicktime-7-1-mov-188",
+        "sequential-102-avc-aac-quicktime-7-1-mov-377",
+        "sequential-102-avc-aac-quicktime-7-1-mov-389",
+        "sequential-103-avc-aac-quicktime-fragmented-mov-188",
+        "sequential-104-avc-aac-quicktime-minimal-wave-mov-188",
+        "sequential-104-avc-aac-quicktime-minimal-wave-mov-377",
+        "sequential-104-avc-aac-quicktime-minimal-wave-mov-389",
+        "sequential-105-avc-aac-quicktime-reordered-mov-188",
+        "sequential-105-avc-aac-quicktime-reordered-mov-377",
+        "sequential-105-avc-aac-quicktime-reordered-mov-389",
+        "sequential-106-avc-aac-quicktime-surround-mov-188",
+        "sequential-106-avc-aac-quicktime-surround-mov-377",
+        "sequential-106-avc-aac-quicktime-surround-mov-389",
+        "sequential-111-avc-opus-cropped-edit-mp4-188",
+        "sequential-111-avc-opus-cropped-edit-mp4-377",
+        "sequential-111-avc-opus-cropped-edit-mp4-389",
+        "sequential-112-avc-opus-edit-mp4-188",
+        "sequential-112-avc-opus-edit-mp4-377",
+        "sequential-112-avc-opus-edit-mp4-389",
+        "sequential-113-avc-opus-long-roll-mp4-188",
+        "sequential-113-avc-opus-long-roll-mp4-377",
+        "sequential-113-avc-opus-long-roll-mp4-389",
+        "sequential-114-avc-opus-rescaled-edit-mp4-188",
+        "sequential-114-avc-opus-rescaled-edit-mp4-377",
+        "sequential-114-avc-opus-rescaled-edit-mp4-389",
+        "sequential-115-avc-opus-seek-boundary-mp4-188",
+        "sequential-115-avc-opus-seek-boundary-mp4-377",
+        "sequential-115-avc-opus-seek-boundary-mp4-389",
+        "sequential-116-avc-opus-trimmed-end-mp4-188",
+        "sequential-116-avc-opus-trimmed-end-mp4-377",
+        "sequential-116-avc-opus-trimmed-end-mp4-389",
+        "sequential-117-avc-opus-video-composition-offset-mp4-188",
+        "sequential-117-avc-opus-video-composition-offset-mp4-377",
+        "sequential-117-avc-opus-video-composition-offset-mp4-389",
+        "sequential-120-dav1-mp4-188",
+        "sequential-120-dav1-mp4-377",
+        "sequential-120-dav1-mp4-389",
+        "sequential-121-dvh1-mp4-188",
+        "sequential-121-dvh1-mp4-389",
+        "sequential-122-dvhe-mp4-188",
+        "sequential-122-dvhe-mp4-389",
+        "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-188",
+        "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-389",
+        "sequential-124-fragmented-aac-media-clock-mp4-188",
+        "sequential-124-fragmented-aac-media-clock-mp4-377",
+        "sequential-124-fragmented-aac-media-clock-mp4-389",
+        "sequential-125-fragmented-avc-aac-mp4-188",
+        "sequential-125-fragmented-avc-aac-mp4-377",
+        "sequential-125-fragmented-avc-aac-mp4-389",
+        "sequential-126-fragmented-subtitle-edit-mp4-188",
+        "sequential-126-fragmented-subtitle-edit-mp4-377",
+        "sequential-126-fragmented-subtitle-edit-mp4-389",
+        "sequential-127-fragmented-subtitles-mp4-188",
+        "sequential-127-fragmented-subtitles-mp4-2048",
+        "sequential-127-fragmented-subtitles-mp4-389",
+        "sequential-240-encoded-avc-aac-front-mp4-188",
+        "sequential-240-encoded-avc-aac-front-mp4-389",
+        "sequential-241-encoded-avc-aac-indexed-seek-mp4-188",
+        "sequential-241-encoded-avc-aac-indexed-seek-mp4-377",
+        "sequential-241-encoded-avc-aac-indexed-seek-mp4-389",
+        "sequential-242-encoded-avc-aac-native-seek-mp4-188",
+        "sequential-242-encoded-avc-aac-native-seek-mp4-389",
+        "sequential-243-encoded-hevc-aac-front-mp4-188",
+        "sequential-243-encoded-hevc-aac-front-mp4-389",
+        "sequential-244-f-ctts-v1-mp4-188",
+        "sequential-244-f-ctts-v1-mp4-389",
+        "sequential-245-f-description-change-mp4-188",
+        "sequential-245-f-description-change-mp4-389",
+        "sequential-246-f-explicit-mp4-188",
+        "sequential-246-f-explicit-mp4-389",
+        "sequential-247-f-multitrack-mp4-188",
+        "sequential-247-f-multitrack-mp4-389",
+        "sequential-248-f-no-second-tfdt-mp4-188",
+        "sequential-248-f-no-second-tfdt-mp4-389",
+        "sequential-249-forward-aac-fractional-edit-mp4-188",
+        "sequential-249-forward-aac-fractional-edit-mp4-377",
+        "sequential-249-forward-aac-fractional-edit-mp4-389",
+        "sequential-250-forward-aac-priming-mp4-188",
+        "sequential-250-forward-aac-priming-mp4-377",
+        "sequential-250-forward-aac-priming-mp4-389",
+        "sequential-251-forward-aac-tail-trim-mp4-188",
+        "sequential-251-forward-aac-tail-trim-mp4-377",
+        "sequential-251-forward-aac-tail-trim-mp4-389",
+        "sequential-253-forward-avc-empty-edit-rounded-end-mp4-188",
+        "sequential-253-forward-avc-empty-edit-rounded-end-mp4-389",
+        "sequential-254-forward-avc-empty-edit-single-sync-mp4-188",
+        "sequential-254-forward-avc-empty-edit-single-sync-mp4-389",
+        "sequential-255-forward-avc-empty-edit-trimmed-mp4-188",
+        "sequential-255-forward-avc-empty-edit-trimmed-mp4-389",
+        "sequential-256-forward-avc-empty-edit-mp4-188",
+        "sequential-256-forward-avc-empty-edit-mp4-389",
+        "sequential-257-forward-fragment-aac-edit-mp4-188",
+        "sequential-257-forward-fragment-aac-edit-mp4-377",
+        "sequential-257-forward-fragment-aac-edit-mp4-389",
+        "sequential-258-forward-fragment-aac-late-track-mp4-188",
+        "sequential-258-forward-fragment-aac-late-track-mp4-377",
+        "sequential-258-forward-fragment-aac-late-track-mp4-389",
+        "sequential-259-forward-fragment-aac-short-mp4-188",
+        "sequential-259-forward-fragment-aac-short-mp4-377",
+        "sequential-259-forward-fragment-aac-short-mp4-389",
+        "sequential-260-forward-fragment-mp3-edit-mp4-188",
+        "sequential-260-forward-fragment-mp3-edit-mp4-377",
+        "sequential-260-forward-fragment-mp3-edit-mp4-389",
+        "sequential-261-r-ctts-v1-mov-188",
+        "sequential-261-r-ctts-v1-mov-377",
+        "sequential-261-r-ctts-v1-mov-389",
+        "sequential-262-r-description-change-mov-188",
+        "sequential-262-r-description-change-mov-377",
+        "sequential-262-r-description-change-mov-389",
+        "sequential-263-r-edits-repeat-mov-188",
+        "sequential-263-r-edits-repeat-mov-389",
+        "sequential-265-r-front-stco-mov-188",
+        "sequential-265-r-front-stco-mov-377",
+        "sequential-265-r-front-stco-mov-389",
+        "sequential-266-r-multiple-mdats-mov-188",
+        "sequential-266-r-multiple-mdats-mov-377",
+        "sequential-266-r-multiple-mdats-mov-389",
+        "sequential-267-r-multitrack-mov-188",
+        "sequential-267-r-multitrack-mov-377",
+        "sequential-267-r-multitrack-mov-389",
+        "sequential-268-r-negative-cts-mov-188",
+        "sequential-268-r-negative-cts-mov-377",
+        "sequential-268-r-negative-cts-mov-389",
+        "sequential-269-r-subtitle-tx3g-mov-188",
+        "sequential-269-r-subtitle-tx3g-mov-377",
+        "sequential-269-r-subtitle-tx3g-mov-389",
+        "sequential-270-r-unknown-movie-duration-mov-188",
+        "sequential-270-r-unknown-movie-duration-mov-389",
+        "sequential-271-first-source-clock-unknown-mp4-188",
+        "sequential-271-first-source-clock-unknown-mp4-389",
+        "sequential-272-opaque-tail-terminal-mp4-188",
+        "sequential-272-opaque-tail-terminal-mp4-377",
+        "sequential-272-opaque-tail-terminal-mp4-389",
+        "sequential-273-pending-terminal-mp4-188",
+        "sequential-273-pending-terminal-mp4-389",
+        "sequential-274-regular-terminal-mp4-188",
+        "sequential-274-regular-terminal-mp4-377",
+        "sequential-274-regular-terminal-mp4-389",
+        "sequential-275-unknown-clock-terminal-mp4-188",
+        "sequential-275-unknown-clock-terminal-mp4-389",
+        "sequential-276-pending-description-mp4-188",
+        "sequential-276-pending-description-mp4-389",
+        "sequential-277-pending-pair-mp4-188",
+        "sequential-277-pending-pair-mp4-389",
+        "sequential-278-pending-reverse-ranges-mp4-188",
+        "sequential-278-pending-reverse-ranges-mp4-389",
+        "sequential-279-pending-two-mdats-mp4-188",
+        "sequential-279-pending-two-mdats-mp4-389",
+        "sequential-280-pending-unknown-clock-mp4-188",
+        "sequential-280-pending-unknown-clock-mp4-389",
+        "sequential-281-ten-sequential-batches-mp4-188",
+        "sequential-281-ten-sequential-batches-mp4-389",
+        "sequential-349-moof-first-mp4-188",
+        "sequential-349-moof-first-mp4-377",
+        "sequential-349-moof-first-mp4-389",
+        "sequential-362-wide-first-mov-188",
+        "sequential-362-wide-first-mov-377",
+        "sequential-362-wide-first-mov-389"
+      ]
+    },
+    {
+      "reading": "A sample is the bytes its size states: one the source cuts short is not delivered",
+      "clause": "ISO/IEC 14496-12:2015 \u00a78.7.3.2.2 states each sample's size and \u00a78.8.8.2 a fragment sample's; these streams end inside a sample's bytes.",
+      "candidate": "Delivers the samples that arrived whole, then fails with truncated input.",
+      "reference": "Delivers the part of the cut sample that arrived as a packet, which it logs as corrupt, and reports the end of the source.",
+      "cases": [
+        "sequential-103-avc-aac-quicktime-fragmented-mov-2048",
+        "sequential-120-dav1-mp4-2048",
+        "sequential-123-forward-avc-empty-edit-overlapping-sync-mp4-2048",
+        "sequential-124-fragmented-aac-media-clock-mp4-2048",
+        "sequential-125-fragmented-avc-aac-mp4-2048",
+        "sequential-240-encoded-avc-aac-front-mp4-2048",
+        "sequential-249-forward-aac-fractional-edit-mp4-2048",
+        "sequential-250-forward-aac-priming-mp4-2048",
+        "sequential-251-forward-aac-tail-trim-mp4-2048",
+        "sequential-253-forward-avc-empty-edit-rounded-end-mp4-2048",
+        "sequential-254-forward-avc-empty-edit-single-sync-mp4-2048",
+        "sequential-255-forward-avc-empty-edit-trimmed-mp4-2048",
+        "sequential-256-forward-avc-empty-edit-mp4-2048",
+        "sequential-257-forward-fragment-aac-edit-mp4-2048",
+        "sequential-258-forward-fragment-aac-late-track-mp4-2048",
+        "sequential-259-forward-fragment-aac-short-mp4-2048",
+        "sequential-259-forward-fragment-aac-short-mp4-whole",
+        "sequential-260-forward-fragment-mp3-edit-mp4-2048"
+      ]
+    },
+    {
+      "reading": "A top-level mdat of size zero runs to the end of the source, where the file ends",
+      "clause": "ISO/IEC 14496-12:2015 \u00a74.2: a box of size 0 is the last box of its file and its payload extends to the end of the file.",
+      "candidate": "Delivers every sample and ends at the end of the source.",
+      "reference": "Delivers the same packets, then fails with invalid data looking for a further root box (partial file).",
+      "cases": [
+        "sequential-272-opaque-tail-terminal-mp4-2048",
+        "sequential-272-opaque-tail-terminal-mp4-whole",
+        "sequential-274-regular-terminal-mp4-2048",
+        "sequential-274-regular-terminal-mp4-whole"
+      ]
+    },
+    {
+      "reading": "A sample's decode time is the sum of the decode deltas before it, whatever its composition offset",
+      "clause": "ISO/IEC 14496-12:2015 \u00a78.6.1.2.1: DT(n+1) = DT(n) + STTS(n) from a zero origin; \u00a78.6.1.3.1: CT(n) = DT(n) + CTTS(n), the offset signed in version 1.",
+      "candidate": "Decode times 0, 1000, 2000 and so on; each presentation time is its decode time plus its offset.",
+      "reference": "The same presentation times; every decode time is 1000 ticks earlier, the track's most negative offset.",
+      "cases": [
+        "sequential-261-r-ctts-v1-mov-2048",
+        "sequential-261-r-ctts-v1-mov-whole"
+      ]
+    },
+    {
+      "reading": "A fragment sample's composition time is its decode time plus its offset, which version 1 states signed",
+      "clause": "ISO/IEC 14496-12:2015 \u00a78.8.8.2 (sample_composition_time_offset, signed in version 1) and \u00a78.8.12.1 (tfdt states the decode time of the fragment's first sample).",
+      "candidate": "Decode times as tfdt and the sample durations state them; each presentation time is its decode time plus its offset.",
+      "reference": "The same decode times; every presentation time is 1000 ticks later, the track's most negative offset.",
+      "cases": [
+        "sequential-244-f-ctts-v1-mp4-2048",
+        "sequential-244-f-ctts-v1-mp4-whole"
+      ]
+    },
+    {
+      "reading": "A box of type moof holds boxes: one whose payload is not a sequence of boxes is malformed",
+      "clause": "ISO/IEC 14496-12:2015 \u00a78.8.4.1: the Movie Fragment Box contains a movie fragment header and track fragment boxes; this input's first box is typed moof and holds the payload of a file type box.",
+      "candidate": "Fails with truncated input when it walks the box: its first child would cross the box's end.",
+      "reference": "Passes the box over and reads the movie that follows it.",
+      "cases": [
+        "sequential-349-moof-first-mp4-2048",
+        "sequential-349-moof-first-mp4-whole"
+      ]
+    }
+  ],
+  "open_refusals": [
+    {
+      "reason": "A source without random access is read forward only: media that precedes the movie box lies behind the reader once the movie box names its samples",
+      "clause": "ISO/IEC 14496-12:2015 \u00a76.2.3 leaves the order of moov and mdat free, so the input is valid; crates/isobmff/README.md (Container reader) states the limit",
+      "detail": "progressive MP4 needs front metadata",
+      "cases": [
+        {
+          "id": "sequential-107-avc-aac-rtp-hints-mp4-whole",
+          "sha256": "93188e58d7231bd9d90d97af6db4a0813cbaf2645cc577ca27b5ed94f7975273",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916704379
+          }
+        },
+        {
+          "id": "sequential-108-avc-leading-edit-short-reordered-mp4-whole",
+          "sha256": "86dbc2353fc13606e6f4b598e7f42a38e4ac87074a374adddee6202f4af8c8bc",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916039367
+          }
+        },
+        {
+          "id": "sequential-109-avc-leading-edit-trimmed-mp4-whole",
+          "sha256": "a129ceb76c1926594738d98a9fd513854db348c90a74e92e63f1d58c760b17be",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916039367
+          }
+        },
+        {
+          "id": "sequential-110-avc-leading-edit-mp4-whole",
+          "sha256": "b070fe3144893f7e747ee3609dbfabe488f429b25719d219ebc788358474385d",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916039367
+          }
+        },
+        {
+          "id": "sequential-118-avc-signed-endpoint-edit-mp4-whole",
+          "sha256": "57e65c61776b77c498a203a3e38e64f90ad93e461e77fa7192f34fc839acb9f9",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916054743
+          }
+        },
+        {
+          "id": "sequential-119-avc-unrepresentable-edit-mp4-whole",
+          "sha256": "36116695ac130b276e7f44bc0f49c58f6c38713c582075add21f1b35ae481d3f",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916054743
+          }
+        },
+        {
+          "id": "sequential-128-mov-stream-shorter-than-movie-mov-whole",
+          "sha256": "463a1c93d3cc155721fc481e4c2783b97fb4e388d571b3fdcf6972c6ce290b5b",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2907501843
+          }
+        },
+        {
+          "id": "sequential-129-mp4-init-nonkeyframe-mp4-whole",
+          "sha256": "94d76d559b850373a65108bae4b1716b8a4df975b317033745b0cc2ba6de64b7",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 3953055428
+          }
+        },
+        {
+          "id": "sequential-130-regular-avc-aac-mp4-whole",
+          "sha256": "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916027835
+          }
+        },
+        {
+          "id": "sequential-131-variable-aac-duration-mp4-whole",
+          "sha256": "30eea0cf071465639669a0ab87c6e48db0022323a1f169c53f5de901b318c8d1",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2916027835
+          }
+        },
+        {
+          "id": "sequential-264-r-end-co64-mov-2048",
+          "sha256": "0100ce1a959b5dda456131420ea16f138394d55a836757dedffeef320266fa4c",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2835045326
+          }
+        },
+        {
+          "id": "sequential-264-r-end-co64-mov-whole",
+          "sha256": "0100ce1a959b5dda456131420ea16f138394d55a836757dedffeef320266fa4c",
+          "candidate": {
+            "packets": 2,
+            "bytes": 0,
+            "digest": 2835045326
+          }
+        }
+      ]
+    },
+    {
+      "reason": "A source without random access is read forward only: a fragment whose samples lie before samples already read needs a range request",
+      "clause": "ISO/IEC 14496-12:2015 \u00a78.8.8.1 lets the data of a track run lie anywhere in the file, so the input is valid; crates/isobmff/README.md (Container reader) states the limit",
+      "detail": "sample before the read position needs random access",
+      "cases": [
+        {
+          "id": "sequential-278-pending-reverse-ranges-mp4-2048",
+          "sha256": "5c697cef7c0369a88dc76dd463a452df2494f46d46357d1fe7c3205205457676",
+          "candidate": {
+            "packets": 9,
+            "bytes": 72,
+            "digest": 4558155271720192881
+          }
+        },
+        {
+          "id": "sequential-278-pending-reverse-ranges-mp4-whole",
+          "sha256": "5c697cef7c0369a88dc76dd463a452df2494f46d46357d1fe7c3205205457676",
+          "candidate": {
+            "packets": 9,
+            "bytes": 72,
+            "digest": 4558155271720192881
+          }
+        }
       ]
     }
   ]

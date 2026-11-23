@@ -105,14 +105,17 @@ releases its retained capacity after replaying the last byte.
 
 The [facade probe comparison](../../harness/features/facade-probe/contract.json)
 checks prefix verdicts and the format selected by both adapters. For admitted inputs the
-comparison checks every supplied byte through EOF after a rewind or sequential replay.
+comparison checks every supplied byte through EOF after a rewind or sequential replay,
+and for ISO BMFF on a sequential source it reads the movie: the tracks, every packet's
+track, size, times and bytes, and how the read ended, against FFmpeg's MOV demuxer on
+the same pipe.
 
 ## Features and lower-level crates
 
 | Feature | Default | Module | Through `AnyReader` |
 |---|---|---|---|
 | `matroska` | yes | `triergon::matroska` ([triergon-matroska](../matroska/README.md)) | yes |
-| `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | yes, for seekable sources |
+| `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | yes; from a sequential source when `moov` comes first |
 | `mpegts` | no | `triergon::mpegts` ([triergon-mpegts](../mpegts/README.md)) | yes, source access units in TS188/M2TS192 |
 | `ogg` | no | `triergon::ogg` ([triergon-ogg](../ogg/README.md)) | yes |
 | `elementary` | no | `triergon::elementary` ([triergon-elementary](../elementary/README.md)): native FLAC, MPEG audio, ADTS, AC-3 | yes |
@@ -166,10 +169,14 @@ The meaning of each type is documented in
   use `mpegts::ReaderLimits` for an explicit selection. An unrecognised source (`source
   format not recognised`) and a format without its feature (`reader feature not
   enabled`) are `Error::Unsupported`.
-- **ISO BMFF needs random access.** The facade's ISO BMFF reader reads the movie index
-  where it lies, so it refuses a source without random access, a pipe through
-  `open_sequential` included, with `Error::Unsupported("ISO BMFF reader needs random
-  access")` once the signature has selected it.
+- **ISO BMFF from a sequential source.** With random access the ISO BMFF reader reads
+  the movie index where it lies. Without it, a pipe through `open_sequential`
+  included, the reader only moves forward: `moov` must precede the first `mdat`, each
+  later `moof` is indexed as it arrives, and nothing is kept for the length of the
+  source. An `mdat` before `moov` fails with `Error::Unsupported("progressive MP4
+  needs front metadata")` when its header is read, and a sample that starts before
+  the read position with `Error::Unsupported("sample before the read position needs
+  random access")`. See [the reader's limits](../isobmff/README.md#container-reader).
 - **Defaults.** `open` builds each reader with its default limits
   (`triergon_matroska::Limits`, `triergon_isobmff::ReaderLimits`,
   `triergon_mpegts::ReaderLimits`) and asks for at most

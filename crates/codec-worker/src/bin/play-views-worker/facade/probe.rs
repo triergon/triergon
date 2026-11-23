@@ -2,9 +2,14 @@
 
 use std::cell::Cell;
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
-use triergon::{AnyReader, Budget, Error, Probed, SourceFormat, open_blocking, open_sequential};
+use triergon::isobmff::ReaderEvent;
+use triergon::{
+    AnyOther, AnyPacket, AnyReader, Budget, Error, Event, PacketInfo, Probed, SourceFormat,
+    open_blocking, open_sequential,
+};
+use triergon_harness_protocol::digest::signed;
 
-use triergon_harness_runner::{Operation, Totals};
+use triergon_harness_runner::{Operation, Outcome};
 
 #[derive(Clone, Copy)]
 enum Mode {
@@ -14,6 +19,12 @@ enum Mode {
 }
 
 pub(super) fn prepare<'a>(input: &'a [u8], arguments: &[&str]) -> Result<Operation<'a>, String> {
+    // With a trailing `--report-refusal`, a movie read the reader refuses as unsupported
+    // names its detail on the result line.
+    let (proof, arguments) = match arguments.split_last() {
+        Some((&"--report-refusal", rest)) => (true, rest),
+        _ => (false, arguments),
+    };
     let [mode, length, window] = arguments else {
         return Err("usage: facade-probe-* FILE bytes|blocking|sequential PREFIX WINDOW".into());
     };
@@ -34,7 +45,14 @@ pub(super) fn prepare<'a>(input: &'a [u8], arguments: &[&str]) -> Result<Operati
     Ok(Operation {
         name: "facade-probe",
         run: Box::new(move |work, trace| {
-            run(&input[..length], whole, window, mode, &pool, work, trace)
+            let case = Case {
+                input: &input[..length],
+                whole,
+                window,
+                mode,
+                proof,
+            };
+            run(&case, &pool, work, trace)
         }),
     })
 }
@@ -44,6 +62,14 @@ fn parse(text: &str, max: usize) -> Result<usize, String> {
         .ok()
         .filter(|value| (1..=max).contains(value))
         .ok_or_else(|| format!("expected an integer in 1..={max}"))
+}
+
+struct Case<'a> {
+    input: &'a [u8],
+    whole: bool,
+    window: usize,
+    mode: Mode,
+    proof: bool,
 }
 
 struct Reads<'a> {
@@ -69,21 +95,24 @@ impl Seek for Reads<'_> {
 }
 
 fn run(
-    input: &[u8],
-    whole: bool,
-    window: usize,
-    mode: Mode,
+    case: &Case<'_>,
     pool: &Budget,
-    work: &mut Totals,
-    trace: Option<&mut dyn Write>,
+    work: &mut Outcome,
+    mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
+    let &Case {
+        input,
+        whole,
+        window,
+        mode,
+        proof,
+    } = case;
     let high_water = Cell::new(0);
     let source = Reads {
         cursor: Cursor::new(input),
         high_water: &high_water,
         window,
     };
-    let mut needs_random_access = false;
     let mut more = false;
     let (verdict, width, replay) = match mode {
         Mode::Bytes => {
@@ -122,19 +151,6 @@ fn run(
                 )?;
                 (verdict, 0, Some(input.len()))
             }
-            Err(Error::Unsupported("ISO BMFF reader needs random access")) => {
-                let consumed = high_water.get();
-                if consumed != 8
-                    || triergon::probe(&input[..consumed]) != Probed::Format(SourceFormat::Isobmff)
-                {
-                    return Err("ISO BMFF refusal did not follow its fixed signature".into());
-                }
-                if trace.is_some() {
-                    eprintln!("probe consumed {consumed} bytes and requires random access");
-                }
-                needs_random_access = true;
-                (6, 0, None)
-            }
             Err(error) => refusal(error, trace.is_some())?,
         },
     };
@@ -143,22 +159,89 @@ fn run(
         width,
         // Bytes mode: whether the prefix asks for more bytes. The adapters: a replay.
         u64::from(replay.is_some() || more),
-        replay.map_or(u64::from(needs_random_access), |length| length as u64),
+        replay.map_or(0, |length| length as u64),
     ];
-    let words = &words[..if replay.is_some() || needs_random_access {
-        4
-    } else {
-        3
-    }];
-    work.record(3, words, &[]);
+    let words = &words[..if replay.is_some() { 4 } else { 3 }];
+    record(work, &mut trace, 3, words, &[])?;
+    if matches!(mode, Mode::Sequential) && verdict == 6 {
+        let source = Reads {
+            cursor: Cursor::new(input),
+            high_water: &high_water,
+            window,
+        };
+        if let Some(Error::Unsupported(detail)) = read_movie(source, pool, work, &mut trace)?
+            && proof
+        {
+            work.unsupported = Some(detail);
+        }
+    }
+    Ok(())
+}
+
+fn record(
+    work: &mut Outcome,
+    trace: &mut Option<&mut dyn Write>,
+    kind: u64,
+    words: &[u64],
+    payload: &[u8],
+) -> Result<(), String> {
+    work.record(kind, words, payload);
     if let Some(trace) = trace {
-        write!(trace, "3").map_err(|error| error.to_string())?;
+        write!(trace, "{kind}").map_err(|error| error.to_string())?;
         for word in words {
             write!(trace, " {word}").map_err(|error| error.to_string())?;
         }
         writeln!(trace).map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+/// Reads an ISO BMFF movie from a sequential source through the facade's adapter: one
+/// record of kind 5 per track (its `track_ID` and time base), one of kind 4 per packet
+/// (track, size, presentation and decode time, with the payload), and one of kind 6
+/// that is 0 where the source was read to its end and 1 where the read was refused or
+/// failed. Returns the error that ended the read.
+fn read_movie(
+    source: Reads<'_>,
+    pool: &Budget,
+    work: &mut Outcome,
+    trace: &mut Option<&mut dyn Write>,
+) -> Result<Option<Error>, String> {
+    let mut movie = open_sequential(source, pool).map_err(|error| error.to_string())?;
+    let ended = loop {
+        match movie.next_event() {
+            Ok(Some(Event::Packet(packet))) => {
+                let AnyPacket::Isobmff(_) = &packet else {
+                    return Err("the facade returned a packet of another format".into());
+                };
+                let words = [
+                    packet.track().0,
+                    packet.payload().len() as u64,
+                    signed(packet.pts().unwrap_or(i64::MIN)),
+                    signed(packet.dts().unwrap_or(i64::MIN)),
+                ];
+                record(work, trace, 4, &words, packet.payload())?;
+            }
+            Ok(Some(Event::Other(AnyOther::Isobmff(ReaderEvent::Movie)))) => {
+                let AnyReader::Isobmff(reader) = movie.reader() else {
+                    return Err("the facade opened a reader of another format".into());
+                };
+                for track in reader.tracks() {
+                    let header = track.header();
+                    let words = [u64::from(header.track_id), 1, u64::from(header.timescale)];
+                    record(work, trace, 5, &words, &[])?;
+                }
+            }
+            Ok(Some(_)) => {}
+            Ok(None) => break None,
+            Err(error) => break Some(error),
+        }
+    };
+    if let (Some(error), true) = (ended, trace.is_some()) {
+        eprintln!("movie read ended: {error}");
+    }
+    record(work, trace, 6, &[u64::from(ended.is_some())], &[])?;
+    Ok(ended)
 }
 
 fn check_replay(

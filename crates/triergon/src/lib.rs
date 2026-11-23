@@ -54,7 +54,7 @@ pub use triergon_framing as framing;
 /// Read segment feeds and progressive MPEG transport.
 pub use triergon_hls as hls;
 #[cfg(feature = "isobmff")]
-/// Readers for seekable ISO BMFF sources, including fragmented MP4.
+/// Readers for ISO BMFF sources, including fragmented MP4.
 pub use triergon_isobmff as isobmff;
 #[cfg(feature = "matroska")]
 /// Readers for Matroska and WebM sources.

@@ -91,18 +91,8 @@ pub(super) fn prepare<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a
                         length,
                         random_access,
                     };
-                    let opened = AnyReader::open(input, &pool, SOURCE, caps);
-                    if format == SourceFormat::Isobmff && !random_access {
-                        if !matches!(
-                            opened,
-                            Err(Error::Unsupported("ISO BMFF reader needs random access"))
-                        ) {
-                            return Err("ISO BMFF did not refuse a sequential source".into());
-                        }
-                        record(work, &mut trace, 3, caps)?;
-                        continue;
-                    }
-                    let mut reader = opened.map_err(|error| error.to_string())?;
+                    let mut reader = AnyReader::open(input, &pool, SOURCE, caps)
+                        .map_err(|error| error.to_string())?;
                     let mut request = reader.reset().map_err(|error| error.to_string())?;
                     for (kind, failure, error) in [
                         (1, SourceFailure::Transport, Error::Transport),

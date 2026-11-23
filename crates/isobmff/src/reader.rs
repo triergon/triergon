@@ -1,6 +1,8 @@
 //! [`Reader`], the source view through the neutral container model.
 use crate::fragment::FragmentCursorPosition;
-use crate::open::{Movie, MovieOpen, MovieTrack, OpenLimits, OpenStep};
+use crate::open::{
+    FragmentTrack, MetadataReadScope, Movie, MovieOpen, MovieTrack, OpenLimits, OpenStep,
+};
 use crate::table::SampleCursorPosition;
 use crate::{
     Access, BuildStatus, Next, Sample,
@@ -10,6 +12,7 @@ use crate::{
     movie::{EditList, MovieHeader, SampleDescription, TrackHeader},
     table::SampleTable,
 };
+use forward::Forward;
 use std::mem;
 use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,6 +25,8 @@ use triergon_core::{
     Result, Rounding, SourceCapabilities, SourceFailure, SourceId, SourceLocation, Step, Time,
     TimeBase, WorkBudget,
 };
+
+mod forward;
 
 /// The media kind of an `hdlr` handler code, or [`MediaKind::Unknown`].
 pub fn media_kind(handler: &[u8; 4]) -> MediaKind {
@@ -73,6 +78,21 @@ impl Default for ReaderLimits {
             packet_bytes: 64 << 20,
             configuration: ConfigurationLimits::default(),
         }
+    }
+}
+impl ReaderLimits {
+    /// The payload length of `sample`, within [`packet_bytes`](Self::packet_bytes).
+    #[inline]
+    fn payload_length(&self, sample: &Sample) -> Result<usize> {
+        let length =
+            usize::try_from(sample.range.end - sample.range.start).map_err(|_| Error::Overflow)?;
+        if length > self.packet_bytes {
+            return Err(Error::Limit {
+                requested: length,
+                maximum: self.packet_bytes,
+            });
+        }
+        Ok(length)
     }
 }
 
@@ -164,6 +184,15 @@ impl Track {
         self.fragment_position = FragmentCursorPosition::default();
         self.head = None;
     }
+    /// Forgets the fragments whose samples have all been taken, except the last, which
+    /// states where the next fragment's decode clock starts.
+    fn release_delivered(&mut self) {
+        let fragments = &mut self.source.fragments;
+        let delivered = self.fragment.min(fragments.len().saturating_sub(1));
+        fragments.rotate_left(delivered);
+        fragments.truncate(fragments.len() - delivered);
+        self.fragment -= delivered;
+    }
     /// Make the next sample the head. `false` means the work is spent; `true`
     /// with no head means the track has ended.
     fn fill(&mut self, work: &mut WorkBudget) -> Result<bool> {
@@ -198,6 +227,14 @@ impl Track {
             }
         }
         Ok(true)
+    }
+}
+impl FragmentTrack for Track {
+    fn opened(&self) -> &MovieTrack {
+        &self.source
+    }
+    fn opened_mut(&mut self) -> &mut MovieTrack {
+        &mut self.source
     }
 }
 impl TrackInfo for Track {
@@ -241,7 +278,8 @@ impl TrackInfo for Track {
 /// Reader events other than packets and seeks.
 #[derive(Clone, Debug)]
 pub enum ReaderEvent {
-    /// A root box was passed. `moov`, `moof` and `ftyp` are retained.
+    /// A root box was passed. On a source without random access an `mdat` is passed once
+    /// its samples have been delivered.
     Box(BoxHeader),
     /// The movie is indexed: tracks are available and packets follow.
     Movie,
@@ -262,10 +300,27 @@ enum Phase {
     Entries {
         entry: usize,
     } = 2,
-    /// Delivering packets.
+    /// Delivering packets by range requests.
     Packets = 3,
     Seek(Seeking) = 4,
     Ended = 5,
+    /// Delivering packets as their bytes arrive, on a source without random access.
+    Forward(Forward) = 6,
+}
+impl Phase {
+    /// The phase that delivers the packets of `movie`. Its open chose how: an open that
+    /// read every root box is followed by range requests, one that stopped at the first
+    /// media box by reading on from there.
+    fn delivery(movie: Option<&Movie>) -> Result<Self> {
+        match movie {
+            Some(Movie {
+                read_scope: MetadataReadScope::FrontMetadataBeforeMdat(media),
+                trex,
+                ..
+            }) => Ok(Self::Forward(Forward::new(*media, trex)?)),
+            _ => Ok(Self::Packets),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -308,12 +363,24 @@ struct Seeking {
 type Output = Step<Neutral<Packet, ReaderEvent>, Backpressure>;
 
 /// The source view through the neutral container model: the one type to open a file and
-/// read its packets with. It needs a seekable source: it walks the root boxes, indexes
-/// every track, then delivers samples in ascending byte order across tracks and decode
-/// order within each. Times are media ticks without edits, which stay on
-/// [`Track::edits`]; a fragment without `tfdt` has unknown times. Boxes the neutral model
-/// has no field for stay readable through [`Reader::movie_box`] and
-/// [`SampleDescription::raw`]. Errors are sticky until [`Reader::reset`].
+/// read its packets with. It walks the root boxes, indexes every track, then delivers
+/// samples in ascending byte order across tracks and decode order within each. Times are
+/// media ticks without edits, which stay on [`Track::edits`]; a fragment without `tfdt`
+/// continues its track's decode clock. Boxes the neutral model has no field for stay
+/// readable through [`Reader::movie_box`] and [`SampleDescription::raw`]. Errors are
+/// sticky until [`Reader::reset`].
+///
+/// How the source is read is chosen once, from its capabilities:
+///
+/// - With random access the open reads every root box, wherever `moov` lies, and each
+///   sample is asked for by its range.
+/// - Without it the reader only moves forward. `moov` must precede the first `mdat`
+///   (`Error::Unsupported` otherwise); the open ends there, and each later `moof` is
+///   indexed when the cursor reaches it. A sample that starts before the read position,
+///   as when one track's chunks go back in the file or a fragment's samples precede its
+///   `moof`, is `Error::Unsupported("sample before the read position needs random
+///   access")`. A `moof` is held until its samples are delivered, so memory does not grow
+///   with the source. There is no seek.
 #[derive(Debug)]
 pub struct Reader {
     input: InputCursor,
@@ -326,8 +393,9 @@ pub struct Reader {
 }
 
 impl Reader {
-    /// A reader for one source. It refuses a source without random access,
-    /// because `mdat` may precede `moov` and is passed before any sample is known.
+    /// A reader for one source, which asks for at most `window` bytes at a time.
+    /// `Error::Invalid` for limits outside the ranges [`OpenLimits`] states or a zero
+    /// window.
     pub fn new(
         pool: &triergon_core::Budget,
         source: SourceId,
@@ -335,11 +403,8 @@ impl Reader {
         limits: ReaderLimits,
         window: usize,
     ) -> Result<Self> {
-        if !capabilities.random_access {
-            return Err(Error::Unsupported("ISO BMFF reader needs random access"));
-        }
         let input = InputCursor::new(pool, source, capabilities, window)?;
-        let opener = MovieOpen::new(&input, limits.open)?;
+        let opener = MovieOpen::for_source(&input, limits.open)?;
         Ok(Self {
             input,
             limits,
@@ -359,7 +424,10 @@ impl Reader {
         }
     }
     fn movie_open(&self) -> bool {
-        matches!(self.phase, Phase::Packets | Phase::Seek(_) | Phase::Ended)
+        matches!(
+            self.phase,
+            Phase::Packets | Phase::Seek(_) | Phase::Ended | Phase::Forward(_)
+        )
     }
     /// The `ftyp` major brand; that of the first `ftyp` where the source has several.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
@@ -377,7 +445,8 @@ impl Reader {
     pub fn movie_header(&self) -> Option<&MovieHeader> {
         self.movie.as_ref().map(Movie::header)
     }
-    /// Payload extents of the `mdat` boxes, in source order.
+    /// Payload extents of the `mdat` boxes the open read, in source order: every one with
+    /// random access, the first without.
     pub fn media_extents(&self) -> &[Range<u64>] {
         self.movie
             .as_ref()
@@ -390,7 +459,7 @@ impl Reader {
                 return Err(Error::Cancelled);
             }
             let output = match &mut self.phase {
-                Phase::Open(opener) => match opener.advance(&mut self.input, work, cancel)? {
+                Phase::Open(opener) => match open_step(opener, &mut self.input, work, cancel)? {
                     OpenStep::Yield => Some(Step::Yield),
                     OpenStep::NeedInput(request) => Some(Step::NeedInput(request)),
                     OpenStep::Root(header) => {
@@ -417,11 +486,19 @@ impl Reader {
                         identify_entry(self.tracks.as_mut_slice(), entry, &self.limits, work)?;
                     // The movie is announced once every entry is identified.
                     if matches!(output, Some(Step::Ready(_))) {
-                        self.phase = Phase::Packets;
+                        self.phase = Phase::delivery(self.movie.as_ref())?;
                     }
                     output
                 }
                 Phase::Packets => self.packet(work, cancel)?,
+                Phase::Forward(forward) => forward.poll(
+                    &mut self.input,
+                    self.tracks.as_mut_slice(),
+                    &mut self.reading,
+                    &self.limits,
+                    work,
+                    cancel,
+                )?,
                 Phase::Seek(seeking) => {
                     let output = seeking.poll(self.tracks.as_mut_slice(), work)?;
                     if matches!(output, Some(Step::Ready(_))) {
@@ -459,8 +536,10 @@ impl Reader {
             }
             self.begin_reading(track, sample)?
         };
-        match self.read_payload(&mut reading, work, cancel) {
-            Ok(Read::Payload(payload)) => self.finish_packet(reading, payload).map(Some),
+        match Self::read_payload(&mut self.input, &mut reading, work, cancel) {
+            Ok(Read::Payload(payload)) => {
+                Self::finish_packet(self.tracks.as_slice(), reading, payload).map(Some)
+            }
             Ok(Read::Pending(output)) => {
                 self.reading = Some(reading);
                 Ok(output)
@@ -480,14 +559,7 @@ impl Reader {
             .and_then(|at| extents.get(at))
             .ok_or(Error::Invalid("sample outside media extent"))?;
         sample.require_within(extent.clone())?;
-        let length =
-            usize::try_from(sample.range.end - sample.range.start).map_err(|_| Error::Overflow)?;
-        if length > self.limits.packet_bytes {
-            return Err(Error::Limit {
-                requested: length,
-                maximum: self.limits.packet_bytes,
-            });
-        }
+        let length = self.limits.payload_length(&sample)?;
         if length != 0 && self.input.position() != sample.range.start {
             self.input.request_range(sample.range.start)?;
         }
@@ -498,13 +570,18 @@ impl Reader {
         })
     }
 
+    /// Reads on in the payload of `reading`, which starts at the cursor's position or has
+    /// been read in part.
+    // Part of each delivery loop: out of line, every packet pays this call and
+    // `finish_packet`'s, both answering through memory (1.4% of an MP4 subtitle read).
+    #[inline(always)]
     fn read_payload(
-        &mut self,
+        input: &mut InputCursor,
         reading: &mut Reading,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Read> {
-        let pool = self.input.budget().clone();
+        let pool = input.budget().clone();
         let range = &reading.sample.range;
         let length = usize::try_from(range.end - range.start).map_err(|_| Error::Overflow)?;
         if length == 0 {
@@ -519,17 +596,17 @@ impl Reader {
                 }
             };
         }
-        if self.input.buffered().is_empty()
-            && let Some(request) = self.input.pending_request(cancel)?
+        if input.buffered().is_empty()
+            && let Some(request) = input.pending_request(cancel)?
         {
             return Ok(Read::Pending(Some(Step::NeedInput(request))));
         }
         // A sample inside one window shares it; only a split sample is copied.
         if reading.buffer.is_none()
-            && self.input.buffered().len() >= length
+            && input.buffered().len() >= length
             && work.remaining() >= length as u64
         {
-            return match self.input.read_span(length, work, cancel)? {
+            return match input.read_span(length, work, cancel)? {
                 Step::Ready(payload) => Ok(Read::Payload(payload)),
                 Step::NeedInput(request) => Ok(Read::Pending(Some(Step::NeedInput(request)))),
                 Step::Yield => Ok(Read::Pending(Some(Step::Yield))),
@@ -546,10 +623,7 @@ impl Reader {
         };
         let filled = buffer.len();
         Ok(Read::Pending(
-            match self
-                .input
-                .read_append(buffer, length - filled, work, cancel)?
-            {
+            match input.read_append(buffer, length - filled, work, cancel)? {
                 Step::Ready(_) => None,
                 Step::NeedInput(request) => Some(Step::NeedInput(request)),
                 Step::Yield => Some(Step::Yield),
@@ -559,9 +633,10 @@ impl Reader {
         ))
     }
 
-    fn finish_packet(&self, reading: Reading, payload: Bytes) -> Result<Output> {
+    #[inline(always)]
+    fn finish_packet(tracks: &[Track], reading: Reading, payload: Bytes) -> Result<Output> {
         let Reading { track, sample, .. } = reading;
-        let track = &self.tracks.as_slice()[track];
+        let track = &tracks[track];
         let ticks = |value: Option<i128>| {
             value
                 .map(|ticks| i64::try_from(ticks).map_err(|_| Error::Overflow))
@@ -576,6 +651,18 @@ impl Reader {
             payload,
         })))
     }
+}
+
+/// One step of the open.
+// Out of line: inlined, the opener's frame becomes the frame of every packet step.
+#[inline(never)]
+fn open_step(
+    opener: &mut MovieOpen,
+    input: &mut InputCursor,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+) -> Result<OpenStep> {
+    opener.advance(input, work, cancel)
 }
 
 /// Takes the head sample that starts first in the file, with its track's index; the
@@ -734,10 +821,11 @@ impl ContainerReader for Reader {
     fn fail(&mut self, source: SourceId, token: InputToken, failure: SourceFailure) -> Result<()> {
         self.input.fail(source, token, failure)
     }
-    /// Keeps nothing: the source is read and indexed again from its start.
+    /// Keeps nothing: the source is read and indexed again from its start, which a
+    /// source without random access has to be able to supply again.
     fn reset(&mut self) -> Result<InputRequest> {
         let request = self.input.reset(0)?;
-        self.phase = Phase::Open(MovieOpen::new(&self.input, self.limits.open)?);
+        self.phase = Phase::Open(MovieOpen::for_source(&self.input, self.limits.open)?);
         self.movie = None;
         self.tracks.clear();
         self.reading = None;
@@ -759,7 +847,9 @@ impl ContainerReader for Reader {
     /// or before it, or the first one if none is. Other tracks resume at their
     /// first sample at or after that time, which may not be a sync sample. The
     /// search reads no media and may scan every sample of the track. Failing to
-    /// find a sync sample is reported by `step` and needs [`Reader::reset`].
+    /// find a sync sample is reported by `step` and needs [`Reader::reset`]. A source
+    /// without random access refuses the request with the cursor's
+    /// `Error::Unsupported` and goes on delivering.
     ///
     /// The returned request is the current position; a later `NeedInput` names
     /// the landing range.

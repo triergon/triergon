@@ -9,7 +9,7 @@
   "contract": [
     "Drive the Matroska, ISO BMFF, TS188 and M2TS192 AnyReader source lifecycle under the ContainerReader and InputRequest API contracts. Test known and unknown source length with both random-access and sequential capabilities.",
     "Compare the exposed capabilities before and after restart. Require every reset to issue an offset-zero request with the source and token used by the next step. The parser may ask for a shorter first window. Reject a failure from the wrong source or old generation and check persistent Transport and Cancelled outcomes before resetting.",
-    "Fold the successful Transport and Cancelled cycles as kinds 1 and 2. Kind 3 records the ISO BMFF reader's documented refusal of a sequential source. All rows record the source length (zero when unknown) and random-access flag."
+    "Fold the Transport and Cancelled cycles as kinds 1 and 2. Every row records the source length (zero when unknown) and the random-access flag."
   ],
   "required_profiles": ["mkv", "mp4", "ts188", "m2ts192"],
   "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],

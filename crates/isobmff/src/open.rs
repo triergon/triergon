@@ -733,6 +733,12 @@ impl MovieOpen {
         Self::new_inner(input, limits, false, true)
     }
 
+    /// The open a source's capabilities call for: [`new`](Self::new) with random
+    /// access, [`new_progressive`](Self::new_progressive) without.
+    pub(crate) fn for_source(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
+        Self::new_inner(input, limits, false, !input.capabilities().random_access)
+    }
+
     /// Opens with terminal media declarations preserved and legacy QuickTime
     /// data handlers and dependency flags admitted. Limits are as in [`Self::new`].
     pub fn new_recovery(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
