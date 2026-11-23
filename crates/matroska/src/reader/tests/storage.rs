@@ -205,15 +205,6 @@ fn pending_blocking_read_and_frozen_source_owners_have_the_same_exact_floor() {
     assert_eq!(pool.used(), baseline);
 }
 
-/// The two facts of the reader's layout its callers were measured with: the
-/// Cluster time's tag, its largest niche, at offset 0, where an enum around the
-/// reader keeps its own tag, and on 64-bit hosts its size.
-#[test]
-fn the_reader_keeps_its_niche_first_and_its_measured_size() {
-    assert_eq!(std::mem::offset_of!(Reader, stream.cluster_time), 0);
-    #[cfg(target_pointer_width = "64")]
-    assert_eq!(size_of::<Reader>(), 8896);
-}
 #[cfg(target_pointer_width = "64")]
 #[test]
 fn performance_lace_workspace_keeps_one_descriptor_arena() {

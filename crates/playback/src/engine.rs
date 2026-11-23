@@ -117,6 +117,11 @@ impl TrackInfo for Track<'_> {
     reason = "bounded inline format state; no uncharged boxed parser"
 )]
 #[derive(Debug)]
+// An explicit tag, so that the layout does not depend on which engine is the largest
+// or where its niches lie: every engine sits at the same offset. A word, as the
+// reader's niche word it replaces was: a byte or a four-byte tag cost HLS segments up
+// to +0.22% and +0.16% of their instructions.
+#[repr(u64)]
 pub enum Engine {
     /// A Matroska reader.
     Matroska(MkvEngine),

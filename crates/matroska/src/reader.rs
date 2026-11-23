@@ -30,7 +30,6 @@ use crate::{
 };
 use head::{EbmlJob, SeekHeadJob};
 use std::convert::Infallible;
-use std::mem::MaybeUninit;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Backpressure, Budget, BudgetVec, InputRequest, InputToken, InputWindow, SourceCapabilities,
@@ -267,8 +266,6 @@ impl Control {
 #[derive(Debug)]
 #[repr(C)]
 struct Stream {
-    // First: this tag is the reader's largest niche, and an enum around the reader
-    // keeps its own tag there.
     cluster_time: Option<u64>,
     state_coverage_contiguous: bool,
     state_seen: bool,
@@ -296,22 +293,6 @@ struct Stream {
     state_coverage_end: u64,
     seek_index: Option<Box<seek_index::ImmutableSeekIndex>>,
     state: State,
-    reserve: Reserve,
-}
-
-/// Bytes after the transaction workspace that keep the reader at the size its
-/// callers were measured with: they hold it inline, and a smaller reader moves
-/// their own fields.
-#[derive(Clone, Copy)]
-struct Reserve([MaybeUninit<u8>; RESERVE]);
-#[cfg(target_pointer_width = "64")]
-const RESERVE: usize = 6752 - size_of::<State>();
-#[cfg(not(target_pointer_width = "64"))]
-const RESERVE: usize = 0;
-impl std::fmt::Debug for Reserve {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} reserved bytes", self.0.len())
-    }
 }
 
 /// An incremental Matroska and WebM reader over windows the caller supplies. Each
@@ -442,7 +423,6 @@ impl Reader {
                 state_coverage_end: 0,
                 seek_index: None,
                 state: State::Envelope,
-                reserve: Reserve([MaybeUninit::uninit(); RESERVE]),
             },
             control: Control::Head,
             gate: Gate::Open,
