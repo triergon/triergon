@@ -674,8 +674,8 @@ impl MovieOpen {
         if w.remaining() == 0 {
             return Ok(OpenStep::Yield);
         }
-        if self.pending_header.is_some() {
-            return self.announced_header(input, w);
+        if let Some(header) = self.pending_header {
+            return self.announced_header(header, input, w);
         }
         if self.pending_metadata.is_some() {
             return self.metadata(w);
@@ -939,15 +939,13 @@ impl MovieOpen {
     }
     fn announced_header(
         &mut self,
+        h: BoxHeader,
         input: &mut InputCursor,
         w: &mut WorkBudget,
     ) -> Result<OpenStep> {
         if !w.try_charge(1) {
             return Ok(OpenStep::Yield);
         }
-        let h = self
-            .pending_header
-            .ok_or(Error::Invalid("pending MP4 header missing"))?;
         if h.kind == *b"mdat" {
             if self.media.len() >= self.limits.roots {
                 return Err(Error::Limit {
