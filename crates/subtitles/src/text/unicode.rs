@@ -93,37 +93,6 @@ impl Cursor {
         })
     }
 
-    fn poll_multibyte(
-        &mut self,
-        bytes: &[u8],
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Poll<Scalar>> {
-        loop {
-            cancelled(cancel)?;
-            let decoder = self
-                .multibyte
-                .as_mut()
-                .ok_or(Error::Invalid("multibyte cursor absent"))?;
-            if self.at == self.end {
-                decoder.finish(cancel)?;
-                return Ok(Poll::End);
-            }
-            let byte = *bytes
-                .get(self.at)
-                .ok_or(Error::Invalid("multibyte source range"))?;
-            match decoder.push_table(byte, work, cancel)? {
-                DecodeStep::Yield => return Ok(Poll::Yield),
-                DecodeStep::NeedInput => self.at = decoder.position(),
-                DecodeStep::Scalar(scalar) => {
-                    self.at = scalar.range.end;
-                    self.scalar_start = scalar.range.start;
-                    return self.scalar(u32::from(scalar.value)).map(Poll::Ready);
-                }
-            }
-        }
-    }
-
     /// The next scalar. What a multibyte profile decodes outside its table
     /// ([`outside_table`](Self::outside_table)) is resolved here.
     #[inline(always)]
@@ -181,9 +150,8 @@ impl Cursor {
         }
     }
 
-    /// The next scalar of what the encoding's own tables hold. A multibyte
-    /// profile's byte tests and table lookups are calls out of it: inlined,
-    /// they cost every character, ASCII included.
+    /// The next scalar from the encoding's own tables.
+    // Keep table lookups separate from scalar decoding to protect the ASCII path.
     #[inline(never)]
     pub(super) fn step(
         &mut self,
@@ -191,8 +159,26 @@ impl Cursor {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Poll<Scalar>> {
-        if self.multibyte.is_some() {
-            return self.poll_multibyte(bytes, work, cancel);
+        if let Some(decoder) = &mut self.multibyte {
+            loop {
+                cancelled(cancel)?;
+                if self.at == self.end {
+                    decoder.finish(cancel)?;
+                    return Ok(Poll::End);
+                }
+                let byte = *bytes
+                    .get(self.at)
+                    .ok_or(Error::Invalid("multibyte source range"))?;
+                match decoder.push_table(byte, work, cancel)? {
+                    DecodeStep::Yield => return Ok(Poll::Yield),
+                    DecodeStep::NeedInput => self.at = decoder.position(),
+                    DecodeStep::Scalar(scalar) => {
+                        self.at = scalar.range.end;
+                        self.scalar_start = scalar.range.start;
+                        return self.scalar(u32::from(scalar.value)).map(Poll::Ready);
+                    }
+                }
+            }
         }
         loop {
             cancelled(cancel)?;
