@@ -26,19 +26,30 @@ pub enum StartupStep {
     /// The startup context is known: call `finish`.
     Ready,
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum Phase {
+    Window,
+    Prefix,
+    Eof,
+    Bootstrap,
+    Ready,
+    Failed,
+}
+
 /// Reads the startup context of a TS input before playback: a finite entity read
 /// whole up to its confirmed end, or an M2TS prefix ([`Self::new_m2ts_prefix`]).
 #[derive(Debug)]
 pub struct Startup<S: Source> {
     // An inline bootstrap phase raises M2TS startup instruction counts by 14% through a copy.
-    input: Option<InputCursor>,
-    source: Option<SourceOwner<S>>,
+    input: InputCursor,
+    source: SourceOwner<S>,
     format: PacketFormat,
     bootstrap: Option<InputBootstrap>,
     prefix: Option<PrefixRead>,
     eof_request: Option<InputRequest>,
     context: Option<InputContext>,
-    failed: bool,
+    phase: Phase,
 }
 /// A TS input with its startup context, ready for a player.
 #[derive(Debug)]
@@ -60,14 +71,14 @@ impl<S: Source> Startup<S> {
             return Err(Error::Invalid("PES startup requires input at offset zero"));
         }
         Ok(Self {
-            input: Some(selected.input),
-            source: Some(selected.source),
+            input: selected.input,
+            source: selected.source,
             format,
             bootstrap: None,
             prefix: None,
             eof_request: None,
             context: None,
-            failed: false,
+            phase: Phase::Window,
         })
     }
     /// Read one bounded M2TS probe from a fresh selected Source. The cursor
@@ -83,6 +94,7 @@ impl<S: Source> Startup<S> {
         }
         let bytes = BudgetVec::new(selected.input.budget());
         let mut startup = Self::new(selected)?;
+        startup.phase = Phase::Prefix;
         startup.prefix = Some(PrefixRead {
             bytes,
             pending: None,
@@ -93,17 +105,15 @@ impl<S: Source> Startup<S> {
     /// Reads within `w`. A failure closes the source and is final, except backpressure
     /// or an allocation failure while reading an M2TS prefix.
     pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<StartupStep> {
-        if self.failed {
+        if self.phase == Phase::Failed {
             return Err(Error::Closed);
         }
         let result = self.inner(w, c);
-        let retry = self.prefix.is_some()
+        let retry = self.phase == Phase::Prefix
             && matches!(&result, Err(Error::Backpressure { .. } | Error::Allocation));
         if result.is_err() && !retry {
-            self.failed = true;
-            if let Some(source) = self.source.as_mut() {
-                source.close();
-            }
+            self.phase = Phase::Failed;
+            self.source.close();
         }
         result
     }
@@ -114,19 +124,21 @@ impl<S: Source> Startup<S> {
         if w.remaining() == 0 {
             return Ok(StartupStep::Yield);
         }
-        if self.context.is_some() {
+        if self.phase == Phase::Ready {
             return Ok(StartupStep::Ready);
         }
-        let input = self.input.as_mut().ok_or(Error::Closed)?;
-        let source = self.source.as_mut().ok_or(Error::Closed)?;
-        if let Some(prefix) = self.prefix.as_mut() {
+        let input = &mut self.input;
+        let source = &mut self.source;
+        if self.phase == Phase::Prefix {
+            let prefix = self.prefix.as_mut().ok_or(Error::Closed)?;
             if let Some(bootstrap) = prefix.poll(input, source, w, c)? {
                 self.bootstrap = Some(bootstrap);
                 self.prefix = None;
+                self.phase = Phase::Bootstrap;
             }
             return Ok(StartupStep::Yield);
         }
-        if self.bootstrap.is_none() {
+        if self.phase == Phase::Window {
             let request = input.request();
             match source.poll(&request, w, c)? {
                 SourceReply::Pending => return Ok(StartupStep::Yield),
@@ -162,11 +174,13 @@ impl<S: Source> Startup<S> {
                     eof.maximum = 1;
                     self.bootstrap = Some(bootstrap);
                     self.eof_request = Some(eof);
+                    self.phase = Phase::Eof;
                     return Ok(StartupStep::NeedEof);
                 }
             }
         }
-        if let Some(request) = self.eof_request.as_ref() {
+        if self.phase == Phase::Eof {
+            let request = self.eof_request.as_ref().ok_or(Error::Closed)?;
             match source.poll(request, w, c)? {
                 SourceReply::Pending => return Ok(StartupStep::NeedEof),
                 SourceReply::Failed {
@@ -203,6 +217,7 @@ impl<S: Source> Startup<S> {
                         .ok_or(Error::Closed)?
                         .observe_entity_eof(input, source, &token, request.offset)?;
                     self.eof_request = None;
+                    self.phase = Phase::Bootstrap;
                 }
             }
             return Ok(StartupStep::Yield);
@@ -217,23 +232,23 @@ impl<S: Source> Startup<S> {
             InputStep::Yield => Ok(StartupStep::Yield),
             InputStep::Ready(context) => {
                 self.context = Some(context);
+                self.phase = Phase::Ready;
                 Ok(StartupStep::Ready)
             }
         }
     }
     /// The bound input. Fails with `Closed` after a failure and with `Invalid` before
     /// `Ready`.
-    pub fn finish(mut self) -> Result<BoundInput<S>> {
-        if self.failed {
+    pub fn finish(self) -> Result<BoundInput<S>> {
+        if self.phase == Phase::Failed {
             return Err(Error::Closed);
         }
         Ok(BoundInput {
             context: self
                 .context
-                .take()
                 .ok_or(Error::Invalid("PES startup context not ready"))?,
-            input: self.input.take().ok_or(Error::Closed)?,
-            source: self.source.take().ok_or(Error::Closed)?,
+            input: self.input,
+            source: self.source,
             format: self.format,
         })
     }
