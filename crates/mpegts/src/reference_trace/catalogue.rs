@@ -527,7 +527,7 @@ impl Catalogue {
                         "demux catalogue PAT entry disagrees with the encoded program or PID",
                     ));
                 }
-                if entry[2] & 0xe0 != 0xe0 || !pid::ELEMENTARY.contains(&expected.pid) {
+                if !pid::ELEMENTARY.contains(&expected.pid) {
                     return Err(Error::Invalid(
                         "demux catalogue PAT has an invalid encoded PMT PID",
                     ));
