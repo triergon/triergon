@@ -101,29 +101,68 @@ static int reader_refusal(ViewWork *work)
 
 typedef struct {
     AVProbeData data;
-    int elementary;
+    int elementary, whole;
     uint8_t padded[];
 } ReaderProbe;
 
+static uint64_t reader_probe_verdict(const char *name, int elementary)
+{
+    if (elementary) {
+        if (!strcmp(name, "flac")) return 1;
+        if (!strcmp(name, "mp3")) return 2;
+        if (!strcmp(name, "aac")) return 3;
+        if (!strcmp(name, "ac3") || !strcmp(name, "eac3")) return 4;
+    } else {
+        if (!strcmp(name, "matroska,webm")) return 5;
+        if (!strcmp(name, "mov,mp4,m4a,3gp,3g2,mj2")) return 6;
+        if (!strcmp(name, "ogg")) return 7;
+        if (!strcmp(name, "mpegts")) return 8;
+    }
+    return 0;
+}
+
+/* The format the opener selects from a whole input: av_probe_input_buffer2 over a
+ * non-seekable stream that ends with the input, at the default probe size. */
+static int reader_probe_open(const ReaderProbe *probe, const AVInputFormat **format)
+{
+    ReaderSource source = {probe->padded, (size_t)probe->data.buf_size, 0};
+    uint8_t *buffer = av_malloc(4096);
+    if (!buffer)
+        return AVERROR(ENOMEM);
+    AVIOContext *io = avio_alloc_context(buffer, 4096, 0, &source, reader_read, NULL, NULL);
+    if (!io) {
+        av_free(buffer);
+        return AVERROR(ENOMEM);
+    }
+    int score = av_probe_input_buffer2(io, format, "", NULL, 0, 0);
+    av_freep(&io->buffer);
+    avio_context_free(&io);
+    return score;
+}
+
+/* A whole input folds the opener's selection. A shorter prefix folds the best-scoring
+ * format and whether its score is at most AVPROBE_SCORE_RETRY, at which the public
+ * header recommends a retry with a larger probe buffer. */
 static int reader_probe(const ViewCase *input, ViewWork *work)
 {
     const ReaderProbe *probe = input->prepared;
+    const AVInputFormat *format = NULL;
     int score = 0;
-    const AVInputFormat *format = av_probe_input_format3(&probe->data, 1, &score);
-    const char *name = format && score > AVPROBE_SCORE_RETRY ? format->name : "";
-    uint64_t verdict = 0;
-    if (probe->elementary) {
-        if (!strcmp(name, "flac")) verdict = 1;
-        else if (!strcmp(name, "mp3")) verdict = 2;
-        else if (!strcmp(name, "aac")) verdict = 3;
-        else if (!strcmp(name, "ac3") || !strcmp(name, "eac3")) verdict = 4;
+    uint64_t retry = 0;
+    if (probe->whole) {
+        score = reader_probe_open(probe, &format);
+        if (score < 0 && score != AVERROR_INVALIDDATA && score != AVERROR_EOF)
+            return 2;
     } else {
-        if (!strcmp(name, "matroska,webm")) verdict = 5;
-        else if (!strcmp(name, "mov,mp4,m4a,3gp,3g2,mj2")) verdict = 6;
-        else if (!strcmp(name, "ogg")) verdict = 7;
-        else if (!strcmp(name, "mpegts")) verdict = 8;
+        format = av_probe_input_format3(&probe->data, 1, &score);
+        retry = score <= AVPROBE_SCORE_RETRY;
     }
-    reader_record(work, 3, &verdict, 1, NULL, 0);
+    const char *name = format && score >= 0 ? format->name : "";
+    const uint64_t words[] = {reader_probe_verdict(name, probe->elementary), retry};
+    reader_record(work, 3, words, 2, NULL, 0);
+    if (work->trace)
+        fprintf(stderr, "probe %s name=%s score=%d\n", probe->whole ? "opener" : "prefix",
+                name, score);
     return 0;
 }
 
@@ -143,12 +182,15 @@ static int reader_probe_prepare(ViewCase *input)
         if (value < length)
             length = value;
     }
+    if (length > INT_MAX)
+        return 2;
     ReaderProbe *probe = calloc(1, sizeof(*probe) + length + AVPROBE_PADDING_SIZE);
     if (!probe)
         return 2;
     memcpy(probe->padded, input->data, length);
     probe->data = (AVProbeData){.filename = "", .buf = probe->padded, .buf_size = (int)length};
     probe->elementary = elementary;
+    probe->whole = length == input->size;
     input->name = "media-probe";
     input->prepared = probe;
     input->release = free;

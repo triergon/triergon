@@ -40,27 +40,33 @@ pub(super) fn operation<'a>(
                 Some("container") => false,
                 _ => return Err("unknown probe family".into()),
             };
+            // A whole input is decided with the bytes it has; a shorter prefix may also
+            // answer that more bytes are wanted.
+            let whole = prefix.len() == input.len();
             Ok(Operation {
                 name: "media-probe",
                 run: Box::new(move |work, trace| {
-                    let verdict = if elementary {
+                    let [verdict, more] = if elementary {
                         match elementary::probe(prefix) {
-                            Some(Kind::Flac) => 1,
-                            Some(Kind::MpegAudio) => 2,
-                            Some(Kind::Adts) => 3,
-                            Some(Kind::Ac3) => 4,
-                            None => 0,
+                            Some(Kind::Flac) => [1, 0],
+                            Some(Kind::MpegAudio) => [2, 0],
+                            Some(Kind::Adts) => [3, 0],
+                            Some(Kind::Ac3) => [4, 0],
+                            None => [0, u64::from(!whole)],
                         }
+                    } else if whole {
+                        [
+                            triergon::probe_whole(prefix).map_or(0, container_verdict),
+                            0,
+                        ]
                     } else {
                         match triergon::probe(prefix) {
-                            Probed::Format(SourceFormat::Matroska) => 5,
-                            Probed::Format(SourceFormat::Isobmff) => 6,
-                            Probed::Format(SourceFormat::Ogg) => 7,
-                            Probed::Format(SourceFormat::Ts | SourceFormat::M2ts) => 8,
-                            _ => 0,
+                            Probed::Format(format) => [container_verdict(format), 0],
+                            Probed::Need(_) => [0, 1],
+                            Probed::Unrecognised => [0, 0],
                         }
                     };
-                    record(work, trace, 3, &[verdict], &[])
+                    record(work, trace, 3, &[verdict, more], &[])
                 }),
             })
         }
@@ -105,6 +111,17 @@ pub(super) fn operation<'a>(
             })
         }
         _ => Err(format!("usage: {prefix} operation is unavailable")),
+    }
+}
+
+/// The media-probe verdict of a container family format; 0 for an elementary stream.
+fn container_verdict(format: SourceFormat) -> u64 {
+    match format {
+        SourceFormat::Matroska => 5,
+        SourceFormat::Isobmff => 6,
+        SourceFormat::Ogg => 7,
+        SourceFormat::Ts | SourceFormat::M2ts => 8,
+        SourceFormat::Flac | SourceFormat::MpegAudio | SourceFormat::Adts | SourceFormat::Ac3 => 0,
     }
 }
 

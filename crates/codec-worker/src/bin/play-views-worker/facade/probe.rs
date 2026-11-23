@@ -30,9 +30,12 @@ pub(super) fn prepare<'a>(input: &'a [u8], arguments: &[&str]) -> Result<Operati
     };
     let window = parse(window, 65536)?;
     let pool = Budget::new(16 << 20).map_err(|error| error.to_string())?;
+    let whole = length == input.len();
     Ok(Operation {
         name: "facade-probe",
-        run: Box::new(move |work, trace| run(&input[..length], window, mode, &pool, work, trace)),
+        run: Box::new(move |work, trace| {
+            run(&input[..length], whole, window, mode, &pool, work, trace)
+        }),
     })
 }
 
@@ -67,6 +70,7 @@ impl Seek for Reads<'_> {
 
 fn run(
     input: &[u8],
+    whole: bool,
     window: usize,
     mode: Mode,
     pool: &Budget,
@@ -80,9 +84,18 @@ fn run(
         window,
     };
     let mut needs_random_access = false;
+    let mut more = false;
     let (verdict, width, replay) = match mode {
         Mode::Bytes => {
-            let (verdict, width) = format(triergon::probe(input));
+            // A whole input is decided with the bytes it has; a shorter prefix may
+            // answer that more bytes are wanted.
+            let probed = if whole {
+                triergon::probe_whole(input).map_or(Probed::Unrecognised, Probed::Format)
+            } else {
+                triergon::probe(input)
+            };
+            more = matches!(probed, Probed::Need(_));
+            let (verdict, width) = format(probed);
             (verdict, width, None)
         }
         Mode::Blocking => match open_blocking(source, pool) {
@@ -128,7 +141,8 @@ fn run(
     let words = [
         verdict,
         width,
-        u64::from(replay.is_some()),
+        // Bytes mode: whether the prefix asks for more bytes. The adapters: a replay.
+        u64::from(replay.is_some() || more),
         replay.map_or(u64::from(needs_random_access), |length| length as u64),
     ];
     let words = &words[..if replay.is_some() || needs_random_access {

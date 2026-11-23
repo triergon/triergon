@@ -56,13 +56,27 @@ static uint64_t playback_probe_verdict(const char *name, PlaybackProbeMode mode)
     return 0;
 }
 
-/* H.222.0 carrier sync at byte zero, or after the four-byte M2TS prefix.
- * The three-sync fixture rule has no width verdict for a tie. */
+/* H.222.0 carrier sync at byte zero, or after the four-byte M2TS prefix, at three
+ * positions; a tie has no width. */
 static size_t playback_probe_width(const uint8_t *data, size_t size)
 {
     int ts = size > 376 && data[0] == 0x47 && data[188] == 0x47 && data[376] == 0x47;
     int m2ts = size > 388 && data[4] == 0x47 && data[196] == 0x47 && data[388] == 0x47;
     return ts == m2ts ? 0 : ts ? 188 : 192;
+}
+
+/* FFmpeg names MPEG-TS without a packet spacing. For that verdict, the spacing the sync
+ * bytes of the first three packets inside the input follow: 188 bytes from byte zero
+ * (H.222.0 2.4.3.2), or 192 bytes after the four-byte M2TS prefix; 0 if both or neither. */
+static uint64_t playback_probe_spacing(const uint8_t *data, size_t size)
+{
+    int fits[2] = {1, 1};
+    for (size_t carrier = 0; carrier < 2; ++carrier) {
+        const size_t start = carrier ? 4 : 0, step = carrier ? 192 : 188;
+        for (size_t at = start; at < size && at <= start + 2 * step; at += step)
+            fits[carrier] &= data[at] == 0x47;
+    }
+    return fits[0] == fits[1] ? 0 : fits[0] ? 188 : 192;
 }
 
 static int playback_probe_read(void *opaque, uint8_t *destination, int length)
@@ -98,8 +112,10 @@ static int64_t playback_probe_seek(void *opaque, int64_t offset, int whence)
     return (int64_t)source->offset;
 }
 
+/* The opener's probe over the input as a whole stream, read in windows, then every
+ * byte read back through the same context and checked against the input. */
 static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mode,
-                               const AVInputFormat **format, int *can_seek, int trace)
+                               const AVInputFormat **format, int trace)
 {
     int buffer_size = 4096;
     uint8_t *buffer = av_malloc(buffer_size);
@@ -112,8 +128,9 @@ static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mod
         av_free(buffer);
         return AVERROR(ENOMEM);
     }
-    *can_seek = (io->seekable & AVIO_SEEKABLE_NORMAL) != 0;
-    int score = av_probe_input_buffer2(io, format, "", NULL, 0, 65536);
+    /* The facade's adapters probe at most 64 KiB; the others use the default size. */
+    const unsigned maximum = mode >= PROBE_BLOCKING ? 65536 : 0;
+    int score = av_probe_input_buffer2(io, format, "", NULL, 0, maximum);
     if (trace)
         fprintf(stderr, "probe consumed %zu bytes before handoff\n", source->offset);
     if (score >= 0 && *format && playback_probe_verdict((*format)->name, mode)) {
@@ -137,20 +154,18 @@ static int playback_probe_avio(PlaybackProbeInput *source, PlaybackProbeMode mod
     return score;
 }
 
+/* Bytes mode folds `3 verdict width retry`: for the whole input the opener's selection
+ * (retry 0); for a shorter prefix the best-scoring format of av_probe_input_format3 and
+ * whether its score is at most AVPROBE_SCORE_RETRY, at which the public header
+ * recommends a retry with a larger probe buffer. Every other mode opens the prefix as a
+ * whole stream and folds `3 verdict width replay [length [md5]]`. */
 static int playback_probe_run(const ViewCase *input, ViewWork *work)
 {
     const PlaybackProbeCase *probe = input->prepared;
     const AVInputFormat *format = NULL;
     int score = 0;
-    size_t replay_length = 0;
-    int can_seek = 0;
-    if (probe->mode >= PROBE_BLOCKING) {
-        PlaybackProbeInput source = {input->data, probe->length, 0, probe->window};
-        score = playback_probe_avio(&source, probe->mode, &format, &can_seek, work->trace);
-        if (score < 0 && score != AVERROR_INVALIDDATA && score != AVERROR_EOF)
-            return 2;
-        replay_length = source.size;
-    } else {
+    const int prefix = probe->mode == PROBE_BYTES && probe->length < input->size;
+    if (prefix) {
         uint8_t *buffer = av_mallocz(probe->length + AVPROBE_PADDING_SIZE);
         if (!buffer)
             return 2;
@@ -158,46 +173,51 @@ static int playback_probe_run(const ViewCase *input, ViewWork *work)
         AVProbeData data = {.filename = "", .buf = buffer, .buf_size = (int)probe->length};
         format = av_probe_input_format3(&data, 1, &score);
         av_free(buffer);
-        if (score <= AVPROBE_SCORE_RETRY)
-            format = NULL;
+    } else {
+        PlaybackProbeInput source = {input->data, probe->length, 0, probe->window};
+        score = playback_probe_avio(&source, probe->mode, &format, work->trace);
+        if (score < 0 && score != AVERROR_INVALIDDATA && score != AVERROR_EOF)
+            return 2;
     }
     const char *name = format && score >= 0 ? format->name : "";
     const uint64_t verdict = playback_probe_verdict(name, probe->mode);
     const int adapter = probe->mode >= PROBE_BLOCKING;
-    const uint64_t width = !adapter ? playback_probe_width(input->data, probe->length) : 0;
-    /* For these ISO BMFF opening boxes, compare the facade reader's capability
-     * requirement separately from the AVIO probe and validated AVIO replay. */
-    const int needs_random_access = probe->mode == PROBE_SEQUENTIAL && !can_seek &&
-        verdict == 6 && probe->length >= 8 &&
-        (!memcmp(input->data + 4, "ftyp", 4) || !memcmp(input->data + 4, "moof", 4));
-    const int replay = verdict && !needs_random_access &&
-        (adapter || (probe->mode < PROBE_BYTES && verdict < 9));
+    /* The adapters fold no width. Where no transport is selected, the playback modes
+     * fold the same three-sync prefix fact the playback candidate states. */
+    uint64_t width = 0;
+    if (!adapter && verdict == 8)
+        width = playback_probe_spacing(input->data, probe->length);
+    else if (probe->mode < PROBE_BYTES)
+        width = playback_probe_width(input->data, probe->length);
+    uint64_t words[4] = {verdict, width};
+    size_t count = 3;
     uint8_t hash[16];
     size_t hash_size = 0;
-    if (replay && !adapter) {
-        replay_length = probe->length;
-        av_md5_sum(hash, input->data, replay_length);
-        hash_size = sizeof(hash);
-    }
-    const uint64_t words[] = {verdict, width, (uint64_t)replay,
-                              needs_random_access ? 1 : replay_length};
-    view_record(work, 3, words, replay || needs_random_access ? 4 : 3, hash, hash_size);
-    if (work->trace) {
-        printf("3 %" PRIu64 " %" PRIu64 " %d", verdict, width, replay);
-        if (replay)
-            printf(" %zu", replay_length);
-        if (needs_random_access) {
-            printf(" 1");
-            fprintf(stderr, "AVIO replay verified %zu bytes; facade requires random access\n",
-                    replay_length);
+    if (probe->mode == PROBE_BYTES) {
+        words[2] = prefix && score <= AVPROBE_SCORE_RETRY;
+    } else if (verdict && (adapter || verdict < 9)) {
+        /* playback_probe_avio has read every byte back through the opener. */
+        words[2] = 1;
+        words[3] = probe->length;
+        count = 4;
+        if (!adapter) {
+            av_md5_sum(hash, input->data, probe->length);
+            hash_size = sizeof(hash);
         }
+    }
+    view_record(work, 3, words, count, hash, hash_size);
+    if (work->trace) {
+        printf("3");
+        for (size_t i = 0; i < count; ++i)
+            printf(" %" PRIu64, words[i]);
         if (hash_size) {
             putchar(' ');
             for (size_t i = 0; i < hash_size; ++i)
                 printf("%02x", hash[i]);
         }
         putchar('\n');
-        fprintf(stderr, "probe name=%s score=%d\n", name, score);
+        fprintf(stderr, "probe %s name=%s score=%d\n", prefix ? "prefix" : "opener", name,
+                score);
     }
     return 0;
 }
