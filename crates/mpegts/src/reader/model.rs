@@ -549,18 +549,10 @@ impl AccessUnit {
     }
     pub(super) fn anchor_offset(&self) -> u64 {
         match self {
-            Self::Video(unit) => {
-                unit.nals()
-                    .first()
-                    .map_or(unit.range.start, |nal| match nal.facts().framing {
-                        triergon_framing::nal::NalFraming::AnnexB { prefix_offset, .. } => {
-                            prefix_offset
-                        }
-                        triergon_framing::nal::NalFraming::LengthPrefixed { .. } => {
-                            unreachable!("raw reader uses Annex B")
-                        }
-                    })
-            }
+            Self::Video(unit) => unit
+                .nals()
+                .first()
+                .map_or(unit.range.start, |nal| nal.facts().framing.offset),
             _ => self.range().start,
         }
     }

@@ -95,17 +95,9 @@ impl Build {
                 return Err(Error::Cancelled);
             }
             let facts = nal.facts();
-            let triergon_framing::nal::NalFraming::AnnexB {
-                leading_zero_bytes,
-                start_code_bytes,
-                ..
-            } = facts.framing
-            else {
-                unreachable!()
-            };
             let (bytes, total, zeros): (&[u8], usize, bool) = match self.part {
-                0 => (&ZEROS, leading_zero_bytes, true),
-                1 if start_code_bytes == 4 => (&[0, 0, 0, 1], 4, false),
+                0 => (&ZEROS, facts.framing.leading_zero_bytes, true),
+                1 if facts.framing.start_code_bytes == 4 => (&[0, 0, 0, 1], 4, false),
                 1 => (&[0, 0, 1], 3, false),
                 2 => (nal.bytes().as_ref(), nal.bytes().len(), false),
                 3 => (&ZEROS, facts.trailing_zero_bytes, true),

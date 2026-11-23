@@ -5,7 +5,7 @@ use crate::retryable;
 use crate::{
     avc::picture::AvcPictures,
     hevc,
-    nal::{Codec, NalFraming, NalHeader, NalUnit, ReaderLimits, reader::AnnexBNalReader},
+    nal::{AnnexBPrefix, Codec, NalHeader, NalUnit, ReaderLimits, reader::AnnexBNalReader},
 };
 use std::{
     ops::Range,
@@ -69,13 +69,13 @@ pub struct RawAccessUnit {
     pub has_vcl: bool,
     /// Coded IDR or IRAP indication, before any decoder or seek policy.
     pub random_access: bool,
-    nals: BudgetVec<NalUnit>,
+    nals: BudgetVec<NalUnit<AnnexBPrefix>>,
 }
 
 impl RawAccessUnit {
     /// The access unit's NAL units in source order, parameter sets, SEI and
     /// delimiters included.
-    pub fn nals(&self) -> &[NalUnit] {
+    pub fn nals(&self) -> &[NalUnit<AnnexBPrefix>] {
         self.nals.as_slice()
     }
 
@@ -84,22 +84,12 @@ impl RawAccessUnit {
     pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
         self.nals().iter().flat_map(|nal| {
             let facts = nal.facts();
-            let (leading, prefix) = match facts.framing {
-                NalFraming::AnnexB {
-                    leading_zero_bytes,
-                    start_code_bytes,
-                    ..
-                } => (
-                    leading_zero_bytes,
-                    if start_code_bytes == 4 {
-                        START_4
-                    } else {
-                        START_3
-                    },
-                ),
-                NalFraming::LengthPrefixed { .. } => unreachable!("raw reader uses Annex B"),
+            let prefix = if facts.framing.start_code_bytes == 4 {
+                START_4
+            } else {
+                START_3
             };
-            zeros(leading)
+            zeros(facts.framing.leading_zero_bytes)
                 .chain([prefix, nal.bytes().as_ref()])
                 .chain(zeros(facts.trailing_zero_bytes))
         })
@@ -121,7 +111,7 @@ struct Role {
     random_access: bool,
 }
 
-fn hevc_role(nal: &NalUnit, reader: &AnnexBNalReader) -> Result<Role> {
+fn hevc_role(nal: &NalUnit<AnnexBPrefix>, reader: &AnnexBNalReader) -> Result<Role> {
     let NalHeader::Hevc {
         nal_unit_type,
         layer_id,
@@ -146,7 +136,11 @@ fn hevc_role(nal: &NalUnit, reader: &AnnexBNalReader) -> Result<Role> {
     })
 }
 
-fn avc_role(pictures: &mut AvcPictures, nal: &NalUnit, has_vcl: bool) -> Result<Role> {
+fn avc_role(
+    pictures: &mut AvcPictures,
+    nal: &NalUnit<AnnexBPrefix>,
+    has_vcl: bool,
+) -> Result<Role> {
     let header = nal.facts().header;
     let kind = header.nal_unit_type();
     // H.264 7.4.1.2.3 distinguishes leading NALs from EOS/EOB suffixes.
@@ -163,7 +157,7 @@ fn avc_role(pictures: &mut AvcPictures, nal: &NalUnit, has_vcl: bool) -> Result<
 }
 
 struct PendingNal {
-    nal: NalUnit,
+    nal: NalUnit<AnnexBPrefix>,
     role: Option<Role>,
 }
 
@@ -188,7 +182,7 @@ struct PendingNal {
 pub struct RawAnnexBReader {
     nal: AnnexBNalReader,
     end: Option<SourceLocation>,
-    unit: BudgetVec<NalUnit>,
+    unit: BudgetVec<NalUnit<AnnexBPrefix>>,
     pending: Option<PendingNal>,
     // The NAL limits live in `nal`.
     maximum_access_unit_bytes: usize,
@@ -406,10 +400,7 @@ impl RawAnnexBReader {
             if self.pending.is_none() {
                 match self.nal.step(work, cancel)? {
                     Step::Ready(nal) => {
-                        self.pending = Some(PendingNal {
-                            nal: nal.into(),
-                            role: None,
-                        });
+                        self.pending = Some(PendingNal { nal, role: None });
                     }
                     Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                     Step::Yield => return Ok(Step::Yield),
@@ -455,16 +446,10 @@ impl RawAnnexBReader {
             .as_ref()
             .ok_or(Error::Invalid("raw pending NAL"))?;
         let facts = pending.nal.facts();
-        let NalFraming::AnnexB {
-            prefix_offset,
-            leading_zero_bytes,
-            ..
-        } = facts.framing
-        else {
-            return Err(Error::Invalid("raw NAL framing"));
-        };
-        let start = prefix_offset
-            .checked_sub(leading_zero_bytes as u64)
+        let start = facts
+            .framing
+            .offset
+            .checked_sub(facts.framing.leading_zero_bytes as u64)
             .ok_or(Error::Overflow)?;
         if start != self.next_offset {
             return Err(Error::Invalid("raw Annex B discontinuous extent"));
@@ -513,7 +498,7 @@ impl RawAnnexBReader {
     /// Mutable buffer capacity in bytes and completed NALs awaiting a picture
     /// boundary. Fails if input or an unprocessed NAL is buffered, or sizing overflows.
     #[doc(hidden)]
-    pub fn input_wait_storage(&self) -> Result<(usize, &[NalUnit])> {
+    pub fn input_wait_storage(&self) -> Result<(usize, &[NalUnit<AnnexBPrefix>])> {
         if self.pending.is_some() {
             return Err(Error::Invalid("Annex B reader has an unprocessed NAL"));
         }
@@ -521,7 +506,7 @@ impl RawAnnexBReader {
         let capacity = self
             .unit
             .capacity()
-            .checked_mul(size_of::<NalUnit>())
+            .checked_mul(size_of::<NalUnit<AnnexBPrefix>>())
             .and_then(|bytes| bytes.checked_add(nal_capacity))
             .ok_or(Error::Overflow)?;
         Ok((capacity, self.unit.as_slice()))

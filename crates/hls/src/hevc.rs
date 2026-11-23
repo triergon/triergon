@@ -12,7 +12,7 @@ use triergon_core::{
     SourceId, SourceLocation, Step, WorkBudget,
 };
 use triergon_framing::nal::{
-    Codec, NalFraming, NalHeader, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader, ReaderLimits,
+    Codec, NalHeader, RawAccessUnit, RawAnnexBLimits, RawAnnexBReader, ReaderLimits,
 };
 use triergon_mpegts::{
     AssemblyStep,
@@ -410,9 +410,7 @@ impl Active {
             .as_ref()
             .ok_or(Error::Invalid("HLS HEVC missing access unit"))?;
         let first = unit.nals().first().ok_or(Error::Truncated)?;
-        let NalFraming::AnnexB { prefix_offset, .. } = first.facts().framing else {
-            return Err(Error::Invalid("HLS HEVC NAL framing"));
-        };
+        let prefix_offset = first.facts().framing.offset;
         // A later PES may begin inside this picture or even inside its start
         // code. Select by the prefix's first byte, including across lookahead.
         while let Some(anchor) = self

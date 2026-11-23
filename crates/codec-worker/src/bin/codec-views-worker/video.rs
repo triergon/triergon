@@ -322,7 +322,7 @@ fn drain(
     Ok(())
 }
 
-fn avc_slice(nal: &nal::NalUnit) -> bool {
+fn avc_slice(nal: &nal::NalUnit<nal::AnnexBPrefix>) -> bool {
     matches!(
         nal.facts().header,
         nal::NalHeader::Avc {
