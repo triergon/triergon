@@ -15,7 +15,7 @@ use triergon_core::{
 };
 use triergon_harness_protocol::hex;
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 const SOURCE: SourceId = SourceId(1);
 const NEXT: SourceId = SourceId(2);
@@ -31,7 +31,7 @@ fn caps(length: Option<u64>, random_access: bool) -> SourceCapabilities {
 
 fn row(
     trace: &mut Option<&mut dyn Write>,
-    work: &mut Work,
+    work: &mut Totals,
     kind: u64,
     values: &[u64],
     bytes: &[u8],
@@ -74,7 +74,11 @@ fn require(condition: bool, what: &'static str) -> triergon_core::Result<()> {
     }
 }
 
-fn cursor(input: &[u8], trace: &mut Option<&mut dyn Write>, work: &mut Work) -> Result<(), String> {
+fn cursor(
+    input: &[u8],
+    trace: &mut Option<&mut dyn Write>,
+    work: &mut Totals,
+) -> Result<(), String> {
     let pool = Budget::new(1 << 20).map_err(|e| e.to_string())?;
     let mut reader = InputCursor::new(&pool, SOURCE, caps(Some(input.len() as u64), true), 8)
         .map_err(|e| e.to_string())?;
@@ -307,7 +311,7 @@ impl Seek for Source<'_> {
     }
 }
 
-fn feed(input: &[u8], trace: &mut Option<&mut dyn Write>, work: &mut Work) -> Result<(), String> {
+fn feed(input: &[u8], trace: &mut Option<&mut dyn Write>, work: &mut Totals) -> Result<(), String> {
     for maximum in [1, 8, 64, 8192] {
         let observations = (|| -> triergon_core::Result<_> {
             let pool = Budget::new(1 << 20)?;
@@ -361,7 +365,7 @@ fn feed(input: &[u8], trace: &mut Option<&mut dyn Write>, work: &mut Work) -> Re
 fn blocking(
     input: &[u8],
     trace: &mut Option<&mut dyn Write>,
-    work: &mut Work,
+    work: &mut Totals,
 ) -> Result<(), String> {
     for random_access in [false, true] {
         let mut source = Source::new(input);
@@ -443,7 +447,7 @@ fn blocking_seek(
     pool: &Budget,
     caps: SourceCapabilities,
     trace: &mut Option<&mut dyn Write>,
-    work: &mut Work,
+    work: &mut Totals,
 ) -> Result<(), String> {
     let reader =
         AdtsReader::new(pool, SOURCE, caps, Limits::default(), 7).map_err(|e| e.to_string())?;

@@ -23,8 +23,8 @@ use triergon_harness_protocol::md5;
 #[path = "../../../../triergon/examples/play/pipeline.rs"]
 mod pipeline;
 
-use super::protocol::{Operation, Work};
 use pipeline::{Observer, Options};
+use triergon_harness_runner::{Operation, Totals};
 
 fn options(arguments: &[OsString]) -> std::result::Result<Options, String> {
     let parse_track = |value: &OsStr| {
@@ -121,7 +121,7 @@ struct Raw {
 struct Output<'w, 't> {
     raw: Option<Raw>,
     trace: Option<&'t mut dyn Write>,
-    work: &'w mut Work,
+    work: &'w mut Totals,
 }
 
 impl Observer for Output<'_, '_> {
@@ -301,7 +301,7 @@ pub(super) fn command(arguments: &[OsString]) -> std::result::Result<(), String>
             return Err("input exceeds the worker limit".into());
         }
         let mut stdout = io::stdout().lock();
-        let mut work = Work::default();
+        let mut work = Totals::default();
         let mut output = Output {
             raw: Some(Raw {
                 video: BufWriter::new(File::create(video)?),

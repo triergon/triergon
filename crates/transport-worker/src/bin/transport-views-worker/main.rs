@@ -6,16 +6,16 @@ mod catalogue;
 mod facts;
 mod mux;
 mod packets;
-#[path = "../../../../framing/examples/framing_views/protocol.rs"]
-mod protocol;
 mod reader;
 mod signatures;
 mod source;
 
 use std::process::ExitCode;
 
-const OPERATIONS: &[(&str, protocol::Prepare)] = &[
-    ("views-smoke-", protocol::smoke),
+use triergon_harness_runner::{Prepare, serve, smoke};
+
+const OPERATIONS: &[(&str, Prepare)] = &[
+    ("views-smoke-", smoke),
     ("ts-catalogue-", catalogue::operation),
     ("ts-psi-", catalogue::operation),
     ("ts-video-descriptors-", catalogue::operation),
@@ -35,7 +35,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    protocol::main(std::env::args_os(), OPERATIONS)
+    serve(std::env::args_os(), OPERATIONS)
 }
 
 /// C's entry point, the worker's one exception to `deny(unsafe_code)`.

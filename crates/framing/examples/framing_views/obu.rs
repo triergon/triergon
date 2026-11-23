@@ -5,10 +5,8 @@ use triergon_core::{
 };
 use triergon_framing::av1::{Av1Obu, Av1ObuFraming, Av1ObuLimits, Av1ObuReader};
 
-use super::{
-    envelope,
-    protocol::{Operation, Work},
-};
+use super::envelope;
+use triergon_harness_runner::{Operation, Totals};
 
 const SOURCE: SourceId = SourceId(1);
 const OBU_BYTES: usize = 16 << 20;
@@ -148,7 +146,7 @@ impl Unit {
         &self,
         pool: &Budget,
         input: &[u8],
-        work: &mut Work,
+        work: &mut Totals,
         trace: &mut Option<&mut dyn Write>,
     ) -> Result<(), String> {
         let index = self.index;
@@ -214,7 +212,7 @@ impl Unit {
 }
 
 pub(super) fn record(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     words: &[u64],

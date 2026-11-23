@@ -7,7 +7,7 @@ use triergon_isobmff::{
     index::{MovieFragmentRandomAccessTail, SegmentIndex, TrackFragmentRandomAccess},
 };
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 #[derive(Clone, Copy)]
 enum Kind {
@@ -67,7 +67,7 @@ pub(super) fn parsed_box(
 }
 
 struct Output<'a, 'b> {
-    work: &'a mut Work,
+    work: &'a mut Totals,
     trace: Option<&'b mut dyn Write>,
 }
 

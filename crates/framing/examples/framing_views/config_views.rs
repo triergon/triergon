@@ -11,10 +11,8 @@ use triergon_framing::{
     vp9::{Vp9ConfigContext, Vp9ConfigLimits, Vp9ConfigParser},
 };
 
-use super::{
-    obu::record,
-    protocol::{Action, Operation},
-};
+use super::obu::record;
+use triergon_harness_runner::{Action, Operation};
 
 #[path = "config_views/eac3.rs"]
 mod eac3;

@@ -6,15 +6,15 @@
 mod index;
 #[path = "isobmff_views/packets.rs"]
 mod packets;
-#[path = "../../framing/examples/framing_views/protocol.rs"]
-mod protocol;
 #[path = "isobmff_views/segment_index.rs"]
 mod segment_index;
 #[path = "isobmff_views/trace.rs"]
 mod trace;
 
-const OPERATIONS: &[(&str, protocol::Prepare)] = &[
-    ("views-smoke-", protocol::smoke),
+use triergon_harness_runner::{Prepare, serve, smoke};
+
+const OPERATIONS: &[(&str, Prepare)] = &[
+    ("views-smoke-", smoke),
     ("qt-pcm-", packets::operation),
     ("qt-sound-", packets::operation),
     ("mov-pcm-", packets::operation),
@@ -31,7 +31,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> std::process::ExitCode {
-    protocol::main(std::env::args_os(), OPERATIONS)
+    serve(std::env::args_os(), OPERATIONS)
 }
 
 /// C's entry point, the worker's one exception to `deny(unsafe_code)`.

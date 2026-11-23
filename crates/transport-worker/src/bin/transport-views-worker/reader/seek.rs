@@ -9,7 +9,7 @@ use triergon_harness_protocol::digest::{fold, fold_framed, signed};
 use triergon_mpegts::{AccessUnit, PacketFormat, Reader, ReaderLimits, SourceEpochs};
 
 use super::{CAPACITY, SOURCE, WINDOW, WORK, capabilities, explain, supply};
-use crate::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 pub(super) fn operation<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, String> {
     let [size, program, pid, target, policy, options @ ..] = args else {
@@ -119,7 +119,7 @@ impl SeekCase {
         &self,
         reader: &mut Reader,
         bytes: &Bytes,
-        work: &mut Work,
+        work: &mut Totals,
         trace: &mut Option<&mut dyn Write>,
     ) -> Result<(), String> {
         reader
@@ -143,7 +143,7 @@ impl SeekCase {
         &self,
         reader: &mut Reader,
         bytes: &Bytes,
-        work: &mut Work,
+        work: &mut Totals,
         trace: &mut Option<&mut dyn Write>,
         method: SeekMethod,
     ) -> Result<(), String> {

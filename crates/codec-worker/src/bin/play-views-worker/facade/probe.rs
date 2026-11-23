@@ -4,7 +4,7 @@ use std::cell::Cell;
 use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use triergon::{AnyReader, Budget, Error, Probe, open_blocking, open_sequential};
 
-use super::super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 #[derive(Clone, Copy)]
 enum Mode {
@@ -70,7 +70,7 @@ fn run(
     window: usize,
     mode: Mode,
     pool: &Budget,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let high_water = Cell::new(0);

@@ -4,8 +4,8 @@ use std::ffi::OsString;
 use triergon_matroska::metadata::{Attachment, Chapter, SimpleTag, Tag};
 use triergon_matroska::{Reader, Result};
 
-use super::protocol::Operation;
 use super::side_data::{Input, Rows};
+use triergon_harness_runner::Operation;
 
 const TARGETS: [u64; 4] = [0x63c5, 0x63c9, 0x63c4, 0x63c6];
 

@@ -10,10 +10,10 @@ use triergon_subtitles::text::{
     Addition, Cue, Encoding, Extractor, Format, Input, Limits, RawClock, Status, Timing,
 };
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 pub(super) struct Records<'a, 'b> {
-    pub work: &'a mut Work,
+    pub work: &'a mut Totals,
     pub trace: Option<&'b mut dyn Write>,
 }
 
@@ -106,7 +106,7 @@ pub(super) fn operation<'a>(
     };
     let mode = mode.to_str().ok_or("invalid extraction mode")?;
     let pool = Budget::new(128 * 1024 * 1024).map_err(|error| error.to_string())?;
-    let run: super::protocol::Action<'a> = match mode {
+    let run: triergon_harness_runner::Action<'a> = match mode {
         "raw" => {
             let [start, duration, clock, limit, addition] = rest else {
                 return Err("expected raw timing, clock, limit and addition".into());

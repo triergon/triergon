@@ -10,7 +10,7 @@ use triergon_session::{
     video_decoder, video_decoder_in,
 };
 
-use super::super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 const START: i64 = -4_000_000;
 const PERIOD: i64 = 3_000_000;
@@ -64,7 +64,7 @@ fn enqueue(
 }
 
 fn record(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     fields: &[u64],
 ) -> Result<(), String> {
@@ -85,7 +85,7 @@ fn produce(
     coding: (Codec, VideoCodec),
     canvas: Canvas,
     positions: &BTreeMap<u64, i64>,
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let (codec, video) = coding;
@@ -216,7 +216,7 @@ fn refusal(
     units: &[(i64, &[u8])],
     canvas: Canvas,
     first_rgba: &[u8],
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let invalid = match codec {

@@ -7,7 +7,7 @@ use triergon::{Budget, Error as StorageError};
 use triergon_codec_mpeg1::{Encoder, EncoderConfig, Error, Limits};
 use triergon_pixel::{Geometry, Picture};
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 pub(super) fn operation<'a>(
     _: &str,
@@ -43,7 +43,7 @@ pub(super) fn operation<'a>(
 
 fn run(
     cfg: EncoderConfig,
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let tight = Budget::new(1024).map_err(explain)?;
@@ -138,7 +138,7 @@ fn sequence(cfg: EncoderConfig, bytes: &[u8]) -> Result<(), String> {
 }
 
 fn row(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     words: &[u64],

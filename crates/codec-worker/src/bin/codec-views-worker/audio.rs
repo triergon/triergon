@@ -14,7 +14,7 @@ use triergon_session::TrackDecoder;
 use triergon_codec_aac::adts;
 use triergon_harness_protocol::digest::fold_bytes;
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 pub(super) fn operation<'a>(
     prefix: &str,
@@ -83,7 +83,7 @@ pub(super) fn command(command: &str, _arguments: &[OsString]) -> Result<(), Stri
 }
 
 fn record(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     fields: &[u64],
@@ -258,7 +258,7 @@ fn audio_frames(
 fn file_layouts(
     input: &[u8],
     frame: &mut AudioFrame,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<bool, String> {
     let pool = Budget::new(256 << 20).map_err(|error| error.to_string())?;
@@ -310,7 +310,7 @@ fn file_layouts(
 }
 
 fn frame_info(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     info: &FrameInfo,
     packet: &[u8],
@@ -419,7 +419,7 @@ fn encoding(encoding: SurroundEncoding) -> u64 {
 }
 
 fn layout(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     frame: &AudioFrame,
     levels: Option<DownmixLevels>,
@@ -485,7 +485,7 @@ fn layout(
 }
 
 fn downmix(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     info: &DownmixInfo,
 ) -> Result<(), String> {

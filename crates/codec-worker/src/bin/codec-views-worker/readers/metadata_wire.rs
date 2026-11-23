@@ -5,7 +5,7 @@ use triergon::elementary::{Ac3, Adts, Flac, FlacBlockKind, Format, MpegAudio, Ta
 use triergon::framing::mpeg_audio::{MpegInfoKind, MpegVersion};
 
 use super::metadata::opened;
-use super::{Work, record};
+use super::{Totals, record};
 
 type Emit<'a> = dyn FnMut(u64, &[u64], &[u8]) -> Result<(), String> + 'a;
 
@@ -205,7 +205,7 @@ fn ac3(format: &Ac3, emit: &mut Emit<'_>) -> Result<(), String> {
 pub(super) fn run(
     input: &[u8],
     format: &str,
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let mut emit = |kind, words: &[u64], bytes: &[u8]| {

@@ -6,16 +6,13 @@
 mod extensions;
 #[path = "matroska_views/metadata.rs"]
 mod metadata;
-#[path = "../../framing/examples/framing_views/protocol.rs"]
-mod protocol;
 #[path = "matroska_views/side_data.rs"]
 mod side_data;
-// Use the shared C entry point without adding a dependency to the library package.
-#[path = "../../worker-entry/src/lib.rs"]
-pub mod triergon_worker_entry;
 
-const OPERATIONS: &[(&str, protocol::Prepare)] = &[
-    ("views-smoke-", protocol::smoke),
+use triergon_harness_runner::{Prepare, serve, smoke};
+
+const OPERATIONS: &[(&str, Prepare)] = &[
+    ("views-smoke-", smoke),
     ("mkv-side-data-", side_data::operation),
     ("mkv-codec-state-", side_data::operation),
     ("mkv-track-extensions-", extensions::operation),
@@ -25,7 +22,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> std::process::ExitCode {
-    protocol::main(std::env::args_os(), OPERATIONS)
+    serve(std::env::args_os(), OPERATIONS)
 }
 
 /// C's entry point, the worker's one exception to `deny(unsafe_code)`.

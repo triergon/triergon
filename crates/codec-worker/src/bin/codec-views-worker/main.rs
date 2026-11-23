@@ -2,8 +2,6 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
 
-#[path = "../../../../framing/examples/framing_views/protocol.rs"]
-mod protocol;
 // The reader lanes share the measured reader's packet and track output.
 mod audio;
 mod audio_session_lifecycle;
@@ -23,8 +21,10 @@ mod packets;
 mod readers;
 mod video;
 
-const OPERATIONS: &[(&str, protocol::Prepare)] = &[
-    ("views-smoke-", protocol::smoke),
+use triergon_harness_runner::{Prepare, failed, serve, smoke};
+
+const OPERATIONS: &[(&str, Prepare)] = &[
+    ("views-smoke-", smoke),
     ("media-probe-", readers::operation),
     ("elementary-metadata-", readers::operation),
     ("flac-integer-", readers::operation),
@@ -92,13 +92,10 @@ fn worker_main() -> std::process::ExitCode {
     {
         return match run(name, arguments) {
             Ok(()) => std::process::ExitCode::SUCCESS,
-            Err(error) => {
-                eprintln!("{error}");
-                std::process::ExitCode::from(2)
-            }
+            Err(error) => failed(None, 2, error),
         };
     }
-    protocol::main(args, OPERATIONS)
+    serve(args, OPERATIONS)
 }
 
 /// C's entry point, the worker's one exception to `deny(unsafe_code)`.

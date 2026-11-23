@@ -10,7 +10,7 @@ use triergon_framing::{
 };
 
 use super::{CANCEL, error, record, refusal};
-use crate::protocol::{Action, Work};
+use triergon_harness_runner::{Action, Totals};
 
 const SOURCE: SourceId = SourceId(1);
 const FRAME_BYTES: usize = 4096;
@@ -118,7 +118,7 @@ pub(super) fn inspect(input: &[u8], bits: usize, bytes: usize) -> Action<'_> {
 
 fn wire_rows(
     bsi: &Eac3Bsi,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     fn scalar(value: Option<impl Into<u64>>) -> [u64; 3] {
@@ -275,7 +275,7 @@ impl Packet {
         }
     }
 
-    fn emit(self, work: &mut Work, trace: &mut Option<&mut dyn Write>) -> Result<(), String> {
+    fn emit(self, work: &mut Totals, trace: &mut Option<&mut dyn Write>) -> Result<(), String> {
         record(
             work,
             trace,

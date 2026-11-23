@@ -7,13 +7,13 @@ mod charset;
 mod dvb;
 mod dvd;
 mod pgs;
-#[path = "../../../../framing/examples/framing_views/protocol.rs"]
-mod protocol;
 mod text;
 mod tx3g;
 
-const OPERATIONS: &[(&str, protocol::Prepare)] = &[
-    ("views-smoke-", protocol::smoke),
+use triergon_harness_runner::{Prepare, serve, smoke};
+
+const OPERATIONS: &[(&str, Prepare)] = &[
+    ("views-smoke-", smoke),
     ("text-extract-", text::operation),
     ("renderer-context-", text::operation),
     ("charset-", charset::operation),
@@ -28,7 +28,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> std::process::ExitCode {
-    protocol::main(std::env::args_os(), OPERATIONS)
+    serve(std::env::args_os(), OPERATIONS)
 }
 
 /// C's entry point, the worker's one exception to `deny(unsafe_code)`.

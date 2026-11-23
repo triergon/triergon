@@ -13,7 +13,7 @@ use triergon_mpegts::pes::Pes;
 use triergon_mpegts::psi::{DescriptorNamespace, PsiCrc32};
 use triergon_mpegts::stream::{TraceEvent, TransportStream};
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 const TS_PACKET: u64 = 188;
 const WINDOW: usize = 4096;
@@ -291,7 +291,7 @@ pub(super) fn operation<'a>(
 }
 
 struct Rows<'work, 'trace> {
-    work: &'work mut Work,
+    work: &'work mut Totals,
     trace: Option<&'trace mut dyn Write>,
 }
 

@@ -13,8 +13,8 @@ use triergon_subtitles::reference_trace::carriage::{
 };
 use triergon_subtitles::text::{Format, RawClock, Timing};
 
-use super::protocol::Operation;
 use super::text::{Records, packet_input};
+use triergon_harness_runner::Operation;
 
 pub(super) fn operation<'a>(
     prefix: &str,

@@ -7,7 +7,7 @@ use triergon_matroska::compat::block_additions::{self, BlockAdditionContainer};
 use triergon_matroska::{Error, Event, Hdr10Plus, Hdr10PlusPeakGrid, Limits, ParseStep, Reader};
 
 use super::extensions::track_extensions;
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 pub(super) const SOURCE: SourceId = SourceId(1);
 const WINDOW: usize = 32 * 1024;
@@ -98,7 +98,7 @@ impl<'a> Input<'a> {
 }
 
 pub(super) struct Rows<'a, 'b> {
-    pub work: &'a mut Work,
+    pub work: &'a mut Totals,
     pub trace: Option<&'b mut dyn Write>,
 }
 

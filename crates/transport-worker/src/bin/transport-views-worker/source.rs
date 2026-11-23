@@ -4,12 +4,12 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::atomic::AtomicBool;
 
-use super::protocol::{Operation, Work};
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId,
     Step, Time, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+use triergon_harness_runner::{Operation, Totals};
 use triergon_mpegts::compat::input::{InputBootstrap, InputContext, InputStep};
 use triergon_mpegts::compat::pes::{
     CompactDemuxPacket, DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DemuxSpanViews,
@@ -202,7 +202,7 @@ pub(super) fn operation<'a>(
 }
 
 struct Output<'a, 'b> {
-    work: &'a mut Work,
+    work: &'a mut Totals,
     trace: Option<&'b mut dyn Write>,
 }
 

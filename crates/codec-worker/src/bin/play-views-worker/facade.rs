@@ -13,7 +13,7 @@ use triergon::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, fold_framed, signed};
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 fn reader(input: &[u8], pool: &Budget, format: Probe) -> Result<AnyReader, String> {
     let capabilities = SourceCapabilities {
@@ -101,7 +101,7 @@ fn access_units<'a>(input: &'a [u8], args: &[&str]) -> Result<Operation<'a>, Str
 fn ts_admission(
     input: &[u8],
     pool: &Budget,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     use triergon::Error;
@@ -131,7 +131,7 @@ fn ts_packet(
     packet: &Packet,
     size: u64,
     index: usize,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let source = packet.sources().first().ok_or("packet has no PES source")?;
@@ -198,7 +198,7 @@ fn seek(
     reader: &mut Blocking<AnyReader, Cursor<&[u8]>>,
     request: SeekRequest,
     base: TimeBase,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     reader.seek(request).map_err(|error| error.to_string())?;
@@ -419,7 +419,7 @@ fn container_suffix(
     request: SeekRequest,
     base: TimeBase,
     limit: usize,
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let mut receipt = false;

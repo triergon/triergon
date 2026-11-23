@@ -16,10 +16,8 @@ use triergon_framing::{
     },
 };
 
-use super::{
-    envelope::{self, Event, Script},
-    protocol::{Operation, Work},
-};
+use super::envelope::{self, Event, Script};
+use triergon_harness_runner::{Operation, Totals};
 
 const SOURCE: SourceId = SourceId(1);
 const POOL_BYTES: usize = 32 << 20;
@@ -49,7 +47,7 @@ const fn reader_limits(window: usize) -> ReaderLimits {
 }
 
 struct Output<'a, 't> {
-    work: &'a mut Work,
+    work: &'a mut Totals,
     trace: Option<&'t mut dyn Write>,
 }
 

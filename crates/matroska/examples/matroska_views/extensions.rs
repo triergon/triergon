@@ -4,8 +4,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::WorkBudget;
 use triergon_matroska::{Configuration, Error, Limits, ParseStep, Presence, TrackExtensions};
 
-use super::protocol::Operation;
 use super::side_data::{Input, Rows};
+use triergon_harness_runner::Operation;
 
 const DVCC: u64 = 0x64766343;
 const DVVC: u64 = 0x64767643;

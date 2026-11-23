@@ -3,14 +3,14 @@
 #![cfg_attr(not(test), no_main)]
 
 mod facade;
-#[path = "../../../../framing/examples/framing_views/protocol.rs"]
-mod protocol;
 mod raw;
 
 use std::process::ExitCode;
 
-const OPERATIONS: &[(&str, protocol::Prepare)] = &[
-    ("views-smoke-", protocol::smoke),
+use triergon_harness_runner::{Prepare, failed, serve, smoke};
+
+const OPERATIONS: &[(&str, Prepare)] = &[
+    ("views-smoke-", smoke),
     ("play-", raw::operation),
     ("facade-probe-", facade::operation),
     ("any-ts-au-", facade::operation),
@@ -29,13 +29,10 @@ fn worker_main() -> ExitCode {
     {
         return match raw::command(arguments) {
             Ok(()) => ExitCode::SUCCESS,
-            Err(error) => {
-                eprintln!("{error}");
-                ExitCode::from(2)
-            }
+            Err(error) => failed(None, 2, error),
         };
     }
-    protocol::main(args, OPERATIONS)
+    serve(args, OPERATIONS)
 }
 
 /// C's entry point, the worker's one exception to `deny(unsafe_code)`.

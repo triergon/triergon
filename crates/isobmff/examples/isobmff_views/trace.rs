@@ -36,10 +36,8 @@ use triergon_isobmff::{
     table::SampleTableBuilder,
 };
 
-use super::{
-    protocol::{Operation, Work},
-    segment_index::parsed_box,
-};
+use super::segment_index::parsed_box;
+use triergon_harness_runner::{Operation, Totals};
 
 const EOF: i64 = -541_478_725;
 const INVALID_DATA: i64 = -1_094_995_529;
@@ -129,7 +127,7 @@ fn complete(result: Result<()>, out: &mut Output<'_, '_>) -> std::result::Result
 }
 
 struct Output<'a, 'b> {
-    work: &'a mut Work,
+    work: &'a mut Totals,
     trace: Option<&'b mut dyn Write>,
 }
 

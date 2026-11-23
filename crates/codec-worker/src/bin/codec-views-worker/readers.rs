@@ -5,7 +5,7 @@ use triergon::Probe;
 use triergon::elementary::{self, Kind};
 use triergon::ogg::page::{PageHeader, write_page};
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 mod decode;
 mod flac_integer;
@@ -109,7 +109,7 @@ pub(super) fn operation<'a>(
 }
 
 fn record(
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
     kind: u64,
     words: &[u64],
@@ -137,7 +137,7 @@ fn record(
 
 fn pages(
     mut input: &[u8],
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let mut rewritten = Vec::new();

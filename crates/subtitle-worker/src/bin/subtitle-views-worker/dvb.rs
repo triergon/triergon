@@ -13,9 +13,9 @@ use triergon_mpegts::psi::ElementaryStream;
 use triergon_mpegts::transport::TransportFramer;
 use triergon_mpegts::{PacketFormat, ParseLimits};
 
-use super::protocol::Operation;
 use super::text::Records;
 use triergon::{AnyReader, ContainerReader, PacketInfo, TrackInfo};
+use triergon_harness_runner::Operation;
 use triergon_subtitles::compat::dvb::{PesParser, PesProgress};
 use triergon_subtitles::dvb::{
     ClockOrigin, ClockValue, DvbPacket, PacketEnvelope, PacketIdentity, PacketTiming, SourceClock,
@@ -122,7 +122,7 @@ fn ts_source(input: &[u8]) -> triergon::Result<Source> {
     let mut parser = PesParser::new(&pool);
     let cancel = AtomicBool::new(false);
     for (sequence, packet) in pes.into_iter().enumerate() {
-        let (pts, _) = clock.place(packet.pts_raw33, packet.dts_raw33)?;
+        let (pts, dts) = clock.place(packet.pts_raw33, packet.dts_raw33)?;
         parser.provide(&packet.data, pts)?;
         let unit = loop {
             match parser.step(&mut WorkBudget::new(1 << 20), &cancel)? {
@@ -131,9 +131,11 @@ fn ts_source(input: &[u8]) -> triergon::Result<Source> {
                 PesProgress::NeedPacket => return Err(Error::Invalid("DVB PES parser stalled")),
             }
         };
+        // DTS only where the PES header codes one, as the Matroska path reports it
+        // only where the block does.
         let timing = PacketTiming {
             pts: unit.codec_pts().map(clock_value),
-            dts: unit.codec_pts().map(clock_value),
+            dts: dts.map(clock_value),
             duration: None,
         };
         packets.push(service.packet(&pool, unit.codec(), timing, identity(sequence))?);

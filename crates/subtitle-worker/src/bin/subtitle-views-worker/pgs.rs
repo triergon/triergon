@@ -6,8 +6,8 @@ use triergon_subtitles::pgs::{
     Composition, Envelope, ObjectFragment, Palette, SegmentIter, Windows,
 };
 
-use super::protocol::Operation;
 use super::text::Records;
+use triergon_harness_runner::Operation;
 
 pub(super) fn operation<'a>(
     prefix: &str,

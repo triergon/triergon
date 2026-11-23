@@ -6,7 +6,8 @@ use triergon_framing::{
     aac::{AacAdtsParser, AacSource, inspect_adts_header},
 };
 
-use super::{obu::record, protocol::Operation};
+use super::obu::record;
+use triergon_harness_runner::Operation;
 
 static CANCEL: AtomicBool = AtomicBool::new(false);
 

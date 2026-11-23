@@ -5,8 +5,8 @@ use triergon_core::{Budget, BudgetVec};
 use triergon_subtitles::compat::dvd::VobSubIndex;
 use triergon_subtitles::dvd::vobsub::{Line, Lines};
 
-use super::protocol::Operation;
 use super::text::Records;
+use triergon_harness_runner::Operation;
 
 pub(super) fn operation<'a>(
     prefix: &str,

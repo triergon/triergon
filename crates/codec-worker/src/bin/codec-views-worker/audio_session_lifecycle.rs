@@ -10,7 +10,7 @@ use triergon_session::{
     SessionState, StreamSelection, VideoCodec, VideoSession,
 };
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 const RATE: u32 = 1000;
 const MS: i64 = 1_000_000;
@@ -111,7 +111,7 @@ impl AudioDecoder for CallerPcm {
 }
 
 fn record(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     values: &[u64],
@@ -135,7 +135,7 @@ fn record(
 }
 
 fn block(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     consumed: usize,
@@ -171,7 +171,7 @@ fn block(
 
 fn lifecycle(
     input: &[u8],
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let mut session = AudioSession::with_form(
@@ -257,7 +257,7 @@ fn lifecycle(
 
 fn refusals(
     input: &[u8],
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let limits = QueueLimits::AUDIO;

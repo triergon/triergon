@@ -12,7 +12,7 @@ use triergon_codec::{
     AudioDecoder, AudioFrame, BudgetVec, Divisor, Reservation, divide, divide_u32,
 };
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 mod cabac;
 mod palette;
@@ -31,7 +31,7 @@ fn number<T: str::FromStr>(field: Option<&str>) -> Result<T, String> {
 
 fn row(
     trace: &mut Option<&mut dyn Write>,
-    work: &mut Work,
+    work: &mut Totals,
     kind: u64,
     words: &[u64],
     data: &[u8],

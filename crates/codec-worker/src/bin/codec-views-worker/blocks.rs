@@ -5,7 +5,7 @@ use triergon_bitstream::crc::{Crc32Ieee, Crc32Mpeg, crc8, crc16_a52};
 use triergon_core::TickScale;
 use triergon_harness_protocol::digest::signed;
 
-use super::protocol::Operation;
+use triergon_harness_runner::Operation;
 
 pub(super) fn operation<'a>(
     prefix: &str,

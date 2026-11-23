@@ -14,7 +14,7 @@ use triergon_pixel::{Colour, PictureView, Plane};
 use triergon_codec_hevc::AccessUnitSplitter;
 use triergon_harness_protocol::digest::fold_bytes;
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 mod session_clock;
 
@@ -461,7 +461,7 @@ fn sar((num, den): (u32, u32)) -> (u64, u64) {
 fn output_picture(
     picture: &Picture,
     properties: bool,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     scratch: &mut Vec<u8>,
 ) -> Result<(), String> {

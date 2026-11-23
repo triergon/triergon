@@ -19,7 +19,7 @@ use triergon_framing::reference_trace::dts::{
 };
 use triergon_harness_protocol::digest::signed;
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 const SOURCE: SourceId = SourceId(1);
 static CANCEL: AtomicBool = AtomicBool::new(false);
@@ -173,7 +173,7 @@ fn input_window(
 }
 
 struct Output<'a, 'b> {
-    work: &'a mut Work,
+    work: &'a mut Totals,
     trace: Option<&'b mut dyn Write>,
 }
 
@@ -239,7 +239,7 @@ fn core(
     window: usize,
     maximum: usize,
     mut decoded: bool,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<()> {
     let pool = pool(4 * FRAME_BYTES, window)?;
@@ -302,7 +302,7 @@ fn packed(
     input: &[u8],
     window: usize,
     reader: Reader,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<()> {
     let mut output = Output { work, trace };
@@ -379,7 +379,7 @@ fn parser(
     input: &[u8],
     window: usize,
     order: DtsWordOrder,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<()> {
     let pool = pool(input.len(), window)?;
@@ -516,7 +516,7 @@ fn verify_inspectors(owned: &DtsInspection, packed: &dts::DtsPackedHeader) -> Re
 fn headers(
     input: &[u8],
     stream: bool,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<()> {
     let pool = pool(input.len(), 0)?;
@@ -672,7 +672,7 @@ fn location(
 fn unpack(
     input: &[u8],
     format: DtsPacking,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<()> {
     let mut output = Output { work, trace };
@@ -748,7 +748,7 @@ fn unpack(
 fn sync_canonical(
     input: &[u8],
     order: DtsWordOrder,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<()> {
     let window = 4096;

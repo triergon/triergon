@@ -7,7 +7,7 @@ use triergon::elementary::{self, Ac3, Adts, Flac, Format, MpegAudio};
 use triergon::ogg;
 use triergon::{CodecId, PacketInfo, TrackInfo};
 
-use super::{Work, record, tags};
+use super::{Totals, record, tags};
 
 mod ogg_wire;
 
@@ -94,7 +94,7 @@ fn comments(mut data: &[u8]) -> Vec<(Vec<u8>, Vec<u8>)> {
 
 fn emit_comments(
     pairs: &[(Vec<u8>, Vec<u8>)],
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     for (key, value) in pairs {
@@ -141,7 +141,7 @@ fn cover_art(encoded: &[u8]) -> Option<Vec<u8>> {
 
 pub(super) fn ogg_tracks(
     input: &[u8],
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let Ok(reader) = ogg::BlockingReader::open(Cursor::new(input), ogg::Limits::default()) else {
@@ -250,7 +250,7 @@ pub(super) fn opened<F: Format>(input: &[u8]) -> triergon::Result<Opened<'_, F>>
 fn elementary_fields<F: Format>(
     input: &[u8],
     family: &str,
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let Ok((mut reader, first)) = opened::<F>(input) else {
@@ -406,7 +406,7 @@ fn check_audio_properties(
 pub(super) fn elementary(
     input: &[u8],
     format: &str,
-    work: &mut Work,
+    work: &mut Totals,
     trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     match format {

@@ -14,7 +14,7 @@ use triergon_mpegts::compat::annex_b::VideoEofPolicy;
 use triergon_mpegts::stream::TraceEvent;
 use triergon_mpegts::{Reader, ReaderEvent, ReaderLimits};
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 mod seek;
 mod views;
@@ -130,7 +130,7 @@ impl ClockCase {
         &self,
         pool: &Budget,
         bytes: &Bytes,
-        work: &mut Work,
+        work: &mut Totals,
         mut trace: Option<&mut dyn Write>,
     ) -> Result<(), String> {
         let policy = SourceTimePolicy::Bounded(self.anchor);
@@ -198,7 +198,7 @@ impl ClockCase {
 
     fn record(
         &self,
-        work: &mut Work,
+        work: &mut Totals,
         trace: &mut Option<&mut dyn Write>,
         field: u64,
         stamp: SourceTimestamp,
@@ -250,7 +250,7 @@ impl ClockCase {
 }
 
 pub(super) fn row(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     words: &[u64],

@@ -8,7 +8,7 @@ use triergon::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 
-use super::{Operation, Work};
+use super::{Operation, Totals};
 
 const SOURCE: SourceId = SourceId(1);
 
@@ -56,7 +56,7 @@ fn respond_with_failure(
 }
 
 fn record(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     caps: SourceCapabilities,

@@ -3,7 +3,7 @@ use std::io::Write;
 
 use triergon_bitstream::cabac::{Engine, init_state};
 
-use super::{Operation, Work, number, row, text};
+use super::{Operation, Totals, number, row, text};
 
 #[derive(Clone, Copy)]
 enum Call {
@@ -93,7 +93,7 @@ pub(super) fn prepare<'a>(input: &[u8], arguments: &[OsString]) -> Result<Operat
 fn run<const HEADROOM: bool>(
     data: &[u8],
     calls: &[Call],
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let mut engine = None;

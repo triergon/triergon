@@ -11,6 +11,9 @@
 )]
 
 pub mod records;
+mod table;
+
+pub use table::{Action, Operation, Prepare, dispatch, serve, smoke};
 
 use std::fmt::{self, Display};
 use std::io::{self, Write};
@@ -19,8 +22,11 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::time::{Duration, Instant};
 use triergon_core::Budget;
-use triergon_harness_protocol::digest::fold;
+use triergon_harness_protocol::digest::{fold, fold_bytes};
 use triergon_harness_protocol::push_quoted;
+
+/// How often one invocation may run its operation.
+const ITERATIONS: RangeInclusive<u64> = 1..=1_000_000;
 
 /// A worker result; errors end the process with their message.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -141,7 +147,7 @@ impl<'a> Invocation<'a> {
         &self,
         usage: impl FnOnce() -> T,
     ) -> Result<()> {
-        if (1..=1_000_000).contains(&self.iterations) {
+        if ITERATIONS.contains(&self.iterations) {
             Ok(())
         } else {
             Err(usage().into())
@@ -301,6 +307,22 @@ pub struct Totals {
     pub refusal: Option<Box<Refusal>>,
     /// An unsupported feature the operation met and reports while completing.
     pub unsupported: Option<&'static str>,
+}
+
+impl Totals {
+    /// Fold one record: its kind, its words and, when it has one, its payload, which
+    /// it counts as one packet of the payload's length.
+    pub fn record(&mut self, kind: u64, words: &[u64], payload: &[u8]) {
+        fold(&mut self.digest, kind);
+        for &word in words {
+            fold(&mut self.digest, word);
+        }
+        if !payload.is_empty() {
+            fold_bytes(&mut self.digest, payload);
+        }
+        self.packets += 1;
+        self.bytes += payload.len() as u64;
+    }
 }
 
 /// An operation that ended early: its error and the input event it is attributed

@@ -16,9 +16,10 @@ mod probe;
 mod source_view;
 mod subtitles;
 
-use playback_worker::runner::{self, Invocation, MAX_INPUT, Mode, Totals, measure};
+use playback_worker::runner;
+use std::ffi::OsString;
 use std::process::ExitCode;
-use triergon_harness_protocol::digest::fold;
+use triergon_harness_runner::dispatch;
 
 const RUNNERS: &[(&str, runner::Run)] = &[
     ("views-smoke-", smoke),
@@ -40,32 +41,10 @@ const RUNNERS: &[(&str, runner::Run)] = &[
     ("subtitle-bridge-", subtitles::run),
 ];
 
+/// `views-smoke-`, the table workers' smoke operation.
 fn smoke(args: &[String]) -> runner::Result<()> {
-    let invocation = Invocation::parse(args, "views-smoke-", "", 0..=0, true)?;
-    let input = invocation.input(MAX_INPUT)?;
-    measure(&invocation, "views-smoke", None, || {
-        let (mut a, mut b) = (1_u32, 0_u32);
-        for &byte in &input {
-            a = (a + u32::from(byte)) % 65521;
-            b = (a + b) % 65521;
-        }
-        let size = input.len() as u64;
-        let checksum = u64::from(b << 16 | a);
-        let mut digest = 0;
-        for word in [3, size, checksum] {
-            fold(&mut digest, word);
-        }
-        if invocation.mode == Mode::Trace {
-            println!("3 {size} {checksum}");
-        }
-        Ok(Totals {
-            packets: 1,
-            bytes: 0,
-            digest,
-            refusal: None,
-            unsupported: None,
-        })
-    })
+    let args: Vec<OsString> = args.iter().map(OsString::from).collect();
+    dispatch(&args, &[("views-smoke-", triergon_harness_runner::smoke)])
 }
 
 #[cfg_attr(test, allow(dead_code))]

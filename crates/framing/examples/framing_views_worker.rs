@@ -19,11 +19,11 @@ mod dts;
 mod nal;
 #[path = "framing_views/obu.rs"]
 mod obu;
-#[path = "framing_views/protocol.rs"]
-mod protocol;
 
-const OPERATIONS: &[(&str, protocol::Prepare)] = &[
-    ("views-smoke-", protocol::smoke),
+use triergon_harness_runner::{Prepare, serve, smoke};
+
+const OPERATIONS: &[(&str, Prepare)] = &[
+    ("views-smoke-", smoke),
     ("nal-units-", nal::operation),
     ("nal-config-", nal::operation),
     ("hvcc-annexb-", nal::operation),
@@ -45,7 +45,7 @@ const OPERATIONS: &[(&str, protocol::Prepare)] = &[
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> std::process::ExitCode {
-    protocol::main(std::env::args_os(), OPERATIONS)
+    serve(std::env::args_os(), OPERATIONS)
 }
 
 /// C's entry point, the worker's one exception to `deny(unsafe_code)`.

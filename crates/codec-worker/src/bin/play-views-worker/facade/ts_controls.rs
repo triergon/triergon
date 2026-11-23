@@ -8,10 +8,10 @@ use triergon::mpegts::transport::ContinuityOutcome;
 use triergon::{AnyOther, Blocking, Budget, Event};
 use triergon_harness_protocol::hex;
 
-use super::{Operation, Work, reader, transport_size};
+use super::{Operation, Totals, reader, transport_size};
 
 fn row(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     kind: u64,
     fields: &[u64],
@@ -35,7 +35,7 @@ fn row(
 }
 
 fn continuity(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     pid: u16,
     outcome: ContinuityOutcome,
@@ -63,7 +63,7 @@ fn continuity(
 }
 
 fn source_event(
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
     event: &TraceEvent,
 ) -> Result<(), String> {
@@ -188,7 +188,7 @@ fn fault_fields(fault: &triergon::mpegts::stream::TraceFault) -> Result<[u64; 3]
 
 fn boundary_source(
     event: &TraceEvent,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     match event {
@@ -231,7 +231,7 @@ fn interrupted_access_unit(
     track: &triergon::mpegts::Track,
     range: std::ops::Range<u64>,
     cause: &TraceEvent,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let prefix = [u64::from(track.stream().pid), range.start, range.end];
@@ -267,7 +267,7 @@ fn interrupted_access_unit(
 fn interrupted_pes(
     source: &TraceEvent,
     boundary: &TraceEvent,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let (
@@ -312,7 +312,7 @@ fn interrupted_pes(
 fn packet_boundary(
     kind: u64,
     packet: &triergon::mpegts::Packet,
-    work: &mut Work,
+    work: &mut Totals,
     trace: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     use triergon::PacketInfo;

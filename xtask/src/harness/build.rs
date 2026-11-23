@@ -666,8 +666,6 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "harness/reference_codec_rotations.c",
         ],
         "matroska-views-worker" => &[
-            "crates/worker-entry/src/lib.rs",
-            "crates/worker-entry/README.md",
             "harness/reference_matroska_views.c",
             "harness/reference_matroska_side_data.h",
             "harness/reference_matroska_metadata.h",
@@ -696,8 +694,6 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             "xtask/src/framing_views/nal.rs",
         ],
         "isobmff-views-worker" => &[
-            "crates/framing/examples/framing_views/fold.rs",
-            "crates/framing/examples/framing_views/protocol.rs",
             "harness/reference_isobmff_views.c",
             "harness/reference_views_protocol.h",
             "harness/reference_isobmff_packets.h",
@@ -717,14 +713,7 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             | "transport-views-worker"
             | "play-views-worker"
     ) {
-        inputs.extend(
-            [
-                "crates/framing/examples/framing_views/fold.rs",
-                "crates/framing/examples/framing_views/protocol.rs",
-                "harness/reference_views_protocol.h",
-            ]
-            .map(str::to_owned),
-        );
+        inputs.push("harness/reference_views_protocol.h".to_owned());
     }
     inputs.sort();
     inputs.dedup();

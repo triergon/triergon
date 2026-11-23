@@ -7,7 +7,7 @@ use triergon_subtitles::text::tx3g_config::{
     ConfigJob, ConfigLayout, ConfigLimits, ConfigStatus, Configuration,
 };
 
-use super::protocol::Operation;
+use triergon_harness_runner::Operation;
 use triergon_subtitles::text::Format;
 use triergon_subtitles::text::tx3g_semantics::{
     PaintIntent, PointQuery, SemanticJob, SemanticLimits, SemanticStatus, Semantics, StyleOrigin,

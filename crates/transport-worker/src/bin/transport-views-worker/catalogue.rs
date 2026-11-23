@@ -18,7 +18,7 @@ use triergon_mpegts::transport::{Continuity, ContinuityOutcome, PacketFormat, Tr
 use triergon_mpegts::{AssemblyStep, ParseLimits, SourceRange};
 
 use super::packets::{self, Carrier, GRANT, SOURCE, record};
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 #[derive(Clone, Copy)]
 enum Policy {
@@ -75,10 +75,10 @@ pub(super) fn operation<'a>(
     })
 }
 
-type CatalogueRun = fn(&[u8], Case, &mut Work, &mut Option<&mut dyn Write>) -> Result<(), String>;
+type CatalogueRun = fn(&[u8], Case, &mut Totals, &mut Option<&mut dyn Write>) -> Result<(), String>;
 
 fn program_row(
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
     number: u16,
     pmt: u16,
@@ -101,7 +101,7 @@ fn program_row(
 }
 
 fn block(
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
     kind: u64,
     bytes: &[u8],
@@ -123,7 +123,7 @@ impl StreamRow<'_> {
     fn write(
         &self,
         program: u16,
-        work: &mut Work,
+        work: &mut Totals,
         out: &mut Option<&mut dyn Write>,
     ) -> Result<(), String> {
         record(
@@ -152,7 +152,7 @@ impl StreamRow<'_> {
 fn projected(
     data: &[u8],
     case: Case,
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let budget = packets::budget()?;
@@ -686,7 +686,7 @@ impl<'a> Tables<'a> {
 fn standalone(
     data: &[u8],
     case: Case,
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let budget = packets::budget()?;
@@ -723,7 +723,7 @@ fn standalone(
 }
 
 fn source_stream(
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
     program: u16,
     stream: &ElementaryStream,
@@ -807,7 +807,7 @@ fn append_language(languages: &mut Vec<u8>, code: &[u8; 3]) {
 fn descriptors(
     data: &[u8],
     case: Case,
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let budget = packets::budget()?;

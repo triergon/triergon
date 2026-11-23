@@ -8,7 +8,7 @@ use triergon::{
 use triergon_harness_protocol::md5;
 
 use super::metadata::opened;
-use super::{Work, record};
+use super::{Totals, record};
 
 // Fixed-block frame, 16 mono samples at 32 kHz, constant signed value -32767.
 const MONO_FRAME: &[u8] = b"\xff\xf8\x68\x08\x00\x0f\x26\x00\x80\x01\x6e\x8c";
@@ -59,7 +59,7 @@ fn decode(decoder: &mut Decoder, packet: &[u8], frame: &mut IntegerFrame) -> Res
 pub(super) fn run(
     input: &[u8],
     mode: Mode,
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let error = |value: &dyn std::fmt::Debug| format!("{value:?}");
@@ -130,7 +130,7 @@ pub(super) fn run(
 
 fn check_crc(
     budget: &Budget,
-    work: &mut Work,
+    work: &mut Totals,
     mut trace: Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let mut bad_footer = MONO_FRAME.to_vec();

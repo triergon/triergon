@@ -13,7 +13,7 @@ use triergon_mpegts::transport::{
 };
 use triergon_mpegts::{AssemblyStep, ParseLimits};
 
-use super::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 pub(super) const SOURCE: SourceId = SourceId(1);
 pub(super) const GRANT: u64 = 1 << 20;
@@ -111,7 +111,7 @@ pub(super) fn walk(
 }
 
 pub(super) fn record(
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
     kind: u64,
     words: &[u64],
@@ -135,7 +135,7 @@ pub(super) fn record(
 }
 
 fn boundary(
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
     format: PacketFormat,
     offset: u64,
@@ -162,7 +162,7 @@ fn clock(words: &mut Vec<u64>, pcr: Option<Pcr>) -> Result<(), String> {
 }
 
 fn block(
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
     offset: u64,
     field: u64,
@@ -175,7 +175,7 @@ fn block(
 }
 
 fn fields(
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
     packet: &TransportPacket,
 ) -> Result<(), String> {
@@ -231,7 +231,7 @@ fn compact_fields(
     format: PacketFormat,
     window: usize,
     budget: &Budget,
-    work: &mut Work,
+    work: &mut Totals,
     out: &mut Option<&mut dyn Write>,
 ) -> Result<(), String> {
     let mut input = input_cursor(budget, data.len(), window)?;
@@ -321,8 +321,8 @@ pub(super) fn operation<'a>(
                             parse_transport(packet.source.clone(), format, packet.source_offset)
                                 .map_err(|e| e.to_string())?;
                         // The independent parse must return the same public fields.
-                        let mut detached_work = Work::default();
-                        let mut observed_work = Work::default();
+                        let mut detached_work = Totals::default();
+                        let mut observed_work = Totals::default();
                         fields(&mut detached_work, &mut None, &detached)?;
                         fields(&mut observed_work, &mut None, &packet)?;
                         if detached_work.digest != observed_work.digest

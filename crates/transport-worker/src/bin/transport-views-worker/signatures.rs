@@ -4,7 +4,8 @@ use triergon_core::signature::{
     Container, Policy, Selection, TransportSync, TransportTie, ebml, ogg, opening_box, select,
 };
 
-use super::{packets::record, protocol::Operation};
+use super::packets::record;
+use triergon_harness_runner::Operation;
 
 const BOX_SETS: [&[[u8; 4]]; 3] = [&[], &[*b"ftyp", *b"moof"], &[*b"wide", *b"\0foo", *b"uuid"]];
 

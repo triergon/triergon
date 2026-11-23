@@ -30,7 +30,7 @@ use triergon_mpegts::{
 };
 
 use super::{CAPACITY, SOURCE, WINDOW, WORK, capabilities, explain, row};
-use crate::protocol::{Operation, Work};
+use triergon_harness_runner::{Operation, Totals};
 
 mod wire;
 
@@ -312,7 +312,7 @@ fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), S
 }
 
 struct Output<'work, 'trace> {
-    work: &'work mut Work,
+    work: &'work mut Totals,
     trace: Option<&'trace mut dyn Write>,
     entities: &'work [Entity],
     format: PacketFormat,

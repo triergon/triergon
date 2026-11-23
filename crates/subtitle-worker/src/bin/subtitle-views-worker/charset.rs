@@ -9,8 +9,8 @@ use triergon_subtitles::text::charset::multibyte::{
 use triergon_subtitles::text::charset::{Charset, CharsetJob, CharsetStatus};
 use triergon_subtitles::text::{Format, Limits};
 
-use super::protocol::Operation;
 use super::text::{Records, packet_input};
+use triergon_harness_runner::Operation;
 
 pub(super) fn operation<'a>(
     prefix: &str,
