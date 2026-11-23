@@ -7,6 +7,136 @@ use triergon_core::{Bytes, Error as C, SourceCapabilities, Time, WorkBudget};
 use triergon_playback::ByteSource;
 use triergon_playback::{SourceOwner, *};
 
+fn element(id: &[u8], data: &[u8]) -> Vec<u8> {
+    let mut out = id.to_vec();
+    if data.len() < 127 {
+        out.push(0x80 | data.len() as u8);
+    } else {
+        assert!(data.len() < 16_383);
+        out.extend_from_slice(&(0x4000 | data.len() as u16).to_be_bytes());
+    }
+    out.extend_from_slice(data);
+    out
+}
+
+fn track(number: u8, kind: u8, codec: &[u8], extra: &[u8]) -> Vec<u8> {
+    element(
+        &[0xae],
+        &[
+            element(&[0xd7], &[number]),
+            element(&[0x73, 0xc5], &[number]),
+            element(&[0x83], &[kind]),
+            element(&[0x86], codec),
+            extra.to_vec(),
+        ]
+        .concat(),
+    )
+}
+
+fn block(number: u8, delta: i16, data: &[u8]) -> Vec<u8> {
+    element(
+        &[0xa3],
+        &[&[0x80 | number], &delta.to_be_bytes()[..], &[0x80], data].concat(),
+    )
+}
+
+/// A Matroska file of `tracks` and one cluster at timestamp 4 holding `blocks`.
+fn matroska_file(tracks: &[Vec<u8>], blocks: &[Vec<u8>]) -> Vec<u8> {
+    [
+        element(
+            &[0x1a, 0x45, 0xdf, 0xa3],
+            &element(&[0x42, 0x82], b"matroska"),
+        ),
+        element(
+            &[0x18, 0x53, 0x80, 0x67],
+            &[
+                element(&[0x16, 0x54, 0xae, 0x6b], &tracks.concat()),
+                element(
+                    &[0x1f, 0x43, 0xb6, 0x75],
+                    &[&element(&[0xe7], &[4])[..], &blocks.concat()].concat(),
+                ),
+            ]
+            .concat(),
+        ),
+    ]
+    .concat()
+}
+
+/// Every output of a player over the Matroska file `data`.
+fn matroska_outputs(
+    pool: &triergon_core::Budget,
+    data: &[u8],
+) -> (Player<ByteSource>, Vec<Output>) {
+    let engine = Engine::matroska(
+        triergon_matroska::Reader::new(
+            pool,
+            ID,
+            SourceCapabilities {
+                length: Some(data.len() as u64),
+                random_access: true,
+            },
+            triergon_matroska::Limits::default(),
+            4096,
+        )
+        .unwrap(),
+    );
+    let source = ByteSource::new(ID, Bytes::copy_from_slice(pool, data).unwrap(), 7).unwrap();
+    let mut player = Player::new(
+        engine,
+        SourceOwner::new(source),
+        Selection::All,
+        PlayerPolicy::default(),
+    )
+    .unwrap();
+    let outputs = collect(&mut player, 1).unwrap();
+    (player, outputs)
+}
+
+#[test]
+fn vobsub_track_without_codec_private_decodes_with_the_receiver_defaults() {
+    use bitmap_bridge::{DvdBridgeConfig, DvdReceiver};
+    use matroska_feed::MatroskaBitmapTrack;
+    use triergon_matroska::Event as MkvEvent;
+
+    let dvd_frame =
+        &include_bytes!("../../../playback/tests/fixtures/bitmap/original-dvd-two-units-tail.spu")
+            [..30];
+    let data = matroska_file(&[track(7, 17, b"S_VOBSUB", &[])], &[block(7, 5, dvd_frame)]);
+    let pool = pool();
+    let (_player, outputs) = matroska_outputs(&pool, &data);
+    let configuration = outputs
+        .iter()
+        .find(|o| matches!(o.event(), Event::Matroska(MkvEvent::Configuration(_))))
+        .unwrap();
+    let track = MatroskaBitmapTrack::new(configuration, 7).unwrap();
+    let settings = track.vobsub_settings().unwrap();
+    assert_eq!(
+        settings,
+        triergon_subtitles::compat::dvd::Settings::default()
+    );
+    let mut receiver = DvdReceiver::new(
+        &pool,
+        track.scope(),
+        DvdBridgeConfig {
+            settings,
+            ..DvdBridgeConfig::default()
+        },
+    )
+    .unwrap();
+    let input = outputs
+        .iter()
+        .find_map(|o| track.packet(o, 0).unwrap())
+        .unwrap();
+    receiver
+        .provide(input)
+        .unwrap_or_else(|e| panic!("{:?}", e.error));
+    let output = dvd_next(&mut receiver, 1).unwrap();
+    let picture = output.packet_clock_picture().unwrap().unwrap();
+    assert_eq!(picture.start_ns, 9_000_000);
+    assert_eq!(picture.canvas, None);
+    assert_eq!(picture.picture.row(1).unwrap(), &[1]);
+}
+
 #[test]
 fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     use bitmap_bridge::*;
@@ -16,36 +146,6 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
     use triergon_matroska::Event as MkvEvent;
     use triergon_subtitles::{dvb, pgs};
 
-    fn element(id: &[u8], data: &[u8]) -> Vec<u8> {
-        let mut out = id.to_vec();
-        if data.len() < 127 {
-            out.push(0x80 | data.len() as u8);
-        } else {
-            assert!(data.len() < 16_383);
-            out.extend_from_slice(&(0x4000 | data.len() as u16).to_be_bytes());
-        }
-        out.extend_from_slice(data);
-        out
-    }
-    fn track(number: u8, kind: u8, codec: &[u8], extra: &[u8]) -> Vec<u8> {
-        element(
-            &[0xae],
-            &[
-                element(&[0xd7], &[number]),
-                element(&[0x73, 0xc5], &[number]),
-                element(&[0x83], &[kind]),
-                element(&[0x86], codec),
-                extra.to_vec(),
-            ]
-            .concat(),
-        )
-    }
-    fn block(number: u8, delta: i16, data: &[u8]) -> Vec<u8> {
-        element(
-            &[0xa3],
-            &[&[0x80 | number], &delta.to_be_bytes()[..], &[0x80], data].concat(),
-        )
-    }
     fn group(number: u8, delta: i16, duration: u8, data: &[u8]) -> Vec<u8> {
         let payload = [&[0x80 | number], &delta.to_be_bytes()[..], &[0], data].concat();
         element(
@@ -93,75 +193,34 @@ fn matroska_bitmap_tracks_feed_native_receivers_without_copying_frames() {
         &[0x6d, 0x80],
         &element(&[0x62, 0x40], &element(&[0x50, 0x34], &[])),
     );
-    let data = [
-        element(
-            &[0x1a, 0x45, 0xdf, 0xa3],
-            &element(&[0x42, 0x82], b"matroska"),
-        ),
-        element(
-            &[0x18, 0x53, 0x80, 0x67],
-            &[
-                element(
-                    &[0x16, 0x54, 0xae, 0x6b],
-                    &[
-                        track(1, 1, b"V_VP9", &[]),
-                        track(3, 17, b"S_HDMV/PGS", &[]),
-                        track(
-                            7,
-                            17,
-                            b"S_VOBSUB",
-                            &[element(&[0x63, 0xa2], palette), zlib].concat(),
-                        ),
-                        track(8, 17, b"S_DVBSUB", &element(&[0x63, 0xa2], &dvb_private)),
-                        track(
-                            9,
-                            17,
-                            b"S_DVBSUB",
-                            &element(&[0x63, 0xa2], &dvb_private[..4]),
-                        ),
-                    ]
-                    .concat(),
-                ),
-                element(
-                    &[0x1f, 0x43, 0xb6, 0x75],
-                    &[
-                        element(&[0xe7], &[4]),
-                        block(1, 0, &[0]),
-                        pgs_blocks,
-                        block(7, 5, &compressed),
-                        group(8, 15, 42, dvb_frame),
-                        block(8, 90, &dvb_clear),
-                    ]
-                    .concat(),
-                ),
-            ]
-            .concat(),
-        ),
-    ]
-    .concat();
-    let pool = pool();
-    let engine = Engine::matroska(
-        triergon_matroska::Reader::new(
-            &pool,
-            ID,
-            SourceCapabilities {
-                length: Some(data.len() as u64),
-                random_access: true,
-            },
-            triergon_matroska::Limits::default(),
-            4096,
-        )
-        .unwrap(),
+    let data = matroska_file(
+        &[
+            track(1, 1, b"V_VP9", &[]),
+            track(3, 17, b"S_HDMV/PGS", &[]),
+            track(
+                7,
+                17,
+                b"S_VOBSUB",
+                &[element(&[0x63, 0xa2], palette), zlib].concat(),
+            ),
+            track(8, 17, b"S_DVBSUB", &element(&[0x63, 0xa2], &dvb_private)),
+            track(
+                9,
+                17,
+                b"S_DVBSUB",
+                &element(&[0x63, 0xa2], &dvb_private[..4]),
+            ),
+        ],
+        &[
+            block(1, 0, &[0]),
+            pgs_blocks,
+            block(7, 5, &compressed),
+            group(8, 15, 42, dvb_frame),
+            block(8, 90, &dvb_clear),
+        ],
     );
-    let source = ByteSource::new(ID, Bytes::copy_from_slice(&pool, &data).unwrap(), 7).unwrap();
-    let mut player = Player::new(
-        engine,
-        SourceOwner::new(source),
-        Selection::All,
-        PlayerPolicy::default(),
-    )
-    .unwrap();
-    let outputs = collect(&mut player, 1).unwrap();
+    let pool = pool();
+    let (mut player, outputs) = matroska_outputs(&pool, &data);
     let configuration = outputs
         .iter()
         .find(|o| matches!(o.event(), Event::Matroska(MkvEvent::Configuration(_))))

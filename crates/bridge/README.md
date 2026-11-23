@@ -69,8 +69,9 @@ from the transport packets offered to `TeletextTsBridge::observe`.
 `PgsTsTrack` hands each PES to `PgsBridge`. `Mp4DvdSetup` reads the colour
 table of an `mp4s` entry, and its `Mp4DvdTrack` hands each sample to
 `DvdReceiver`; a subpicture without a stop ends with its packet's duration.
-A Matroska VobSub track's `vobsub_settings` reads its palette and canvas; the
-DVD queue places pictures on that canvas.
+A Matroska VobSub track's `vobsub_settings` reads its palette and canvas, or
+gives the receiver's defaults for a track without CodecPrivate; the DVD queue
+places pictures on that canvas.
 The DVB queue exposes up to eight rectangles per picture in decoder order
 and uses zero before it has a presentation clock. Explicit service binding
 keeps the selected composition and ancillary pages.

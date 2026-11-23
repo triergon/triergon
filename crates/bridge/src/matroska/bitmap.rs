@@ -188,17 +188,22 @@ impl MatroskaBitmapTrack {
     }
 
     /// The DVD receiver's settings from the track's VobSub `CodecPrivate`:
-    /// its palette and canvas, read as the reference's decoder reads them.
+    /// its palette and canvas, read as the reference's decoder reads them. A
+    /// track without `CodecPrivate` gets the receiver's default palette and
+    /// canvas: the codec mapping says what the element holds, not that it is
+    /// present.
     pub fn vobsub_settings(&self) -> Result<compat::dvd::Settings> {
         if !matches!(self.codec, Codec::VobSub) {
             return Err(Error::Invalid("VobSub settings require a VobSub track"));
         }
-        let raw = self
+        match self
             .association
             .configuration
             .initialization_bytes(self.association.track)
-            .ok_or(Error::Invalid("missing Matroska VobSub initialization"))?;
-        compat::dvd::Settings::from_configuration(&raw)
+        {
+            Some(raw) => compat::dvd::Settings::from_configuration(&raw),
+            None => Ok(compat::dvd::Settings::default()),
+        }
     }
 
     /// The selected service and the original five-byte CodecPrivate.

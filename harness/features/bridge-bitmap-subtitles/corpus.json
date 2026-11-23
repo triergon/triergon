@@ -9095,11 +9095,6 @@
         "packets": 203,
         "bytes": 17302,
         "digest": 10223772635467640233
-      },
-      "candidate_expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 280
       }
     },
     {
