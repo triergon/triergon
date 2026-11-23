@@ -11,6 +11,81 @@ input, read through the [`triergon-playback`](../playback/README.md) PES feed.
 | Segment clocks | `clock::resolve_hls_aac_clocks`, `HlsAacClock` |
 | Packet views | `TsProgressiveReader::packet` and `HlsSegment::packet` borrow AVC and AAC units as `PacketInfo`. AVC uses 90 kHz ticks and AAC uses a clock that represents PES times and sample durations exactly |
 
+## Usage
+
+Each reader takes a source and its input cursor. These examples use finite,
+in-memory bytes. With a source that may return `Pending`, wait for the source
+before advancing again after `NeedInput`.
+
+```rust
+use std::sync::atomic::AtomicBool;
+use triergon_core::source::ByteSource;
+use triergon_core::{Backpressure, Budget, Bytes, Error, InputCursor, Result,
+    SourceCapabilities, SourceId, WorkBudget};
+use triergon_hls::progressive::{TsProgressiveReader, TsProgressiveStep, TsProgressiveUnit};
+use triergon_hls::segment::{
+    HlsMediaProfile, HlsMediaSegment, HlsMediaSegmentReader, HlsSegment,
+    HlsSegmentProgress, HlsSegmentReader,
+};
+
+fn input(pool: &Budget, bytes: Bytes) -> Result<(InputCursor, ByteSource)> {
+    let id = SourceId(1);
+    let window = 4096;
+    let caps = SourceCapabilities { length: Some(bytes.len() as u64), random_access: false };
+    Ok((InputCursor::new(pool, id, caps, window)?, ByteSource::new(id, bytes, window)?))
+}
+
+fn segment(pool: &Budget, bytes: Bytes) -> Result<Option<HlsSegment>> {
+    let (cursor, source) = input(pool, bytes)?;
+    let mut reader = HlsSegmentReader::new(cursor, source, Default::default(), Default::default())?;
+    let cancel = AtomicBool::new(false);
+    loop {
+        match reader.advance(&mut WorkBudget::new(16_384), &cancel)? {
+            HlsSegmentProgress::Ready => return reader.take(&cancel),
+            HlsSegmentProgress::Yield | HlsSegmentProgress::NeedInput(_) => continue,
+            HlsSegmentProgress::Backpressure { requested, available } =>
+                return Err(Error::Backpressure(Backpressure { requested, available })),
+        }
+    }
+}
+
+fn media_segment(
+    pool: &Budget, bytes: Bytes, profile: HlsMediaProfile,
+) -> Result<Option<HlsMediaSegment>> {
+    let (cursor, source) = input(pool, bytes)?;
+    let mut reader = HlsMediaSegmentReader::new(cursor, source, profile, Default::default())?;
+    let cancel = AtomicBool::new(false);
+    loop {
+        match reader.advance(&mut WorkBudget::new(16_384), &cancel)? {
+            HlsSegmentProgress::Ready => return reader.take(&cancel),
+            HlsSegmentProgress::Yield | HlsSegmentProgress::NeedInput(_) => continue,
+            HlsSegmentProgress::Backpressure { requested, available } =>
+                return Err(Error::Backpressure(Backpressure { requested, available })),
+        }
+    }
+}
+
+fn progressive(
+    pool: &Budget, bytes: Bytes, mut consume: impl FnMut(&TsProgressiveUnit),
+) -> Result<()> {
+    let (cursor, source) = input(pool, bytes)?;
+    let mut reader = TsProgressiveReader::new(cursor, source, Default::default())?;
+    let cancel = AtomicBool::new(false);
+    loop {
+        match reader.advance(&mut WorkBudget::new(16_384), &cancel)? {
+            TsProgressiveStep::Unit(unit) => {
+                consume(&unit);
+                reader.reuse_unit(unit);
+            }
+            TsProgressiveStep::End => return Ok(()),
+            TsProgressiveStep::Yield | TsProgressiveStep::NeedInput(_) => continue,
+            TsProgressiveStep::Backpressure { requested, available } =>
+                return Err(Error::Backpressure(Backpressure { requested, available })),
+        }
+    }
+}
+```
+
 ## Behaviour and limits
 
 **HLS segments.** One independent TS188 segment with in-band PAT and PMT.
@@ -33,12 +108,11 @@ work counts. A request stays pending if the source runs out of work before it
 can reply. Start a new reader to begin at another offset.
 Input requests prefer a TS188 boundary within the cursor's window limit. Short
 replies continue through the ordinary packet carry path.
-On 64-bit targets, progressive PES payloads retain one shared backing handle per
-admitted carrier run. The AVC and AAC cursors borrow each logical carrier range, preserving its
-validation, work and retirement boundaries. Independently retained AAC frames
-still keep the full backing allocation charged. Both framers also expose
-`push_compact` for explicit `CompactDemuxPacket` delivery alongside ordinary `push`.
-Both paths share track, configuration-epoch and source-clock admission checks.
+On 64-bit targets, several carriers in a progressive PES packet can share an
+allocation. An AAC frame that borrows those bytes keeps the full allocation
+charged while you hold it. The standalone AVC and AAC readers accept both
+`CompactDemuxPacket` through `push_compact` and ordinary PES packets through
+`push`, with the same track, configuration and clock checks.
 
 **ADTS AAC.** Complete frames contained in one source span can share its charged
 backing storage when its capacity fits the configured maximum frame size. After

@@ -1,8 +1,8 @@
 # triergon-bridge
 
-Takes [`triergon-playback`](../playback/README.md) packets to decoders and to
-subtitle receivers. The crate has two halves: access units (the root modules)
-and subtitle receivers (`subtitles`).
+Frames packets for decoders, discovers Matroska startup configuration and
+demux clocks, and binds [`triergon-playback`](../playback/README.md) outputs to
+subtitle receivers.
 
 | Area | Entry points |
 |---|---|
@@ -21,6 +21,38 @@ unit through `contiguous_feed` or `segments`. `Event::DemuxPes` and PES carried
 in `Event::Ts` have no packet view. `AccessUnits::for_track` refuses Matroska
 AAC without CodecPrivate; `AccessUnits::for_matroska` frames it from the
 Matroska track entry.
+
+```rust
+use std::sync::atomic::AtomicBool;
+use triergon_bridge::access::AccessUnits;
+use triergon_core::container::{PacketInfo, TrackInfo};
+use triergon_core::{Budget, Error, Result, WorkBudget};
+use triergon_framing::BuildStep;
+
+fn frame_one(pool: &Budget, track: &dyn TrackInfo, packet: &impl PacketInfo) -> Result<()> {
+    let cancel = AtomicBool::new(false);
+    let mut setup = AccessUnits::for_track(pool, track, Default::default())?;
+    let mut framing = loop {
+        match setup.step(&mut WorkBudget::new(16_384), &cancel)? {
+            BuildStep::Ready(framing) => break framing,
+            BuildStep::Yield => continue,
+            BuildStep::Complete => return Err(Error::Closed),
+        }
+    };
+    let mut job = framing.packet(packet)?;
+    loop {
+        match job.step(&mut WorkBudget::new(16_384), &cancel)? {
+            BuildStep::Ready(unit) => {
+                // Submit unit.payload() to the decoder before releasing the unit.
+                let _ = unit.payload();
+                return Ok(());
+            }
+            BuildStep::Yield => continue,
+            BuildStep::Complete => return Err(Error::Closed),
+        }
+    }
+}
+```
 
 **ADTS program configuration.** An ADTS header has no room for an
 AudioSpecificConfig. For channel configuration 0, `AccessUnits` and `AacBridge`
@@ -59,6 +91,35 @@ identify a wrong packet codec, a mismatched feed, or a video sample that cannot
 extend the decode clock.
 
 ## Subtitles
+
+Keep one `TextBridge` for the selected track and generation. When the bridge
+requests a packet, hand over the corresponding playback output and step until
+it requests the next one. Call `finish` after the last packet, then step until
+`TextStep::Finished`.
+
+```rust
+use std::sync::atomic::AtomicBool;
+use triergon_bridge::subtitles::text::{TextBridge, TextSource, TextStep};
+use triergon_core::{Result, WorkBudget};
+use triergon_playback::Output;
+
+fn submit_text(bridge: &mut TextBridge, packet: Output) -> Result<()> {
+    let source = TextSource::from_output(packet).map_err(|rejected| rejected.error)?;
+    bridge.provide(source).map_err(|rejected| rejected.error)?;
+    let cancel = AtomicBool::new(false);
+    loop {
+        match bridge.step(&mut WorkBudget::new(16_384), &cancel)? {
+            TextStep::Cue(output) => {
+                // Pass the cue to the subtitle renderer.
+                let _ = output.cue;
+            }
+            TextStep::Refused(refused) => return Err(refused.error),
+            TextStep::NeedPacket | TextStep::Finished => return Ok(()),
+            TextStep::Yield => continue,
+        }
+    }
+}
+```
 
 **Refusals.** A subtitle packet that cannot be read costs only its own output:
 `TextStep::Refused` returns a text packet or document whose bytes break its
