@@ -450,7 +450,7 @@ fn avc_receiver_preserves_short_profile_extension_and_frames_complete_parameter_
                 .expect("AVC receiver must publish with bounded work");
             assert_eq!(config.source_bytes().as_ref(), raw);
             assert_eq!(config.fields().raw_extension(), None);
-            assert_eq!(config.trailing_bytes(), suffix);
+            assert_eq!(config.opaque_suffix(), suffix);
             assert_eq!(config.strict_source_refusal(), Some(Error::Truncated));
             assert_eq!(
                 receiver.strict_source_refusal(),

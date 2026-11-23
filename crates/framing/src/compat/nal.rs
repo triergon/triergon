@@ -137,8 +137,8 @@ impl ReceiverAvcConfiguration {
     }
     /// The record's bytes after its last array. The zero to three bytes of an
     /// extension header that is cut short are among them.
-    pub fn trailing_bytes(&self) -> &[u8] {
-        self.inner.trailing_bytes()
+    pub fn opaque_suffix(&self) -> &[u8] {
+        self.inner.opaque_suffix()
     }
     /// NAL units in all arrays together.
     pub fn nal_count(&self) -> usize {
@@ -159,7 +159,7 @@ impl ReceiverAvcConfiguration {
     }
     /// Width of the length field before each NAL unit of a sample,
     /// `lengthSizeMinusOne + 1`: 1 to 4 bytes, three among them.
-    pub fn observed_length_size(&self) -> LengthSize {
+    pub fn sample_length_size(&self) -> LengthSize {
         self.inner.sample_length_size()
     }
     /// The NAL units of all arrays in record order.
@@ -212,8 +212,8 @@ impl ReceiverHevcConfiguration {
     }
     /// Width of the length field before each NAL unit of a sample,
     /// `lengthSizeMinusOne + 1`: 1 to 4 bytes, three among them.
-    pub fn observed_length_size(&self) -> LengthSize {
-        self.inner.length_size()
+    pub fn sample_length_size(&self) -> LengthSize {
+        self.inner.sample_length_size()
     }
     /// [`Error::Unsupported`], with which [`HvcConfigParser`] refuses a
     /// three-byte NAL length; `None` for a record it accepts.

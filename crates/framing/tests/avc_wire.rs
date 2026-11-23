@@ -100,7 +100,7 @@ fn wire_grammar_is_implemented_instead_of_declared_layout_only() {
     assert_eq!(value.nal(1).unwrap().source_bytes(), [0x68, 0x40]);
     assert_eq!(value.nal(1).unwrap().header().nal_unit_type(), 8);
     assert_eq!(value.understood_end(), 15);
-    assert!(value.trailing_bytes().is_empty());
+    assert!(value.opaque_suffix().is_empty());
 }
 
 #[test]
@@ -134,7 +134,7 @@ fn all82_independent_records_and_spans_agree_at_each_work_quantum() {
                         unhex(cells[6])
                     );
                     assert_eq!(v.understood_end().to_string(), cells[7]);
-                    assert_eq!(v.trailing_bytes(), unhex(cells[8]));
+                    assert_eq!(v.opaque_suffix(), unhex(cells[8]));
                     let arrays: Vec<_> = cells[9].split('|').collect();
                     assert_eq!(arrays.len(), v.arrays().len());
                     for (expected, a) in arrays.iter().zip(v.arrays()) {
@@ -222,7 +222,7 @@ fn selected2010_profile_branch_does_not_guess_newer_profile_extensions() {
     let v = parse(&pool, &unhex("01f4a528ffe000fdf8f800")).unwrap();
     assert_eq!(v.fields().profile_indication(), 244);
     assert_eq!(v.fields().raw_extension(), None);
-    assert_eq!(v.trailing_bytes(), [0xfd, 0xf8, 0xf8, 0]);
+    assert_eq!(v.opaque_suffix(), [0xfd, 0xf8, 0xf8, 0]);
     assert!(matches!(
         parse(&pool, &unhex("0164a528ffe000")),
         Err(Error::Truncated)
@@ -432,6 +432,6 @@ fn original_length_fields_and_opaque_nal_body_bytes_are_not_rewritten() {
     assert_eq!(v.nals().len(), 3);
     assert_eq!(v.nal(0).unwrap().source_bytes(), [0x67, 0, 0, 3, 1]);
     assert_eq!(v.nal(1).unwrap().header().nal_unit_type(), 31);
-    assert_eq!(v.trailing_bytes(), [0xbb, 0]);
+    assert_eq!(v.opaque_suffix(), [0xbb, 0]);
     assert_eq!(v.source_bytes().as_ref(), bytes);
 }

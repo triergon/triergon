@@ -314,7 +314,7 @@ type DescriptorStorage<T> = InlineStorage<T, INLINE_DESCRIPTORS>;
 pub struct HvcConfigParser {
     phase: Phase,
     first_unsupported_array: Option<(u8, u8)>,
-    observed_width_three: bool,
+    filter_acceptance: bool,
     // None once published or failed: the output takes it and a failure drops it,
     // so no spare pool handle or empty replacement storage is kept for either.
     record: Option<Record>,
@@ -385,7 +385,7 @@ impl HvcConfigParser {
             understood_end: 0,
             first_unsupported_array: None,
             failure: None,
-            observed_width_three: false,
+            filter_acceptance: false,
         })
     }
 
@@ -398,7 +398,7 @@ impl HvcConfigParser {
         limits: HvcConfigLimits,
     ) -> Result<Self> {
         let mut parser = Self::new(pool, source, raw, limits)?;
-        parser.observed_width_three = true;
+        parser.filter_acceptance = true;
         Ok(parser)
     }
 
@@ -502,7 +502,7 @@ impl HvcConfigParser {
                         return Err(Error::Unsupported("hvcC configuration version"));
                     }
                     let fields = inspect_config_prefix(raw.as_ref())?;
-                    if fields.length_size_minus_one() == 2 && !self.observed_width_three {
+                    if fields.length_size_minus_one() == 2 && !self.filter_acceptance {
                         return Err(Error::Unsupported("hvcC three-byte sample length"));
                     }
                     let count = fields.array_count();
@@ -758,7 +758,7 @@ impl HvcConfiguration {
     }
     /// Width of the length field before each NAL unit of a sample:
     /// `lengthSizeMinusOne + 1` bytes.
-    pub const fn length_size(&self) -> LengthSize {
+    pub const fn sample_length_size(&self) -> LengthSize {
         self.width
     }
     /// Offset in the record, in bytes, of the end of its last array, or 23 when it

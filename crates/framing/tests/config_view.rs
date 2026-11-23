@@ -221,8 +221,8 @@ fn avc_facts(v: &AvcConfiguration) -> AvcFacts {
         assert_eq!(a.source(), v.source());
     }
     assert_eq!(
-        v.trailing_bytes(),
-        v.retain_trailing_bytes().unwrap().as_ref()
+        v.opaque_suffix(),
+        v.retain_opaque_suffix().unwrap().as_ref()
     );
     AvcFacts {
         raw: v.source_bytes().to_vec(),
@@ -230,7 +230,7 @@ fn avc_facts(v: &AvcConfiguration) -> AvcFacts {
         fields: v.fields(),
         width: v.sample_length_size().bytes(),
         understood_end: v.understood_end(),
-        trailing: v.trailing_bytes().to_vec(),
+        trailing: v.opaque_suffix().to_vec(),
         arrays: v
             .arrays()
             .map(|a| {
@@ -415,7 +415,7 @@ fn hvc_facts(v: &HvcConfiguration) -> HvcFacts {
         raw: v.source_bytes().to_vec(),
         source: v.source(),
         fields: v.fields(),
-        width: v.length_size().bytes(),
+        width: v.sample_length_size().bytes(),
         understood_end: v.understood_end(),
         suffix: v.opaque_suffix().to_vec(),
         syntax_issues: v.syntax_issues(),
@@ -549,7 +549,7 @@ fn every_record_and_quantum_holds_exact_storage_and_record_extents() {
             &[0xfd, 0xf8, 0xf8, 1, 0, 4, 0x6d, 1, 2, 3]
         ]
     );
-    let _: &[u8] = v.trailing_bytes();
+    let _: &[u8] = v.opaque_suffix();
     let mut p = HvcConfigParser::new(
         &pool,
         hvc_source(),
@@ -715,7 +715,7 @@ fn single_exports_outlive_parser_and_configuration_with_one_full_owner() {
     let mut parser = AvcConfigParser::new(&pool, avc_source(), raw, avc_limits()).unwrap();
     let config = run(&mut parser, 1).1.unwrap();
     drop(parser);
-    let trailing = config.retain_trailing_bytes().unwrap();
+    let trailing = config.retain_opaque_suffix().unwrap();
     drop(config);
     assert_eq!(pool.used(), baseline + raw_charge);
     assert_eq!(&trailing[..], [0xaa, 0xbb]);
@@ -742,7 +742,7 @@ fn hidden_parent_offsets_are_record_relative_and_fully_charged() {
             assert_eq!(config.source_bytes().as_ref(), record);
             assert_eq!(config.nal(0).unwrap().source_range(), 8..11);
             assert_eq!(config.nal(0).unwrap().source_bytes(), [0x67, 0x64, 0x00]);
-            assert_eq!(config.trailing_bytes(), [0xaa, 0xbb]);
+            assert_eq!(config.opaque_suffix(), [0xaa, 0xbb]);
             assert_eq!(
                 config.retained_storage_bytes().unwrap(),
                 full + config.descriptor_storage_bytes().unwrap()
@@ -827,7 +827,7 @@ fn empty_arrays_extensions_reserved_bits_mismatch_and_suffix() {
     assert_eq!(config.sample_length_size().bytes(), 1);
     assert_eq!(config.fields().raw_extension(), Some([0xfc, 0xf8, 0xf8, 0]));
     assert_eq!(config.fields().syntax_issues(), 1);
-    assert_eq!(config.trailing_bytes(), [1, 2]);
+    assert_eq!(config.opaque_suffix(), [1, 2]);
     // hvcC: reserved bits and an empty array.
     let raw = hvc_corpus()
         .into_iter()
@@ -1463,7 +1463,7 @@ fn strict_and_observed_configurations_keep_distinct_typed_refusals() {
             ReceiverAvcConfigParser::new(&pool, avc_source(), bytes(&pool, &avc3), avc_limits())
                 .unwrap();
         let v = run(&mut parser, quantum).1.unwrap();
-        assert_eq!(v.observed_length_size().bytes(), 3);
+        assert_eq!(v.sample_length_size().bytes(), 3);
         assert_eq!(
             v.strict_source_refusal(),
             Some(Error::Invalid("AVC three-byte sample length"))
@@ -1471,13 +1471,13 @@ fn strict_and_observed_configurations_keep_distinct_typed_refusals() {
         assert_eq!(v.source(), avc_source());
         assert_eq!(v.source_bytes().as_ref(), avc3);
         assert_eq!(v.nal_count(), 5);
-        assert_eq!(v.trailing_bytes(), [0xaa, 0xbb]);
+        assert_eq!(v.opaque_suffix(), [0xaa, 0xbb]);
 
         let mut parser =
             ReceiverHevcConfigParser::new(&pool, hvc_source(), bytes(&pool, &hvc3), hvc_limits())
                 .unwrap();
         let v = run(&mut parser, quantum).1.unwrap();
-        assert_eq!(v.observed_length_size().bytes(), 3);
+        assert_eq!(v.sample_length_size().bytes(), 3);
         assert_eq!(
             v.strict_source_refusal(),
             Some(Error::Unsupported("hvcC three-byte sample length"))

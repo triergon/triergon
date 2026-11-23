@@ -131,7 +131,7 @@ impl HevcAnnexBAccessUnit<'_> {
 
     /// The sample's NAL units without their length fields, in sample order.
     pub fn source_nals(&self) -> impl Iterator<Item = &[u8]> {
-        let width = usize::from(self.config.record.length_size().bytes());
+        let width = usize::from(self.config.record.sample_length_size().bytes());
         let mut rest = self.sample;
         std::iter::from_fn(move || {
             let (nal, tail) = next_nal(rest, width).ok()?;
@@ -187,7 +187,7 @@ impl<'a> HevcAnnexBJob<'a> {
         let Some(mut rest) = self.rest else {
             return Ok(BuildStep::Complete);
         };
-        let width = usize::from(self.config.record.length_size().bytes());
+        let width = usize::from(self.config.record.sample_length_size().bytes());
         while !rest.is_empty() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);

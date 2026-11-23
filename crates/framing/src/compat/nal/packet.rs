@@ -263,7 +263,7 @@ impl NalPacketConfiguration {
     pub(crate) fn width(&self) -> Option<LengthSize> {
         match self.record() {
             ConfigurationRef::Avc(record) => Some(record.sample_length_size()),
-            ConfigurationRef::Hevc(record) => Some(record.length_size()),
+            ConfigurationRef::Hevc(record) => Some(record.sample_length_size()),
             ConfigurationRef::Passthrough(_) => None,
         }
     }

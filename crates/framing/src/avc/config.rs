@@ -211,7 +211,12 @@ impl Scan {
 
     // Single caller per walk; inlining lets the event stay in registers.
     #[inline(always)]
-    fn next(&mut self, raw: &[u8], limits: AvcConfigLimits, receiver: bool) -> Result<Event> {
+    fn next(
+        &mut self,
+        raw: &[u8],
+        limits: AvcConfigLimits,
+        filter_acceptance: bool,
+    ) -> Result<Event> {
         match self.phase {
             ScanPhase::Sequence => self.group(
                 AvcConfigArrayKind::Sequence,
@@ -242,7 +247,7 @@ impl Scan {
                 let start = self.position;
                 let end = start.checked_add(4).ok_or(Error::Overflow)?;
                 let Some(bytes) = raw.get(start..end) else {
-                    if receiver {
+                    if filter_acceptance {
                         self.phase = ScanPhase::End;
                         return Ok(Event::End(start));
                     }
@@ -250,9 +255,9 @@ impl Scan {
                 };
                 let bytes: [u8; 4] = bytes.try_into().map_err(|_| Error::Truncated)?;
                 self.position = end;
-                // A receiver can publish the base parameter sets when the
+                // The filter can publish the base parameter sets when the
                 // record ends immediately after the extension header.
-                let count = if receiver && end == raw.len() {
+                let count = if filter_acceptance && end == raw.len() {
                     0
                 } else {
                     bytes[3]
@@ -368,7 +373,7 @@ pub struct AvcConfigParser {
     arrays: [ArrayDescriptor; 3],
     phase: Phase,
     extension: Option<[u8; 4]>,
-    receiver: bool,
+    filter_acceptance: bool,
 }
 
 impl std::fmt::Debug for AvcConfigParser {
@@ -422,7 +427,7 @@ impl AvcConfigParser {
             understood_end: 0,
             failure: None,
             extension: None,
-            receiver: false,
+            filter_acceptance: false,
         })
     }
 
@@ -435,7 +440,7 @@ impl AvcConfigParser {
         limits: AvcConfigLimits,
     ) -> Result<Self> {
         let mut parser = Self::new(pool, source, raw, limits)?;
-        parser.receiver = true;
+        parser.filter_acceptance = true;
         Ok(parser)
     }
 
@@ -481,7 +486,7 @@ impl AvcConfigParser {
         self.failure
     }
 
-    // One record walk serves the strict and the receiver slot; `publish` makes the
+    // One record walk serves the strict and the filter-accepting slot; `publish` makes the
     // slot's value from the record directly.
     #[inline]
     pub(crate) fn step_into_with<T>(
@@ -572,7 +577,7 @@ impl AvcConfigParser {
                         .ok_or(Error::Truncated)?
                         .try_into()
                         .map_err(|_| Error::Truncated)?;
-                    if prefix[4] & 3 == 2 && !self.receiver {
+                    if prefix[4] & 3 == 2 && !self.filter_acceptance {
                         return Err(Error::Invalid("AVC three-byte sample length"));
                     }
                     self.phase = Phase::Count(prefix);
@@ -580,7 +585,7 @@ impl AvcConfigParser {
                 Phase::Count(prefix) | Phase::Fill(prefix) => {
                     let counting = matches!(self.phase, Phase::Count(_));
                     let mut next = *scan;
-                    let event = next.next(raw, self.limits, self.receiver)?;
+                    let event = next.next(raw, self.limits, self.filter_acceptance)?;
                     match event {
                         Event::Group {
                             kind,
@@ -743,7 +748,7 @@ impl AvcConfiguration {
         self.width
     }
     /// Offset in the record, in bytes, of the end of its last array. What follows
-    /// is [`Self::trailing_bytes`].
+    /// is [`Self::opaque_suffix`].
     pub const fn understood_end(&self) -> usize {
         self.arrays[self.array_count() - 1].range.end as usize
     }
@@ -825,13 +830,13 @@ impl AvcConfiguration {
     }
     /// The bytes of the record after its last array, which the parser does not
     /// interpret; empty when the record ends there.
-    pub fn trailing_bytes(&self) -> &[u8] {
+    pub fn opaque_suffix(&self) -> &[u8] {
         &self.raw[self.understood_end()..]
     }
-    /// [`Self::trailing_bytes`] as an owner that shares the record's allocation and
+    /// [`Self::opaque_suffix`] as an owner that shares the record's allocation and
     /// keeps all of it charged. Fails only for a range outside the record, which a
     /// parsed record rules out.
-    pub fn retain_trailing_bytes(&self) -> Result<Bytes> {
+    pub fn retain_opaque_suffix(&self) -> Result<Bytes> {
         self.raw.slice(self.understood_end()..self.raw.len())
     }
     /// Element-count lower bound for live descriptor storage (capacity may be

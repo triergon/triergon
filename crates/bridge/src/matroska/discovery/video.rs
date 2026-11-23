@@ -265,7 +265,7 @@ fn hevc_chain(view: &HvcConfiguration) -> Result<Chain> {
     let chain = hevc::startup_chain(view.nals().map(|nal| nal.source_bytes()))?;
     Ok(Chain {
         codec: Codec::Hevc,
-        length: view.length_size(),
+        length: view.sample_length_size(),
         pps: chain.pps_id,
         minimum_pictures: chain.reorder + 1,
         reorders: chain.reorder != 0,

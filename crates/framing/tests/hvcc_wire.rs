@@ -181,7 +181,7 @@ fn every_temporal_flag_combination_is_independent_of_length_and_nesting() {
 #[test]
 fn empty_arrays_and_empty_configuration_are_distinct_and_owned() {
     let a = parse(&prefix(1, 0)).unwrap();
-    assert_eq!(a.length_size(), LengthSize::new(1).unwrap());
+    assert_eq!(a.sample_length_size(), LengthSize::new(1).unwrap());
     assert_eq!(a.array_count(), 0);
     assert_eq!(a.nal_count(), 0);
     let b = record(&[(32, true, vec![]), (55, false, vec![])], &[]);
@@ -257,7 +257,7 @@ fn one_two_four_widths_are_parsed_three_is_explicit_unsupported() {
         (4, LengthSize::new(4).unwrap()),
     ] {
         let b = prefix(width, 0);
-        assert_eq!(parse(&b).unwrap().length_size(), expected);
+        assert_eq!(parse(&b).unwrap().sample_length_size(), expected);
     }
     let b = prefix(3, 0);
     assert_eq!(
