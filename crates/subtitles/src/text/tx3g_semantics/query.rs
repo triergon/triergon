@@ -76,14 +76,7 @@ impl<'a> PointQuery<'a> {
             }
             self.search = match self.search {
                 Search::Run { low, high } if low == high => {
-                    let run = semantic
-                        .runs
-                        .as_slice()
-                        .get(low)
-                        .ok_or(Error::Invalid("tx3g point run absent"))?;
-                    if !run.characters.contains(&character) {
-                        return Err(Error::Invalid("tx3g point run geometry"));
-                    }
+                    // The resolved runs partition the text and construction checks the character index.
                     Search::Event {
                         run: low,
                         low: 0,

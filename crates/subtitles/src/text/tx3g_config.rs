@@ -325,12 +325,7 @@ impl ConfigJob {
                         30
                     };
                     if *read < count {
-                        let byte = *raw.get(*read).ok_or(Error::Truncated)?;
-                        if !work.try_charge(1) {
-                            return Ok(ConfigStatus::Pending);
-                        }
-                        bytes[*read] = byte;
-                        *read += 1;
+                        read_byte(raw, *read, bytes, read, work)?;
                     } else {
                         self.defaults = Some(Self::defaults(self.layout, bytes)?);
                         self.at = count;
@@ -343,6 +338,7 @@ impl ConfigJob {
                 }
                 Phase::Header { start, bytes, read } => {
                     if self.at == raw.len() && *read == 0 {
+                        // TS 126 245 §5.16 requires a font table in the sample description.
                         if !self.ftab_seen {
                             return Err(Error::Invalid("tx3g font table absent"));
                         }
@@ -360,29 +356,10 @@ impl ConfigJob {
                     };
                     if *read < header {
                         let offset = start.checked_add(*read).ok_or(Error::Overflow)?;
-                        let byte = *raw.get(offset).ok_or(Error::Truncated)?;
-                        if !work.try_charge(1) {
-                            return Ok(ConfigStatus::Pending);
-                        }
-                        bytes[*read] = byte;
-                        *read += 1;
+                        read_byte(raw, offset, bytes, read, work)?;
                         continue;
                     }
-                    let [a, b, c, d, kind @ .., e, f, g, h, i, j, k, l] = *bytes;
-                    let size = match u32::from_be_bytes([a, b, c, d]) {
-                        0 => raw.len() - *start,
-                        1 => usize::try_from(u64::from_be_bytes([e, f, g, h, i, j, k, l]))
-                            .map_err(|_| Error::Overflow)?,
-                        n => n as usize,
-                    };
-                    let minimum = header + if kind == *b"uuid" { 16 } else { 0 };
-                    if size < minimum {
-                        return Err(Error::Invalid("tx3g config box size"));
-                    }
-                    let end = start.checked_add(size).ok_or(Error::Overflow)?;
-                    if end > raw.len() {
-                        return Err(Error::Truncated);
-                    }
+                    let modifier = box_header(*bytes, *start, header, raw.len())?;
                     if self.boxes.len() >= self.limits.maximum_boxes {
                         return Err(Error::Limit {
                             requested: self.boxes.len() + 1,
@@ -390,8 +367,8 @@ impl ConfigJob {
                         });
                     }
                     self.phase = Phase::BoxCommit {
-                        kind,
-                        range: *start..end,
+                        kind: modifier.kind,
+                        range: modifier.range,
                         header,
                         paid: false,
                     };
@@ -403,9 +380,7 @@ impl ConfigJob {
                     paid,
                 } => {
                     if !*paid {
-                        if !work.try_charge(1) {
-                            return Ok(ConfigStatus::Pending);
-                        }
+                        work.take(1);
                         *paid = true;
                     }
                     self.boxes
@@ -436,15 +411,8 @@ impl ConfigJob {
                 }
                 Phase::FontCount { end, bytes, read } => {
                     if *read < 2 {
-                        if self.at >= *end {
-                            return Err(Error::Truncated);
-                        }
-                        if !work.try_charge(1) {
-                            return Ok(ConfigStatus::Pending);
-                        }
-                        bytes[*read] = raw[self.at];
+                        read_byte(&raw[..*end], self.at, bytes, read, work)?;
                         self.at += 1;
-                        *read += 1;
                     } else {
                         let left = usize::from(u16::from_be_bytes(*bytes));
                         if left > self.limits.maximum_fonts {
@@ -479,15 +447,8 @@ impl ConfigJob {
                         continue;
                     }
                     if *read < 3 {
-                        if self.at >= *end {
-                            return Err(Error::Truncated);
-                        }
-                        if !work.try_charge(1) {
-                            return Ok(ConfigStatus::Pending);
-                        }
-                        bytes[*read] = raw[self.at];
+                        read_byte(&raw[..*end], self.at, bytes, read, work)?;
                         self.at += 1;
-                        *read += 1;
                     } else {
                         let [id_high, id_low, length] = *bytes;
                         let name_end = self
@@ -547,9 +508,7 @@ impl ConfigJob {
                     paid,
                 } => {
                     if !*paid {
-                        if !work.try_charge(1) {
-                            return Ok(ConfigStatus::Pending);
-                        }
+                        work.take(1);
                         *paid = true;
                     }
                     self.fonts.try_push(font.clone()).map_err(|e| e.error)?;
@@ -586,4 +545,42 @@ impl ConfigJob {
         self.phase = Phase::Taken;
         Ok(result)
     }
+}
+
+/// Reads one fixed-field byte after the poll loop has established available work.
+fn read_byte(
+    raw: &[u8],
+    at: usize,
+    buffer: &mut [u8],
+    read: &mut usize,
+    work: &mut WorkBudget,
+) -> Result<()> {
+    let byte = *raw.get(at).ok_or(Error::Truncated)?;
+    work.take(1);
+    buffer[*read] = byte;
+    *read += 1;
+    Ok(())
+}
+
+/// Reads the size and type of a complete box header within a sample description.
+fn box_header(bytes: [u8; 16], start: usize, header: usize, length: usize) -> Result<Modifier> {
+    let [a, b, c, d, kind @ .., e, f, g, h, i, j, k, l] = bytes;
+    let size = match u32::from_be_bytes([a, b, c, d]) {
+        0 => length - start,
+        1 => usize::try_from(u64::from_be_bytes([e, f, g, h, i, j, k, l]))
+            .map_err(|_| Error::Overflow)?,
+        n => n as usize,
+    };
+    let minimum = header + if kind == *b"uuid" { 16 } else { 0 };
+    if size < minimum {
+        return Err(Error::Invalid("tx3g config box size"));
+    }
+    let end = start.checked_add(size).ok_or(Error::Overflow)?;
+    if end > length {
+        return Err(Error::Truncated);
+    }
+    Ok(Modifier {
+        kind,
+        range: start..end,
+    })
 }

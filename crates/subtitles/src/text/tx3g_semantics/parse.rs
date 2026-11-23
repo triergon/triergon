@@ -69,7 +69,7 @@ impl Kind {
 #[derive(Debug)]
 enum Phase {
     Header,
-    Records,
+    Records { left: usize },
     Url(Cursor),
     AltLength,
     Alt(Cursor),
@@ -87,8 +87,6 @@ pub(super) struct Reader {
     buffer: [u8; 12],
     read: usize,
     need: usize,
-    count: usize,
-    current: usize,
     start: u16,
     finish: u16,
     url: Range<usize>,
@@ -121,8 +119,6 @@ impl Reader {
             buffer: [0; 12],
             read: 0,
             need: kind.header(),
-            count: 0,
-            current: 0,
             start: 0,
             finish: 0,
             url: 0..0,
@@ -198,143 +194,141 @@ impl Reader {
                     self.reset(1);
                     continue;
                 }
-                self.exact_end()?;
-                self.phase = Phase::Done;
-                return Ok(Poll::Ready(Item::Hyperlink(
-                    self.source(self.body_start),
-                    self.start,
-                    self.finish,
-                    self.url.clone(),
-                    self.alternate.clone(),
-                )));
+                return self
+                    .finish(Item::Hyperlink(
+                        self.source(self.body_start),
+                        self.start,
+                        self.finish,
+                        self.url.clone(),
+                        self.alternate.clone(),
+                    ))
+                    .map(Poll::Ready);
             }
             if !self.data(bytes, work, cancel)? {
                 return Ok(Poll::Yield);
             }
-            if let Phase::AltLength = self.phase {
-                let end = self
-                    .at
-                    .checked_add(usize::from(self.buffer[0]))
-                    .ok_or(Error::Overflow)?;
-                if end > self.end {
-                    return Err(Error::Truncated);
+            match self.phase {
+                Phase::Records { left } => return self.record(left).map(Poll::Ready),
+                Phase::AltLength => {
+                    self.alternate = self.string_range(self.buffer[0])?;
+                    self.phase = Phase::Alt(Cursor::new(self.alternate.clone(), Encoding::Utf8));
                 }
-                self.alternate = self.at..end;
-                self.phase = Phase::Alt(Cursor::new(self.alternate.clone(), Encoding::Utf8));
-                self.at = end;
-                continue;
-            }
-            if let Phase::Records = self.phase {
-                if self.current == self.count {
-                    self.exact_end()?;
-                    self.phase = Phase::Done;
-                    continue;
-                }
-                let source = self.source(self.begin);
-                let style = self.kind == Kind::Style;
-                let item = if style {
-                    Item::Style(
-                        source,
-                        StyleRecord {
-                            start: self.u16(0),
-                            end: self.u16(2),
-                            font_id: self.u16(4),
-                            face_flags: self.buffer[6],
-                            font_size: self.buffer[7],
-                            rgba: [
-                                self.buffer[8],
-                                self.buffer[9],
-                                self.buffer[10],
-                                self.buffer[11],
-                            ],
-                        },
-                    )
-                } else {
-                    Item::Karaoke(source, self.u32(0), self.u16(4), self.u16(6))
-                };
-                self.current += 1;
-                self.reset(if style { 12 } else { 8 });
-                if self.current == self.count {
-                    self.exact_end()?;
-                    self.phase = Phase::Done;
-                }
-                return Ok(Poll::Ready(item));
-            }
-            let source = self.source(self.begin);
-            let item = match self.kind {
-                Kind::Style | Kind::Karaoke => {
-                    let karaoke = self.kind == Kind::Karaoke;
-                    self.count = usize::from(self.u16(if karaoke { 4 } else { 0 }));
-                    self.current = 0;
-                    let count = self
-                        .count
-                        .checked_mul(if karaoke { 8 } else { 12 })
-                        .ok_or(Error::Overflow)?;
-                    if self.at.checked_add(count).ok_or(Error::Overflow)? != self.end {
-                        return Err(Error::Invalid("tx3g modifier record count/size"));
-                    }
-                    let header =
-                        karaoke.then(|| Item::KaraokeHeader(source, self.u32(0), self.u16(4)));
-                    self.phase = if self.count == 0 {
-                        Phase::Done
-                    } else {
-                        Phase::Records
-                    };
-                    self.reset(if karaoke { 8 } else { 12 });
-                    if let Some(item) = header {
+                _ => {
+                    if let Some(item) = self.header()? {
                         return Ok(Poll::Ready(item));
                     }
-                    continue;
                 }
-                Kind::Hyperlink => {
-                    self.start = self.u16(0);
-                    self.finish = self.u16(2);
-                    let end = self
-                        .at
-                        .checked_add(usize::from(self.buffer[4]))
-                        .ok_or(Error::Overflow)?;
-                    if end > self.end {
-                        return Err(Error::Truncated);
-                    }
-                    self.url = self.at..end;
-                    self.phase = Phase::Url(Cursor::new(self.url.clone(), Encoding::Utf8));
-                    self.at = end;
-                    continue;
-                }
-                Kind::Highlight => Item::Highlight(source, self.u16(0), self.u16(2)),
-                Kind::Blink => Item::Blink(source, self.u16(0), self.u16(2)),
-                Kind::HighlightColour => Item::HighlightColour(
-                    source,
-                    [
-                        self.buffer[0],
-                        self.buffer[1],
-                        self.buffer[2],
-                        self.buffer[3],
-                    ],
-                ),
-                Kind::ScrollDelay => Item::ScrollDelay(source, self.u32(0)),
-                Kind::TextBox => Item::TextBox(
-                    source,
-                    [
-                        self.u16(0) as i16,
-                        self.u16(2) as i16,
-                        self.u16(4) as i16,
-                        self.u16(6) as i16,
-                    ],
-                ),
-                Kind::Wrap => Item::Wrap(
-                    source,
-                    match self.buffer[0] {
-                        0 => WrapMode::NoWrap,
-                        1 => WrapMode::Soft,
-                        _ => return Err(Error::Unsupported("tx3g wrap flag")),
-                    },
-                ),
-                Kind::Disparity => Item::Disparity(source, self.u16(0) as i16),
-            };
-            self.exact_end()?;
-            self.phase = Phase::Done;
-            return Ok(Poll::Ready(item));
+            }
         }
+    }
+
+    fn finish(&mut self, item: Item) -> Result<Item> {
+        self.exact_end()?;
+        self.phase = Phase::Done;
+        Ok(item)
+    }
+
+    fn string_range(&mut self, length: u8) -> Result<Range<usize>> {
+        let end = self
+            .at
+            .checked_add(usize::from(length))
+            .ok_or(Error::Overflow)?;
+        if end > self.end {
+            return Err(Error::Truncated);
+        }
+        let range = self.at..end;
+        self.at = end;
+        Ok(range)
+    }
+
+    fn record(&mut self, left: usize) -> Result<Item> {
+        let source = self.source(self.begin);
+        let item = if self.kind == Kind::Style {
+            Item::Style(
+                source,
+                StyleRecord {
+                    start: self.u16(0),
+                    end: self.u16(2),
+                    font_id: self.u16(4),
+                    face_flags: self.buffer[6],
+                    font_size: self.buffer[7],
+                    rgba: [
+                        self.buffer[8],
+                        self.buffer[9],
+                        self.buffer[10],
+                        self.buffer[11],
+                    ],
+                },
+            )
+        } else {
+            Item::Karaoke(source, self.u32(0), self.u16(4), self.u16(6))
+        };
+        if left == 1 {
+            return self.finish(item);
+        }
+        self.phase = Phase::Records { left: left - 1 };
+        self.reset(self.need);
+        Ok(item)
+    }
+
+    fn header(&mut self) -> Result<Option<Item>> {
+        let source = self.source(self.begin);
+        let item = match self.kind {
+            Kind::Style | Kind::Karaoke => {
+                let karaoke = self.kind == Kind::Karaoke;
+                let count = self.u16(if karaoke { 4 } else { 0 });
+                let size = if karaoke { 8 } else { 12 };
+                let left = usize::from(count);
+                let end = self.at.checked_add(left * size).ok_or(Error::Overflow)?;
+                if end != self.end {
+                    return Err(Error::Invalid("tx3g modifier record count/size"));
+                }
+                self.phase = if left == 0 {
+                    Phase::Done
+                } else {
+                    Phase::Records { left }
+                };
+                self.reset(size);
+                return Ok(karaoke.then(|| Item::KaraokeHeader(source, self.u32(0), count)));
+            }
+            Kind::Hyperlink => {
+                self.start = self.u16(0);
+                self.finish = self.u16(2);
+                self.url = self.string_range(self.buffer[4])?;
+                self.phase = Phase::Url(Cursor::new(self.url.clone(), Encoding::Utf8));
+                return Ok(None);
+            }
+            Kind::Highlight => Item::Highlight(source, self.u16(0), self.u16(2)),
+            Kind::Blink => Item::Blink(source, self.u16(0), self.u16(2)),
+            Kind::HighlightColour => Item::HighlightColour(
+                source,
+                [
+                    self.buffer[0],
+                    self.buffer[1],
+                    self.buffer[2],
+                    self.buffer[3],
+                ],
+            ),
+            Kind::ScrollDelay => Item::ScrollDelay(source, self.u32(0)),
+            Kind::TextBox => Item::TextBox(
+                source,
+                [
+                    self.u16(0) as i16,
+                    self.u16(2) as i16,
+                    self.u16(4) as i16,
+                    self.u16(6) as i16,
+                ],
+            ),
+            Kind::Wrap => Item::Wrap(
+                source,
+                match self.buffer[0] {
+                    0 => WrapMode::NoWrap,
+                    1 => WrapMode::Soft,
+                    _ => return Err(Error::Unsupported("tx3g wrap flag")),
+                },
+            ),
+            Kind::Disparity => Item::Disparity(source, self.u16(0) as i16),
+        };
+        self.finish(item).map(Some)
     }
 }
