@@ -13,6 +13,7 @@ use triergon_harness_protocol::{
     digest::{fold, fold_bytes},
     hex,
 };
+use triergon_harness_runner::{Outcome, measure_outcome};
 use triergon_mpegts::{
     PacketFormat,
     clock::SourceTimePolicy,
@@ -137,9 +138,42 @@ impl<'a> Case<'a> {
     }
 }
 
+/// What a cue folds, chosen so that both sides of a comparison fold the same thing.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum CueFold {
+    /// The decoded text and the parsed WebVTT identifier and settings: caption and
+    /// teletext events, which the reference's receivers also give as text.
+    Decoded,
+    /// The display lines of a tx3g string, compared with the reference decoder's
+    /// display text: every line terminator of ETSI TS 126 245 section 5.11 (CR LF,
+    /// CR, LF, NEL, U+2028, U+2029) is written as LF.
+    Tx3gLines,
+    /// The Matroska Block data and its type-1 BlockAdditional, compared with the
+    /// packet and side data the reference's demuxer returns.
+    MatroskaBlock,
+}
+
+/// `text` with each ETSI TS 126 245 section 5.11 line terminator written as LF.
+fn tx3g_lines(text: &[u8]) -> Vec<u8> {
+    let mut lines = Vec::with_capacity(text.len());
+    let mut rest = text;
+    while let Some((&byte, tail)) = rest.split_first() {
+        let (terminator, tail) = match (byte, tail) {
+            (b'\r', [b'\n', after @ ..]) => (true, after),
+            (b'\r' | b'\n', _) => (true, tail),
+            (0xc2, [0x85, after @ ..]) | (0xe2, [0x80, 0xa8 | 0xa9, after @ ..]) => (true, after),
+            _ => (false, tail),
+        };
+        lines.push(if terminator { b'\n' } else { byte });
+        rest = tail;
+    }
+    lines
+}
+
 struct Records {
     totals: Totals,
     trace: bool,
+    cue_fold: CueFold,
 }
 
 impl Records {
@@ -164,16 +198,30 @@ impl Records {
     }
 
     fn cue(&mut self, cue: &text::Cue) -> Result<()> {
-        let body = cue.decoded_utf8.as_ref().unwrap_or(&cue.input.payload);
-        self.record(
-            1,
-            &[micros(cue.start)?, micros(cue.duration)?, body.len() as u64],
-            body,
-        );
-        for (kind, field) in [(2, &cue.identifier), (3, &cue.settings)] {
-            if let Some(field) = field {
-                let bytes = field.view(&cue.input)?;
-                self.record(kind, &[bytes.len() as u64], &bytes);
+        let clock = [micros(cue.start)?, micros(cue.duration)?];
+        match self.cue_fold {
+            CueFold::Decoded => {
+                let body = cue.decoded_utf8.as_ref().unwrap_or(&cue.input.payload);
+                self.record(1, &[clock[0], clock[1], body.len() as u64], body);
+                for (kind, field) in [(2, &cue.identifier), (3, &cue.settings)] {
+                    if let Some(field) = field {
+                        let bytes = field.view(&cue.input)?;
+                        self.record(kind, &[bytes.len() as u64], &bytes);
+                    }
+                }
+            }
+            CueFold::Tx3gLines => {
+                let text = cue.decoded_utf8.as_ref().ok_or("tx3g cue without text")?;
+                let lines = tx3g_lines(text);
+                self.record(1, &[clock[0], clock[1], lines.len() as u64], &lines);
+            }
+            CueFold::MatroskaBlock => {
+                let block = &cue.input.payload;
+                self.record(1, &[clock[0], clock[1], block.len() as u64], block);
+                if let Some(addition) = &cue.input.addition {
+                    let bytes = &addition.bytes;
+                    self.record(2, &[addition.id, bytes.len() as u64], bytes);
+                }
             }
         }
         Ok(())
@@ -384,47 +432,71 @@ pub(super) fn run(args: &[String]) -> Result<()> {
         5..=12,
         true,
     )?;
-    let case = Case::parse(invocation.arguments, is_text)?;
+    // With a trailing `--report-refusal`, an unsupported feature that ends the
+    // operation is also reported on the result line, so a registered refusal can
+    // check its detail.
+    let (report_refusal, arguments) = match invocation.arguments.split_last() {
+        Some((last, rest)) if last == "--report-refusal" => (true, rest),
+        _ => (false, invocation.arguments),
+    };
+    let case = Case::parse(arguments, is_text)?;
     let file = invocation.input(MAX_INPUT)?;
     let pool = Budget::new(256 << 20)?;
     let raw = Bytes::copy_from_slice(&pool, &file)?;
     drop(file);
-    measure(
-        &invocation,
-        if is_text {
-            "text-subtitle-bridge"
-        } else {
-            "subtitle-bridge"
-        },
-        Some(&pool),
-        || {
-            let mut records = Records {
-                totals: Totals {
-                    packets: 0,
-                    bytes: 0,
-                    digest: 0,
-                    refusal: None,
-                },
-                trace: invocation.mode == Mode::Trace,
-            };
-            let result = (|| {
-                let mut player = player(&case, &pool, &raw)?;
-                match case.codec {
-                    Codec::Tx3g | Codec::Utf8 | Codec::Ass | Codec::Vtt => {
-                        text_track(&case, &pool, &mut player, &mut records)
-                    }
-                    Codec::Cc => captions::closed(&case, &pool, &mut player, &mut records),
-                    Codec::Teletext => captions::teletext(&case, &pool, &mut player, &mut records),
-                    _ => bitmap::play(&case, &pool, &mut player, &mut records),
+    let name = if is_text {
+        "text-subtitle-bridge"
+    } else {
+        "subtitle-bridge"
+    };
+    // One run: its totals and, with `--report-refusal`, the unsupported feature that
+    // ended it.
+    let mut operation = || -> Result<Outcome> {
+        let mut records = Records {
+            totals: Totals {
+                packets: 0,
+                bytes: 0,
+                digest: 0,
+                refusal: None,
+            },
+            trace: invocation.mode == Mode::Trace,
+            cue_fold: match case.codec {
+                Codec::Tx3g => CueFold::Tx3gLines,
+                Codec::Utf8 | Codec::Ass | Codec::Vtt => CueFold::MatroskaBlock,
+                _ => CueFold::Decoded,
+            },
+        };
+        let result = (|| {
+            let mut player = player(&case, &pool, &raw)?;
+            match case.codec {
+                Codec::Tx3g | Codec::Utf8 | Codec::Ass | Codec::Vtt => {
+                    text_track(&case, &pool, &mut player, &mut records)
                 }
-            })();
-            if records.trace
-                && let Err(error) = &result
-            {
+                Codec::Cc => captions::closed(&case, &pool, &mut player, &mut records),
+                Codec::Teletext => captions::teletext(&case, &pool, &mut player, &mut records),
+                _ => bitmap::play(&case, &pool, &mut player, &mut records),
+            }
+        })();
+        let mut unsupported = None;
+        if let Err(error) = &result {
+            if records.trace {
                 println!("# candidate: {error}");
             }
-            records.record(9, &[u64::from(result.is_err())], &[]);
-            Ok(records.totals)
-        },
-    )
+            if report_refusal
+                && let Some(triergon_core::Error::Unsupported(detail)) = error.downcast_ref()
+            {
+                unsupported = Some(*detail);
+            }
+        }
+        records.record(9, &[u64::from(result.is_err())], &[]);
+        Ok(Outcome {
+            totals: records.totals,
+            unsupported,
+        })
+    };
+    if report_refusal {
+        measure_outcome(&invocation, name, Some(&pool), operation)
+    } else {
+        measure(&invocation, name, Some(&pool), || Ok(operation()?.totals))
+    }
 }

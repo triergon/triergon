@@ -163,6 +163,23 @@ static void subtitle_bridge_webvtt_fields(ViewWork *work, const AVPacket *packet
     }
 }
 
+/* A Matroska text Block as the demuxer returns it: the packet clock and data,
+ * then the bytes of its type-1 BlockAdditional, which FFmpeg exports after an
+ * eight-byte big-endian BlockAddID. */
+static void subtitle_bridge_block(ViewWork *work, const AVPacket *packet, AVRational base)
+{
+    const uint64_t pts = subtitle_bridge_micros(packet->pts, base);
+    const uint64_t duration = packet->duration ? subtitle_bridge_micros(packet->duration, base) : BRIDGE_ABSENT;
+    uint64_t fields[] = {pts, duration, (uint64_t)packet->size};
+    subtitle_bridge_record(work, 1, fields, 3, packet->data, (size_t)packet->size);
+    size_t size = 0;
+    const uint8_t *extra = av_packet_get_side_data(packet, AV_PKT_DATA_MATROSKA_BLOCKADDITIONAL, &size);
+    if (extra && size >= 8 && AV_RB64(extra) == 1) {
+        uint64_t words[] = {1, size - 8};
+        subtitle_bridge_record(work, 2, words, 2, extra + 8, size - 8);
+    }
+}
+
 static int subtitle_bridge_text_event(ViewWork *work, const AVSubtitle *subtitle, const AVPacket *packet,
                              AVRational base, enum AVCodecID codec)
 {
@@ -220,10 +237,17 @@ typedef struct {
     enum AVCodecID codec;
     AVRational base;
     int text, probe, draining;
+    /* A Matroska text track: fold the demuxed Block, decode nothing. */
+    int source_text;
 } BridgeDecode;
 
 static int subtitle_bridge_decode(BridgeDecode *run, AVPacket *packet)
 {
+    if (run->source_text) {
+        if (!run->draining)
+            subtitle_bridge_block(run->work, packet, run->base);
+        return 0;
+    }
     AVSubtitle event = {0};
     int got = 0;
     if (run->probe && !run->draining) {
@@ -587,6 +611,18 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
         goto done;
     }
     AVStream *stream = format->streams[selected];
+    /* MP4 tx3g compares the mov_text decoder's display text; a Matroska text
+     * track compares its Blocks, which the bridge returns as source cues. */
+    int source_text = !strcmp(input->argv[0], "text") && strcmp(carrier, "mov");
+    if (source_text) {
+        if ((rc = subtitle_bridge_options(input, &options, codec)) < 0)
+            goto done;
+        if (av_dict_count(options)) {
+            rc = AVERROR_OPTION_NOT_FOUND;
+            goto done;
+        }
+        goto decode;
+    }
     const AVCodec *implementation = avcodec_find_decoder(codec);
     if (!implementation || !(decoder = avcodec_alloc_context3(implementation))) {
         rc = AVERROR_DECODER_NOT_FOUND;
@@ -616,9 +652,11 @@ static int subtitle_bridge_consume(const ViewCase *input, ViewWork *work)
         uint64_t length = decoder->subtitle_header ? strlen((const char *)decoder->subtitle_header) : 0;
         subtitle_bridge_record(work, 10, &length, 1, decoder->subtitle_header, (size_t)length);
     }
+decode:;
     BridgeDecode run = {.decoder = decoder, .work = work, .codec = codec, .base = stream->time_base,
                         .text = !strcmp(input->argv[0], "text"),
-                        .probe = !strcmp(input->argv[0], "mkv-bitmap-probe")};
+                        .probe = !strcmp(input->argv[0], "mkv-bitmap-probe"),
+                        .source_text = source_text};
     if (probe_pgs) {
         rc = subtitle_bridge_pgs_probe(input, &run, format, packet, selected);
     } else {

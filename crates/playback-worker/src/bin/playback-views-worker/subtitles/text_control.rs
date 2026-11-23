@@ -5,9 +5,9 @@ use triergon_harness_protocol::md5;
 use triergon_playback::Output;
 
 use super::{
-    Budget, Bytes, CANCEL, Case, Codec, Event, GRANT, ID, Invocation, MAX_INPUT, Mode, Mp4Event,
-    Records, Result, TextBridge, TextSource, TextStep, Totals, WorkBudget, measure, next, player,
-    text,
+    Budget, Bytes, CANCEL, Case, Codec, CueFold, Event, GRANT, ID, Invocation, MAX_INPUT, Mode,
+    Mp4Event, Records, Result, TextBridge, TextSource, TextStep, Totals, WorkBudget, measure, next,
+    player, text,
 };
 
 fn pending_packet(case: &Case<'_>, pool: &Budget, bytes: &Bytes) -> Result<(Output, bool)> {
@@ -91,6 +91,7 @@ fn check(case: &Case<'_>, pool: &Budget, bytes: &Bytes, trace: bool) -> Result<T
             refusal: None,
         },
         trace,
+        cue_fold: CueFold::Decoded,
     };
     let (output, refused_event) = pending_packet(case, pool, bytes)?;
     let generation = output.generation();

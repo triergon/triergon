@@ -8,9 +8,9 @@
   "worker_operation": "text-bridge-",
   "reference": "ffmpeg-playback-views-native",
   "contract": [
-    "Play MP4 tx3g and Matroska UTF-8, ASS/SSA or WebVTT to EOF through Player and TextBridge. Compare with live av_read_frame and the text decoders of the pinned FFmpeg formats build.",
-    "Fold emitted cue bytes and presentation and duration clocks with an explicit unknown marker in microseconds, plus WebVTT identifiers and settings. The ASS packet is opaque. For WebVTT, compare the demuxer's typed side data or the type-1 BlockAdditional exposed by its Matroska API; for the plain-text comparison project the decoded ASS Text field by resolving line and space escapes and removing override blocks. A source cue can preserve literal markup, zero or unknown durations and signed timestamps that the reference decoder or demuxer changes.",
-    "Preload the container on both sides. Opening and reading the container, decoding, folding and teardown are inside the operation."
+    "Play MP4 tx3g and Matroska UTF-8, ASS/SSA or WebVTT to EOF through Player and TextBridge. Compare with live av_read_frame of the pinned FFmpeg formats build and, for tx3g, its mov_text decoder.",
+    "Fold each cue's presentation and duration clocks in microseconds, with an explicit unknown marker, then its text. A Matroska text track compares source with source: the candidate folds the cue's Block data and the bytes of its type-1 BlockAdditional, the reference the packet data and the type-1 BlockAdditional side data av_read_frame returns, decoding nothing. MP4 tx3g compares display text with display text, because the reference has no source text view: the reference decodes with mov_text and projects the ASS Text field by resolving line and space escapes and removing override blocks; the candidate writes every line terminator of ETSI TS 126 245 section 5.11 (CR LF, CR, LF, NEL, U+2028, U+2029) in the decoded string as LF.",
+    "Preload the container on both sides. Opening and reading the container, the tx3g decode, folding and teardown are inside the operation."
   ],
   "required_profiles": [
     "text-mkv-ass",
@@ -645,108 +645,166 @@
   ],
   "open_deviations": [
     {
-      "reading": "A zero-length timed-text string has a source cue extent",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes.",
-      "candidate": "Emits a zero-byte cue at the listed sample time and retains any subsequent cues.",
-      "reference": "Suppresses the empty sample. In one two-packet case the next visible cue is b at 1001000 us.",
-      "compat": "compat::text::suppress_empty_tx3g for consumers that only want visible cues.",
+      "reading": "BOM-marked UTF-16 tx3g text decodes to Unicode scalars",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.1: terminals shall correctly decode both UTF-8 and UTF-16, and a UTF-16 string begins with the byte order mark.",
+      "candidate": "Returns the decoded text: c385e6b0b40ac3a9, 41e6b0b4, f09f988041 and 41; in r-subtitle-tx3g the UTF-16 cue e7b582 at 3000000 us and, by the empty-string rule, a zero-byte cue at 1000000 us.",
+      "reference": "The mov_text decoder reads the UTF-16 bytes as UTF-8, logs an invalid UTF-8 byte and publishes no event for these samples; every other sample agrees.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
+      "cases": [
+        "tx3g-utf16be-bom",
+        "capsule-mov-text-utf16be",
+        "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
+        "capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output",
+        "r-subtitle-tx3g"
+      ]
+    },
+    {
+      "reading": "A NUL inside the counted tx3g string is a character, not its end",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17: the string is text-length bytes and there is no need for null termination; section 5.3: a control character with no defined graphical behaviour is not displayed and does not move the rendering position.",
+      "candidate": "Keeps the NUL and the text after it: 610062, 007461696c and 610a62000a0a0a (a LF b NUL and three line breaks from NEL, U+2028 and U+2029).",
+      "reference": "Ends the displayed string at the first NUL: 61, an empty string and 610a62.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
+      "cases": [
+        "tx3g-embedded-nul",
+        "capsule-mov-text-wrap-nul",
+        "capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets"
+      ]
+    },
+    {
+      "reading": "A lone CR in tx3g text starts a new line",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.11: LF, U+2028 and U+2029 shall start a new line; CR, NEL and CR LF should.",
+      "candidate": "Displays a LF b LF c LF d (610a620a630a64) for the source a CR LF b CR c LF d.",
+      "reference": "Drops the lone CR and joins b and c: 610a62630a64.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
+      "cases": [
+        "tx3g-line-codepoints-exact"
+      ]
+    },
+    {
+      "reading": "Braces and backslashes in tx3g text are characters, not ASS markup",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 holds the text as characters and sections 5.17.1.1 onwards carry styles as modifier boxes; the format has no inline markup.",
+      "candidate": "Displays A LF {\\b1}B\\NC LF (410a7b5c62317d425c4e430a).",
+      "reference": "Passes the characters into its ASS event unescaped, so {\\b1} becomes an override and \\N a line break: A LF B LF C LF (410a420a430a).",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
+      "cases": [
+        "capsule-mov-text-cr-lf-markup"
+      ]
+    },
+    {
+      "reading": "A font name in the sample description does not change the sample's text",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.16 names fonts for the style records; the text of a sample is its section 5.17 string.",
+      "candidate": "Returns abcdef for each of the 13 samples.",
+      "reference": "Writes the font name into the ASS override unescaped, so Sp ace,{x} leaves a literal brace (a}bcdef at 4000000 us), and publishes no event for the samples at 14000000, 18000000 and 22000000 us whose font names (ff fe, A U+FFFE, a truncated c3) are not UTF-8.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
+      "cases": [
+        "capsule-mov-text-tags-font-table"
+      ]
+    },
+    {
+      "reading": "A noncharacter is a valid scalar in well-formed text",
+      "clause": "Unicode Corrigendum #9 and RFC 3629 sections 3 and 4: noncharacters such as U+FFFE are well-formed UTF-8 and may be interchanged; ETSI TS 126 245 V19.0.0 section 5.1 requires UTF-8 decoding.",
+      "candidate": "Returns U+FFFE as efbfbe.",
+      "reference": "Logs invalid UTF-8 and publishes no event for the sample.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
+      "cases": [
+        "capsule-mov-text-noncharacter-fffe"
+      ]
+    },
+    {
+      "reading": "A known zero source duration remains a value",
+      "clause": "ISO/IEC 14496-12:2015 section 8.6.1.2 stores sample deltas, zero included; RFC 9559 section 5.1.3.5.3 defines an explicit BlockDuration in Track Ticks.",
+      "candidate": "Reports duration 0 (known) for the cues a, a and zero.",
+      "reference": "Reports the duration as unknown: AVPacket.duration 0 means unknown, so a known zero cannot be carried.",
+      "cases": [
+        "capsule-mov-text-known-zero-duration",
+        "capsule-mov-text-negative-half",
+        "utf8-packet-known-zero-duration"
+      ]
+    },
+    {
+      "reading": "A negative Matroska Block time is kept",
+      "clause": "RFC 9559 section 11.2: the Block timestamp is signed, it SHOULD NOT be negative, and a frame with a negative timestamp MUST be decoded but not played.",
+      "candidate": "Returns the Block at -715000 us with duration 333000 us.",
+      "reference": "Returns the same Block and duration with PTS 0.",
+      "cases": [
+        "utf8-packet-negative-start"
+      ]
+    },
+    {
+      "reading": "The unsigned stts delta of 4294967295 ticks is kept",
+      "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2.2 and 8.6.1.2.3: sample_delta is an unsigned 32-bit count.",
+      "candidate": "Reports 4294967295000000 us for the 4294967295-tick sample at one tick per second.",
+      "reference": "Reports 1000000 us after clipping the delta to one tick.",
+      "cases": [
+        "capsule-mov-text-overflow-clock"
+      ]
+    },
+    {
+      "reading": "A zero-byte ASS Block is a packet",
+      "clause": "RFC 9559 section 10 frames each Block's data by the element size and sets no minimum frame size.",
+      "candidate": "Returns a zero-byte cue at 0 with duration 0.",
+      "reference": "The demuxer returns no packet for the zero-byte Block.",
+      "cases": [
+        "ass-empty-not-clear"
+      ]
+    },
+    {
+      "reading": "An empty tx3g string is reported as a zero-byte cue (a bridge rule, not a specification rule)",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 allows a text-length of 0 and does not say whether a player publishes an event for it; TextBridge reports every sample as a cue.",
+      "candidate": "Emits a zero-byte cue for each empty sample: at 0 (1001000 us and 1500000 us), at 0 before b, at 0, 21334 and 2621334 us in fragmented-subtitles and at 0 and 2600000 us in fragmented-subtitle-edit; every nonempty cue agrees.",
+      "reference": "The mov_text decoder publishes no event for an empty string.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-empty-sample",
         "capsule-tx3g-empty_text_has_no_runs_and_no_queryable_character",
         "capsule-mov-text-clear-then-good",
         "fragmented-subtitles",
-        "r-subtitle-tx3g"
+        "fragmented-subtitle-edit"
       ]
     },
     {
-      "reading": "Opaque ASS source bytes survive demux",
-      "clause": "RFC 9559 section 10.1 defines Block data. Matroska codec mappings draft 21 sections 3.5.7 and 5.3 store ASS event fields in that data.",
-      "candidate": "Exposes the zero-byte block or the unchanged legacy or invalid-UTF-8 ASS bytes to the client.",
-      "reference": "Publishes no decoded subtitle for these packets.",
-      "compat": "compat::text::decoded_ass_events for clients that require decoder admission before receiving an event.",
-      "cases": [
-        "ass-empty-not-clear",
-        "ass-invalid-utf8-unvalidated",
-        "ass-unknown-charset-opaque"
-      ]
-    },
-    {
-      "reading": "Byte-counted text preserves line and nonprinting scalars",
-      "clause": "ETSI TS 126 245 V19.0.0 sections 5.1–5.2 and 5.17 define the UTF-8 or BOM-marked UTF-16 string as a byte-counted field.",
-      "candidate": "Keeps CR, LF and U+0000 in the extracted UTF-8 string, including a NUL between a and b and a leading NUL before tail.",
-      "reference": "Stops the published string at NUL or changes the line breaks in the display-text projection.",
-      "compat": "compat::text::c_string_display for callers that need the reference display string.",
-      "cases": [
-        "tx3g-embedded-nul",
-        "tx3g-line-codepoints-exact",
-        "capsule-mov-text-wrap-nul",
-        "capsule-mov-text-tags-ranges",
-        "capsule-mov-text-tags-nul-transitions",
-        "capsule-tx3g-all_line_break_and_nonprinting_scalars_count_in_style_offsets"
-      ]
-    },
-    {
-      "reading": "Timed-text bytes remain separate from presentation modifiers",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes. Section 5.17.1.1 stores styles as modifier records.",
-      "candidate": "For the markup fixture preserves all 13 source bytes. For the font-table case returns abcdef.",
-      "reference": "The decoded display projection normalizes the markup fixture to six bytes and returns a literal closing brace in a}bcdef.",
-      "cases": [
-        "capsule-mov-text-cr-lf-markup",
-        "capsule-mov-text-tags-font-table"
-      ]
-    },
-    {
-      "reading": "BOM-marked big-endian UTF-16 decodes to Unicode scalars",
-      "clause": "ETSI TS 126 245 V19.0.0 sections 5.1–5.2 and 5.17 define the UTF-8 or BOM-marked UTF-16 string as a byte-counted field.",
-      "candidate": "Returns full decoded UTF-8, including the ASCII, Hangul and supplementary-plane controls.",
-      "reference": "Returns no cue for the four valid UTF-16 samples.",
-      "cases": [
-        "tx3g-utf16be-bom",
-        "capsule-mov-text-utf16be",
-        "capsule-tx3g-utf16_bom_is_excluded_while_surrogate_pairs_are_one_scalar",
-        "capsule-tx3g-retained_source_description_font_and_decoded_owners_release_only_after_output"
-      ]
-    },
-    {
-      "reading": "Physical timed-text box layouts remain bounded by the sample",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes. ISO/IEC 14496-12:2015 section 4.2 defines compact, extended and end-of-file box sizes.",
-      "candidate": "Accepts the valid bounded modifier layouts and retains abcd or x.",
-      "reference": "Suppresses the cue on the complete sample with these layouts.",
+      "reading": "A size-0 modifier box extends to the end of its sample (a reading of ours)",
+      "clause": "ISO/IEC 14496-12:2015 section 4.2 defines size 0 only for the last box of a file, whose contents extend to the end of the file; ETSI TS 126 245 V19.0.0 section 5.17 does not define it inside a sample. Extractor::tx3g_iso_boxes reads it as extending to the end of the sample.",
+      "candidate": "Keeps the text abcd and x, and a at 0 followed by b at 1001000 us.",
+      "reference": "Refuses the sample with a size-0 box (tsmb_size invalid) and publishes no event for it; b at 1001000 us agrees. It accepts the 64-bit size form.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "capsule-mov-text-size0",
-        "capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules"
+        "capsule-tx3g-extended_and_to_end_known_boxes_reuse_existing_physical_box_rules",
+        "capsule-mov-text-box-refusal-then-good"
       ]
     },
     {
-      "reading": "A truncated timed-text length field supplies no string",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes.",
-      "candidate": "Reports a source refusal before emitting any cue.",
-      "reference": "Emits no cue and completes successfully.",
+      "reading": "Triergon refuses a tx3g sample too short for its 16-bit text length (recovery policy)",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17: a TextSample begins with unsigned int(16) text-length.",
+      "candidate": "Refuses the track with Truncated before any cue (9 1).",
+      "reference": "Publishes no event for the sample and completes (9 0).",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-missing-length",
-        "capsule-mov-text-bad-two",
         "capsule-mov-text-empty-physical",
         "capsule-mov-text-tx3g-missing-length"
       ]
     },
     {
-      "reading": "A sample does not cover the bytes claimed by its string length",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes.",
-      "candidate": "Refuses before publishing text rather than treating a partial string as complete.",
-      "reference": "Publishes the available prefix, such as xy, ab or xy in the short controls.",
-      "compat": "compat::text::recover_truncated_tx3g for consumers showing a partial source string.",
+      "reading": "Triergon refuses a tx3g sample whose text is shorter than its length (recovery policy)",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17: text-length counts the bytes of the string that follows.",
+      "candidate": "Refuses the track with Truncated before any cue.",
+      "reference": "Publishes the bytes present as the text: xy, ab and xy, and nothing for capsule-mov-text-bad-two, whose one counted byte is absent.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-text-overrun",
         "capsule-mov-text-overstated",
-        "capsule-mov-text-tx3g-text-overrun"
+        "capsule-mov-text-tx3g-text-overrun",
+        "capsule-mov-text-bad-two"
       ]
     },
     {
-      "reading": "A malformed modifier cannot extend past its sample",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 delimits text by a 16-bit byte count and requires the remaining sample bytes to be modifier boxes. ISO/IEC 14496-12:2015 section 4.2 defines the length of each complete box.",
-      "candidate": "Refuses the invalid suffix after the length-delimited text.",
-      "reference": "Ignores the invalid box extent and emits x, abcd or a, or suppresses a sample with an incomplete box header.",
-      "compat": "compat::text::ignore_invalid_tx3g_modifiers for consumers needing prefix text from broken modifiers.",
+      "reading": "Triergon refuses a tx3g sample with a malformed modifier box (recovery policy)",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 fills the rest of the sample with modifier boxes; ISO/IEC 14496-12:2015 section 4.2 gives each box a size of at least its header and within its container.",
+      "candidate": "Refuses the track: Invalid for a complete header whose size is below 8, Truncated for an incomplete header or a box past the sample.",
+      "reference": "Publishes no event for a complete header with a size below 8 (tx3g-short-box, capsule-mov-text-short-box, capsule-mov-text-tx3g-short-box); publishes the text for an incomplete header or an overrunning box (x, abcd, abcd, x, a).",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-short-box",
         "tx3g-box-overrun",
@@ -759,11 +817,11 @@
       ]
     },
     {
-      "reading": "A timed-text string must be well-formed in its signaled encoding",
-      "clause": "ETSI TS 126 245 V19.0.0 sections 5.1–5.2 and 5.17 define the UTF-8 or BOM-marked UTF-16 string as a byte-counted field. RFC 3629 sections 3–4 forbid overlong UTF-8 and surrogate encodings. TS 126 245 section 5.1 makes byte-reversed UTF-16 support optional.",
-      "candidate": "Refuses malformed UTF-8, unpaired or incomplete UTF-16, or the unsupported reverse BOM.",
-      "reference": "Suppresses the sample without the source refusal, or decodes a valid prefix before NUL. It continues to a later cue in the two-packet malformed UTF-8 control.",
-      "compat": "compat::text::skip_invalid_tx3g for clients that need to resume after malformed string data.",
+      "reading": "Triergon refuses a tx3g string that is not well formed in its encoding (recovery policy)",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.1 requires UTF-8 or BOM-marked UTF-16; RFC 3629 sections 3 and 4 exclude overlong forms, surrogates and incomplete sequences.",
+      "candidate": "Refuses the track at the sample with Invalid, losing later cues: b at 1001000 us in capsule-mov-text-utf8-refusal-then-good, and in capsule-mov-text-tags-nul-transitions every cue from sample 9 (ab NUL ff d) on.",
+      "reference": "Publishes no event for the sample and continues, or shows the text before a NUL: a in capsule-mov-text-nul-invalid-tail; in capsule-mov-text-tags-nul-transitions ab for each sample, ending at its NUL, through 24000000 us.",
+      "compat": "triergon_subtitles::compat::mov_text::Decoder, which converts tx3g samples to the events of the reference's mov_text decoder",
       "cases": [
         "tx3g-utf16-odd",
         "tx3g-lone-surrogate",
@@ -772,104 +830,44 @@
         "capsule-mov-text-nul-invalid-tail",
         "capsule-mov-text-tx3g-lone-surrogate",
         "capsule-mov-text-tx3g-utf16-odd",
-        "capsule-mov-text-utf16le",
-        "capsule-mov-text-utf8-refusal-then-good"
+        "capsule-mov-text-utf8-refusal-then-good",
+        "capsule-mov-text-tags-nul-transitions"
       ]
     },
     {
-      "reading": "Matroska UTF-8 extraction retains the complete Block text",
-      "clause": "Matroska codec mappings draft 21 sections 3.5.11 and 5.2 store the UTF-8 subtitle text in the Block data. RFC 3629 section 3 encodes U+0000 as one byte and does not assign it a string-terminator role.",
-      "candidate": "Retains the UTF-8 BOM, embedded NUL and later bytes, or the literal angle-bracket markup.",
-      "reference": "Stops at NUL or strips apparent markup in the display projection.",
-      "compat": "compat::text::decoded_utf8_display for clients needing the normalized display string.",
-      "cases": [
-        "utf8-packet-bom-nul-content",
-        "utf8-packet-markup"
-      ]
-    },
-    {
-      "reading": "Matroska UTF-8 rejects a scalar above U+10FFFF",
-      "clause": "Matroska codec mappings draft 21 sections 3.5.11 and 5.2 store the UTF-8 subtitle text in the Block data. RFC 3629 section 3 confines the encoded scalar range to U+0000 through U+10FFFF.",
-      "candidate": "Refuses the text call on invalid UTF-8.",
-      "reference": "Emits no cue and completes successfully.",
+      "reading": "Triergon refuses Matroska UTF-8 text with a scalar above U+10FFFF (recovery policy)",
+      "clause": "Matroska codec mappings draft 21 section 3.5.11 carries S_TEXT/UTF8 as UTF-8 text; RFC 3629 section 3 limits UTF-8 to U+10FFFF.",
+      "candidate": "Refuses the track with Invalid (invalid Unicode scalar) before any cue.",
+      "reference": "Returns the four-byte Block f4908080.",
       "cases": [
         "utf8-packet-too-large-scalar"
       ]
     },
     {
-      "reading": "A known zero source duration remains a value",
-      "clause": "ISO/IEC 14496-12:2015 section 8.6.1.2.1 stores sample deltas, including zero. RFC 9559 section 5.1.3.5.3 defines explicit BlockDuration in Track Ticks.",
-      "candidate": "Emits duration zero, with presence retained.",
-      "reference": "Supplies no duration when its packet duration field is zero.",
-      "cases": [
-        "capsule-mov-text-known-zero-duration",
-        "capsule-mov-text-negative-half",
-        "utf8-packet-known-zero-duration"
-      ]
-    },
-    {
-      "reading": "Signed Matroska subtitle Block time is preserved",
-      "clause": "RFC 9559 section 11.2 defines the signed relative Block timestamp and presentation arithmetic.",
-      "candidate": "Returns the source cue at -715000 us with a duration of 333000 us.",
-      "reference": "Reports the same cue and duration with PTS zero.",
-      "compat": "compat::matroska::clamp_negative_subtitle_pts for callers needing the reference projected time.",
-      "cases": [
-        "utf8-packet-negative-start"
-      ]
-    },
-    {
-      "reading": "Timed text retains the unsigned stts delta",
-      "clause": "ISO/IEC 14496-12:2015 sections 8.6.1.2.2–8.6.1.2.3 define sample_delta as an unsigned 32-bit count.",
-      "candidate": "Reports 4294967295000000 us for the coded 4294967295-tick duration at one tick per second.",
-      "reference": "Reports 1000000 us for the same one-byte cue.",
-      "cases": [
-        "capsule-mov-text-overflow-clock"
-      ]
-    },
-    {
-      "reading": "WebVTT payload carries its inline timestamp syntax",
-      "clause": "Matroska codec mappings draft 21 sections 5.4.3 and 5.4.5.2–5.4.5.5 define cue payload carriage including transformed inline timestamps.",
-      "candidate": "Returns all 19 bytes of the payload including the relative inline timestamp.",
-      "reference": "Returns only the eight bytes of the visible word relative.",
-      "cases": [
-        "mkv-vtt-relative-inline-time"
-      ]
-    },
-    {
-      "reading": "A WebVTT BlockAdditional needs its settings and identifier lines",
-      "clause": "Matroska codec mappings draft 21 section 5.4.4 defines newline-delimited settings and identifier records in type-1 BlockAdditional.",
-      "candidate": "Refuses the incomplete additional record at the source boundary.",
-      "reference": "Decodes and publishes the four-byte cue body without the invalid additional fields.",
+      "reading": "Triergon refuses a WebVTT BlockAdditional without its identifier line (recovery policy)",
+      "clause": "Matroska codec mappings draft 21 section 5.4.4: the type-1 BlockAdditional holds the cue settings, a LF, the cue identifier, a LF, then comments.",
+      "candidate": "Refuses the track with Truncated before any cue.",
+      "reference": "Returns the Block body and its 41-byte type-1 addition (align:start LF and an unterminated identifier); it does not interpret the addition.",
       "cases": [
         "mkv-vtt-truncated-addition"
       ]
-    },
+    }
+  ],
+  "open_refusals": [
     {
-      "reading": "An empty timed-text sample preserves its source interval",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 permits a zero string byte count. ISO/IEC 14496-12:2015 sections 8.6.1.2 and 8.8.8 keep the sample interval.",
-      "candidate": "Emits empty cues at 0 and 2600000 us around the nonempty 2400000-us cue.",
-      "reference": "Publishes only the nonempty cue at 200000 us.",
-      "compat": "compat::text::suppress_empty_tx3g for consumers that only want visible cues.",
+      "reason": "Byte-reversed UTF-16 tx3g text is not read",
+      "clause": "ETSI TS 126 245 V19.0.0 section 5.1: terminals are not required to recognise byte-reversed UTF-16 (a string beginning FF FE).",
+      "detail": "byte-reversed UTF-16",
       "cases": [
-        "fragmented-subtitle-edit"
-      ]
-    },
-    {
-      "reading": "A noncharacter is valid in a well-formed text string",
-      "clause": "Unicode Corrigendum 9 and RFC 3629 sections 3–4 distinguish noncharacters from invalid UTF-8. ETSI TS 126 245 V19.0.0 section 5.1 defines character decoding.",
-      "candidate": "Returns the UTF-8 scalar U+FFFE as efbfbe.",
-      "reference": "Suppresses the cue.",
-      "cases": [
-        "capsule-mov-text-noncharacter-fffe"
-      ]
-    },
-    {
-      "reading": "A bounded unknown modifier leaves timed text readable",
-      "clause": "ETSI TS 126 245 V19.0.0 section 5.17 skips unrecognized modifier boxes. ISO/IEC 14496-12:2015 section 4.2 defines a size-zero box extending through the enclosing end.",
-      "candidate": "Keeps cue a at 0 and cue b at 1001000 us. The unknown zzzz modifier only occupies the remaining bytes of the first sample.",
-      "reference": "Refuses the first sample with an invalid box size and publishes only b.",
-      "cases": [
-        "capsule-mov-text-box-refusal-then-good"
+        {
+          "id": "capsule-mov-text-utf16le",
+          "sha256": "9b82819f5b6f70d2884bc050bb10d915570c024834f0641148cf45207edffa32",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 280
+          }
+        }
       ]
     }
   ]
