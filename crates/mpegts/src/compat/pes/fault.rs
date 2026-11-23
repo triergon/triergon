@@ -7,9 +7,9 @@ use crate::compat::pes::observer::{
 };
 use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS, stream_id};
 use crate::stream::{FaultKind, TraceFault};
-use crate::transport::TransportPacket;
 use crate::transport::{
-    OPCR_WITHOUT_PCR, PCR_ENCODING, SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR,
+    CarrierHeader, OPCR_WITHOUT_PCR, PCR_ENCODING, SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR,
+    TransportPacket,
 };
 use crate::{AssemblyStep, SourceEpochs, SourceRange};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -390,7 +390,7 @@ impl TransportFaultRecovery {
         if packet.transport_error || packet.scrambling != 0 {
             self.pending = Some(TransportFaultJob::new(packet, context, &self.inner, None)?);
             Ok(())
-        } else if self.policy.timing_headers && TransportFaultJob::header_hint(&packet) {
+        } else if self.policy.timing_headers && video_timing_hint(&packet) {
             self.pending = Some(TransportFaultJob::new_header(packet, context, &self.inner)?);
             Ok(())
         } else {
@@ -527,7 +527,42 @@ impl TransportFaultRecovery {
     }
 }
 
-/// Shared with the comparison-only adapter; all parsing and storage phases live here.
+/// Whether `packet` starts a PES on video stream 0xE0 whose `PTS_DTS_flags` take the
+/// forbidden value `01`, or whose lone PTS has a wrong prefix or marker bit.
+pub(crate) fn video_timing_hint(packet: &TransportPacket) -> bool {
+    let Some(body) = packet.payload.as_ref().map(AsRef::as_ref) else {
+        return false;
+    };
+    packet.payload_unit_start
+        && body.len() >= 9
+        && body[..4] == [0, 0, 1, stream_id::VIDEO_FIRST]
+        && (body[7] >> 6 == 1
+            || (body[7] >> 6 == 2
+                && body.len() >= 14
+                && (body[9] >> 4 != 2
+                    || body[9] & 1 == 0
+                    || body[11] & 1 == 0
+                    || body[13] & 1 == 0)))
+}
+
+/// The header of a selected diagnostic's carrier `raw`: one that starts a payload unit on
+/// `pid` with an adaptation field and a payload, the payload at `start`, after an
+/// adaptation field of at least one byte.
+// Inlined into `TransportFaultRecovery::poll` it measured +0.084% on a PES fault workload.
+#[inline(never)]
+pub(crate) fn diagnostic_header(raw: &[u8], pid: u16, start: usize) -> Option<CarrierHeader> {
+    let header = CarrierHeader::parse(raw).ok()?;
+    let payload_start = 5 + usize::from(*raw.get(4)?);
+    (header.pusi
+        && header.pid == pid
+        && header.afc == 3
+        && start == payload_start
+        && (6..=188).contains(&start))
+    .then_some(header)
+}
+
+/// One damaged carrier being checked and cut into a packet, phase by phase. The
+/// comparison-only selected-AVC view shares its envelope check and timing hint.
 #[derive(Debug)]
 pub(crate) struct TransportFaultJob {
     carrier: PesFaultCarrier,
@@ -555,21 +590,6 @@ impl TransportFaultJob {
         cursor: Option<&triergon_core::InputCursor>,
     ) -> std::result::Result<Self, Refused<TransportPacket>> {
         Self::from_transport(packet, input, inner, cursor, false)
-    }
-    fn header_hint(packet: &TransportPacket) -> bool {
-        let Some(body) = packet.payload.as_ref().map(AsRef::as_ref) else {
-            return false;
-        };
-        packet.payload_unit_start
-            && body.len() >= 9
-            && body[..4] == [0, 0, 1, stream_id::VIDEO_FIRST]
-            && (body[7] >> 6 == 1
-                || (body[7] >> 6 == 2
-                    && body.len() >= 14
-                    && (body[9] >> 4 != 2
-                        || body[9] & 1 == 0
-                        || body[11] & 1 == 0
-                        || body[13] & 1 == 0)))
     }
     #[expect(
         clippy::result_large_err,
@@ -840,28 +860,21 @@ impl TransportFaultJob {
             // Typed recovery stages counted at least 0.29% more instructions on a PES fault workload.
             match self.phase {
                 0 => {
-                    if raw[0] != 0x47
-                        || raw[1] & 0x40 == 0
-                        || (u16::from(raw[1] & 31) << 8) | u16::from(raw[2]) != inner.scope().pid
-                        || raw[3] & 0x30 != 0x30
-                        || self.start != 5 + usize::from(raw[4])
-                        || !(6..=188).contains(&self.start)
-                    {
+                    let Some(header) = diagnostic_header(raw, inner.scope().pid, self.start) else {
                         return Err(Error::Unsupported(
                             "selected diagnostic raw envelope unobserved",
                         ));
-                    }
+                    };
                     if matches!(self.carrier, PesFaultCarrier::Transport(_))
                         && inner
                             .recovery_counter()
-                            .is_some_and(|cc| ((cc + 1) & 15) != (raw[3] & 15))
+                            .is_some_and(|cc| ((cc + 1) & 15) != header.cc)
                     {
                         return Err(Error::Unsupported(
                             "selected diagnostic counter damage unobserved",
                         ));
                     }
-                    let tei = raw[1] & 0x80 != 0;
-                    let scrambling = raw[3] >> 6;
+                    let (tei, scrambling) = (header.tei, header.scrambling);
                     let flags = match self.kind {
                         PesFaultKind::PcrEncoding => 16,
                         PesFaultKind::OpcrWithoutPcr => 8,
@@ -880,7 +893,7 @@ impl TransportFaultJob {
                     if let PesFaultCarrier::Transport(packet) = &self.carrier
                         && (tei != packet.transport_error
                             || scrambling != packet.scrambling
-                            || raw[3] & 15 != packet.continuity_counter)
+                            || header.cc != packet.continuity_counter)
                     {
                         return Err(Error::Unsupported(
                             "selected diagnostic additional transport fault/context",

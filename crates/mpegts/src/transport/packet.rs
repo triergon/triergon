@@ -1,4 +1,5 @@
 //! H.222.0 (08/2023), 2.4.3.1-5. No implementation source was used.
+use super::SYNC;
 use crate::compat::pes::PcrPolicy;
 use std::ops::Range;
 use triergon_core::{Bytes, Error, Result, SourceId, Time};
@@ -32,7 +33,7 @@ impl PacketFormat {
     pub fn prefix_bytes(self) -> usize {
         self.bytes() - 188
     }
-    /// The format whose sync bytes (0x47) the start of an input repeats at
+    /// The format whose sync bytes the start of an input repeats at
     /// three successive packets, as far as `head` reaches: 188-byte packets
     /// first, then 192-byte packets after their 4-byte prefix.
     pub fn detect(head: &[u8]) -> Option<Self> {
@@ -41,7 +42,7 @@ impl PacketFormat {
             head.len() > sync
                 && (0..3).all(|n| {
                     head.get(sync + n * format.bytes())
-                        .is_none_or(|&b| b == 0x47)
+                        .is_none_or(|&b| b == SYNC)
                 })
         })
     }

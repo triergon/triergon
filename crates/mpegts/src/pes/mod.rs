@@ -8,7 +8,7 @@ pub use assembler::PesAssembler;
 pub(crate) use assembler::{FINITE_SURPLUS, UNBOUNDED_NON_VIDEO};
 #[cfg(feature = "reference-trace")]
 pub(crate) use header::timestamp;
-pub(crate) use header::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
+pub(crate) use header::{FORBIDDEN_TIME_FLAGS, START_CODE, START_CODE_PREFIX, TIMESTAMP_MARKERS};
 pub(crate) use header::{parse_header, parse_timed_header, timestamp_bits, timestamp_markers};
 
 use crate::{SourceEpochs, SourceRange};

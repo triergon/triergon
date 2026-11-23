@@ -1,5 +1,6 @@
 //! Explicit finite AVC diagnostic view.
 use super::*;
+use crate::compat::pes::fault::{diagnostic_header, video_timing_hint};
 use crate::pes::{FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS};
 use crate::stream::{FaultKind, TraceFault};
 use crate::transport::{PCR_ENCODING, SCRAMBLED_PAYLOAD, TRANSPORT_ERROR_INDICATOR};
@@ -199,21 +200,7 @@ impl SelectedPending {
 /// Constant bounded hint only; no source header is validated or replaced here.
 /// The staged carrier cannot emit until its actual strict diagnostic arrives.
 pub(super) fn has_selected_hint(packet: &TransportPacket) -> bool {
-    if packet.transport_error || packet.scrambling != 0 {
-        return true;
-    }
-    if !packet.payload_unit_start {
-        return false;
-    }
-    let Some(p) = packet.payload.as_ref().map(AsRef::as_ref) else {
-        return false;
-    };
-    p.len() >= 9
-        && p[..4] == [0, 0, 1, stream_id::VIDEO_FIRST]
-        && (p[7] >> 6 == 1
-            || (p[7] >> 6 == 2
-                && p.len() >= 14
-                && (p[9] >> 4 != 2 || p[9] & 1 == 0 || p[11] & 1 == 0 || p[13] & 1 == 0)))
+    packet.transport_error || packet.scrambling != 0 || video_timing_hint(packet)
 }
 
 impl RecoveryObserver {
@@ -558,29 +545,20 @@ impl SelectedPending {
                 .ok_or(Error::Invalid("selected diagnostic payload offset"))?;
             match p.phase {
                 0 => {
-                    let s = inner.scope();
-                    if raw[0] != 0x47
-                        || raw[1] & 0x40 == 0
-                        || (u16::from(raw[1] & 31) << 8) | u16::from(raw[2]) != s.pid
-                        || raw[3] & 0x30 != 0x30
-                        || p.start != 5 + usize::from(raw[4])
-                        || p.start > 188
-                        || p.start < 6
-                    {
+                    let Some(header) = diagnostic_header(raw, inner.scope().pid, p.start) else {
                         return Err(Error::Unsupported(
                             "selected diagnostic raw envelope unobserved",
                         ));
-                    }
+                    };
                     if inner
                         .recovery_counter()
-                        .is_some_and(|cc| ((cc + 1) & 15) != (raw[3] & 15))
+                        .is_some_and(|cc| ((cc + 1) & 15) != header.cc)
                     {
                         return Err(Error::Unsupported(
                             "selected diagnostic counter damage unobserved",
                         ));
                     }
-                    let tei = raw[1] & 0x80 != 0;
-                    let scramble = raw[3] >> 6;
+                    let (tei, scramble) = (header.tei, header.scrambling);
                     let envelope_ok = match p.kind {
                         SelectedFault::PcrEncoding => !tei && scramble == 0 && raw[5] == 16,
                         SelectedFault::TransportError => tei && scramble == 0 && raw[5] == 0,

@@ -9,6 +9,7 @@
 //! The discovered grid determines compatibility byte positions. Each carrier
 //! still undergoes transport validation when the source reader consumes it.
 use crate::PacketFormat;
+use crate::transport::SYNC;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
@@ -388,13 +389,14 @@ impl InputBootstrap {
             // A work chunk is shorter than a carrier, so it has at most one
             // expected sync byte. Score competing grids only at complete headers.
             if next_sync < end {
-                self.bad_sync |= bytes[next_sync] != 0x47;
+                self.bad_sync |= bytes[next_sync] != SYNC;
                 next_sync += width;
             }
             let (words, tail) = bytes[start..end.min(header_end).max(start)].as_chunks::<8>();
             for (offset, word) in words.iter().enumerate() {
                 const LOW_BITS: u64 = 0x7f7f_7f7f_7f7f_7f7f;
-                let difference = u64::from_le_bytes(*word) ^ 0x4747_4747_4747_4747;
+                const SYNC_BYTES: u64 = u64::from_le_bytes([SYNC; 8]);
+                let difference = u64::from_le_bytes(*word) ^ SYNC_BYTES;
                 // Each nonzero byte sets its high bit without a carry into
                 // neighbouring bytes. Only exact matches remain in the mask.
                 let mut matches =
@@ -406,7 +408,7 @@ impl InputBootstrap {
             }
             let tail_start = start + words.len() * 8;
             for (offset, &byte) in tail.iter().enumerate() {
-                if byte == 0x47 {
+                if byte == SYNC {
                     score(tail_start + offset);
                 }
             }

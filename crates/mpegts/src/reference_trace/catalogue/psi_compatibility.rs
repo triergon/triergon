@@ -8,7 +8,7 @@ use crate::psi::{
     Descriptors, PatReader, PmtReader, Section, SectionAssembler, SectionHeader, TableStep,
 };
 use crate::stream::{FaultKind, TraceFault};
-use crate::transport::TransportPacket;
+use crate::transport::{CarrierHeader, TransportPacket};
 
 /// A PSI table the demuxer accepts and the source view refuses or defers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -254,18 +254,20 @@ fn validate_carrier(
         return Err(Error::Invalid("PSI compatibility declared carrier format"));
     }
     let raw = &full[prefix..];
+    let header = CarrierHeader::parse(raw).ok().filter(|header| {
+        header.pid == packet.pid
+            && header.pusi == packet.payload_unit_start
+            && header.cc == packet.continuity_counter
+            && !header.tei
+            && header.scrambling == 0
+    });
     if packet.source_id != Some(source)
         || raw.len() != 188
         || !packet.source_offset.is_multiple_of(format.bytes() as u64)
         || context.byte_run_epoch.is_some()
-        || raw[0] != 0x47
-        || packet.pid != u16::from_be_bytes([raw[1] & 31, raw[2]])
-        || packet.payload_unit_start != (raw[1] & 0x40 != 0)
-        || packet.continuity_counter != raw[3] & 15
-        || raw[1] & 0x80 != 0
+        || header.is_none()
         || packet.transport_error
         || packet.scrambling != 0
-        || raw[3] & 0xc0 != 0
     {
         return Err(Error::Invalid("PSI compatibility actual carrier identity"));
     }

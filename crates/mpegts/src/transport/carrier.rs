@@ -7,7 +7,10 @@ use std::{
 };
 use triergon_core::{Budget, Bytes, Error, Refused, Result, SourceId, SourceLocation, WorkBudget};
 
-/// A carrier that does not start with the 0x47 sync byte.
+/// The `sync_byte` that begins every transport packet (H.222.0 §2.4.3.2).
+pub(crate) const SYNC: u8 = 0x47;
+
+/// A carrier that does not start with the sync byte.
 pub(crate) const SYNC_BYTE: &str = "TS sync byte";
 
 /// An adaptation field that signals an OPCR without a PCR.
@@ -24,7 +27,7 @@ pub(crate) const PLAIN_PAYLOAD_BYTES: usize = TS188_BYTES - TS_PAYLOAD_START;
 
 /// Header of a clear, payload-only continuation in a complete TS188 carrier.
 pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
-    let [0x47, high, low, control, ..] = ts else {
+    let [SYNC, high, low, control, ..] = ts else {
         return None;
     };
     if high & 0xc0 != 0 || control & 0xf0 != 0x10 {
@@ -34,20 +37,30 @@ pub(crate) fn payload_only_continuation(ts: &[u8]) -> Option<(u16, u8)> {
     Some((pid, control & 15))
 }
 
+/// The four-byte header of a transport packet (H.222.0 §2.4.3.2), field by field.
 #[derive(Clone, Copy, Debug)]
-struct CarrierHeader {
-    pid: u16,
-    pusi: bool,
-    priority: bool,
-    tei: bool,
-    scrambling: u8,
-    cc: u8,
-    afc: u8,
+pub(crate) struct CarrierHeader {
+    /// `PID`.
+    pub(crate) pid: u16,
+    /// `payload_unit_start_indicator`.
+    pub(crate) pusi: bool,
+    /// `transport_priority`.
+    pub(crate) priority: bool,
+    /// `transport_error_indicator`.
+    pub(crate) tei: bool,
+    /// `transport_scrambling_control`.
+    pub(crate) scrambling: u8,
+    /// `continuity_counter`.
+    pub(crate) cc: u8,
+    /// `adaptation_field_control`.
+    pub(crate) afc: u8,
 }
 
 impl CarrierHeader {
-    fn parse(data: &[u8]) -> Result<Self> {
-        let [0x47, high, low, control, ..] = data else {
+    /// The header at the start of `data`; fails if `data` is shorter or does not
+    /// start with the sync byte.
+    pub(crate) fn parse(data: &[u8]) -> Result<Self> {
+        let [SYNC, high, low, control, ..] = data else {
             return Err(Error::Invalid(SYNC_BYTE));
         };
         Ok(Self {

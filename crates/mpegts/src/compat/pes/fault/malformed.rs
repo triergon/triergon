@@ -3,12 +3,12 @@
 //! including empty physical input.
 use super::{SourceContext, TransportFaultRecovery};
 use crate::compat::pes::observer::DemuxScope;
-use crate::pes::stream_id;
+use crate::pes::{START_CODE_PREFIX, stream_id};
 use crate::psi::{DescriptorNamespace, stream_type};
 use crate::stream::{
     FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
 };
-use crate::transport::TransportPacket;
+use crate::transport::{CarrierHeader, TransportPacket};
 use crate::{PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
@@ -32,7 +32,7 @@ impl MalformedInputKind {
         Error::Invalid(match self {
             Self::ReservedAdaptationControl => "reserved adaptation control",
             Self::AdaptationLengthOverrun => "adaptation length/control",
-            Self::PesStartCode => "PES start code",
+            Self::PesStartCode => crate::pes::START_CODE,
             Self::PesHeaderLength => "PES header exceeds length",
         })
     }
@@ -485,7 +485,7 @@ impl MalformedInputCompletion {
                 let raw = payload.as_ref();
                 if raw.len() < 6 || raw[3] != stream_id::VIDEO_FIRST {
                     None
-                } else if raw[..3] != [0, 0, 1] {
+                } else if raw[..3] != START_CODE_PREFIX {
                     Some(MalformedInputKind::PesStartCode)
                 } else if raw.len() >= 9 && raw[6] & 0xc0 == 0x80 {
                     let size = usize::from(u16::from_be_bytes([raw[4], raw[5]]));
@@ -603,15 +603,15 @@ impl MalformedInputCompletion {
             return Ok(MalformedSourceDisposition::Forward);
         };
         let raw = rejected.bytes().as_ref();
-        let kind = if raw.len() == 188 && raw[0] == 0x47 && raw[1] & 0x80 == 0 && raw[3] & 0xc0 == 0
-        {
-            match (raw[3] >> 4) & 3 {
-                0 => Some(MalformedInputKind::ReservedAdaptationControl),
-                3 if raw[4] > 183 => Some(MalformedInputKind::AdaptationLengthOverrun),
-                _ => None,
+        let kind = match CarrierHeader::parse(raw) {
+            Ok(header) if raw.len() == 188 && !header.tei && header.scrambling == 0 => {
+                match header.afc {
+                    0 => Some(MalformedInputKind::ReservedAdaptationControl),
+                    3 if raw[4] > 183 => Some(MalformedInputKind::AdaptationLengthOverrun),
+                    _ => None,
+                }
             }
-        } else {
-            None
+            _ => None,
         };
         let Some(kind) = kind else {
             self.blocked = true;

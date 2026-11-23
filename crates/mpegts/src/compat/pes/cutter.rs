@@ -6,7 +6,7 @@
 //! optional fields are not checked. Continuity counters are not checked either:
 //! a repeated or missing transport packet changes the data as it arrives.
 use super::observer::DemuxBoundary;
-use crate::pes::{HEADER_MAX, stream_id, timestamp_bits};
+use crate::pes::{HEADER_MAX, START_CODE_PREFIX, stream_id, timestamp_bits};
 use crate::transport::TransportPacket;
 use crate::{ParseLimits, checked_pid, limit};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
@@ -210,7 +210,7 @@ impl PesCutter {
     fn after_header(&self) -> Result<State> {
         let header = &self.header[..self.used];
         if self.used == 6 {
-            if header[..3] != [0, 0, 1] {
+            if header[..3] != START_CODE_PREFIX {
                 return Ok(State::Idle);
             }
             if !has_optional_header(header[3]) {

@@ -1,7 +1,7 @@
 //! Format-specific <=192-byte carry, not an I/O cursor/token framework.
 use crate::transport::carrier::{PlainCarrier, PlainContinuation, TS188_BYTES};
 use crate::transport::{
-    RejectedTransport, TransportInspection, TransportInspector, TransportPacket,
+    RejectedTransport, SYNC, TransportInspection, TransportInspector, TransportPacket,
 };
 use crate::{AssemblyStep, PacketFormat};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -68,7 +68,7 @@ impl NullCarrierRun {
 // H.222.0 2.4.3.3–4. Limit the fast path to clear, unflagged null
 // packets with payload and no adaptation syntax beyond a zero flags byte.
 fn plain_null(ts: &[u8]) -> bool {
-    if ts[0] != 0x47 || ts[1] & 0xdf != 0x1f || ts[2] != 0xff {
+    if ts[0] != SYNC || ts[1] & 0xdf != 0x1f || ts[2] != 0xff {
         return false;
     }
     match ts[3] & 0xf0 {

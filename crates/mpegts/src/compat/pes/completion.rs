@@ -5,6 +5,7 @@
 //! can be constructed from this operation's confirmation. Non-control payload needs
 //! the existing real-scope observer; it can never select an empty fallback.
 use crate::compat::pes::observer::SourceContext;
+use crate::pes::START_CODE_PREFIX;
 use crate::psi::{PatReader, PatSection, Section, SectionAssembler, TableStep};
 use crate::stream::entity::{ObservedTrace, TraceOrigin};
 use crate::stream::{CompactTraceEvent, FaultKind, MediaEntityEnd, TraceEvent, TraceFault};
@@ -375,7 +376,7 @@ impl PacketCompletion {
                 && actual
                     .payload
                     .as_ref()
-                    .is_some_and(|b| b.as_ref().starts_with(&[0, 0, 1]))
+                    .is_some_and(|b| b.as_ref().starts_with(&START_CODE_PREFIX))
             {
                 self.block_empty(Error::Unsupported(
                     "packet completion ambiguous PES start on PAT PID",
@@ -398,7 +399,7 @@ impl PacketCompletion {
                 .payload
                 .as_ref()
                 .ok_or(Error::Invalid("packet completion PMT payload missing"))?;
-            if actual.payload_unit_start && body.as_ref().starts_with(&[0, 0, 1]) {
+            if actual.payload_unit_start && body.as_ref().starts_with(&START_CODE_PREFIX) {
                 return Err(Error::Unsupported(
                     "packet completion PES start on declared PMT PID",
                 ));

@@ -8,8 +8,8 @@ use crate::pes::stream_id;
 use crate::psi::stream_type;
 use crate::stream::entity::TraceOrigin;
 use crate::stream::{FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault};
-use crate::transport::SYNC_BYTE;
 use crate::transport::TransportPacket;
+use crate::transport::{SYNC, SYNC_BYTE};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Error, InputCursor, InputToken, Refused, Result, SourceLocation, Step, WorkBudget,
@@ -332,7 +332,7 @@ impl TransportFaultRecovery {
                     && rejected.error() == fault.error
                     && rejected.secondary_error().is_none()
                     && rejected.bytes().len() == 188
-                    && rejected.bytes().as_ref()[0] != 0x47
+                    && rejected.bytes().as_ref()[0] != SYNC
                     && rejected.bytes().belongs_to(self.inner.recovery_budget())
             }),
             _ => false,

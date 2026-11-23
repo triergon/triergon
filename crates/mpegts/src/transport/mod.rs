@@ -5,7 +5,7 @@ pub(crate) mod framer;
 pub(crate) mod packet;
 pub mod pid;
 
-pub(crate) use carrier::{OPCR_WITHOUT_PCR, SYNC_BYTE};
+pub(crate) use carrier::{CarrierHeader, OPCR_WITHOUT_PCR, SYNC, SYNC_BYTE};
 pub use carrier::{
     RejectedTransport, TransportInspection, TransportInspector, TransportObservation,
 };

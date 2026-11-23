@@ -8,7 +8,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Refused, Result, SourceId, SourceLocation, WorkBudget,
 };
 
-use super::header::{parse_header, parse_timed_header};
+use super::header::{START_CODE, START_CODE_PREFIX, parse_header, parse_timed_header};
 use super::{HEADER_MAX, Pes, PesHeader, PesSpan, stream_id};
 
 #[derive(Debug)]
@@ -733,8 +733,8 @@ impl PesAssembler {
                 match self.header_used {
                     6 => {
                         // Shared prefix views raised playback instructions by up to 0.0018%.
-                        if self.raw_header[..3] != [0, 0, 1] {
-                            return Err(Error::Invalid("PES start code"));
+                        if self.raw_header[..3] != START_CODE_PREFIX {
+                            return Err(Error::Invalid(START_CODE));
                         }
                         let id = self.raw_header[3];
                         if !(id == stream_id::PRIVATE_STREAM_1

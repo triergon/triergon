@@ -1,13 +1,13 @@
 //! The PES header of the packet being cut.
 use super::body::CONTINUATION_WITHOUT_PACKET;
 use super::{Arena, DemuxObserver, Follow};
-use crate::pes::{HEADER_MAX, parse_header, parse_timed_header};
+use crate::pes::{HEADER_MAX, START_CODE_PREFIX, parse_header, parse_timed_header};
 use crate::{SourceRange, commit_range, limit, prepare_range};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
 
 /// A PES that does not begin with the start code prefix.
-const START_CODE: Error = Error::Invalid("PES start code");
+const START_CODE: Error = Error::Invalid(crate::pes::START_CODE);
 /// A PES whose optional header runs past its declared length.
 const EXCEEDS_LENGTH: Error = Error::Invalid("PES header exceeds length");
 
@@ -129,7 +129,7 @@ impl DemuxObserver {
             }
             match self.header_used {
                 6 => {
-                    if self.raw_header[..3] != [0, 0, 1] {
+                    if self.raw_header[..3] != START_CODE_PREFIX {
                         return Err(START_CODE);
                     }
                     if self.raw_header[3] != self.scope.stream_id {

@@ -1,6 +1,12 @@
 //! The PES header fields: prefix, flags and timestamps.
 use triergon_core::{Budget, Bytes, Error, Result, WorkBudget};
 
+/// The `packet_start_code_prefix` that begins every PES packet (H.222.0 §2.4.3.7).
+pub(crate) const START_CODE_PREFIX: [u8; 3] = [0, 0, 1];
+
+/// A PES that does not begin with the start code prefix.
+pub(crate) const START_CODE: &str = "PES start code";
+
 /// PTS_DTS_flags set to the forbidden value 01.
 pub(crate) const FORBIDDEN_TIME_FLAGS: &str = "forbidden PES time flags";
 
@@ -51,7 +57,7 @@ pub(crate) fn parse_timed_header(
     work: &WorkBudget,
 ) -> Option<(PesHeader, Option<usize>)> {
     let prefix = bytes.first_chunk::<9>()?;
-    if prefix[..3] != [0, 0, 1]
+    if prefix[..3] != START_CODE_PREFIX
         || prefix[6] & 0xf0 != 0x80
         || !matches!((prefix[7], prefix[8]), (0x80, 5) | (0xc0, 10))
     {
