@@ -260,10 +260,7 @@ pub(crate) fn apply_time(
 
 /// Process the coupling channels themselves (TNS, and the filterbank for independent ones).
 pub(crate) fn process_cces(core: &mut Core) {
-    let cfg = CoreCfg {
-        aot: core.aot,
-        sf_index: core.sf_index,
-    };
+    let cfg = core.spectral_config();
     for c in &mut core.cce {
         let c: &mut CceState = c;
         let Some(point) = c.point else {

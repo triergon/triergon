@@ -245,11 +245,28 @@ enum ExtensionMode {
     SbrWithParametricStereo,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Configuration {
+    aot: ObjectType,
+    frequency_index: u8,
+    channel_config: u8,
+}
+
+impl Configuration {
+    const INITIAL: Self = Self {
+        aot: ObjectType::Lc,
+        frequency_index: 4,
+        channel_config: 0,
+    };
+
+    fn frequency_index(self) -> usize {
+        usize::from(self.frequency_index)
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct Core {
-    pub aot: ObjectType,
-    pub sf_index: usize,
-    pub channel_config: u8,
+    configuration: Option<Configuration>,
     pub slots: Vec<Slot>,
     pub layout: ChannelLayout,
     pub elements: Vec<Charged<Box<ElementState>>>,
@@ -259,7 +276,6 @@ pub(crate) struct Core {
     pub pce: Option<Pce>,
     /// Keep slot order for planes (FFmpeg unspecified-order layouts).
     pub unordered: bool,
-    pub configured: bool,
     /// Coupling channel state (one per CCE tag)
     pub cce: Vec<Charged<Box<crate::cce::CceState>>>,
     /// The modulations of every SBR QMF bank.
@@ -277,6 +293,22 @@ pub(crate) struct Core {
 }
 
 impl Core {
+    fn configuration(&self) -> Configuration {
+        self.configuration.unwrap_or(Configuration::INITIAL)
+    }
+
+    pub(crate) fn is_configured(&self) -> bool {
+        self.configuration.is_some()
+    }
+
+    pub(crate) fn spectral_config(&self) -> CoreCfg {
+        let config = self.configuration();
+        CoreCfg {
+            aot: config.aot,
+            sf_index: config.frequency_index(),
+        }
+    }
+
     fn sbr_active(&self) -> bool {
         self.extension != ExtensionMode::Core
     }
@@ -287,9 +319,7 @@ impl Core {
 
     pub(crate) fn new(budget: &Budget) -> Core {
         Core {
-            aot: ObjectType::Lc,
-            sf_index: 4,
-            channel_config: 0,
+            configuration: None,
             slots: Vec::new(),
             layout: ChannelLayout::default(),
             elements: Vec::new(),
@@ -298,7 +328,6 @@ impl Core {
             extension: ExtensionMode::Core,
             pce: None,
             unordered: false,
-            configured: false,
             cce: Vec::new(),
             qmf: sbr::Modulation::new(),
             budget: budget.clone(),
@@ -326,7 +355,7 @@ impl Core {
     }
 
     pub(crate) fn output_rate(&self) -> u32 {
-        let r = SAMPLE_RATES[self.sf_index];
+        let r = SAMPLE_RATES[self.configuration().frequency_index()];
         if self.sbr_active() { r * 2 } else { r }
     }
 
@@ -349,31 +378,29 @@ impl Core {
         if sf_index > 12 {
             return Err(DecodeError::Unsupported(Feature::SampleRateIndex(sf_index)));
         }
-        if self.configured
-            && aot == self.aot
-            && usize::from(sf_index) == self.sf_index
-            && channel_config == self.channel_config
-        {
+        let proposed = Configuration {
+            aot,
+            frequency_index: sf_index,
+            channel_config,
+        };
+        if self.configuration == Some(proposed) {
             return Ok(());
         }
         // The new configuration starts from nothing. Until its element state is charged
         // the decoder is unconfigured, so a refusal here is retried by the next header.
         self.elements.clear();
         self.cce.clear();
-        self.configured = false;
+        self.configuration = None;
         let slots = if channel_config == 0 {
             Vec::new()
         } else {
             fixed_config_slots(channel_config, layout)
         };
         let elements = self.build_elements(aot, &slots, false, &[])?;
-        self.aot = aot;
-        self.sf_index = usize::from(sf_index);
-        self.channel_config = channel_config;
         self.extension = ExtensionMode::Core;
         self.frames_out = 0;
         self.elements = elements;
-        self.configured = true;
+        self.configuration = Some(proposed);
         self.unordered = false;
         self.slots = slots;
         if channel_config != 0 {
@@ -423,14 +450,16 @@ impl Core {
             }
         }
         let mut core = Self::new(budget);
-        core.sf_index = usize::from(frequency_index);
         core.slots = slots;
         core.rebuild_layout()?;
         if core.layout.mask() == 0 {
             return Err(DecodeError::Unsupported(Feature::RawProgramLayout));
         }
         core.elements = core.build_elements(ObjectType::Lc, &core.slots, false, &[])?;
-        core.configured = true;
+        core.configuration = Some(Configuration {
+            frequency_index,
+            ..Configuration::INITIAL
+        });
         Ok(core)
     }
 
@@ -454,7 +483,7 @@ impl Core {
             if sbr {
                 e.sbr = Some(new_sbr(
                     &self.budget,
-                    self.sf_index,
+                    self.configuration().frequency_index(),
                     s.kind,
                     self.extension_policy,
                 )?);
@@ -543,7 +572,12 @@ impl Core {
         self.make_room(out, layout.channels(), self.frame_len(), blocks)?;
         // Both layouts together hold at most 48 identities (16 tags of each kind), so the
         // switch never holds more element state than that.
-        let added = self.build_elements(self.aot, &slots, self.sbr_active(), &self.elements)?;
+        let added = self.build_elements(
+            self.configuration().aot,
+            &slots,
+            self.sbr_active(),
+            &self.elements,
+        )?;
         // The elements both layouts have, renewed, and the new ones, in the order of their
         // first slot.
         let first_slot = |e: &Charged<Box<ElementState>>| {
@@ -569,7 +603,7 @@ impl Core {
 
     fn element_index(&self, kind: ElementId, tag: u8, occurrence: usize) -> Option<usize> {
         // map to a slot
-        let slot = if self.channel_config != 0 {
+        let slot = if self.configuration().channel_config != 0 {
             // FFmpeg maps fixed configurations by element order, ignoring tags.
             let mut n = 0;
             let mut found = None;
@@ -610,12 +644,9 @@ impl Core {
         for c in &mut self.cce {
             c.point = None;
         }
-        let cfg = CoreCfg {
-            aot: self.aot,
-            sf_index: self.sf_index,
-        };
+        let cfg = self.spectral_config();
         let mut occ = [0usize; 4];
-        let fixed_raw = RAW && self.channel_config != 0;
+        let fixed_raw = RAW && self.configuration().channel_config != 0;
         let mut raw_elements = 0;
         let mut last_elem: Option<usize> = None;
         let mut layout_changed = false;
@@ -648,7 +679,7 @@ impl Core {
                         self.element_index(id, tag, o)
                     };
                     if ei.is_none()
-                        && self.channel_config == 2
+                        && self.configuration().channel_config == 2
                         && id == ElementId::Sce
                         && o < 2
                         && !RAW
@@ -663,7 +694,7 @@ impl Core {
                         }
                     }
                     if ei.is_none()
-                        && self.channel_config == 1
+                        && self.configuration().channel_config == 1
                         && id == ElementId::Cpe
                         && o == 0
                         && !RAW
@@ -676,7 +707,10 @@ impl Core {
                             out,
                             blocks,
                         )?;
-                        self.channel_config = 2;
+                        self.configuration = Some(Configuration {
+                            channel_config: 2,
+                            ..self.configuration()
+                        });
                         layout_changed = true;
                         ei = self.element_index(id, tag, o);
                     }
@@ -701,7 +735,10 @@ impl Core {
                 ElementId::Pce => {
                     let p = parse_pce(br, block_start)?;
                     // The out-of-band program stays in effect for raw access units.
-                    if !RAW && self.channel_config == 0 && self.pce.as_ref() != Some(&p) {
+                    if !RAW
+                        && self.configuration().channel_config == 0
+                        && self.pce.as_ref() != Some(&p)
+                    {
                         let (slots, unordered) = pce_slots(&p, true);
                         self.switch_layout(slots, unordered, out, blocks)?;
                         self.pce = Some(p);
@@ -850,6 +887,7 @@ impl Core {
         out: &mut AudioFrame,
         blocks: usize,
     ) -> Result<bool> {
+        let sf_index = self.configuration().frequency_index();
         let is_cpe = self.elements[ei].kind == ElementId::Cpe;
         // A mono stream whose very first frame carries SBR is output as stereo (FFmpeg assumes
         // HE-AAC v2 for implicitly signalled mono SBR).
@@ -859,7 +897,7 @@ impl Core {
         let mut changed = false;
         if !self.sbr_active() {
             // implicit SBR signalling: FFmpeg switches the output to twice the core rate
-            if SAMPLE_RATES[self.sf_index] > 48000 {
+            if SAMPLE_RATES[sf_index] > 48000 {
                 // FFmpeg refuses SBR above 48 kHz core rate; ignore the payload
                 return Ok(false);
             }
@@ -871,7 +909,7 @@ impl Core {
                 sbr.push(match e.sbr {
                     None => Some(new_sbr(
                         &self.budget,
-                        self.sf_index,
+                        sf_index,
                         e.kind,
                         self.extension_policy,
                     )?),
@@ -894,7 +932,7 @@ impl Core {
             Some(ref mut sbr) => sbr,
             None => e.sbr.insert(new_sbr(
                 &self.budget,
-                self.sf_index,
+                sf_index,
                 e.kind,
                 self.extension_policy,
             )?),
@@ -915,10 +953,7 @@ impl Core {
     }
 
     fn finish_frame<const RAW: bool>(&mut self, frame: &mut AudioFrame) {
-        let cfg = CoreCfg {
-            aot: self.aot,
-            sf_index: self.sf_index,
-        };
+        let cfg = self.spectral_config();
         crate::cce::process_cces(self);
         for ei in 0..self.elements.len() {
             let e: &mut ElementState = &mut self.elements[ei];

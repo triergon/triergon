@@ -130,7 +130,7 @@ impl Decoder {
 
     /// Current output sample rate (0 before the first frame).
     pub fn sample_rate(&self) -> u32 {
-        if self.core.configured {
+        if self.core.is_configured() {
             self.core.output_rate()
         } else {
             0
