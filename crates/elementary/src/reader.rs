@@ -15,7 +15,7 @@ use crate::tags::{
 use std::sync::atomic::AtomicBool;
 
 mod seek;
-use seek::Seeking;
+use seek::{Progress, Seeking};
 use triergon_core::container::{
     ContainerReader, Event, ReaderStep, SeekMethod, SeekPolicy, SeekRequest,
 };
@@ -689,35 +689,28 @@ impl<F: Format> Reader<F> {
 
     /// The source ended without a sync.
     fn sync_exhausted(&mut self) -> Result<Next> {
-        if let Some(seeking) = self.seeking {
-            if let Plan::Bisect { low, method, .. } = seeking.plan
-                && !seeking.forward
-            {
+        if let Some(mut seeking) = self.seeking {
+            let plan = match seeking.progress {
                 // No frame starts after the probe: the target lies before it.
-                self.set_plan(Plan::Bisect {
+                Progress::Bisect { low, .. } => Plan::Bisect {
                     low,
                     high: seeking.probe,
-                    method,
-                });
-                return self
-                    .jump()
-                    .map(|request| Flow::Wait(Wait::Step(Step::NeedInput(request))));
-            }
-            if let Plan::Estimate { .. } = seeking.plan
-                && !seeking.forward
-            {
+                    method: seeking.method,
+                },
                 // The estimate fell past the last frame: count from the start instead.
-                if let Some(seeking) = self.seeking.as_mut() {
-                    seeking.plan = Plan::Scan;
+                Progress::Estimate => {
                     seeking.method = SeekMethod::Restart;
                     seeking.basis = SeekBasis::Exact;
+                    Plan::Scan
                 }
-                return self
-                    .jump()
-                    .map(|request| Flow::Wait(Wait::Step(Step::NeedInput(request))));
-            }
-            self.seeking = None;
-            return Ok(Flow::Wait(Wait::End));
+                Progress::Forward => {
+                    self.seeking = None;
+                    return Ok(Flow::Wait(Wait::End));
+                }
+            };
+            return self
+                .jump(seeking, plan)
+                .map(|request| Flow::Wait(Wait::Step(Step::NeedInput(request))));
         }
         if self.opened.is_none() {
             return Err(Error::Invalid("no frame in the source"));
@@ -732,8 +725,8 @@ impl<F: Format> Reader<F> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Next> {
-        if self.seeking.is_some() {
-            return self.seek_found(header);
+        if let Some(seeking) = self.seeking {
+            return self.seek_found(seeking, header);
         }
         if self.opened.is_none() {
             let facts = self.format.adopt(&header, self.input.cursor().budget())?;
@@ -1139,8 +1132,8 @@ impl<F: Format> Reader<F> {
             .map_err(|_| Error::Overflow)?;
         let duration = self.format.samples(&header);
         let (extra, then) = unit.after.then();
-        if let Some(seeking) = self.seeking
-            && seeking.forward
+        if let Some(seeking) = self.seeking.as_mut()
+            && matches!(seeking.progress, Progress::Forward)
         {
             let preroll = match seeking.policy {
                 SeekPolicy::PreviousRandomAccess => 0,
@@ -1151,17 +1144,16 @@ impl<F: Format> Reader<F> {
             if reach <= target && !matches!(unit.after, After::End) {
                 // Before the target: read past the unit without delivering it.
                 self.next_pts = pts + i64::from(duration);
-                if let Some(seeking) = self.seeking.as_mut() {
-                    seeking.scanned += unit.len as u64;
-                }
+                seeking.scanned += unit.len as u64;
                 self.phase = Phase::Discard {
                     left: unit.len as u64 + extra,
                     then,
                 };
                 return Ok(Flow::Ready(None));
             }
+            let seeking = *seeking;
             self.phase = Phase::Frame(cut);
-            return Ok(Flow::Ready(Some(Event::Seek(self.land(pts)?))));
+            return Ok(Flow::Ready(Some(Event::Seek(self.land(seeking, pts)?))));
         }
         let offset = self.input.position();
         let Some(data) = self.input.take(unit.len, work, cancel)? else {
