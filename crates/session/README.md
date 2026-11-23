@@ -80,10 +80,8 @@ one directly.
 | Container track | any `TrackInfo` of a supported codec, its packets | `TrackDecoder`: decoded frames with the container's trims applied |
 
 `TrackDecoder::new(track)` picks the decoder from a track's codec (`audio_codec`) and
-configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). For AAC,
-a track with an AudioSpecificConfig takes raw LC packets. An AAC track without
-configuration takes ADTS packets. Use `aac_access_units_in` when the packet's sample
-description supplies a different configuration.
+configuration (Matroska CodecPrivate, ISO BMFF codec records, Ogg headers). The
+generic AAC track decoder takes ADTS; raw packets use `aac_access_units_in` above.
 `TrackDecoder::decode(packet, frame)` drops what the container marks for
 discarding: the packet's `Trim`, samples before time zero (Matroska CodecDelay, Ogg
 pre-skip) and the decoder's start delay (`AudioDecoder::delay`, the Opus pre-skip), a
