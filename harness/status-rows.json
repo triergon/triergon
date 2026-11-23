@@ -178,7 +178,9 @@
         "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
-      "unmeasured": "mov-pcm-packets"
+      "unmeasured": "mov-pcm-packets",
+      "open": "",
+      "parity": {"aarch64-unknown-linux-gnu": "10/22 match on AArch64: 12 listed differences. [Contract](../harness/features/mov-pcm-packets/contract.json)"}
     },
     {
       "area": "MOV table and physical recovery",
@@ -194,7 +196,9 @@
         "aarch64-unknown-linux-gnu",
         "thumbv7neon-unknown-linux-gnueabihf"
       ],
-      "unmeasured": "mov-encoded-views"
+      "unmeasured": "mov-encoded-views",
+      "open": "",
+      "parity": {"aarch64-unknown-linux-gnu": "41/53 match on AArch64: 9 listed deviations and 3 listed policy differences. [Contract](../harness/features/mov-encoded-views/contract.json)"}
     },
     {
       "area": "MOV DTS demuxed signalling",

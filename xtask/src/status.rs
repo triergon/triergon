@@ -64,6 +64,7 @@ struct Row<'a> {
     runs: Vec<&'a str>,
     cells: Cells<'a>,
     parity: BTreeMap<&'a str, &'a str>,
+    open: Option<&'a str>,
 }
 
 struct Rows<'a> {
@@ -257,6 +258,7 @@ impl<'a> Rows<'a> {
                 runs: row_runs,
                 cells,
                 parity,
+                open: text(row, "open"),
             });
         }
         let mut open = BTreeSet::new();
@@ -526,6 +528,7 @@ struct PageTable<'p> {
     implemented: Option<usize>,
     columns: (usize, usize),
     parity: Option<usize>,
+    open: Option<usize>,
     rows: Vec<(usize, Vec<&'p str>)>,
 }
 
@@ -572,6 +575,7 @@ fn page_table<'p>(lines: &[&'p str], heading: &str) -> Result<PageTable<'p>, Str
         implemented: column("Implemented").ok(),
         columns,
         parity,
+        open: column("Open").ok(),
         rows,
     })
 }
@@ -584,6 +588,7 @@ struct RenderedRow {
     bounds: Option<(String, String)>,
     parity: Option<String>,
     implemented: Option<String>,
+    open: Option<String>,
 }
 
 impl RenderedRow {
@@ -609,6 +614,12 @@ impl RenderedRow {
                     .implemented
                     .zip(self.implemented.as_deref())
                     .map(|(index, cell)| (index, cell, "Implemented")),
+            )
+            .chain(
+                table
+                    .open
+                    .zip(self.open.as_deref())
+                    .map(|(index, cell)| (index, cell, "Open")),
             )
     }
 }
@@ -734,6 +745,7 @@ fn render<'p>(
                 bounds,
                 parity,
                 implemented: row.implemented.map(str::to_owned),
+                open: row.open.map(str::to_owned),
             });
         }
         rendered.push((page_table, cells));
@@ -1094,7 +1106,7 @@ pub fn tables(root: &Path, write: bool) -> Result<String, String> {
         printed.push(lines[table.header].to_owned());
         printed.push(lines[table.header + 1].to_owned());
         for ((line, written), cell) in table.rows.iter().zip(cells) {
-            if cell.bounds.is_some() || cell.parity.is_some() || cell.implemented.is_some() {
+            if cell.cells(table).next().is_some() {
                 let mut written: Vec<&str> = written.clone();
                 for (column, shown, _) in cell.cells(table) {
                     written[column] = shown;

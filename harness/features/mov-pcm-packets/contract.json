@@ -109,19 +109,6 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
-  ],
-  "open_cases": [
-    {
-      "id": "sound-v1",
-      "requirement": "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
-    },
-    {
-      "id": "sound-v2",
-      "requirement": "compat::mov::pcm::PcmCursor refuses sound sample description versions 1 and 2 (Unsupported: QT sound description version1/2), which the demuxer reads as PCM. Both extend version 0 for uncompressed audio (Apple QuickTime File Format 'Sound sample description version 1' and 'version 2')."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "A version 0 description outside the version 0 layout",

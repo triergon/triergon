@@ -83,72 +83,72 @@ with the specification; every other listed case withholds its comparison's accep
 | [`codecs/play-manifest`](../harness/codecs/play-manifest.json) | 8 | 1 |  |  |  | 9 |  |
 | [`codecs/reader-seeks`](../harness/codecs/reader-seeks.json) | 20 | 10 |  |  |  | 30 |  |
 | [`codecs/session-cases`](../harness/codecs/session-cases.json) | 40 | 189 | 31 |  | 1 | 261 |  |
-| [`aac-adts-frames`](../harness/features/aac-adts-frames/contract.json) | 4 |  | 7 |  |  | 11 | 96 |
-| [`adts-sync`](../harness/features/adts-sync/contract.json) | 7 |  |  |  |  | 7 | 104 |
-| [`ass-parse-host`](../harness/features/ass-parse-host/contract.json) |  | 4 / 2 |  |  |  | 4 / 2 | 15 |
-| [`ass-render-host`](../harness/features/ass-render-host/contract.json) |  | 4 / 0 |  |  |  | 4 / 0 | 4 |
-| [`av1-obu-reading`](../harness/features/av1-obu-reading/contract.json) | 6 | 3 |  |  |  | 9 | 108 |
-| [`bridge-access-units`](../harness/features/bridge-access-units/contract.json) | 5 | 4 |  |  |  | 9 | 111 |
-| [`bridge-bitmap-subtitles`](../harness/features/bridge-bitmap-subtitles/contract.json) | 4 | 1 | 4 |  |  | 9 | 501 |
-| [`bridge-matroska-discovery`](../harness/features/bridge-matroska-discovery/contract.json) | 16 | 1 |  |  |  | 17 | 36 |
-| [`bridge-mp4-packets`](../harness/features/bridge-mp4-packets/contract.json) |  | 1 |  |  |  | 1 | 37 |
-| [`bridge-text-subtitles`](../harness/features/bridge-text-subtitles/contract.json) | 18 | 20 |  | 1 |  | 39 | 199 |
-| [`carriage-trace`](../harness/features/carriage-trace/contract.json) | 9 |  |  |  |  | 9 | 278 |
-| [`charset-streams`](../harness/features/charset-streams/contract.json) | 1 | 12 |  |  |  | 13 | 108 |
-| [`codec-config-views`](../harness/features/codec-config-views/contract.json) | 7 | 3 | 5 |  |  | 15 | 169 |
-| [`codec-layouts`](../harness/features/codec-layouts/contract.json) |  | 1 |  |  |  | 1 | 437 |
-| [`dsp-imdct`](../harness/features/dsp-imdct/contract.json) | 19 / 0 |  |  |  |  | 19 / 0 | 110 |
-| [`dts-core-frames`](../harness/features/dts-core-frames/contract.json) | 72 | 3 | 2 |  |  | 77 | 238 |
-| [`dts-packed-frames`](../harness/features/dts-packed-frames/contract.json) | 172 | 4 |  |  |  | 176 | 777 |
-| [`elementary-metadata`](../harness/features/elementary-metadata/contract.json) | 1 | 9 |  |  |  | 10 | 282 |
-| [`facade-mpegts`](../harness/features/facade-mpegts/contract.json) | 4 | 84 |  |  |  | 88 | 150 |
-| [`facade-probe`](../harness/features/facade-probe/contract.json) | 593 | 900 | 14 |  |  | 1507 | 9345 |
+| [`aac-adts-frames`](../harness/features/aac-adts-frames/contract.json) | 4 |  | 7 |  |  | 11 |  |
+| [`adts-sync`](../harness/features/adts-sync/contract.json) | 7 |  |  |  |  | 7 |  |
+| [`ass-parse-host`](../harness/features/ass-parse-host/contract.json) |  | 4 / 2 |  |  |  | 4 / 2 |  |
+| [`ass-render-host`](../harness/features/ass-render-host/contract.json) |  | 4 / 0 |  |  |  | 4 / 0 |  |
+| [`av1-obu-reading`](../harness/features/av1-obu-reading/contract.json) | 6 | 3 |  |  |  | 9 |  |
+| [`bridge-access-units`](../harness/features/bridge-access-units/contract.json) | 5 | 4 |  |  |  | 9 |  |
+| [`bridge-bitmap-subtitles`](../harness/features/bridge-bitmap-subtitles/contract.json) | 4 | 1 | 4 |  |  | 9 |  |
+| [`bridge-matroska-discovery`](../harness/features/bridge-matroska-discovery/contract.json) | 16 | 1 |  |  |  | 17 |  |
+| [`bridge-mp4-packets`](../harness/features/bridge-mp4-packets/contract.json) |  | 1 |  |  |  | 1 |  |
+| [`bridge-text-subtitles`](../harness/features/bridge-text-subtitles/contract.json) | 18 | 20 |  | 1 |  | 39 |  |
+| [`carriage-trace`](../harness/features/carriage-trace/contract.json) | 9 |  |  |  |  | 9 |  |
+| [`charset-streams`](../harness/features/charset-streams/contract.json) | 1 | 12 |  |  |  | 13 |  |
+| [`codec-config-views`](../harness/features/codec-config-views/contract.json) | 7 | 3 | 5 |  |  | 15 |  |
+| [`codec-layouts`](../harness/features/codec-layouts/contract.json) |  | 1 |  |  |  | 1 |  |
+| [`dsp-imdct`](../harness/features/dsp-imdct/contract.json) | 19 / 0 |  |  |  |  | 19 / 0 |  |
+| [`dts-core-frames`](../harness/features/dts-core-frames/contract.json) | 72 | 3 | 2 |  |  | 77 |  |
+| [`dts-packed-frames`](../harness/features/dts-packed-frames/contract.json) | 172 | 4 |  |  |  | 176 |  |
+| [`elementary-metadata`](../harness/features/elementary-metadata/contract.json) | 1 | 9 |  |  |  | 10 |  |
+| [`facade-mpegts`](../harness/features/facade-mpegts/contract.json) | 4 | 84 |  |  |  | 88 |  |
+| [`facade-probe`](../harness/features/facade-probe/contract.json) | 593 | 900 | 14 |  |  | 1507 |  |
 | [`facade-seek` container seeks](../harness/features/facade-seek/container-pins.json) | 156 | 50 |  |  |  | 158 | 285 |
-| [`h264-stream-inspection`](../harness/features/h264-stream-inspection/contract.json) | 3 |  |  |  |  | 3 | 195 |
-| [`hevc-record-annexb`](../harness/features/hevc-record-annexb/contract.json) | 8 | 6 |  |  |  | 14 | 66 |
-| [`hls-aac-clocks`](../harness/features/hls-aac-clocks/contract.json) | 1 |  |  |  |  | 1 | 28 |
-| [`hls-compact-push`](../harness/features/hls-compact-push/contract.json) | 1 |  |  | 1 |  | 2 | 16 |
-| [`hls-unit-packets`](../harness/features/hls-unit-packets/contract.json) | 1 |  |  |  |  | 1 | 16 |
-| [`isobmff-dts-signalling`](../harness/features/isobmff-dts-signalling/contract.json) | 22 |  | 4 |  |  | 26 | 50 |
-| [`isobmff-source-seek`](../harness/features/isobmff-source-seek/contract.json) | 43 |  |  |  |  | 43 | 4454 |
-| [`media-probe`](../harness/features/media-probe/contract.json) | 294 | 475 |  |  |  | 769 | 9164 |
-| [`mkv-attachments`](../harness/features/mkv-attachments/contract.json) | 1 |  |  |  |  | 1 | 52 |
-| [`mkv-metadata-fields`](../harness/features/mkv-metadata-fields/contract.json) | 3 |  |  |  |  | 3 | 52 |
-| [`mkv-side-data`](../harness/features/mkv-side-data/contract.json) |  | 3 |  |  |  | 3 | 27 |
-| [`mkv-track-extensions`](../harness/features/mkv-track-extensions/contract.json) |  | 1 |  |  |  | 1 | 12 |
-| [`mov-encoded-views`](../harness/features/mov-encoded-views/contract.json) | 9 | 3 |  |  | 7 | 19 | 53 |
-| [`mov-pcm-packets`](../harness/features/mov-pcm-packets/contract.json) | 12 |  |  |  | 2 | 14 | 22 |
-| [`mov-run-recovery`](../harness/features/mov-run-recovery/contract.json) | 18 | 2 |  |  |  | 20 | 144 |
-| [`mov-track-seek`](../harness/features/mov-track-seek/contract.json) | 30 | 64 |  |  |  | 94 | 2944 |
-| [`nal-config-inputs`](../harness/features/nal-config-inputs/contract.json) | 6 |  |  |  |  | 6 | 123 |
-| [`nal-length-prefixed`](../harness/features/nal-length-prefixed/contract.json) | 15 |  |  |  |  | 15 | 759 |
-| [`ogg-tracks`](../harness/features/ogg-tracks/contract.json) | 10 | 2 |  |  |  | 12 | 53 |
-| [`picture-properties`](../harness/features/picture-properties/contract.json) |  |  | 31 |  |  | 31 | 389 |
-| [`playback-delivery`](../harness/features/playback-delivery/contract.json) | 129 | 72 |  |  |  | 129 | 291 |
-| [`playback-mov-index`](../harness/features/playback-mov-index/contract.json) | 36 |  |  |  |  | 36 | 557 |
-| [`playback-probe`](../harness/features/playback-probe/contract.json) | 228 | 170 |  |  |  | 398 | 6230 |
-| [`playback-source-view`](../harness/features/playback-source-view/contract.json) | 28 |  |  |  |  | 28 | 134 |
-| [`playback-track-selection`](../harness/features/playback-track-selection/contract.json) | 3 |  |  |  |  | 3 | 9 |
-| [`playback-ts-open`](../harness/features/playback-ts-open/contract.json) |  |  | 4 | 1 |  | 5 | 42 |
-| [`quicktime-pcm-samples`](../harness/features/quicktime-pcm-samples/contract.json) | 12 |  | 2 |  |  | 14 | 22 |
-| [`raster-sweep`](../harness/features/raster-sweep/contract.json) |  | 0 / 2 |  |  |  | 0 / 2 | 303 |
-| [`subtitle-dvd-host`](../harness/features/subtitle-dvd-host/contract.json) |  | 4 / 0 |  |  |  | 4 / 0 | 5 |
-| [`text-extraction`](../harness/features/text-extraction/contract.json) | 3 |  |  |  |  | 3 | 214 |
-| [`time-rescale`](../harness/features/time-rescale/contract.json) | 8 |  |  |  |  | 8 | 318 |
-| [`ts-catalogue`](../harness/features/ts-catalogue/contract.json) |  | 3 |  |  |  | 3 | 267 |
-| [`ts-fault-facts`](../harness/features/ts-fault-facts/contract.json) |  |  |  | 18 |  | 18 | 93 |
-| [`ts-mux-readback`](../harness/features/ts-mux-readback/contract.json) |  |  |  | 1 |  | 1 | 21 |
-| [`ts-observer-forms`](../harness/features/ts-observer-forms/contract.json) |  | 12 |  | 10 |  | 22 | 291 |
-| [`ts-pes-assembler`](../harness/features/ts-pes-assembler/contract.json) | 44 | 68 |  |  |  | 112 | 388 |
-| [`ts-psi-readers`](../harness/features/ts-psi-readers/contract.json) |  | 10 |  |  |  | 10 | 263 |
-| [`ts-reader-container`](../harness/features/ts-reader-container/contract.json) | 1 | 11 |  |  |  | 12 | 179 |
-| [`ts-reader-views`](../harness/features/ts-reader-views/contract.json) | 12 | 26 |  |  |  | 38 | 179 |
-| [`ts-recovery-trace`](../harness/features/ts-recovery-trace/contract.json) |  |  |  | 6 |  | 6 | 42 |
-| [`ts-source-poll`](../harness/features/ts-source-poll/contract.json) | 55 | 85 |  |  |  | 140 | 485 |
-| [`tx3g-configuration`](../harness/features/tx3g-configuration/contract.json) | 56 |  |  |  |  | 56 | 84 |
-| [`video-nal-input`](../harness/features/video-nal-input/contract.json) | 2 |  | 52 |  |  | 54 | 597 |
-| [`vobsub-index`](../harness/features/vobsub-index/contract.json) | 3 |  |  |  |  | 3 | 210 |
-| **Total** | 2266 / 2247 | 2322 / 2314 | 191 | 39 | 10 | 4708 / 4681 | 43233 |
+| [`h264-stream-inspection`](../harness/features/h264-stream-inspection/contract.json) | 3 |  |  |  |  | 3 |  |
+| [`hevc-record-annexb`](../harness/features/hevc-record-annexb/contract.json) | 8 | 6 |  |  |  | 14 |  |
+| [`hls-aac-clocks`](../harness/features/hls-aac-clocks/contract.json) | 1 |  |  |  |  | 1 |  |
+| [`hls-compact-push`](../harness/features/hls-compact-push/contract.json) | 1 |  |  | 1 |  | 2 |  |
+| [`hls-unit-packets`](../harness/features/hls-unit-packets/contract.json) | 1 |  |  |  |  | 1 |  |
+| [`isobmff-dts-signalling`](../harness/features/isobmff-dts-signalling/contract.json) | 22 |  | 4 |  |  | 26 |  |
+| [`isobmff-source-seek`](../harness/features/isobmff-source-seek/contract.json) | 43 |  |  |  |  | 43 |  |
+| [`media-probe`](../harness/features/media-probe/contract.json) | 294 | 475 |  |  |  | 769 |  |
+| [`mkv-attachments`](../harness/features/mkv-attachments/contract.json) | 1 |  |  |  |  | 1 |  |
+| [`mkv-metadata-fields`](../harness/features/mkv-metadata-fields/contract.json) | 3 |  |  |  |  | 3 |  |
+| [`mkv-side-data`](../harness/features/mkv-side-data/contract.json) |  | 3 |  |  |  | 3 |  |
+| [`mkv-track-extensions`](../harness/features/mkv-track-extensions/contract.json) |  | 1 |  |  |  | 1 |  |
+| [`mov-encoded-views`](../harness/features/mov-encoded-views/contract.json) | 9 | 3 |  |  |  | 12 |  |
+| [`mov-pcm-packets`](../harness/features/mov-pcm-packets/contract.json) | 12 |  |  |  |  | 12 |  |
+| [`mov-run-recovery`](../harness/features/mov-run-recovery/contract.json) | 18 | 2 |  |  |  | 20 |  |
+| [`mov-track-seek`](../harness/features/mov-track-seek/contract.json) | 30 | 64 |  |  |  | 94 |  |
+| [`nal-config-inputs`](../harness/features/nal-config-inputs/contract.json) | 6 |  |  |  |  | 6 |  |
+| [`nal-length-prefixed`](../harness/features/nal-length-prefixed/contract.json) | 15 |  |  |  |  | 15 |  |
+| [`ogg-tracks`](../harness/features/ogg-tracks/contract.json) | 10 | 2 |  |  |  | 12 |  |
+| [`picture-properties`](../harness/features/picture-properties/contract.json) |  |  | 31 |  |  | 31 |  |
+| [`playback-delivery`](../harness/features/playback-delivery/contract.json) | 129 | 72 |  |  |  | 129 |  |
+| [`playback-mov-index`](../harness/features/playback-mov-index/contract.json) | 36 |  |  |  |  | 36 |  |
+| [`playback-probe`](../harness/features/playback-probe/contract.json) | 228 | 170 |  |  |  | 398 |  |
+| [`playback-source-view`](../harness/features/playback-source-view/contract.json) | 28 |  |  |  |  | 28 |  |
+| [`playback-track-selection`](../harness/features/playback-track-selection/contract.json) | 3 |  |  |  |  | 3 |  |
+| [`playback-ts-open`](../harness/features/playback-ts-open/contract.json) |  |  | 4 | 1 |  | 5 |  |
+| [`quicktime-pcm-samples`](../harness/features/quicktime-pcm-samples/contract.json) | 12 |  | 2 |  |  | 14 |  |
+| [`raster-sweep`](../harness/features/raster-sweep/contract.json) |  | 0 / 2 |  |  |  | 0 / 2 |  |
+| [`subtitle-dvd-host`](../harness/features/subtitle-dvd-host/contract.json) |  | 4 / 0 |  |  |  | 4 / 0 |  |
+| [`text-extraction`](../harness/features/text-extraction/contract.json) | 3 |  |  |  |  | 3 |  |
+| [`time-rescale`](../harness/features/time-rescale/contract.json) | 8 |  |  |  |  | 8 |  |
+| [`ts-catalogue`](../harness/features/ts-catalogue/contract.json) |  | 3 |  |  |  | 3 |  |
+| [`ts-fault-facts`](../harness/features/ts-fault-facts/contract.json) |  |  |  | 18 |  | 18 |  |
+| [`ts-mux-readback`](../harness/features/ts-mux-readback/contract.json) |  |  |  | 1 |  | 1 |  |
+| [`ts-observer-forms`](../harness/features/ts-observer-forms/contract.json) |  | 12 |  | 10 |  | 22 |  |
+| [`ts-pes-assembler`](../harness/features/ts-pes-assembler/contract.json) | 44 | 68 |  |  |  | 112 |  |
+| [`ts-psi-readers`](../harness/features/ts-psi-readers/contract.json) |  | 10 |  |  |  | 10 |  |
+| [`ts-reader-container`](../harness/features/ts-reader-container/contract.json) | 1 | 11 |  |  |  | 12 |  |
+| [`ts-reader-views`](../harness/features/ts-reader-views/contract.json) | 12 | 26 |  |  |  | 38 |  |
+| [`ts-recovery-trace`](../harness/features/ts-recovery-trace/contract.json) |  |  |  | 6 |  | 6 |  |
+| [`ts-source-poll`](../harness/features/ts-source-poll/contract.json) | 55 | 85 |  |  |  | 140 |  |
+| [`tx3g-configuration`](../harness/features/tx3g-configuration/contract.json) | 56 |  |  |  |  | 56 |  |
+| [`video-nal-input`](../harness/features/video-nal-input/contract.json) | 2 |  | 52 |  |  | 54 |  |
+| [`vobsub-index`](../harness/features/vobsub-index/contract.json) | 3 |  |  |  |  | 3 |  |
+| **Total** | 2266 / 2247 | 2322 / 2314 | 191 | 39 | 1 | 4699 / 4672 | 285 |
 
 ## Linux AArch64
 
@@ -179,9 +179,9 @@ with the specification; every other listed case withholds its comparison's accep
 | ISO BMFF source seek | Ordinal plans with caller preroll and composition-time selection on regular movies | 4,411/4,454 match on AArch64, with 43 listed differences. [Contract](../harness/features/isobmff-source-seek/contract.json) | parity only (both workers refuse the input or request, paired runtime and memory collections are pending on isolated gate hosts, the reference reads every packet for presentation times while the candidate reads tables) | parity only (both workers refuse the input or request, paired runtime and memory collections are pending on isolated gate hosts, the reference reads every packet for presentation times while the candidate reads tables) | Private codec children and empty sync tables |
 | QuickTime PCM samples | Version 0 PCM layouts, concatenated sample bytes and whole frames per stream | 8/22 match on AArch64: 2 listed refusals (sound descriptions v1 and v2) and 12 listed differences. [Contract](../harness/features/quicktime-pcm-samples/contract.json) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | Description changes, whole-frame reads and version 0 layout |
 | QuickTime sound descriptions | Version 0 wire fields, exact fixed-point rates and supported PCM layouts | 21/21 match on AArch64. [Contract](../harness/features/quicktime-sound-description/contract.json) | parity only (the public demuxer has no equivalent source field view) | parity only (the public demuxer has no equivalent source field view) | — |
-| MOV PCM packets | Packet boundaries, clocks, flags, file positions, payloads and cross-track order | 8/22 match on AArch64: 2 open cases (sound descriptions v1 and v2) and 12 listed differences. [Contract](../harness/features/mov-pcm-packets/contract.json) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | Sound description and whole-frame admission |
+| MOV PCM packets | Packet boundaries, clocks, flags, file positions, payloads and cross-track order | 10/22 match on AArch64: 12 listed differences. [Contract](../harness/features/mov-pcm-packets/contract.json) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | parity only (paired runtime and memory collections are pending on isolated gate hosts) |  |
 | MOV table and physical recovery | Run and direct recovery, shortened payloads and terminal read status at ordinary and tiny windows | 124/144 match on AArch64: 18 listed differences and 2 recovery policy differences. [Contract](../harness/features/mov-run-recovery/contract.json) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | Malformed tables and terminal transport geometry |
-| MOV encoded stream views | Encoded catalogue metadata, packet fields, dependency flags and skip-samples side data | 34/53 match on AArch64: 7 open cases (valid sample-group syntax and wave layouts refused), 9 listed differences and 3 policy differences. [Contract](../harness/features/mov-encoded-views/contract.json) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | Sound-description, sample-group and dependency admission |
+| MOV encoded stream views | Encoded catalogue metadata, packet fields, dependency flags and skip-samples side data | 41/53 match on AArch64: 9 listed deviations and 3 listed policy differences. [Contract](../harness/features/mov-encoded-views/contract.json) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | parity only (paired runtime and memory collections are pending on isolated gate hosts) |  |
 | MOV DTS demuxed signalling | DTS stream classification, rate and access-unit sample count | 24/50 match on AArch64, with 26 listed differences. [Contract](../harness/features/isobmff-dts-signalling/contract.json) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | parity only (paired runtime and memory collections are pending on isolated gate hosts) | Incomplete configuration, coreless tags and MPEG-4 object types |
 | MOV DTS source entries | DTS core admission, sample-entry base rate and source access-unit clock | 50/50 match on AArch64. [Contract](../harness/features/isobmff-dts-entry-source/contract.json) | parity only (the public demuxer has no equivalent source field view) | parity only (the public demuxer has no equivalent source field view) | — |
 | ISO BMFF segment indexes | Complete `sidx`, `tfra` and `mfro` fields, entry ranges and malformed input | 254/254 oracle traces match on AArch64. [Contract](../harness/features/isobmff-segment-indexes/contract.json) | parity only (the public demuxer does not expose the complete index fields) | parity only (the public demuxer does not expose the complete index fields) | ARMv7 parity |

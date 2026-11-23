@@ -205,43 +205,6 @@
       "cause": "paired runtime and memory collections are pending on isolated gate hosts"
     }
   ],
-  "pending_module_requirements": [
-    "The metadata view (EncodedStreamJob::new_description_with_metadata) refuses a version-1 mp4a wave without frma (Unsupported: encoded incomplete mp4a wave context). Apple QuickTime File Format 'Sound sample data' only recommends frma and has unknown atoms ignored; the entry's esds is present and the reference reads 458 bytes.",
-    "The encoded recovery profile refuses a sample-to-group map that leaves samples without an explicit association (Unsupported: encoded incomplete recovery coverage); ISO/IEC 14496-12:2015 8.9.2.3 assigns them to the default group, or none.",
-    "The encoded recovery profile refuses an sbgp run with sample_count 0 (Invalid: encoded empty recovery run); no clause of ISO/IEC 14496-12:2015 8.9.2 forbids an empty run.",
-    "The encoded recovery profile refuses valid ISO/IEC 14496-12:2015 8.9 group syntax it does not implement: a version-1 sbgp grouping_type_parameter, a grouping type it does not know (4.2: skip what is not recognised) and sgpd version 1 with default_length 0.",
-    "The dependency profile refuses a file that also carries a referenced roll group (Unsupported: encoded dependency view nonempty recovery descriptions); sdtp and roll are independent sample facts (ISO/IEC 14496-12:2015 8.6.4, 8.9)."
-  ],
-  "open_cases": [
-    {
-      "id": "qt-v1-missing-frma",
-      "requirement": "The metadata view (EncodedStreamJob::new_description_with_metadata) refuses a version-1 mp4a wave without frma (Unsupported: encoded incomplete mp4a wave context). Apple QuickTime File Format 'Sound sample data' only recommends frma and has unknown atoms ignored; the entry's esds is present and the reference reads 458 bytes."
-    },
-    {
-      "id": "coverage-under",
-      "requirement": "The encoded recovery profile refuses a sample-to-group map that leaves samples without an explicit association (Unsupported: encoded incomplete recovery coverage); ISO/IEC 14496-12:2015 8.9.2.3 assigns them to the default group, or none."
-    },
-    {
-      "id": "empty-run",
-      "requirement": "The encoded recovery profile refuses an sbgp run with sample_count 0 (Invalid: encoded empty recovery run); no clause of ISO/IEC 14496-12:2015 8.9.2 forbids an empty run."
-    },
-    {
-      "id": "grouping-parameter",
-      "requirement": "The encoded recovery profile refuses valid ISO/IEC 14496-12:2015 8.9 group syntax it does not implement: a version-1 sbgp grouping_type_parameter, a grouping type it does not know (4.2: skip what is not recognised) and sgpd version 1 with default_length 0."
-    },
-    {
-      "id": "unknown-group-unadmitted",
-      "requirement": "The encoded recovery profile refuses valid ISO/IEC 14496-12:2015 8.9 group syntax it does not implement: a version-1 sbgp grouping_type_parameter, a grouping type it does not know (4.2: skip what is not recognised) and sgpd version 1 with default_length 0."
-    },
-    {
-      "id": "variable-length-unadmitted",
-      "requirement": "The encoded recovery profile refuses valid ISO/IEC 14496-12:2015 8.9 group syntax it does not implement: a version-1 sbgp grouping_type_parameter, a grouping type it does not know (4.2: skip what is not recognised) and sgpd version 1 with default_length 0."
-    },
-    {
-      "id": "dep-real-roll-unadmitted",
-      "requirement": "The dependency profile refuses a file that also carries a referenced roll group (Unsupported: encoded dependency view nonempty recovery descriptions); sdtp and roll are independent sample facts (ISO/IEC 14496-12:2015 8.6.4, 8.9)."
-    }
-  ],
   "open_deviations": [
     {
       "reading": "An absent, nonempty or nonfinal wave terminator",
