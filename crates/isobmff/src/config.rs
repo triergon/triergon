@@ -205,77 +205,9 @@ impl EsdsWalk {
                     tag,
                     end,
                     index,
-                    mut es_flags,
-                    mut skip,
-                } => {
-                    if self.at >= end {
-                        return Err(Error::Truncated);
-                    }
-                    let b = self.byte()?;
-                    let next = index.checked_add(1).ok_or(Error::Overflow)?;
-                    let done = if tag == 4 {
-                        if index == 0 {
-                            let allowed = match self.profile {
-                                EsdsProfile::Aac | EsdsProfile::AacDescription => b == 0x40,
-                                EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
-                                EsdsProfile::AudioDescription
-                                | EsdsProfile::ObjectType
-                                | EsdsProfile::SystemStream => true,
-                            };
-                            if !allowed {
-                                return Err(Error::Unsupported(
-                                    "encoded mp4a object-type is not selected AAC",
-                                ));
-                            }
-                            self.object_type = Some(b);
-                        }
-                        if index == 1
-                            && !matches!(self.profile, EsdsProfile::SystemStream)
-                            && (b >> 2 != 5 || b & 1 == 0)
-                        {
-                            return Err(Error::Unsupported(if self.object_type == Some(0x40) {
-                                "encoded AAC decoder stream-type"
-                            } else {
-                                "encoded mp4a decoder stream-type"
-                            }));
-                        }
-                        next == 13
-                    } else {
-                        // ES_ID(2), flags(1), optional dependsOn_ES_ID(2),
-                        // URL length+bytes, OCR_ES_ID(2). The raw bytes survive.
-                        if index == 2 {
-                            es_flags = b;
-                            skip = if b & 128 != 0 { 2 } else { 0 };
-                        } else if index > 2 {
-                            if skip != 0 {
-                                skip -= 1;
-                            } else if es_flags & 64 != 0 {
-                                es_flags &= !64;
-                                skip = usize::from(b);
-                            } else if es_flags & 32 != 0 {
-                                es_flags &= !32;
-                                skip = 1;
-                            }
-                        }
-                        next >= 3 && skip == 0 && es_flags & 0x60 == 0
-                    };
-                    if done {
-                        if self.depth == 2 {
-                            return Err(Error::Unsupported("encoded descriptor nesting"));
-                        }
-                        self.depth += 1;
-                        self.ends[self.depth] = end;
-                        self.phase = DescriptorPhase::Tag;
-                    } else {
-                        self.phase = DescriptorPhase::Prefix {
-                            tag,
-                            end,
-                            index: next,
-                            es_flags,
-                            skip,
-                        };
-                    }
-                }
+                    es_flags,
+                    skip,
+                } => self.read_prefix(tag, end, index, es_flags, skip)?,
                 DescriptorPhase::Body { tag, end } => {
                     if tag == 5 && self.depth == 2 {
                         if self.dsi.is_some() {
@@ -290,6 +222,84 @@ impl EsdsWalk {
                 }
             }
         }
+    }
+    #[inline(always)]
+    fn read_prefix(
+        &mut self,
+        tag: u8,
+        end: usize,
+        index: usize,
+        mut es_flags: u8,
+        mut skip: usize,
+    ) -> Result<()> {
+        if self.at >= end {
+            return Err(Error::Truncated);
+        }
+        let b = self.byte()?;
+        let next = index.checked_add(1).ok_or(Error::Overflow)?;
+        let done = if tag == 4 {
+            if index == 0 {
+                let allowed = match self.profile {
+                    EsdsProfile::Aac | EsdsProfile::AacDescription => b == 0x40,
+                    EsdsProfile::RangeAudio => b == 0x40 || dts_object_type(b)?,
+                    EsdsProfile::AudioDescription
+                    | EsdsProfile::ObjectType
+                    | EsdsProfile::SystemStream => true,
+                };
+                if !allowed {
+                    return Err(Error::Unsupported(
+                        "encoded mp4a object-type is not selected AAC",
+                    ));
+                }
+                self.object_type = Some(b);
+            }
+            if index == 1
+                && !matches!(self.profile, EsdsProfile::SystemStream)
+                && (b >> 2 != 5 || b & 1 == 0)
+            {
+                return Err(Error::Unsupported(if self.object_type == Some(0x40) {
+                    "encoded AAC decoder stream-type"
+                } else {
+                    "encoded mp4a decoder stream-type"
+                }));
+            }
+            next == 13
+        } else {
+            // ES_ID(2), flags(1), optional dependsOn_ES_ID(2),
+            // URL length+bytes, OCR_ES_ID(2). The raw bytes survive.
+            if index == 2 {
+                es_flags = b;
+                skip = if b & 128 != 0 { 2 } else { 0 };
+            } else if index > 2 {
+                if skip != 0 {
+                    skip -= 1;
+                } else if es_flags & 64 != 0 {
+                    es_flags &= !64;
+                    skip = usize::from(b);
+                } else if es_flags & 32 != 0 {
+                    es_flags &= !32;
+                    skip = 1;
+                }
+            }
+            next >= 3 && skip == 0 && es_flags & 0x60 == 0
+        };
+        if done {
+            if self.depth == 2 {
+                return Err(Error::Unsupported("encoded descriptor nesting"));
+            }
+            self.depth += 1;
+            self.ends[self.depth] = end;
+            self.phase = DescriptorPhase::Tag;
+        } else {
+            self.phase = DescriptorPhase::Prefix {
+                tag,
+                end,
+                index: next,
+                es_flags,
+                skip,
+            };
+        }
+        Ok(())
     }
 }
 
