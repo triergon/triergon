@@ -77,8 +77,8 @@
 
 use super::{Held, NalDecode, Tables, collect};
 use crate::cc::extraction::queue::FrameQueue;
-use crate::cc::video::avc;
-use triergon_framing::avc::AvcPocSyntax;
+use crate::cc::video::avc::{self, Sps};
+use triergon_framing::avc::{AvcPocSyntax, AvcSliceHeader, AvcSps};
 use triergon_framing::picture_output::levels::max_dpb_frames;
 use triergon_framing::picture_output::order::{
     AfterGap, AfterMmco5, AvcOrder, AvcPocCoding, AvcPocFields,
@@ -339,24 +339,13 @@ impl AvcState {
     }
 }
 
-impl NalDecode {
-    /// Decodes an H.264 picture; returns whether its packet is in an untimed
-    /// run.
-    pub(super) fn avc_picture(
-        &mut self,
-        slice: avc::Slice,
-        recovery: Option<u32>,
-        mut held: Held,
-        out: &mut FrameQueue,
-    ) -> bool {
-        let Tables::Avc(tables) = &self.tables else {
-            return false;
-        };
-        let Some(sps) = tables.sps(slice.sps_id) else {
-            return false;
-        };
-        let fields = sps.fields;
-        let header = slice.header;
+impl AvcState {
+    /// The picture's stored order count (8.2.1), whether a gap in
+    /// `frame_num` (8.2.5.2) comes before it, and the parity of a field.
+    #[inline(always)]
+    fn order_count(&mut self, slice: &avc::Slice, sps: &Sps) -> (i32, bool, Option<Parity>) {
+        let fields = &sps.fields;
+        let header = &slice.header;
         let coding = match fields.poc {
             AvcPocSyntax::Lsb { bits } => AvcPocCoding::Lsb {
                 lsb: header.pic_order_cnt_lsb,
@@ -375,10 +364,8 @@ impl NalDecode {
             },
             AvcPocSyntax::FrameNum => AvcPocCoding::FrameNum,
         };
-        let state = &mut self.progress.avc;
-        // A gap in `frame_num` (8.2.5.2) before this picture.
         let gap = !slice.idr
-            && state
+            && self
                 .order
                 .gap(
                     u32::from(header.frame_num),
@@ -389,7 +376,7 @@ impl NalDecode {
         let parity = header
             .bottom_field
             .map(|bottom| if bottom { Parity::Bottom } else { Parity::Top });
-        let poc = state.order.next(&AvcPocFields {
+        let poc = self.order.next(&AvcPocFields {
             idr: slice.idr,
             reference: slice.reference,
             frame_num: u32::from(header.frame_num),
@@ -398,74 +385,192 @@ impl NalDecode {
             mmco5: header.mmco5,
             coding,
         });
-        // The second field of a pair joins the first's frame.
-        if let Some(first) = state.first_field.take() {
-            if let Some(parity) = parity
-                && parity != first.parity
-                && first.frame_num == header.frame_num
-                && !slice.idr
-            {
-                let store = NewPicture {
-                    poc: poc.stored_poc,
-                    marking: Marking::Unused,
-                    output: true,
-                    field: Some(parity),
-                    hold: false,
-                };
-                let joined = self.pictures.avc_store_second_field(
-                    first.id,
-                    store,
-                    held,
-                    collect(&mut self.leaving),
-                    |frame, second| {
-                        if frame.end == second.start {
-                            frame.end = second.end;
-                        }
-                    },
-                );
-                if joined.is_ok() {
-                    self.emit_avc(out);
-                    self.bump_avc(out);
-                    return false;
-                }
-            } else if let Some(lone) = self.pictures.take(first.id) {
-                // An unpaired field is not output: its caption bytes go to
-                // the next picture (`h264-fields-lone-ts`).
-                if lone.end == held.start {
-                    held.start = lone.start;
-                }
-            }
-        }
-        // The reorder depth: the bitstream restriction's, or one that grows.
-        let state = &mut self.progress.avc;
+        (poc.stored_poc, gap, parity)
+    }
+
+    /// Takes the SPS's reorder depth if a bitstream restriction states one
+    /// (a new or changed one replaces the depth; without one it starts at 0
+    /// again), its MaxDpbFrames (Table A-1), and whether the start is held.
+    #[inline(always)]
+    fn configure(&mut self, fields: &AvcSps) {
         if let Some(stated) = fields.vui.max_num_reorder_frames {
-            if !state.stated || state.stated_depth != stated {
-                state.depth = stated;
+            if !self.stated || self.stated_depth != stated {
+                self.depth = stated;
             }
-            state.stated = true;
-            state.stated_depth = stated;
+            self.stated = true;
+            self.stated_depth = stated;
         } else {
-            if state.stated {
-                state.depth = 0;
+            if self.stated {
+                self.depth = 0;
             }
-            state.stated = false;
+            self.stated = false;
         }
-        state.dpb_frames = max_dpb_frames(
+        self.dpb_frames = max_dpb_frames(
             fields.profile_idc,
             fields.constraint_set3,
             fields.level_idc,
             fields.frame_mbs,
         )
         .unwrap_or(16);
-        state.holds = !state.stated && state.dpb_frames >= 2;
-        if slice.idr || header.mmco5 {
-            while self.pictures.bump(collect(&mut self.leaving)) {}
-            self.emit_avc(out);
-            let state = &mut self.progress.avc;
-            state.late.restart();
-            state.floor = None;
-            state.recent.clear();
+        self.holds = !self.stated && self.dpb_frames >= 2;
+    }
+
+    /// Counts the picture against the start hold, whose early decoder it
+    /// feeds while the hold lasts; returns whether its packet is in an
+    /// untimed run. Then the picture joins the recent order counts.
+    #[inline(always)]
+    fn start_hold(
+        &mut self,
+        slice: &avc::Slice,
+        order: i32,
+        displaced: u32,
+        gap: bool,
+        stored: usize,
+    ) -> bool {
+        let header = &slice.header;
+        if self.decoded == 1 {
+            self.early.uncounted_first = !slice.idr && header.intra() && header.frame_num == 0;
         }
+        let mut untimed = false;
+        if !self.early.ended {
+            let before = self.early.depth;
+            self.early
+                .picture(order, displaced, header.bipredictive(), gap);
+            let index = self.decoded.saturating_sub(1);
+            self.early.ended = self.early.ends(index, self.dpb_frames, stored);
+            // Without a bitstream restriction, once the hold's depth rises
+            // from 0 to 1 the packets until the hold ends give no time, but
+            // for those of B pictures; a rise above 1 ends the run.
+            let after = self.early.depth;
+            if after > 1 || self.early.ended {
+                self.untimed_run = false;
+            }
+            untimed = self.untimed_run && !header.bipredictive();
+            if !self.stated && before == 0 && after == 1 && !self.early.ended {
+                self.untimed_run = true;
+            }
+        }
+        self.recent.push(order);
+        self.previous = Some(order);
+        untimed
+    }
+}
+
+impl NalDecode {
+    /// Decodes an H.264 picture; returns whether its packet is in an untimed
+    /// run.
+    pub(super) fn avc_picture(
+        &mut self,
+        slice: avc::Slice,
+        recovery: Option<u32>,
+        mut held: Held,
+        out: &mut FrameQueue,
+    ) -> bool {
+        let Tables::Avc(tables) = &self.tables else {
+            return false;
+        };
+        let Some(sps) = tables.sps(slice.sps_id) else {
+            return false;
+        };
+        let fields = sps.fields;
+        let (order, gap, parity) = self.progress.avc.order_count(&slice, sps);
+        if self.avc_second_field(&slice, order, parity, &mut held, out) {
+            return false;
+        }
+        self.progress.avc.configure(&fields);
+        if slice.idr || slice.header.mmco5 {
+            self.avc_output_waiting(out);
+            self.progress.avc.recent.clear();
+        }
+        self.avc_count(&slice.header);
+        let (displaced, far) =
+            self.avc_reorder_depth(&slice.header, &fields, gap, order, &held, out);
+        let stored = self.pictures.len();
+        let untimed = self
+            .progress
+            .avc
+            .start_hold(&slice, order, displaced, gap, stored);
+        let (first_key, unrecovered) =
+            self.avc_recovery(&slice, recovery, &fields, order, &mut held);
+        self.avc_store(
+            &slice,
+            parity,
+            order,
+            first_key,
+            unrecovered,
+            far,
+            held,
+            out,
+        );
+        untimed
+    }
+
+    /// The second field of a pair joins the first's frame: `true` once it
+    /// has. A first field without its pair is dropped and its caption bytes
+    /// go to this picture (`h264-fields-lone-ts`).
+    #[inline(always)]
+    fn avc_second_field(
+        &mut self,
+        slice: &avc::Slice,
+        order: i32,
+        parity: Option<Parity>,
+        held: &mut Held,
+        out: &mut FrameQueue,
+    ) -> bool {
+        let Some(first) = self.progress.avc.first_field.take() else {
+            return false;
+        };
+        if let Some(parity) = parity
+            && parity != first.parity
+            && first.frame_num == slice.header.frame_num
+            && !slice.idr
+        {
+            let store = NewPicture {
+                poc: order,
+                marking: Marking::Unused,
+                output: true,
+                field: Some(parity),
+                hold: false,
+            };
+            let joined = self.pictures.avc_store_second_field(
+                first.id,
+                store,
+                *held,
+                collect(&mut self.leaving),
+                |frame, second| {
+                    if frame.end == second.start {
+                        frame.end = second.end;
+                    }
+                },
+            );
+            if joined.is_ok() {
+                self.emit_avc(out);
+                self.bump_avc(out);
+                return true;
+            }
+        } else if let Some(lone) = self.pictures.take(first.id)
+            && lone.end == held.start
+        {
+            held.start = lone.start;
+        }
+        false
+    }
+
+    /// Outputs every picture waiting and starts the late-output and floor
+    /// rules again.
+    #[inline(always)]
+    fn avc_output_waiting(&mut self, out: &mut FrameQueue) {
+        while self.pictures.bump(collect(&mut self.leaving)) {}
+        self.emit_avc(out);
+        let state = &mut self.progress.avc;
+        state.late.restart();
+        state.floor = None;
+    }
+
+    /// Counts the picture decoded, and closes the [`BWindow`] at its first B
+    /// picture or its end.
+    #[inline(always)]
+    fn avc_count(&mut self, header: &AvcSliceHeader) {
         let state = &mut self.progress.avc;
         state.decoded = state.decoded.saturating_add(1);
         if state.b_window == BWindow::Open {
@@ -477,18 +582,29 @@ impl NalDecode {
                 self.choose_start();
             }
         }
+    }
+
+    /// The pictures of the last 16 above the picture, and whether it lies
+    /// below all of them; the reorder depth grows as the module
+    /// documentation describes.
+    #[inline(always)]
+    fn avc_reorder_depth(
+        &mut self,
+        header: &AvcSliceHeader,
+        fields: &AvcSps,
+        gap: bool,
+        order: i32,
+        held: &Held,
+        out: &mut FrameQueue,
+    ) -> (u32, bool) {
         let state = &mut self.progress.avc;
-        let order = poc.stored_poc;
         let displaced = state.recent.above(order);
         // Far below the last pictures decoded: the pictures waiting leave
         // first, it does not raise the depth, and no floor drops it (observed
         // with a B picture below the intra picture).
         let far = state.recent.len >= FAR_BACK && state.recent.last(FAR_BACK).all(|q| order < q);
         if far {
-            while self.pictures.bump(collect(&mut self.leaving)) {}
-            self.emit_avc(out);
-            self.progress.avc.late.restart();
-            self.progress.avc.floor = None;
+            self.avc_output_waiting(out);
         } else if !state.stated {
             state.depth = state.depth.max(displaced);
             if header.bipredictive() {
@@ -514,34 +630,24 @@ impl NalDecode {
         if let Some(shown) = &mut self.progress.shown {
             shown.picture(held.pts, header.bipredictive().then_some(displaced > 0));
         }
-        let state = &mut self.progress.avc;
-        if state.decoded == 1 {
-            state.early.uncounted_first = !slice.idr && header.intra() && header.frame_num == 0;
-        }
-        let mut untimed = false;
-        if !state.early.ended {
-            let before = state.early.depth;
-            state
-                .early
-                .picture(order, displaced, header.bipredictive(), gap);
-            let index = state.decoded.saturating_sub(1);
-            state.early.ended = state
-                .early
-                .ends(index, state.dpb_frames, self.pictures.len());
-            // Without a bitstream restriction, once the hold's depth rises
-            // from 0 to 1 the packets until the hold ends give no time, but
-            // for those of B pictures; a rise above 1 ends the run.
-            let after = state.early.depth;
-            if after > 1 || state.early.ended {
-                state.untimed_run = false;
-            }
-            untimed = state.untimed_run && !header.bipredictive();
-            if !state.stated && before == 0 && after == 1 && !state.early.ended {
-                state.untimed_run = true;
-            }
-        }
-        state.recent.push(order);
-        state.previous = Some(order);
+        (displaced, far)
+    }
+
+    /// Recovery of a stream that did not start at an IDR picture, as the
+    /// module documentation describes: marks `held` as an intra picture
+    /// before recovery or the stream's first, and returns whether the
+    /// picture is its first intra picture and whether it is one of those
+    /// above it that are not recovered.
+    #[inline(always)]
+    fn avc_recovery(
+        &mut self,
+        slice: &avc::Slice,
+        recovery: Option<u32>,
+        fields: &AvcSps,
+        order: i32,
+        held: &mut Held,
+    ) -> (bool, bool) {
+        let header = &slice.header;
         let state = &mut self.progress.avc;
         if slice.idr {
             state.recovered = true;
@@ -578,7 +684,7 @@ impl NalDecode {
         }
         let state = &mut self.progress.avc;
         let mut unrecovered = false;
-        if !state.recovered && !first_key && state.key_poc.is_some_and(|key| poc.stored_poc > key) {
+        if !state.recovered && !first_key && state.key_poc.is_some_and(|key| order > key) {
             state.above_key = state.above_key.saturating_add(1);
             held.above = state.above_key;
             if deferring {
@@ -596,24 +702,23 @@ impl NalDecode {
             held.key = true;
             if !state.keyed {
                 state.keyed = true;
-                state.floor = Some(poc.stored_poc);
+                state.floor = Some(order);
             }
         }
         if first_key {
             held.first_key = true;
             state.key_reference = slice.reference;
-            state.key_poc = Some(poc.stored_poc);
+            state.key_poc = Some(order);
             state.above_key = 0;
             state.key_kept = state.decoded == 1 && header.frame_num != 0;
         }
         if target {
             state.target = None;
-            if first_key || key_poc.is_none_or(|key| poc.stored_poc < key) {
+            if first_key || key_poc.is_none_or(|key| order < key) {
                 // Before any intra picture, at the first or below it: the
                 // recovery point recovers the pictures still waiting too.
                 state.recovered = true;
-                let floor = poc.stored_poc;
-                state.floor = Some(state.floor.map_or(floor, |old| old.min(floor)));
+                state.floor = Some(state.floor.map_or(order, |old| old.min(order)));
                 for mut entry in self.pictures.entries_mut() {
                     entry.picture_mut().recovered = true;
                 }
@@ -621,17 +726,37 @@ impl NalDecode {
                 // After the first intra picture it recovers itself and the
                 // pictures above it, waiting or later; those below it still
                 // count above the intra picture.
-                let floor = poc.stored_poc;
-                state.recovered_from = Some(floor);
+                state.recovered_from = Some(order);
                 for mut entry in self.pictures.entries_mut() {
-                    if entry.poc() >= floor {
+                    if entry.poc() >= order {
                         entry.picture_mut().recovered = true;
                     }
                 }
             }
         }
-        // With a bitstream restriction, a reference picture in the start
-        // window takes a buffer: the pictures beyond the depth leave first.
+        (first_key, unrecovered)
+    }
+
+    /// Stores the picture, without the processes of C.4.5: pictures leave by
+    /// the reorder depth instead, and a first field waits for its second.
+    /// With a bitstream restriction a reference picture in the start window
+    /// takes a buffer, so the pictures beyond the depth leave first.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "One seam of the picture decode, inlined into it; the facts it stores are those decoded before it."
+    )]
+    #[inline(always)]
+    fn avc_store(
+        &mut self,
+        slice: &avc::Slice,
+        parity: Option<Parity>,
+        order: i32,
+        first_key: bool,
+        unrecovered: bool,
+        far: bool,
+        mut held: Held,
+        out: &mut FrameQueue,
+    ) {
         let state = &self.progress.avc;
         if !far && state.stated && slice.reference && state.decoded <= START_WINDOW + 1 {
             let depth = state.depth as usize;
@@ -641,13 +766,9 @@ impl NalDecode {
         }
         let state = &self.progress.avc;
         held.recovered = state.recovered && !unrecovered
-            || state
-                .recovered_from
-                .is_some_and(|from| poc.stored_poc >= from);
-        // Stored without the processes of C.4.5: pictures leave by the
-        // reorder depth instead. A first field waits for its second.
+            || state.recovered_from.is_some_and(|from| order >= from);
         let new = NewPicture {
-            poc: poc.stored_poc,
+            poc: order,
             output: true,
             marking: Marking::Unused,
             field: parity,
@@ -655,7 +776,7 @@ impl NalDecode {
         };
         // Within the room reserved, the store neither allocates nor fails.
         let Ok(id) = self.pictures.store(new, held) else {
-            return untimed;
+            return;
         };
         if first_key {
             self.progress.avc.key_id = Some(id);
@@ -663,12 +784,11 @@ impl NalDecode {
         if let Some(parity) = parity {
             self.progress.avc.first_field = Some(FirstField {
                 id,
-                frame_num: header.frame_num,
+                frame_num: slice.header.frame_num,
                 parity,
             });
         }
         self.bump_avc(out);
-        untimed
     }
 
     /// Decides the recovery of the pictures above the first intra picture
@@ -739,7 +859,9 @@ impl NalDecode {
         }
     }
 
-    /// Makes the start choice once the [`BWindow`] is decided.
+    /// Makes the start choice once the [`BWindow`] is decided. Out of line:
+    /// inlined at its three calls it costs the caption workloads more.
+    #[inline(never)]
     pub(super) fn choose_start(&mut self) {
         let Some(choice) = self.progress.avc.choice else {
             return;
