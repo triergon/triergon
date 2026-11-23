@@ -22,7 +22,7 @@ pub(crate) struct TextValue {
 /// Validation state of one text span, holding no source owner: each step reads
 /// the span from the source the caller passes, which must be the same bytes
 /// every time. A completed check returns the span up to its first zero byte.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct TextCheck {
     range: Range<usize>,
     at: usize,

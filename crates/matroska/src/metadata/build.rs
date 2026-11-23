@@ -5,7 +5,6 @@ use super::{
     default_uint, master, unsigned, utf8,
 };
 use crate::ebml::ChildCursor;
-use crate::step::Required;
 use crate::step::check;
 use crate::{
     Error, Result, ebml,
@@ -19,22 +18,28 @@ use std::{
 };
 use triergon_core::{Budget, BudgetVec, Reservation, WorkBudget};
 
+/// One level of the stack the parse and the validation share: a master being
+/// parsed (its node and the cursor over its children), then an Edition or chapter
+/// being validated (`end` is the node after its last descendant). The frame at
+/// stack index `d` is at nesting depth `d`.
 #[derive(Debug)]
 enum Frame {
-    Parse {
-        node: u16,
-        cursor: ChildCursor,
-        depth: u8,
-    },
-    // Parsing has finished before these contexts reuse the same fixed slots.
-    // The bounds summarize chapter ancestors only up to the nearest Edition.
-    Validate {
-        end: u16,
-        lower: u64,
-        upper: u64,
-        ordered: bool,
-    },
+    Parse { node: u16, cursor: ChildCursor },
+    Validate { end: u16, context: Context },
 }
+/// The bounds a chapter's start must lie in: the chapter ancestors up to the
+/// nearest Edition, and whether that Edition is ordered.
+#[derive(Clone, Copy, Debug)]
+struct Context {
+    lower: u64,
+    upper: u64,
+    ordered: bool,
+}
+const NO_CONTEXT: Context = Context {
+    lower: 0,
+    upper: u64::MAX,
+    ordered: false,
+};
 #[derive(Debug, Clone, Copy, Default)]
 struct Fields {
     presence: u64,
@@ -147,7 +152,6 @@ fn require(fields: Fields, ids: &[u64]) -> Result<()> {
 enum Phase {
     Owner,
     NodeReserve,
-    NodeCopy,
     NodeAppend,
     NodeKind,
     Text,
@@ -173,15 +177,21 @@ pub(crate) struct DocumentJob {
     attachment_limit: usize,
     source_offset: Option<u64>,
     nodes: BudgetVec<Node>,
-    owner: Option<Reservation>,
+    owner: Reservation,
+    /// The larger node arena and how many nodes it holds so far; the copy finishes
+    /// before the phase goes on.
     growth: Option<(BudgetVec<Node>, usize)>,
-    pending: Option<Node>,
+    // The node being admitted, its payload and its index once appended.
+    pending: Node,
     pending_range: Range<usize>,
     pending_index: u16,
+    // Parsing has finished before validation reuses the same fixed slots.
     stack: [Option<Frame>; 65],
     stack_len: usize,
     attachment_bytes: usize,
-    text: Option<TextCheck>,
+    text: TextCheck,
+    // The context the Edition or chapter that ValidateRules passed opens.
+    opened: Context,
     phase: Phase,
     validate: usize,
     child: usize,
@@ -192,9 +202,8 @@ pub(crate) struct DocumentJob {
     uids: BudgetVec<u64>,
     uid_kind: usize,
     uid_at: usize,
-    heap: Option<Heap>,
+    heap: Heap,
     timestamp_scale: Option<u64>,
-    result: Option<SharedDocument>,
     failed: bool,
 }
 /// The four existing document resource policies travel as one explicit record.
@@ -237,20 +246,21 @@ impl DocumentJob {
             attachment_limit,
             source_offset,
             nodes: BudgetVec::new(pool),
-            owner: None,
+            owner: Reservation::empty(pool),
             growth: None,
-            pending: Some(Node {
+            pending: Node {
                 id: kind as u32,
                 header: 0,
                 next: 1,
                 parent: u16::MAX,
-            }),
+            },
             pending_range: 0..end,
             pending_index: 0,
             stack: std::array::from_fn(|_| None),
             stack_len: 0,
             attachment_bytes: 0,
-            text: None,
+            text: TextCheck::default(),
+            opened: NO_CONTEXT,
             phase: Phase::Owner,
             validate: 0,
             child: 0,
@@ -261,9 +271,8 @@ impl DocumentJob {
             uids: BudgetVec::new(pool),
             uid_kind: 0,
             uid_at: 0,
-            heap: None,
+            heap: Heap::new(0),
             timestamp_scale: None,
-            result: None,
             failed: false,
         })
     }
@@ -283,12 +292,7 @@ impl DocumentJob {
         if index == 0 {
             return Ok(0..raw.len());
         }
-        let node = self
-            .nodes
-            .as_slice()
-            .get(index)
-            .required("missing metadata node")?;
-        let at = node.header as usize;
+        let at = self.nodes.as_slice()[index].header as usize;
         let head = ebml::header(&raw[at..])?;
         let Some(size) = head.size else {
             return Err(Error::Invalid("unknown metadata child size"));
@@ -331,20 +335,15 @@ impl DocumentJob {
         }
         Ok(())
     }
-    fn validation_context(&self) -> Result<(u64, u64, bool)> {
+    /// The context of the innermost Edition or chapter being validated.
+    fn validation_context(&self) -> Result<Context> {
         if self.stack_len == 0 {
-            return Ok((0, u64::MAX, false));
+            return Ok(NO_CONTEXT);
         }
-        let Some(Frame::Validate {
-            lower,
-            upper,
-            ordered,
-            ..
-        }) = self.stack[self.stack_len - 1].as_ref()
-        else {
+        let Some(Frame::Validate { context, .. }) = &self.stack[self.stack_len - 1] else {
             return Err(Error::Invalid("missing metadata validation context"));
         };
-        Ok((*lower, *upper, *ordered))
+        Ok(*context)
     }
     pub(crate) fn step(
         &mut self,
@@ -391,512 +390,479 @@ impl DocumentJob {
         cancel: &AtomicBool,
     ) -> Result<ParseStep<SharedDocument>> {
         let raw: &[u8] = &self.raw;
-        loop {
-            check(cancel)?;
-            match *phase {
-                Phase::Owner => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    self.owner = Some(
-                        self.pool
-                            .reserve(size_of::<Document>() + 2 * size_of::<usize>())?,
-                    );
-                    *phase = Phase::NodeReserve;
-                }
-                Phase::NodeReserve => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    if self.nodes.len() >= self.node_limit {
-                        return Err(Error::Policy("metadata nodes"));
-                    }
-                    if self.nodes.len() < self.nodes.capacity() {
-                        *phase = Phase::NodeAppend;
-                        continue;
-                    }
-                    let initial = (raw.len() / 2 + 1).min(8);
-                    let target = self
-                        .nodes
-                        .len()
-                        .saturating_mul(2)
-                        .max(initial)
-                        .min(self.node_limit);
-                    let lower = target
-                        .checked_mul(size_of::<Node>())
-                        .and_then(|n| n.checked_add(self.raw.retained_capacity()))
-                        .and_then(|n| n.checked_add(size_of::<Document>() + 2 * size_of::<usize>()))
-                        .ok_or(Error::Overflow)?;
-                    if lower > self.storage_limit {
-                        return Err(Error::Policy("metadata retained storage"));
-                    }
-                    let mut replacement = BudgetVec::new(&self.pool);
-                    replacement.try_reserve_exact(target)?;
-                    if self.retained_with_capacity(replacement.capacity())? > self.storage_limit {
-                        return Err(Error::Policy("metadata retained storage"));
-                    }
-                    self.growth = Some((replacement, 0));
-                    *phase = Phase::NodeCopy;
-                }
-                Phase::NodeCopy => {
-                    let growth = self
-                        .growth
-                        .as_mut()
-                        .required("missing metadata arena growth")?;
-                    if growth.1 == self.nodes.len() {
-                        let (replacement, _) = self
-                            .growth
-                            .take()
-                            .required("missing metadata arena growth")?;
-                        self.nodes = replacement;
-                        *phase = Phase::NodeAppend;
-                        continue;
-                    }
-                    let count = work.take((self.nodes.len() - growth.1).min(64) as u64) as usize;
+        'document: loop {
+            if let Some((replacement, copied)) = &mut self.growth {
+                check(cancel)?;
+                if *copied < self.nodes.len() {
+                    let count = work.take((self.nodes.len() - *copied).min(64) as u64) as usize;
                     if count == 0 {
                         return Ok(ParseStep::Yield);
                     }
-                    growth.0.try_extend_from_slice(
-                        &self.nodes.as_slice()[growth.1..growth.1 + count],
-                    )?;
-                    growth.1 += count;
+                    replacement
+                        .try_extend_from_slice(&self.nodes.as_slice()[*copied..*copied + count])?;
+                    *copied += count;
+                    continue;
                 }
-                Phase::NodeAppend => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let node = self
-                        .pending
-                        .take()
-                        .required("missing metadata node admission")?;
-                    self.pending_index = u16::try_from(self.nodes.len())
-                        .map_err(|_| Error::Policy("metadata index space"))?;
-                    if let Err(error) = self.nodes.try_push(node) {
-                        self.pending = Some(error.value);
-                        return Err(error.error);
-                    }
-                    *phase = Phase::NodeKind;
+                if let Some((replacement, _)) = self.growth.take() {
+                    self.nodes = replacement;
                 }
-                Phase::NodeKind => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let index = usize::from(self.pending_index);
-                    let id = u64::from(self.nodes.as_slice()[index].id);
-                    if master(id) {
-                        let depth = if self.stack_len == 0 {
-                            0
-                        } else {
-                            let Some(Frame::Parse { depth, .. }) =
-                                self.stack[self.stack_len - 1].as_ref()
-                            else {
-                                return Err(Error::Invalid("missing metadata parent"));
-                            };
-                            usize::from(*depth) + 1
-                        };
-                        if depth > self.depth_limit {
-                            return Err(Error::Policy("metadata nesting"));
+            }
+            loop {
+                check(cancel)?;
+                match *phase {
+                    Phase::Owner => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
                         }
-                        self.stack[self.stack_len] = Some(Frame::Parse {
-                            node: self.pending_index,
-                            cursor: ChildCursor::new(self.pending_range.clone()),
-                            depth: u8::try_from(depth).map_err(|_| Error::Overflow)?,
-                        });
-                        self.stack_len += 1;
-                        *phase = Phase::Parse;
-                        continue;
+                        self.owner
+                            .resize_to(size_of::<Document>() + 2 * size_of::<usize>())?;
+                        *phase = Phase::NodeReserve;
                     }
-                    let payload = &raw[self.pending_range.clone()];
-                    if unsigned(id) {
-                        let value = if payload.is_empty() {
-                            default_uint(id)
-                        } else {
-                            ebml::uint(payload)?
-                        };
-                        if id == 0x2ad7b1
-                            && self.nodes.as_slice()[index].parent == 0
-                            && u64::from(self.nodes.as_slice()[0].id) == INFO
-                        {
-                            self.timestamp_scale = Some(value);
+                    Phase::NodeReserve => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
                         }
-                        if boolean(id) && value > 1 {
-                            return Err(Error::Invalid("metadata boolean"));
+                        if self.nodes.len() >= self.node_limit {
+                            return Err(Error::Policy("metadata nodes"));
                         }
-                        if matches!(id, 0x46ae | 0x73c4 | 0x45bc | 0x6ebc | 0x68ca) && value == 0 {
-                            return Err(Error::Invalid("zero metadata UID/type"));
-                        }
-                        if id == 0x6922 && value > 2 {
-                            return Err(Error::Invalid("chapter process time"));
-                        }
-                    }
-                    // Every scalar is visited here once. Count UID namespaces
-                    // now, while retaining the original post-validation
-                    // workspace admission and complete duplicate checks.
-                    let uid_kind = match id {
-                        0x46ae => 1,
-                        0x73c4 => 2,
-                        0x45bc => 4,
-                        _ => 0,
-                    };
-                    if uid_kind != 0 {
-                        self.uid_count = self.uid_count.checked_add(1).ok_or(Error::Overflow)?;
-                        self.uid_kinds |= uid_kind;
-                    }
-                    if id == 0x4489 {
-                        let value = match payload.len() {
-                            0 => 0.,
-                            4 => f64::from(f32::from_be_bytes(
-                                payload
-                                    .try_into()
-                                    .map_err(|_| Error::Invalid("metadata float width"))?,
-                            )),
-                            8 => f64::from_be_bytes(
-                                payload
-                                    .try_into()
-                                    .map_err(|_| Error::Invalid("metadata float width"))?,
-                            ),
-                            _ => return Err(Error::Invalid("metadata float width")),
-                        };
-                        if !value.is_finite() || value <= 0. {
-                            return Err(Error::Invalid("Segment duration range"));
-                        }
-                    }
-                    if id == 0x4461 && !matches!(payload.len(), 0 | 8) {
-                        return Err(Error::Invalid("DateUTC width"));
-                    }
-                    if id == 0x6e67 && payload.len() != 16 {
-                        return Err(Error::Invalid("chapter SegmentUUID length"));
-                    }
-                    if id == 0x465c {
-                        self.attachment_bytes = self
-                            .attachment_bytes
-                            .checked_add(payload.len())
-                            .ok_or(Error::Overflow)?;
-                        if self.attachment_bytes > self.attachment_limit {
-                            return Err(Error::Policy("attachment payload bytes"));
-                        }
-                    }
-                    if utf8(id) || ascii(id) {
-                        self.text =
-                            Some(TextCheck::new(raw, self.pending_range.clone(), ascii(id))?);
-                        *phase = Phase::Text;
-                    } else {
-                        let next = u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
-                        self.nodes.as_mut_slice()[index].next = next;
-                        *phase = Phase::Parse;
-                    }
-                }
-                Phase::Text => match self
-                    .text
-                    .as_mut()
-                    .required("missing metadata text job")?
-                    .step(raw, work, cancel)?
-                {
-                    ParseStep::Event(_) => {
-                        self.text = None;
-                        let next = u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
-                        self.nodes.as_mut_slice()[usize::from(self.pending_index)].next = next;
-                        *phase = Phase::Parse;
-                    }
-                    other => return crate::step::pending(other),
-                },
-                Phase::Parse => {
-                    let Some(Frame::Parse { node, cursor, .. }) =
-                        self.stack[self.stack_len - 1].as_mut()
-                    else {
-                        return Err(Error::Invalid("missing metadata parse frame"));
-                    };
-                    match cursor.step(raw, work, cancel) {
-                        Err(Error::Invalid("unknown size inside metadata")) => {
-                            return Err(Error::Invalid("unknown metadata child size"));
-                        }
-                        Err(error) => return Err(error),
-                        Ok(ParseStep::Yield) => return Ok(ParseStep::Yield),
-                        Ok(ParseStep::Event(None)) => {
-                            if !work.try_charge(1) {
-                                return Ok(ParseStep::Yield);
-                            }
-                            let node = *node;
-                            let next =
-                                u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
-                            self.nodes.as_mut_slice()[usize::from(node)].next = next;
-                            self.stack_len -= 1;
-                            self.stack[self.stack_len] = None;
-                            if self.stack_len == 0 {
-                                *phase = Phase::ValidateStart;
-                            }
-                        }
-                        Ok(ParseStep::Event(Some(child))) => {
-                            self.pending = Some(Node {
-                                id: child.id as u32,
-                                header: child.header as u32,
-                                next: 0,
-                                parent: *node,
-                            });
-                            self.pending_range = child.payload;
-                            *phase = Phase::NodeReserve;
-                        }
-                        _ => return Err(Error::Invalid("invalid metadata parse transition")),
-                    }
-                }
-                Phase::ValidateStart => {
-                    if self.validate == self.nodes.len() {
-                        self.uid_at = 0;
-                        *phase = if self.uid_count == 0 {
-                            Phase::Finish
-                        } else {
-                            Phase::UidReserve
-                        };
-                        continue;
-                    }
-                    if self.stack_len != 0 {
-                        let Some(Frame::Validate { end, .. }) =
-                            self.stack[self.stack_len - 1].as_ref()
-                        else {
-                            return Err(Error::Invalid("missing metadata validation context"));
-                        };
-                        if usize::from(*end) <= self.validate {
-                            if !work.try_charge(1) {
-                                return Ok(ParseStep::Yield);
-                            }
-                            self.stack_len -= 1;
-                            self.stack[self.stack_len] = None;
+                        if self.nodes.len() < self.nodes.capacity() {
+                            *phase = Phase::NodeAppend;
                             continue;
                         }
+                        let initial = (raw.len() / 2 + 1).min(8);
+                        let target = self
+                            .nodes
+                            .len()
+                            .saturating_mul(2)
+                            .max(initial)
+                            .min(self.node_limit);
+                        let lower = target
+                            .checked_mul(size_of::<Node>())
+                            .and_then(|n| n.checked_add(self.raw.retained_capacity()))
+                            .and_then(|n| {
+                                n.checked_add(size_of::<Document>() + 2 * size_of::<usize>())
+                            })
+                            .ok_or(Error::Overflow)?;
+                        if lower > self.storage_limit {
+                            return Err(Error::Policy("metadata retained storage"));
+                        }
+                        let mut replacement = BudgetVec::new(&self.pool);
+                        replacement.try_reserve_exact(target)?;
+                        if self.retained_with_capacity(replacement.capacity())? > self.storage_limit
+                        {
+                            return Err(Error::Policy("metadata retained storage"));
+                        }
+                        self.growth = Some((replacement, 0));
+                        *phase = Phase::NodeAppend;
+                        continue 'document;
                     }
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
+                    Phase::NodeAppend => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        self.pending_index = u16::try_from(self.nodes.len())
+                            .map_err(|_| Error::Policy("metadata index space"))?;
+                        self.nodes
+                            .try_push(self.pending)
+                            .map_err(|error| error.error)?;
+                        *phase = Phase::NodeKind;
                     }
-                    // Scalar and opaque nodes have no parsed children or
-                    // parent-field rules. NodeKind has already checked every
-                    // scalar value. Keep one charged visit, the context-pop
-                    // order above and the later complete UID validation.
-                    if !master(u64::from(self.nodes.as_slice()[self.validate].id)) {
-                        self.validate += 1;
-                        continue;
+                    Phase::NodeKind => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let index = usize::from(self.pending_index);
+                        let id = u64::from(self.nodes.as_slice()[index].id);
+                        if master(id) {
+                            // The new frame's depth is its stack index.
+                            if self.stack_len > self.depth_limit {
+                                return Err(Error::Policy("metadata nesting"));
+                            }
+                            self.stack[self.stack_len] = Some(Frame::Parse {
+                                node: self.pending_index,
+                                cursor: ChildCursor::new(self.pending_range.clone()),
+                            });
+                            self.stack_len += 1;
+                            *phase = Phase::Parse;
+                            continue;
+                        }
+                        let payload = &raw[self.pending_range.clone()];
+                        if unsigned(id) {
+                            let value = if payload.is_empty() {
+                                default_uint(id)
+                            } else {
+                                ebml::uint(payload)?
+                            };
+                            if id == 0x2ad7b1
+                                && self.nodes.as_slice()[index].parent == 0
+                                && u64::from(self.nodes.as_slice()[0].id) == INFO
+                            {
+                                self.timestamp_scale = Some(value);
+                            }
+                            if boolean(id) && value > 1 {
+                                return Err(Error::Invalid("metadata boolean"));
+                            }
+                            if matches!(id, 0x46ae | 0x73c4 | 0x45bc | 0x6ebc | 0x68ca)
+                                && value == 0
+                            {
+                                return Err(Error::Invalid("zero metadata UID/type"));
+                            }
+                            if id == 0x6922 && value > 2 {
+                                return Err(Error::Invalid("chapter process time"));
+                            }
+                        }
+                        // Every scalar is visited here once. Count UID namespaces
+                        // now, while retaining the original post-validation
+                        // workspace admission and complete duplicate checks.
+                        let uid_kind = match id {
+                            0x46ae => 1,
+                            0x73c4 => 2,
+                            0x45bc => 4,
+                            _ => 0,
+                        };
+                        if uid_kind != 0 {
+                            self.uid_count =
+                                self.uid_count.checked_add(1).ok_or(Error::Overflow)?;
+                            self.uid_kinds |= uid_kind;
+                        }
+                        if id == 0x4489 {
+                            let value = match payload.len() {
+                                0 => 0.,
+                                4 => f64::from(f32::from_be_bytes(
+                                    payload
+                                        .try_into()
+                                        .map_err(|_| Error::Invalid("metadata float width"))?,
+                                )),
+                                8 => f64::from_be_bytes(
+                                    payload
+                                        .try_into()
+                                        .map_err(|_| Error::Invalid("metadata float width"))?,
+                                ),
+                                _ => return Err(Error::Invalid("metadata float width")),
+                            };
+                            if !value.is_finite() || value <= 0. {
+                                return Err(Error::Invalid("Segment duration range"));
+                            }
+                        }
+                        if id == 0x4461 && !matches!(payload.len(), 0 | 8) {
+                            return Err(Error::Invalid("DateUTC width"));
+                        }
+                        if id == 0x6e67 && payload.len() != 16 {
+                            return Err(Error::Invalid("chapter SegmentUUID length"));
+                        }
+                        if id == 0x465c {
+                            self.attachment_bytes = self
+                                .attachment_bytes
+                                .checked_add(payload.len())
+                                .ok_or(Error::Overflow)?;
+                            if self.attachment_bytes > self.attachment_limit {
+                                return Err(Error::Policy("attachment payload bytes"));
+                            }
+                        }
+                        if utf8(id) || ascii(id) {
+                            self.text = TextCheck::new(raw, self.pending_range.clone(), ascii(id))?;
+                            *phase = Phase::Text;
+                        } else {
+                            let next =
+                                u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
+                            self.nodes.as_mut_slice()[index].next = next;
+                            *phase = Phase::Parse;
+                        }
                     }
-                    self.fields = Fields::default();
-                    self.child = self.validate + 1;
-                    self.child_end = usize::from(self.nodes.as_slice()[self.validate].next);
-                    *phase = Phase::ValidateChildren;
-                }
-                Phase::ValidateChildren => {
-                    // One charged visit and one cancellation check per child, as
-                    // one outer iteration per child would do, without re-dispatch.
-                    let mut fields = self.fields;
-                    let singletons =
-                        singleton_mask(u64::from(self.nodes.as_slice()[self.validate].id));
-                    let mut first = true;
-                    while self.child < self.child_end {
+                    Phase::Text => match self.text.step(raw, work, cancel)? {
+                        ParseStep::Event(_) => {
+                            let next =
+                                u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
+                            self.nodes.as_mut_slice()[usize::from(self.pending_index)].next = next;
+                            *phase = Phase::Parse;
+                        }
+                        other => return crate::step::pending(other),
+                    },
+                    Phase::Parse => {
+                        let Some(Frame::Parse { node, cursor }) =
+                            &mut self.stack[self.stack_len - 1]
+                        else {
+                            return Err(Error::Invalid("missing metadata parse frame"));
+                        };
+                        match cursor.step(raw, work, cancel) {
+                            Err(Error::Invalid("unknown size inside metadata")) => {
+                                return Err(Error::Invalid("unknown metadata child size"));
+                            }
+                            Err(error) => return Err(error),
+                            Ok(ParseStep::Yield) => return Ok(ParseStep::Yield),
+                            Ok(ParseStep::Event(None)) => {
+                                if !work.try_charge(1) {
+                                    return Ok(ParseStep::Yield);
+                                }
+                                let node = *node;
+                                let next =
+                                    u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
+                                self.nodes.as_mut_slice()[usize::from(node)].next = next;
+                                self.stack_len -= 1;
+                                self.stack[self.stack_len] = None;
+                                if self.stack_len == 0 {
+                                    *phase = Phase::ValidateStart;
+                                }
+                            }
+                            Ok(ParseStep::Event(Some(child))) => {
+                                self.pending = Node {
+                                    id: child.id as u32,
+                                    header: child.header as u32,
+                                    next: 0,
+                                    parent: *node,
+                                };
+                                self.pending_range = child.payload;
+                                *phase = Phase::NodeReserve;
+                            }
+                            _ => return Err(Error::Invalid("invalid metadata parse transition")),
+                        }
+                    }
+                    Phase::ValidateStart => {
+                        if self.validate == self.nodes.len() {
+                            self.uid_at = 0;
+                            *phase = if self.uid_count == 0 {
+                                Phase::Finish
+                            } else {
+                                Phase::UidReserve
+                            };
+                            continue;
+                        }
+                        if self.stack_len != 0 {
+                            let Some(Frame::Validate { end, .. }) = &self.stack[self.stack_len - 1]
+                            else {
+                                return Err(Error::Invalid("missing metadata validation context"));
+                            };
+                            if usize::from(*end) <= self.validate {
+                                if !work.try_charge(1) {
+                                    return Ok(ParseStep::Yield);
+                                }
+                                self.stack_len -= 1;
+                                self.stack[self.stack_len] = None;
+                                continue;
+                            }
+                        }
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        // Scalar and opaque nodes have no parsed children or
+                        // parent-field rules. NodeKind has already checked every
+                        // scalar value. Keep one charged visit, the context-pop
+                        // order above and the later complete UID validation.
+                        if !master(u64::from(self.nodes.as_slice()[self.validate].id)) {
+                            self.validate += 1;
+                            continue;
+                        }
+                        self.fields = Fields::default();
+                        self.child = self.validate + 1;
+                        self.child_end = usize::from(self.nodes.as_slice()[self.validate].next);
+                        *phase = Phase::ValidateChildren;
+                    }
+                    Phase::ValidateChildren => {
+                        // One charged visit and one cancellation check per child, as
+                        // one outer iteration per child would do, without re-dispatch.
+                        let mut fields = self.fields;
+                        let singletons =
+                            singleton_mask(u64::from(self.nodes.as_slice()[self.validate].id));
+                        let mut first = true;
+                        while self.child < self.child_end {
+                            if !first {
+                                check(cancel)?;
+                            }
+                            first = false;
+                            if !work.try_charge(1) {
+                                self.fields = fields;
+                                return Ok(ParseStep::Yield);
+                            }
+                            let result = self.collect(raw, singletons, self.child, &mut fields);
+                            self.fields = fields;
+                            result?;
+                            self.child = usize::from(self.nodes.as_slice()[self.child].next);
+                        }
                         if !first {
                             check(cancel)?;
                         }
-                        first = false;
+                        *phase = Phase::ValidateRules;
+                    }
+                    Phase::ValidateRules => {
                         if !work.try_charge(1) {
-                            self.fields = fields;
                             return Ok(ParseStep::Yield);
                         }
-                        let result = self.collect(raw, singletons, self.child, &mut fields);
-                        self.fields = fields;
-                        result?;
-                        self.child = usize::from(self.nodes.as_slice()[self.child].next);
-                    }
-                    if !first {
-                        check(cancel)?;
-                    }
-                    *phase = Phase::ValidateRules;
-                }
-                Phase::ValidateRules => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let id = u64::from(self.nodes.as_slice()[self.validate].id);
-                    let fields = self.fields;
-                    match id {
-                        ATTACHMENTS => require(fields, &[0x61a7])?,
-                        CHAPTERS => require(fields, &[0x45b9])?,
-                        TAGS => require(fields, &[0x7373])?,
-                        0x61a7 => require(fields, &[0x46ae, 0x466e, 0x4660, 0x465c])?,
-                        0x45b9 => require(fields, &[0xb6])?,
-                        0xb6 => {
-                            require(fields, &[0x73c4, 0x91])?;
-                            let start = fields.start.required("chapter start")?;
-                            if fields.end.is_some_and(|end| end < start) {
-                                return Err(Error::Invalid("chapter time range"));
+                        let id = u64::from(self.nodes.as_slice()[self.validate].id);
+                        let fields = self.fields;
+                        match id {
+                            ATTACHMENTS => require(fields, &[0x61a7])?,
+                            CHAPTERS => require(fields, &[0x45b9])?,
+                            TAGS => require(fields, &[0x7373])?,
+                            0x61a7 => require(fields, &[0x46ae, 0x466e, 0x4660, 0x465c])?,
+                            0x45b9 => {
+                                require(fields, &[0xb6])?;
+                                self.opened = Context {
+                                    ordered: fields.ordered == Some(1),
+                                    ..NO_CONTEXT
+                                };
                             }
-                            if fields.presence & bit(0x6ebc) != 0 {
-                                require(fields, &[0x6e67])?;
+                            0xb6 => {
+                                require(fields, &[0x73c4])?;
+                                let Some(start) = fields.start else {
+                                    return Err(Error::Invalid("missing metadata field"));
+                                };
+                                if fields.end.is_some_and(|end| end < start) {
+                                    return Err(Error::Invalid("chapter time range"));
+                                }
+                                if fields.presence & bit(0x6ebc) != 0 {
+                                    require(fields, &[0x6e67])?;
+                                }
+                                let context = self.validation_context()?;
+                                if start < context.lower || start > context.upper {
+                                    return Err(Error::Invalid("nested chapter time range"));
+                                }
+                                if context.ordered && fields.presence & bit(0xb6) == 0 {
+                                    require(fields, &[0x92])?;
+                                }
+                                self.opened = Context {
+                                    lower: context.lower.max(start),
+                                    upper: context.upper.min(fields.end.unwrap_or(u64::MAX)),
+                                    ordered: context.ordered,
+                                };
                             }
-                            let (lower, upper, ordered) = self.validation_context()?;
-                            if start < lower || start > upper {
-                                return Err(Error::Invalid("nested chapter time range"));
+                            0x80 => require(fields, &[0x85])?,
+                            0x7373 => require(fields, &[0x67c8])?,
+                            0x67c8 => {
+                                require(fields, &[0x45a3])?;
+                                if fields.presence & bit(0x4487) != 0
+                                    && fields.presence & bit(0x4485) != 0
+                                {
+                                    return Err(Error::Invalid("text and binary tag"));
+                                }
                             }
-                            if ordered && fields.presence & bit(0xb6) == 0 {
-                                require(fields, &[0x92])?;
-                            }
+                            0x6911 => require(fields, &[0x6922, 0x6933])?,
+                            _ => (),
                         }
-                        0x80 => require(fields, &[0x85])?,
-                        0x7373 => require(fields, &[0x67c8])?,
-                        0x67c8 => {
-                            require(fields, &[0x45a3])?;
-                            if fields.presence & bit(0x4487) != 0
-                                && fields.presence & bit(0x4485) != 0
-                            {
-                                return Err(Error::Invalid("text and binary tag"));
-                            }
+                        if matches!(id, 0x45b9 | 0xb6)
+                            && usize::from(self.nodes.as_slice()[self.validate].next)
+                                > self.validate + 1
+                        {
+                            *phase = Phase::ValidateContext;
+                        } else {
+                            self.validate += 1;
+                            *phase = Phase::ValidateStart;
                         }
-                        0x6911 => require(fields, &[0x6922, 0x6933])?,
-                        _ => (),
                     }
-                    if matches!(id, 0x45b9 | 0xb6)
-                        && usize::from(self.nodes.as_slice()[self.validate].next)
-                            > self.validate + 1
-                    {
-                        *phase = Phase::ValidateContext;
-                    } else {
+                    Phase::ValidateContext => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let node = self.nodes.as_slice()[self.validate];
+                        if self.stack_len == self.stack.len() {
+                            return Err(Error::Policy("metadata nesting"));
+                        }
+                        self.stack[self.stack_len] = Some(Frame::Validate {
+                            end: node.next,
+                            context: self.opened,
+                        });
+                        self.stack_len += 1;
                         self.validate += 1;
                         *phase = Phase::ValidateStart;
                     }
-                }
-                Phase::ValidateContext => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let node = self.nodes.as_slice()[self.validate];
-                    let (lower, upper, ordered) = if u64::from(node.id) == 0x45b9 {
-                        (0, u64::MAX, self.fields.ordered == Some(1))
-                    } else {
-                        let (lower, upper, ordered) = self.validation_context()?;
-                        (
-                            lower.max(self.fields.start.required("chapter start")?),
-                            upper.min(self.fields.end.unwrap_or(u64::MAX)),
-                            ordered,
-                        )
-                    };
-                    if self.stack_len == self.stack.len() {
-                        return Err(Error::Policy("metadata nesting"));
-                    }
-                    self.stack[self.stack_len] = Some(Frame::Validate {
-                        end: node.next,
-                        lower,
-                        upper,
-                        ordered,
-                    });
-                    self.stack_len += 1;
-                    self.validate += 1;
-                    *phase = Phase::ValidateStart;
-                }
-                Phase::UidReserve => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let workspace = self
-                        .uid_count
-                        .checked_mul(size_of::<u64>())
-                        .ok_or(Error::Overflow)?;
-                    if self
-                        .retained_with_capacity(self.nodes.capacity())?
-                        .checked_add(workspace)
-                        .ok_or(Error::Overflow)?
-                        > self.storage_limit
-                    {
-                        return Err(Error::Policy("metadata validation storage"));
-                    }
-                    self.uids.try_reserve_exact(self.uid_count)?;
-                    // The completed count proves which independent UID namespaces
-                    // are populated. Keep the original full-u64 arena and kind
-                    // order; absent kinds need no second walk of every node.
-                    self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
-                    self.uid_at = 0;
-                    *phase = Phase::UidFill;
-                }
-                Phase::UidFill => {
-                    // One charged visit and one cancellation check per node, as
-                    // one outer iteration per node would do, without re-dispatch.
-                    let kind = [0x46ae, 0x73c4, 0x45bc][self.uid_kind];
-                    let mut first = true;
-                    while self.uid_at < self.nodes.len() {
-                        if !first {
-                            check(cancel)?;
-                        }
-                        first = false;
+                    Phase::UidReserve => {
                         if !work.try_charge(1) {
                             return Ok(ParseStep::Yield);
                         }
-                        if u64::from(self.nodes.as_slice()[self.uid_at].id) == kind {
-                            let value = self.uint(raw, self.uid_at)?;
-                            self.uids.try_push(value).map_err(|e| e.error)?;
+                        let workspace = self
+                            .uid_count
+                            .checked_mul(size_of::<u64>())
+                            .ok_or(Error::Overflow)?;
+                        if self
+                            .retained_with_capacity(self.nodes.capacity())?
+                            .checked_add(workspace)
+                            .ok_or(Error::Overflow)?
+                            > self.storage_limit
+                        {
+                            return Err(Error::Policy("metadata validation storage"));
+                        }
+                        self.uids.try_reserve_exact(self.uid_count)?;
+                        // The completed count proves which independent UID namespaces
+                        // are populated. Keep the original full-u64 arena and kind
+                        // order; absent kinds need no second walk of every node.
+                        self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
+                        self.uid_at = 0;
+                        *phase = Phase::UidFill;
+                    }
+                    Phase::UidFill => {
+                        // One charged visit and one cancellation check per node, as
+                        // one outer iteration per node would do, without re-dispatch.
+                        let kind = [0x46ae, 0x73c4, 0x45bc][self.uid_kind];
+                        let mut first = true;
+                        while self.uid_at < self.nodes.len() {
+                            if !first {
+                                check(cancel)?;
+                            }
+                            first = false;
+                            if !work.try_charge(1) {
+                                return Ok(ParseStep::Yield);
+                            }
+                            if u64::from(self.nodes.as_slice()[self.uid_at].id) == kind {
+                                let value = self.uint(raw, self.uid_at)?;
+                                self.uids.try_push(value).map_err(|e| e.error)?;
+                            }
+                            self.uid_at += 1;
+                        }
+                        if !first {
+                            check(cancel)?;
+                        }
+                        self.heap = Heap::new(self.uids.len());
+                        *phase = Phase::UidSort;
+                    }
+                    Phase::UidSort => {
+                        if !self.heap.step(self.uids.as_mut_slice(), work, cancel)? {
+                            return Ok(ParseStep::Yield);
+                        }
+                        self.uid_at = 0;
+                        *phase = Phase::UidCheck;
+                    }
+                    Phase::UidCheck => {
+                        if self.uid_at + 1 >= self.uids.len() {
+                            self.uid_kinds &= !(1_u8 << self.uid_kind);
+                            if self.uid_kinds == 0 {
+                                self.uids = BudgetVec::new(&self.pool);
+                                *phase = Phase::Finish;
+                            } else {
+                                self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
+                                self.uid_at = 0;
+                                self.uids.clear();
+                                *phase = Phase::UidFill;
+                            }
+                            continue;
+                        }
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        if self.uids.as_slice()[self.uid_at]
+                            == self.uids.as_slice()[self.uid_at + 1]
+                        {
+                            return Err(Error::Invalid("duplicate metadata UID"));
                         }
                         self.uid_at += 1;
                     }
-                    if !first {
-                        check(cancel)?;
-                    }
-                    self.heap = Some(Heap::new(self.uids.len()));
-                    *phase = Phase::UidSort;
-                }
-                Phase::UidSort => {
-                    if !self.heap.as_mut().required("missing UID sort job")?.step(
-                        self.uids.as_mut_slice(),
-                        work,
-                        cancel,
-                    )? {
-                        return Ok(ParseStep::Yield);
-                    }
-                    self.uid_at = 0;
-                    *phase = Phase::UidCheck;
-                }
-                Phase::UidCheck => {
-                    if self.uid_at + 1 >= self.uids.len() {
-                        self.uid_kinds &= !(1_u8 << self.uid_kind);
-                        if self.uid_kinds == 0 {
-                            self.uids = BudgetVec::new(&self.pool);
-                            self.heap = None;
-                            *phase = Phase::Finish;
-                        } else {
-                            self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
-                            self.uid_at = 0;
-                            self.uids.clear();
-                            self.heap = None;
-                            *phase = Phase::UidFill;
+                    Phase::Finish => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
                         }
-                        continue;
+                        let nodes = std::mem::replace(&mut self.nodes, BudgetVec::new(&self.pool));
+                        let charge =
+                            std::mem::replace(&mut self.owner, Reservation::empty(&self.pool));
+                        let document = Document {
+                            raw: self.raw.clone(),
+                            nodes: StorageVec(nodes),
+                            attachment_bytes: self.attachment_bytes,
+                            source_offset: self.source_offset,
+                            _pool: self.pool.clone(),
+                            owner_charge: charge,
+                        };
+                        *phase = Phase::Done;
+                        return Ok(ParseStep::Event(SharedDocument(Arc::new(document))));
                     }
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    if self.uids.as_slice()[self.uid_at] == self.uids.as_slice()[self.uid_at + 1] {
-                        return Err(Error::Invalid("duplicate metadata UID"));
-                    }
-                    self.uid_at += 1;
-                }
-                Phase::Finish => {
-                    if !work.try_charge(1) {
-                        return Ok(ParseStep::Yield);
-                    }
-                    let nodes = std::mem::replace(&mut self.nodes, BudgetVec::new(&self.pool));
-                    let charge = self
-                        .owner
-                        .take()
-                        .required("missing metadata owner reservation")?;
-                    let document = Document {
-                        raw: self.raw.clone(),
-                        nodes: StorageVec(nodes),
-                        attachment_bytes: self.attachment_bytes,
-                        source_offset: self.source_offset,
-                        _pool: self.pool.clone(),
-                        owner_charge: charge,
-                    };
-                    self.result = Some(SharedDocument(Arc::new(document)));
-                    *phase = Phase::Done;
-                }
-                Phase::Done => {
-                    return Ok(ParseStep::Event(
-                        self.result
-                            .as_ref()
-                            .required("missing completed metadata document")?
-                            .clone(),
-                    ));
+                    Phase::Done => return Ok(ParseStep::Finished),
                 }
             }
         }
@@ -1068,16 +1034,13 @@ impl CataloguePrepareJob {
                         .ok_or(Error::Policy("metadata retained storage"))?,
                 ));
             }
+            let copied = self.at == catalogue.documents.len();
+            if let Some(replacement) = self.replacement.take_if(|_| copied) {
+                catalogue.documents = StorageVec(replacement);
+                self.ready = true;
+                continue;
+            }
             if let Some(replacement) = &mut self.replacement {
-                if self.at == catalogue.documents.len() {
-                    catalogue.documents = StorageVec(
-                        self.replacement
-                            .take()
-                            .required("missing prepared catalogue growth")?,
-                    );
-                    self.ready = true;
-                    continue;
-                }
                 if !work.try_charge(1) {
                     return Ok(ParseStep::Yield);
                 }
@@ -1119,13 +1082,18 @@ impl CataloguePrepareJob {
         }
     }
 }
+/// Where the commit of a document to the catalogue stands. The document job
+/// runs in `CatalogueJob::job` between Copy and Commit.
 #[derive(Debug)]
 enum CommitPhase {
+    /// Refusing a second Attachments document.
     Duplicate,
+    /// Making room in the catalogue for one more document.
     Prepare,
+    /// Copying the catalogue into the larger `replacement`.
     Copy,
-    Parse,
-    Commit,
+    /// Adding the validated document to the catalogue.
+    Commit(SharedDocument),
     Done,
 }
 #[derive(Debug)]
@@ -1138,11 +1106,10 @@ pub(crate) struct CatalogueJob {
     pool: Budget,
     phase: CommitPhase,
     at: usize,
-    replacement: Option<BudgetVec<SharedDocument>>,
+    replacement: BudgetVec<SharedDocument>,
+    /// The document job; it finishes before the phase goes on.
     job: Option<DocumentJob>,
-    ready: Option<SharedDocument>,
     timestamp_scale: Option<u64>,
-    result: Option<CatalogueCommit>,
     failed: bool,
 }
 impl CatalogueJob {
@@ -1166,11 +1133,9 @@ impl CatalogueJob {
             pool: pool.clone(),
             phase: CommitPhase::Duplicate,
             at: 0,
-            replacement: None,
+            replacement: BudgetVec::new(pool),
             job: None,
-            ready: None,
             timestamp_scale: None,
-            result: None,
             failed: false,
         })
     }
@@ -1212,7 +1177,18 @@ impl CatalogueJob {
     ) -> Result<ParseStep<CatalogueCommit>> {
         loop {
             check(cancel)?;
-            match self.phase {
+            if let Some(job) = &mut self.job {
+                match job.step(work, cancel)? {
+                    ParseStep::Event(document) => {
+                        self.timestamp_scale = job.timestamp_scale();
+                        self.job = None;
+                        self.phase = CommitPhase::Commit(document);
+                        continue;
+                    }
+                    other => return crate::step::pending(other),
+                }
+            }
+            match &mut self.phase {
                 CommitPhase::Duplicate => {
                     if self.at == catalogue.documents.len() {
                         self.phase = CommitPhase::Prepare;
@@ -1252,9 +1228,7 @@ impl CatalogueJob {
                         {
                             return Err(Error::Policy("metadata retained storage"));
                         }
-                        let mut replacement = BudgetVec::new(&self.pool);
-                        replacement.try_reserve_exact(target)?;
-                        self.replacement = Some(replacement);
+                        self.replacement.try_reserve_exact(target)?;
                         self.at = 0;
                         self.phase = CommitPhase::Copy;
                         continue;
@@ -1263,13 +1237,11 @@ impl CatalogueJob {
                 }
                 CommitPhase::Copy => {
                     if self.at == catalogue.documents.len() {
-                        let replacement = self
-                            .replacement
-                            .take()
-                            .required("missing catalogue growth")?;
                         // Old shared handles have fixed-size drop; document/data
                         // owners stay retained by the copied handles. At most the
                         // explicit 256-document policy can be present here.
+                        let replacement =
+                            std::mem::replace(&mut self.replacement, BudgetVec::new(&self.pool));
                         catalogue.documents = StorageVec(replacement);
                         self.start_document(catalogue)?;
                         continue;
@@ -1278,38 +1250,14 @@ impl CatalogueJob {
                         return Ok(ParseStep::Yield);
                     }
                     self.replacement
-                        .as_mut()
-                        .required("missing catalogue growth")?
                         .try_push(catalogue.documents[self.at].clone())
                         .map_err(|e| e.error)?;
                     self.at += 1;
                 }
-                CommitPhase::Parse => match self
-                    .job
-                    .as_mut()
-                    .required("missing catalogue document job")?
-                    .step(work, cancel)?
-                {
-                    ParseStep::Event(value) => {
-                        self.timestamp_scale = self
-                            .job
-                            .as_ref()
-                            .required("missing document scale state")?
-                            .timestamp_scale();
-                        self.ready = Some(value);
-                        self.job = None;
-                        self.phase = CommitPhase::Commit;
-                    }
-                    other => return crate::step::pending(other),
-                },
-                CommitPhase::Commit => {
+                CommitPhase::Commit(document) => {
                     if !work.try_charge(1) {
                         return Ok(ParseStep::Yield);
                     }
-                    let document = self
-                        .ready
-                        .as_ref()
-                        .required("missing validated catalogue document")?;
                     let structural_bytes = document
                         .raw
                         .len()
@@ -1339,19 +1287,10 @@ impl CatalogueJob {
                         structural_bytes,
                         timestamp_scale: self.timestamp_scale,
                     };
-                    self.result = Some(result.clone());
-                    self.ready = None;
                     self.phase = CommitPhase::Done;
                     return Ok(ParseStep::Event(result));
                 }
-                CommitPhase::Done => {
-                    return Ok(ParseStep::Event(
-                        self.result
-                            .as_ref()
-                            .required("missing catalogue commit")?
-                            .clone(),
-                    ));
-                }
+                CommitPhase::Done => return Ok(ParseStep::Finished),
             }
         }
     }
@@ -1383,7 +1322,6 @@ impl CatalogueJob {
             self.source_offset,
             &self.pool,
         )?);
-        self.phase = CommitPhase::Parse;
         Ok(())
     }
 }
@@ -1421,8 +1359,7 @@ crate::storage::usage::storage!(DocumentJob, |s| [
     s.nodes,
     s.owner,
     s.growth.as_ref().map(|(buffer, _)| buffer),
-    s.uids,
-    s.result
+    s.uids
 ]);
 crate::storage::usage::storage!(CataloguePrepareJob, |s| [
     s.replacement,
@@ -1432,8 +1369,22 @@ crate::storage::usage::storage!(CatalogueCommit, |s| [s.document]);
 crate::storage::usage::storage!(CatalogueJob, |s| [
     s.raw,
     s.replacement,
-    crate::storage::usage::Documents(s.replacement.as_ref().map_or(&[][..], BudgetVec::as_slice)),
+    crate::storage::usage::Documents(s.replacement.as_slice()),
     s.job,
-    s.ready,
-    s.result
+    s.phase
 ]);
+/// The validated document waiting for its commit.
+impl crate::storage::usage::Storage for CommitPhase {
+    fn storage_slots(&self) -> Result<usize> {
+        match self {
+            Self::Commit(document) => document.storage_slots(),
+            _ => Ok(0),
+        }
+    }
+    fn storage_owner(&self, index: usize) -> Result<Option<crate::storage::usage::Owner>> {
+        match self {
+            Self::Commit(document) => document.storage_owner(index),
+            _ => Ok(None),
+        }
+    }
+}
