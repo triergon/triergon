@@ -5,7 +5,7 @@ use super::*;
 use crate::EncoderConfig;
 
 /// The capture rate rule at 1 Mbit/s for pictures of `geometry`.
-fn config(geometry: Geometry) -> EncoderConfig {
+fn config(geometry: MacroblockGeometry) -> EncoderConfig {
     EncoderConfig {
         geometry,
         bit_rate: 1_000_000,
@@ -16,7 +16,7 @@ fn config(geometry: Geometry) -> EncoderConfig {
 }
 
 fn encoder() -> Encoder {
-    Encoder::new(config(Geometry::new(16, 16).unwrap())).unwrap()
+    Encoder::new(config(MacroblockGeometry::new(16, 16).unwrap())).unwrap()
 }
 
 fn code(
@@ -26,7 +26,7 @@ fn code(
     base: u8,
     tight: bool,
 ) -> ([i32; 64], [i32; 64], usize) {
-    let mut input = Picture::new(e.cfg.geometry);
+    let mut input = CodedPicture::new(e.cfg.geometry);
     e.reference.y_mut().fill(base);
     e.reference.cb_mut().fill(base);
     e.reference.cr_mut().fill(base);
@@ -175,11 +175,11 @@ fn a_macroblock_under_the_vbv_guard_codes_no_coefficients() {
 
 #[test]
 fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
-    let geometry = Geometry::new(64, 48).unwrap();
+    let geometry = MacroblockGeometry::new(64, 48).unwrap();
     let cfg = config(geometry);
     // A gradient with a little texture: the first P pictures refine it, then
     // its residual quantises to zero and the macroblocks are skipped.
-    let mut input = Picture::new(geometry);
+    let mut input = CodedPicture::new(geometry);
     let mut seed = 1u32;
     let mut sample = |base: usize| {
         seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12_345);
@@ -219,7 +219,7 @@ fn skips_reused_for_a_repeated_picture_match_the_computed_path() {
 fn the_intra_probe_counts_the_same_bits_without_reconstructing() {
     let mut probe = encoder();
     let mut final_pass = encoder();
-    let mut input = Picture::new(probe.cfg.geometry);
+    let mut input = CodedPicture::new(probe.cfg.geometry);
     for (i, sample) in input.y_mut().iter_mut().enumerate() {
         *sample = (i as u8).wrapping_mul(13);
     }

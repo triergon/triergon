@@ -1,5 +1,5 @@
 use std::fmt;
-use triergon_pixel::Geometry;
+use triergon_pixel::MacroblockGeometry;
 
 /// The result of building an encoder or coding a picture.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -11,17 +11,17 @@ pub enum Error {
     /// sequence header's bit_rate field states as a rate; carries the refused rate in
     /// bit/s.
     BitRate(u32),
-    /// `vbv_bits` is zero or above the 16,760,832 bits the sequence header's
-    /// vbv_buffer_size field holds; carries the refused size.
+    /// `vbv_bits` is zero, cannot hold one picture at the average bit rate, or exceeds
+    /// the sequence header's 16,760,832-bit limit. Carries the refused size in bits.
     VbvBuffer(u32),
     /// `gop` is zero: an intra period holds at least one picture.
     Gop(u32),
     /// The input picture's geometry differs from the configured one.
     PictureGeometry {
         /// The configured geometry.
-        expected: Geometry,
+        expected: MacroblockGeometry,
         /// The input picture's geometry.
-        actual: Geometry,
+        actual: MacroblockGeometry,
     },
     /// Storage the encoder needs does not fit its budget: a limit when it is built,
     /// backpressure before a picture is coded.
