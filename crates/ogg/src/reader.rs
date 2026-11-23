@@ -285,14 +285,70 @@ impl Reader {
             let step = match &mut self.phase {
                 Phase::Ended(location) => return Ok(Step::End(*location)),
                 Phase::Pages => self.pages.next(&mut self.input, work, cancel)?,
-                Phase::Bisect(_) => match self.bisect(work, cancel)? {
-                    Some(step) => step,
-                    None => continue,
-                },
-                Phase::EndScan { .. } => match self.end_scan(work, cancel)? {
-                    Some(step) => step,
-                    None => continue,
-                },
+                Phase::Bisect(bisection) => {
+                    if !bisection.probing() {
+                        if let Some(offset) = bisection.next_probe() {
+                            self.input.request_range(offset)?;
+                            self.pages.clear();
+                        } else {
+                            let offset = bisection.resume();
+                            if let Some(landing) = self.landing.as_mut() {
+                                landing.scanned += bisection.scanned;
+                            }
+                            self.resume(offset)?;
+                        }
+                        continue;
+                    }
+                    match self.pages.next(&mut self.input, work, cancel) {
+                        Ok(Step::Ready(page)) => {
+                            let serial = page.header.serial;
+                            let known = self.streams.iter().any(|s| s.serial == serial)
+                                || self.tracks.iter().any(|track| {
+                                    track.link as usize == self.link && track.serial == serial
+                                });
+                            if bisection.page(&page, known) == Probe::Settled {
+                                self.pages.clear();
+                            }
+                            continue;
+                        }
+                        Ok(Step::End(_)) | Err(Error::Policy(_)) => {
+                            bisection.exhausted();
+                            continue;
+                        }
+                        step => step?,
+                    }
+                }
+                Phase::EndScan {
+                    resume,
+                    chained,
+                    contiguous,
+                } => {
+                    match self.pages.next(&mut self.input, work, cancel) {
+                        Ok(Step::Ready(page)) => {
+                            Self::end_scan_page(
+                                page.header,
+                                chained,
+                                *contiguous,
+                                &self.streams,
+                                self.tracks.as_mut_slice(),
+                            );
+                            continue;
+                        }
+                        Ok(Step::End(_)) | Err(Error::Policy(_)) => {
+                            // A scan after a jump may have begun in a later link.
+                            if *chained && !*contiguous {
+                                for track in self.tracks.iter_mut() {
+                                    track.end = None;
+                                }
+                            }
+                            self.input.request_range(*resume)?;
+                            self.pages.clear();
+                            self.phase = Phase::Pages;
+                            continue;
+                        }
+                        step => step?,
+                    }
+                }
             };
             match step {
                 Step::Ready(page) => {
@@ -780,97 +836,26 @@ impl Reader {
         Ok(())
     }
 
-    fn end_scan(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<Option<Step<Page>>> {
-        let Phase::EndScan {
-            resume,
-            chained,
-            contiguous,
-        } = &mut self.phase
-        else {
-            return Ok(None);
-        };
-        let resume = *resume;
-        let step = match self.pages.next(&mut self.input, work, cancel) {
-            Ok(Step::Ready(page)) => {
-                let header = page.header;
-                if header.begin_of_stream()
-                    && (*contiguous || !self.streams.iter().any(|s| s.serial == header.serial))
-                {
-                    *chained = true;
-                }
-                if !*chained
-                    && let Some(granule) = header.granule_position()
-                    && let Some(track) = self
-                        .tracks
-                        .iter_mut()
-                        .find(|track| track.link == 0 && track.serial == header.serial)
-                    && track.timeline().timed()
-                {
-                    track.end = track.timeline().ticks(granule).checked_add(track.offset);
-                }
-                return Ok(None);
-            }
-            Ok(Step::End(_)) | Err(Error::Policy(_)) => None,
-            Ok(step @ (Step::NeedInput(_) | Step::Yield)) => return Ok(Some(step)),
-            Ok(Step::Backpressure(never)) => match never {},
-            Err(error) => return Err(error),
-        };
-        // A scan that starts after a jump may have begun in a later link.
-        // A contiguous scan already knows which granules preceded the next BOS.
-        if *chained && !*contiguous {
-            for track in self.tracks.iter_mut() {
-                track.end = None;
-            }
+    fn end_scan_page(
+        header: PageHeader,
+        chained: &mut bool,
+        contiguous: bool,
+        streams: &[Stream],
+        tracks: &mut [Track],
+    ) {
+        if header.begin_of_stream()
+            && (contiguous || !streams.iter().any(|s| s.serial == header.serial))
+        {
+            *chained = true;
         }
-        self.input.request_range(resume)?;
-        self.pages.clear();
-        self.phase = Phase::Pages;
-        Ok(step)
-    }
-
-    fn bisect(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<Step<Page>>> {
-        let Phase::Bisect(bisection) = &mut self.phase else {
-            return Ok(None);
-        };
-        if !bisection.probing() {
-            if let Some(offset) = bisection.next_probe() {
-                self.input.request_range(offset)?;
-                self.pages.clear();
-            } else {
-                let resume = bisection.resume();
-                if let Some(landing) = self.landing.as_mut() {
-                    landing.scanned += bisection.scanned;
-                }
-                self.resume(resume)?;
-            }
-            return Ok(None);
-        }
-        match self.pages.next(&mut self.input, work, cancel) {
-            Ok(Step::Ready(page)) => {
-                let known = self.streams.iter().any(|s| s.serial == page.header.serial)
-                    || self
-                        .tracks
-                        .iter()
-                        .any(|t| t.link as usize == self.link && t.serial == page.header.serial);
-                if let Phase::Bisect(bisection) = &mut self.phase
-                    && bisection.page(&page, known) == Probe::Settled
-                {
-                    self.pages.clear();
-                }
-                Ok(None)
-            }
-            Ok(Step::End(_)) | Err(Error::Policy(_)) => {
-                if let Phase::Bisect(bisection) = &mut self.phase {
-                    bisection.exhausted();
-                }
-                Ok(None)
-            }
-            Ok(step) => Ok(Some(step)),
-            Err(error) => Err(error),
+        if !*chained
+            && let Some(granule) = header.granule_position()
+            && let Some(track) = tracks
+                .iter_mut()
+                .find(|track| track.link == 0 && track.serial == header.serial)
+            && track.timeline().timed()
+        {
+            track.end = track.timeline().ticks(granule).checked_add(track.offset);
         }
     }
 
