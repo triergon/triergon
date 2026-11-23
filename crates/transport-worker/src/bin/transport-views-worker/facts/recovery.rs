@@ -10,11 +10,11 @@ use triergon_mpegts::reference_trace::recovery::{
     DiagnosticPacket, PatRoute, PatSelection, RecoveredPacket,
 };
 
-use super::{SOURCE, WORK, explain};
+use super::{SOURCE, Stop, WORK};
 
 pub(super) fn expect_pending<T>(
     mut poll: impl FnMut(&mut WorkBudget, &AtomicBool) -> triergon_core::Result<TableStep<T>>,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     if !matches!(
         poll(&mut WorkBudget::new(0), &AtomicBool::new(false)),
         Ok(TableStep::Yield)
@@ -31,7 +31,7 @@ pub(super) fn check_pat(
     table: &PatTable,
     requested: Option<&ProgramAssociation>,
     route: Option<PatRoute>,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let count = table
         .programs
         .as_slice()
@@ -56,7 +56,7 @@ pub(super) fn check_pat_selection(
     table: &PatTable,
     pool: &Budget,
     context: SourceContext,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     if !matches!(
         PatSelection::new(table, 0, pool, context),
         Err(Error::Invalid(
@@ -75,7 +75,7 @@ pub(super) fn check_pat_selection(
                 .all(|entry| entry.program_number != number)
         })
         .ok_or("PAT control has no unlisted program")?;
-    let mut selection = PatSelection::new(table, missing, pool, context).map_err(explain)?;
+    let mut selection = PatSelection::new(table, missing, pool, context)?;
     if !matches!(
         selection.poll(&mut WorkBudget::new(WORK), &AtomicBool::new(false)),
         Ok(TableStep::Output(None))
@@ -93,7 +93,7 @@ fn original(source: &[u8], range: SourceRange) -> Option<&[u8]> {
     source.get(start..start.checked_add(range.bytes)?)
 }
 
-fn check_header(source: &[u8], mut header: &[u8], ranges: &[SourceRange]) -> Result<(), String> {
+fn check_header(source: &[u8], mut header: &[u8], ranges: &[SourceRange]) -> Result<(), Stop> {
     for range in ranges {
         let wire = original(source, *range).ok_or("header range lies outside the source")?;
         header = header
@@ -106,7 +106,7 @@ fn check_header(source: &[u8], mut header: &[u8], ranges: &[SourceRange]) -> Res
     Ok(())
 }
 
-fn check_spans(source: &[u8], spans: &[DemuxSpan], length: usize) -> Result<(), String> {
+fn check_spans(source: &[u8], spans: &[DemuxSpan], length: usize) -> Result<(), Stop> {
     let mut count = 0;
     for span in spans {
         if original(source, span.source) != Some(span.as_ref())
@@ -129,7 +129,7 @@ pub(super) fn check_rejected(
     source: &[u8],
     packet: &RecoveredPacket,
     program: u16,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let range = packet
         .rejection
         .source_range()
@@ -158,7 +158,7 @@ pub(super) fn check_diagnostic(
     source: &[u8],
     packet: &DiagnosticPacket,
     program: u16,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let carrier = packet.carrier.backing_bytes();
     let range = SourceRange {
         entity: packet.source_origin.source,

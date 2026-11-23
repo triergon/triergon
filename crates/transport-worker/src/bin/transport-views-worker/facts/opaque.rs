@@ -9,21 +9,17 @@ pub(super) fn run(
     program: u16,
     pid: u16,
     out: &mut Output<'_, '_>,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let caps = SourceCapabilities {
         length: Some(bytes.len() as u64),
         random_access: false,
     };
     let cancel = AtomicBool::new(false);
     let limits = ParseLimits::default();
-    let mut source = TransportStream::new(pool.clone(), PacketFormat::Ts188, limits, program)
-        .map_err(explain)?;
-    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024).map_err(explain)?;
+    let mut source = TransportStream::new(pool.clone(), PacketFormat::Ts188, limits, program)?;
+    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024)?;
     let (trigger, original_fault) = loop {
-        match source
-            .poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)
-            .map_err(explain)?
-        {
+        match source.poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)? {
             Step::Ready(TraceEvent::Diagnostic(fault)) => {
                 if let Some(trigger) = RecoveryTrigger::from_fault(&fault) {
                     break (trigger, fault);
@@ -33,25 +29,21 @@ pub(super) fn run(
                 return Err("source completed without an opaque recovery trigger".into());
             }
             Step::Ready(_) | Step::Yield => {}
-            Step::NeedInput(request) => provide(&mut cursor, bytes, request).map_err(explain)?,
-            Step::End(_) => source.end_of_source().map_err(explain)?,
+            Step::NeedInput(request) => provide(&mut cursor, bytes, request)?,
+            Step::End(_) => source.end_of_source()?,
         }
     };
     drop(source);
-    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024).map_err(explain)?;
+    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024)?;
     let mut recovery = OpaqueRecovery::new(
         &cursor,
         limits,
         program,
         DescriptorNamespace::Unspecified,
         trigger,
-    )
-    .map_err(explain)?;
+    )?;
     loop {
-        match recovery
-            .poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)
-            .map_err(explain)?
-        {
+        match recovery.poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)? {
             Step::Ready(recovered) => {
                 let end = recovered.physical_end().location();
                 let fault = recovered.source_fault();
@@ -70,7 +62,8 @@ pub(super) fn run(
                         bytes.len(),
                         recovered.diagnostic_context(),
                         recovered.source_finished()
-                    ));
+                    )
+                    .into());
                 }
                 let mut count = 0;
                 for observation in recovered.observations() {
@@ -81,7 +74,7 @@ pub(super) fn run(
                     };
                     for span in spans {
                         let source = span.source;
-                        let start = usize::try_from(source.offset).map_err(explain)?;
+                        let start = usize::try_from(source.offset)?;
                         if source.entity != SOURCE
                             || bytes.get(start..start.saturating_add(source.bytes))
                                 != Some(span.as_ref())
@@ -96,7 +89,7 @@ pub(super) fn run(
                 }
                 return packet(&recovered, program, pid, &cancel, out);
             }
-            Step::NeedInput(request) => provide(&mut cursor, bytes, request).map_err(explain)?,
+            Step::NeedInput(request) => provide(&mut cursor, bytes, request)?,
             Step::Yield => {}
             Step::End(_) => return Err("opaque recovery ended before publication".into()),
         }
@@ -109,8 +102,8 @@ fn packet(
     pid: u16,
     cancel: &AtomicBool,
     out: &mut Output<'_, '_>,
-) -> Result<(), String> {
-    let mut clock = DemuxClock::new(program).map_err(explain)?;
+) -> Result<(), Stop> {
+    let mut clock = DemuxClock::new(program)?;
     let mut grant = WorkBudget::new(WORK);
     let first = recovered
         .observations()
@@ -125,15 +118,13 @@ fn packet(
                     packet.time_header(),
                     &mut grant,
                     cancel,
-                )
-                .map_err(explain)?
+                )?
                 .ok_or("clock yielded")?;
             (packet.pid, time.pts90, time.dts90, packet.position)
         }
         RecoveredPes::Faulted(packet) => {
             let time = clock
-                .project_transport_fault(packet, &mut grant, cancel)
-                .map_err(explain)?
+                .project_transport_fault(packet, &mut grant, cancel)?
                 .ok_or("transport clock yielded")?;
             (
                 packet.pid,
@@ -144,8 +135,7 @@ fn packet(
         }
         RecoveredPes::PesFault(packet) => {
             let time = clock
-                .project_pes_fault(packet, &mut grant, cancel)
-                .map_err(explain)?
+                .project_pes_fault(packet, &mut grant, cancel)?
                 .ok_or("PES clock yielded")?;
             (packet.pid, time.pts90, time.dts90, packet.position)
         }
@@ -160,8 +150,7 @@ fn packet(
             recovered.payload_len(),
             recovered.source_fault().error,
             recovered.physical_end().location().offset
-        )
-        .map_err(explain)?;
+        )?;
     }
     out.packet(pid, pts, dts, pos, 0, recovered.payload())
 }

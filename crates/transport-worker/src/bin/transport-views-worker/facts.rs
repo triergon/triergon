@@ -18,7 +18,7 @@ use triergon_mpegts::reference_trace::recovery::{
 use triergon_mpegts::stream::{TraceEvent, TransportStream};
 use triergon_mpegts::{AssemblyStep, PacketFormat, ParseLimits};
 
-use super::reader::{explain, row};
+use super::reader::{Stop, explain, refusal_detail, row};
 use triergon_harness_runner::{Operation, Totals};
 
 const SOURCE: SourceId = SourceId(1);
@@ -45,6 +45,11 @@ pub(super) fn operation<'a>(
     input: &'a [u8],
     arguments: &[OsString],
 ) -> Result<Operation<'a>, String> {
+    // A registered refusal case asks the worker to name its typed unsupported detail.
+    let (report_refusal, arguments) = match arguments.split_last() {
+        Some((last, rest)) if last == "--report-refusal" => (true, rest),
+        _ => (false, arguments),
+    };
     let [program, pid, policy] = arguments else {
         return Err("expected PROGRAM PID opcr|selected|audio|dvb".into());
     };
@@ -95,12 +100,16 @@ pub(super) fn operation<'a>(
             };
             match operation {
                 Ok(()) => row(output.work, &mut output.trace, 7, &[], &[]),
-                Err(error) => {
+                Err(Stop::Refused(error)) => {
                     if let Some(trace) = &mut output.trace {
                         writeln!(trace, "# {error}").map_err(explain)?;
                     }
+                    if report_refusal {
+                        output.work.unsupported = Some(refusal_detail(&error));
+                    }
                     row(output.work, &mut output.trace, 8, &[], &[])
                 }
+                Err(Stop::Failed(failure)) => Err(failure),
             }
         }),
     })
@@ -125,7 +134,7 @@ struct Recovery {
 }
 
 impl Recovery {
-    fn new(program: u16, pid: u16, policy: Policy, pool: &Budget) -> Result<Self, String> {
+    fn new(program: u16, pid: u16, policy: Policy, pool: &Budget) -> Result<Self, Stop> {
         let namespace = if matches!(policy, Policy::PrivateAudio | Policy::DvbSubtitles) {
             DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile)
         } else {
@@ -141,9 +150,8 @@ impl Recovery {
             ParseLimits::default(),
             program,
             namespace,
-        )
-        .map_err(explain)?;
-        let clock = DemuxClock::new(program).map_err(explain)?;
+        )?;
+        let clock = DemuxClock::new(program)?;
         if clock.selected_program() != program {
             return Err("clock selected a different program".into());
         }
@@ -166,16 +174,15 @@ impl Recovery {
         pool: &Budget,
         bytes: &Bytes,
         output: &mut Output<'_, '_>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Stop> {
         let bound = matches!(self.policy, Policy::Input(_));
         let caps = SourceCapabilities {
             length: Some(bytes.len() as u64),
             random_access: bound,
         };
-        let mut cursor =
-            InputCursor::new(pool, SOURCE, caps, (32 * 1024).max(bytes.len())).map_err(explain)?;
+        let mut cursor = InputCursor::new(pool, SOURCE, caps, (32 * 1024).max(bytes.len()))?;
         let startup = if let Policy::Input(format) = self.policy {
-            Some(position_probe(&mut cursor, bytes, format, &self.cancel).map_err(explain)?)
+            Some(position_probe(&mut cursor, bytes, format, &self.cancel)?)
         } else {
             None
         };
@@ -183,12 +190,11 @@ impl Recovery {
         loop {
             match self
                 .source
-                .poll(&mut cursor, &mut WorkBudget::new(WORK), &self.cancel)
-                .map_err(explain)?
+                .poll(&mut cursor, &mut WorkBudget::new(WORK), &self.cancel)?
             {
                 Step::Ready(TraceEvent::Finished) => {
                     let observer = self.observer.as_mut().ok_or("no selected PMT")?;
-                    observer.end_of_source().map_err(explain)?;
+                    observer.end_of_source()?;
                     if !self.drain(output, bound.then_some(&cursor), bytes)? {
                         return Err("recovery observer requested input at logical EOF".into());
                     }
@@ -212,9 +218,9 @@ impl Recovery {
                     }
                 }
                 Step::NeedInput(request) => {
-                    provide(&mut cursor, bytes, request).map_err(explain)?;
+                    provide(&mut cursor, bytes, request)?;
                 }
-                Step::End(_) => self.source.end_of_source().map_err(explain)?,
+                Step::End(_) => self.source.end_of_source()?,
                 Step::Yield => {}
                 Step::Backpressure(never) => match never {},
             }
@@ -227,12 +233,12 @@ impl Recovery {
         event: TraceEvent,
         context: SourceContext,
         startup: Option<(&InputContext, &InputCursor)>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Stop> {
         match event {
             TraceEvent::Pat(table) => {
                 recovery::check_pat_selection(&table, pool, context)?;
                 let mut selection =
-                    PatSelection::new(&table, self.program, pool, context).map_err(explain)?;
+                    PatSelection::new(&table, self.program, pool, context)?;
                 recovery::expect_pending(|work, cancel| selection.poll(work, cancel))?;
                 let expected = table
                     .programs
@@ -242,7 +248,7 @@ impl Recovery {
                 loop {
                     match selection
                         .poll(&mut WorkBudget::new(WORK), &self.cancel)
-                        .map_err(explain)?
+                        ?
                     {
                         TableStep::Output(route) => {
                             recovery::check_pat(&table, expected, route)?;
@@ -269,7 +275,7 @@ impl Recovery {
                         observer.push_accepted_with_input(packet, context, cursor)
                     } else {
                         observer.push_accepted(packet, context)
-                    }.map_err(|refused| explain(refused.error))?;
+                    }.map_err(|refused| Stop::Refused(refused.error))?;
                 }
             }
             TraceEvent::Diagnostic(fault)
@@ -286,7 +292,7 @@ impl Recovery {
                     if fault.rejected.is_some() {
                         observer
                             .push_diagnostic_rejection(fault, context)
-                            .map_err(|refused| explain(refused.error))?;
+                            .map_err(|refused| Stop::Refused(refused.error))?;
                     } else if matches!(
                         fault.error,
                         Error::Invalid(
@@ -297,12 +303,12 @@ impl Recovery {
                     ) {
                         observer
                             .confirm_source_fault(&fault, context)
-                            .map_err(explain)?;
+                            ?;
                     }
                 } else if let Some(rejected) = fault.rejected {
                     observer
                         .push_rejected(rejected, context)
-                        .map_err(|refused| explain(refused.error))?;
+                        .map_err(|refused| Stop::Refused(refused.error))?;
                 }
             }
             TraceEvent::Timeline { .. } if self.policy == Policy::Selected => {
@@ -310,7 +316,7 @@ impl Recovery {
                     .as_mut()
                     .ok_or("timeline without selected PMT")?
                     .commit_source_timeline(context)
-                    .map_err(explain)?;
+                    ?;
             }
             _ => {}
         }
@@ -323,7 +329,7 @@ impl Recovery {
         map: &ProgramMap,
         context: SourceContext,
         startup: Option<(&InputContext, &InputCursor)>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Stop> {
         let route = self.route.ok_or("PMT without selected PAT route")?;
         let rebind = self.observer.is_some();
         if route.program() != self.program || route.entity() != SOURCE {
@@ -332,7 +338,7 @@ impl Recovery {
         if !rebind {
             let mut observer = self.observer(pool, map, context)?;
             if let Some((startup, input)) = startup {
-                observer.bind_input(startup, input).map_err(explain)?;
+                observer.bind_input(startup, input)?;
             }
             self.observer = Some(observer);
         }
@@ -349,17 +355,13 @@ impl Recovery {
             observer.rebind_drained_selected_pmt(route, map, context)
         } else {
             observer.bind_selected_pmt(route, map, context)
-        }
-        .map_err(explain)?;
+        }?;
         recovery::expect_pending(|work, cancel| job.poll(work, cancel))?;
         if job.current_scope() != old_scope {
             return Err("PMT job changed the active scope before commit".into());
         }
         let binding = loop {
-            match job
-                .poll(&mut WorkBudget::new(WORK), &self.cancel)
-                .map_err(explain)?
-            {
+            match job.poll(&mut WorkBudget::new(WORK), &self.cancel)? {
                 TableStep::Output(binding) => break binding,
                 TableStep::Yield => {}
                 TableStep::Done => return Err("PMT binding finished without a result".into()),
@@ -397,7 +399,7 @@ impl Recovery {
         pool: &Budget,
         map: &ProgramMap,
         context: SourceContext,
-    ) -> Result<RecoveryObserver, String> {
+    ) -> Result<RecoveryObserver, Stop> {
         let [stream] = map.streams.as_slice() else {
             return Err("recovery requires one selected PMT stream".into());
         };
@@ -439,8 +441,7 @@ impl Recovery {
                     stream.stream_type,
                     descriptors,
                     limits,
-                )
-                .map_err(explain)?;
+                )?;
                 RecoveryObserver::new_private_audio(
                     scope,
                     carriage,
@@ -463,7 +464,7 @@ impl Recovery {
                 return Err("expected a recovery trace policy".into());
             }
         }
-        .map_err(explain)
+        .map_err(Stop::Refused)
     }
 
     fn drain(
@@ -471,7 +472,7 @@ impl Recovery {
         out: &mut Output<'_, '_>,
         input: Option<&InputCursor>,
         source: &[u8],
-    ) -> Result<bool, String> {
+    ) -> Result<bool, Stop> {
         let Some(observer) = &mut self.observer else {
             return Ok(false);
         };
@@ -487,7 +488,7 @@ impl Recovery {
             } else {
                 observer.poll(&mut work, cancel)
             };
-            match step.map_err(explain)? {
+            match step? {
                 AssemblyStep::Output(DemuxObservation::Accepted(packet)) => {
                     let time = clock
                         .project_header(
@@ -496,8 +497,7 @@ impl Recovery {
                             packet.time_header(),
                             &mut grant,
                             cancel,
-                        )
-                        .map_err(explain)?
+                        )?
                         .ok_or("demux clock yielded")?;
                     *first = first.or(time.source_dts_raw33).or(time.source_pts_raw33);
                     out.packet(
@@ -582,7 +582,7 @@ fn checked_projection<T>(
     grant: &mut WorkBudget,
     cancel: &AtomicBool,
     mut project: impl FnMut(u16, &mut WorkBudget, &AtomicBool) -> triergon_core::Result<Option<T>>,
-) -> Result<T, String> {
+) -> Result<T, Stop> {
     if !matches!(project(pid, &mut WorkBudget::new(0), cancel), Ok(None))
         || !matches!(
             project(pid, &mut WorkBudget::new(1), &AtomicBool::new(true)),
@@ -595,9 +595,7 @@ fn checked_projection<T>(
     {
         return Err("header clock changed a work, cancellation or PID refusal".into());
     }
-    project(pid, grant, cancel)
-        .map_err(explain)?
-        .ok_or("header clock yielded with a full grant".into())
+    project(pid, grant, cancel)?.ok_or("header clock yielded with a full grant".into())
 }
 
 pub(super) fn wire_timestamp(stamp: &[u8]) -> Option<u64> {
@@ -641,8 +639,8 @@ fn lift(origin: ClockOrigin, raw: u64) -> i128 {
 }
 
 impl Output<'_, '_> {
-    fn header(&mut self, flags: u8, pts: Option<u64>, data: &[u8]) -> Result<(), String> {
-        row(
+    fn header(&mut self, flags: u8, pts: Option<u64>, data: &[u8]) -> Result<(), Stop> {
+        Ok(row(
             self.work,
             &mut self.trace,
             3,
@@ -653,7 +651,7 @@ impl Output<'_, '_> {
                 data.len() as u64,
             ],
             data,
-        )
+        )?)
     }
     fn packet<'a>(
         &mut self,
@@ -663,11 +661,11 @@ impl Output<'_, '_> {
         pos: i64,
         flags: u32,
         payload: impl Iterator<Item = &'a [u8]>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Stop> {
         let timestamp =
             |ticks: Option<i128>| ticks.map_or(Ok(i64::MIN), i64::try_from).map_err(explain);
         let bytes: Vec<u8> = payload.flatten().copied().collect();
-        row(
+        Ok(row(
             self.work,
             &mut self.trace,
             1,
@@ -680,7 +678,7 @@ impl Output<'_, '_> {
                 bytes.len() as u64,
             ],
             &bytes,
-        )
+        )?)
     }
 }
 

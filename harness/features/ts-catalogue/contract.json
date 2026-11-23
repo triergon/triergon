@@ -8,7 +8,7 @@
   "contract": [
     "Drive TransportStream and the comparison-only Catalogue with an explicit selected program and descriptor namespace. The compatible profile opts into all three PSI compatibility policies. Both projections keep the whole PAT and include PMT fields and streams only for the selected program.",
     "Drain each physical transport entity independently. Reference FFmpeg formats opens MPEG-TS with a preloaded byte source and calls av_read_frame to EOF with codec parsers and timestamp fill disabled.",
-    "Fold kind 5 program rows (subkind 0: program number, PMT PID, PCR PID, signed PMT version), followed by member streams in observable order. The absent PMT has PCR PID zero and version -1. Reference tracks without program membership are reported as program zero.",
+    "Fold kind 5 program rows (subkind 0: program number, PMT PID, PCR PID, signed PMT version), followed by member streams in observable order. The absent PMT has PCR PID zero and version -1. A stream the demuxer discovers from PES on a PID that no PMT lists has no PSI program membership and is not folded; the PSI readers never see PES.",
     "Fold kind 5 stream rows (subkind 1: program number, PID, PMT stream type, hearing-impaired flag, visual-impaired flag), then length-prefixed codec name (subkind 2), language bytes (subkind 3) and DVB subtitle initialization (subkind 4, composition and ancillary page words and type for each service). MPEG audio is represented as one codec family because the stream_type does not identify the exact audio layer. Initialization outside DVB subtitle signalling is outside this comparison.",
     "Check every retained PSI section byte against its physical source ranges. For each compatibility record, check the linked evidence, original header, carrier and event context, and confirm the incomplete PAT, nonzero PMT section or descriptor-overrun policy against the retained wire and matching strict-source event.",
     "Fold kind 7 for clean end and kind 8 for source refusal."
@@ -309,46 +309,31 @@
   ],
   "open_deviations": [
     {
-      "reading": "Unbound PES has no current program membership",
-      "clause": "H.222.0 \u00a7\u00a72.4.4.5\u20132.4.4.6 and 2.4.4.9\u20132.4.4.10 define MPEG program membership through the current PAT and PMT.",
-      "candidate": "Does not add a catalogue stream without a current program map.",
-      "reference": "Publishes an unassociated stream from the observed PES PID.",
-      "compat": "compat::psi::InferUnboundPes",
-      "cases": [
-        "au-adts-across-entities-1",
-        "au-adts-across-entities-2",
-        "au-m2ts-initialization-entity-1",
-        "hls-map-media",
-        "inactive-pat-then-unrouted-pes",
-        "unknown-pid-pes-after-pat-control"
-      ]
-    },
-    {
-      "reading": "An incomplete PAT version cannot replace the current table",
-      "clause": "H.222.0 \u00a72.4.4.6 defines the version number for the whole PAT and last_section_number for a complete table.",
-      "candidate": "Waits for all sections of the advertised version before routing that program.",
-      "reference": "Routes the program from the first section even though the remaining section is absent.",
-      "compat": "compat::psi::IncompletePatSection",
+      "reading": "A PAT version announced over two sections of which one arrives: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.6 applies version_number to the whole PAT and last_section_number gives its extent; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict catalogue profile waits for every section of a version before routing its programs, so no program comes from the partial PAT.",
+      "reference": "Observed rule: routes the program from the first section although the second never arrives.",
+      "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
         "pat-incomplete-version"
       ]
     },
     {
-      "reading": "A PMT descriptor crosses the enclosing loop",
-      "clause": "H.222.0 \u00a72.4.4.10 and \u00a72.6.1 require each descriptor to fit the declared PMT loop and section length.",
-      "candidate": "Rejects the PMT and exposes no stream from it.",
-      "reference": "Publishes the stream from the malformed PMT.",
-      "compat": "compat::psi::DescriptorOverrun",
+      "reading": "A PMT descriptor that runs past its loop: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.4.10 and 2.6.1: ES_info_length 6 encloses an ISO 639 descriptor of length 8; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict catalogue profile rejects the malformed PMT and exposes no stream from it.",
+      "reference": "Observed rule: publishes the stream entry from the malformed PMT.",
+      "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
         "pmt-descriptor-overrun"
       ]
     },
     {
-      "reading": "PMT section numbers must both be zero",
-      "clause": "H.222.0 \u00a72.4.4.10 requires section_number and last_section_number to equal zero.",
-      "candidate": "Rejects the PMT and exposes no stream from it.",
-      "reference": "Publishes the stream from the malformed PMT.",
-      "compat": "compat::psi::NonzeroPmtSection",
+      "reading": "A PMT with section_number 1: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 requires section_number and last_section_number 0 in a PMT; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict catalogue profile rejects the PMT and exposes no stream from it.",
+      "reference": "Observed rule: publishes the stream from the PMT.",
+      "compat": "no compat option exists for a consumer; the comparison-only reference_trace::catalogue compatible profile reproduces the reference (the -compat cases of ts-catalogue pass)",
       "cases": [
         "pmt-multi-section-forbidden"
       ]

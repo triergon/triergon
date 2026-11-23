@@ -232,16 +232,75 @@ static int transport_reader_start_code(const uint8_t *bytes, size_t size)
     return 0;
 }
 
-static void transport_reader_dvb(ViewWork *work, const AVPacket *packet)
+/* The segment data of the original PES that starts at the packet's TS188
+ * carrier: its payload after data_identifier and subtitle_stream_id (EN 300 743
+ * §7.1), up to PES_packet_length or the PID's next unit start. Returns its size,
+ * or -1 when the packet does not start such a PES in a single entity. */
+static int64_t transport_reader_dvb_original(const TsEntities *source, unsigned pid,
+                                             int64_t position, uint8_t *out, size_t capacity)
 {
+    if (source->count != 1 || position < 0 || (uint64_t)position % 188)
+        return -1;
+    const uint8_t *data = source->entities[0].bytes;
+    const size_t end = source->entities[0].size;
+    size_t used = 0, header = 9, length = 0, total = 0;
+    uint8_t fixed[9];
+    for (size_t at = (size_t)position; end - at >= 188 && at < end; at += 188) {
+        const uint8_t *ts = data + at;
+        if (ts[0] != 0x47)
+            return -1;
+        if ((((unsigned)ts[1] & 31) << 8 | ts[2]) != pid || !(ts[3] & 16))
+            continue;
+        if (!!(ts[1] & 64) != (at == (size_t)position)) {
+            if (at != (size_t)position)
+                break;
+            return -1;
+        }
+        size_t start = ts[3] & 32 ? 5u + ts[4] : 4u;
+        for (; start < 188; ++start, ++total) {
+            if (total < 9) {
+                fixed[total] = ts[start];
+                if (total == 8) {
+                    if (fixed[0] || fixed[1] || fixed[2] != 1)
+                        return -1;
+                    header = 9u + fixed[8];
+                    length = ((size_t)fixed[4] << 8 | fixed[5]) + 6u;
+                }
+                continue;
+            }
+            if (length > 9 && total >= length)
+                break;
+            if (total < header + 2)
+                continue;
+            if (used == capacity)
+                return -1;
+            out[used++] = ts[start];
+        }
+        if (length > 9 && total >= length)
+            break;
+    }
+    return total >= header + 2 ? (int64_t)used : -1;
+}
+
+/* Count the complete EN 300 743 §7.2 segments and the unfinished tail. The segments
+ * are those of the original PES at the packet's position, which the reader reports;
+ * the demuxer's packet holds the complete prefix. */
+static void transport_reader_dvb(ViewWork *work, const TsEntities *source, const AVStream *stream,
+                                 const AVPacket *packet)
+{
+    static uint8_t original[65536];
+    const int64_t found = transport_reader_dvb_original(source, (unsigned)stream->id, packet->pos,
+                                                        original, sizeof(original));
+    const uint8_t *bytes = found >= 0 ? original : packet->data;
+    const size_t size = found >= 0 ? (size_t)found : (size_t)packet->size;
     uint64_t count = 0;
-    size_t at = 0, size = (size_t)packet->size, tail = 0;
-    while (at < size && packet->data[at] == 15) {
+    size_t at = 0, tail = 0;
+    while (at < size && bytes[at] == 15) {
         if (size - at < 6) {
             tail = size - at;
             break;
         }
-        size_t extent = 6u + ((unsigned)packet->data[at + 4] << 8) + packet->data[at + 5];
+        size_t extent = 6u + ((unsigned)bytes[at + 4] << 8) + bytes[at + 5];
         if (extent > size - at) {
             tail = size - at;
             break;
@@ -333,9 +392,14 @@ static int transport_reader_evidence(ViewWork *work, const TsEntities *entities,
             const int duplicate = transport_reader_same_carrier(previous, carrier);
             const int discontinuity = (carrier[3] & 0x20) && carrier[4] &&
                                       (carrier[5] & 0x80);
+            /* A signalled discontinuity whose carrier also codes a PCR starts a new
+             * system time base (H.222.0 §2.4.3.5): the counter observation and the
+             * time-base change both admit the continuity change. */
+            const int timeline = discontinuity && (carrier[5] & 0x10);
             /* An unpermitted change contributes the discontinuity observation
              * and its confirming source diagnostic at the same carrier. */
-            size_t copies = duplicate ? 1u + (unsigned)saw_copy : 2u - (unsigned)discontinuity;
+            size_t copies = duplicate ? 1u + (unsigned)saw_copy
+                                      : 2u - (unsigned)(discontinuity && !timeline);
             if (copies > sizeof(offsets) / sizeof(*offsets) - count)
                 return AVERROR_INVALIDDATA;
             offsets[count++] = offset;
@@ -453,7 +517,7 @@ static int transport_reader_views(const ViewCase *view, ViewWork *work)
             }
             uint64_t codec = transport_reader_codec(stream->codecpar->codec_id);
             if (!container && codec == 10) {
-                transport_reader_dvb(work, packet);
+                transport_reader_dvb(work, source, stream, packet);
             } else if (!container && (codec == 6 || codec == 7)) {
                 int encoded = packet->size >= 2 && packet->data[0] == 0x0b && packet->data[1] == 0x77;
                 if (encoded) {

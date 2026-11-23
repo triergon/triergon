@@ -357,9 +357,9 @@
         "Service01"
       ],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 9
+        "packets": 41,
+        "bytes": 1175,
+        "digest": 14724072663304495014
       }
     },
     {
@@ -401,9 +401,9 @@
         "Caf\u00e9"
       ],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 9
+        "packets": 41,
+        "bytes": 1171,
+        "digest": 5900220291628618992
       }
     },
     {
@@ -445,9 +445,9 @@
         "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
       ],
       "expected": {
-        "packets": 1,
-        "bytes": 0,
-        "digest": 9
+        "packets": 41,
+        "bytes": 1317,
+        "digest": 1003489352037154404
       }
     }
   ]

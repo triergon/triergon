@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::sync::atomic::AtomicBool;
 
+use super::reader::Stop;
 use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceCapabilities, SourceId,
     Step, Time, WorkBudget,
@@ -68,6 +69,7 @@ struct Request {
     program: u16,
     namespace: DescriptorNamespace,
     scope_refusal: bool,
+    report_refusal: bool,
 }
 
 pub(super) fn operation<'a>(
@@ -75,6 +77,11 @@ pub(super) fn operation<'a>(
     input: &'a [u8],
     arguments: &[OsString],
 ) -> Result<Operation<'a>, String> {
+    // A registered refusal case asks the worker to name its typed unsupported detail.
+    let (report_refusal, arguments) = match arguments.split_last() {
+        Some((last, rest)) if last == "--report-refusal" => (true, rest),
+        _ => (false, arguments),
+    };
     let [size, program, form, tail @ ..] = arguments else {
         return Err(format!(
             "{prefix} requires SIZE PROGRAM FORM [NAMESPACE] [ENTITY...]"
@@ -194,10 +201,18 @@ pub(super) fn operation<'a>(
         program,
         namespace,
         scope_refusal,
+        report_refusal,
     };
     Ok(Operation {
         name,
-        run: Box::new(move |work, trace| execute(&request, &mut Output { work, trace })),
+        run: Box::new(move |work, trace| {
+            let mut output = Output { work, trace };
+            match execute(&request, &mut output) {
+                Ok(()) => Ok(()),
+                Err(Stop::Refused(error)) => output.refusal(error, request.report_refusal),
+                Err(Stop::Failed(failure)) => Err(failure),
+            }
+        }),
     })
 }
 
@@ -212,6 +227,18 @@ impl Output<'_, '_> {
             writeln!(trace, "{line}").map_err(|error| error.to_string())?;
         }
         Ok(())
+    }
+
+    /// The operation's last record after a library refusal: kind 8 with the error's
+    /// text as payload. On request it names the refusal's detail for a registered
+    /// refusal.
+    fn refusal(&mut self, error: Error, report: bool) -> Result<(), String> {
+        let text = error.to_string();
+        self.work.record(8, &[], text.as_bytes());
+        if report {
+            self.work.unsupported = Some(super::reader::refusal_detail(&error));
+        }
+        self.note(format_args!("refusal {text}"))
     }
 
     fn packet(
@@ -313,7 +340,7 @@ fn view_poll(
     input: &mut InputCursor,
     request: &Request,
     output: &mut Output<'_, '_>,
-) -> Result<Step<Option<TraceEvent>>, String> {
+) -> Result<Step<Option<TraceEvent>>, Stop> {
     let work = &mut WorkBudget::new(GRANT);
     let compact = match form {
         PollForm::Compact => stream.poll_compact(input, work, &CANCEL),
@@ -333,10 +360,10 @@ fn view_poll(
                 }
                 _ => unreachable!("literal poll forms"),
             };
-            return step.map(|step| map_step(step, Some)).map_err(err);
+            return Ok(map_step(step?, Some));
         }
     };
-    let step = compact.map_err(err)?;
+    let step = compact?;
     if let Step::Ready(CompactTraceEvent::NullRun(run)) = &step {
         controls::null_run(request, run)?;
         output.note(format_args!("null-run {run:?}"))?;
@@ -366,19 +393,14 @@ fn input_context(
     input: &mut InputCursor,
     bytes: &Bytes,
     format: PacketFormat,
-) -> Result<InputContext, String> {
+) -> Result<InputContext, Stop> {
     let request = input.request();
-    let window = InputWindow::new(request.source, request.token, 0, bytes.clone()).map_err(err)?;
-    input.provide(&window).map_err(err)?;
-    let mut bootstrap = InputBootstrap::new(input, &window, format).map_err(err)?;
-    bootstrap
-        .observe_entity_eof(input, window.source, &window.token, bytes.len() as u64)
-        .map_err(err)?;
+    let window = InputWindow::new(request.source, request.token, 0, bytes.clone())?;
+    input.provide(&window)?;
+    let mut bootstrap = InputBootstrap::new(input, &window, format)?;
+    bootstrap.observe_entity_eof(input, window.source, &window.token, bytes.len() as u64)?;
     loop {
-        match bootstrap
-            .poll(input, &mut WorkBudget::new(GRANT), &CANCEL)
-            .map_err(err)?
-        {
+        match bootstrap.poll(input, &mut WorkBudget::new(GRANT), &CANCEL)? {
             InputStep::Ready(context) => return Ok(context),
             InputStep::Yield => {}
             InputStep::NeedEntityEof => {
@@ -731,14 +753,13 @@ impl Observer {
         clock: &mut DemuxClock,
         request: &Request,
         output: &mut Output<'_, '_>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Stop> {
         loop {
             let work = &mut WorkBudget::new(GRANT);
             if self.form == ObserverForm::Compact {
                 match self
                     .demux
-                    .poll_compact_payload_with_input(input, work, &CANCEL)
-                    .map_err(err)?
+                    .poll_compact_payload_with_input(input, work, &CANCEL)?
                 {
                     AssemblyStep::Output(packet) => {
                         compact_packet(packet, self, request, clock, output)?;
@@ -751,8 +772,7 @@ impl Observer {
                     self.demux.poll_with_input(input, work, &CANCEL)
                 } else {
                     self.demux.poll(work, &CANCEL)
-                }
-                .map_err(err)?;
+                }?;
                 match step {
                     AssemblyStep::Output(packet) => {
                         for span in packet.spans.as_slice() {
@@ -774,13 +794,11 @@ impl Observer {
     }
 }
 
-fn observer_times(clock: &mut DemuxClock, header: Option<&PesHeader>) -> Result<[u64; 2], String> {
-    let (pts, dts) = clock
-        .place(
-            header.and_then(|h| h.pts_raw33),
-            header.and_then(|h| h.dts_raw33),
-        )
-        .map_err(err)?;
+fn observer_times(clock: &mut DemuxClock, header: Option<&PesHeader>) -> Result<[u64; 2], Stop> {
+    let (pts, dts) = clock.place(
+        header.and_then(|h| h.pts_raw33),
+        header.and_then(|h| h.dts_raw33),
+    )?;
     Ok([pts, dts].map(|time| signed(time.map_or(NO_TIME, |value| value as i64))))
 }
 
@@ -789,7 +807,7 @@ fn owned_packet(
     base: u64,
     clock: &mut DemuxClock,
     output: &mut Output<'_, '_>,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let [pts, dts] = observer_times(clock, packet.time_header())?;
     output.packet(
         [
@@ -804,7 +822,8 @@ fn owned_packet(
         ],
         packet.stream_id,
         packet.payload(),
-    )
+    )?;
+    Ok(())
 }
 
 fn compact_packet(
@@ -813,7 +832,7 @@ fn compact_packet(
     request: &Request,
     clock: &mut DemuxClock,
     output: &mut Output<'_, '_>,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let [pts, dts] = observer_times(clock, packet.time_header())?;
     let fields = [
         0,
@@ -876,15 +895,15 @@ fn compact_packet(
             return Err("compact cursor omitted a payload span".into());
         }
         Ok(())
-    })
+    })?;
+    Ok(())
 }
 
-fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String> {
+fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), Stop> {
     let budget = &request.budget;
     let mut entity_index = 0;
     let mut bytes = &request.entities[0].bytes;
-    let mut input =
-        InputCursor::new(budget, SourceId(1), capabilities(bytes.len()), WINDOW).map_err(err)?;
+    let mut input = InputCursor::new(budget, SourceId(1), capabilities(bytes.len()), WINDOW)?;
     let limits = ParseLimits::default();
     let mut stream = if request.namespace == DescriptorNamespace::Unspecified {
         TransportStream::new(budget.clone(), request.format, limits, request.program)
@@ -896,8 +915,7 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
             request.program,
             request.namespace,
         )
-    }
-    .map_err(err)?;
+    }?;
     let form = match request.mode {
         Mode::Source(form) => form,
         Mode::Assembler(_) | Mode::Observer(_) => PollForm::Poll,
@@ -910,7 +928,7 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
     };
     let mut assembly: Option<Assembly> = None;
     let mut observer: Option<Observer> = None;
-    let mut clock = DemuxClock::new(request.program).map_err(err)?;
+    let mut clock = DemuxClock::new(request.program)?;
     let mut ordinal = 0;
     let mut controls = controls::SourceControls::default();
     loop {
@@ -974,15 +992,15 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                                             )
                                         ) =>
                                 {
-                                    return super::packets::record(
+                                    return Ok(super::packets::record(
                                         output.work,
                                         &mut output.trace,
                                         8,
                                         &[],
                                         &[],
-                                    );
+                                    )?);
                                 }
-                                result => observer = Some(result.map_err(err)?),
+                                result => observer = Some(result?),
                             }
                         }
                     }
@@ -1009,7 +1027,7 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                             } else {
                                 observer.demux.push_with_input(packet, facts, &input)
                             }
-                            .map_err(|refusal| err(refusal.error))?;
+                            .map_err(|refused| Stop::Refused(refused.error))?;
                             observer.drain(&input, &mut clock, request, output)?;
                         }
                     }
@@ -1046,7 +1064,7 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                             assembly.drain(request, output, epochs, quantum, None)?;
                         }
                         if let Some(observer) = &mut observer {
-                            observer.demux.end_of_source().map_err(err)?;
+                            observer.demux.end_of_source()?;
                             observer.drain(&input, &mut clock, request, output)?;
                         }
                         return Ok(());
@@ -1056,7 +1074,7 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                 ordinal += 1;
             }
             Step::Ready(None) | Step::Yield => {}
-            Step::NeedInput(request) => supply(&mut input, bytes, request).map_err(err)?,
+            Step::NeedInput(request) => supply(&mut input, bytes, request)?,
             Step::End(location) => {
                 if matches!(request.mode, Mode::Source(_))
                     && (location.source != input.source() || location.offset != bytes.len() as u64)
@@ -1064,35 +1082,32 @@ fn execute(request: &Request, output: &mut Output<'_, '_>) -> Result<(), String>
                     return Err("source poll ended at a different entity boundary".into());
                 }
                 let end = stream
-                    .media_entity_end(&mut input, &mut WorkBudget::new(GRANT), &CANCEL)
-                    .map_err(err)?
+                    .media_entity_end(&mut input, &mut WorkBudget::new(GRANT), &CANCEL)?
                     .ok_or("source entity end exhausted its work grant")?;
                 entity_index += 1;
                 let Some(next) = request.entities.get(entity_index) else {
-                    stream.end_of_source().map_err(err)?;
+                    stream.end_of_source()?;
                     continue;
                 };
                 bytes = &next.bytes;
-                input
-                    .continue_source(SourceId(entity_index as u64 + 1), capabilities(bytes.len()))
-                    .map_err(err)?;
+                input.continue_source(
+                    SourceId(entity_index as u64 + 1),
+                    capabilities(bytes.len()),
+                )?;
                 if next.discontinuity {
-                    stream.discontinuity().map_err(err)?;
+                    stream.discontinuity()?;
                     assembly = None;
                     observer = None;
                     if context.is_some() {
                         context = Some(input_context(&mut input, bytes, request.format)?);
                     }
                 } else if let Some(observer) = &mut observer
-                    && !observer
-                        .demux
-                        .continue_media_entity(
-                            &end,
-                            &mut input,
-                            &mut WorkBudget::new(GRANT),
-                            &CANCEL,
-                        )
-                        .map_err(err)?
+                    && !observer.demux.continue_media_entity(
+                        &end,
+                        &mut input,
+                        &mut WorkBudget::new(GRANT),
+                        &CANCEL,
+                    )?
                 {
                     return Err("observer entity end exhausted its work grant".into());
                 }

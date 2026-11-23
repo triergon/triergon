@@ -45,6 +45,52 @@ pub(super) fn explain(error: impl std::fmt::Display) -> String {
     error.to_string()
 }
 
+/// Why an operation stopped before its end: a typed library refusal, which the
+/// fold records, or a failure of the worker's own checks, which ends the worker.
+pub(super) enum Stop {
+    Refused(triergon_core::Error),
+    Failed(String),
+}
+
+/// The detail a registered refusal names: an unsupported feature's own detail,
+/// otherwise the refusal's text.
+pub(super) fn refusal_detail(error: &triergon_core::Error) -> &'static str {
+    match error {
+        triergon_core::Error::Unsupported(detail) => detail,
+        other => Box::leak(other.to_string().into_boxed_str()),
+    }
+}
+
+impl From<triergon_core::Error> for Stop {
+    fn from(error: triergon_core::Error) -> Self {
+        Self::Refused(error)
+    }
+}
+
+impl From<String> for Stop {
+    fn from(failure: String) -> Self {
+        Self::Failed(failure)
+    }
+}
+
+impl From<std::io::Error> for Stop {
+    fn from(error: std::io::Error) -> Self {
+        Self::Failed(error.to_string())
+    }
+}
+
+impl From<std::num::TryFromIntError> for Stop {
+    fn from(error: std::num::TryFromIntError) -> Self {
+        Self::Failed(error.to_string())
+    }
+}
+
+impl From<&str> for Stop {
+    fn from(failure: &str) -> Self {
+        Self::Failed(failure.into())
+    }
+}
+
 fn capabilities(len: usize, random_access: bool) -> SourceCapabilities {
     SourceCapabilities {
         length: Some(len as u64),

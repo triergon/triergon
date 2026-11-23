@@ -13,7 +13,8 @@
     "The candidate folds the observer packet fields and the demux clock projection of its applicable header. Check each owned or borrowed span against its offered carrier, input bytes and source context, including the physical bounds of M2TS prefixes. Require the compact span iterator and consuming cursor to produce the same sequence of spans with identical provenance.",
     "The pinned formats worker opens the selected program with public MPEG-TS AVIO, NOPARSE and NOFILLIN, without stream discovery. It delivers ordinary entities in one AVIO source and flushes at a declared discontinuity.",
     "The packet fold is the mpegts-pes fold: stream index, PID, PTS and DTS in 90 kHz ticks (INT64_MIN for absence), duration, position, flags, size, bytes and every side-data element. Input loading is outside the run. Both sides drain the last entity to logical end.",
-    "Every operation in the mpegts-pes corpus runs for each form, retaining its 272 request mappings and the hash of every ordered input."
+    "Every operation in the mpegts-pes corpus runs for each form, retaining its 272 request mappings and the hash of every ordered input.",
+    "A library refusal ends the candidate's fold with one kind 8 record; a failed check of the worker's own ends the worker with an error, which no registry entry admits."
   ],
   "required_profiles": [
     "ts188-basic",
@@ -1017,11 +1018,11 @@
   "pin_note": "Reference folds are recorded from the formats views worker and match the mpegts-pes pins for the same ordered inputs.",
   "open_deviations": [
     {
-      "reading": "PCR extension outside its modulus",
-      "clause": "H.222.0 \u00a72.4.3.5 defines PCR extension as the system-clock count modulo 300.",
-      "candidate": "Rejects the affected carrier and emits no PES from it.",
-      "reference": "Returns the 27-byte PES payload at PTS 90000.",
-      "compat": "compat::pes::IgnoreInvalidPcrExtension",
+      "reading": "A PES in a carrier whose PCR extension is out of range: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 codes program_clock_reference_extension modulo 300; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict source walk rejects the carrier with its payload, so none of the three observers sees the PES.",
+      "reference": "Observed rule: ignores the extension and returns the 27-byte PES at PTS 90000.",
+      "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pcr-extension-invalid passes)",
       "cases": [
         "pcr-extension-invalid-unregistered",
         "pcr-extension-invalid-input-bound",
@@ -1029,11 +1030,11 @@
       ]
     },
     {
-      "reading": "OPCR is signalled without PCR",
-      "clause": "H.222.0 \u00a72.4.3.5 permits OPCR only in a transport packet containing PCR.",
-      "candidate": "The strict source walk rejects the unpaired OPCR carrier and none of the three observers emits a packet.",
-      "reference": "Returns both 27-byte packets.",
-      "compat": "compat::pes::IgnoreUnpairedOpcr",
+      "reading": "A PES in a carrier that codes OPCR without PCR: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 allows OPCR only in a packet that carries PCR; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, Errors and recovery): the strict source walk rejects the carrier with the unpaired OPCR, so no observer emits a packet.",
+      "reference": "Observed rule: ignores the OPCR and returns both 27-byte PES.",
+      "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts opcr-without-pcr-invalid passes)",
       "cases": [
         "opcr-without-pcr-invalid-unregistered",
         "opcr-without-pcr-invalid-input-bound",
@@ -1041,35 +1042,11 @@
       ]
     },
     {
-      "reading": "Transport error indication marks untrustworthy payload",
-      "clause": "H.222.0 \u00a72.4.3.3 defines TEI as at least one uncorrectable error in the transport packet.",
-      "candidate": "Does not publish a PES from the errored carrier.",
-      "reference": "Returns 27 bytes at PTS 90000 without a corrupt flag.",
-      "compat": "compat::pes::DeliverTeiPayload",
-      "cases": [
-        "transport-tei-unregistered",
-        "transport-tei-input-bound",
-        "transport-tei-compact"
-      ]
-    },
-    {
-      "reading": "User-defined scrambling flag requires an interpretation before clear payload delivery",
-      "clause": "H.222.0 \u00a72.4.3.3 Table 2-4 distinguishes scrambling from clear payload.",
-      "candidate": "Does not publish a PES from the scrambled carrier.",
-      "reference": "Returns the 27 bytes and PTS 90000 as a packet.",
-      "compat": "compat::pes::DeliverScrambledPayload",
-      "cases": [
-        "transport-scrambled-unregistered",
-        "transport-scrambled-input-bound",
-        "transport-scrambled-compact"
-      ]
-    },
-    {
-      "reading": "A zero PTS marker bit violates the PES header grammar",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 Table 2-21 requires the timestamp marker bits.",
-      "candidate": "Rejects the malformed header and emits no PES.",
-      "reference": "Returns 27 bytes with PTS and DTS 90000.",
-      "compat": "compat::pes::IgnoreTimestampMarkers",
+      "reading": "A PES header with a zero timestamp marker bit: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 Table 2-21 requires each PTS marker_bit to be 1; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, FFmpeg-compatible view): DemuxObserver refuses the operation at the PES with Invalid (PES timestamp markers) and emits no packet; the fold ends with that refusal.",
+      "reference": "Observed rule: reads the timestamp regardless and returns the 27 bytes with PTS and DTS 90000.",
+      "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-timestamp-marker passes)",
       "cases": [
         "pes-timestamp-marker-unregistered",
         "pes-timestamp-marker-input-bound",
@@ -1077,73 +1054,162 @@
       ]
     },
     {
-      "reading": "PES timestamp flag value 01 is forbidden",
-      "clause": "H.222.0 \u00a72.4.3.7 forbids PTS_DTS_flags 01.",
-      "candidate": "Rejects the malformed header and emits no PES.",
-      "reference": "Returns 27 bytes with both clocks absent.",
-      "compat": "compat::pes::IgnoreForbiddenTimeFlags",
+      "reading": "A PES header with PTS_DTS_flags 01: a recovery policy no standard decides",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.7 forbids PTS_DTS_flags value 01; the clause makes the input nonconforming and does not say what a receiver delivers from it.",
+      "candidate": "Our rule (triergon-mpegts README, FFmpeg-compatible view): DemuxObserver refuses the operation at the PES with Invalid (forbidden PES time flags) and emits no packet; the fold ends with that refusal.",
+      "reference": "Observed rule: returns the 27 bytes with neither clock.",
+      "compat": "compat::pes::TransportFaultRecovery with PesFaultPolicy extracts the demuxer's PES from a finite TS188 AVC carrier with this fault (ts-fault-facts pes-forbidden-time-flags passes)",
       "cases": [
         "pes-forbidden-time-flags-unregistered",
         "pes-forbidden-time-flags-input-bound",
         "pes-forbidden-time-flags-compact"
       ]
-    },
+    }
+  ],
+  "open_refusals": [
     {
-      "reading": "Finite startup requires complete transport carriers",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.1\u20132.4.3.2 fix the 188-byte packet extent. The finite observer binding validates the supplied entity before delivery.",
-      "candidate": "Refuses the finite source with a partial final carrier.",
-      "reference": "Emits the 27-byte packet on the complete prefix.",
-      "compat": "compat::input::DiscardPartialCarrier",
+      "reason": "DemuxObserver takes no carrier with a transport error or scrambling; compat::pes::TransportFaultRecovery is the opt-in that extracts such a PES",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 and Table 2-4 (transport_error_indicator, transport_scrambling_control)",
+      "detail": "PES carrier has a transport error or scrambling",
       "cases": [
-        "transport-partial-final-packet-input-bound",
-        "transport-partial-final-packet-compact"
+        {
+          "id": "transport-tei-unregistered",
+          "sha256": "0285850f9cf9c14fa70a9ca36c422688224287251c38349d8d56f9015e448895",
+          "candidate": {
+            "packets": 1,
+            "bytes": 60,
+            "digest": 17017220949092147030
+          }
+        },
+        {
+          "id": "transport-tei-input-bound",
+          "sha256": "0285850f9cf9c14fa70a9ca36c422688224287251c38349d8d56f9015e448895",
+          "candidate": {
+            "packets": 1,
+            "bytes": 60,
+            "digest": 17017220949092147030
+          }
+        },
+        {
+          "id": "transport-tei-compact",
+          "sha256": "0285850f9cf9c14fa70a9ca36c422688224287251c38349d8d56f9015e448895",
+          "candidate": {
+            "packets": 1,
+            "bytes": 60,
+            "digest": 17017220949092147030
+          }
+        },
+        {
+          "id": "transport-scrambled-unregistered",
+          "sha256": "98711c9c5209d844f6a13444738049959803327797030bfd4db3b4d1ad888e14",
+          "candidate": {
+            "packets": 1,
+            "bytes": 60,
+            "digest": 17017220949092147030
+          }
+        },
+        {
+          "id": "transport-scrambled-input-bound",
+          "sha256": "98711c9c5209d844f6a13444738049959803327797030bfd4db3b4d1ad888e14",
+          "candidate": {
+            "packets": 1,
+            "bytes": 60,
+            "digest": 17017220949092147030
+          }
+        },
+        {
+          "id": "transport-scrambled-compact",
+          "sha256": "98711c9c5209d844f6a13444738049959803327797030bfd4db3b4d1ad888e14",
+          "candidate": {
+            "packets": 1,
+            "bytes": 60,
+            "digest": 17017220949092147030
+          }
+        }
       ]
     },
     {
-      "reading": "Finite startup requires sync on the supplied grid",
-      "clause": "H.222.0 \u00a72.4.3.3 requires 0x47 at the start of each carrier. The finite observer binding validates every sync byte.",
-      "candidate": "Refuses the broken finite grid.",
-      "reference": "Emits the 27-byte packet on the intact portion.",
-      "compat": "compat::input::ResyncTransport",
+      "reason": "InputBootstrap admits a finite entity only as whole transport packets",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 fixes the 188-byte transport packet; the finite input binding requires every carrier complete",
+      "detail": "finite PES startup needs a nonempty entity with whole transport packets",
       "cases": [
-        "transport-sync-loss-input-bound",
-        "transport-sync-loss-compact"
+        {
+          "id": "transport-partial-final-packet-input-bound",
+          "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+          "candidate": {
+            "packets": 1,
+            "bytes": 84,
+            "digest": 14553395899588572371
+          }
+        },
+        {
+          "id": "transport-partial-final-packet-compact",
+          "sha256": "819ad792840e42e71aed201bdda145386eab24a5a3b21a0316eb7c8e4146ac33",
+          "candidate": {
+            "packets": 1,
+            "bytes": 84,
+            "digest": 14553395899588572371
+          }
+        }
       ]
     },
     {
-      "reading": "PES optional data exceeds the finite packet length",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 place the optional header within the declared PES length.",
-      "candidate": "Refuses the malformed header with Invalid.",
-      "reference": "Silently reaches EOF with no selected packet.",
-      "compat": "compat::pes::SkipInvalidHeaders",
+      "reason": "InputBootstrap admits a finite entity only on one sync grid",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 places sync_byte 0x47 at every packet start; the finite input binding checks every carrier",
+      "detail": "PES startup found missing sync bytes on the expected packet grid",
       "cases": [
-        "pes-optional-header-overrun-unregistered",
-        "pes-optional-header-overrun-input-bound",
-        "pes-optional-header-overrun-compact"
+        {
+          "id": "transport-sync-loss-input-bound",
+          "sha256": "bc619e8aa33b71910fa06c3e8fe66f1ada0e81b0bd48af74e793ed61d40a2d94",
+          "candidate": {
+            "packets": 1,
+            "bytes": 77,
+            "digest": 2599403413553035900
+          }
+        },
+        {
+          "id": "transport-sync-loss-compact",
+          "sha256": "bc619e8aa33b71910fa06c3e8fe66f1ada0e81b0bd48af74e793ed61d40a2d94",
+          "candidate": {
+            "packets": 1,
+            "bytes": 77,
+            "digest": 2599403413553035900
+          }
+        }
       ]
     },
     {
-      "reading": "PES lacks the start-code prefix",
-      "clause": "H.222.0 \u00a72.4.3.7 requires start-code prefix 0x000001.",
-      "candidate": "Refuses the invalid prefix with Invalid.",
-      "reference": "Silently reaches EOF with no selected packet.",
-      "compat": "compat::pes::SkipInvalidHeaders",
+      "reason": "DemuxObserver does not cross a signalled PCR discontinuity on a continuation carrier without an explicit clock-boundary policy (compat::pes::TransportFaultRecovery::confirm_source_timeline)",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 discontinuity_indicator with a new PCR starts a new system time base",
+      "detail": "PCR discontinuity requires an explicit PES clock boundary policy",
       "cases": [
-        "pes-start-prefix-invalid-unregistered",
-        "pes-start-prefix-invalid-input-bound",
-        "pes-start-prefix-invalid-compact"
-      ]
-    },
-    {
-      "reading": "A bare observer requires explicit confirmation of the PCR timeline boundary",
-      "clause": "H.222.0 \u00a72.4.3.5 distinguishes system time-base discontinuity from continuity-counter discontinuity. The bare observer requires separate clock policy before combining packets across the boundary.",
-      "candidate": "Publishes the first PES at 90000 ticks, then refuses the new source-clock boundary.",
-      "reference": "Publishes the first PES at 90000 ticks and a second PES at 10 ticks without a separate caller confirmation.",
-      "compat": "compat::pes::TransportFaultRecovery::confirm_source_timeline",
-      "cases": [
-        "pcr-timeline-discontinuity-unregistered",
-        "pcr-timeline-discontinuity-input-bound",
-        "pcr-timeline-discontinuity-compact"
+        {
+          "id": "pcr-timeline-discontinuity-unregistered",
+          "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
+          "candidate": {
+            "packets": 2,
+            "bytes": 104,
+            "digest": 18333233967416508246
+          }
+        },
+        {
+          "id": "pcr-timeline-discontinuity-input-bound",
+          "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
+          "candidate": {
+            "packets": 2,
+            "bytes": 104,
+            "digest": 18333233967416508246
+          }
+        },
+        {
+          "id": "pcr-timeline-discontinuity-compact",
+          "sha256": "45f8097aa41daf9dccdb165586638a9b6aa0054b56f58fc49772c7e333e5fe03",
+          "candidate": {
+            "packets": 2,
+            "bytes": 104,
+            "digest": 18333233967416508246
+          }
+        }
       ]
     }
   ]

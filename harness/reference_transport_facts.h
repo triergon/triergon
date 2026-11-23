@@ -37,8 +37,12 @@ static void transport_fact_header(const ViewCase *input, ViewWork *work, const A
     transport_view_row(work, 3, words, 4, header, length);
 }
 
+/* The packets of the selected PID while it belongs to the selected program, the
+ * route the candidate's PAT and PMT selection gives it (H.222.0 §§2.4.4.6 and
+ * 2.4.4.10). */
 static int transport_recovery_trace(const ViewCase *input, ViewWork *work)
 {
+    const int program = atoi(input->argv[0]);
     const int pid = atoi(input->argv[1]);
     const int opaque = !strcmp(input->argv[2], "opaque");
     TransportViewInput source;
@@ -51,7 +55,8 @@ static int transport_recovery_trace(const ViewCase *input, ViewWork *work)
             source.format->flags &= ~AVFMT_FLAG_NOPARSE;
         while ((status = av_read_frame(source.format, packet)) >= 0) {
             const AVStream *stream = source.format->streams[packet->stream_index];
-            if (stream->id == pid) {
+            if (stream->id == pid &&
+                ts_views_in_program(source.format, packet->stream_index, program)) {
                 if (!strcmp(input->argv[2], "faults"))
                     transport_fact_header(input, work, packet);
                 const uint64_t words[] = {

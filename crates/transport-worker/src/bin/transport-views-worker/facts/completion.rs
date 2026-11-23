@@ -14,36 +14,31 @@ pub(super) fn run(
     pid: u16,
     control: bool,
     out: &mut Output<'_, '_>,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let caps = SourceCapabilities {
         length: Some(bytes.len() as u64),
         random_access: false,
     };
-    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024).map_err(explain)?;
+    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024)?;
     let limits = ParseLimits::default();
     let cancel = AtomicBool::new(false);
     if control {
         return control_only(&mut cursor, bytes, program, limits, &cancel, out);
     }
     let mut completion =
-        MalformedInputCompletion::new(&cursor, PacketFormat::Ts188, limits, program)
-            .map_err(explain)?;
-    let mut clock = DemuxClock::new(program).map_err(explain)?;
+        MalformedInputCompletion::new(&cursor, PacketFormat::Ts188, limits, program)?;
+    let mut clock = DemuxClock::new(program)?;
     let mut recovery = None;
     let mut packets = 0;
     let mut discards = 0;
     loop {
-        match completion
-            .poll_source(&mut cursor, &mut WorkBudget::new(WORK), &cancel)
-            .map_err(explain)?
-        {
-            Step::NeedInput(request) => provide(&mut cursor, bytes, request).map_err(explain)?,
+        match completion.poll_source(&mut cursor, &mut WorkBudget::new(WORK), &cancel)? {
+            Step::NeedInput(request) => provide(&mut cursor, bytes, request)?,
             Step::Ready(mut step) => {
                 let context = step.context();
-                let grant = step.required_work().map_err(explain)?;
+                let grant = step.required_work()?;
                 match step
-                    .observe(recovery.as_mut(), &mut WorkBudget::new(grant), &cancel)
-                    .map_err(explain)?
+                    .observe(recovery.as_mut(), &mut WorkBudget::new(grant), &cancel)?
                     .ok_or("malformed completion yielded")?
                 {
                     MalformedSourceDisposition::Reported(fact) => {
@@ -56,8 +51,7 @@ pub(super) fn run(
                                 fact.kind(),
                                 fact.source_bytes().len(),
                                 fact.source_fault().error
-                            )
-                            .map_err(explain)?;
+                            )?;
                         }
                     }
                     MalformedSourceDisposition::AwaitDiagnostic => {}
@@ -89,8 +83,7 @@ pub(super) fn run(
                                 RegisteredCarriage::Avc,
                                 pool.clone(),
                                 limits,
-                            )
-                            .map_err(explain)?;
+                            )?;
                             let policy = PesFaultPolicy {
                                 timing_headers: true,
                                 rejected_clock_fields: true,
@@ -99,23 +92,24 @@ pub(super) fn run(
                             };
                             let mut observer =
                                 TransportFaultRecovery::with_policy(observer, policy)
-                                    .map_err(|refused| explain(refused.error))?;
-                            observer.bind_source_input(step.input()).map_err(explain)?;
+                                    .map_err(|refused| Stop::Refused(refused.error))?;
+                            observer.bind_source_input(step.input())?;
                             recovery = Some(observer);
                         }
+                        // A carrier of the PID before the selected PMT has no
+                        // route: it reaches no observer, and the input's completion
+                        // must account for it.
                         TraceEvent::Transport(packet) if packet.pid == pid => {
-                            recovery
-                                .as_mut()
-                                .ok_or("carrier precedes selected PMT")?
-                                .push(packet.clone(), context)
-                                .map_err(|refused| explain(refused.error))?;
+                            if let Some(observer) = recovery.as_mut() {
+                                observer
+                                    .push(packet.clone(), context)
+                                    .map_err(|refused| Stop::Refused(refused.error))?;
+                            }
                         }
                         TraceEvent::Diagnostic(fault) => {
                             if let Some(observer) = &mut recovery {
                                 if observer.awaiting_source_fault() {
-                                    observer
-                                        .confirm_source_fault(fault, context)
-                                        .map_err(explain)?;
+                                    observer.confirm_source_fault(fault, context)?;
                                 } else if fault.rejected.is_some()
                                     && matches!(
                                         fault.error,
@@ -126,14 +120,14 @@ pub(super) fn run(
                                 {
                                     observer
                                         .push_rejected_fault(fault.clone(), context)
-                                        .map_err(|refused| explain(refused.error))?;
+                                        .map_err(|refused| Stop::Refused(refused.error))?;
                                 } else if fault.kind == FaultKind::Transport
                                     && matches!(
                                         fault.error,
                                         Error::Truncated | Error::Invalid("TS sync byte")
                                     )
                                 {
-                                    step.hold_terminal_transport(observer).map_err(explain)?;
+                                    step.hold_terminal_transport(observer)?;
                                 }
                             }
                         }
@@ -141,8 +135,7 @@ pub(super) fn run(
                             recovery
                                 .as_mut()
                                 .ok_or("timeline precedes selected PMT")?
-                                .confirm_source_timeline(step.event(), context)
-                                .map_err(explain)?;
+                                .confirm_source_timeline(step.event(), context)?;
                         }
                         _ => {}
                     },
@@ -152,17 +145,14 @@ pub(super) fn run(
                 if let Some(observer) = &mut recovery {
                     if finished {
                         if observer.awaiting_terminal_completion() {
-                            let witness = completion.source_finished(&cursor).map_err(explain)?;
-                            if !observer
-                                .confirm_terminal_finished(
-                                    &witness,
-                                    context,
-                                    &mut cursor,
-                                    &mut WorkBudget::new(WORK),
-                                    &cancel,
-                                )
-                                .map_err(explain)?
-                            {
+                            let witness = completion.source_finished(&cursor)?;
+                            if !observer.confirm_terminal_finished(
+                                &witness,
+                                context,
+                                &mut cursor,
+                                &mut WorkBudget::new(WORK),
+                                &cancel,
+                            )? {
                                 return Err("terminal confirmation yielded".into());
                             }
                             let tail = observer
@@ -188,8 +178,7 @@ pub(super) fn run(
                                 );
                             }
                             if let Some(trace) = &mut out.trace {
-                                writeln!(trace, "# tail end {}", tail.physical_end().offset)
-                                    .map_err(explain)?;
+                                writeln!(trace, "# tail end {}", tail.physical_end().offset)?;
                             }
                         }
                         if packets == 0 && completion.discarded_carriers() != 0 {
@@ -199,8 +188,7 @@ pub(super) fn run(
                                     &mut cursor,
                                     &mut WorkBudget::new(WORK),
                                     &cancel,
-                                )
-                                .map_err(explain)?
+                                )?
                                 .ok_or("no-packets confirmation yielded")?;
                             let end = confirmation.physical_end();
                             if end.source != SOURCE
@@ -219,18 +207,26 @@ pub(super) fn run(
                                     "# no packets at {} after {} discarded carriers",
                                     confirmation.physical_end().offset,
                                     confirmation.discarded_carriers()
-                                )
-                                .map_err(explain)?;
+                                )?;
                             }
                         }
-                        observer.end_of_source().map_err(explain)?;
+                        observer.end_of_source()?;
                     }
                     packets += drain(observer, &mut clock, &cancel, out, finished)?;
                     if finished && packets == 0 && completion.discarded_carriers() == 0 {
                         return Err("empty observation has no completion proof".into());
                     }
                 } else if finished {
-                    return Err("missing selected PMT at EOF".into());
+                    // Without a selected PMT the input publishes no packet only
+                    // when its completion proves that nothing was left unrouted.
+                    let confirmation = completion
+                        .confirm_no_packets(None, &mut cursor, &mut WorkBudget::new(WORK), &cancel)?
+                        .ok_or("no-packets confirmation yielded")?;
+                    if confirmation.physical_end().offset != bytes.len() as u64
+                        || confirmation.source_finished() != context
+                    {
+                        return Err("no-packets confirmation differs from the checked input".into());
+                    }
                 }
                 if finished {
                     return Ok(());
@@ -238,18 +234,20 @@ pub(super) fn run(
             }
             Step::End(_) => {
                 let end = completion
-                    .seal_physical_end(&mut cursor, &mut WorkBudget::new(WORK), &cancel)
-                    .map_err(explain)?
+                    .seal_physical_end(&mut cursor, &mut WorkBudget::new(WORK), &cancel)?
                     .ok_or("physical end yielded")?;
                 if let Some(observer) = &mut recovery
                     && observer.awaiting_terminal_completion()
-                    && !observer
-                        .seal_terminal_end(&end, &mut cursor, &mut WorkBudget::new(WORK), &cancel)
-                        .map_err(explain)?
+                    && !observer.seal_terminal_end(
+                        &end,
+                        &mut cursor,
+                        &mut WorkBudget::new(WORK),
+                        &cancel,
+                    )?
                 {
                     return Err("terminal End yielded".into());
                 }
-                completion.end_of_source().map_err(explain)?;
+                completion.end_of_source()?;
             }
             Step::Yield => {}
             Step::Backpressure(never) => match never {},
@@ -257,12 +255,11 @@ pub(super) fn run(
     }
 }
 
-fn check_discard(fact: &MalformedInputFact, input: &Bytes) -> Result<(), String> {
+fn check_discard(fact: &MalformedInputFact, input: &Bytes) -> Result<(), Stop> {
     let fault = fact.source_fault();
     let transport = fact.accepted_transport();
     let start =
-        usize::try_from(transport.map_or(fault.location.offset, |packet| packet.source_offset))
-            .map_err(explain)?;
+        usize::try_from(transport.map_or(fault.location.offset, |packet| packet.source_offset))?;
     let carrier = fact.source_bytes().as_ref();
     if fault.location.source != SOURCE
         || carrier.len() != 188
@@ -316,11 +313,11 @@ fn drain(
     cancel: &AtomicBool,
     out: &mut Output<'_, '_>,
     finished: bool,
-) -> Result<u64, String> {
+) -> Result<u64, Stop> {
     let mut count = 0;
     loop {
         let mut grant = WorkBudget::new(WORK);
-        match observer.poll(&mut grant, cancel).map_err(explain)? {
+        match observer.poll(&mut grant, cancel)? {
             AssemblyStep::Output(RecoveredPes::Accepted(packet)) => {
                 let time = clock
                     .project_header(
@@ -329,8 +326,7 @@ fn drain(
                         packet.time_header(),
                         &mut grant,
                         cancel,
-                    )
-                    .map_err(explain)?
+                    )?
                     .ok_or("clock yielded")?;
                 if let Some(header) = packet.time_header() {
                     out.header(
@@ -350,8 +346,7 @@ fn drain(
             }
             AssemblyStep::Output(RecoveredPes::Faulted(packet)) => {
                 let time = clock
-                    .project_transport_fault(&packet, &mut grant, cancel)
-                    .map_err(explain)?
+                    .project_transport_fault(&packet, &mut grant, cancel)?
                     .ok_or("transport fault clock yielded")?;
                 let header = &packet.encoded_header;
                 out.header(
@@ -370,8 +365,7 @@ fn drain(
             }
             AssemblyStep::Output(RecoveredPes::PesFault(packet)) => {
                 let time = clock
-                    .project_pes_fault(&packet, &mut grant, cancel)
-                    .map_err(explain)?
+                    .project_pes_fault(&packet, &mut grant, cancel)?
                     .ok_or("PES fault clock yielded")?;
                 let header = &packet.encoded_header;
                 out.header(
@@ -404,19 +398,14 @@ fn control_only(
     limits: ParseLimits,
     cancel: &AtomicBool,
     out: &mut Output<'_, '_>,
-) -> Result<(), String> {
+) -> Result<(), Stop> {
     let pool = cursor.budget().clone();
-    let mut source = TransportStream::new(pool.clone(), PacketFormat::Ts188, limits, program)
-        .map_err(explain)?;
+    let mut source = TransportStream::new(pool.clone(), PacketFormat::Ts188, limits, program)?;
     let mut completion =
-        PacketCompletion::new_for_format(pool, limits, program, PacketFormat::Ts188)
-            .map_err(explain)?;
+        PacketCompletion::new_for_format(pool, limits, program, PacketFormat::Ts188)?;
     let mut ordinal = 0;
     loop {
-        match source
-            .poll_observed(cursor, &mut WorkBudget::new(WORK), cancel)
-            .map_err(explain)?
-        {
+        match source.poll_observed(cursor, &mut WorkBudget::new(WORK), cancel)? {
             Step::Ready(issued) => {
                 let context = SourceContext {
                     source_event_ordinal: ordinal,
@@ -424,18 +413,19 @@ fn control_only(
                     byte_run_epoch: None,
                 };
                 ordinal += 1;
-                let grant = completion.required_work(issued.event()).map_err(explain)?;
-                if !completion
-                    .observe_issued(&issued, context, &mut WorkBudget::new(grant), cancel)
-                    .map_err(explain)?
-                {
+                let grant = completion.required_work(issued.event())?;
+                if !completion.observe_issued(
+                    &issued,
+                    context,
+                    &mut WorkBudget::new(grant),
+                    cancel,
+                )? {
                     return Err("control observation yielded".into());
                 }
                 if matches!(issued.event(), TraceEvent::Finished) {
-                    let grant = completion.required_end_work().map_err(explain)?;
+                    let grant = completion.required_end_work()?;
                     let confirmation = completion
-                        .confirm_no_media(cursor, &mut WorkBudget::new(grant), cancel)
-                        .map_err(explain)?
+                        .confirm_no_media(cursor, &mut WorkBudget::new(grant), cancel)?
                         .ok_or("no media confirmation yielded")?;
                     if confirmation.source() != SOURCE
                         || confirmation.source_bytes() != bytes.len() as u64
@@ -451,26 +441,26 @@ fn control_only(
                             trace,
                             "# no media after source event {}",
                             confirmation.source_finished().source_event_ordinal
-                        )
-                        .map_err(explain)?;
+                        )?;
                     }
                     return Ok(());
                 }
             }
-            Step::NeedInput(request) => provide(cursor, bytes, request).map_err(explain)?,
+            Step::NeedInput(request) => provide(cursor, bytes, request)?,
             Step::End(_) => {
                 let end = source
-                    .media_entity_end(cursor, &mut WorkBudget::new(WORK), cancel)
-                    .map_err(explain)?
+                    .media_entity_end(cursor, &mut WorkBudget::new(WORK), cancel)?
                     .ok_or("physical end yielded")?;
-                let grant = completion.required_end_work().map_err(explain)?;
-                if !completion
-                    .seal_physical_end(&end, cursor, &mut WorkBudget::new(grant), cancel)
-                    .map_err(explain)?
-                {
+                let grant = completion.required_end_work()?;
+                if !completion.seal_physical_end(
+                    &end,
+                    cursor,
+                    &mut WorkBudget::new(grant),
+                    cancel,
+                )? {
                     return Err("control end yielded".into());
                 }
-                source.end_of_source().map_err(explain)?;
+                source.end_of_source()?;
             }
             Step::Yield => {}
             Step::Backpressure(never) => match never {},

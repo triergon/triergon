@@ -8,11 +8,12 @@
   "worker_operation": "ts-facts-",
   "reference": "ffmpeg-transport-views-native",
   "contract": [
-    "Read the selected TS188 stream through the transport and PES fault policies, malformed-input completion or the control-only completion path, and compare their packet consequences and terminal outcomes with parser-disabled FFmpeg.",
+    "Read the selected TS188 stream through the transport and PES fault policies, malformed-input completion or the control-only completion path, and compare their packet consequences and terminal outcomes with parser-disabled FFmpeg. Both sides select the PID's packets only while the PID belongs to the selected program. Without a selected PMT, the candidate's outcome is the malformed-input completion's zero-packet confirmation.",
     "For each emitted packet, fold source header bytes at its physical carrier position, timing flags and applicable raw PTS, then PID, projected PTS and DTS, carrier position, corrupt flag and original payload bytes. Compare clean EOF, including genuinely empty input outcomes. Check confirmation counts and physical ends against the observed carriers and original entity length. Check discarded carriers against the original bytes, malformed wire field and typed source fault.",
     "Header syntax is read directly from the source carrier on the reference side. FFmpeg supplies the packet and its projected fields.",
     "Input geometry controls probe the original TS188 or M2TS192 entity and compare the resulting packet positions or refusal.",
-    "Opaque recovery replays the diagnosed AVC source on a new cursor, publishes the original bytes and clock, and proves physical end. Compare the fault type and location against the original diagnostic, require it to precede logical completion, and recover the total payload extent from original carrier ranges. The reference enables its codec parser for the same stream."
+    "Opaque recovery replays the diagnosed AVC source on a new cursor, publishes the original bytes and clock, and proves physical end. Compare the fault type and location against the original diagnostic, require it to precede logical completion, and recover the total payload extent from original carrier ranges. The reference enables its codec parser for the same stream.",
+    "A library refusal ends the candidate's fold with one kind 8 record; a failed check of the worker's own ends the worker with an error, which no registry entry admits."
   ],
   "required_profiles": [
     "forbidden-five",
@@ -415,176 +416,237 @@
       "cause": "The PES and access-unit contracts measure the underlying policies. This operation adds fact folds."
     }
   ],
-  "open_deviations": [
+  "open_refusals": [
     {
-      "reading": "Invalid PCR and invalid adaptation stuffing",
-      "clause": "H.222.0 \u00a72.4.3.5 requires conforming PCR fields and 0xFF stuffing in the adaptation field.",
-      "candidate": "Refuses a rejected clock carrier with an additional adaptation fault.",
-      "reference": "Delivers 17 payload bytes at 180000 ticks.",
-      "compat": "compat::pes::RecoverCompoundFaults",
+      "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.5 (PCR fields and 0xFF adaptation stuffing_byte)",
+      "detail": "rejected clock is not the sole checked source fault",
       "cases": [
-        "pcr-and-stuffing"
+        {
+          "id": "pcr-and-stuffing",
+          "sha256": "19d64784c4e568ac55ef9ebf356c449f42bbf88f646e7bc9bb9dadbb82bfb403",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "Scrambled payload with forbidden timestamp flags",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 distinguish scrambled payload and disallow timing flag value 01.",
-      "candidate": "Refuses a scrambled carrier with an additional PES header fault.",
-      "reference": "Delivers 17 payload bytes with no timestamps.",
-      "compat": "compat::pes::RecoverCompoundFaults",
+      "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 (scrambling with PTS_DTS_flags 01)",
+      "detail": "selected diagnostic additional header fault/context",
       "cases": [
-        "scrambling-and-forbidden"
+        {
+          "id": "scrambling-and-forbidden",
+          "sha256": "53560589d001f9fe832bd39ca2f8ef72a693d8311e13d0ae57c2b288298daa7e",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "TEI plus a zero PES timestamp marker",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 identify an uncorrectable carrier error and require PES timestamp marker bits.",
-      "candidate": "Refuses the TEI carrier with an additional timestamp fault.",
-      "reference": "Delivers 17 payload bytes at 180000 ticks.",
-      "compat": "compat::pes::RecoverCompoundFaults",
+      "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault; PesFaultPolicy covers the PTS-only prefix 0010 alone",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 Table 2-21 (TEI with a zero marker bit; PTS prefix 0011 with PTS_DTS_flags 10)",
+      "detail": "selected diagnostic additional timestamp fault/prefix",
       "cases": [
-        "tei-and-marker"
+        {
+          "id": "tei-and-marker",
+          "sha256": "88a2c37019f0004a4daddcecb4df19cdae452ba10b5041127e8817a37c3f8212",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "wrong-time-prefix",
+          "sha256": "4530c5c14e6880fbfda05e3c3529e69ab003f1da1a231004f286a0e612c95057",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "TEI plus scrambling",
-      "clause": "H.222.0 \u00a72.4.3.3 defines TEI and distinct clear and scrambled payload modes.",
-      "candidate": "Refuses the carrier with both transport faults.",
-      "reference": "Delivers 17 payload bytes at 180000 ticks.",
-      "compat": "compat::pes::RecoverCompoundFaults",
+      "reason": "compat::pes::TransportFaultRecovery recovers one fault per carrier; it declines a carrier with a second fault",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 (TEI and scrambling in one carrier)",
+      "detail": "selected diagnostic additional transport fault/context",
       "cases": [
-        "tei-and-scrambling"
+        {
+          "id": "tei-and-scrambling",
+          "sha256": "5f2ef7c050e7bd9e423cff5ad38596310f526c467790683b29125640c4ca7141",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "The PTS-only timestamp carries another prefix",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.6\u20132.4.3.7 Table 2-21 requires prefix 0010 for PTS without DTS.",
-      "candidate": "Refuses the timestamp header when the prefix does not match its flags.",
-      "reference": "Delivers 17 payload bytes at 180000 ticks.",
-      "compat": "compat::pes::IgnoreTimestampPrefix",
+      "reason": "compat::pes::TransportFaultRecovery recovers only a complete finite PES",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.3 and 2.4.3.7 (TEI and a finite PES that ends early)",
+      "detail": "selected incomplete/unbounded finite PES unobserved",
       "cases": [
-        "wrong-time-prefix"
+        {
+          "id": "tei-incomplete-finite",
+          "sha256": "da89950f20f28df410d204be495f0ca50ec04b3fa67bd0859b08151b10d1b5aa",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "TEI and an incomplete finite PES",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.3.7 define TEI and the exact finite PES packet length. The fault recovery policy requires the entire PES.",
-      "candidate": "Refuses without a complete finite PES.",
-      "reference": "Delivers the available 17 bytes with a corrupt flag.",
-      "compat": "compat::pes::DeliverCorruptPrefix",
+      "reason": "The fault adapter is scoped to AVC; its registered AVC carriage refuses the AAC route",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.4.10 Table 2-34 (stream type 0x0f) and \u00a72.4.3.7 (PES_packet_length 0 for audio)",
+      "detail": "invalid data: registered PES carriage disagrees with the PMT stream type",
       "cases": [
-        "tei-incomplete-finite"
+        {
+          "id": "pes-audio-zero-length-invalid",
+          "sha256": "e3faae845ad4399024785e8a975a67f2953fccf27c3788dba706cdc4da335af4",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "A zero-length PES belongs to a selected audio PID",
-      "clause": "H.222.0 \u00a72.4.3.7 allows PES_packet_length zero only for video elementary payload in TS, and the fault adapter is scoped to AVC.",
-      "candidate": "Refuses the AAC route for this recovery profile.",
-      "reference": "Returns the nonconforming 27-byte audio payload.",
-      "compat": "compat::pes::AllowUnboundedAudio",
+      "reason": "TransportTailConfirmation confirms a terminal transport fault only at the physical end",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.3.2 and 2.4.3.3 (packet geometry and sync_byte)",
+      "detail": "source boundary confirmation required",
       "cases": [
-        "pes-audio-zero-length-invalid"
+        {
+          "id": "valid-transport-sync-loss-then-valid",
+          "sha256": "16986950a3ca49e38f277108c03a42dfc73176fce55743cb828e7161a3dc013e",
+          "candidate": {
+            "packets": 3,
+            "bytes": 41,
+            "digest": 301763614231778750
+          }
+        }
       ]
     },
     {
-      "reading": "A terminal transport error has carriers after it",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.2\u20132.4.3.3 define fixed transport packet geometry. The terminal fault policy requires the damaged carrier to reach the physical end.",
-      "candidate": "Publishes the initial intact packet and refuses confirmation of terminal transport loss while more physical input follows.",
-      "reference": "Publishes the same packet and ends cleanly.",
-      "compat": "compat::input::ResyncTransport",
+      "reason": "MalformedInputCompletion confirms a zero-packet outcome only when every carrier is classified; these inputs hold payload no selected PMT routes",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a7\u00a72.4.4.3 to 2.4.4.10 (PSI sections and program membership)",
+      "detail": "malformed completion has unproved packet work",
       "cases": [
-        "valid-transport-sync-loss-then-valid"
+        {
+          "id": "inactive-pat-then-unrouted-pes",
+          "sha256": "33af9e70a2f08e48e4b730618aaf6fd1e23db95d8dc11523301ec341a2e476ca",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "pes-on-declared-pmt-pid",
+          "sha256": "a76ee3c7bc186ca8c35d87385bca0e98d2454c855ed9782f26fddcd3054947d0",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "physical-truncated-tail",
+          "sha256": "75e936a5a331222dc208e0c2d1a5c1cf0070fbad96cf56fee6e674ad94254c39",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "pmt-control-truncated-section",
+          "sha256": "a5862356a79f9b9c78272b2597888a4c121ff103f0b7b509cf99e94ea4352725",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "tei-rejected-control",
+          "sha256": "c828522c81c4ec9022d5682ecb4eb35c78e75dec4ea905cf25f9c4556c950de1",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "unanchored-pmt-control",
+          "sha256": "e1caa6e1642d406fed46fc937f789a5f0d2c8567233082ec5beb8392af4146f0",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "unknown-pid-continuation-after-control",
+          "sha256": "e76bd798b25dcb807947abc329f1e041a30ffb3774b6377a9976c178f1bba8dc",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        },
+        {
+          "id": "unknown-pid-pes-after-pat-control",
+          "sha256": "6999ce34811696d772473c1da0ec4c7398fcef3ed04b5c8926e9c52efed4c15b",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "No applicable PAT routes the following PES",
-      "clause": "H.222.0 \u00a7\u00a72.4.4.6 and 2.4.4.10 require current association and map information for a selected-program route.",
-      "candidate": "Refuses packet publication in the absence of its selected route.",
-      "reference": "Publishes 27 bytes inferred from the PID alone.",
-      "compat": "compat::psi::InferUnboundPes",
+      "reason": "InputBootstrap refuses an entity on which both packet grids are plausible",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.2 (TS188) beside the four-byte M2TS prefix",
+      "detail": "PES startup found a competing packet sync grid",
       "cases": [
-        "inactive-pat-then-unrouted-pes"
+        {
+          "id": "false188-7",
+          "sha256": "3fa695e493bb41050dff90ddb0cdf2d2006e25d1b7a617064326f0ad7a0fd569",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     },
     {
-      "reading": "PES-looking payload on a PMT PID cannot certify an empty control entity",
-      "clause": "H.222.0 \u00a7\u00a72.4.4.3 and 2.4.4.9 require PSI section syntax on a PMT PID.",
-      "candidate": "Refuses to certify an empty control-only source.",
-      "reference": "Ends with zero packets.",
-      "compat": "compat::psi::AcceptUnprovedEmpty",
+      "reason": "InputBootstrap admits a finite entity only on one sync grid",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 places sync_byte 0x47 at every packet start; the finite input binding checks every carrier",
+      "detail": "PES startup found missing sync bytes on the expected packet grid",
       "cases": [
-        "pes-on-declared-pmt-pid"
-      ]
-    },
-    {
-      "reading": "An incomplete carrier cannot certify physical control coverage",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.1\u20132.4.3.2 require a complete 188-byte transport packet.",
-      "candidate": "Refuses incomplete physical coverage.",
-      "reference": "Ends with zero packets.",
-      "compat": "compat::input::DiscardPartialCarrier",
-      "cases": [
-        "physical-truncated-tail"
-      ]
-    },
-    {
-      "reading": "An unfinished section cannot certify control-only coverage",
-      "clause": "H.222.0 \u00a7\u00a72.4.4.3 and 2.4.4.10 define PSI section boundaries and declared length.",
-      "candidate": "Refuses the incomplete PMT.",
-      "reference": "Ends with zero packets.",
-      "compat": "compat::psi::AcceptUnprovedEmpty",
-      "cases": [
-        "pmt-control-truncated-section"
-      ]
-    },
-    {
-      "reading": "An errored control carrier cannot certify its content",
-      "clause": "H.222.0 \u00a72.4.3.3 defines TEI as an uncorrectable carrier error.",
-      "candidate": "Refuses to certify the unreadable carrier as control-only.",
-      "reference": "Ends with zero packets.",
-      "compat": "compat::psi::AcceptUnprovedEmpty",
-      "cases": [
-        "tei-rejected-control"
-      ]
-    },
-    {
-      "reading": "A PMT continuation lacks its section start",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.3 and 2.4.4.3 locate section starts with PUSI and pointer_field.",
-      "candidate": "Refuses to certify the unanchored control bytes.",
-      "reference": "Ends with zero packets.",
-      "compat": "compat::psi::AcceptUnprovedEmpty",
-      "cases": [
-        "unanchored-pmt-control"
-      ]
-    },
-    {
-      "reading": "Unknown physical payload is not proof of no media",
-      "clause": "H.222.0 \u00a7\u00a72.4.4.6 and 2.4.4.10 map elementary PIDs through valid PSI.",
-      "candidate": "Refuses control-only proof while an unclassified PID has payload.",
-      "reference": "Ends with zero packets.",
-      "compat": "compat::psi::AcceptUnprovedEmpty",
-      "cases": [
-        "unknown-pid-continuation-after-control",
-        "unknown-pid-pes-after-pat-control"
-      ]
-    },
-    {
-      "reading": "Two plausible carrier grids prevent bounded input admission",
-      "clause": "H.222.0 \u00a7\u00a72.4.3.2\u20132.4.3.3 define the TS body and its sync byte; the finite-source API requires an unambiguous supplied grid.",
-      "candidate": "Refuses the competing TS188 sync grid on the M2TS192 input.",
-      "reference": "Ends with zero packets.",
-      "compat": "compat::input::PreferDemuxSyncGrid",
-      "cases": [
-        "false188-7"
-      ]
-    },
-    {
-      "reading": "A carrier in the claimed grid lacks sync",
-      "clause": "H.222.0 \u00a72.4.3.3 requires sync byte 0x47.",
-      "candidate": "Refuses the damaged M2TS192 grid.",
-      "reference": "Publishes the four-byte PES at physical sync offset 388.",
-      "compat": "compat::input::ResyncTransport",
-      "cases": [
-        "seventh-sync-zero"
+        {
+          "id": "seventh-sync-zero",
+          "sha256": "a29993fe31a1bf18c7b208862a19e8ce1de20ba50a00bc30479d5402e3d0857d",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     }
   ]

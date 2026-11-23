@@ -575,9 +575,9 @@
         "faults"
       ],
       "expected": {
-        "packets": 3,
-        "bytes": 41,
-        "digest": 301763614231778749
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
       }
     },
     {

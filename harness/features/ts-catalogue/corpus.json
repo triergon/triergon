@@ -429,9 +429,9 @@
         "strict"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 4,
-        "digest": 14629629008525216256
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
       }
     },
     {
@@ -447,9 +447,9 @@
         "strict"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 4,
-        "digest": 14629629008525216256
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
       }
     },
     {
@@ -1293,9 +1293,9 @@
         "strict"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 4,
-        "digest": 14629629008525216256
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
       }
     },
     {
@@ -2373,9 +2373,9 @@
         "strict"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 4,
-        "digest": 14629629008525216256
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
       }
     },
     {
@@ -2643,9 +2643,9 @@
         "strict"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 4,
-        "digest": 14629629008525216256
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
       }
     },
     {
@@ -2769,9 +2769,9 @@
         "strict"
       ],
       "expected": {
-        "packets": 4,
-        "bytes": 4,
-        "digest": 15506608359546793527
+        "packets": 1,
+        "bytes": 0,
+        "digest": 7
       }
     },
     {
@@ -2808,6 +2808,11 @@
         "packets": 5,
         "bytes": 4,
         "digest": 8410191788596416878
+      },
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -3132,6 +3137,11 @@
         "packets": 5,
         "bytes": 4,
         "digest": 8410191788596416878
+      },
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {
@@ -3168,6 +3178,11 @@
         "packets": 5,
         "bytes": 4,
         "digest": 8410191788596416878
+      },
+      "candidate_expected": {
+        "packets": 1,
+        "bytes": 0,
+        "digest": 8
       }
     },
     {

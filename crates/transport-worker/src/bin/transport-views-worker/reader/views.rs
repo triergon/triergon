@@ -29,7 +29,7 @@ use triergon_mpegts::{
     AccessUnit, Packet, PacketFormat, Reader, ReaderEvent, ReaderLimits, SourceEpochs, Track,
 };
 
-use super::{CAPACITY, SOURCE, WINDOW, WORK, capabilities, explain, row};
+use super::{CAPACITY, SOURCE, Stop, WINDOW, WORK, capabilities, explain, row};
 use triergon_harness_runner::{Operation, Totals};
 
 mod wire;
@@ -141,6 +141,7 @@ pub(super) fn operation<'a>(
                 indices: BTreeMap::new(),
                 audio: BTreeMap::new(),
                 container,
+                deferred: Vec::new(),
             };
             let result = if container {
                 let reader =
@@ -150,15 +151,23 @@ pub(super) fn operation<'a>(
                 let reader = Reader::new(&pool, SOURCE, caps, limits, WINDOW).map_err(explain)?;
                 drain(reader, &mut output)
             };
-            match result {
+            // A library refusal ends the fold with kind 8; a failed check of the
+            // worker's own ends the worker.
+            let end = || match result {
                 Ok(()) => output.row(7, &[], &[]),
-                Err(error) => {
+                Err(Stop::Refused(error)) => {
+                    output.flush_deferred()?;
                     if let Some(trace) = &mut output.trace {
-                        writeln!(trace, "# {error}").map_err(explain)?;
+                        writeln!(trace, "# {error}")?;
                     }
                     output.row(8, &[], &[])
                 }
-            }
+                Err(failure) => Err(failure),
+            };
+            end().map_err(|stop| match stop {
+                Stop::Refused(error) => error.to_string(),
+                Stop::Failed(failure) => failure,
+            })
         }),
     })
 }
@@ -227,10 +236,10 @@ impl ViewReader for ContinuityReader {
     }
 }
 
-fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), String> {
+fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), Stop> {
     let cancel = AtomicBool::new(false);
     let mut index = 0;
-    let request = reader.request().map_err(explain)?;
+    let request = reader.request()?;
     if reader.capabilities() != capabilities(out.entities[0].bytes.len(), false)
         || request.source != SOURCE
         || request.offset != 0
@@ -238,13 +247,11 @@ fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), S
         return Err("reader returned a different initial source view".into());
     }
     loop {
-        let step: ReaderStep<R> = reader
-            .step(&mut WorkBudget::new(WORK), &cancel)
-            .map_err(explain)?;
+        let step: ReaderStep<R> = reader.step(&mut WorkBudget::new(WORK), &cancel)?;
         match step {
             Step::NeedInput(request) => {
                 if out.container {
-                    let pending = reader.request().map_err(explain)?;
+                    let pending = reader.request()?;
                     if pending.source != request.source
                         || pending.token != request.token
                         || pending.offset != request.offset
@@ -254,28 +261,23 @@ fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), S
                     }
                 }
                 let bytes = &out.entities[index].bytes;
-                let start = usize::try_from(request.offset).map_err(explain)?;
+                let start = usize::try_from(request.offset)?;
                 if start == bytes.len() {
                     if let Some(next) = out.entities.get(index + 1) {
                         index += 1;
-                        reader
-                            .continue_entity(request, SourceId(1 + index as u64), next)
-                            .map_err(explain)?;
+                        reader.continue_entity(request, SourceId(1 + index as u64), next)?;
                     } else {
-                        reader
-                            .finish(request.source, request.token)
-                            .map_err(explain)?;
+                        reader.finish(request.source, request.token)?;
                     }
                 } else {
                     let data = bytes
-                        .slice(start..bytes.len().min(start.saturating_add(request.maximum)))
-                        .map_err(explain)?;
-                    reader
-                        .provide(
-                            &InputWindow::new(request.source, request.token, request.offset, data)
-                                .map_err(explain)?,
-                        )
-                        .map_err(explain)?;
+                        .slice(start..bytes.len().min(start.saturating_add(request.maximum)))?;
+                    reader.provide(&InputWindow::new(
+                        request.source,
+                        request.token,
+                        request.offset,
+                        data,
+                    )?)?;
                 }
             }
             Step::Ready(Event::Packet(packet)) => out.queue_packet(packet, &cancel)?,
@@ -288,7 +290,7 @@ fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), S
             Step::Ready(Event::Seek(_)) => {
                 return Err("unexpected seek while reading forward".into());
             }
-            Step::Backpressure(pressure) => return Err(explain(Error::Backpressure(pressure))),
+            Step::Backpressure(pressure) => return Err(Error::Backpressure(pressure).into()),
             Step::Yield => {}
             Step::End(end) => {
                 if end.source != SourceId(1 + index as u64)
@@ -298,6 +300,7 @@ fn drain<R: ViewReader>(mut reader: R, out: &mut Output<'_, '_>) -> Result<(), S
                     return Err("reader ended before the complete source sequence".into());
                 }
                 out.flush_audio(&cancel)?;
+                out.flush_deferred()?;
                 for index in 0..reader.track_count() {
                     out.track(reader.track(index).ok_or("track count exceeds catalogue")?)?;
                 }
@@ -322,6 +325,18 @@ struct Output<'work, 'trace> {
     indices: BTreeMap<u16, u64>,
     audio: BTreeMap<u16, AudioLookahead>,
     container: bool,
+    /// The container view's strict packet rows, held until a continuity residue
+    /// can stand for the ones its run covers.
+    deferred: Vec<Deferred>,
+}
+
+/// A strict packet row of the container view, written at the residue or the end.
+struct Deferred {
+    pid: u16,
+    position: u64,
+    words: [u64; 10],
+    bytes: Vec<u8>,
+    stream_id: u8,
 }
 
 struct PacketPayload<'a> {
@@ -383,7 +398,7 @@ fn ac3_declared_extent(bytes: &[u8]) -> Option<usize> {
     Some(2 * words)
 }
 
-fn ac3_duration(packet: &Packet, known: bool) -> Result<i64, String> {
+fn ac3_duration(packet: &Packet, known: bool) -> Result<i64, Stop> {
     if !known {
         return Ok(0);
     }
@@ -392,11 +407,10 @@ fn ac3_duration(packet: &Packet, known: bool) -> Result<i64, String> {
     }
     let span = ac3_header(packet)
         .map(Ac3FrameHeader::sample_span)
-        .transpose()
-        .map_err(explain)?;
+        .transpose()?;
     span.map_or(Ok(0), |span| {
         span.to_i64_ticks(TimeBase::HZ_90000, Rounding::NearestAway)
-            .map_err(explain)
+            .map_err(Stop::Refused)
     })
 }
 
@@ -428,11 +442,11 @@ fn codec(codec: CodecId) -> u64 {
 }
 
 impl Output<'_, '_> {
-    fn row(&mut self, kind: u64, words: &[u64], bytes: &[u8]) -> Result<(), String> {
-        row(self.work, &mut self.trace, kind, words, bytes)
+    fn row(&mut self, kind: u64, words: &[u64], bytes: &[u8]) -> Result<(), Stop> {
+        Ok(row(self.work, &mut self.trace, kind, words, bytes)?)
     }
 
-    fn track(&mut self, track: &Track) -> Result<(), String> {
+    fn track(&mut self, track: &Track) -> Result<(), Stop> {
         let pid = track.id().0;
         let epoch = track.configuration_epoch();
         if self.tracks.insert(pid, epoch) == Some(epoch) || self.container {
@@ -444,9 +458,9 @@ impl Output<'_, '_> {
         let mut dvb = Vec::new();
         if track.codec() == CodecId::DvbSubtitle {
             for descriptor in stream.descriptors() {
-                let descriptor = descriptor.map_err(explain)?;
+                let descriptor = descriptor?;
                 if descriptor.tag == 0x59 {
-                    for service in descriptor.dvb_subtitling().map_err(explain)?.services() {
+                    for service in descriptor.dvb_subtitling()?.services() {
                         dvb.extend_from_slice(&service.composition_page_id.to_be_bytes());
                         dvb.extend_from_slice(&service.ancillary_page_id.to_be_bytes());
                         dvb.push(service.subtitling_type);
@@ -473,7 +487,7 @@ impl Output<'_, '_> {
         )
     }
 
-    fn queue_packet(&mut self, packet: Packet, cancel: &AtomicBool) -> Result<(), String> {
+    fn queue_packet(&mut self, packet: Packet, cancel: &AtomicBool) -> Result<(), Stop> {
         let pid = packet.track_info().stream().pid;
         let ac3 = matches!(packet.access_unit(), AccessUnit::Ac3(_))
             || matches!(packet.access_unit(), AccessUnit::IncompleteAudio { .. })
@@ -508,8 +522,7 @@ impl Output<'_, '_> {
                 }
                 AccessUnit::Dts(frame) if frame.core_bytes().len() == frame.bytes().len() => {
                     let span = frame.sample_span();
-                    span.to_i64_ticks(TimeBase::HZ_90000, Rounding::TowardZero)
-                        .map_err(explain)?
+                    span.to_i64_ticks(TimeBase::HZ_90000, Rounding::TowardZero)?
                 }
                 _ => 0,
             }
@@ -517,7 +530,7 @@ impl Output<'_, '_> {
         self.packet(&packet, duration, cancel)
     }
 
-    fn flush_audio(&mut self, cancel: &AtomicBool) -> Result<(), String> {
+    fn flush_audio(&mut self, cancel: &AtomicBool) -> Result<(), Stop> {
         let mut audio: Vec<_> = std::mem::take(&mut self.audio).into_iter().collect();
         audio.sort_by_key(|(pid, _)| self.indices.get(pid).copied());
         for (_, lookahead) in audio {
@@ -529,12 +542,7 @@ impl Output<'_, '_> {
         Ok(())
     }
 
-    fn packet(
-        &mut self,
-        packet: &Packet,
-        duration: i64,
-        cancel: &AtomicBool,
-    ) -> Result<(), String> {
+    fn packet(&mut self, packet: &Packet, duration: i64, cancel: &AtomicBool) -> Result<(), Stop> {
         let track = packet.track_info();
         self.track(track)?;
         let source = packet
@@ -605,7 +613,7 @@ impl Output<'_, '_> {
         Ok(())
     }
 
-    fn source(&mut self, event: ReaderEvent, cancel: &AtomicBool) -> Result<(), String> {
+    fn source(&mut self, event: ReaderEvent, cancel: &AtomicBool) -> Result<(), Stop> {
         match event {
             ReaderEvent::VideoHeaders(packet)
             | ReaderEvent::IncompleteAudio(packet)
@@ -687,8 +695,7 @@ impl Output<'_, '_> {
             ReaderEvent::Source(source) => {
                 if let Some(pes) = source.event().pes_source() {
                     self.clock
-                        .project(pes, &mut WorkBudget::new(WORK), cancel)
-                        .map_err(explain)?
+                        .project(pes, &mut WorkBudget::new(WORK), cancel)?
                         .ok_or("source PES clock yielded")?;
                 }
                 match source.event() {
@@ -708,7 +715,7 @@ impl Output<'_, '_> {
                     }
                     TraceEvent::UnboundedAdtsPes(pes) => {
                         if let Some(trace) = &mut self.trace {
-                            writeln!(trace, "# unbounded ADTS PES {pes:?}").map_err(explain)?;
+                            writeln!(trace, "# unbounded ADTS PES {pes:?}")?;
                         }
                     }
                     _ => {}
@@ -727,11 +734,10 @@ impl Output<'_, '_> {
         epochs: SourceEpochs,
         payload: PacketPayload<'_>,
         cancel: &AtomicBool,
-    ) -> Result<(), String> {
+    ) -> Result<(), Stop> {
         let view = self
             .clock
-            .project_header(pes.pid, epochs, header, &mut WorkBudget::new(WORK), cancel)
-            .map_err(explain)?
+            .project_header(pes.pid, epochs, header, &mut WorkBudget::new(WORK), cancel)?
             .ok_or("clock projection yielded")?;
         let position = if let Some(pes) = position {
             let header = pes
@@ -752,9 +758,8 @@ impl Output<'_, '_> {
         )
     }
 
-    fn position(&self, entity: SourceId, offset: u64) -> Result<u64, String> {
-        let index = usize::try_from(entity.0.checked_sub(1).ok_or("invalid source ID")?)
-            .map_err(explain)?;
+    fn position(&self, entity: SourceId, offset: u64) -> Result<u64, Stop> {
+        let index = usize::try_from(entity.0.checked_sub(1).ok_or("invalid source ID")?)?;
         let item = self
             .entities
             .get(index)
@@ -779,31 +784,78 @@ impl Output<'_, '_> {
             flags,
             bytes,
         }: PacketPayload<'_>,
-    ) -> Result<(), String> {
+    ) -> Result<(), Stop> {
         let ticks =
             |value: Option<i128>| value.map_or(Ok(i64::MIN), i64::try_from).map_err(explain);
         let next_index = self.indices.len() as u64;
         let index = *self.indices.entry(pid).or_insert(next_index);
-        self.row(
-            1,
-            &[
-                index,
-                u64::from(pid),
-                ticks(pts)? as u64,
-                ticks(dts)? as u64,
-                duration as u64,
+        let words = [
+            index,
+            u64::from(pid),
+            ticks(pts)? as u64,
+            ticks(dts)? as u64,
+            duration as u64,
+            position,
+            flags,
+            bytes.len() as u64,
+            base.numerator(),
+            base.denominator(),
+        ];
+        if self.container {
+            self.deferred.push(Deferred {
+                pid,
                 position,
-                flags,
-                bytes.len() as u64,
-                base.numerator(),
-                base.denominator(),
-            ],
-            bytes,
-        )?;
+                words,
+                bytes: bytes.to_vec(),
+                stream_id,
+            });
+            return Ok(());
+        }
+        self.packet_rows(&words, bytes, stream_id)
+    }
+
+    fn packet_rows(&mut self, words: &[u64; 10], bytes: &[u8], stream_id: u8) -> Result<(), Stop> {
+        self.row(1, words, bytes)?;
         self.row(3, &[1, 1], &[stream_id])
     }
 
-    fn residue(&mut self, residue: &ContinuityResidue, index: usize) -> Result<(), String> {
+    fn flush_deferred(&mut self) -> Result<(), Stop> {
+        for row in std::mem::take(&mut self.deferred) {
+            self.packet_rows(&row.words, &row.bytes, row.stream_id)?;
+        }
+        Ok(())
+    }
+
+    /// A continuity residue is the run the reference demuxes as one packet, from
+    /// its first chunk to the logical end it was proved at. It stands for the strict
+    /// packets of its PID that start within that run, whose bytes it must hold in
+    /// order (a duplicate or a faulted carrier can add bytes between them); the
+    /// strict packets themselves are compared in `ts-reader-views`.
+    fn supersede(&mut self, pid: u16, position: u64, residue: &[u8]) -> Result<(), Stop> {
+        let mut kept = Vec::with_capacity(self.deferred.len());
+        let mut rest = residue.iter();
+        for row in std::mem::take(&mut self.deferred) {
+            if row.pid != pid || row.position == u64::MAX || row.position < position {
+                kept.push(row);
+                continue;
+            }
+            if row.bytes.is_empty()
+                || !row
+                    .bytes
+                    .iter()
+                    .all(|byte| rest.by_ref().any(|held| held == byte))
+            {
+                return Err("continuity residue omits the strict packet it stands for".into());
+            }
+            if let Some(trace) = &mut self.trace {
+                writeln!(trace, "# superseded strict packet at {}", row.position)?;
+            }
+        }
+        self.deferred = kept;
+        self.flush_deferred()
+    }
+
+    fn residue(&mut self, residue: &ContinuityResidue, index: usize) -> Result<(), Stop> {
         let first = residue
             .chunks()
             .first()
@@ -811,6 +863,7 @@ impl Output<'_, '_> {
         let clock = residue.clock();
         let position = self.position(first.source_origin.source, first.source_origin.offset)?;
         let data: Vec<u8> = residue.payload().flatten().copied().collect();
+        self.supersede(first.pid, position, &data)?;
         self.payload(
             first.pid,
             (clock.pts90, clock.dts90),
@@ -818,6 +871,7 @@ impl Output<'_, '_> {
             first.stream_id,
             PacketPayload::untimed(0, &data),
         )?;
+        self.flush_deferred()?;
         let end = residue.source_end();
         let source = SourceId(1 + index as u64);
         let bytes = self.entities[index].bytes.as_ref();
@@ -829,7 +883,7 @@ impl Output<'_, '_> {
         let mut expected_fault = None;
         for evidence in residue.evidence() {
             let carrier = &evidence.carrier;
-            let at = usize::try_from(carrier.source_offset).map_err(explain)?;
+            let at = usize::try_from(carrier.source_offset)?;
             let extent = at.saturating_add(carrier.source.len());
             let ordinal = evidence.context.source_event_ordinal;
             if carrier.source_id != Some(source)
@@ -894,7 +948,7 @@ impl Output<'_, '_> {
     }
 }
 
-fn clock_header(clock: Option<&PacketClock>) -> Result<Option<&PesHeader>, String> {
+fn clock_header(clock: Option<&PacketClock>) -> Result<Option<&PesHeader>, Stop> {
     match clock {
         Some(clock) if clock.quarantined => Err("clock is quarantined".into()),
         Some(clock) => clock

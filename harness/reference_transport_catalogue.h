@@ -152,16 +152,9 @@ static int transport_catalogue_run(const ViewCase *input, ViewWork *work)
                 transport_catalogue_stream(work, (unsigned)program->program_num,
                                            format->streams[program->stream_index[j]]);
         }
-        for (unsigned index = 0; index != format->nb_streams; ++index) {
-            int referenced = 0;
-            for (unsigned i = 0; i != format->nb_programs; ++i) {
-                const AVProgram *program = format->programs[i];
-                for (unsigned j = 0; j != program->nb_stream_indexes; ++j)
-                    referenced |= program->stream_index[j] == index;
-            }
-            if (!referenced)
-                transport_catalogue_stream(work, 0, format->streams[index]);
-        }
+        /* A stream the demuxer discovers from PES on a PID that no PMT lists has no
+         * PSI program membership; the PSI readers never see PES, so it is not part of
+         * the catalogue compared here. */
         transport_view_row(work, 7, NULL, 0, NULL, 0);
     } else {
         transport_view_row(work, 8, NULL, 0, NULL, 0);

@@ -128,11 +128,24 @@ impl MuxWire {
                 if packet[3] & 0x30 != 0x10 || packet[4..6] != [0, table_id] {
                     return Err(Error::Invalid("mux table pointer or ID"));
                 }
-                let section_length = usize::from(u16::from_be_bytes([packet[6] & 15, packet[7]]));
-                let end = 8 + section_length;
-                let section = packet.get(5..end).ok_or(Error::Truncated)?;
-                if wire_crc_remainder(section) != 0
-                    || packet[end..].iter().any(|&byte| byte != 0xff)
+                // The section starts after the pointer field and continues in the
+                // PID's next carriers until its declared length (EN 300 468 §5.1.2).
+                let total = 3 + usize::from(u16::from_be_bytes([packet[6] & 15, packet[7]]));
+                let mut section = packet[5..].to_vec();
+                let mut last = packet;
+                while section.len() < total {
+                    let next = packets.next().ok_or(Error::Truncated)?;
+                    self.check_header(next, pid, index, false)?;
+                    if next[3] & 0x30 != 0x10 {
+                        return Err(Error::Invalid("mux table continuation carrier"));
+                    }
+                    section.extend_from_slice(&next[4..]);
+                    last = next;
+                }
+                let stuffing = section.split_off(total);
+                if wire_crc_remainder(&section) != 0
+                    || stuffing.iter().any(|&byte| byte != 0xff)
+                    || stuffing.len() >= last.len() - 4
                 {
                     return Err(Error::Invalid("mux table CRC or stuffing"));
                 }
@@ -261,6 +274,11 @@ pub(super) fn operation<'a>(
     input: &'a [u8],
     arguments: &[OsString],
 ) -> Result<Operation<'a>, String> {
+    // A registered refusal case asks the worker to name its typed unsupported detail.
+    let (report_refusal, arguments) = match arguments.split_last() {
+        Some((last, rest)) if last == "--report-refusal" => (true, rest),
+        _ => (false, arguments),
+    };
     let (export, arguments) = match arguments.split_first() {
         Some((arg, rest)) if arg == "--emit-ts" => {
             let (path, args) = rest.split_first().ok_or("missing TS output path")?;
@@ -283,7 +301,12 @@ pub(super) fn operation<'a>(
                         read_back(&ts, &mut rows)
                     }
                 }
-                Err(Error::Unsupported(_)) => rows.record(8, &[], &[]),
+                Err(Error::Unsupported(detail)) => {
+                    if report_refusal {
+                        rows.work.unsupported = Some(detail);
+                    }
+                    rows.record(8, &[], &[])
+                }
                 Err(error) => Err(error.to_string()),
             }
         }),
@@ -344,8 +367,8 @@ impl Rows<'_, '_> {
     }
 }
 
-// ETSI EN 300 468, actual-TS SDT (5.2.3) and service descriptor (6.2.33).
-// This writer emits single-packet sections with printable ASCII names.
+// ETSI EN 300 468, actual-TS SDT (5.2.3) and service descriptor (6.2.33), from the
+// payload of the SDT carriers that hold one section.
 fn service_names(payload: &[u8]) -> Option<(u16, &[u8], &[u8])> {
     let (&pointer, payload) = payload.split_first()?;
     let section = payload.get(usize::from(pointer)..)?;
@@ -368,7 +391,17 @@ fn service_names(payload: &[u8]) -> Option<(u16, &[u8], &[u8])> {
     }
     let (provider, remainder) = rest.split_at_checked(usize::from(*provider_len))?;
     let (&service_len, service) = remainder.split_first()?;
-    (service.len() == usize::from(service_len)).then_some((service_id, provider, service))
+    (service.len() == usize::from(service_len)).then_some((
+        service_id,
+        decoded_text(provider),
+        decoded_text(service),
+    ))
+}
+
+/// The characters of an EN 300 468 Annex A text field the writer emits: printable
+/// ASCII as it is, or UTF-8 behind the 0x15 selector of Table A.3.
+fn decoded_text(field: &[u8]) -> &[u8] {
+    field.strip_prefix(&[0x15]).unwrap_or(field)
 }
 
 fn read_back(ts: &[u8], rows: &mut Rows<'_, '_>) -> Result<(), String> {
@@ -394,26 +427,31 @@ fn read_back(ts: &[u8], rows: &mut Rows<'_, '_>) -> Result<(), String> {
     let mut starts = BTreeMap::new();
     let mut program = None;
     let mut names = None;
+    let mut sdt = Vec::new();
     let cancel = AtomicBool::new(false);
     loop {
         match stream
             .poll(&mut input, &mut WorkBudget::new(65536), &cancel)
             .map_err(fail)?
         {
+            // An SDT section can continue in the PID's following carriers.
+            Step::Ready(TraceEvent::Transport(packet)) if packet.pid == 0x11 => {
+                if packet.payload_unit_start {
+                    sdt.clear();
+                }
+                sdt.extend_from_slice(
+                    packet
+                        .payload
+                        .as_ref()
+                        .ok_or("missing SDT payload")?
+                        .as_ref(),
+                );
+                if let Some((id, provider, service)) = service_names(&sdt) {
+                    names = Some((id, provider.to_vec(), service.to_vec()));
+                }
+            }
             Step::Ready(TraceEvent::Transport(packet)) if packet.payload_unit_start => {
-                if packet.pid == 0x11 {
-                    names = Some(
-                        service_names(
-                            packet
-                                .payload
-                                .as_ref()
-                                .ok_or("missing SDT payload")?
-                                .as_ref(),
-                        )
-                        .map(|(id, provider, service)| (id, provider.to_vec(), service.to_vec()))
-                        .ok_or("invalid mux SDT")?,
-                    );
-                } else if stream
+                if stream
                     .active_program()
                     .is_some_and(|map| map.streams().any(|stream| stream.pid() == packet.pid))
                 {

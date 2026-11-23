@@ -23,9 +23,9 @@
     "The candidate calls Muxer::new and write_picture for every authored picture, then polls TransportStream to logical EOF over the resulting TS188 bytes. The reference demuxes those same muxed bytes with the pinned FFmpeg 9.0.2 decode profile's MPEG-TS demuxer and +noparse+nofillin.",
     "Each case supplies default or decimal TSID, ONID, program, PMT PID, video PID and stream type followed by provider and service names. Each input picture has big-endian signed 64-bit PTS and DTS in 90 kHz ticks, a one-byte key indicator, a big-endian 32-bit payload length and the coded picture bytes.",
     "Packet rows (kind 1) fold PID, optional PTS and DTS, flags, first carrier offset and payload length and all payload bytes, in order. Candidate clocks are raw period-zero PES values. Bit 0 compares the transport random-access indicator. On the reference side, read this bit at the demuxed packet position after verifying the TS sync, PID and payload start. Other public packet flags still compare.",
-    "After draining, catalogue rows (kind 5) fold the program number and PMT PID, each stream PID and tag, then the provider and service tags with presence, length and bytes. The candidate reads the names from the emitted SDT service descriptor. A clean EOF adds kind 7.",
+    "After draining, catalogue rows (kind 5) fold the program number and PMT PID, each stream PID and tag, then the provider and service tags with presence, length and bytes. The candidate reads the names from the emitted SDT service descriptor, across the SDT's carriers, without the 0x15 UTF-8 selector of EN 300 468 Annex A. A clean EOF adds kind 7.",
     "Check the candidate's original wire against each input picture. Require SDT at 45,000 DTS ticks, PAT and PMT at 9,000 ticks or at a transition to a key picture, initial tables in SDT/PAT/PMT order, per-PID continuity, and exact section CRC and stuffing. Check first-carrier PCR and random access, unbounded video PES headers, both coded timestamps and every coded picture byte across all its carriers.",
-    "A refused MuxConfig emits one kind 8 row. When the candidate supplies no TS, the reference runs its own muxer against the same configuration. Header refusal with zero output emits kind 8. Successful TS output emits kind 9. The refusal cases cover zero program number, reserved or colliding PIDs, unsupported stream type, non-printable or non-ASCII names, and both name length and combined SDT capacity."
+    "A refused MuxConfig emits one kind 8 row. When the candidate supplies no TS, the reference runs its own muxer against the same configuration. Header refusal with zero output emits kind 8. Successful TS output emits kind 9. The refusal cases cover zero program number, reserved or colliding PIDs, a control character in a name and name length; AVC, a non-ASCII name and names that need two SDT carriers are admitted and read back as the other cases are."
   ],
   "pin_note": "Pins are recorded by transport-views manifest --record from the decode demuxer for read-back and its muxer for configuration admission.",
   "open_unmeasured": [
@@ -129,41 +129,21 @@
       "cause": "A refused configuration produces no TS to demux"
     }
   ],
-  "open_deviations": [
+  "open_refusals": [
     {
-      "reading": "A writer configured for MPEG-1/2 video refuses AVC",
-      "clause": "H.222.0 \u00a72.4.4.10 Table 2-34 assigns stream type 0x1B to AVC. MuxConfig limits its writer to types 0x01 and 0x02.",
-      "candidate": "Refuses the AVC configuration before writing carriers.",
-      "reference": "Admits AVC and emits TS188 with stream type 0x1B.",
+      "reason": "MuxConfig refuses a name with a control character (triergon-mpegts README, Writing TS)",
+      "clause": "ETSI EN 300 468 V1.17.1 \u00a76.2.33 and Annex A; a C0 code such as TAB after the first byte has no meaning in character table 00",
+      "detail": "service name encoding: control character",
       "cases": [
-        "refuse-stream-type"
-      ]
-    },
-    {
-      "reading": "The provider name contains a tab",
-      "clause": "ETSI EN 300 468 \u00a76.2.33 and Annex A \u00a7A.1 define the service text layout and permitted control codes. MuxConfig admits printable ASCII.",
-      "candidate": "Refuses the provider name before writing carriers.",
-      "reference": "Accepts the tab in the provider field and emits TS188.",
-      "cases": [
-        "refuse-provider-control"
-      ]
-    },
-    {
-      "reading": "The service name requires a non-ASCII character",
-      "clause": "ETSI EN 300 468 \u00a76.2.33 and Annex A \u00a7A.2 provide alternative text encodings. MuxConfig admits printable ASCII.",
-      "candidate": "Refuses Caf\u00e9 before writing carriers.",
-      "reference": "Admits the non-ASCII service name and emits TS188.",
-      "cases": [
-        "refuse-service-non-ascii"
-      ]
-    },
-    {
-      "reading": "The names together exceed one SDT carrier",
-      "clause": "ETSI EN 300 468 \u00a7\u00a75.1.2 and 6.2.33 permit a section across carriers. MuxConfig limits the names to 158 combined bytes so the SDT fits one carrier.",
-      "candidate": "Refuses the 159-byte combined names before writing carriers.",
-      "reference": "Admits both names and emits TS188 using a second SDT carrier.",
-      "cases": [
-        "refuse-sdt-overflow"
+        {
+          "id": "refuse-provider-control",
+          "sha256": "688752f397ed68cf0cd77429a74ce2f5ab26789a28da83d9b6efc47fb65b5c26",
+          "candidate": {
+            "packets": 1,
+            "bytes": 0,
+            "digest": 8
+          }
+        }
       ]
     }
   ]
