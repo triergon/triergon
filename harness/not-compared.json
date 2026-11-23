@@ -72,12 +72,6 @@
     "triergon-pixel": [],
     "triergon-playback": [
       {
-        "name": "player-mp4-seeks",
-        "entry_points": ["Player::prepare_mp4_sync_seek", "Player::apply_mp4_sync_seek", "Player::prepare_mp4_demux_seek", "Player::apply_mp4_demux_seek", "Player::prepare_mp4_progressive_sync_seek", "Player::prepare_mp4_progressive_demux_seek", "mp4::PreparedMp4::movie_seek", "Player::apply_movie_seek"],
-        "degree": "recorded",
-        "needs": "Start each track of a movie-time demux replay at its own landing; one playback-mp4-seek case remains open."
-      },
-      {
         "name": "fifo-delivery-and-pump",
         "entry_points": ["Player::advance", "Player::advance_ready", "Player::pop", "Player::may_deliver", "Player::pause", "Player::stop", "pump::Pump", "pump::Sink", "pump::CatalogueSink", "pump::Feed"],
         "degree": "no-reference",

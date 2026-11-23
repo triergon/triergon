@@ -1530,6 +1530,68 @@ fn demux_index_applies_the_encoded_edits_of_a_complete_movie() {
 }
 
 #[test]
+fn movie_time_seek_starts_each_track_at_its_demux_landing() {
+    // The video's empty edit ends at 1180 ticks and its second edit presents the
+    // media from there; movie time 3000 lies in the second sample, whose sync sample
+    // is the first. The audio starts at the packet that holds the video landing's
+    // time (ISO/IEC 14496-12 section 8.6.6), not at the priming packet that precedes
+    // the video landing in the file.
+    let raw = include_bytes!("../fixtures/mp4/forward-avc-empty-edit.mp4");
+    let (mut player, movie, _, _) = native_range_player(raw);
+    let cancel = off();
+    let old = first_packet(&mut player);
+    let request = {
+        let plan = player.engine().and_then(Engine::mp4_plan).unwrap();
+        let mut job = plan
+            .movie_seek(1, Time::new(3000, 12288).unwrap(), 16)
+            .unwrap();
+        while !job.poll(&mut WorkBudget::new(1), &cancel).unwrap() {}
+        let command = job.finish().unwrap();
+        assert!(matches!(
+            command.point(),
+            triergon_isobmff::seek::MoviePoint::Media(point) if point.edit_ordinal == Some(2)
+        ));
+        command
+            .demux_seek(triergon_isobmff::compat::mov::seek::SeekLimits::default())
+            .unwrap()
+            .unwrap()
+    };
+    assert_eq!((request.video, request.timestamp), (1, 3000));
+    let seek = {
+        let mut job = player
+            .prepare_mp4_demux_seek(&movie, request, Selection::All)
+            .unwrap();
+        while !job.poll(&mut WorkBudget::new(4096), &cancel).unwrap() {}
+        job.finish().unwrap()
+    };
+    assert_eq!(seek.receipt().selected.timestamp, 1180);
+    assert_eq!(seek.start_offset(), 1760);
+    assert!(
+        player
+            .apply_mp4_demux_seek(&seek, &mut WorkBudget::new(4096), &cancel)
+            .unwrap()
+    );
+    assert!(!player.current(&old));
+    let output = collect(&mut player, 4096).unwrap();
+    let first = |track: u32| {
+        output
+            .iter()
+            .find_map(|output| match output.event() {
+                Event::Mp4(Mp4Event::Packet(packet))
+                    if packet.configuration.track.track_id == track =>
+                {
+                    let demux = &packet.occurrence.as_ref().unwrap().demux;
+                    Some((demux.pts, packet.source.sample.range.start))
+                }
+                _ => None,
+            })
+            .unwrap()
+    };
+    assert_eq!(first(1), (Some(1180), 1760));
+    assert_eq!(first(2), (Some(4096), 3801));
+}
+
+#[test]
 fn native_range_seek_refusals_leave_the_current_player_untouched() {
     let (mut player, movie, calls, _) =
         native_range_player(include_bytes!("../fixtures/mp4/r-edits-repeat.mov"));

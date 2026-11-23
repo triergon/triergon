@@ -21,6 +21,6 @@ pub use open::{
     MetadataReadScope, Movie, MovieTrack, Mp4Open, OpenLimits, OpenProgress, OpenedMp4,
 };
 pub use plan::{
-    MovieSeekCommand, MovieSeekJob, MovieSeekOutcome, Mp4Configuration, Mp4IndexJob, PlanLimits,
-    PlanTrack, PreparedMp4, SourceRow, TrackMetadata, TrackSnapshot,
+    MovieSeekCommand, MovieSeekJob, Mp4Configuration, Mp4IndexJob, PlanLimits, PlanTrack,
+    PreparedMp4, SourceRow, TrackMetadata, TrackSnapshot,
 };

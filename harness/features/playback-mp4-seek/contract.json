@@ -10,7 +10,7 @@
   "contract": [
     "Compare the landed video position and complete packet suffix for each backward seek.",
     "Source-clock seeks select in unedited composition time and carry the preceding sync sample within its description. Compare the entire physical replay with black-box demux packet bytes and coded sample durations, descriptions and sync flags. Demux-clock seeks use the projected video clock and the public backward MOV demux seek.",
-    "A request inside an empty edit emits an empty mapping and no packets. A mapped movie seek verifies the edited video occurrence against a fresh demux and compares its entire suffix including secondary-track packets. The AV1 source seek compares the coded sync flag and traces the demuxer disposable assertion.",
+    "A request inside an empty edit emits an empty mapping and no packets. A movie time that maps to media is sought as the demux-clock seek at that time on the video track, where the reference runs the public backward MOV demux seek: compare the video landing and every packet of every track after it. The AV1 source seek compares the coded sync flag and traces the demuxer disposable assertion.",
     "Compare track, PTS, DTS, duration, flags, size, payload, position, time base and encoded trim. Preserve every original range case, including start-up and Opus roll recovery.",
     "For range playback compare the nonzero usable MovieHeaderBox duration in microseconds, or the maximum packet presentation endpoint of the playable tracks when the header has no usable duration. Preserve the reference stream-info estimate in the trace. Release seek checkpoints before the checkpoint control and compare the resulting seek.",
     "Preload input outside the measurement window."
@@ -446,15 +446,6 @@
         "checkpoint-discard"
       ],
       "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
-    }
-  ],
-  "pending_module_requirements": [
-    "Start each track of a movie-time demux replay at its own landing, as the demux seek does. The replay starts at the plan's first row and delivers the audio priming packet that precedes the video landing."
-  ],
-  "open_cases": [
-    {
-      "id": "movie-mapped-edit",
-      "requirement": "Start each track of a movie-time demux replay at its own landing, as the demux seek does. The replay starts at the plan's first row and delivers the audio priming packet that precedes the video landing."
     }
   ]
 }

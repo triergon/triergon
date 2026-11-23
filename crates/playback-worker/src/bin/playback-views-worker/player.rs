@@ -43,9 +43,9 @@ mod worker {
             },
         },
         mp4::{
-            MetadataReadScope, Movie, MovieSeekOutcome, Mp4Catalogue, Mp4CatalogueMode,
-            Mp4DemuxSeekRequest, Mp4Event, Mp4IndexJob, Mp4Open, Mp4RangeOpen, Mp4SyncSeekRequest,
-            OpenLimits, OpenProgress, OpenedMp4, PlanLimits, ProgressiveLimits,
+            MetadataReadScope, Movie, Mp4Catalogue, Mp4CatalogueMode, Mp4DemuxSeekRequest,
+            Mp4Event, Mp4IndexJob, Mp4Open, Mp4RangeOpen, Mp4SyncSeekRequest, OpenLimits,
+            OpenProgress, OpenedMp4, PlanLimits, ProgressiveLimits,
         },
         probe::SelectedInput,
         pump::{Feed, FeedToken, Pump, PumpStep, Sink, Submission},
@@ -855,29 +855,27 @@ mod worker {
             while !job.poll(&mut g.work(), cancel)? {}
             let command = job.finish()?;
             while !player.apply_mp4_sync_seek(&command, &mut g.work(), cancel)? {}
-        } else if mode == Seek::Movie {
-            let plan = player
-                .engine()
-                .and_then(Engine::mp4_plan)
-                .ok_or("missing movie plan")?;
-            let mut job = plan.movie_seek(video, time, 128)?;
-            while !job.poll(&mut g.work(), cancel)? {}
-            let command = job.finish()?;
-            loop {
-                match player.apply_movie_seek(&command, Selection::All, &mut g.work(), cancel)? {
-                    MovieSeekOutcome::Applied(_) => break,
-                    MovieSeekOutcome::Yield => {}
-                    MovieSeekOutcome::Empty(_) => {
-                        rows.field(3, 0);
-                        return Ok(());
-                    }
-                    MovieSeekOutcome::Outside { .. } => {
-                        rows.field(3, 1);
-                        return Ok(());
-                    }
-                }
-            }
         } else {
+            let demux = if mode == Seek::Movie {
+                let plan = player
+                    .engine()
+                    .and_then(Engine::mp4_plan)
+                    .ok_or("missing movie plan")?;
+                let mut job = plan.movie_seek(video, time, 128)?;
+                while !job.poll(&mut g.work(), cancel)? {}
+                let command = job.finish()?;
+                let Some(request) = command.demux_seek(demux.limits)? else {
+                    let empty = matches!(
+                        command.point(),
+                        triergon_isobmff::seek::MoviePoint::Empty(_)
+                    );
+                    rows.field(3, u64::from(!empty));
+                    return Ok(());
+                };
+                request
+            } else {
+                demux
+            };
             let mut job = player.prepare_mp4_demux_seek(&movie, demux, Selection::All)?;
             while !job.poll(&mut g.work(), cancel)? {}
             let command = job.finish()?;

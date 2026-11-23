@@ -1385,27 +1385,22 @@ impl<'a> Mp4IndexJob<'a> {
         Ok((self.finish()?, cursor, duration.micros))
     }
 }
-/// Source movie-time mapping uses the existing format job. The command binds
-/// the actual model/pool/entity, so callers cannot invent a source mapping.
+/// Maps a movie time through one track's edit list, within work budgets.
 #[derive(Debug)]
 pub struct MovieSeekJob<'a> {
     locator: iso::seek::MovieEditLocator<'a>,
-    source: triergon_core::SourceId,
-    generation: u64,
-    pool: Budget,
     track: u32,
+    demux_base: TimeBase,
     raw_media_clock: BoxView,
     raw_edits: Option<BoxView>,
 }
-/// A movie time mapped through a track's edit list, bound to the plan's source and
-/// generation.
+/// Where a movie time falls on a track: the point its edit list maps it to, and the
+/// seek requests that land there.
 #[derive(Debug)]
 pub struct MovieSeekCommand {
-    pub(crate) point: iso::seek::MoviePoint,
-    pub(crate) source: triergon_core::SourceId,
-    pub(crate) generation: u64,
-    pub(crate) pool: Budget,
-    pub(crate) track: u32,
+    point: iso::seek::MoviePoint,
+    track: u32,
+    demux_base: TimeBase,
     #[cfg_attr(
         not(feature = "reference-trace"),
         expect(dead_code, reason = "read only by the comparison accessor")
@@ -1422,6 +1417,49 @@ impl MovieSeekCommand {
     /// edits.
     pub fn point(&self) -> &iso::seek::MoviePoint {
         &self.point
+    }
+    /// The demux-clock seek to the movie time, for
+    /// [`Player::prepare_mp4_demux_seek`](crate::Player::prepare_mp4_demux_seek): the
+    /// demux clock is the movie's presentation clock, so each track lands where that
+    /// seek lands it for the movie time in the track's ticks, rounded down. `None`
+    /// when the movie time falls in an empty edit or outside the edits, where the
+    /// track presents nothing. Fails with `Overflow` when the time does not fit the
+    /// track's clock.
+    pub fn demux_seek(
+        &self,
+        limits: iso::compat::mov::seek::SeekLimits,
+    ) -> Result<Option<crate::mp4::Mp4DemuxSeekRequest>> {
+        let iso::seek::MoviePoint::Media(point) = &self.point else {
+            return Ok(None);
+        };
+        let ticks = point
+            .requested_movie_time
+            .to_ticks(self.demux_base, Rounding::Floor)?;
+        Ok(Some(crate::mp4::Mp4DemuxSeekRequest {
+            video: self.track,
+            timestamp: i64::try_from(ticks).map_err(|_| Error::Overflow)?,
+            limits,
+        }))
+    }
+    /// The source-clock seek to the media time the movie time maps to, for
+    /// [`Player::prepare_mp4_sync_seek`](crate::Player::prepare_mp4_sync_seek), keeping
+    /// `audio_preroll` of audio before the sync sample and inspecting at most
+    /// `maximum_scanned_rows` rows. `None` when the movie time falls in an empty edit
+    /// or outside the edits.
+    pub fn sync_seek(
+        &self,
+        audio_preroll: Time,
+        maximum_scanned_rows: usize,
+    ) -> Option<crate::mp4::Mp4SyncSeekRequest> {
+        let iso::seek::MoviePoint::Media(point) = &self.point else {
+            return None;
+        };
+        Some(crate::mp4::Mp4SyncSeekRequest {
+            video: self.track,
+            source_time: point.source_time,
+            audio_preroll,
+            maximum_scanned_rows,
+        })
     }
     /// The track's media header box the mapping used.
     #[cfg(feature = "reference-trace")]
@@ -1445,11 +1483,12 @@ impl PreparedMp4 {
         maximum_edits: u32,
     ) -> Result<MovieSeekJob<'_>> {
         let t = self.track(track)?;
+        let media_base = t.snapshot.base.require()?;
         let locator = iso::seek::MovieEditLocator::new(
             t.edits.as_ref(),
             iso::seek::MovieSeekClocks {
                 movie_base: self.movie_base,
-                media_base: t.snapshot.base.require()?,
+                media_base,
                 media_duration: None,
             },
             requested_movie_time,
@@ -1457,10 +1496,8 @@ impl PreparedMp4 {
         )?;
         Ok(MovieSeekJob {
             locator,
-            source: self.source,
-            generation: self.opening_generation,
-            pool: self.pool.clone(),
             track,
+            demux_base: MediaClock::from_source(media_base)?.demux_base,
             raw_media_clock: t.snapshot.raw_mdhd.clone(),
             raw_edits: t.snapshot.raw_edits.clone(),
         })
@@ -1475,27 +1512,10 @@ impl MovieSeekJob<'_> {
     pub fn finish(self) -> Result<MovieSeekCommand> {
         Ok(MovieSeekCommand {
             point: self.locator.finish()?,
-            source: self.source,
-            generation: self.generation,
-            pool: self.pool,
             track: self.track,
+            demux_base: self.demux_base,
             raw_media_clock: self.raw_media_clock,
             raw_edits: self.raw_edits,
         })
     }
-}
-/// What applying a movie seek did.
-#[derive(Clone, Debug)]
-pub enum MovieSeekOutcome {
-    /// The seek started at this point.
-    Applied(iso::seek::MovieSourcePoint),
-    /// The work budget ran out: apply again.
-    Yield,
-    /// The movie time falls in an empty edit, where nothing plays.
-    Empty(iso::seek::MovieEmptyEdit),
-    /// The movie time lies outside the edits.
-    Outside {
-        /// The movie time asked for, which no edit covers.
-        requested_movie_time: Time,
-    },
 }

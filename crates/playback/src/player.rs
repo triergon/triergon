@@ -819,54 +819,6 @@ impl<S: Source> Player<S> {
         });
     }
 
-    /// Seeks to the mapped MP4 point on the player's clock. Other engines give
-    /// `Invalid`. Mismatched commands give `ForeignPool` or `SourceMismatch`.
-    pub fn apply_movie_seek(
-        &mut self,
-        command: &crate::mp4::plan::MovieSeekCommand,
-        selection: Selection,
-        w: &mut WorkBudget,
-        c: &AtomicBool,
-    ) -> Result<crate::mp4::plan::MovieSeekOutcome> {
-        use crate::mp4::plan::MovieSeekOutcome;
-        if c.load(Ordering::Relaxed) {
-            self.cancel();
-            return Err(Error::Cancelled);
-        }
-        let Some(Engine::Mp4(engine)) = self.engine.as_ref() else {
-            return Err(Error::Invalid("movie seek requires MP4 source"));
-        };
-        if !self.pool.same_pool(&command.pool) {
-            return Err(Error::ForeignPool);
-        }
-        if engine.plan.source != command.source
-            || engine.plan.opening_generation != command.generation
-        {
-            return Err(Error::SourceMismatch);
-        }
-        match &command.point {
-            triergon_isobmff::seek::MoviePoint::Media(point) => {
-                let target = if self.clock == ClockChoice::Source {
-                    point.source_time
-                } else {
-                    point.requested_movie_time
-                };
-                if self.seek_and_select(TrackKey::Mp4(command.track), target, selection, w, c)? {
-                    Ok(MovieSeekOutcome::Applied(point.clone()))
-                } else {
-                    Ok(MovieSeekOutcome::Yield)
-                }
-            }
-            triergon_isobmff::seek::MoviePoint::Empty(point) => {
-                Ok(MovieSeekOutcome::Empty(point.clone()))
-            }
-            triergon_isobmff::seek::MoviePoint::Outside {
-                requested_movie_time,
-            } => Ok(MovieSeekOutcome::Outside {
-                requested_movie_time: *requested_movie_time,
-            }),
-        }
-    }
     /// Continues a TS entity sequence with `next`, the source of the next entity, as
     /// `id` with `caps`; `discontinuity` marks a clock discontinuity between them.
     /// Returns `false` when `w` had no work left.

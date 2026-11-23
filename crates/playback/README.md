@@ -169,7 +169,7 @@ index as separate operations.
 | Probe | `probe::Probe`: Matroska, MP4, TS188 and M2TS192 |
 | Matroska | `Engine::matroska` (an unstarted reader built with `Reader::new`, `Reader::new_with_payload_ownership`, `new_with_immutable_seek_index` or `compat::block_additions::new_reader`), `Engine::matroska_reader`, `matroska::ReplayOutput` |
 | MP4 / MOV | `mp4::Mp4Open` (`new`, `new_progressive`, `new_recovery`, `with_timing_policy`), `mp4::Mp4IndexJob`, `Engine::mp4`, `Engine::mp4_progressive`, `compat::mov::{index, index_front, index_encoded_range, open_front, forward_encoded_edits}`, `mp4::Mp4RangeOpen` / `Mp4RangePlayer` |
-| MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` |
+| MP4 seek | `Player::prepare_mp4_sync_seek` / `apply_mp4_sync_seek`, `prepare_mp4_demux_seek` / `apply_mp4_demux_seek`, progressive variants, `PreparedMp4::movie_seek` with `MovieSeekCommand::{demux_seek, sync_seek}` |
 | MP4 catalogue replacement | `mp4::Mp4Catalogue`, `Player::prepare_mp4_catalogue` / `replace_mp4_catalogue` |
 | TS / M2TS | `Engine::ts`, `Engine::ts_entities`; demux PES of selected PIDs (1 to 0x1ffe, at most 64) or of a segment's own tracks: `compat::pes::{open, open_segment, open_private_audio}`, `compat::pes::startup::Startup` for bound M2TS startup and program playback |
 | PES feed | `pes_feed`: the feed [`triergon-hls`](../hls/README.md) reads HLS segments and progressive TS188 input from |
@@ -235,6 +235,10 @@ reordering retains at most 32 KiB of media. An in-band second `moov` is not
 accepted; replace the catalogue explicitly with a freshly opened source.
 Range seeks plan from the sample tables without reading payload; the first
 media request starts at the command's `start_offset()`.
+`PreparedMp4::movie_seek` maps a movie time through a track's edit list. The
+mapped point gives the request of the demux-clock or the source-clock seek, so
+every track starts at the landing that seek plans for it; a time in an empty edit
+or outside the edits maps to no seek.
 When the movie header's duration is unknown or exceeds the presentation clock,
 range playback finds the latest packet end while checking projections. It scans
 in merged order when the seek restarts could reach their count or storage limit.
