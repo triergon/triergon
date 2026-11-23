@@ -39,8 +39,10 @@ triergon-raster = { path = "../raster", optional = true }
 triergon-shape = { path = "../shape", optional = true }
 
 [dev-dependencies]
-# Plain `cargo test` builds every optional reader and the full playback example.
-triergon = { path = ".", features = ["isobmff", "mpegts", "ogg", "elementary", "subtitles", "playback", "codecs", "render"] }
+# Plain `cargo test -p triergon` builds the full playback example. MPEG-TS stays off, so
+# that it also tests the refusal of a reader feature that is not enabled; the workspace
+# tests enable it.
+triergon = { path = ".", default-features = false, features = ["isobmff", "ogg", "elementary", "playback", "codecs", "render"] }
 triergon-bitstream = { path = "../bitstream" }
 
 [features]

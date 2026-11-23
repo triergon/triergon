@@ -1,4 +1,5 @@
 //! Reading a whole in-memory file through `AnyReader`.
+#![allow(dead_code, reason = "each test crate uses the helpers it needs")]
 use std::sync::atomic::AtomicBool;
 use triergon::{
     AnyPacket, AnyReader, Budget, Bytes, ContainerReader, Event, InputRequest, InputWindow,
@@ -20,19 +21,27 @@ pub fn read(file: &[u8]) -> (AnyReader, Vec<AnyPacket>) {
         match reader.step(&mut WorkBudget::new(4096), &cancel).unwrap() {
             Step::Ready(Event::Packet(packet)) => packets.push(packet),
             Step::Ready(_) | Step::Yield => {}
-            Step::NeedInput(request) => answer(&mut reader, &pool, file, request),
+            Step::NeedInput(request) => answer(&mut reader, &pool, file, request, usize::MAX),
             Step::Backpressure(pressure) => panic!("{pressure:?}"),
             Step::End(_) => return (reader, packets),
         }
     }
 }
 
-fn answer(reader: &mut AnyReader, pool: &Budget, file: &[u8], request: InputRequest) {
+/// Answer `request` from `file` in a window of at most `window` bytes; at the end of the
+/// file, finish the source.
+pub fn answer(
+    reader: &mut AnyReader,
+    pool: &Budget,
+    file: &[u8],
+    request: InputRequest,
+    window: usize,
+) {
     let at = request.offset as usize;
     if at >= file.len() {
         reader.finish(request.source, request.token).unwrap();
     } else {
-        let end = file.len().min(at + request.maximum);
+        let end = file.len().min(at + request.maximum.min(window));
         let bytes = Bytes::copy_from_slice(pool, &file[at..end]).unwrap();
         let window = InputWindow::new(request.source, request.token, request.offset, bytes);
         reader.provide(&window.unwrap()).unwrap();

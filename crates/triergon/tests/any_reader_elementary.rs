@@ -6,6 +6,7 @@ use triergon::{
     AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, Probed, SourceFormat,
     open_blocking, open_sequential, probe,
 };
+use triergon_bitstream::crc::{crc8, crc16_a52};
 
 #[test]
 fn any_reader_reads_mpeg_audio_frames() {
@@ -26,25 +27,10 @@ fn any_reader_reads_mpeg_audio_frames() {
 /// A FLAC frame without the stream marker: fixed blocking, 4096 samples, 44.1 kHz,
 /// mono, 16 bits, frame `number`, with valid CRCs.
 fn flac_frame(number: u8, len: usize) -> Vec<u8> {
-    fn crc(data: &[u8], width: u32, polynomial: u32) -> u32 {
-        let top = 1 << (width - 1);
-        let mask = (1u64 << width) as u32 - 1;
-        data.iter().fold(0, |mut crc, &byte| {
-            crc ^= u32::from(byte) << (width - 8);
-            for _ in 0..8 {
-                crc = if crc & top != 0 {
-                    (crc << 1) ^ polynomial
-                } else {
-                    crc << 1
-                } & mask;
-            }
-            crc
-        })
-    }
     let mut frame = vec![0xff, 0xf8, 0xc9, 0x08, number];
-    frame.push(crc(&frame, 8, 0x07) as u8);
+    frame.push(crc8(0, &frame));
     frame.extend((0..len).map(|i| (i % 97) as u8));
-    let check = crc(&frame, 16, 0x8005) as u16;
+    let check = crc16_a52(0, &frame);
     frame.extend(check.to_be_bytes());
     frame
 }

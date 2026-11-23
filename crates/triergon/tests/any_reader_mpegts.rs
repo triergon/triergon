@@ -1,10 +1,12 @@
 #![cfg(feature = "mpegts")]
+mod common;
+
 use std::sync::atomic::AtomicBool;
 use triergon::mpegts::stream::TraceEvent;
 use triergon::mpegts::{AccessUnit, ReaderEvent};
 use triergon::{
-    AnyOther, AnyPacket, AnyReader, Budget, Bytes, ContainerReader, Event, InputWindow, PacketInfo,
-    Probed, SourceCapabilities, SourceFormat, SourceId, Step, WorkBudget, probe,
+    AnyOther, AnyPacket, AnyReader, Budget, ContainerReader, Event, PacketInfo, Probed,
+    SourceCapabilities, SourceFormat, SourceId, Step, WorkBudget, probe,
 };
 
 #[test]
@@ -86,18 +88,7 @@ fn facade_delivers_source_aus_and_every_original_pes_without_decoder_injection()
                 panic!("unexpected gap: {event:?}")
             }
             Step::Ready(_) | Step::Yield => (),
-            Step::NeedInput(r) => {
-                let at = r.offset as usize;
-                if at == input.len() {
-                    reader.finish(r.source, r.token).unwrap();
-                } else {
-                    let end = input.len().min(at + r.maximum.min(7));
-                    let bytes = Bytes::copy_from_slice(&pool, &input[at..end]).unwrap();
-                    reader
-                        .provide(&InputWindow::new(r.source, r.token, r.offset, bytes).unwrap())
-                        .unwrap();
-                }
-            }
+            Step::NeedInput(request) => common::answer(&mut reader, &pool, input, request, 7),
             Step::Backpressure(p) => panic!("{p:?}"),
             Step::End(_) => {
                 assert!(count.into_iter().all(|n| n > 0));

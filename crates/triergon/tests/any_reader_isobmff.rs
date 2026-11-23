@@ -1,10 +1,12 @@
 //! ISO BMFF opens from its first bytes and reads through the neutral model.
 #![cfg(feature = "isobmff")]
+mod common;
+
 use std::sync::atomic::AtomicBool;
 use triergon::{
-    AnyOther, AnyPacket, AnyReader, Budget, Bytes, CodecId, ContainerReader, Error, Event,
-    InputRequest, InputWindow, MediaKind, PacketInfo, SeekPolicy, SeekRequest, SourceCapabilities,
-    SourceId, Step, Time, TrackId, WorkBudget, isobmff::ReaderEvent,
+    AnyOther, AnyPacket, AnyReader, Budget, CodecId, ContainerReader, Error, Event, MediaKind,
+    PacketInfo, SeekPolicy, SeekRequest, SourceCapabilities, SourceId, Step, Time, TrackId,
+    WorkBudget, isobmff::ReaderEvent,
 };
 
 const FILE: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-config/creation-all.mp4");
@@ -13,18 +15,6 @@ fn capabilities() -> SourceCapabilities {
     SourceCapabilities {
         length: Some(FILE.len() as u64),
         random_access: true,
-    }
-}
-
-fn answer(reader: &mut AnyReader, pool: &Budget, request: InputRequest) {
-    let at = request.offset as usize;
-    if at >= FILE.len() {
-        reader.finish(request.source, request.token).unwrap();
-    } else {
-        let end = FILE.len().min(at + request.maximum);
-        let bytes = Bytes::copy_from_slice(pool, &FILE[at..end]).unwrap();
-        let window = InputWindow::new(request.source, request.token, request.offset, bytes);
-        reader.provide(&window.unwrap()).unwrap();
     }
 }
 
@@ -38,7 +28,7 @@ fn drain(reader: &mut AnyReader, pool: &Budget) -> (Vec<AnyPacket>, bool, Option
             Step::Ready(Event::Seek(receipt)) => landing = Some(receipt.landing),
             Step::Ready(Event::Other(AnyOther::Isobmff(ReaderEvent::Movie))) => movie = true,
             Step::Ready(Event::Other(_)) | Step::Yield => {}
-            Step::NeedInput(request) => answer(reader, pool, request),
+            Step::NeedInput(request) => common::answer(reader, pool, FILE, request, usize::MAX),
             Step::Backpressure(pressure) => panic!("{pressure:?}"),
             Step::End(_) => return (packets, movie, landing),
         }
