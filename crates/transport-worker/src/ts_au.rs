@@ -43,7 +43,12 @@ const WORK: u64 = 4096;
 enum SourceProof {
     ControlOnly,
     ReportedMalformed(malformed::Diagnostic),
-    OpaqueRecovery(au_recovery::Trigger),
+    /// A recovery replay, and the observation that ended the reader's attempt when that
+    /// is the refusal should the replay fail too.
+    OpaqueRecovery(
+        au_recovery::Trigger,
+        Option<Box<(ReaderEvent, SourceLocation)>>,
+    ),
 }
 
 struct TrackProjection {
@@ -521,8 +526,7 @@ fn operation<const TRACE: bool>(
     let mut deferred_continuity = None;
     let mut recovered = None;
     let mut observed_media = false;
-    let mut unproved = None;
-    let (proof, reader_refusal) = loop {
+    let (mut proof, reader_refusal) = loop {
         let step = match reader.step_with_carriers(&mut WorkBudget::new(WORK), cancel, |_| ()) {
             Ok(step) => step,
             Err(error) => {
@@ -719,7 +723,7 @@ fn operation<const TRACE: bool>(
                             && totals.packets == 0
                             && let Some(trigger) = au_recovery::Trigger::from_fault(fault)
                         {
-                            break (SourceProof::OpaqueRecovery(trigger), totals);
+                            break (SourceProof::OpaqueRecovery(trigger, None), totals);
                         }
                         if single_entity && !observed_media {
                             match fault.kind {
@@ -800,10 +804,10 @@ fn operation<const TRACE: bool>(
                     _ => None,
                 };
                 if let Some(trigger) = recovery {
-                    // The observation's text is the refusal only when the recovery
-                    // proof fails, so it is written then.
-                    unproved = Some((event, at));
-                    break (SourceProof::OpaqueRecovery(trigger), totals);
+                    // The observation's text is the refusal only when the replay
+                    // fails, so it is written then.
+                    let unproved = Some(Box::new((event, at)));
+                    break (SourceProof::OpaqueRecovery(trigger, unproved), totals);
                 }
                 return Ok(refused(
                     totals,
@@ -905,9 +909,13 @@ fn operation<const TRACE: bool>(
     // completed reader attempt before reserving storage for the replay.
     drop(reader);
     drop(tracks);
+    let unproved = match &mut proof {
+        SourceProof::OpaqueRecovery(_, unproved) => unproved.take(),
+        _ => None,
+    };
     Ok(match prove_source(pool, request, proof, cancel)? {
         Some(totals) => totals,
-        None => match unproved {
+        None => match unproved.map(|unproved| *unproved) {
             Some((event, at)) => refused(
                 reader_refusal,
                 &format!("incomplete access-unit observation: {event:?}"),
@@ -933,7 +941,7 @@ fn prove_source(
         SourceProof::ReportedMalformed(diagnostic) => {
             Ok(malformed::confirm(pool, request, diagnostic, cancel)?.map(|_| Totals::default()))
         }
-        SourceProof::OpaqueRecovery(trigger) => {
+        SourceProof::OpaqueRecovery(trigger, _) => {
             au_recovery::project(pool, request, trigger, cancel)
         }
     }
