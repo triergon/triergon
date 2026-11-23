@@ -3,7 +3,7 @@
 use super::*;
 use crate::AssemblyStep;
 use crate::compat::pes::observer::{DemuxObserver, SourceContext};
-use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY};
+use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY, fields};
 use crate::psi::{
     Descriptors, PatReader, PmtReader, Section, SectionAssembler, SectionHeader, TableStep,
 };
@@ -456,12 +456,10 @@ fn decode_rejected_pmt(
         let head = raw
             .get(at..at + 5)
             .ok_or(Error::Invalid("PSI compatibility ES header truncated"))?;
-        let pid = u16::from_be_bytes([head[1], head[2]]) & pid::MASK;
+        let pid = fields::pid([head[1], head[2]]);
         let end = at
             .checked_add(5)
-            .and_then(|n| {
-                n.checked_add(usize::from(u16::from_be_bytes([head[3], head[4]]) & 0x0fff))
-            })
+            .and_then(|n| n.checked_add(fields::length([head[3], head[4]])))
             .ok_or(Error::Overflow)?;
         if end > raw.len() - 4
             || !pid::ELEMENTARY.contains(&pid)
@@ -554,7 +552,7 @@ fn decode_rejected_pmt(
     }
     Ok(DecodedPmt {
         header: h,
-        pcr_pid: u16::from_be_bytes([raw[8], raw[9]]) & pid::MASK,
+        pcr_pid: fields::pid([raw[8], raw[9]]),
         streams,
         descriptor_stop: stop,
     })

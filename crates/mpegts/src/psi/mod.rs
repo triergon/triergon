@@ -5,6 +5,7 @@ pub mod descriptor_tag;
 mod descriptors;
 mod dts_hd;
 pub(crate) mod dvb;
+pub(crate) mod fields;
 mod pat_table;
 mod section;
 mod signalling;

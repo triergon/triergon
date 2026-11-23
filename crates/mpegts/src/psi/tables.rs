@@ -1,4 +1,4 @@
-use super::{Descriptors, Section, descriptor_tag, stream_type};
+use super::{Descriptors, Section, descriptor_tag, fields, stream_type};
 use crate::transport::pid;
 use crate::{ParseLimits, SourceRange, limit};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -149,7 +149,7 @@ impl PatReader {
             }
             let data = &self.source.as_ref()[self.position..self.position + 4];
             let program_number = u16::from_be_bytes([data[0], data[1]]);
-            let pid = u16::from_be_bytes([data[2], data[3]]) & pid::MASK;
+            let pid = fields::pid([data[2], data[3]]);
             if !pid::ELEMENTARY.contains(&pid) {
                 return Err(Error::Invalid("PAT PID"));
             }
@@ -310,9 +310,9 @@ impl PmtReader {
         {
             return Err(Error::Invalid(PMT_PROGRAM_IDENTITY));
         }
-        let pcr = u16::from_be_bytes([data[8], data[9]]);
+        let pcr_pid = fields::pid([data[8], data[9]]);
         // A 12-bit length whose first two bits are not '00' exceeds every PMT section.
-        let end = 12 + usize::from(u16::from_be_bytes([data[10], data[11]]) & 0x0fff);
+        let end = 12 + fields::length([data[10], data[11]]);
         if end > data.len() - 4 {
             return Err(Error::Invalid("PMT program-info length"));
         }
@@ -322,7 +322,7 @@ impl PmtReader {
             budget: budget.clone(),
             limits,
             header,
-            pcr_pid: pcr & pid::MASK,
+            pcr_pid,
             program_descriptors: source.slice(12..end)?,
             source,
             position: 12,
@@ -442,7 +442,7 @@ impl PmtReader {
                 return Err(Error::Invalid("PMT elementary header"));
             }
             let data = &self.source.as_ref()[self.position..];
-            let pid = u16::from_be_bytes([data[1], data[2]]) & pid::MASK;
+            let pid = fields::pid([data[1], data[2]]);
             if !pid::ELEMENTARY.contains(&pid) {
                 return Err(Error::Invalid("PMT elementary PID"));
             }
@@ -455,8 +455,7 @@ impl PmtReader {
                 return Err(Error::Invalid("duplicate PMT elementary PID"));
             }
             let info_start = self.position + 5;
-            let info_end =
-                info_start + usize::from(u16::from_be_bytes([data[3], data[4]]) & 0x0fff);
+            let info_end = info_start + fields::length([data[3], data[4]]);
             if info_end > end {
                 return Err(Error::Invalid("PMT elementary-info length"));
             }

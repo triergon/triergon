@@ -8,7 +8,7 @@
 //!
 //! The bounded catalogue preserves H.222.0 source validation. Compatibility
 //! observations carry their source status, and only accepted tables activate routes.
-use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY};
+use crate::psi::{DESCRIPTOR_LENGTH, PMT_PROGRAM_IDENTITY, fields};
 use crate::psi::{
     DescriptorNamespace, ElementaryStream, PatTable, ProgramMap, PsiCrc32, Section, descriptor_tag,
     stream_type,
@@ -521,7 +521,7 @@ impl Catalogue {
                     .get(position)
                     .ok_or(Error::Invalid("demux catalogue PAT entry missing"))?;
                 if expected.program_number != u16::from_be_bytes([entry[0], entry[1]])
-                    || expected.pid != u16::from_be_bytes([entry[2], entry[3]]) & pid::MASK
+                    || expected.pid != fields::pid([entry[2], entry[3]])
                 {
                     return Err(Error::Invalid(
                         "demux catalogue PAT entry disagrees with the encoded program or PID",
@@ -624,12 +624,12 @@ impl Catalogue {
         {
             return Err(Error::Invalid("demux catalogue PMT has no PAT route"));
         }
-        if map.pcr_pid != u16::from_be_bytes([raw[8], raw[9]]) & pid::MASK {
+        if map.pcr_pid != fields::pid([raw[8], raw[9]]) {
             return Err(Error::Invalid(
                 "demux catalogue PMT disagrees with the encoded PCR PID",
             ));
         }
-        let start = 12 + (usize::from(u16::from_be_bytes([raw[10], raw[11]]) & 0x0fff));
+        let start = 12 + fields::length([raw[10], raw[11]]);
         if start > raw.len() - 4 || map.program_descriptors.as_ref() != &raw[12..start] {
             return Err(Error::Invalid(
                 "demux catalogue program descriptors disagree with the encoded PMT",
@@ -648,10 +648,10 @@ impl Catalogue {
             let encoded = raw.get(at..at + 5).ok_or(Error::Invalid(
                 "demux catalogue PMT stream header is truncated",
             ))?;
-            let end = at + 5 + usize::from(u16::from_be_bytes([encoded[3], encoded[4]]) & 0x0fff);
+            let end = at + 5 + fields::length([encoded[3], encoded[4]]);
             if end > raw.len() - 4
                 || stream.stream_type != encoded[0]
-                || stream.pid != u16::from_be_bytes([encoded[1], encoded[2]]) & pid::MASK
+                || stream.pid != fields::pid([encoded[1], encoded[2]])
                 || stream.descriptor_bytes.as_ref() != &raw[at + 5..end]
             {
                 return Err(Error::Invalid(

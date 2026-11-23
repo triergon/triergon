@@ -10,7 +10,7 @@
 //! [`TransportStream`]: crate::stream::TransportStream
 //! [`ElementaryStream::codec`]: crate::psi::ElementaryStream::codec
 use crate::psi::{
-    Descriptor, ElementaryStream, Section, SectionAssembler, descriptor_tag, stream_type,
+    Descriptor, ElementaryStream, Section, SectionAssembler, descriptor_tag, fields, stream_type,
 };
 use crate::transport::{TransportPacket, pid};
 use crate::{AssemblyStep, ParseLimits, limit};
@@ -176,7 +176,7 @@ impl ProgramReader {
         let mut pmts = BudgetVec::new(&self.budget);
         for entry in data[8..data.len() - 4].chunks_exact(4) {
             let program = u16::from_be_bytes([entry[0], entry[1]]);
-            let pid = u16::from_be_bytes([entry[2], entry[3]]) & pid::MASK;
+            let pid = fields::pid([entry[2], entry[3]]);
             if program == 0 || pid == pid::PAT || pid == pid::NULL {
                 continue;
             }
@@ -217,22 +217,21 @@ impl ProgramReader {
         }
         route.last = crc;
         let end = data.len() - 4;
-        let pcr_pid = u16::from_be_bytes([data[8], data[9]]) & pid::MASK;
-        let info = usize::from(u16::from_be_bytes([data[10], data[11]]) & 0x0fff);
+        let pcr_pid = fields::pid([data[8], data[9]]);
+        let info = fields::length([data[10], data[11]]);
         let mut position = 12 + info;
         let mut streams = BudgetVec::new(&self.budget);
         while position + 5 <= end {
             let entry = &data[position..position + 5];
             let start = position + 5;
-            let stop =
-                (start + usize::from(u16::from_be_bytes([entry[3], entry[4]]) & 0x0fff)).min(end);
+            let stop = (start + fields::length([entry[3], entry[4]])).min(end);
             if streams.len() == self.limits.streams {
                 return Err(limit(streams.len() + 1, self.limits.streams));
             }
             streams
                 .try_push(ElementaryStream::unchecked(
                     entry[0],
-                    u16::from_be_bytes([entry[1], entry[2]]) & pid::MASK,
+                    fields::pid([entry[1], entry[2]]),
                     section.bytes().slice(start..stop)?,
                 ))
                 .map_err(|error| error.error)?;
