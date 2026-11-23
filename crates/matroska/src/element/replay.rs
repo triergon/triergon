@@ -4,8 +4,9 @@
 //! generation; only the explicit seek transition starts a new one.
 use super::control::EnvelopeProgress;
 use super::{
-    BLOCK_GROUP, CLUSTER, CRC32, ClusterCheckpoint, EBML, ElementHeader, ElementReader, Master,
-    ParseStep, Phase, SEGMENT, SIMPLE_BLOCK, TIMESTAMP, VOID, is_segment_metadata,
+    BLOCK_GROUP, CLUSTER, CRC32, ClusterCheckpoint, EBML, ElementEvent, ElementHeader,
+    ElementReader, Master, ParseStep, Phase, SEGMENT, SIMPLE_BLOCK, TIMESTAMP, VOID,
+    is_segment_metadata,
 };
 use crate::step::Required;
 use crate::{Error, Result};
@@ -187,7 +188,7 @@ impl ElementReader {
         remaining: &mut u64,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<ParseStep> {
+    ) -> Result<ParseStep<ElementEvent>> {
         self.scan_left = *remaining;
         let before = self.input.position();
         let result = self.step(work, cancel);

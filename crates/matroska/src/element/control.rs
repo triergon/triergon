@@ -12,7 +12,7 @@ use triergon_core::WorkBudget;
 #[derive(Debug)]
 pub(crate) enum EnvelopeProgress {
     Header(ElementHeader),
-    Step(ParseStep),
+    Step(ParseStep<super::ElementEvent>),
 }
 
 /// Same source events, with no temporary owned leaf event in typed delivery.

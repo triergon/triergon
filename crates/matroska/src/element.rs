@@ -479,7 +479,11 @@ impl ElementReader {
         });
         Ok(None)
     }
-    pub(crate) fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ParseStep> {
+    pub(crate) fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<ElementEvent>> {
         self.step_mode::<PublicDelivery>(work, cancel, Admit::Never)
     }
     fn step_mode<D: EnvelopeDelivery>(

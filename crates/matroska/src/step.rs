@@ -1,5 +1,4 @@
 //! The step vocabulary every resumable job of this crate answers with.
-use crate::element::ElementEvent;
 use crate::{Error, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::InputRequest;
@@ -8,7 +7,7 @@ use triergon_core::InputRequest;
 /// without one. After any variant but `Event` and `Finished` the same call can
 /// be repeated once the condition is resolved.
 #[derive(Debug)]
-pub enum ParseStep<T = ElementEvent> {
+pub enum ParseStep<T> {
     /// The job's next result.
     Event(T),
     /// The job needs the bytes this request names before it can continue.
