@@ -68,6 +68,7 @@ mod tests;
 use crate::cc::cc_data::{constructs, is_field_pair};
 use crate::cc::line21::odd_parity;
 use crate::cc::text::Text;
+use crate::decimal::decimal;
 use memory::{Effect, Memory};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -175,7 +176,7 @@ impl Subtitle {
     }
 
     fn push(&mut self, read_order: u32, text: &[u8]) -> Result<()> {
-        self.lines.put(itoa(read_order).as_slice())?;
+        decimal(read_order, |digits| self.lines.put(digits))?;
         self.lines.put(b",0,Default,,0,0,0,,")?;
         self.lines.put(text)?;
         if self.ends.len() == self.ends.capacity() {
@@ -184,33 +185,6 @@ impl Subtitle {
         self.ends
             .try_push(self.lines.len())
             .map_err(|rejected| rejected.error)
-    }
-}
-
-/// Decimal digits of `value`, without allocation.
-fn itoa(mut value: u32) -> Digits {
-    let mut digits = Digits {
-        bytes: [0; 10],
-        start: 10,
-    };
-    loop {
-        digits.start -= 1;
-        digits.bytes[digits.start] = b'0' + (value % 10) as u8;
-        value /= 10;
-        if value == 0 {
-            return digits;
-        }
-    }
-}
-
-struct Digits {
-    bytes: [u8; 10],
-    start: usize,
-}
-
-impl Digits {
-    fn as_slice(&self) -> &[u8] {
-        &self.bytes[self.start..]
     }
 }
 

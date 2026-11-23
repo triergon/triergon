@@ -22,6 +22,7 @@ pub mod compat;
 pub mod reference_trace;
 
 mod canvas;
+mod decimal;
 mod teletext;
 
 use std::sync::atomic::{AtomicBool, Ordering};

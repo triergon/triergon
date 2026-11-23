@@ -1,5 +1,6 @@
 //! Budget-charged UTF-8 output.
 
+use crate::decimal::decimal;
 use triergon_core::{BudgetVec, Result};
 
 /// Appends UTF-8 text to a charged buffer, growing it geometrically.
@@ -28,18 +29,8 @@ impl Out<'_> {
     }
 
     /// A decimal number.
-    pub(super) fn number(&mut self, mut value: u32) -> Result<()> {
-        let mut digits = [0u8; 10];
-        let mut at = digits.len();
-        loop {
-            at -= 1;
-            digits[at] = b'0' + (value % 10) as u8;
-            value /= 10;
-            if value == 0 {
-                break;
-            }
-        }
-        self.bytes(&digits[at..])
+    pub(super) fn number(&mut self, value: u32) -> Result<()> {
+        decimal(value, |digits| self.bytes(digits))
     }
 
     /// Six uppercase hexadecimal digits.

@@ -700,7 +700,9 @@ fn hex_tag(
     }
     tags.append(b"&}")
 }
-/// Appends `value` in decimal.
+/// Appends `value` in decimal, a byte at a time. Through the receivers'
+/// [`decimal`](crate::decimal::decimal), a `u32` loop handing over a slice, a
+/// size tag cost a library copy call (17 instructions) and a sample up to 23.
 fn decimal(tags: &mut Fixed<64>, value: u8) -> Result<()> {
     if value >= 100 {
         tags.append(&[b'0' + value / 100])?;
