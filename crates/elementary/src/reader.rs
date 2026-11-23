@@ -290,7 +290,8 @@ impl<F: Format> Reader<F> {
     pub fn stream(&self) -> Option<&Track> {
         self.opened.as_ref().map(|(track, _)| track)
     }
-    /// Tags found so far: ID3v2 at the start, ID3v1 and APEv2 once reached.
+    /// Tags found so far: ID3v2 at the start, ID3v1 and APEv2 once reached. Every
+    /// entry is charged to the pool, including tags retained by length alone.
     pub fn tags(&self) -> &[Tag] {
         &self.tags
     }
@@ -377,16 +378,16 @@ impl<F: Format> Reader<F> {
             return Ok(Flow::Wait(wait));
         }
         self.phase = match id3v2(self.input.view()) {
-            Leading::Tag(len) => self.keep(len, Owner::Tag(TagKind::Id3v2), Then::Leading),
+            Leading::Tag(len) => self.keep(len, Owner::Tag(TagKind::Id3v2), Then::Leading)?,
             Leading::No | Leading::Short => Phase::Prelude,
         };
         Ok(Flow::Ready(None))
     }
 
     /// Retain `len` bytes if the limits allow it, or record their length and drop them.
-    fn keep(&mut self, len: u64, owner: Owner, then: Then<F::Header>) -> Phase<F::Header> {
+    fn keep(&mut self, len: u64, owner: Owner, then: Then<F::Header>) -> Result<Phase<F::Header>> {
         let room = self.limits.retained_metadata_bytes - self.retained;
-        match usize::try_from(len) {
+        Ok(match usize::try_from(len) {
             Ok(len) if len <= room && len <= self.limits.frame_bytes => {
                 self.retained += len;
                 Phase::Retain { len, owner, then }
@@ -398,16 +399,15 @@ impl<F: Format> Reader<F> {
                         offset: self.input.position(),
                         len,
                         bytes: None,
-                    });
+                    })?;
                 }
                 Phase::Discard { left: len, then }
             }
-        }
+        })
     }
 
-    fn record(&mut self, tag: Tag) {
-        // A tag list the budget cannot hold loses its tail, never the stream.
-        let _ = self.tags.try_push(tag);
+    fn record(&mut self, tag: Tag) -> Result<()> {
+        self.tags.try_push(tag).map_err(|refused| refused.error)
     }
 
     fn prelude(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Next> {
@@ -428,7 +428,7 @@ impl<F: Format> Reader<F> {
                     return Ok(Flow::Ready(None));
                 }
                 Prelude::Keep(len) => {
-                    self.phase = self.keep(len, Owner::Format, Then::Prelude);
+                    self.phase = self.keep(len, Owner::Format, Then::Prelude)?;
                     if matches!(self.phase, Phase::Discard { .. }) {
                         self.format.omit(len)?;
                     }
@@ -490,6 +490,10 @@ impl<F: Format> Reader<F> {
             Flow::Ready(false) => return Err(Error::Truncated),
             Flow::Ready(true) => {}
         }
+        if matches!(owner, Owner::Tag(_)) {
+            // Reserve the tag entry before taking its bytes so backpressure can retry.
+            self.tags.try_reserve(1)?;
+        }
         let offset = self.input.position();
         let Some(bytes) = self.input.take(len, work, cancel)? else {
             return Ok(Flow::Wait(Wait::Step(Step::Yield)));
@@ -500,7 +504,7 @@ impl<F: Format> Reader<F> {
                 offset,
                 len: len as u64,
                 bytes: Some(bytes),
-            }),
+            })?,
             Owner::Format => self.format.keep(bytes)?,
         }
         self.phase = Self::resume(then);
@@ -1210,7 +1214,7 @@ impl<F: Format> Reader<F> {
                 }
             }
         };
-        self.phase = self.keep(len, Owner::Tag(kind), Then::End);
+        self.phase = self.keep(len, Owner::Tag(kind), Then::End)?;
         Ok(Flow::Ready(None))
     }
 }
@@ -1269,7 +1273,59 @@ impl<F: Format> ContainerReader for Reader<F> {
 
 #[cfg(test)]
 mod tests {
-    use super::find;
+    use super::*;
+    use crate::MpegAudio;
+    use triergon_core::Bytes;
+
+    #[test]
+    fn a_tag_entry_is_retried_after_backpressure() {
+        let tag = b"ID3\x04\x00\x00\x00\x00\x00\x01x";
+        let mut frame = vec![0xff, 0xfb, 0x90, 0x64];
+        frame.resize(417, 0);
+        let file = [tag.as_slice(), &frame, &frame, &frame].concat();
+        let cancel = AtomicBool::new(false);
+        for retained_metadata_bytes in [0, tag.len()] {
+            let limits = Limits {
+                retained_metadata_bytes,
+                ..Limits::default()
+            };
+            let pool = Budget::new(4096).unwrap();
+            let mut reader = Reader::<MpegAudio>::new(
+                &pool,
+                SourceId(1),
+                SourceCapabilities {
+                    length: Some(file.len() as u64),
+                    random_access: true,
+                },
+                limits,
+                4096,
+            )
+            .unwrap();
+            let request = reader.request();
+            let bytes = Bytes::copy_from_slice(&pool, &file).unwrap();
+            let window = InputWindow::new(request.source, request.token, 0, bytes).unwrap();
+            reader.provide(&window).unwrap();
+            let held = pool.reserve(pool.available()).unwrap();
+            assert!(matches!(
+                reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
+                Step::Backpressure(_)
+            ));
+            assert!(reader.tags().is_empty());
+            drop(held);
+            assert!(matches!(
+                reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
+                Step::Ready(Event::Other(ReaderEvent::Opened))
+            ));
+            let [entry] = reader.tags() else {
+                panic!("expected one tag")
+            };
+            assert_eq!((entry.offset, entry.len), (0, tag.len() as u64));
+            assert_eq!(
+                entry.bytes.as_deref(),
+                (retained_metadata_bytes != 0).then_some(tag.as_slice())
+            );
+        }
+    }
 
     #[test]
     fn find_agrees_with_a_byte_search_at_every_offset_and_length() {
