@@ -9,12 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Hot paths keep the forms they were measured with; these rewrites change their code.
-#![allow(
-    clippy::checked_conversions,
-    clippy::map_unwrap_or,
-    clippy::redundant_closure_for_method_calls
-)]
 
 pub mod boxes;
 pub mod compat;

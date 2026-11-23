@@ -6,8 +6,10 @@
 //!
 //! Specification: Apple QuickTime File Format (seeking, `stss` and chunk tables).
 use crate::{
-    Access, BuildStatus, Next, Sample, fragment::FragmentLocator, interleave::SourceTrack,
-    table::SampleLocator,
+    Access, BuildStatus, Next, Sample,
+    fragment::FragmentLocator,
+    interleave::SourceTrack,
+    table::{SampleLocator, SampleTable},
 };
 use std::{
     ops::Range,
@@ -268,7 +270,7 @@ impl<'a> SourceSeekPlanner<'a> {
         count_limit(media_extents.len(), limits.max_media_extents)?;
         let next_ordinal = source
             .regular_index()
-            .map_or(0, |table| table.sample_count())
+            .map_or(0, SampleTable::sample_count)
             .checked_add(1)
             .ok_or(Error::Overflow)?;
         Ok(Self {

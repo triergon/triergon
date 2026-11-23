@@ -246,7 +246,10 @@ impl<'a> IndexCursor<'a> {
             cursor,
             limits.max_entries,
             plans[0].is_some(),
-            plans.iter().flatten().any(|p| p.has_dependency_view()),
+            plans
+                .iter()
+                .flatten()
+                .any(crate::compat::mov::encoded_edits::EncodedEditPlan::has_dependency_view),
         ))
     }
     pub(crate) fn allow_recovery_initial_nonkey(&mut self) {

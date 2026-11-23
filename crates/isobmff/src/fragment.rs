@@ -6,7 +6,7 @@
 //! ISO/IEC 14496-12:2008/FDAmd2 §8.8.7.1 (moof-relative base); FDAM3 §8.8.8.2 and MPEG
 //! m76694 Table 9 (signed `trun`).
 use crate::{
-    Access, BuildStatus, Limits, Next, Sample,
+    Access, BuildStatus, CompositionOffset, Limits, Next, Sample,
     boxes::{BoxChildren, BoxView},
     fields, policy,
     sample::SampleSpan,
@@ -156,7 +156,7 @@ struct Values {
     duration: u32,
     size: u32,
     flags: u32,
-    cto: Option<crate::CompositionOffset>,
+    cto: Option<CompositionOffset>,
 }
 #[derive(Debug)]
 struct Run {
@@ -250,7 +250,7 @@ impl Run {
         );
         let raw_cto = read(0x800, 0);
         let cto = if self.fields & 0x800 != 0 {
-            Some(crate::CompositionOffset::from_wire(self.version, raw_cto)?)
+            Some(CompositionOffset::from_wire(self.version, raw_cto)?)
         } else {
             None
         };
@@ -872,7 +872,7 @@ impl<I: Borrow<FragmentIndex>> FragmentPosition<I> {
             return Ok(Next::End);
         };
         let values = next.values;
-        let cto_ticks = values.cto.map(|value| value.ticks()).unwrap_or(0);
+        let cto_ticks = values.cto.map_or(0, CompositionOffset::ticks);
         let cts = next
             .decode
             .map(|d| d.checked_add(cto_ticks).ok_or(Error::Overflow))

@@ -127,7 +127,7 @@ impl<'a> Checkpoints<'a> {
         let key = flags & 1 != 0;
         let admitted = 5 | if slot
             .encoded_edit
-            .is_some_and(|edit| edit.has_dependency_view())
+            .is_some_and(EncodedEditPlan::has_dependency_view)
         {
             16
         } else {
@@ -211,7 +211,7 @@ impl<'a> PacketCursor<'a> {
 
     pub(super) fn initialize_range_seek_checkpoints(&mut self) {
         self.recording_seek_checkpoints = false;
-        if self.limits.max_occurrences <= i32::MAX as u64
+        if i32::try_from(self.limits.max_occurrences).is_ok()
             && self.slots.as_slice().iter().all(|slot| {
                 slot.resume_remaining == 0
                     && (slot.track.fragments.is_empty() || slot.track.table.sample_count() == 0)

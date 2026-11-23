@@ -190,7 +190,7 @@ pub(crate) const fn composition_shift_rows(rows: u32) -> u32 {
 fn nearest_away(value: u128, divisor: u64) -> u128 {
     let (quotient, remainder) = if let Ok(value) = u64::try_from(value) {
         (u128::from(value / divisor), value % divisor)
-    } else if divisor <= u64::from(u32::MAX) {
+    } else if u32::try_from(divisor).is_ok() {
         [96, 64, 32, 0]
             .into_iter()
             .fold((0, 0), |(quotient, remainder): (u128, u64), shift| {
