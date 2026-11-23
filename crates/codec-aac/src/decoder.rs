@@ -140,6 +140,8 @@ pub(crate) struct Slot {
     pub kind: ElementId,
     pub tag: u8,
     pub speakers: [Option<Speaker>; 2],
+    /// Output plane of each channel. A single-channel slot has no second plane.
+    planes: [Option<u8>; 2],
 }
 
 /// Element instance state (channels + SBR).
@@ -226,8 +228,6 @@ pub(crate) struct Core {
     pub channel_config: u8,
     pub slots: Vec<Slot>,
     pub layout: ChannelLayout,
-    /// plane index for slot i channel c
-    pub plane_of: Vec<[usize; 2]>,
     pub elements: Vec<Charged<Box<ElementState>>>,
     pub fb: Filterbank,
     pub random: u32,
@@ -263,7 +263,6 @@ impl Core {
             channel_config: 0,
             slots: Vec::new(),
             layout: ChannelLayout::default(),
-            plane_of: Vec::new(),
             elements: Vec::new(),
             fb: Filterbank::new(),
             random: PNS_INITIAL_STATE,
@@ -464,21 +463,17 @@ impl Core {
     }
 
     fn rebuild_layout(&mut self) -> Result<()> {
-        (self.layout, self.plane_of) = self.layout_of(&self.slots, self.unordered)?;
+        self.layout = Self::layout_of(&mut self.slots, self.ps_active, self.unordered)?;
         Ok(())
     }
 
-    /// The layout of `slots` and the plane of each slot's channels.
-    fn layout_of(
-        &self,
-        slots: &[Slot],
-        unordered: bool,
-    ) -> Result<(ChannelLayout, Vec<[usize; 2]>)> {
+    /// Assigns output planes to `slots` in layout order.
+    fn layout_of(slots: &mut [Slot], ps_active: bool, unordered: bool) -> Result<ChannelLayout> {
         // Expand slots to planes; PS doubles the single mono slot.
         let mut entries: Vec<(Speaker, usize, usize)> = Vec::new();
         for (i, s) in slots.iter().enumerate() {
             let mut sp = s.speakers;
-            if self.ps_active && s.kind == ElementId::Sce && slots.len() == 1 {
+            if ps_active && s.kind == ElementId::Sce && slots.len() == 1 {
                 sp = [Some(Speaker::FrontLeft), Some(Speaker::FrontRight)];
             }
             for (c, x) in sp.iter().enumerate() {
@@ -491,26 +486,28 @@ impl Core {
         if !unordered {
             entries.sort_by_key(|e| e.0);
         }
-        let mut plane_of = vec![[usize::MAX; 2]; slots.len()];
-        for (p, e) in entries.iter().enumerate() {
-            plane_of[e.1][e.2] = p;
-        }
         // A PCE yields one slot per listed element: at most CAPACITY planes.
         let layout = ChannelLayout::new(entries.iter().map(|e| e.0))
             .ok_or(DecodeError::Unsupported(Feature::TooManyChannels))?;
-        Ok((layout, plane_of))
+        for slot in slots.iter_mut() {
+            slot.planes = [None; 2];
+        }
+        for (plane, (_, slot, channel)) in entries.into_iter().enumerate() {
+            slots[slot].planes[channel] = Some(plane as u8);
+        }
+        Ok(layout)
     }
 
     /// Apply an in-band layout of `slots`: its elements and the room it needs in `out` are
     /// charged first, so a refusal leaves the configuration as it was.
     fn switch_layout(
         &mut self,
-        slots: Vec<Slot>,
+        mut slots: Vec<Slot>,
         unordered: bool,
         out: &mut AudioFrame,
         blocks: usize,
     ) -> Result<()> {
-        let (layout, plane_of) = self.layout_of(&slots, unordered)?;
+        let layout = Self::layout_of(&mut slots, self.ps_active, unordered)?;
         self.make_room(out, layout.channels(), self.frame_len(), blocks)?;
         // Both layouts together hold at most 48 identities (16 tags of each kind), so the
         // switch never holds more element state than that.
@@ -535,7 +532,6 @@ impl Core {
         self.slots = slots;
         self.unordered = unordered;
         self.layout = layout;
-        self.plane_of = plane_of;
         Ok(())
     }
 
@@ -911,7 +907,10 @@ impl Core {
                     let out = if RAW {
                         // Every fixed slot has its own element in wire order. The
                         // frame has already reserved a plane for each channel.
-                        &mut frame.planes[self.plane_of[ei][c]][..]
+                        let Some(plane) = self.slots[ei].planes[c] else {
+                            continue;
+                        };
+                        &mut frame.planes[usize::from(plane)][..]
                     } else {
                         &mut e.out[c][..]
                     };
@@ -990,7 +989,7 @@ impl Core {
         }
         let base = out.planes.first().map_or(0, Vec::len);
         out.try_resize(channels, base + flen, &mut self.output_charge)?;
-        for (si, slot) in self.slots.iter().enumerate() {
+        for slot in &self.slots {
             let Some(e) = self
                 .elements
                 .iter()
@@ -998,11 +997,9 @@ impl Core {
             else {
                 continue;
             };
-            for c in 0..2 {
-                let p = self.plane_of[si][c];
-                if let Some(dst) = out.planes.get_mut(p) {
-                    // (a later slot mapped to the same plane replaces the earlier one)
-                    dst[base..].copy_from_slice(&e.out[c][..flen]);
+            for (plane, source) in slot.planes.into_iter().zip(&e.out) {
+                if let Some(plane) = plane {
+                    out.planes[usize::from(plane)][base..].copy_from_slice(&source[..flen]);
                 }
             }
         }
@@ -1059,16 +1056,19 @@ fn fixed_config_slots(cfg: u8, layout: FixedLayout) -> Vec<Slot> {
         kind: ElementId::Sce,
         tag: 0,
         speakers: [Some(s), None],
+        planes: [None; 2],
     };
     let cpe = |a, b| Slot {
         kind: ElementId::Cpe,
         tag: 0,
         speakers: [Some(a), Some(b)],
+        planes: [None; 2],
     };
     let lfe = Slot {
         kind: ElementId::Lfe,
         tag: 0,
         speakers: [Some(LowFrequency), None],
+        planes: [None; 2],
     };
     let surround_pair = || match layout {
         FixedLayout::Raw(Policy::ConventionalSurround) => cpe(BackLeft, BackRight),
@@ -1153,11 +1153,13 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
         kind: ElementId::Sce,
         tag: t,
         speakers: [Some(s), None],
+        planes: [None; 2],
     };
     let cpe = |t, a, b| Slot {
         kind: ElementId::Cpe,
         tag: t,
         speakers: [Some(a), Some(b)],
+        planes: [None; 2],
     };
     // front
     let nfch: usize = front.iter().map(|e| if e.is_cpe { 2 } else { 1 }).sum();
@@ -1266,6 +1268,7 @@ fn pce_slots(p: &Pce, adts: bool) -> (Vec<Slot>, bool) {
                 Some(if k == 0 { LowFrequency } else { LowFrequency2 }),
                 None,
             ],
+            planes: [None; 2],
         });
     }
     // height layers
@@ -1409,9 +1412,9 @@ pub(crate) mod tests {
             lfe: vec![0],
             ..Pce::default()
         };
-        let (slots, unordered) = pce_slots(&pce, true);
-        let core = Core::new(&Budget::new(1 << 20).unwrap());
-        let (layout, planes) = core.layout_of(&slots, unordered).unwrap();
+        let (mut slots, unordered) = pce_slots(&pce, true);
+        let layout = Core::layout_of(&mut slots, false, unordered).unwrap();
+        let planes: Vec<_> = slots.iter().map(|slot| slot.planes).collect();
         assert_eq!(
             layout.speakers(),
             [
@@ -1423,7 +1426,15 @@ pub(crate) mod tests {
                 Speaker::BackRight,
             ]
         );
-        assert_eq!(planes, [[2, usize::MAX], [0, 1], [4, 5], [3, usize::MAX]]);
+        assert_eq!(
+            planes,
+            [
+                [Some(2), None],
+                [Some(0), Some(1)],
+                [Some(4), Some(5)],
+                [Some(3), None]
+            ]
+        );
     }
 
     /// `value`'s `Debug` text without the counters of the pools it is charged to.
