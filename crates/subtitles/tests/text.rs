@@ -795,3 +795,19 @@ fn addition_limit_returns_all_source_facts_without_reclassification() {
     );
     same_input(&rejection.value, &original);
 }
+
+#[test]
+fn byte_reversed_utf16_tx3g_text_is_unsupported() {
+    // TS 26.245 5.1 does not require terminals to read byte-reversed UTF-16.
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut extractor = Extractor::new(&pool, Limits::default(), 0);
+    let mut input = opaque(&pool, &[0, 4, 0xff, 0xfe, b'A', 0], 0);
+    input.format = Format::Tx3g;
+    input.encoding = Encoding::Tx3gInBand;
+    extractor.provide(input).unwrap();
+    let result = extractor.step(&mut WorkBudget::new(4096), &AtomicBool::new(false));
+    assert_eq!(
+        result.unwrap_err(),
+        Error::Unsupported("byte-reversed UTF-16")
+    );
+}

@@ -32,7 +32,8 @@ pub enum Encoding {
     /// Little-endian UTF-16; a leading FEFF is content.
     Utf16Le,
     /// tx3g in-band selection: big-endian UTF-16 after a leading FE FF, which
-    /// is not content, and UTF-8 otherwise.
+    /// is not content, and UTF-8 otherwise. A leading FF FE, byte-reversed
+    /// UTF-16, is `Error::Unsupported`.
     Tx3gInBand,
     /// Not decoded: the bytes have no character view.
     Opaque,

@@ -267,6 +267,10 @@ impl Probe {
                 (Encoding::Utf16Le, self.range.start + 2..self.range.end)
             }
             (Encoding::Utf16Bom, _, _) => return Err(Error::Invalid("UTF-16 BOM required")),
+            // TS 26.245 5.1: a terminal need not read byte-reversed UTF-16.
+            (Encoding::Tx3gInBand, 2, [0xff, 0xfe]) => {
+                return Err(Error::Unsupported("byte-reversed UTF-16"));
+            }
             (Encoding::Tx3gInBand, _, _) => (Encoding::Utf8, self.range.clone()),
             _ => return Err(Error::Invalid("encoding selector")),
         };
