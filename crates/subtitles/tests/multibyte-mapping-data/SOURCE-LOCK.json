@@ -121,7 +121,7 @@
       ]
     },
     "INDEX-BIG5.TXT": {
-      "url": "https://encoding.spec.whatwg.org/index-big5.txt",
+      "represents": "https://encoding.spec.whatwg.org/index-big5.txt",
       "sha256": "804ec2688abb23dec196c9b3df4b3a2fa3282f4f9cbf4c170435dda28c7e5719",
       "bytes": 262498,
       "head": [
@@ -131,7 +131,7 @@
         "# (lead - 0x81) * 157 + (trail - 0x40, or trail - 0x62 from 0xA1). The codes 8862, 8864, 88A3 and",
         "# 88A5 decode to two code points and are listed last, as comments."
       ],
-      "written_from": "the tables encoding_rs 0.8.35 generates from the index (BIG5_LOW_BITS, BIG5_ASTRALNESS); the sha256 is this file's, not the index file's"
+      "written_from": "the tables encoding_rs 0.8.35 generates from the index (BIG5_LOW_BITS, BIG5_ASTRALNESS), not the index file; the sha256 is this file's"
     }
   },
   "profiles": {

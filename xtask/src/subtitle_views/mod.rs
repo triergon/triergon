@@ -1,5 +1,7 @@
-//! Inputs and reference pins for the subtitle views worker.
+//! Inputs and reference pins for the subtitle views worker, and the strict
+//! Big5 profile's tables.
 
+mod charset_tables;
 mod inputs;
 
 use std::path::Path;
@@ -8,6 +10,11 @@ use std::process::Command;
 pub(crate) use inputs::private_input;
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
+    if let [command, rest @ ..] = args
+        && command == "charset-tables"
+    {
+        return charset_tables::main(root, rest);
+    }
     if args == ["fixtures", "corpus"] {
         return inputs::prepare(root);
     }

@@ -47,9 +47,12 @@ under the Unicode License V3 (`charset/UNICODE-LICENSE.txt`,
 `charset/mapping-data/UNICODE-LICENSE.txt`). The Big5 index is WHATWG's, under the BSD
 3-Clause License (`charset/mapping-data/WHATWG-LICENSE.txt`); it is held as
 `big5.bin` and, for the plane 2 characters, `big5_plane2.bin` with the low 16 bits of
-each scalar, and its text form for the tests, `tests/multibyte-mapping-data/INDEX-BIG5.TXT`,
-was written from the tables the `encoding_rs` crate (0.8.35) generates from the index. The GNU Big5 charmap, with its
-free-distribution notice, is `charset/mapping-data/RECEIVER-BIG5-DATA.txt`. The
+each scalar, and its text form for the tests, `tests/multibyte-mapping-data/INDEX-BIG5.TXT`.
+Both were written from the tables the `encoding_rs` crate (0.8.35) generates from the
+index, not from `index-big5.txt` itself; `cargo xtask subtitle-views charset-tables big5
+FILE` compares the tables with that file, and `--write` writes them from it. The GNU
+Big5 charmap, with its free-distribution notice, is
+`charset/mapping-data/RECEIVER-BIG5-DATA.txt`. The
 original text tables, including KSC5601 for cross-checking, are in the crate's
 `tests/multibyte-mapping-data/` and `tests/receiver-mapping-data/`. Mapping code is
 original; no iconv or FFmpeg code is used.

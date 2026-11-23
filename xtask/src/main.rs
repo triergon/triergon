@@ -132,6 +132,8 @@ commands:
   playback-views author-probes | VIEWS   the playback views worker's probe controls
   subtitle-views fixtures corpus | fixtures --write-to DIR | VIEWS
                  the subtitle views worker's inputs
+                 | charset-tables big5 INDEX [--write]   compare the strict Big5
+                 tables with the Encoding Standard's index-big5.txt, or write them
   transport-views fixtures catalogue-packets | fixtures --write-manifest source-signatures
                  | VIEWS   the transport views worker's inputs
   fetch-specs    [--record]   cache the specification texts and verify specs/sources.json

@@ -119,7 +119,15 @@ Translated from libass 0.17.5, stage by stage:
 
 ## Elsewhere
 
-- `triergon-subtitles` carries Unicode mapping data and a GNU Big5 mapping, with their
-  notices in [crates/subtitles/LICENSE](../crates/subtitles/LICENSE).
+- `triergon-subtitles` carries Unicode and Microsoft mapping data, a GNU Big5 mapping and
+  the WHATWG Encoding Standard's Big5 index, with their notices in
+  [crates/subtitles/LICENSE](../crates/subtitles/LICENSE). The strict Big5 profile's
+  tables (`src/text/charset/mapping-data/big5.bin` and `big5_plane2.bin`) hold
+  `index-big5.txt` (https://encoding.spec.whatwg.org/index-big5.txt), which the
+  standard licenses under the BSD 3-Clause License when it is incorporated into source
+  code. They were written from the tables `encoding_rs` 0.8.35 generates from that file
+  (Mozilla Foundation, Apache-2.0 or MIT), not from the file itself:
+  `cargo xtask subtitle-views charset-tables big5 FILE` compares them with the file,
+  and with `--write` writes them from it.
 - `xtask`, which no library links, has a zlib-derived deflate encoder and an MT19937
   generator; see [xtask/THIRD-PARTY.md](../xtask/THIRD-PARTY.md).
