@@ -246,18 +246,7 @@ impl CharsetJob {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        let mut value = self.inner(work, cancel);
-        // Only Big5 decodes anything its table refuses.
-        while value.is_err() && self.charset == Charset::Multibyte(MultibyteCharset::Big5) {
-            match self.outside_table() {
-                Ok(true) => value = self.inner(work, cancel),
-                Ok(false) => break,
-                Err(error) => {
-                    value = Err(error);
-                    break;
-                }
-            }
-        }
+        let value = self.inner(work, cancel);
         if let Err(error) = value
             && !matches!(error, Error::Backpressure { .. } | Error::Cancelled)
         {
@@ -270,29 +259,6 @@ impl CharsetJob {
     // `poll`: inlined into a decoder's larger step they cost about a tenth more
     // instructions for each conversion.
     #[inline(never)]
-    /// After `inner` failed: takes what the reader's profile decodes although
-    /// its table refused it, as `inner` takes a character; `false` when the
-    /// refusal stands. `inner` reads through the cursor's bare step, so this
-    /// is the one place a conversion calls for it.
-    #[cold]
-    fn outside_table(&mut self) -> Result<bool> {
-        let Reader::Scalars(cursor) = &mut self.reader else {
-            return Ok(false);
-        };
-        match cursor.outside_table(self.source.as_ref()) {
-            Outside::Refused => return Ok(false),
-            Outside::Lead => {}
-            Outside::Scalar(scalar) => match self.phase {
-                Phase::Count => self.length = counted(self.length, scalar.value, &self.limits)?,
-                Phase::Encode => {
-                    self.pending_len = scalar.value.encode_utf8(&mut self.pending).len();
-                    self.pending_at = 0;
-                }
-                _ => {}
-            },
-        }
-        Ok(true)
-    }
     fn inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CharsetStatus> {
         loop {
             cancelled(cancel)?;
@@ -332,15 +298,20 @@ impl CharsetJob {
                         self.range = range;
                     }
                     Reader::Scalars(cursor) => {
-                        match cursor.step(self.source.as_ref(), work, cancel)? {
-                            Poll::Yield => return Ok(CharsetStatus::Pending),
-                            Poll::Ready(scalar) => {
+                        match cursor.step(self.source.as_ref(), work, cancel) {
+                            Ok(Poll::Yield) => return Ok(CharsetStatus::Pending),
+                            Ok(Poll::Ready(scalar)) => {
                                 self.length = counted(self.length, scalar.value, &self.limits)?;
                             }
-                            Poll::End if self.charset == Charset::Utf8 => {
+                            Ok(Poll::End) if self.charset == Charset::Utf8 => {
                                 self.phase = Phase::Ready(self.source.slice(self.range.clone())?);
                             }
-                            Poll::End => self.phase = Phase::Allocate { paid: false },
+                            Ok(Poll::End) => self.phase = Phase::Allocate { paid: false },
+                            Err(error) => {
+                                if !self.outside_table()? {
+                                    return Err(error);
+                                }
+                            }
                         }
                     }
                 },
@@ -408,11 +379,17 @@ impl CharsetJob {
                             continue;
                         }
                         Reader::Scalars(cursor) => {
-                            match cursor.step(self.source.as_ref(), work, cancel)? {
-                                Poll::Yield => return Ok(CharsetStatus::Pending),
-                                Poll::Ready(scalar) => scalar.value,
-                                Poll::End => {
+                            match cursor.step(self.source.as_ref(), work, cancel) {
+                                Ok(Poll::Yield) => return Ok(CharsetStatus::Pending),
+                                Ok(Poll::Ready(scalar)) => scalar.value,
+                                Ok(Poll::End) => {
                                     self.phase = Phase::Freeze { paid: false };
+                                    continue;
+                                }
+                                Err(error) => {
+                                    if !self.outside_table()? {
+                                        return Err(error);
+                                    }
                                     continue;
                                 }
                             }
@@ -443,6 +420,32 @@ impl CharsetJob {
                 Phase::Taken => return Err(Error::Invalid("charset output already taken")),
             }
         }
+    }
+    /// After [`Cursor::step`] failed: takes what the reader's profile decodes
+    /// although its table refused it, as [`inner`](Self::inner) takes a
+    /// character; `false` when the refusal stands. Only Big5 decodes anything
+    /// its table refuses.
+    #[cold]
+    fn outside_table(&mut self) -> Result<bool> {
+        if self.charset != Charset::Multibyte(MultibyteCharset::Big5) {
+            return Ok(false);
+        }
+        let Reader::Scalars(cursor) = &mut self.reader else {
+            return Ok(false);
+        };
+        match cursor.outside_table(self.source.as_ref()) {
+            Outside::Refused => return Ok(false),
+            Outside::Lead => {}
+            Outside::Scalar(scalar) => match self.phase {
+                Phase::Count => self.length = counted(self.length, scalar.value, &self.limits)?,
+                Phase::Encode => {
+                    self.pending_len = scalar.value.encode_utf8(&mut self.pending).len();
+                    self.pending_at = 0;
+                }
+                _ => {}
+            },
+        }
+        Ok(true)
     }
     /// The conversion, once [`poll`](Self::poll) reported
     /// [`CharsetStatus::Ready`]; `Error::Invalid` before then and once taken.
