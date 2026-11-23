@@ -6,7 +6,7 @@ use crate::page::{CAPTURE_SCAN_LIMIT, MAX_PAGE, Page, PageHeader, PageReader};
 use crate::queue::Queue;
 use crate::seek::{Bisection, Landing, Offer, Output, Probe};
 use crate::timing::{Clock, PageClock, Slot};
-use crate::track::{Packet, Track};
+use crate::track::{HeaderState, Packet, Track};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
     ContainerReader, Event, ReaderStep, SeekMethod, SeekRequest, TrackInfo,
@@ -95,7 +95,6 @@ struct Stream {
     serial: u32,
     track: Option<usize>,
     assembler: Assembler,
-    headers: Headers,
     previous: Previous,
     clock: Clock,
     reference: ReferenceClock,
@@ -107,7 +106,6 @@ impl Stream {
             serial,
             track: None,
             assembler: Assembler::new(pool, limits.packet_bytes),
-            headers: Headers::Done,
             previous: Previous::Start,
             clock: Clock::at(None),
             reference: ReferenceClock::default(),
@@ -115,8 +113,13 @@ impl Stream {
     }
 
     /// Whether the stream's headers are read, or ended in an invalid one.
-    fn headers_read(&self) -> bool {
-        self.track.is_some() && matches!(self.headers, Headers::Done | Headers::Invalid)
+    fn headers_read(&self, tracks: &[Track]) -> bool {
+        self.track.is_some_and(|index| {
+            matches!(
+                tracks[index].headers.expected(),
+                Headers::Done | Headers::Invalid
+            )
+        })
     }
 }
 
@@ -262,7 +265,7 @@ impl Reader {
 
     /// Whether every logical stream of the current link has read its headers.
     pub(crate) fn headers_read(&self) -> bool {
-        !self.streams.is_empty() && self.streams.iter().all(Stream::headers_read)
+        !self.streams.is_empty() && self.streams.iter().all(|s| s.headers_read(&self.tracks))
     }
 
     fn advance(
@@ -526,25 +529,27 @@ impl Reader {
         let Some(track) = self.streams[stream].track else {
             return self.attach(stream, &payload);
         };
-        let headers = self.streams[stream].headers;
+        let view = &mut self.tracks[track];
+        let headers = view.headers.expected();
         if headers != Headers::Done {
             if headers == Headers::Invalid {
                 return Ok(());
             }
             let step = headers.classify(&payload);
-            let configuring = !self.tracks[track].configured;
             match step {
                 // The headers ended before this media packet (FLAC without a count).
                 Ok(HeaderStep::Media) => {
-                    self.streams[stream].headers = Headers::Done;
+                    view.headers.expect(Headers::Done);
                     self.configured(stream, track)?;
                 }
                 Ok(step) => {
-                    if configuring && self.tracks[track].header_error.is_none() {
-                        match self.tracks[track].config.header(headers, &payload) {
+                    if let HeaderState::Opening { error, .. } = &mut view.headers
+                        && error.is_none()
+                    {
+                        match view.config.header(headers, &payload) {
                             Ok(()) => {}
                             Err(error @ Error::Backpressure { .. }) => return Err(error),
-                            Err(error) => self.tracks[track].header_error = Some(error),
+                            Err(failed) => *error = Some(failed),
                         }
                     }
                     let next = if step == HeaderStep::Last {
@@ -552,7 +557,7 @@ impl Reader {
                     } else {
                         headers.next()
                     };
-                    self.streams[stream].headers = next;
+                    view.headers.expect(next);
                     if next == Headers::Done {
                         self.configured(stream, track)?;
                     }
@@ -561,11 +566,11 @@ impl Reader {
                 // Not the header the mapping requires here: the stream is invalid (RFC
                 // 7845 section 5, Vorbis I section 4.2.1, Theora I section 6.1). The
                 // track keeps its identification and the error; no packet follows.
-                Err(error) => {
-                    if configuring {
-                        self.tracks[track].header_error = Some(error);
+                Err(failed) => {
+                    if let HeaderState::Opening { error, .. } = &mut view.headers {
+                        *error = Some(failed);
                     }
-                    self.streams[stream].headers = Headers::Invalid;
+                    view.headers.expect(Headers::Invalid);
                     return Ok(());
                 }
             }
@@ -615,14 +620,14 @@ impl Reader {
         } else {
             ReferenceClock::default()
         };
-        let headers = if track.header_error.is_some() {
+        let headers = if track.header_error().is_some() {
             Headers::Done
         } else {
             Headers::after_first(mapping, first)
         };
         let s = &mut self.streams[stream];
         s.track = Some(index);
-        s.headers = headers;
+        self.tracks[index].headers.expect(headers);
         s.reference = reference;
         if headers == Headers::Done {
             self.configured(stream, index)?;
@@ -654,15 +659,15 @@ impl Reader {
             .iter()
             .filter(|track| track.link == link)
             .count();
-        let mut track = Track::new(
+        let track = Track::new(
             serial,
             link,
             u32::try_from(position).map_err(|_| Error::Overflow)?,
             mapping,
             tag,
             config,
+            error,
         );
-        track.header_error = error;
         self.tracks.try_push(track).map_err(|e| e.error)?;
         Ok(self.tracks.len() - 1)
     }
@@ -674,10 +679,13 @@ impl Reader {
         let s = &mut self.streams[stream];
         s.previous = Previous::Start;
         s.clock = Clock::at(start);
-        if track.configured {
+        let HeaderState::Opening { error, .. } = track.headers else {
             return Ok(());
-        }
-        track.configured = true;
+        };
+        track.headers = HeaderState::Ready {
+            next: Headers::Done,
+            error,
+        };
         track.time_base = track.config.time_base();
         if let Some(start) = self.link_start
             && track.timeline().timed()
@@ -790,7 +798,7 @@ impl Reader {
         }
         if let Some(link) = self.links.get_mut(self.link)
             && link.data.is_none()
-            && self.streams.iter().all(Stream::headers_read)
+            && self.streams.iter().all(|s| s.headers_read(&self.tracks))
         {
             link.data = Some(page.offset + page.bytes.len() as u64);
         }
@@ -878,16 +886,17 @@ impl Reader {
         if !at_start {
             let link = self.link;
             for index in 0..self.tracks.len() {
-                let track = &self.tracks[index];
+                let track = &mut self.tracks[index];
                 if track.link as usize != link {
                     continue;
                 }
                 let mut stream = Stream::new(self.input.budget(), track.serial, &self.limits);
                 stream.track = Some(index);
-                if !track.configured {
-                    // Its headers broke: the stream stays invalid.
-                    stream.headers = Headers::Invalid;
-                }
+                track.headers.expect(if track.is_configured() {
+                    Headers::Done
+                } else {
+                    Headers::Invalid
+                });
                 stream.previous = Previous::Unknown;
                 if self.reference_clock {
                     stream.reference = ReferenceClock::resumed(track.reference_shift);
@@ -1014,7 +1023,7 @@ impl ContainerReader for Reader {
             .position(|track| track.id() == request.track)
             .ok_or(Error::Invalid("seek track is not in the source"))?;
         let track = &self.tracks[requested];
-        if !track.configured || !track.timeline().timed() {
+        if !track.is_configured() || !track.timeline().timed() {
             return Err(Error::Unsupported("seek on a track without packet times"));
         }
         // The track at the same position of the last known link starting by the target.
@@ -1026,7 +1035,7 @@ impl ContainerReader for Reader {
             .rev()
             .find(|(_, t)| {
                 t.position == position
-                    && t.configured
+                    && t.is_configured()
                     && t.timeline().timed()
                     && Time::from_ticks(i128::from(t.offset), t.time_base)
                         .is_ok_and(|start| start <= request.target)

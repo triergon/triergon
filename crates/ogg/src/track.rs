@@ -1,6 +1,6 @@
 //! Tracks and packets, and their neutral views.
 use crate::compat::clock::ReferenceTiming;
-use crate::mapping::{Configuration, Mapping, Timeline};
+use crate::mapping::{Configuration, Headers, Mapping, Timeline};
 use triergon_core::container::{
     CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim,
 };
@@ -24,12 +24,38 @@ pub struct Track {
     pub(crate) time_base: TimeBase,
     /// Ticks from this link's time zero to the physical stream's.
     pub(crate) offset: i64,
-    pub(crate) configured: bool,
-    pub(crate) header_error: Option<Error>,
+    pub(crate) headers: HeaderState,
     pub(crate) end: Option<i64>,
     /// Where the reference clock ended this track, for the next link.
     pub(crate) reference_end: Option<i64>,
     pub(crate) reference_shift: i64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum HeaderState {
+    Opening {
+        next: Headers,
+        error: Option<Error>,
+    },
+    /// Published configuration stays readable while a seek reads the headers again.
+    Ready {
+        next: Headers,
+        error: Option<Error>,
+    },
+}
+
+impl HeaderState {
+    pub(crate) fn expected(&self) -> Headers {
+        match *self {
+            Self::Opening { next, .. } | Self::Ready { next, .. } => next,
+        }
+    }
+
+    pub(crate) fn expect(&mut self, headers: Headers) {
+        match self {
+            Self::Opening { next, .. } | Self::Ready { next, .. } => *next = headers,
+        }
+    }
 }
 
 impl Track {
@@ -40,6 +66,7 @@ impl Track {
         mapping: Mapping,
         tag: &[u8],
         config: Configuration,
+        error: Option<Error>,
     ) -> Track {
         let mut bytes = [0; 8];
         let tag_len = tag.len().min(8);
@@ -55,8 +82,10 @@ impl Track {
             time_base: config.time_base(),
             config,
             offset: 0,
-            configured: false,
-            header_error: None,
+            headers: HeaderState::Opening {
+                next: Headers::Done,
+                error,
+            },
             end: None,
             reference_end: None,
             reference_shift: 0,
@@ -79,7 +108,7 @@ impl Track {
 
     /// Whether every header packet has been read (or the mapping has none).
     pub fn is_configured(&self) -> bool {
-        self.configured
+        matches!(self.headers, HeaderState::Ready { .. })
     }
 
     /// Why a header packet could not be read. A packet that is not the header its mapping
@@ -89,7 +118,9 @@ impl Track {
     ///
     /// [`Limits::header_bytes`]: crate::Limits::header_bytes
     pub fn header_error(&self) -> Option<Error> {
-        self.header_error
+        match self.headers {
+            HeaderState::Opening { error, .. } | HeaderState::Ready { error, .. } => error,
+        }
     }
 
     /// The sample rate the identification header states.
