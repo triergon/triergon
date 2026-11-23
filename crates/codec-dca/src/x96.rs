@@ -32,7 +32,7 @@ impl X96Header {
     pub(crate) fn parse(
         br: &mut BitReader<'_>,
         nch: usize,
-        cpf: bool,
+        crc_present: bool,
     ) -> Result<Option<Self>, DecodeError> {
         let _fsize96 = br.read(12);
         let revno = br.read(4);
@@ -96,7 +96,7 @@ impl X96Header {
                 h.sel[ch][n] = br.read(w) as u8;
             }
         }
-        if cpf {
+        if crc_present {
             let _ahcrc96 = br.read(16);
         }
         Ok(Some(h))
@@ -135,8 +135,8 @@ pub(crate) fn decode_subframe(
     h: &X96Header,
     side: &mut X96Side,
     nssc: usize,
-    aspf: bool,
-    cpf: bool,
+    sync_each_subsubframe: bool,
+    crc_present: bool,
     lossless: bool,
     buf: &mut SubBuf,
     t0: usize,
@@ -219,7 +219,7 @@ pub(crate) fn decode_subframe(
             }
         }
     }
-    if cpf {
+    if crc_present {
         let _sicrc96 = br.read(16);
     }
     if br.overrun() {
@@ -279,7 +279,7 @@ pub(crate) fn decode_subframe(
                 }
             }
         }
-        if (ssf == nssc - 1 || aspf) && br.read(16) != 0xFFFF {
+        if (ssf == nssc - 1 || sync_each_subsubframe) && br.read(16) != 0xFFFF {
             return Err(DecodeError::Invalid("X96 DSYNC"));
         }
     }

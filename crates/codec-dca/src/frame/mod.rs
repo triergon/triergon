@@ -25,10 +25,10 @@ const QMF64_GAIN: f64 = 0.25 * 256.0 * std::f64::consts::SQRT_2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 struct Config {
-    amode: u8,
+    audio_mode: u8,
     nch: usize,
-    lff: u8,
-    filts: bool,
+    lfe_mode: u8,
+    perfect_reconstruction: bool,
     rate: u32,
 }
 
@@ -160,8 +160,8 @@ impl FrameDecoder {
         let core_end = optional_info(&mut br, &f);
 
         // Core-embedded extensions (clause 6).
-        if f.h.ext_audio
-            && f.h.ext_audio_id == 6
+        if f.h.extension_present
+            && f.h.extension_type == 6
             && aligned_syncs(f.data, core_end, XXCH_SYNC, 4)
                 .next()
                 .is_some()
@@ -174,8 +174,8 @@ impl FrameDecoder {
         }
         let mut nslots = f.set.nch;
         let mut xch = false;
-        if f.h.ext_audio
-            && f.h.ext_audio_id == 0
+        if f.h.extension_present
+            && f.h.extension_type == 0
             && let Some(pos) = find_xch(f.data, core_end)
         {
             self.decode_xch(&f, pos, &mut nsubs_all)?;
@@ -184,8 +184,8 @@ impl FrameDecoder {
         }
         self.prev_xch = xch;
         let mut have_x96 = false;
-        if f.h.ext_audio
-            && f.h.ext_audio_id == 2
+        if f.h.extension_present
+            && f.h.extension_type == 2
             && let Some(pos) = find_x96(f.data, core_end)
         {
             have_x96 = self.decode_x96(&f, pos)?;
@@ -212,33 +212,33 @@ impl FrameDecoder {
     ) -> Result<(CoreFrame<'a>, BitReader<'a>), DecodeError> {
         let mut br = BitReader::new(data);
         let h = FrameHeader::parse(&mut br)?;
-        if h.fsize > data.len() {
+        if h.frame_bytes > data.len() {
             return Err(DecodeError::Invalid("frame shorter than FSIZE"));
         }
-        let frame = &data[..h.fsize];
+        let frame = &data[..h.frame_bytes];
         let mut br = {
             let pos = br.position();
             let mut b = BitReader::new(frame);
             b.seek(pos);
             b
         };
-        let speakers = amode_speakers(h.amode).ok_or(DecodeError::Unsupported(
+        let speakers = audio_mode_speakers(h.audio_mode).ok_or(DecodeError::Unsupported(
             "AMODE above 9 (more than 5 core channels)",
         ))?;
-        if h.short != 31 {
+        if h.deficit_samples_minus_one != 31 {
             // FFmpeg (reference) refuses deficit-sample frames.
             return Err(DecodeError::Unsupported("deficit samples (SHORT != 31)"));
         }
         let nsubfs = br.read(4) as usize + 1;
-        let set = SetHeader::parse(&mut br, h.cpf)?;
+        let set = SetHeader::parse(&mut br, h.crc_present)?;
         if set.nch != speakers.len() {
             return Err(DecodeError::Invalid("PCHS does not match AMODE"));
         }
         let cfg = Config {
-            amode: h.amode,
+            audio_mode: h.audio_mode,
             nch: set.nch,
-            lff: h.lff,
-            filts: h.filts,
+            lfe_mode: h.lfe_mode,
+            perfect_reconstruction: h.perfect_reconstruction,
             rate: h.sample_rate,
         };
         let same = self.prev == Some(cfg);
@@ -253,17 +253,17 @@ impl FrameDecoder {
             self.max_blocks = h.blocks;
             self.lfe_state.reset();
         }
-        let keep = same && h.hflag && !grows;
+        let keep = same && h.predictor_history && !grows;
         self.prev = Some(cfg);
         self.sub.start_frame(0..set.nch, h.blocks, keep)?;
 
         let params = SubframeParams {
             nssc: 0,
-            aspf: h.aspf,
-            cpf: h.cpf,
+            sync_each_subsubframe: h.sync_each_subsubframe,
+            crc_present: h.crc_present,
             lossless: h.rate == 0x1F,
-            dynf: h.dynf,
-            lff: h.lff,
+            dynamic_range_present: h.dynamic_range_present,
+            lfe_mode: h.lfe_mode,
         };
         let f = CoreFrame {
             h,
@@ -302,7 +302,7 @@ impl FrameDecoder {
                 nssc,
                 ..*params_base
             };
-            let lfe = if h.lff > 0 {
+            let lfe = if h.lfe_mode > 0 {
                 Some(&mut self.lfe_dec[lfe_pos..])
             } else {
                 None
@@ -319,7 +319,7 @@ impl FrameDecoder {
                 nsubs_all,
             )?;
             t0 += nssc * 8;
-            lfe_pos += 2 * h.lff as usize * nssc;
+            lfe_pos += 2 * h.lfe_mode as usize * nssc;
         }
         if t0 != h.blocks {
             return Err(DecodeError::Invalid("subframes do not fill NBLKS"));
@@ -338,7 +338,7 @@ impl FrameDecoder {
         let (h, set) = (&f.h, &f.set);
         let mut xb = BitReader::new(f.data);
         xb.seek(pos + 32 + 10 + 4);
-        let xset = SetHeader::parse(&mut xb, h.cpf)?;
+        let xset = SetHeader::parse(&mut xb, h.crc_present)?;
         if xset.nch != 1 {
             return Err(DecodeError::Unsupported("XCh with more than one channel"));
         }
@@ -358,8 +358,8 @@ impl FrameDecoder {
         for &nssc in &f.sf_nssc[..f.nsubfs] {
             let p = SubframeParams {
                 nssc,
-                dynf: false,
-                lff: 0,
+                dynamic_range_present: false,
+                lfe_mode: 0,
                 ..f.params
             };
             subframe::decode_subframe(
@@ -385,7 +385,7 @@ impl FrameDecoder {
         let (h, set) = (&f.h, &f.set);
         let mut xb = BitReader::new(f.data);
         xb.seek(pos + 32);
-        let Some(xh) = x96::X96Header::parse(&mut xb, set.nch, h.cpf)? else {
+        let Some(xh) = x96::X96Header::parse(&mut xb, set.nch, h.crc_present)? else {
             return Ok(false);
         };
         let buf = self
@@ -399,8 +399,8 @@ impl FrameDecoder {
                 &xh,
                 &mut self.x96side,
                 nssc,
-                h.aspf,
-                h.cpf,
+                h.sync_each_subsubframe,
+                h.crc_present,
                 h.rate == 0x1F,
                 buf,
                 xt0,
@@ -417,15 +417,15 @@ impl FrameDecoder {
 #[inline(always)]
 fn optional_info(br: &mut BitReader<'_>, f: &CoreFrame<'_>) -> usize {
     let h = &f.h;
-    if h.timef {
+    if h.timestamp_present {
         br.skip(32);
     }
-    if h.auxf {
+    if h.auxiliary_data_present {
         let auxct = br.read(6) as usize;
         br.align(32);
         br.skip(auxct * 8);
     }
-    if h.cpf && h.dynf {
+    if h.crc_present && h.dynamic_range_present {
         br.skip(16);
     }
     if br.overrun() {
@@ -437,9 +437,9 @@ fn optional_info(br: &mut BitReader<'_>, f: &CoreFrame<'_>) -> usize {
 
 /// Core audio channel arrangements supported (AMODE 0..=9, Table 5-4): coded channel
 /// order mapped to speakers.
-fn amode_speakers(amode: u8) -> Option<&'static [Speaker]> {
+fn audio_mode_speakers(audio_mode: u8) -> Option<&'static [Speaker]> {
     use Speaker::{BackCenter, FrontCenter, FrontLeft, FrontRight, SideLeft, SideRight};
-    Some(match amode {
+    Some(match audio_mode {
         0 => &[FrontCenter],
         1..=4 => &[FrontLeft, FrontRight],
         5 => &[FrontCenter, FrontLeft, FrontRight],

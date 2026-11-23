@@ -28,7 +28,7 @@ impl FrameDecoder {
             self.tbuf.try_resize(blocks * bands, 0.0)?;
         }
         let n48 = blocks * 32;
-        if have_x96 && f.h.lff > 0 && self.lfe48.len() < n48 {
+        if have_x96 && f.h.lfe_mode > 0 && self.lfe48.len() < n48 {
             self.lfe48.try_resize(n48, 0.0)?;
         }
 
@@ -79,7 +79,7 @@ impl FrameDecoder {
                 }
             }
         }
-        if xch && let Some((l, r)) = surround_pair(h.amode) {
+        if xch && let Some((l, r)) = surround_pair(h.audio_mode) {
             // XCh carries Cs; the core surrounds hold Ls + 0.7071 Cs and
             // Rs + 0.7071 Cs (clause 6.4.1). Remove the embedded down-mix.
             for b in 0..32 {
@@ -104,12 +104,16 @@ impl FrameDecoder {
             Some(xb) if have_x96 => (xb, 64),
             _ => (&mut self.sub, 32),
         };
-        let fpair = if h.sumf || h.amode == 3 {
-            front_pair(h.amode)
+        let fpair = if h.front_sum_difference || h.audio_mode == 3 {
+            front_pair(h.audio_mode)
         } else {
             None
         };
-        let spair = if h.sums { surround_pair(h.amode) } else { None };
+        let spair = if h.surround_sum_difference {
+            surround_pair(h.audio_mode)
+        } else {
+            None
+        };
         for (l, r) in [fpair, spair].into_iter().flatten() {
             for b in 0..sbands {
                 let (ll, rr) = src.row_pair_mut(l, r, b);
@@ -144,7 +148,11 @@ impl FrameDecoder {
         } else {
             None
         };
-        let qmf = if h.filts { &self.qmf_pr } else { &self.qmf_np };
+        let qmf = if h.perfect_reconstruction {
+            &self.qmf_pr
+        } else {
+            &self.qmf_np
+        };
         for ch in 0..nslots {
             let (srcbuf, sb): (&SubBuf, usize) = match self.x96buf.as_ref() {
                 Some(xb) if have_x96 && ch < f.set.nch => (xb, 64),
@@ -181,7 +189,7 @@ impl FrameDecoder {
         let h = &f.h;
         let blocks = h.blocks;
         let nsamples = blocks * if have_x96 { 64 } else { 32 };
-        let factor = if h.lff == 1 { 128 } else { 64 };
+        let factor = if h.lfe_mode == 1 { 128 } else { 64 };
         let n48 = blocks * 32;
         let ndec = n48 / factor;
         let plane = &mut out.planes[lp];
@@ -227,7 +235,7 @@ impl FrameDecoder {
             n += 1;
         }
         const LFE_SRC: usize = usize::MAX;
-        if h.lff > 0 {
+        if h.lfe_mode > 0 {
             order[n] = (Speaker::LowFrequency, LFE_SRC);
             n += 1;
         }
@@ -275,16 +283,16 @@ fn run_bank<const TAPS: usize, const LEN: usize>(
 }
 
 /// Coded slot indices of the front and surround L/R pairs for sum/difference decoding.
-fn front_pair(amode: u8) -> Option<(usize, usize)> {
-    match amode {
+fn front_pair(audio_mode: u8) -> Option<(usize, usize)> {
+    match audio_mode {
         2..=4 | 6 | 8 => Some((0, 1)),
         5 | 7 | 9 => Some((1, 2)),
         _ => None,
     }
 }
 
-fn surround_pair(amode: u8) -> Option<(usize, usize)> {
-    match amode {
+fn surround_pair(audio_mode: u8) -> Option<(usize, usize)> {
+    match audio_mode {
         8 => Some((2, 3)),
         9 => Some((3, 4)),
         _ => None,

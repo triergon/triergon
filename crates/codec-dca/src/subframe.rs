@@ -166,13 +166,13 @@ impl SideInfo {
 /// Per-frame parameters that apply to every subframe of a channel set.
 pub(crate) struct SubframeParams {
     pub nssc: usize,
-    pub aspf: bool,
-    pub cpf: bool,
+    pub sync_each_subsubframe: bool,
+    pub crc_present: bool,
     pub lossless: bool,
     /// Core only: DYNF present (RANGE read after the joint scale factors).
-    pub dynf: bool,
+    pub dynamic_range_present: bool,
     /// Core only: LFF (decimated LFE samples read after the high-frequency VQ).
-    pub lff: u8,
+    pub lfe_mode: u8,
 }
 
 #[inline]
@@ -321,10 +321,10 @@ pub(crate) fn decode_subframe(
     }
     // RANGE (dynamic range coefficient): parsed, not applied — FFmpeg, the reference,
     // does not apply it (synthetic `dynf` stream).
-    if p.dynf {
+    if p.dynamic_range_present {
         let _range = br.read(8);
     }
-    if p.cpf {
+    if p.crc_present {
         let _sicrc = br.read(16);
     }
     if br.overrun() {
@@ -353,7 +353,7 @@ pub(crate) fn decode_subframe(
         }
     }
     if let Some(lfe) = lfe {
-        let count = 2 * p.lff as usize * nssc;
+        let count = 2 * p.lfe_mode as usize * nssc;
         let mut q = [0i32; 64];
         for v in q.iter_mut().take(count) {
             *v = br.read_signed(8);
@@ -411,7 +411,7 @@ pub(crate) fn decode_subframe(
                 }
             }
         }
-        if (ssf == nssc - 1 || p.aspf) && br.read(16) != 0xFFFF {
+        if (ssf == nssc - 1 || p.sync_each_subsubframe) && br.read(16) != 0xFFFF {
             return Err(DecodeError::Invalid("DSYNC"));
         }
     }
