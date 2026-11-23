@@ -165,7 +165,7 @@ impl ColourJob {
                                 Some(v);
                         }
                         CHROMA_SITING_HORZ..=CHROMA_SITING_VERT => {
-                            self.out.chroma_siting[(child.id - CHROMA_SITING_HORZ) as usize] = v
+                            self.out.chroma_siting[(child.id - CHROMA_SITING_HORZ) as usize] = v;
                         }
                         RANGE => self.out.range = v,
                         TRANSFER_CHARACTERISTICS => self.out.transfer_characteristics = v,
