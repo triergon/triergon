@@ -2,13 +2,9 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
 
-#[path = "isobmff_views/index.rs"]
 mod index;
-#[path = "isobmff_views/packets.rs"]
 mod packets;
-#[path = "isobmff_views/segment_index.rs"]
 mod segment_index;
-#[path = "isobmff_views/trace.rs"]
 mod trace;
 
 use triergon_harness_runner::{Prepare, serve, smoke};

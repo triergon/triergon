@@ -9,13 +9,11 @@ pub(super) enum Codec {
 
 pub(super) enum Event<'a> {
     Packet {
-        pts: i64,
-        dts: i64,
-        duration: i64,
-        position: i64,
-        flags: u32,
-        stream_index: i32,
         data: &'a [u8],
+        #[cfg_attr(
+            not(test),
+            expect(dead_code, reason = "NAL scanning consumes the packet payload only")
+        )]
         extra: Option<&'a [u8]>,
     },
     Flush,
@@ -70,28 +68,15 @@ impl<'a> Script<'a> {
         for _ in 0..count {
             events.push(match reader.fixed()? {
                 [0] => {
-                    let pts = i64::from_be_bytes(reader.fixed()?);
-                    let dts = i64::from_be_bytes(reader.fixed()?);
-                    let duration = i64::from_be_bytes(reader.fixed()?);
-                    let position = i64::from_be_bytes(reader.fixed()?);
-                    let flags = u32::from_be_bytes(reader.fixed()?);
-                    let stream_index = i32::from_be_bytes(reader.fixed()?);
+                    // Clocks, position, flags and stream index precede the lengths.
+                    reader.take(40)?;
                     let size = u32::from_be_bytes(reader.fixed()?);
                     let extra_size = u32::from_be_bytes(reader.fixed()?);
                     let data = reader.take(size as usize)?;
                     let extra = (extra_size != u32::MAX)
                         .then(|| reader.take(extra_size as usize))
                         .transpose()?;
-                    Event::Packet {
-                        pts,
-                        dts,
-                        duration,
-                        position,
-                        flags,
-                        stream_index,
-                        data,
-                        extra,
-                    }
+                    Event::Packet { data, extra }
                 }
                 [1] => Event::Flush,
                 [2] => Event::Drain,
@@ -110,6 +95,10 @@ impl<'a> Script<'a> {
 }
 
 pub(super) struct IvfFrame<'a> {
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "OBU tracing uses physical frame order")
+    )]
     pub timestamp: u64,
     pub data: &'a [u8],
 }

@@ -2,22 +2,12 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
 
-#[path = "framing_views/envelope.rs"]
-#[allow(
-    dead_code,
-    reason = "The stream and NAL family stubs do not consume envelopes yet."
-)]
 mod envelope;
 
-#[path = "framing_views/adts.rs"]
 mod adts;
-#[path = "framing_views/config_views.rs"]
 mod config_views;
-#[path = "framing_views/dts.rs"]
 mod dts;
-#[path = "framing_views/nal.rs"]
 mod nal;
-#[path = "framing_views/obu.rs"]
 mod obu;
 
 use triergon_harness_runner::{Prepare, serve, smoke};

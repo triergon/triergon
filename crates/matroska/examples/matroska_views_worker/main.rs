@@ -2,11 +2,8 @@
 #![deny(unsafe_code)]
 #![cfg_attr(not(test), no_main)]
 
-#[path = "matroska_views/extensions.rs"]
 mod extensions;
-#[path = "matroska_views/metadata.rs"]
 mod metadata;
-#[path = "matroska_views/side_data.rs"]
 mod side_data;
 
 use triergon_harness_runner::{Prepare, serve, smoke};
