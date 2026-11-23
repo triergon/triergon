@@ -106,7 +106,8 @@ fn iterations(count: &OsStr) -> Option<u64> {
         .filter(|count| ITERATIONS.contains(count))
 }
 
-/// The input file, refused when it is larger than [`MAX_INPUT`].
+/// Read at most one byte beyond [`MAX_INPUT`], even if the file size changes.
+/// Keep the table's file-qualified I/O errors and worker-limit diagnostic.
 fn input(file: &OsStr) -> Result<Vec<u8>> {
     let mut input = Vec::new();
     File::open(file)

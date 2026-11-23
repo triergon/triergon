@@ -155,7 +155,8 @@ impl<'a> Invocation<'a> {
         }
     }
 
-    /// The input file, refused when it is larger than `limit` bytes.
+    /// The input file, refused when its metadata reports more than `limit` bytes.
+    /// This preserves the invocation's `input limit` diagnostic before the read.
     ///
     /// # Errors
     ///
@@ -327,6 +328,7 @@ impl Totals {
 /// What one operation produces when it may meet an unsupported feature while
 /// completing its work: its totals and the feature, which the result line reports
 /// for the first operation that met one.
+// Folding directly into a larger Totals cost up to +0.87% on subtitle workloads.
 #[derive(Debug, Default)]
 pub struct Outcome {
     /// The operation's packets, bytes and digest.

@@ -5,13 +5,16 @@ worker mode is `{prefix}fold FILE ARGS`, `{prefix}bench FILE ITERATIONS ARGS`,
 `{prefix}memory FILE ARGS` or, where the worker prints records,
 `{prefix}trace FILE ARGS`.
 
-- [`Invocation`] parses such a command line. [`measure`] runs the operation as
-  often as it asks, checks that each completed run releases its budget charges,
-  and prints one result line with the summed [`Totals`] or the operation's
-  [`Refusal`]; [`measure_with`] appends named values computed while the input
-  was prepared, [`measure_outcome`] reports an unsupported feature an operation
-  met while completing (its [`Outcome`]), and [`measure_repeated`] runs every
-  planned repetition of an operation whose outcome is a refusal.
+[`Invocation`] parses the command line. Each measurement function checks that
+completed operations release their budget charges and writes one result line.
+
+| Function | Result |
+|---|---|
+| [`measure`] | Fold the operation's [`Totals`], stopping on its first [`Refusal`] |
+| [`measure_with`] | Append named values computed while preparing the input |
+| [`measure_outcome`] | Include the first unsupported feature reported in an [`Outcome`] |
+| [`measure_repeated`] | Run all repetitions and require them to agree on any refusal |
+
 - [`serve`] is the whole worker for a table of `(prefix, Prepare)` entries: it
   reads the input, lets the entry prepare an [`Operation`] from it and runs that
   through the same loop, handing it the trace writer in trace mode. [`smoke`] is
