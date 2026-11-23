@@ -95,46 +95,27 @@ impl Default for Header {
 
 /// Per-channel SBR data and state.
 #[derive(Debug)]
+#[repr(C)]
 pub(crate) struct Chan {
-    // grid of the current frame
-    frame_class: u8,
-    num_env: usize,
-    t_env: [usize; 6],
-    freq_res: [bool; 6],
-    num_noise: usize,
-    t_q: [usize; 3],
-    /// transient envelope index l_A (-1 = none)
-    l_a: i32,
-    amp_res: bool,
-    df_env: [bool; 5],
-    df_noise: [bool; 2],
-    invf: [u8; 5],
-    invf_prev: [u8; 5],
-    bw_prev: [f32; 5],
-    /// quantised envelopes; [0] = last envelope of the previous frame
-    env_q: [[i32; 49]; 6],
-    /// frequency resolution of env_q[0]
-    env_prev_res: bool,
-    noise_q: [[i32; 5]; 3],
-    add_harmonic_flag: bool,
-    add_harmonic: [bool; 49],
-    /// sinusoid mapping of the last envelope of the previous frame (per subband - kx)
-    s_index_prev: [bool; 64],
-    // dequantised
-    e_orig: [[f32; 49]; 5],
-    q_orig: [[f32; 5]; 2],
-    // previous frame state
-    prev_num_env: usize,
-    prev_t_env_last: usize,
-    /// l_A of the previous frame expressed relative to the current frame (0 or -1)
-    l_a_prev: i32,
-    // signal state
     analysis: qmf::Analysis,
     synthesis: qmf::Synthesis,
     /// low band history: xl[k][t], t < T_HFGEN valid
     xl: BudgetVec<[Cpx; XL_LEN]>,
     /// Y of the previous frame, slots 32..38 (high band contribution reaching into this frame)
     y_prev: BudgetVec<[Cpx; 64]>,
+    xh: BudgetVec<[Cpx; 40]>,
+    y: BudgetVec<[Cpx; 64]>,
+    /// sinusoid mapping of the last envelope of the previous frame (per subband - kx)
+    s_index_prev: [bool; 64],
+    num_env: usize,
+    t_env: [usize; 6],
+    num_noise: usize,
+    t_q: [usize; 3],
+    /// quantised envelopes; [0] = last envelope of the previous frame
+    env_q: [[i32; 49]; 6],
+    q_orig: [[f32; 5]; 2],
+    prev_num_env: usize,
+    prev_t_env_last: usize,
     /// gain / noise smoothing history (4 slots) per subband
     g_hist: [[f32; 64]; 4],
     q_hist: [[f32; 64]; 4],
@@ -143,10 +124,26 @@ pub(crate) struct Chan {
     /// kx / M used for the previous frame's high band
     kx_prev: usize,
     m_prev: usize,
-    xh: BudgetVec<[Cpx; 40]>,
-    y: BudgetVec<[Cpx; 64]>,
     /// Scratch: the prediction coefficients of this frame's source bands, by band.
     alpha: [(Cpx, Cpx); 32],
+    /// transient envelope index l_A (-1 = none)
+    l_a: i32,
+    bw_prev: [f32; 5],
+    noise_q: [[i32; 5]; 3],
+    e_orig: [[f32; 49]; 5],
+    /// l_A of the previous frame expressed relative to the current frame (0 or -1)
+    l_a_prev: i32,
+    freq_res: [bool; 6],
+    df_noise: [bool; 2],
+    amp_res: bool,
+    df_env: [bool; 5],
+    /// frequency resolution of env_q[0]
+    env_prev_res: bool,
+    add_harmonic_flag: bool,
+    add_harmonic: [bool; 49],
+    frame_class: u8,
+    invf: [u8; 5],
+    invf_prev: [u8; 5],
 }
 
 impl Chan {
