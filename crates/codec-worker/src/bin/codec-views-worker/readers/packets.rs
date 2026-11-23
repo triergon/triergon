@@ -248,16 +248,11 @@ fn ogg_push(
     counts: &mut Drive,
     out: &mut Vec<u8>,
 ) -> io::Result<triergon::Result<()>> {
-    let mut reader = match ogg::compat::clock::reader(
-        pool,
-        SourceId(1),
-        caps,
-        ogg::Limits::default(),
-        65536,
-    ) {
-        Ok(reader) => reader,
-        Err(error) => return Ok(Err(error)),
-    };
+    let mut reader =
+        match ogg::compat::clock::reader(pool, SourceId(1), caps, ogg::Limits::default(), 65536) {
+            Ok(reader) => reader,
+            Err(error) => return Ok(Err(error)),
+        };
     let end = drive(
         &mut reader,
         ogg::Reader::request,
