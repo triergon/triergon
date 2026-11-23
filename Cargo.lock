@@ -142,6 +142,7 @@ version = "0.0.0"
 dependencies = [
  "triergon",
  "triergon-ass",
+ "triergon-bitstream",
  "triergon-bridge",
  "triergon-codec",
  "triergon-codec-aac",
