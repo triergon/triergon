@@ -759,11 +759,7 @@ impl TsEngine {
                 return T::project(FeedStep::Yield);
             }
             if let Some(TraceEvent::Diagnostic(fault)) = &self.pending
-                && fault.kind == ts::stream::FaultKind::Transport
-                && matches!(
-                    fault.error,
-                    Error::Invalid("TS sync byte") | Error::Truncated
-                )
+                && fault.breaks_packet_grid()
                 && let Binding::Bound(context) = &self.binding
                 && context.is_prefix()
             {
