@@ -181,8 +181,6 @@ pub(crate) struct ElementState {
     pub out: [[f32; 2048]; 2],
     /// An SCE can fill one channel of an element with a CPE slot.
     decoded: DecodedChannels,
-    /// The element's channel count (2 for a mono SBR element carrying PS).
-    pub nch: usize,
     /// Spectral data of the current frame (filterbank deferred to the END element).
     pub cd: [Charged<Box<ChannelData>>; 2],
     /// element_instance_tag as coded in the bitstream this block (CCE targets refer to it).
@@ -201,7 +199,6 @@ impl ElementState {
             sbr: None,
             out: [[0.0; 2048]; 2],
             decoded: DecodedChannels::None,
-            nch: if kind == ElementId::Cpe { 2 } else { 1 },
             cd: [
                 Charged::boxed(budget, ChannelData::new())?,
                 Charged::boxed(budget, ChannelData::new())?,
@@ -214,15 +211,14 @@ impl ElementState {
     /// identity both layouts have without charging it again.
     fn renew(&mut self) {
         let ElementState {
-            kind,
             tag,
             ch,
             sbr,
             out,
             decoded,
-            nch,
             cd,
             bs_tag,
+            ..
         } = self;
         for c in ch {
             c.reset();
@@ -232,7 +228,6 @@ impl ElementState {
         }
         *out = [[0.0; 2048]; 2];
         *decoded = DecodedChannels::None;
-        *nch = if *kind == ElementId::Cpe { 2 } else { 1 };
         for cd in cd {
             let cd: &mut ChannelData = cd;
             *cd = ChannelData::new();
@@ -938,7 +933,11 @@ impl Core {
                 },
                 e.bs_tag,
             );
-            let channels = if RAW { e.nch } else { 2 };
+            let channels = if RAW && e.kind != ElementId::Cpe {
+                1
+            } else {
+                2
+            };
             for c in 0..channels {
                 if RAW || e.decoded.includes(c) {
                     let out = if RAW {
@@ -988,9 +987,6 @@ impl Core {
                     e.kind == ElementId::Cpe,
                     &mut self.qmf,
                 );
-                if ps {
-                    e.nch = 2;
-                }
             }
         }
     }
@@ -1513,7 +1509,7 @@ pub(crate) mod tests {
                 e.ch[0].overlap.fill(1.0);
                 e.ch[1].prev_shape = WindowShape::KaiserBessel;
                 e.out[1][7] = 2.0;
-                (e.decoded, e.nch, e.bs_tag) = (DecodedChannels::Both, 2, 9);
+                (e.decoded, e.bs_tag) = (DecodedChannels::Both, 9);
                 e.cd[0].global_gain = 120;
                 e.renew();
                 assert_eq!(
