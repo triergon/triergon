@@ -68,6 +68,8 @@ pub(crate) fn freeze_whole(output: &mut BudgetVec<u8>) -> Result<Bytes> {
 
 /// The output a reader is building in `slot`; the first use after a freeze starts an
 /// empty one on `pool`.
+// `Option`: a plain vector needs a pooled empty one after each freeze, and an empty
+// vector without a pool measured a null test on every drop (transport +0.85%).
 #[inline(always)]
 pub(crate) fn started<'a>(
     slot: &'a mut Option<BudgetVec<u8>>,
