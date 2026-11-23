@@ -215,9 +215,7 @@ impl Synthesis {
         let (low, high) = pcm.split_at_mut(16);
         for (group, taps) in TAPS.iter().enumerate() {
             let base = group * LANES;
-            let (taps, []) = taps.as_chunks::<2>() else {
-                unreachable!("16 ages are 8 pairs");
-            };
+            let taps = taps.as_chunks::<2>().0;
             let mut sums = Taps {
                 low: [0.0; LANES],
                 high: [0.0; LANES],
