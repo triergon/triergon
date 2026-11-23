@@ -254,7 +254,7 @@ impl Active {
         };
         let facts = packet.facts();
         if !lane_track(self.config.track, self.config.configuration_epoch, &facts)
-            || packet.stream_id & 0xf0 != stream_id::VIDEO_FIRST
+            || !stream_id::VIDEO.contains(&packet.stream_id)
             || packet.source_header.stream_id != packet.stream_id
         {
             return Err(Error::Invalid("HLS HEVC PES track or configuration"));

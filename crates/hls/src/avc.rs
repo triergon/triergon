@@ -368,7 +368,7 @@ impl AvcTsReader {
         };
         let packet = packet.facts();
         if !lane_track(self.config.track, self.config.configuration_epoch, &packet)
-            || packet.source_header.stream_id & 0xf0 != stream_id::VIDEO_FIRST
+            || !stream_id::VIDEO.contains(&packet.source_header.stream_id)
         {
             return Err(Error::Invalid("AVC TS PES track or configuration"));
         }
