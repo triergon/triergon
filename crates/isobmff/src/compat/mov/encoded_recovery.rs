@@ -250,11 +250,8 @@ impl RecoveryWalk {
                                 &mut self.error_backing,
                             )?;
                             if count == 0 {
-                                return source_result(
-                                    Err(Error::Invalid("encoded empty recovery run")),
-                                    source.raw(),
-                                    &mut self.error_backing,
-                                );
+                                *row += 1;
+                                continue;
                             }
                             if index >= 65536 {
                                 return source_result(

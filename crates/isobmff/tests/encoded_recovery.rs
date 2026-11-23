@@ -272,11 +272,10 @@ fn dangling_index_is_rejected_before_any_packet() {
     );
 }
 #[test]
-fn zero_count_run_is_rejected_before_any_packet() {
-    assert_eq!(
-        Source::new(fixture("empty-run")).plan(1).unwrap_err(),
-        Error::Invalid("encoded empty recovery run")
-    );
+fn zero_count_run_leaves_packet_coverage_unchanged() {
+    let source = Source::new(fixture("empty-run"));
+    let plan = source.plan(1).unwrap();
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn too_many_source_samples_in_map_is_rejected() {

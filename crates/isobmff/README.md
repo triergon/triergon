@@ -279,7 +279,8 @@ Limits of the reader:
 (including QuickTime v1/v2 `wave`) unvalidated; callers determine the object type.
 The MOV metadata view accepts a QuickTime MPEG-4 audio `wave` with its `esds`
 and no optional `frma` format atom.
-Samples beyond the last `sbgp` run use the group default when present.
+Empty `sbgp` runs associate no samples. Samples beyond the last run use the group
+default when present.
 
 ## Behaviour and limits
 

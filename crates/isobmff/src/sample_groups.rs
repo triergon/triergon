@@ -704,7 +704,7 @@ impl<'a> RecoveryLookup<'a> {
                     if end > self.scope.sample_count {
                         return Err(Error::Invalid("recovery map exceeds scope"));
                     }
-                    if index != 0 {
+                    if count != 0 && index != 0 {
                         definition(self.scope, index)?;
                     }
                     if self.relative >= self.total && self.relative < end {

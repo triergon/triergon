@@ -369,7 +369,7 @@ fn range_playback_keeps_the_base_config_for_dolby_vision_hevc_entries() {
 }
 
 recovery_case!(recovery_dangling_description, "dangling-description");
-recovery_case!(recovery_empty_run, "empty-run");
+recovery_case!(recovery_empty_run, "empty-run", false);
 recovery_case!(recovery_coverage_over, "coverage-over");
 recovery_case!(recovery_coverage_under, "coverage-under", false);
 recovery_case!(recovery_fragment_namespace, "fragment-namespace");
