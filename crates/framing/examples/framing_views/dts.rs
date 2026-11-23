@@ -329,7 +329,8 @@ fn packed(
             drive!(reader, pool, input, window, output, packet => {
                 let raw = packet.source_bytes().as_ref();
                 let (rate, samples) = match packet.syntax {
-                    Dts14CarrierSyntax::ExactNormal(header) => (header.core_rate_hz, header.coding_window_samples),
+                    Dts14CarrierSyntax::ExactNormal(header)
+                    | Dts14CarrierSyntax::NormalAndHalfWord(header) => (header.core_rate_hz, header.coding_window_samples),
                     _ => match packet.canonical_bytes() {
                         Some(bytes) => coded_clock(&dts::inspect_header_bits(bytes.as_ref(), bytes.len() * 8).map_err(error)?, raw.len()),
                         None => (0, 0),

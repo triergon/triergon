@@ -151,6 +151,17 @@ fn odd_conventional_tail_remains_raw_truncated_refusal() {
     assert!(p[0].canonical_bytes().is_none());
 }
 #[test]
+fn a_complete_frame_before_half_a_word_keeps_its_header() {
+    let (_, p) = acquire(&GOOD[..113], DtsWordOrder::BigEndian, 1, 1);
+    assert_eq!(p.len(), 1);
+    assert_eq!(p[0].source_bytes().as_ref(), &GOOD[..113]);
+    let Dts14CarrierSyntax::NormalAndHalfWord(header) = p[0].syntax else {
+        panic!("{:?}", p[0].syntax)
+    };
+    assert_eq!(header.frame_bytes, 98);
+    assert_eq!(p[0].canonical_bytes().unwrap().len(), 98);
+}
+#[test]
 fn unresolved_extent_is_not_complete_syntax() {
     let (_, p) = acquire(&GOOD[..110], DtsWordOrder::BigEndian, 31, 1);
     assert!(matches!(

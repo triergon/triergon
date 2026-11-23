@@ -659,3 +659,26 @@ fn caller_clones_keep_both_full_owners_charged_after_reader_drop_and_cross_threa
     .unwrap();
     assert_eq!(pool.used(), baseline);
 }
+
+#[test]
+fn a_complete_frame_before_half_a_word_is_returned_and_only_the_byte_refused() {
+    let good = include_bytes!("../fixtures/dts-native-v1/primary-sync-example-variable-big.bin");
+    // The first frame, FSIZE + 1 = 98 bytes in 56 words, then one byte of the next.
+    let source = &good[..113];
+    let pool = Budget::new(65536).unwrap();
+    let mut job = reader(&pool, None, DtsWordOrder::BigEndian, settings());
+    let (frames, error) = collect(&mut job, &pool, source, 7, 3);
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].physical_bytes().as_ref(), &good[..112]);
+    assert_eq!(frames[0].canonical_bytes().len(), 98);
+    assert_eq!(
+        frames[0].facts().boundary,
+        Dts14BoundaryEvidence::ExplicitSourceEnd
+    );
+    assert_eq!(error, Some(Error::Truncated));
+    // Cut inside the frame, the odd byte still refuses the whole span.
+    let mut job = reader(&pool, None, DtsWordOrder::BigEndian, settings());
+    let (frames, error) = collect(&mut job, &pool, &good[..111], 7, 3);
+    assert!(frames.is_empty());
+    assert_eq!(error, Some(Error::Truncated));
+}

@@ -47,11 +47,15 @@ pub enum Dts14CarrierSyntax {
     /// on a byte boundary, [`probe_core_header`] accepts its header, and it holds
     /// `FSIZE` + 1 bytes. Carries that header.
     ExactNormal(DtsCoreHeader),
+    /// The source ends one byte into a word after the packet's whole words, which hold
+    /// one exact normal core frame as for [`ExactNormal`](Self::ExactNormal). Carries
+    /// that frame's header; the last byte stays a source byte of the packet.
+    NormalAndHalfWord(DtsCoreHeader),
     /// The packet starts with the sync pattern but is not one exact normal frame.
-    /// Carries the reason: [`Error::Truncated`] for an odd number of source bytes,
-    /// the header's refusal by [`probe_core_header`], or [`Error::Unsupported`] for
-    /// a payload that does not end on a byte boundary or does not hold `FSIZE` + 1
-    /// bytes.
+    /// Carries the reason: [`Error::Truncated`] for an odd number of source bytes
+    /// whose whole words are not one, the header's refusal by [`probe_core_header`],
+    /// or [`Error::Unsupported`] for a payload that does not end on a byte boundary or
+    /// does not hold `FSIZE` + 1 bytes.
     Refused(Error),
 }
 /// Where the reader's input stood when it returned a packet: the last window it
@@ -89,8 +93,9 @@ impl Dts14CarrierPacket {
     pub fn source_bytes(&self) -> &Bytes {
         &self.raw
     }
-    /// Whole bytes of the unpacked payload in canonical order. Returns `None`
-    /// for an opaque packet or a packet ending in half a source word.
+    /// Whole bytes of the unpacked payload in canonical order: of the frame alone for
+    /// [`Dts14CarrierSyntax::NormalAndHalfWord`]. Returns `None` for an opaque packet
+    /// or another packet ending in half a source word.
     pub fn canonical_bytes(&self) -> Option<&Bytes> {
         self.payload.as_ref().map(Dts14BitPayload::canonical_bytes)
     }
@@ -567,15 +572,7 @@ impl Dts14CarrierReader {
                         let raw = freeze_whole(buffer)?;
                         self.packet =
                             if raw.len() >= 6 && conventional_sync(raw.as_ref(), self.order) {
-                                if raw.len() % 2 != 0 {
-                                    Packet::Ready {
-                                        raw,
-                                        payload: None,
-                                        syntax: Dts14CarrierSyntax::Refused(Error::Truncated),
-                                    }
-                                } else {
-                                    Packet::Frozen { raw }
-                                }
+                                Packet::Frozen { raw }
                             } else {
                                 Packet::Ready {
                                     raw,
@@ -590,10 +587,12 @@ impl Dts14CarrierReader {
                         return Ok(Step::Yield);
                     }
                     let raw = raw.clone();
+                    // The whole words; a last byte the source ends inside stays raw.
+                    let words = raw.slice(0..raw.len() - raw.len() % 2)?;
                     let unpacker = Dts14BitUnpacker::new(
                         &self.pool,
                         self.identity(),
-                        raw.clone(),
+                        words,
                         self.order,
                         DtsPackingLimits {
                             maximum_source_bytes: self.limits.maximum_packet_bytes,
@@ -614,14 +613,19 @@ impl Dts14CarrierReader {
                             Ok(h)
                         }
                     });
-                    let syntax = match checked {
-                        Ok(h) => Dts14CarrierSyntax::ExactNormal(h),
-                        Err(e) => Dts14CarrierSyntax::Refused(e),
+                    let half_word = raw.len() % 2 != 0;
+                    let (payload, syntax) = match checked {
+                        Ok(h) if half_word => (Some(p), Dts14CarrierSyntax::NormalAndHalfWord(h)),
+                        Ok(h) => (Some(p), Dts14CarrierSyntax::ExactNormal(h)),
+                        Err(_) if half_word => {
+                            (None, Dts14CarrierSyntax::Refused(Error::Truncated))
+                        }
+                        Err(e) => (Some(p), Dts14CarrierSyntax::Refused(e)),
                     };
                     let raw = raw.clone();
                     self.packet = Packet::Ready {
                         raw,
-                        payload: Some(p),
+                        payload,
                         syntax,
                     };
                 }

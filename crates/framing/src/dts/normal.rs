@@ -47,8 +47,9 @@ pub enum DtsNormalBoundary {
         /// Source offset of the following sync, in bytes.
         offset: u64,
     },
-    /// The source ended, as [`DtsNormalSourceReader::finish`] declared. A caller may
-    /// declare the end of a part of a stream as well as of a whole one.
+    /// The source ended, as [`DtsNormalSourceReader::finish`] declared, where the frame
+    /// ends or inside the source unit after it. A caller may declare the end of a part
+    /// of a stream as well as of a whole one.
     ExplicitSourceEnd,
 }
 
@@ -354,7 +355,9 @@ impl DtsNormalSourceReader {
     /// the stream does not start with `SYNC`, [`Error::Unsupported`] when it starts
     /// with a `SHORT` code that disagrees with the frame type,
     /// [`Error::Truncated`] when the source ends inside a header or a source word, and
-    /// [`Error::Limit`] when a frame or the number of frames exceeds its limit.
+    /// [`Error::Limit`] when a frame or the number of frames exceeds its limit. A frame
+    /// whose whole source units hold its `FSIZE` + 1 bytes is returned before the
+    /// part of a source unit after it is refused.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -451,13 +454,22 @@ impl DtsNormalSourceReader {
                             Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                             Step::Yield => return Ok(Step::Yield),
                             Step::End(end) => {
-                                self.packing.payload_bits(self.lookahead_len)?;
+                                // The frame takes the whole source units read; a part
+                                // of one after them stays in the lookahead and is
+                                // refused once a complete frame is returned.
+                                let partial = self.lookahead_len % self.packing.source_unit_bytes();
+                                let whole = self.lookahead_len - partial;
+                                let span =
+                                    buffer.len().checked_add(whole).ok_or(Error::Overflow)?;
+                                if partial != 0 && span < shortest_extent(header, self.packing)? {
+                                    return Err(Error::Truncated);
+                                }
                                 self.source_end = Some(end);
-                                *step = if self.lookahead_len == 0 {
+                                *step = if whole == 0 {
                                     BodyStep::Freeze
                                 } else {
                                     BodyStep::Append {
-                                        count: self.lookahead_len,
+                                        count: whole,
                                         copied: 0,
                                     }
                                 };
@@ -565,11 +577,16 @@ impl DtsNormalSourceReader {
             return Err(Error::Invalid("DTS ready source record"));
         };
         self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
-        if let Some(end) = self.source_end {
+        if let Some(end) = self.source_end
+            && self.lookahead_len == 0
+        {
             self.frame = Frame::Ended(end);
         } else {
-            self.prefix[..6].copy_from_slice(&self.lookahead);
-            self.prefix_len = 6;
+            // A following sync, or the part of a source unit the source ends inside,
+            // which the next header read refuses.
+            self.prefix[..self.lookahead_len]
+                .copy_from_slice(&self.lookahead[..self.lookahead_len]);
+            self.prefix_len = self.lookahead_len;
             self.frame_offset = ready
                 .facts
                 .identity
@@ -703,7 +720,9 @@ impl DtsNormalSourceReader {
             .checked_add(u64::try_from(payload.source_bytes().len()).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)?;
         let boundary = if let Some(source_end) = self.source_end {
-            if end != source_end.offset {
+            // A part of a source unit can follow the frame.
+            let tail = u64::try_from(self.lookahead_len).map_err(|_| Error::Overflow)?;
+            if end.checked_add(tail) != Some(source_end.offset) {
                 return Err(Error::Invalid("DTS EOF source mapping"));
             }
             DtsNormalBoundary::ExplicitSourceEnd

@@ -867,9 +867,20 @@ fn odd_word_eof_limits_frame_count_and_foreign_pool_are_explicit_errors() {
     let pool = Budget::new(65536).unwrap();
     let (mut raw, _) = pack(&logical(96, false), P::Words14Le, false, 0);
     raw.push(1);
+    // The complete frame before the odd byte is returned, and the byte alone refused.
     let mut r = reader(&pool, None, P::Words14Le, settings());
+    let frame = next(&mut r, &pool, &raw, 1, 1).unwrap().unwrap();
+    assert_eq!(frame.source_bytes().as_ref(), &raw[..110]);
+    assert_eq!(frame.facts().boundary, DtsNormalBoundary::ExplicitSourceEnd);
     assert_eq!(
         next(&mut r, &pool, &raw, 1, 1).unwrap_err(),
+        Error::Truncated
+    );
+    // A frame the odd byte cuts short of its FSIZE + 1 bytes is refused whole.
+    let cut = [&raw[..90], &[1]].concat();
+    let mut r = reader(&pool, None, P::Words14Le, settings());
+    assert_eq!(
+        next(&mut r, &pool, &cut, 1, 1).unwrap_err(),
         Error::Truncated
     );
     let raw = logical(96, false);

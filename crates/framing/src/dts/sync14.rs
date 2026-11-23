@@ -39,8 +39,9 @@ pub enum Dts14BoundaryEvidence {
         /// Source offset of the following sync, in bytes.
         physical_offset: u64,
     },
-    /// The source ended, as [`Dts14SyncReader::finish`] declared. A caller may
-    /// declare the end of a part of a stream as well as of a whole one.
+    /// The source ended, as [`Dts14SyncReader::finish`] declared, where the frame ends
+    /// or one byte after it. A caller may declare the end of a part of a stream as well
+    /// as of a whole one.
     ExplicitSourceEnd,
 }
 
@@ -350,7 +351,9 @@ impl Dts14SyncReader {
     /// a multiple of seven bytes, that does not hold `FSIZE` + 1 bytes when the source
     /// ends, or whose length a reader from [`new`](Self::new) does not accept,
     /// [`Error::Truncated`] when the source ends inside a header or a word, and
-    /// [`Error::Limit`] when a frame or the number of frames exceeds its limit.
+    /// [`Error::Limit`] when a frame or the number of frames exceeds its limit. A frame
+    /// whose whole words hold exactly its `FSIZE` + 1 bytes is returned before the byte
+    /// of a word after it is refused.
     pub fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -465,15 +468,16 @@ impl Dts14SyncReader {
                             Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                             Step::Yield => return Ok(Step::Yield),
                             Step::End(end) => {
-                                if !self.lookahead_len.is_multiple_of(2) {
-                                    return Err(Error::Truncated);
-                                }
+                                // The frame takes the whole words read; a byte after
+                                // them stays in the lookahead, refused once the frame
+                                // they hold is returned.
+                                let whole = self.lookahead_len - self.lookahead_len % 2;
                                 self.source_end = Some(end);
-                                *step = if self.lookahead_len == 0 {
+                                *step = if whole == 0 {
                                     BodyStep::Geometry
                                 } else {
                                     BodyStep::Append {
-                                        count: self.lookahead_len,
+                                        count: whole,
                                         copied: 0,
                                     }
                                 };
@@ -538,9 +542,13 @@ impl Dts14SyncReader {
                         let length = buffer.len();
                         let bits = (length / 2).checked_mul(14).ok_or(Error::Overflow)?;
                         if length % 2 != 0 || bits % 8 != 0 || bits / 8 != header.frame_bytes {
-                            return Err(Error::Unsupported(
-                                "DTS14 unresolved FSIZE domain or tail geometry",
-                            ));
+                            // Where the source ends inside a word, only a complete frame
+                            // before it is returned.
+                            return Err(if self.lookahead_len == 0 {
+                                Error::Unsupported("DTS14 unresolved FSIZE domain or tail geometry")
+                            } else {
+                                Error::Truncated
+                            });
                         }
                         if self.require_fixed_interval
                             && self.interval.is_some_and(|distance| distance != length)
@@ -552,7 +560,9 @@ impl Dts14SyncReader {
                             .checked_add(u64::try_from(length).map_err(|_| Error::Overflow)?)
                             .ok_or(Error::Overflow)?;
                         let boundary = if let Some(source_end) = self.source_end {
-                            if source_end.offset != end {
+                            let tail =
+                                u64::try_from(self.lookahead_len).map_err(|_| Error::Overflow)?;
+                            if end.checked_add(tail) != Some(source_end.offset) {
                                 return Err(Error::Invalid("DTS14 source end mapping"));
                             }
                             Dts14BoundaryEvidence::ExplicitSourceEnd
@@ -687,11 +697,16 @@ impl Dts14SyncReader {
     fn publish(&mut self, ready: Dts14SyncFrame) -> Result<Step<Dts14SyncFrame>> {
         self.completed = self.completed.checked_add(1).ok_or(Error::Overflow)?;
         self.interval = Some(ready.facts.physical_bytes);
-        if let Some(end) = self.source_end {
+        if let Some(end) = self.source_end
+            && self.lookahead_len == 0
+        {
             self.frame = Frame::Ended(end);
         } else {
-            self.prefix[..6].copy_from_slice(&self.lookahead);
-            self.prefix_len = 6;
+            // A following sync, or the byte of a word the source ends inside, which the
+            // next header read refuses.
+            self.prefix[..self.lookahead_len]
+                .copy_from_slice(&self.lookahead[..self.lookahead_len]);
+            self.prefix_len = self.lookahead_len;
             self.frame_offset = ready
                 .facts
                 .identity

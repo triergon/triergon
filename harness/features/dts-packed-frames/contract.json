@@ -31,7 +31,7 @@
       "reading": "A source that ends inside a header or a word",
       "clause": "ETSI TS 102 114 V1.6.1 clause 5.4.2: the header is 104 bits, 120 with HCRC; a word packing stores whole 16-bit words, and a 14-bit word carries its payload in the low 14 bits (TS 102 114 V1.2.1 clause 5.3)",
       "candidate": "refuses with Truncated where the source ends inside a header or a 16-bit source word, after every complete frame",
-      "reference": "the dca parser flushes the remaining bytes as a packet, odd bytes included, with no clock, with the header's clock, or after a complete frame with that frame's rate and no duration",
+      "reference": "the dca parser flushes the remaining bytes as a packet, odd bytes included, with no clock, with the header's clock, or after a complete frame with that frame's rate and no duration; one byte after a complete frame it joins to that frame's packet, with the frame's clock",
       "cases": [
         "matrix-short-header-cpf-0-bytes-4-be14",
         "matrix-short-header-cpf-0-bytes-4-le14",
@@ -96,7 +96,9 @@
         "truncated-95-le16",
         "below-minimum-fsize-le16",
         "partial-fixed-header-sync",
-        "partial-fixed-header-normal"
+        "partial-fixed-header-normal",
+        "odd-final-physical-byte-sync",
+        "odd-final-physical-byte-normal"
       ]
     },
     {
@@ -272,22 +274,9 @@
     }
   ],
   "pending_module_requirements": [
-    "A 14-bit source that holds a complete FSIZE + 1 frame followed by one stray byte loses the frame: the source and sync readers refuse the whole span as Truncated and the carrier reader returns the packet with no clock. FSIZE + 1 is the frame's size (ETSI TS 102 114 V1.6.1 clause 5.4.2), so the frame is complete; the readers must return it with its header's clock and refuse only the remainder.",
     "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
   ],
   "open_cases": [
-    {
-      "id": "odd-final-physical-byte-sync",
-      "requirement": "A 14-bit source that holds a complete FSIZE + 1 frame followed by one stray byte loses the frame: the source and sync readers refuse the whole span as Truncated and the carrier reader returns the packet with no clock. FSIZE + 1 is the frame's size (ETSI TS 102 114 V1.6.1 clause 5.4.2), so the frame is complete; the readers must return it with its header's clock and refuse only the remainder."
-    },
-    {
-      "id": "odd-final-physical-byte-normal",
-      "requirement": "A 14-bit source that holds a complete FSIZE + 1 frame followed by one stray byte loses the frame: the source and sync readers refuse the whole span as Truncated and the carrier reader returns the packet with no clock. FSIZE + 1 is the frame's size (ETSI TS 102 114 V1.6.1 clause 5.4.2), so the frame is complete; the readers must return it with its header's clock and refuse only the remainder."
-    },
-    {
-      "id": "odd-final-physical-byte-carrier",
-      "requirement": "A 14-bit source that holds a complete FSIZE + 1 frame followed by one stray byte loses the frame: the source and sync readers refuse the whole span as Truncated and the carrier reader returns the packet with no clock. FSIZE + 1 is the frame's size (ETSI TS 102 114 V1.6.1 clause 5.4.2), so the frame is complete; the readers must return it with its header's clock and refuse only the remainder."
-    },
     {
       "id": "matrix-normal-short-zero-be14",
       "requirement": "The normal source reader refuses SHORT 0 in a normal frame as Unsupported. ETSI TS 102 114 V1.6.1 clause 5.3 and Table 5-3 rule that code out, and the core reader refuses the same header as Invalid; the refusal must be Invalid."
