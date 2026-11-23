@@ -354,31 +354,49 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
 
 /// Run the worker binary `name`, which serves `operations`, on the process arguments.
 pub fn main(name: &str, operations: Operations) {
-    // <lane>-<codec>-bench FILE ITERATIONS | <lane>-<codec>-memory FILE | <lane>-<codec>-raw FILE OUT
     let args: Vec<String> = std::env::args().collect();
-    if let [_, command, format, path, seek @ ..] = args.as_slice()
-        && command == "packets"
-        && seek.len() <= 1
-        && operations == Operations::All
+    if operations == Operations::All
+        && let Some(result) = reader_command(&args)
     {
-        if let Err(error) = packets::run(format, path, seek.first().map(String::as_str)) {
+        if let Err(error) = result {
             eprintln!("{error}");
             std::process::exit(2);
         }
         return;
     }
-    if let [_, command, format, path, track, seconds, policy] = args.as_slice()
-        && command == "seek"
-        && operations == Operations::All
-    {
-        if let Err(error) = packets::Seek::parse(track, seconds, policy)
-            .and_then(|seek| packets::seek(format, path, &seek))
-        {
-            eprintln!("{error}");
+
+    let (op, kind, input) = decode_arguments(&args, name, operations);
+    let data = decode_input(op, input);
+    match DecodeMode::parse(kind) {
+        Some(DecodeMode::Bench) => bench(op, &data, args.get(3)),
+        Some(DecodeMode::Memory) => memory(op, &data),
+        Some(DecodeMode::Fold) => fold(op, &data),
+        Some(DecodeMode::Raw) => raw(op, &data, args.get(3)),
+        None => {
+            eprintln!("unknown mode {kind}");
             std::process::exit(2);
         }
-        return;
     }
+}
+
+fn reader_command(args: &[String]) -> Option<Result<(), String>> {
+    match args {
+        [_, command, format, path, seek @ ..] if command == "packets" && seek.len() <= 1 => {
+            Some(packets::run(format, path, seek.first().map(String::as_str)))
+        }
+        [_, command, format, path, track, seconds, policy] if command == "seek" => Some(
+            packets::Seek::parse(track, seconds, policy)
+                .and_then(|seek| packets::seek(format, path, &seek)),
+        ),
+        _ => None,
+    }
+}
+
+fn decode_arguments<'a>(
+    args: &'a [String],
+    name: &str,
+    operations: Operations,
+) -> (&'a str, &'a str, &'a str) {
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
             "usage: {name} KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE{}",
@@ -394,8 +412,11 @@ pub fn main(name: &str, operations: Operations) {
         eprintln!("{name}: unknown operation {op}");
         std::process::exit(2);
     }
-    let input = args.get(2).expect("input");
-    let data = if matches!(
+    (op, kind, args.get(2).expect("input"))
+}
+
+fn decode_input(op: &str, input: &str) -> Vec<u8> {
+    if matches!(
         op,
         aac_access_units::OPERATION | aac_access_units::COMPAT_OPERATION
     ) {
@@ -405,76 +426,71 @@ pub fn main(name: &str, operations: Operations) {
         })
     } else {
         std::fs::read(input).expect("input")
-    };
-    let mut out = Output::default();
-    match DecodeMode::parse(kind) {
-        Some(DecodeMode::Bench) => {
-            let iterations: u32 = args
-                .get(3)
-                .expect("iterations")
-                .parse()
-                .expect("iterations");
-            let start = Timer::start(true);
-            for _ in 0..iterations {
-                run(op, &data, &mut out);
-            }
-            let elapsed = start.elapsed().as_nanos();
-            let line = BenchLine::with_schema(
-                u64::from(iterations),
-                elapsed,
-                (out.frames, out.bytes, out.digest.finish()),
-            );
-            println!("{line}");
-        }
-        Some(DecodeMode::Memory) => {
-            // Same observer protocol as the container workers: one whole operation between markers.
-            let mut stdout = std::io::stdout().lock();
-            Boundary::Begin.mark(&mut stdout).expect("stdout");
-            run(op, &data, &mut out);
-            Boundary::End.mark(&mut stdout).expect("stdout");
-            // Equal memory work is equal units and bytes; the digest goes to stderr
-            // because audio may differ within the graded 1 LSB.
-            writeln!(
-                stdout,
-                "{{\"packets\":{},\"bytes\":{}}}",
-                out.frames, out.bytes
-            )
-            .expect("stdout");
-            eprintln!("{{\"digest\":{}}}", out.digest.finish());
-        }
-        Some(DecodeMode::Fold) => {
-            // One decode and its output identity, without timing: what a fuzz campaign
-            // compares between builds.
-            run(op, &data, &mut out);
-            println!(
-                "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
-                out.frames,
-                out.bytes,
-                out.digest.finish()
-            );
-        }
-        Some(DecodeMode::Raw) => {
-            out.raw = Some(std::io::BufWriter::new(
-                std::fs::File::create(args.get(3).expect("output")).expect("raw output"),
-            ));
-            run(op, &data, &mut out);
-            out.raw.take().expect("raw").flush().expect("raw flush");
-            print!(
-                "{{\"packets\":{},\"bytes\":{},\"digest\":{}",
-                out.frames,
-                out.bytes,
-                out.digest.finish()
-            );
-            if let Some((speakers, channels)) = out.aac_speakers {
-                print!(",\"speakers\":{:?}", &speakers[..channels]);
-            }
-            println!("}}");
-        }
-        None => {
-            eprintln!("unknown mode {kind}");
-            std::process::exit(2);
-        }
     }
+}
+
+fn bench(op: &str, data: &[u8], iterations: Option<&String>) {
+    let iterations: u32 = iterations.expect("iterations").parse().expect("iterations");
+    // One streaming digest spans all iterations, including blocks that straddle a decode boundary.
+    let mut out = Output::default();
+    let start = Timer::start(true);
+    for _ in 0..iterations {
+        run(op, data, &mut out);
+    }
+    let line = BenchLine::with_schema(
+        u64::from(iterations),
+        start.elapsed().as_nanos(),
+        (out.frames, out.bytes, out.digest.finish()),
+    );
+    println!("{line}");
+}
+
+fn memory(op: &str, data: &[u8]) {
+    let mut out = Output::default();
+    let mut stdout = std::io::stdout().lock();
+    Boundary::Begin.mark(&mut stdout).expect("stdout");
+    run(op, data, &mut out);
+    Boundary::End.mark(&mut stdout).expect("stdout");
+    // The memory line carries counts, while the separately graded digest goes to stderr.
+    writeln!(
+        stdout,
+        "{{\"packets\":{},\"bytes\":{}}}",
+        out.frames, out.bytes
+    )
+    .expect("stdout");
+    eprintln!("{{\"digest\":{}}}", out.digest.finish());
+}
+
+fn fold(op: &str, data: &[u8]) {
+    let mut out = Output::default();
+    run(op, data, &mut out);
+    println!(
+        "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
+        out.frames,
+        out.bytes,
+        out.digest.finish()
+    );
+}
+
+fn raw(op: &str, data: &[u8], path: Option<&String>) {
+    let mut out = Output {
+        raw: Some(std::io::BufWriter::new(
+            std::fs::File::create(path.expect("output")).expect("raw output"),
+        )),
+        ..Output::default()
+    };
+    run(op, data, &mut out);
+    out.raw.take().expect("raw").flush().expect("raw flush");
+    print!(
+        "{{\"packets\":{},\"bytes\":{},\"digest\":{}",
+        out.frames,
+        out.bytes,
+        out.digest.finish()
+    );
+    if let Some((speakers, channels)) = out.aac_speakers {
+        print!(",\"speakers\":{:?}", &speakers[..channels]);
+    }
+    println!("}}");
 }
 
 enum DecodeMode {
