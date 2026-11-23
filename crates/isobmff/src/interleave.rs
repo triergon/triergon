@@ -298,7 +298,8 @@ pub struct PhysicalSampleCursor<'a> {
     limits: PhysicalInterleaveLimits,
     phase: Phase<'a>,
     index: usize,
-    best: Option<usize>,
+    /// The slot whose head starts first among those compared, with that start.
+    best: Option<(usize, u64)>,
     previous: Option<SampleOrder>,
     validated: u64,
     layout_error: Option<Error>,
@@ -694,7 +695,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                 }
                 Phase::Select => {
                     if self.index == self.slots.len() {
-                        let Some(selected) = self.best else {
+                        let Some((selected, _)) = self.best else {
                             self.phase = Phase::End;
                             continue;
                         };
@@ -716,20 +717,9 @@ impl<'a> PhysicalSampleCursor<'a> {
                     }
                     let slots = self.slots.as_slice();
                     if let Some(head) = &slots[self.index].head {
-                        let earlier = match self.best {
-                            Some(best) => {
-                                head.range.start
-                                    < slots[best]
-                                        .head
-                                        .as_ref()
-                                        .ok_or(Error::Invalid("missing comparison source head"))?
-                                        .range
-                                        .start
-                            }
-                            None => true,
-                        };
-                        if earlier {
-                            self.best = Some(self.index);
+                        let start = head.range.start;
+                        if self.best.is_none_or(|(_, earliest)| start < earliest) {
+                            self.best = Some((self.index, start));
                         }
                     }
                     self.index += 1;
