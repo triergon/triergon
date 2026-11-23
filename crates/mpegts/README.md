@@ -376,12 +376,44 @@ access units, a 64 KiB elementary input window and the 64 MiB seek scan.
 All storage is charged to one shared `Budget`; an emitted `Bytes` charges its
 whole backing allocation.
 
-## Errors and recovery
+## Recovery from nonconforming input
 
-- **Damage.** `TransportStream` reports each fault as `TraceEvent::Diagnostic` and
-  keeps going. TEI, scrambled, lost and excess-duplicate packets discard the
-  affected partial section or PES. A bad PSI pointer resumes at the next payload
-  unit start. The standalone assemblers keep a fault sticky until `discard`.
+The source view never repairs input. Every fault is one `TraceEvent::Diagnostic`
+(kind, PID when known, location, error) and the stream keeps going; what it drops
+and where it resumes is fixed per fault:
+
+| Input | Diagnostic | Dropped | Resumes at |
+|---|---|---|---|
+| A packet position without a sync byte (`0x47`) | `Transport`, `TS sync byte` | that carrier, every partial section and PES | the next position of the original 188/192-byte grid; the reader never searches for a new sync position |
+| A final partial carrier | `Transport`, `Truncated` | the partial carrier | — |
+| Reserved `adaptation_field_control`, an adaptation field longer than the packet, invalid PCR reserved bits or extension (unless `ReaderLimits::pcr_policy` ignores the reserved bits), an OPCR without a PCR | `Transport` | that carrier, every partial section and PES | the next carrier |
+| A set transport error indicator, a scrambled payload | `Transport` on the PID | that carrier and the PID's partial PES or section | the next payload unit start of the PID |
+| A continuity counter gap, a third copy of a packet | `Continuity` on the PID | the PID's partial PES or section | the next payload unit start |
+| A second copy of a packet (H.222.0 §2.4.3.3) | none | the copy | — |
+| A PES without the start code, with forbidden `PTS_DTS_flags`, zero marker bits, a header beyond its declared length, a declared length its payload overruns, or zero length on a non-video stream | `Pes` on the PID | the whole PES, including the bytes of an overrunning one | the next payload unit start |
+| A PES or section cut off at the end of the source | `Pes` or `Psi`, `Truncated` | the partial PES or section | — |
+| A PSI section with a bad CRC, length, pointer or stuffing, a malformed PAT or PMT, a descriptor overrunning its loop, a PMT section other than 0 of 0 | `Psi` | the section | the next section |
+| A signalled PCR discontinuity | `TraceEvent::Timeline` (new clock epoch) | partial PES of the program | the carrier that brought the new PCR |
+
+The access-unit `Reader` adds one rule: it publishes complete access units only,
+and a PES is not one. Bytes of a track's elementary run that a fault, a clock
+epoch or a table change cuts before they complete an access unit are reported as
+`ReaderEvent::Interrupted` with their extent in the track's concatenated payload;
+the PES that carried them are still delivered as source events. Without the
+opt-in policies below, a PES whose payload is not the track's framing syntax
+(for example AVC bytes before the first start code) fails the reader with
+`Invalid`.
+
+The FFmpeg-compatible `DemuxObserver` cuts what the demuxer cuts and refuses what
+its profile does not cover: a carrier with a transport error or scrambling and a
+PCR discontinuity on its PID return `Unsupported` unless `TransportFaultRecovery`
+confirms the source fault or timeline first; a PES whose header fails its start
+code or length is dropped with its continuations up to the next payload unit start.
+
+## Errors
+
+- **Assemblers.** The standalone section and PES assemblers keep a fault sticky until
+  `discard`.
 - **Backpressure and limits.** A rejected push returns the original bytes.
   `Backpressure` means caller-held output must be released; retry after releasing,
   not in a loop. A total that cannot fit the pool returns `Limit`.
