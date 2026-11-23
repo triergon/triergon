@@ -12,7 +12,7 @@ or `Encoding::Multibyte`; no label or content is guessed.
 | `Big5Unicode` | big5, big-5 | Unicode historical BIG5 table 2.0; its seven NO MAPPING entries are errors. |
 | `ShiftJisUnicode` | shift_jis, shift-jis, sjis | Unicode historical SHIFTJIS table 2.0 (0x5C yen, 0x7E overline), plus C0/DEL identity. |
 | `EucKr` | euc-kr, euc_kr | KS X 1001:2002: CP949 table 2.01 restricted to A1–FE byte pairs, plus A2E8 → U+327E, which KS X 1001:2002 adds and CP949 2.01 predates, and ASCII. UHC extension pairs are refused. |
-| `Windows932` | cp932, windows-932 | Microsoft CP932 table 2.01. |
+| `Windows932` | cp932, windows-932 | Microsoft CP932 table 2.01 plus the 1,880 user-defined codes F040–F9FC → U+E000–U+E757, as Windows and the WHATWG Shift_JIS decoder convert them. |
 | `Windows949` | cp949, windows-949 | Microsoft CP949 table 2.01, including UHC extensions. |
 | `Windows950` | cp950, windows-950 | Microsoft CP950 table 2.01. |
 
@@ -29,7 +29,7 @@ glibc iconv when converting ASS packets (`compat::charset::AssPacketJob`).
 | `ReceiverBig5Glibc239` | big5, big-5 | GNU Big5 charmap 0.92 from glibc 2.39 (14,040 records). |
 | `ReceiverEucKrC1` | euc-kr | `EucKr` plus the 32 C1 controls; equals the glibc 2.39 EUC-KR charmap. |
 | `ReceiverEucKrGlibc239` | euc-kr (`receiver_charset_with_glibc_euc_kr` only) | The same as `ReceiverEucKrC1`. |
-| `ReceiverWindows932Pua` | cp932 | CP932 plus the 1,880 user-defined codes F040–F9FC → U+E000–U+E757. |
+| `ReceiverWindows932Pua` | cp932 | The same as `Windows932`. |
 
 `euc_kr` and `windows-932/949/950` are unavailable in this view.
 

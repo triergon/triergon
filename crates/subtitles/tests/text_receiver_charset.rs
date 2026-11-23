@@ -82,21 +82,22 @@ fn euc_c1_controls_are_explicit_not_cp949_alias() {
     );
 }
 #[test]
-fn cp932_pua_all1880_are_independently_indexed() {
+fn cp932_user_defined_area_maps_all_1880_codes_to_private_use() {
     let p = Budget::new(1 << 20).unwrap();
     let mut n = 0;
     for lead in 0xf0..=0xf9 {
         for trail in (0x40..=0x7e).chain(0x80..=0xfc) {
             let ch = char::from_u32(0xe000 + n).unwrap();
-            assert_eq!(
-                decode(&p, &[lead, trail], M::ReceiverWindows932Pua).unwrap(),
-                ch.to_string().as_bytes()
-            );
+            for profile in [M::Windows932, M::ReceiverWindows932Pua] {
+                assert_eq!(
+                    decode(&p, &[lead, trail], profile).unwrap(),
+                    ch.to_string().as_bytes()
+                );
+            }
             n += 1;
         }
     }
     assert_eq!(n, 1880);
-    assert!(decode(&p, &[0xf0, 0x40], M::Windows932).is_err());
 }
 #[test]
 fn receiver_labels_have_no_aliases_beyond_the_reference_set() {

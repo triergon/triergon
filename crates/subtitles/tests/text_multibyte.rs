@@ -124,7 +124,7 @@ const PROFILES: [(M, &str, usize); 7] = [
     (
         M::Windows932,
         include_str!("multibyte-mapping-data/CP932.TXT"),
-        7915,
+        9795,
     ),
     (
         M::Windows949,
@@ -160,6 +160,16 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
             continue;
         }
         assert!(map.insert(code, value).is_none());
+    }
+    if profile == M::Windows932 {
+        // CP932.TXT 2.01 leaves out the user-defined area, which Windows
+        // converts to the private use area, row by row.
+        let trails = (0x40..=0x7e).chain(0x80..=0xfc);
+        let codes =
+            (0xf0_u16..=0xf9).flat_map(|lead| trails.clone().map(move |trail| lead << 8 | trail));
+        for (code, scalar) in codes.zip(0xe000..) {
+            assert!(map.insert(code, char::from_u32(scalar).unwrap()).is_none());
+        }
     }
     if profile == M::EucKr {
         // CP949.TXT 2.01 predates A2E8, which KS X 1001:2002 assigns.
@@ -268,7 +278,7 @@ fn every_receiver_big5_and_cp932_one_and_two_byte_input() {
         ),
         (
             M::ReceiverWindows932Pua,
-            include_bytes!("../src/text/charset/mapping-data/receiver_cp932_pua.bin").as_slice(),
+            include_bytes!("../src/text/charset/mapping-data/windows932.bin").as_slice(),
         ),
     ] {
         let (records, remainder) = records.as_chunks::<4>();
@@ -502,7 +512,6 @@ fn big5_seven_unmapped_records_are_all_required_refusals() {
 #[test]
 fn no_private_use_or_gb18030_four_byte_inference() {
     assert!(decode(&[0x81, 0x30, 0x81, 0x30], M::GbkCp936, 1).is_err());
-    assert!(decode(&[0xf0, 0x40], M::Windows932, 1).is_err());
     assert!(decode(&[0xfa, 0x40], M::Windows950, 1).is_err());
     assert!(decode(&[0x87, 0x40], M::Big5Unicode, 1).is_err());
 }

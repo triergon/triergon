@@ -24,7 +24,8 @@ pub enum MultibyteCharset {
     /// pairs, plus A2 E8 as U+327E, which KS X 1001:2002 adds, and ASCII; the
     /// UHC extension pairs are refused.
     EucKr,
-    /// Microsoft CP932 table 2.01.
+    /// Microsoft CP932 table 2.01 plus the 1,880 user-defined codes
+    /// F040–F9FC as U+E000–U+E757, as Windows converts them.
     Windows932,
     /// Microsoft CP949 table 2.01, including the UHC extension pairs.
     Windows949,
@@ -35,7 +36,7 @@ pub enum MultibyteCharset {
     ReceiverBig5Glibc239,
     /// [`EucKr`](Self::EucKr) plus bytes 0x80–0x9F as the C1 controls.
     ReceiverEucKrC1,
-    /// CP932 plus the 1,880 user-defined codes F040–F9FC as U+E000–U+E757.
+    /// The CP932 glibc converts, which is [`Windows932`](Self::Windows932).
     ReceiverWindows932Pua,
     /// The glibc 2.39 EUC-KR charmap, which is
     /// [`ReceiverEucKrC1`](Self::ReceiverEucKrC1).
@@ -96,11 +97,12 @@ impl MultibyteCharset {
                 }
                 include_bytes!("mapping-data/euc_kr.bin")
             }
-            Self::Windows932 => include_bytes!("mapping-data/windows932.bin"),
+            Self::Windows932 | Self::ReceiverWindows932Pua => {
+                include_bytes!("mapping-data/windows932.bin")
+            }
             Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
             Self::Windows950 => include_bytes!("mapping-data/windows950.bin"),
             Self::ReceiverBig5Glibc239 => include_bytes!("mapping-data/receiver_big5_glibc239.bin"),
-            Self::ReceiverWindows932Pua => include_bytes!("mapping-data/receiver_cp932_pua.bin"),
         };
         let mut low = 0;
         let mut high = data.len() / 4;
