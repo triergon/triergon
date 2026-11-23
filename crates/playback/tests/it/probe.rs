@@ -1,7 +1,7 @@
 use crate::support::players::*;
 use crate::support::*;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Error as C, InputCursor, SourceCapabilities, WorkBudget};
+use triergon_core::{Budget, Error as C, InputCursor, SourceCapabilities, Step, WorkBudget};
 use triergon_mpegts::{PacketFormat, clock::SourceTimePolicy};
 use triergon_playback::{
     SourceOwner,
@@ -170,6 +170,71 @@ fn cancelled_opener_and_probe_cannot_later_publish_ready() {
     ));
     assert!(probe.finish().is_err());
     assert_eq!(b.used(), Budget::control_storage_bytes());
+}
+
+/// The format a sequential `raw` of unknown length selects, and the bytes its
+/// selected input delivers through the end.
+fn probe_to_end(raw: &[u8], quantum: usize) -> Result<(Format, Vec<u8>)> {
+    let b = pool();
+    let (source, _, _) = observed(&b, raw, quantum, true);
+    let caps = SourceCapabilities {
+        length: None,
+        random_access: false,
+    };
+    let mut probe = Probe::new(&b, ID, caps, 4096, source)?;
+    while !matches!(
+        probe.advance(&mut WorkBudget::new(1), &off())?,
+        ProbeProgress::Selected(_)
+    ) {}
+    let SelectedInput {
+        mut input,
+        mut source,
+        format,
+    } = probe.finish()?;
+    let (mut bytes, mut buffer) = (Vec::new(), [0; 64]);
+    loop {
+        let mut work = WorkBudget::new(1);
+        match input.read_into(&mut buffer, &mut work, &off())? {
+            Step::Ready(count) => bytes.extend_from_slice(&buffer[..count]),
+            Step::NeedInput(request) => {
+                source
+                    .poll(&request, &mut work, &off())?
+                    .provide_to(&mut input)?;
+            }
+            Step::Yield => {}
+            Step::End(_) => return Ok((format, bytes)),
+        }
+    }
+}
+
+#[test]
+fn a_transport_stream_that_ends_before_the_signature_is_selected_by_the_sync_bytes_it_holds() {
+    let ts = include_bytes!("../fixtures/ts/ts188-basic.ts").as_slice();
+    let m2ts = include_bytes!("../fixtures/ts/m2ts192-opaque-prefix.m2ts").as_slice();
+    for (raw, packets) in [
+        (&ts[..376], PacketFormat::Ts188),
+        (&ts[..377], PacketFormat::Ts188),
+        (&ts[..388], PacketFormat::Ts188),
+        (&m2ts[..197], PacketFormat::M2ts192),
+        (&m2ts[..384], PacketFormat::M2ts192),
+    ] {
+        for quantum in [1, 7, 4096] {
+            assert_eq!(
+                probe_to_end(raw, quantum),
+                Ok((Format::Ts(packets), raw.to_vec())),
+                "{} bytes",
+                raw.len()
+            );
+        }
+    }
+    for raw in [&ts[..188], &m2ts[..196]] {
+        assert_eq!(
+            probe_to_end(raw, 7),
+            Err(C::Unsupported(
+                "short or unknown source signature; explicit format required"
+            ))
+        );
+    }
 }
 
 #[test]

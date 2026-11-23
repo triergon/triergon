@@ -9,7 +9,7 @@ use triergon_core::{
 use triergon_framing::nal::{Codec, NalHeader, RawAnnexBLimits, RawAnnexBReader};
 use triergon_playback::{
     Format, Source, SourceOwner, SourceReply,
-    probe::{CONTAINER_SIGNATURE_BYTES, SelectedInput, detect_container},
+    probe::{CONTAINER_SIGNATURE_BYTES, SelectedInput, detect_container, detect_container_whole},
 };
 
 const MAXIMUM_PROBE_WINDOW: usize = 4096;
@@ -369,6 +369,9 @@ impl<S: Source> ProbeDriver<S> {
                     return Err(Error::Unsupported("raw video signature absent at EOF"));
                 }
                 self.end = Some(self.input.position());
+                self.container_pending = false;
+                self.detected = detect_container_whole(self.prefix.as_slice())?
+                    .map(PlaybackInputKind::Container);
             }
         }
     }

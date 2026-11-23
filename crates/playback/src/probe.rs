@@ -35,7 +35,8 @@ pub enum ProbeProgress {
     Selected(Format),
 }
 /// Selects the container format of a source from its first bytes alone, within
-/// work budgets. Three sync bytes one packet apart tell TS188 from M2TS192.
+/// work budgets. Three sync bytes one packet apart tell TS188 from M2TS192; a source
+/// that ends first is decided by the bytes it holds ([`detect_container_whole`]).
 #[derive(Debug)]
 pub struct Probe<S: Source> {
     input: Option<InputCursor>,
@@ -173,9 +174,15 @@ impl<S: Source> Probe<S> {
                 Ok(ProbeProgress::NeedInput(r))
             }
             Step::Yield => Ok(ProbeProgress::Yield),
-            Step::End(_) => Err(Error::Unsupported(
-                "short or unknown source signature; explicit format required",
-            )),
+            Step::End(_) => match detect_container_whole(&self.prefix[..self.used])? {
+                Some(f) => {
+                    self.chosen = Some(f);
+                    Ok(ProbeProgress::Selected(f))
+                }
+                None => Err(Error::Unsupported(
+                    "short or unknown source signature; explicit format required",
+                )),
+            },
         }
     }
     /// The selected input, replaying the probed prefix. Fails with `Closed` after a
@@ -211,8 +218,8 @@ pub const CONTAINER_SIGNATURE_BYTES: usize = M2ts192.prefix_len();
 /// file opens with `ftyp`, `styp`, `moov`, `free`, `wide` or `mdat`; a `moof`,
 /// `sidx` or `skip` first, which `triergon`'s reader probe also accepts, is not a
 /// file a player opens. A transport packet size is chosen on the whole
-/// [`CONTAINER_SIGNATURE_BYTES`] and never for a prefix that fits both, where that
-/// probe takes TS188 at its third sync byte.
+/// [`CONTAINER_SIGNATURE_BYTES`], or on a whole source that ends first, and never
+/// for bytes that fit both, where that probe takes TS188 at its third sync byte.
 pub const SELECTION: signature::Policy = signature::Policy {
     opening_boxes: &[*b"ftyp", *b"styp", *b"moov", *b"free", *b"wide", *b"mdat"],
     ogg: false,
@@ -226,7 +233,21 @@ pub const SELECTION: signature::Policy = signature::Policy {
 // the raw video probe's loop it cost that loop 0.07 to 0.10% of its instructions.
 #[inline(never)]
 pub fn detect_container(prefix: &[u8]) -> Result<Option<Format>> {
-    match signature::select(prefix, &SELECTION) {
+    format(signature::select(prefix, &SELECTION))
+}
+
+/// [`detect_container`] for a whole source, which no more bytes follow: a cut-short
+/// signature is none, and a transport packet size is chosen from the sync bytes the
+/// source holds, two at least (one packet and all or part of a second). Fails with
+/// `Invalid` for a source both packet sizes fit.
+#[inline(never)]
+pub fn detect_container_whole(source: &[u8]) -> Result<Option<Format>> {
+    format(signature::select_whole(source, &SELECTION))
+}
+
+#[inline(always)]
+fn format(selection: Selection) -> Result<Option<Format>> {
+    match selection {
         Selection::Container(Container::Matroska) => Ok(Some(Format::Matroska)),
         Selection::Container(Container::Isobmff) => Ok(Some(Format::Mp4)),
         Selection::Container(Container::Transport(Ts188)) => {
@@ -309,7 +330,7 @@ impl<S: Source> Source for ReplaySource<S> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Format, detect_container};
+    use super::{Format, detect_container, detect_container_whole};
     use triergon_core::Error;
     use triergon_mpegts::PacketFormat;
 
@@ -351,5 +372,46 @@ mod tests {
             Ok(Some(Format::Matroska))
         );
         assert_eq!(detect_container(b"OggS\0"), Ok(None));
+    }
+
+    #[test]
+    fn a_whole_source_shorter_than_the_signature_takes_the_packet_size_its_sync_bytes_fit() {
+        let ts188 = Ok(Some(Format::Ts(PacketFormat::Ts188)));
+        let mut bytes = [0; 388];
+        for at in [0, 188, 376] {
+            bytes[at] = 0x47;
+        }
+        for len in [189, 376, 377, 388] {
+            assert_eq!(
+                detect_container(&bytes[..len]),
+                Ok(None),
+                "{len}-byte prefix"
+            );
+            assert_eq!(
+                detect_container_whole(&bytes[..len]),
+                ts188,
+                "{len}-byte source"
+            );
+        }
+        assert_eq!(detect_container_whole(&bytes[..188]), Ok(None));
+        bytes[4] = 0x47;
+        assert_eq!(detect_container_whole(&bytes[..196]), ts188);
+        bytes[196] = 0x47;
+        assert_eq!(
+            detect_container_whole(&bytes),
+            Err(Error::Invalid("ambiguous transport signature"))
+        );
+        for at in [0, 188, 376] {
+            bytes[at] = 0;
+        }
+        assert_eq!(
+            detect_container_whole(&bytes),
+            Ok(Some(Format::Ts(PacketFormat::M2ts192)))
+        );
+        assert_eq!(detect_container_whole(b"\0\0\0\x10ft"), Ok(None));
+        assert_eq!(
+            detect_container_whole(b"\0\0\0\x10ftyp"),
+            Ok(Some(Format::Mp4))
+        );
     }
 }

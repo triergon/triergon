@@ -126,7 +126,10 @@ packet view FFmpeg's demuxer gives of the same bytes, reproduced by the
 
 `probe::Probe` accepts MP4 opening boxes `ftyp`, `styp`, `moov`, `free`, `wide`
 and `mdat`. For TS, exactly one three-sync pattern must match in the
-389-byte prefix. `SelectedInput` replays the prefix before reading more.
+389-byte prefix; a source that ends first is TS188 or M2TS192 when exactly one
+spacing has a sync byte at each of its offsets the source reaches, two at least
+(one packet and all or part of a second). `SelectedInput` replays the prefix
+before reading more.
 `triergon_raw_video::PlaybackProbe` also detects AVC and HEVC Annex B.
 
 The [probe comparison](../../harness/features/playback-probe/contract.json)

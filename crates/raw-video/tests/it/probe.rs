@@ -224,3 +224,59 @@ fn combined_playback_probe_opens_real_sequential_mp4() {
     drop(player);
     assert_eq!(b.used(), Budget::control_storage_bytes());
 }
+
+#[test]
+fn combined_probe_selects_a_transport_stream_that_ends_before_the_signature() {
+    use triergon_framing::nal::RawAnnexBLimits;
+    use triergon_mpegts::PacketFormat;
+    use triergon_raw_video::{
+        PlaybackInput, PlaybackInputKind, PlaybackProbe, PlaybackProbeStep, RawVideoProbeLimits,
+    };
+
+    let ts = include_bytes!("../../../playback/tests/fixtures/ts/ts188-basic.ts");
+    for (len, detected) in [
+        (
+            376,
+            Ok(PlaybackInputKind::Container(Format::Ts(
+                PacketFormat::Ts188,
+            ))),
+        ),
+        (
+            377,
+            Ok(PlaybackInputKind::Container(Format::Ts(
+                PacketFormat::Ts188,
+            ))),
+        ),
+        (
+            188,
+            Err(C::Unsupported(
+                "raw video probe needs a leading Annex B start code",
+            )),
+        ),
+    ] {
+        let b = pool();
+        let (source, _, _) = observed(&b, &ts[..len], 7, true);
+        let caps = SourceCapabilities {
+            length: None,
+            random_access: false,
+        };
+        let mut probe =
+            PlaybackProbe::new(&b, ID, caps, 4096, source, RawVideoProbeLimits::default()).unwrap();
+        let outcome = loop {
+            match probe.advance(&mut WorkBudget::new(1), &off()) {
+                Ok(PlaybackProbeStep::Detected(kind)) => break Ok(kind),
+                Ok(PlaybackProbeStep::Yield | PlaybackProbeStep::NeedInput(_)) => {}
+                Err(error) => break Err(error),
+            }
+        };
+        assert_eq!(outcome, detected, "{len} bytes");
+        if outcome.is_ok() {
+            let PlaybackInput::Container(selected) =
+                probe.finish(RawAnnexBLimits::default()).unwrap()
+            else {
+                panic!("combined probe did not hand off the transport stream");
+            };
+            assert_eq!(selected.format, Format::Ts(PacketFormat::Ts188));
+        }
+    }
+}
