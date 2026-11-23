@@ -32,12 +32,10 @@ pub enum UnframedVideo {
     /// Keep the video framer's leading-byte error.
     #[default]
     Refuse,
-    /// Report a nonempty run of validated PES payload with invalid leading bytes
-    /// and no Annex B start code anywhere in the run, as
-    /// [`ReaderEvent::IncompleteVideo`](crate::ReaderEvent::IncompleteVideo) at logical EOF
-    /// or before a fault, signalled
-    /// discontinuity, clock epoch or table change that ends the run. A discontinuity
-    /// the caller declares discards the run and reports its extent as `Interrupted`.
+    /// Report a nonempty validated PES run with invalid leading bytes and no Annex B start code
+    /// as [`crate::ReaderEvent::IncompleteVideo`] when EOF, a fault, a signalled discontinuity,
+    /// a clock epoch change or a table change ends it. A caller-declared discontinuity
+    /// discards the run and emits [`crate::ReaderEvent::Interrupted`].
     Report,
 }
 
@@ -48,16 +46,14 @@ pub enum UnframedAudioPolicy {
     /// Require the source namespace before admitting a private-audio framer.
     #[default]
     Refuse,
-    /// With unspecified namespace, admit one finite private-audio PES per
-    /// uninterrupted run when its payload has no AC-3 or E-AC-3 syncword
-    /// and does not end with the first byte of one.
+    /// With unspecified namespace, admit one finite private-audio PES per uninterrupted run.
+    /// Its payload must be free of AC-3 and E-AC-3 syncwords and their first byte at the tail.
     /// The observation preserves the track's source codec and namespace.
     Report,
 }
 
-/// Bounds and source interpretation for the AU reader, independent of its live
-/// storage budget. An absent program selects the sole PAT media program;
-/// transports with several programs require an explicit selection.
+/// Bounds and source interpretation for the AU reader, independent of its live storage budget.
+/// Multiprogram transports require explicit selection.
 #[derive(Clone, Copy, Debug)]
 pub struct ReaderLimits {
     /// The packet format of the source: 188-byte TS or 192-byte M2TS.

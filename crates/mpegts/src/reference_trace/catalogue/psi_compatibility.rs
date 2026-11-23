@@ -1,5 +1,5 @@
-//! Explicit flags48 PSI compatibility. No Source PatTable, active ProgramMap
-//! event, source diagnostic or epoch is synthesized by this optional operation.
+//! PAT and PMT sections admitted by a demux policy, with their source status and
+//! original carriers retained.
 use super::*;
 use crate::AssemblyStep;
 use crate::compat::pes::observer::{DemuxObserver, SourceContext};

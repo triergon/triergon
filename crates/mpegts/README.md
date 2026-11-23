@@ -238,6 +238,8 @@ Sources must remain stable between requests. For one clear entity with a single
 Layer I/II, AVC or HEVC stream, the index can also hold restart checkpoints at
 in-band PAT/PMT carriers; a later seek compares those carriers byte for byte and
 reads no earlier bytes. Other landings replay the entity prefix.
+`SeekReceipt::replays_from_start` is true when delivery skips no packets before
+the landing.
 
 A LOAS envelope with an in-band version-zero AAC-LC configuration can
 be a seek entry. The reader accepts one program and layer with 1–64 nonempty

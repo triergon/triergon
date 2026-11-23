@@ -327,9 +327,8 @@ impl RecoveryObserver {
     }
     /// Starts rebinding a drained, bound observer to a later PMT `map` of the selected program.
     ///
-    /// Fails with `Unsupported` while the observer is not drained, and with `Invalid` when it is
-    /// not
-    /// bound yet.
+    /// Fails with `Unsupported` if input remains pending and with `Invalid` before
+    /// the first binding.
     pub fn rebind_drained_selected_pmt<'a>(
         &'a mut self,
         route: PatRoute,
@@ -376,10 +375,8 @@ impl<'a> PmtBindingJob<'a> {
     }
     /// Checks the PMT within `work` and returns the binding once, then `Done`.
     ///
-    /// Fails with `Invalid` or `Unsupported` when the PMT does not match the route, the scope or
-    /// the
-    /// previous binding, with `ForeignPool` for another byte pool, and with `Cancelled` when
-    /// `cancel` is set.
+    /// Fails with `Invalid` or `Unsupported` for a route, scope or binding mismatch,
+    /// with `ForeignPool` for another byte pool, and with `Cancelled` when `cancel` is set.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,

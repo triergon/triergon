@@ -1,8 +1,6 @@
 //! Comparison-only projections, compiled with the `reference-trace` feature.
 //!
-//! These report what FFmpeg's demuxer does with an input, so the harness can compare
-//! traces byte for byte. They are not behaviour a consumer selects outside a
-//! comparison, and they are absent from default builds. The feature also exposes
+//! The feature also exposes
 //! [`DemuxClock::project_encoded_header`](crate::compat::pes::DemuxClock::project_encoded_header),
 //! [`DemuxClock::project_diagnostic_header`](crate::compat::pes::DemuxClock::project_diagnostic_header)
 //! and

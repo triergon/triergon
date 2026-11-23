@@ -1,14 +1,8 @@
 //! Reference-compatible policies.
 //!
-//! The types at the crate root follow H.222.0 and report every source fact. Where
-//! FFmpeg's demuxer cuts packets, positions or timestamps differently and a consumer
-//! needs FFmpeg's result, the policies here reproduce that demuxer for the input.
-//! They are fed from the same transport packets and never rewrite source facts. Each
-//! module is one policy family; its documentation names the FFmpeg build it
-//! reproduces.
-//!
-//! Projections that exist only to compare traces with FFmpeg are not policies. They
-//! are compiled only with the `reference-trace` feature.
+//! These policies reproduce the named demuxer's packet boundaries, positions and
+//! timestamps while preserving the H.222.0 source facts. Comparison projections
+//! require the `reference-trace` feature.
 
 pub mod adts {
     //! Parser packet boundaries for ADTS carried in MPEG-TS. Original PES
