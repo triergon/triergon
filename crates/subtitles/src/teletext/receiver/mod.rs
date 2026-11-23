@@ -18,10 +18,9 @@ mod writer;
 
 pub use selection::PageSelection;
 
-use super::data_unit::{
-    DATA_UNIT_BYTES, DataField, DataUnitKind, TeletextUnit, is_teletext_data_identifier,
-};
+use super::data_unit::{DATA_UNIT_BYTES, DataUnitKind, TELETEXT_UNIT_LENGTH, TeletextUnit};
 use super::page::{Assembler, Reception};
+use crate::data_field::DataField;
 use memory::{Checkpoint, Completed, PageMemory};
 use out::Out;
 use queue::Queue;
@@ -200,11 +199,11 @@ impl Decoder {
             if !(payload.len() + 45).is_multiple_of(184) {
                 return Ok(Decoded::Refused(Refusal::InvalidData));
             }
-            if is_teletext_data_identifier(field.data_identifier) {
-                let units = field.unit_bytes().chunks_exact(DATA_UNIT_BYTES);
-                let malformed = units
-                    .clone()
-                    .any(|unit| DataUnitKind::from_id(unit[0]).is_teletext() && unit[1] != 0x2C);
+            if field.is_teletext() {
+                let units = field.data.chunks_exact(DATA_UNIT_BYTES);
+                let malformed = units.clone().any(|unit| {
+                    DataUnitKind::from_id(unit[0]).is_teletext() && unit[1] != TELETEXT_UNIT_LENGTH
+                });
                 if malformed {
                     return Ok(Decoded::Refused(Refusal::InvalidData));
                 }

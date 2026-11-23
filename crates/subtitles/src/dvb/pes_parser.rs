@@ -1,6 +1,7 @@
 //! DVB PES data fields cut into the codec packets FFmpeg's demuxer hands its
 //! `dvbsub` decoder, as observed.
 use crate::cancelled;
+use crate::data_field::DataField;
 use std::ops::Range;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -259,7 +260,7 @@ impl PesParser {
         if fresh {
             self.tail = None;
         }
-        let new_group = fresh && pes.starts_with(&[0x20, 0]);
+        let new_group = fresh && DataField::new(pes).is_some_and(|field| field.is_subtitling());
         let start = usize::from(new_group) * 2;
         let prior_len = self.tail.as_ref().map_or(0, Tail::len);
         if new_group {

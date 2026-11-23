@@ -2,9 +2,9 @@
 //!
 //! The decoder is layered as the standards are:
 //!
-//! - [`DataField`](data_unit::DataField) splits an EN 300 472 PES data field
-//!   into data units and [`TeletextUnit`](data_unit::TeletextUnit) takes one
-//!   EBU teletext packet out of a unit.
+//! - A PES data field ([`DataField`](crate::data_field::DataField)) holds the
+//!   data units, and [`TeletextUnit`](data_unit::TeletextUnit) takes one EBU
+//!   teletext packet out of a unit.
 //! - [`Packet`](packet::Packet) decodes a packet's address and, for page
 //!   headers, the page number, subcode and control bits (Hamming 8/4,
 //!   [`coding`]).

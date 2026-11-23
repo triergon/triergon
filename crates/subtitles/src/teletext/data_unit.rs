@@ -1,10 +1,10 @@
-//! EN 300 472 PES data fields: the data identifier and its data units.
+//! EN 300 472 data units, as a PES data field carries them.
 
 /// Bytes in one teletext data unit: identifier, length and the 44-byte field.
 pub(crate) const DATA_UNIT_BYTES: usize = 46;
 
 /// Length of the data field of an EBU teletext data unit.
-const TELETEXT_UNIT_LENGTH: u8 = 0x2C;
+pub(crate) const TELETEXT_UNIT_LENGTH: u8 = 0x2C;
 
 /// What a data unit carries (EN 300 472 table 2).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -51,30 +51,13 @@ pub(crate) struct TeletextUnit {
     pub packet: [u8; 42],
 }
 
-/// One data unit as it is framed in the data field.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct DataUnitHeader {
-    pub kind: DataUnitKind,
-    pub length: u8,
-}
-
-impl DataUnitHeader {
-    /// Whether this is an EBU teletext unit with the length EN 300 472 requires.
-    #[must_use]
-    pub(crate) fn is_well_formed_teletext(self) -> bool {
-        self.kind.is_teletext() && self.length == TELETEXT_UNIT_LENGTH
-    }
-}
-
 impl TeletextUnit {
-    /// The teletext unit framed at the start of `unit`, if it is one.
+    /// The teletext unit framed at the start of `unit`, if it is one with
+    /// the length EN 300 472 requires.
     #[must_use]
     pub(crate) fn parse(unit: &[u8; DATA_UNIT_BYTES]) -> Option<Self> {
-        let header = DataUnitHeader {
-            kind: DataUnitKind::from_id(unit[0]),
-            length: unit[1],
-        };
-        if !header.is_well_formed_teletext() {
+        let kind = DataUnitKind::from_id(unit[0]);
+        if !kind.is_teletext() || unit[1] != TELETEXT_UNIT_LENGTH {
             return None;
         }
         let mut packet = [0; 42];
@@ -83,44 +66,12 @@ impl TeletextUnit {
             *out = byte.reverse_bits();
         }
         Some(Self {
-            kind: header.kind,
+            kind,
             field_parity: unit[2] & 0x20 != 0,
             line_offset: unit[2] & 0x1F,
             framing_code: unit[3],
             packet,
         })
-    }
-}
-
-/// The data identifiers of EBU data (EN 300 472) and of EN 301 775 data that
-/// carries teletext units.
-#[must_use]
-pub(crate) fn is_teletext_data_identifier(identifier: u8) -> bool {
-    matches!(identifier, 0x10..=0x1F | 0x99..=0x9B)
-}
-
-/// A PES data field: its identifier and the data units after it.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct DataField<'a> {
-    pub data_identifier: u8,
-    units: &'a [u8],
-}
-
-impl<'a> DataField<'a> {
-    /// Splits a PES packet payload; `None` when it is empty.
-    #[must_use]
-    pub(crate) fn new(payload: &'a [u8]) -> Option<Self> {
-        let (&data_identifier, units) = payload.split_first()?;
-        Some(Self {
-            data_identifier,
-            units,
-        })
-    }
-
-    /// The bytes after the data identifier.
-    #[must_use]
-    pub(crate) fn unit_bytes(&self) -> &'a [u8] {
-        self.units
     }
 }
 

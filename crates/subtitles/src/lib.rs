@@ -22,6 +22,7 @@ pub mod compat;
 pub mod reference_trace;
 
 mod canvas;
+mod data_field;
 mod decimal;
 mod teletext;
 
