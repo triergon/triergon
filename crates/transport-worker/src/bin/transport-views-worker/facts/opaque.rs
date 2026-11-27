@@ -1,0 +1,156 @@
+use triergon_mpegts::compat::opaque_video::{OpaqueRecovery, RecoveredOpaque, RecoveryTrigger};
+use triergon_mpegts::compat::pes::RecoveredPes;
+
+use super::*;
+
+pub(super) fn run(
+    pool: &Budget,
+    bytes: &Bytes,
+    program: u16,
+    pid: u16,
+    out: &mut Output<'_, '_>,
+) -> Result<(), Stop> {
+    let caps = SourceCapabilities {
+        length: Some(bytes.len() as u64),
+        random_access: false,
+    };
+    let cancel = AtomicBool::new(false);
+    let limits = ParseLimits::default();
+    let mut source = TransportStream::new(pool.clone(), PacketFormat::Ts188, limits, program)?;
+    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024)?;
+    let (trigger, original_fault) = loop {
+        match source.poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)? {
+            Step::Ready(TraceEvent::Diagnostic(fault)) => {
+                if let Some(trigger) = RecoveryTrigger::from_fault(&fault) {
+                    break (trigger, fault);
+                }
+            }
+            Step::Ready(TraceEvent::Finished) => {
+                return Err("source completed without an opaque recovery trigger".into());
+            }
+            Step::Ready(_) | Step::Yield => {}
+            Step::NeedInput(request) => provide(&mut cursor, bytes, request)?,
+            Step::End(_) => source.end_of_source()?,
+        }
+    };
+    drop(source);
+    let mut cursor = InputCursor::new(pool, SOURCE, caps, 32 * 1024)?;
+    let mut recovery = OpaqueRecovery::new(
+        &cursor,
+        limits,
+        program,
+        DescriptorNamespace::Unspecified,
+        trigger,
+    )?;
+    loop {
+        match recovery.poll(&mut cursor, &mut WorkBudget::new(WORK), &cancel)? {
+            Step::Ready(recovered) => {
+                let end = recovered.physical_end().location();
+                let fault = recovered.source_fault();
+                if end.source != SOURCE
+                    || end.offset != bytes.len() as u64
+                    || fault.kind != original_fault.kind
+                    || fault.error != original_fault.error
+                    || fault.location != original_fault.location
+                    || fault.location.offset > end.offset
+                    || fault.pid != original_fault.pid
+                    || recovered.diagnostic_context().source_event_ordinal
+                        >= recovered.source_finished().source_event_ordinal
+                {
+                    return Err(format!(
+                        "opaque recovery fault {fault:?}, original {original_fault:?}, end {end:?}, input length {}, contexts {:?} and {:?}",
+                        bytes.len(),
+                        recovered.diagnostic_context(),
+                        recovered.source_finished()
+                    )
+                    .into());
+                }
+                let mut count = 0;
+                for observation in recovered.observations() {
+                    let spans = match observation {
+                        RecoveredPes::Accepted(packet) => packet.spans.as_slice(),
+                        RecoveredPes::Faulted(packet) => packet.spans.as_slice(),
+                        RecoveredPes::PesFault(packet) => packet.spans.as_slice(),
+                    };
+                    for span in spans {
+                        let source = span.source;
+                        let start = usize::try_from(source.offset)?;
+                        if source.entity != SOURCE
+                            || bytes.get(start..start.saturating_add(source.bytes))
+                                != Some(span.as_ref())
+                        {
+                            return Err("opaque recovery changed its original source span".into());
+                        }
+                        count += source.bytes;
+                    }
+                }
+                if count != recovered.payload_len() {
+                    return Err("opaque recovery changed its payload extent".into());
+                }
+                return packet(&recovered, program, pid, &cancel, out);
+            }
+            Step::NeedInput(request) => provide(&mut cursor, bytes, request)?,
+            Step::Yield => {}
+            Step::End(_) => return Err("opaque recovery ended before publication".into()),
+        }
+    }
+}
+
+fn packet(
+    recovered: &RecoveredOpaque,
+    program: u16,
+    pid: u16,
+    cancel: &AtomicBool,
+    out: &mut Output<'_, '_>,
+) -> Result<(), Stop> {
+    let mut clock = DemuxClock::new(program)?;
+    let mut grant = WorkBudget::new(WORK);
+    let first = recovered
+        .observations()
+        .first()
+        .ok_or("empty opaque payload")?;
+    let (actual_pid, pts, dts, pos) = match first {
+        RecoveredPes::Accepted(packet) => {
+            let time = clock
+                .project_header(
+                    packet.pid,
+                    packet.source_epochs,
+                    packet.time_header(),
+                    &mut grant,
+                    cancel,
+                )?
+                .ok_or("clock yielded")?;
+            (packet.pid, time.pts90, time.dts90, packet.position)
+        }
+        RecoveredPes::Faulted(packet) => {
+            let time = clock
+                .project_transport_fault(packet, &mut grant, cancel)?
+                .ok_or("transport clock yielded")?;
+            (
+                packet.pid,
+                Some(time.pts90),
+                Some(time.dts90),
+                packet.position,
+            )
+        }
+        RecoveredPes::PesFault(packet) => {
+            let time = clock
+                .project_pes_fault(packet, &mut grant, cancel)?
+                .ok_or("PES clock yielded")?;
+            (packet.pid, time.pts90, time.dts90, packet.position)
+        }
+    };
+    if actual_pid != pid {
+        return Err("opaque recovery reported another PID".into());
+    }
+    if let Some(trace) = &mut out.trace {
+        writeln!(
+            trace,
+            "# opaque {} {:?} {}",
+            recovered.payload_len(),
+            recovered.source_fault().error,
+            recovered.physical_end().location().offset
+        )?;
+    }
+    out.packet(pid, pts, dts, pos, 0, recovered.payload())
+}

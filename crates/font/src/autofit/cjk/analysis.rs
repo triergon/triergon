@@ -1,20 +1,19 @@
-//! Finding a glyph's features for the CJK writing system: the latin
-//! writing system's segments, the stems and serifs they form, the edges
-//! they group into and the blue zones those edges lie in.
+//! Finding a glyph's features for the CJK writing system: the latin writing
+//! system's segments, the stems and serifs they form, the edges they group
+//! into and the blue zones those edges lie in. Translated from FreeType
+//! 2.15.0 (see `docs/provenance.md`).
 
-use super::super::hints::{Dimension, GlyphHints};
+use super::super::hints::{Dimension, GlyphHints, SegmentId};
 use super::super::latin::{self, add_to_edge, edge_properties, start_edge};
 use super::{Axis, Metrics, blue};
-use crate::long::{abs, div_fix, mul_fix};
+use crate::fixed::wrap32::{abs, div_fix, mul_fix};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
-/// `af_cjk_hints_detect_features`: segments, their links and edges.
+/// Finds the features of `dim`: segments, their links and edges.
 ///
-/// The segments are the latin writing system's
-/// (`af_cjk_hints_compute_segments`): FreeType's pass that then recomputes
-/// their roundness walks the segments counted before they were computed,
-/// none, and changes nothing.
+/// The segments are the latin writing system's, with the roundness it
+/// gives them, which FreeType leaves unchanged for CJK too.
 pub(super) fn detect_features(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -26,7 +25,7 @@ pub(super) fn detect_features(
     compute_edges(hints, dim, &metrics.axis[dim.index()], work)
 }
 
-/// `af_cjk_hints_link_segments`: pairs each segment in the major direction
+/// Links the segments of `dim`: pairs each segment in the major direction
 /// with a facing segment of opposite direction at or after its position
 /// that overlaps it by 8/2048 em or more: the nearest, unless a slightly
 /// farther one overlaps longer. Then, as strokes of Hanzi widen at their
@@ -78,12 +77,12 @@ fn link_segments(
             };
             if better(first.score, first.len) {
                 let segment = &mut segments[i];
-                (segment.score, segment.len, segment.link) = (dist, len, Some(j));
+                (segment.score, segment.len, segment.link) = (dist, len, Some(SegmentId(j)));
             }
             let second = segments[j];
             if better(second.score, second.len) {
                 let segment = &mut segments[j];
-                (segment.score, segment.len, segment.link) = (dist, len, Some(i));
+                (segment.score, segment.len, segment.link) = (dist, len, Some(SegmentId(i)));
             }
         }
     }
@@ -92,7 +91,8 @@ fn link_segments(
         let Some(link1) = segments[i].link else {
             continue;
         };
-        if segments[link1].link != Some(i) || segments[link1].pos <= segments[i].pos {
+        if segments[link1.0].link != Some(SegmentId(i)) || segments[link1.0].pos <= segments[i].pos
+        {
             continue;
         }
         if segments[i].score >= dist_threshold {
@@ -106,10 +106,12 @@ fn link_segments(
             let Some(link2) = seg2.link else {
                 continue;
             };
-            if segments[link2].link != Some(j) || segments[link2].pos < segments[link1].pos {
+            if segments[link2.0].link != Some(SegmentId(j))
+                || segments[link2.0].pos < segments[link1.0].pos
+            {
                 continue;
             }
-            if seg1.pos == seg2.pos && segments[link1].pos == segments[link2].pos {
+            if seg1.pos == seg2.pos && segments[link1.0].pos == segments[link2.0].pos {
                 continue;
             }
             if seg2.score <= seg1.score || seg1.score * 4 <= seg2.score {
@@ -118,16 +120,16 @@ fn link_segments(
             if seg1.len >= seg2.len * 3 {
                 // The wider stem's segments become serifs of the narrower.
                 for segment in segments.iter_mut() {
-                    if segment.link == Some(j) {
+                    if segment.link == Some(SegmentId(j)) {
                         segment.link = None;
                         segment.serif = Some(link1);
                     } else if segment.link == Some(link2) {
                         segment.link = None;
-                        segment.serif = Some(i);
+                        segment.serif = Some(SegmentId(i));
                     }
                 }
             } else {
-                segments[link1].link = None;
+                segments[link1.0].link = None;
                 segments[i].link = None;
                 break;
             }
@@ -137,24 +139,23 @@ fn link_segments(
         let Some(other) = segments[i].link else {
             continue;
         };
-        if segments[other].link != Some(i) {
+        if segments[other.0].link != Some(SegmentId(i)) {
             segments[i].link = None;
-            if segments[other].score < dist_threshold
-                || segments[i].score < segments[other].score * 4
+            if segments[other.0].score < dist_threshold
+                || segments[i].score < segments[other.0].score * 4
             {
-                segments[i].serif = segments[other].link;
+                segments[i].serif = segments[other.0].link;
             }
         }
     }
     Ok(())
 }
 
-/// `af_cjk_hints_compute_edges`: groups every segment of `dim` into edges,
-/// sorted by position: a segment joins the nearest edge of its direction
-/// closer than the axis's edge threshold (at most 1/4 pixel) whose linked
-/// segments all lie that close to its own link, else starts one. Each edge
-/// then takes its links and serifs from its segments and is round where
-/// most of its segments are.
+/// Groups every segment of `dim` into edges, sorted by position: a segment
+/// joins the nearest edge of its direction closer than the axis's edge
+/// threshold (at most 1/4 pixel) whose linked segments all lie that close
+/// to its own link, else starts one. Each edge then takes its links and
+/// serifs from its segments and is round where most of its segments are.
 fn compute_edges(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -195,14 +196,15 @@ fn compute_edges(
                 let mut dist2 = 0;
                 let mut s1 = edge.first;
                 loop {
-                    if let Some(link1) = segments[s1].link {
-                        dist2 =
-                            (i64::from(segments[link].pos) - i64::from(segments[link1].pos)).abs();
+                    if let Some(link1) = segments[s1.0].link {
+                        dist2 = (i64::from(segments[link.0].pos)
+                            - i64::from(segments[link1.0].pos))
+                        .abs();
                         if dist2 >= edge_distance_threshold {
                             break;
                         }
                     }
-                    s1 = segments[s1].edge_next.unwrap_or(edge.first);
+                    s1 = segments[s1.0].edge_next.unwrap_or(edge.first);
                     if s1 == edge.first {
                         break;
                     }
@@ -226,11 +228,10 @@ fn compute_edges(
     )
 }
 
-/// `af_cjk_hints_compute_blue_edges`: gives each edge of `dim` the active
-/// blue zone edge nearest it within 1/40 em (at most half a pixel): of
-/// each zone, whichever of its reference and overshoot is nearer. Top (and
-/// right) zones take edges against the major direction, bottom (and left)
-/// zones edges along it.
+/// Gives each edge of `dim` the active blue zone edge nearest it within
+/// 1/40 em (at most half a pixel): of each zone, whichever of its reference
+/// and overshoot is nearer. Top (and right) zones take edges against the
+/// major direction, bottom (and left) zones edges along it.
 pub(super) fn compute_blue_edges(
     hints: &mut GlyphHints,
     metrics: &Metrics,
@@ -300,7 +301,10 @@ mod tests {
         let mut work = WorkBudget::new(1 << 20);
         link_segments(&mut hints, Dimension::Horizontal, 1000, &mut work).unwrap();
         let axis = &hints.axis[0];
-        axis.segments.iter().map(|s| (s.link, s.serif)).collect()
+        axis.segments
+            .iter()
+            .map(|s| (s.link.map(|link| link.0), s.serif.map(|serif| serif.0)))
+            .collect()
     }
 
     #[test]

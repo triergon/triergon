@@ -111,9 +111,7 @@ impl Hybrid {
         if long_subbands < 32 {
             reorder(xr, bands, long_subbands * SUBBAND);
         }
-        let (subbands, []) = xr.as_chunks_mut::<SUBBAND>() else {
-            unreachable!("a granule is 32 subbands");
-        };
+        let subbands = xr.as_chunks_mut::<SUBBAND>().0;
         // Short-block reordering moves lines between subbands; long blocks keep them.
         let searched = if long_subbands < 32 {
             32

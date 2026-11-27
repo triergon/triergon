@@ -179,11 +179,8 @@ pub fn digest(value: &Value) -> String {
     sha256::hex(json::canonical(value).as_bytes())
 }
 
-pub fn file_sha(path: &Path) -> R<String> {
-    Ok(sha256::hex(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
-}
+/// The file digest under the name the views trees use.
+pub use crate::files::sha256 as file_sha;
 
 fn strs(items: impl IntoIterator<Item = String>) -> Value {
     Value::strings(items)
@@ -589,7 +586,7 @@ pub fn machine() -> String {
 /// the worker's main) and hash every file of the closure.
 pub fn linked_libraries(worker: &Path, interpreter: Option<&str>) -> R<Value> {
     use std::os::unix::fs::PermissionsExt;
-    let root_sha = file_sha(worker)?;
+    let root_sha = crate::files::sha256(worker)?;
     let binding = loader_environment()?;
     if fs::metadata(worker)
         .map_err(|e| e.to_string())?
@@ -674,7 +671,7 @@ pub fn linked_libraries(worker: &Path, interpreter: Option<&str>) -> R<Value> {
                 "bytes",
                 Value::int(fs::metadata(path).map_err(|e| e.to_string())?.len() as i64),
             ),
-            ("sha256", Value::str(file_sha(path)?)),
+            ("sha256", Value::str(crate::files::sha256(path)?)),
         ]));
     }
     if libraries.is_empty() {
@@ -696,11 +693,11 @@ pub fn linked_libraries(worker: &Path, interpreter: Option<&str>) -> R<Value> {
                 "bytes",
                 Value::int(fs::metadata(&loader).map_err(|e| e.to_string())?.len() as i64),
             ),
-            ("sha256", Value::str(file_sha(&loader)?)),
+            ("sha256", Value::str(crate::files::sha256(&loader)?)),
         ]));
     }
     let main = main_elf_closure(worker, &libraries, &headers)?;
-    if file_sha(worker)? != root_sha {
+    if crate::files::sha256(worker)? != root_sha {
         return Err("inspected ELF changed during dependency discovery".into());
     }
     let anonymous = anonymous.map_or(Value::Null, |a| {
@@ -727,7 +724,10 @@ pub fn linked_libraries(worker: &Path, interpreter: Option<&str>) -> R<Value> {
         ("main_elf_inspection", main),
         ("anonymous_main_mapping", anonymous),
         ("interpreter", Value::str(loader.display().to_string())),
-        ("interpreter_sha256", Value::str(file_sha(&loader)?)),
+        (
+            "interpreter_sha256",
+            Value::str(crate::files::sha256(&loader)?),
+        ),
         ("libraries", Value::Array(libraries)),
         ("virtual_kernel_libraries", strs(virtual_libraries)),
         ("kernel_release", Value::str(kernel_release())),
@@ -1799,7 +1799,11 @@ pub fn kernel_profile_current(
             .map(|(_, v)| v)
             .chain(std::iter::once(coverage.get("review_artifact")?))
         {
-            if file_sha(&root.join(s(pin, "path")?)).ok().as_deref() != s(pin, "sha256") {
+            if crate::files::sha256(&root.join(s(pin, "path")?))
+                .ok()
+                .as_deref()
+                != s(pin, "sha256")
+            {
                 return Some(false);
             }
         }
@@ -1809,7 +1813,9 @@ pub fn kernel_profile_current(
         for (path, expected) in live {
             let allowed = KERNEL_RUNTIME_FILES.contains(&path.as_str())
                 || path == "/sys/module/triergon_rss_bound/srcversion";
-            if !allowed || file_sha(Path::new(path)).ok().as_deref() != expected.as_str() {
+            if !allowed
+                || crate::files::sha256(Path::new(path)).ok().as_deref() != expected.as_str()
+            {
                 return Some(false);
             }
         }
@@ -1818,8 +1824,8 @@ pub fn kernel_profile_current(
         if pin_sha("observer_binary") != observer_sha
             || pin_sha("probe_binary") != probe_sha
             || pin_sha("module_api") != pin_sha("observer_api")
-            || file_sha(&proof_path).ok().as_deref() != s(profile, "proof_sha256")
-            || !crate::checks::read_json(&proof_path).is_ok_and(|p| equal(&p, proof))
+            || crate::files::sha256(&proof_path).ok().as_deref() != s(profile, "proof_sha256")
+            || !json::read(&proof_path).is_ok_and(|p| equal(&p, proof))
         {
             return Some(false);
         }
@@ -1831,7 +1837,7 @@ pub fn kernel_profile_current(
 }
 
 pub fn load_kernel_profile(root: &Path, observer_sha: &str, probe_sha: &str) -> R<Value> {
-    let identity = crate::checks::read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let pin = identity
         .get("instrumentation")
         .and_then(|i| i.get("rss_kernel_bound"))
@@ -1843,7 +1849,7 @@ pub fn load_kernel_profile(root: &Path, observer_sha: &str, probe_sha: &str) -> 
             "proof_sha256",
             pin.get("proof_sha256").cloned().unwrap_or(Value::Null),
         ),
-        ("proof", crate::checks::read_json(&root.join(path))?),
+        ("proof", json::read(&root.join(path))?),
     ]);
     if !kernel_profile_current(root, &profile, Some(observer_sha), Some(probe_sha)) {
         return Err(
@@ -1951,7 +1957,7 @@ fn artifact_current(link: &Value, expected: Option<&str>) -> bool {
     path.is_absolute()
         && expected.is_some()
         && s(artifact, "sha256") == expected
-        && file_sha(path).ok().as_deref() == expected
+        && crate::files::sha256(path).ok().as_deref() == expected
 }
 
 /// The actual executables named by a memory certificate still match its digests.
@@ -2044,7 +2050,7 @@ pub fn certificate_current(root: &Path, certificate: &Value) -> bool {
             .all(|row| {
                 let real = s(row, "realpath").unwrap_or_default();
                 canonical(s(row, "path").unwrap_or_default()) == real
-                    && file_sha(Path::new(real)).ok().as_deref() == s(row, "sha256")
+                    && crate::files::sha256(Path::new(real)).ok().as_deref() == s(row, "sha256")
             })
     });
     environment_same && hashes_same && files_same

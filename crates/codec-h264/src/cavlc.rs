@@ -2,7 +2,7 @@
 //! spec tables in `tables_vlc` (Tables 9-5, 9-7, 9-8, 9-9, 9-10).
 
 use crate::tables_vlc::*;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_bitstream::BitReader;
 
 /// Two-level VLC lookup table. Entry: (symbol or subtable base, length or -subtable_bits).
@@ -32,15 +32,14 @@ impl Vlc {
             .filter(|c| c.1 as u32 > bits)
             .map(|c| c.0 >> (c.1 as u32 - bits))
             .collect();
-        prefixes.sort();
+        prefixes.sort_unstable();
         prefixes.dedup();
         for p in prefixes {
             let sub_bits = codes
                 .iter()
                 .filter(|c| c.1 as u32 > bits && c.0 >> (c.1 as u32 - bits) == p)
                 .map(|c| c.1 as u32 - bits)
-                .max()
-                .unwrap();
+                .fold(0, u32::max);
             let base = table.len();
             table.resize(base + (1 << sub_bits), (0, 0));
             for &(code, len, sym) in codes {
@@ -83,11 +82,9 @@ impl Vlc {
 
 pub(crate) struct CavlcTables {
     /// coeff_token for nC ranges 0..2, 2..4, 4..8, >=8, -1 (chroma DC 4:2:0). Symbol = tc * 4 + t1.
-    pub coeff_token: [Vlc; 5],
-    pub total_zeros: [Vlc; 15],
-    pub total_zeros_dc: [Vlc; 3],
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub run_before: [Vlc; 7],
+    pub(crate) coeff_token: [Vlc; 5],
+    pub(crate) total_zeros: [Vlc; 15],
+    pub(crate) total_zeros_dc: [Vlc; 3],
 }
 
 fn cvt3(t: &[(u32, u8, u8)]) -> Vec<(u32, u8, u16)> {
@@ -95,8 +92,7 @@ fn cvt3(t: &[(u32, u8, u8)]) -> Vec<(u32, u8, u16)> {
 }
 
 pub(crate) fn tables() -> &'static CavlcTables {
-    static T: OnceLock<CavlcTables> = OnceLock::new();
-    T.get_or_init(|| {
+    static TABLES: LazyLock<CavlcTables> = LazyLock::new(|| {
         let ct = |t: &[(u32, u8, u8, u8)]| {
             let v: Vec<(u32, u8, u16)> = t
                 .iter()
@@ -114,9 +110,9 @@ pub(crate) fn tables() -> &'static CavlcTables {
             ],
             total_zeros: std::array::from_fn(|i| Vlc::build(&cvt3(TOTAL_ZEROS_4X4[i]), 6)),
             total_zeros_dc: std::array::from_fn(|i| Vlc::build(&cvt3(TOTAL_ZEROS_2X2[i]), 3)),
-            run_before: std::array::from_fn(|i| Vlc::build(&cvt3(RUN_BEFORE[i]), 6)),
         }
-    })
+    });
+    &TABLES
 }
 
 /// run_before (Table 9-10): small direct table for zerosLeft <= 6, closed form for > 6.
@@ -206,7 +202,6 @@ fn read_run_before(r: &mut BitReader<'_>, zeros_left: i32) -> i32 {
 /// Writes coefficient level `k` (scan index start_idx + k) to `dst[map[start_idx + k]]` and
 /// returns TotalCoeff, or `None` on invalid data. `dst` must be zero on entry.
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn residual_block(
     r: &mut BitReader<'_>,
     t: &CavlcTables,
@@ -225,8 +220,6 @@ pub(crate) fn residual_block(
 }
 
 #[inline(always)]
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn residual_block_inner(
     r: &mut BitReader<'_>,
     t: &CavlcTables,
@@ -280,7 +273,7 @@ fn residual_block_inner(
             };
         }
     }
-    let mut suffix_length: u32 = if total > 10 && t1s < 3 { 1 } else { 0 };
+    let mut suffix_length = u32::from(total > 10 && t1s < 3);
     for i in t1s..total {
         // level_prefix (9.2.2.1) and level_suffix from one 32-bit window.
         let w = r.peek(32);
@@ -382,14 +375,14 @@ mod tests {
 
     #[test]
     fn run_before_fast_path_matches_table() {
-        let t = tables();
+        let table: Vec<Vlc> = RUN_BEFORE.iter().map(|t| Vlc::build(&cvt3(t), 6)).collect();
         for zl in 1..=14i32 {
             for bits in 0u32..(1 << 12) {
                 let mut buf = vec![0u8; 32];
                 buf[..4].copy_from_slice(&((bits << 20) | 0x8_0000).to_be_bytes());
                 let mut a = BitReader::with_end(&buf, 8 * 8);
                 let mut b = BitReader::with_end(&buf, 8 * 8);
-                let va = t.run_before[(zl.min(7) - 1) as usize].read(&mut a);
+                let va = table[(zl.min(7) - 1) as usize].read(&mut a);
                 let vb = read_run_before(&mut b, zl);
                 if let Some(va) = va
                     && va as i32 <= zl

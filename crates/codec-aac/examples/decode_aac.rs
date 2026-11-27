@@ -1,18 +1,38 @@
 //! Decode an ADTS AAC elementary stream to interleaved f32le (planes in FFmpeg native
 //! order). Prints one JSON line to stderr: rate, channels, layout, frames.
 //!
-//! usage: decode IN.aac OUT.f32
+//! usage: decode IN.aac OUT.f32 [--priming encoder-signature|container] [--extensions conceal|reference]
 use std::io::Write;
-use triergon_codec_aac::{AudioFrame, Decoder, adts, layout_name};
+use triergon_codec_aac::compat::ffmpeg::{extensions::Policy as ExtensionPolicy, priming::Policy};
+use triergon_codec_aac::{AudioFrame, Decoder, adts};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    if args.len() < 3 {
-        eprintln!("usage: decode IN.aac OUT.f32");
-        std::process::exit(2);
+    let usage = || -> ! {
+        eprintln!(
+            "usage: decode IN.aac OUT.f32 [--priming encoder-signature|container] [--extensions conceal|reference]"
+        );
+        std::process::exit(2)
+    };
+    let [_, input, output, options @ ..] = args.as_slice() else {
+        usage();
+    };
+    let (options, []) = options.as_chunks::<2>() else {
+        usage();
+    };
+    let mut priming = Policy::default();
+    let mut extensions = ExtensionPolicy::default();
+    for [flag, value] in options {
+        match (flag.as_str(), value.as_str()) {
+            ("--priming", "encoder-signature") => priming = Policy::EncoderSignature,
+            ("--priming", "container") => priming = Policy::Container,
+            ("--extensions", "conceal") => extensions = ExtensionPolicy::Conceal,
+            ("--extensions", "reference") => extensions = ExtensionPolicy::Reference,
+            _ => usage(),
+        }
     }
-    let data = std::fs::read(&args[1]).expect("read input");
-    let mut out = std::io::BufWriter::new(std::fs::File::create(&args[2]).expect("create output"));
+    let data = std::fs::read(input).expect("read input");
+    let mut out = std::io::BufWriter::new(std::fs::File::create(output).expect("create output"));
     // skip an ID3v2 tag
     let mut pos = 0usize;
     while data.len() >= pos + 10 && &data[pos..pos + 3] == b"ID3" {
@@ -23,7 +43,9 @@ fn main() {
         let footer = if data[pos + 5] & 0x10 != 0 { 10 } else { 0 };
         pos += 10 + sz + footer;
     }
-    let mut dec = Decoder::new();
+    let mut dec = Decoder::new()
+        .with_priming_policy(priming)
+        .with_extension_policy(extensions);
     let mut frame = AudioFrame::default();
     let (mut frames, mut errors, mut samples) = (0u64, 0u64, 0u64);
     let mut last: Option<(u32, String, usize)> = None;
@@ -36,11 +58,7 @@ fn main() {
         match dec.decode(au, &mut frame) {
             Ok(()) => {
                 frames += 1;
-                let key = (
-                    frame.sample_rate,
-                    layout_name(&frame.layout),
-                    frame.planes.len(),
-                );
+                let key = (frame.sample_rate, frame.layout.name(), frame.planes.len());
                 if last.as_ref() != Some(&key) {
                     if last.is_some() {
                         changes += 1;

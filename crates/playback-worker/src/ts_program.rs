@@ -1,13 +1,12 @@
-//! One TS188 or M2TS192 program through the playback engine's native packet view:
+//! One TS188 or M2TS192 program through the playback engine's demux PES view:
 //! open a preloaded seekable source, select explicit PIDs of program 1 with their
 //! carriage, project native clocks and fold every selected PES packet through the
 //! end of the source.
 //!
-//! TS188 uses `Engine::ts_native_program_v1` with every selection. M2TS192 starts
-//! through `NativeStartup::new_m2ts_prefix_v2`; a program selection shares its
-//! input context through `PreparedNative::into_program_player`.
-//! Times and durations use the demuxer's 90 kHz clock and flags come from its
-//! packet view.
+//! TS188 uses `compat::pes::open` with every selection. M2TS192 starts
+//! through `Startup::new_m2ts_prefix` with the selected PIDs sharing its input
+//! context. Times are 90 kHz ticks of the demux clock; the duration is the
+//! demuxer's raw 90 kHz duration and the flags its packet flags.
 
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
@@ -19,39 +18,41 @@ use triergon_mpegts::{
     compat::pes::{DemuxPacket, DemuxTimeView, PrivateAudioCarriage, RegisteredCarriage},
     psi::{DescriptorNamespace, DvbNamespaceEvidence},
 };
+use triergon_playback::compat::pes::{
+    self, Carriage, PidSelection,
+    startup::{Startup, StartupStep},
+};
 use triergon_playback::{
-    ByteSource, ClockChoice, Engine, Format, Player, PlayerPolicy, Progress, RawEvent, Selection,
-    TsNativeCarriage, TsNativeSelection, TsNativeTrackSelection,
-    io::{SelectedInput, SourceOwner},
-    native_startup::{NativeStartup, StartupStep},
+    ByteSource, ClockChoice, Event, Format, Player, PlayerPolicy, Progress, Selection, SourceOwner,
+    probe::SelectedInput,
 };
 
 pub const PREFIX: &str = "ts-program-";
-const OPERATION: &str = "ts-native-program";
+const OPERATION: &str = "ts-program-pes";
 const PROGRAM: u16 = 1;
 const WINDOW: usize = 32 * 1024;
 const WORK: u64 = 1 << 16;
 const NAMESPACE: DescriptorNamespace =
     DescriptorNamespace::Dvb(DvbNamespaceEvidence::CallerDeclaredTransportProfile);
 
-fn carriage(name: &str) -> Option<TsNativeCarriage> {
+fn carriage(name: &str) -> Option<Carriage> {
     Some(match name {
-        "avc" => TsNativeCarriage::Registered(RegisteredCarriage::Avc),
-        "hevc" => TsNativeCarriage::Registered(RegisteredCarriage::Hevc),
-        "aac" => TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
-        "latm" => TsNativeCarriage::Registered(RegisteredCarriage::AacLatm),
-        "audio" => TsNativeCarriage::AudioFromPmt,
-        "dvb-ac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::DvbAc3Tag),
-        "dvb-eac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::DvbEac3Tag),
-        "ac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::PrivateType81Ac3),
-        "eac3" => TsNativeCarriage::PrivateAudio(PrivateAudioCarriage::PrivateType87Eac3),
-        "dvbsub" => TsNativeCarriage::DvbSubtitles,
+        "avc" => Carriage::Registered(RegisteredCarriage::Avc),
+        "hevc" => Carriage::Registered(RegisteredCarriage::Hevc),
+        "aac" => Carriage::Registered(RegisteredCarriage::AacAdts),
+        "latm" => Carriage::Registered(RegisteredCarriage::AacLatm),
+        "audio" => Carriage::AudioFromPmt,
+        "dvb-ac3" => Carriage::PrivateAudio(PrivateAudioCarriage::DvbAc3Tag),
+        "dvb-eac3" => Carriage::PrivateAudio(PrivateAudioCarriage::DvbEac3Tag),
+        "ac3" => Carriage::PrivateAudio(PrivateAudioCarriage::PrivateType81Ac3),
+        "eac3" => Carriage::PrivateAudio(PrivateAudioCarriage::PrivateType87Eac3),
+        "dvbsub" => Carriage::DvbSubtitles,
         _ => return None,
     })
 }
 
 /// `FORMAT:PID=CARRIAGE,...`, for example `ts188:256=avc,257=audio`.
-fn selections(argument: &str) -> Result<(PacketFormat, Vec<TsNativeTrackSelection>)> {
+fn selections(argument: &str) -> Result<(PacketFormat, Vec<PidSelection>)> {
     let invalid = || format!("invalid program selection {argument:?}");
     let (format, list) = argument.split_once(':').ok_or_else(invalid)?;
     let format = match format {
@@ -62,7 +63,7 @@ fn selections(argument: &str) -> Result<(PacketFormat, Vec<TsNativeTrackSelectio
     let mut selections = Vec::new();
     for item in list.split(',') {
         let (pid, name) = item.split_once('=').ok_or_else(invalid)?;
-        selections.push(TsNativeTrackSelection {
+        selections.push(PidSelection {
             pid: pid.parse()?,
             carriage: carriage(name).ok_or_else(invalid)?,
         });
@@ -87,7 +88,7 @@ fn player(
     pool: &Budget,
     raw: &Bytes,
     format: PacketFormat,
-    selections: &[TsNativeTrackSelection],
+    selections: &[PidSelection],
 ) -> Result<Player<ByteSource>> {
     let cancel = AtomicBool::new(false);
     let id = SourceId(42);
@@ -100,38 +101,34 @@ fn player(
     let limits = ParseLimits::default();
     let policy = SourceTimePolicy::Unanchored;
     let mut player = if format == PacketFormat::Ts188 {
-        let engine = Engine::ts_native_program_v1(
-            input, format, PROGRAM, limits, policy, NAMESPACE, selections,
-        )?;
+        let engine = pes::open(input, PROGRAM, limits, policy, NAMESPACE, selections)?;
         Player::new(engine, source, Selection::All, PlayerPolicy::default())?
     } else {
-        let mut startup = NativeStartup::new_m2ts_prefix_v2(SelectedInput {
+        let mut startup = Startup::new_m2ts_prefix(SelectedInput {
             input,
             source,
             format: Format::Ts(format),
         })?;
         while startup.advance(&mut WorkBudget::new(WORK), &cancel)? != StartupStep::Ready {}
-        let prepared = startup.finish()?;
+        let bound = startup.finish()?;
         if let [
-            TsNativeTrackSelection {
+            PidSelection {
                 pid,
-                carriage: TsNativeCarriage::Registered(carriage),
+                carriage: Carriage::Registered(carriage),
             },
         ] = selections
         {
-            prepared.into_player(
+            bound.into_player(
                 PROGRAM,
                 limits,
                 policy,
-                TsNativeSelection {
-                    pid: *pid,
-                    carriage: *carriage,
-                },
+                *pid,
+                *carriage,
                 Selection::All,
                 PlayerPolicy::default(),
             )?
         } else {
-            prepared.into_program_player(
+            bound.into_program_player(
                 PROGRAM,
                 limits,
                 policy,
@@ -141,7 +138,7 @@ fn player(
             )?
         }
     };
-    player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
+    player.set_clock_view(ClockChoice::Demux)?;
     Ok(player)
 }
 
@@ -155,9 +152,9 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, mut work: Work) -> Re
         let progress = player.read_output(&mut pending, &mut WorkBudget::new(WORK), &cancel)?;
         if let Some(output) = pending.take() {
             match output.event() {
-                RawEvent::NativeTs { packet, clock } => fold(&mut work, packet, clock)?,
-                RawEvent::NativeRefusal { track, error, .. } => {
-                    return Err(format!("native refusal on {track:?}: {error:?}").into());
+                Event::DemuxPes { packet, clock } => fold(&mut work, packet, clock)?,
+                Event::PesRefusal { track, error, .. } => {
+                    return Err(format!("PES refusal on {track:?}: {error:?}").into());
                 }
                 _ => {}
             }

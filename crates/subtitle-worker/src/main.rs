@@ -37,12 +37,8 @@ mod pgs;
 mod sink;
 mod teletext;
 mod text;
-// The repository's JSON reader, for tests that read a corpus; the parts they
-// do not call are unused here.
 #[cfg(test)]
-#[allow(dead_code)]
-#[path = "../../../xtask/src/json.rs"]
-mod json;
+use triergon_harness_test_support::json;
 
 use container::Result;
 use sink::Sink;
@@ -50,7 +46,7 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use triergon_core::Budget;
-use triergon_harness_runner::{Invocation, Mode, Refusal, Totals, measure_with};
+use triergon_harness_runner::{Invocation, Mode, Refusal, RefusalCause, Totals, measure_with};
 
 /// The words after the file: KIND and its arguments.
 const USAGE: &str = " KIND [ARG...]";
@@ -217,18 +213,10 @@ fn input_digest(clocks: impl ExactSizeIterator<Item = (Option<i64>, Option<i64>)
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let words: Vec<String> = std::env::args().skip(1).collect();
-    let result = match words.first() {
-        Some(mode) if mode.starts_with(text::PREFIX) => text::run(&words),
-        _ => run(&words),
-    };
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("subtitle-worker: {error}");
-            ExitCode::from(2)
-        }
-    }
+    triergon_harness_runner::command(Some("subtitle-worker"), 2, |words| match words.first() {
+        Some(mode) if mode.starts_with(text::PREFIX) => text::run(words),
+        _ => run(words),
+    })
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`
@@ -285,7 +273,10 @@ fn run(words: &[String]) -> Result<()> {
                     let refused = error.downcast::<Refused>()?;
                     Some(Box::new(Refusal {
                         reason: refused.error.to_string(),
-                        cause: format!("{{\"packet\":{}}}", refused.packet),
+                        cause: RefusalCause::from_json(format!(
+                            "{{\"packet\":{}}}",
+                            refused.packet
+                        )),
                     }))
                 }
             };

@@ -1,0 +1,7 @@
+budget 2 0
+get 1 0
+get 2 0
+get 1 51
+get 3 0
+get 1 0
+get 2 0

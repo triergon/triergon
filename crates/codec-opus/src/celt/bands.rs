@@ -362,7 +362,10 @@ impl Bands<'_, '_> {
     }
 
     /// Decode the split angle of a band of `n` bins per half (`compute_theta`).
-    #[allow(clippy::too_many_arguments)] // The split state of the reference.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the split state of RFC 6716's reference decoder"
+    )]
     fn theta(
         &mut self,
         n: usize,
@@ -463,7 +466,10 @@ impl Bands<'_, '_> {
 
     /// A mono band with its time-frequency change (`quant_band`): `lowband` is a private
     /// copy of the folding source, transformed alongside.
-    #[allow(clippy::too_many_arguments)] // The band state of the reference.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the band state of RFC 6716's reference decoder"
+    )]
     fn band(
         &mut self,
         x: &mut [f32],
@@ -548,7 +554,10 @@ impl Bands<'_, '_> {
 
     /// A mono band or half band: split while the bits exceed what one codebook can use,
     /// then decode pulses or fold (`quant_partition`).
-    #[allow(clippy::too_many_arguments)] // The band state of the reference.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the band state of RFC 6716's reference decoder"
+    )]
     fn partition(
         &mut self,
         x: &mut [f32],
@@ -563,6 +572,7 @@ impl Bands<'_, '_> {
         if n == 1 {
             return self.single(x, None, None);
         }
+        // A fixed-width partition-scale enum adds 0.181% instructions with the numeric split test.
         if lm != -1 && n > 2 && b > split_threshold(self.band, lm) {
             let half = n >> 1;
             let lm = lm - 1;
@@ -701,7 +711,10 @@ impl Bands<'_, '_> {
     }
 
     /// A stereo band: mid and side, or intensity stereo (`quant_band_stereo`).
-    #[allow(clippy::too_many_arguments)] // The band state of the reference.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the band state of RFC 6716's reference decoder"
+    )]
     fn stereo(
         &mut self,
         x: &mut [f32],

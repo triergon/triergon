@@ -2,7 +2,7 @@
   "schema": 1,
   "id": "capture required cases v1",
   "frozen_utc": "2026-11-02",
-  "rationale": "Covers both enabled geometries, both row orientations (960x540 is top-down; the application's 480x270 chain is bottom-up, plus one cross case each), the default 2.5 Mbps rate, both extreme hello rate bytes (1 -> 0.1 Mbps, 255 -> 25.5 Mbps) and intermediate rates, and five content classes from idle keepalive to worst-case noise. 90 frames = three GOPs per session. Every case is required; none may be dropped to obtain acceptance.",
+  "rationale": "The 90-frame cases cover both row orientations, rates from 0.1 to 25.5 Mbit/s and five content classes from idle keepalive to noise. The short cases extend the geometries, GOP lengths, maximum rates, VBV sizes and service metadata. Every case is required.",
   "generator": "harness/capture/generate_inputs.py <content> <width> <height> <frames> <out>",
   "cases": [
     {"id": "c01-ui-static-960", "content": "ui_static", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 2500000},
@@ -19,6 +19,54 @@
     {"id": "c12-motion-960-1m", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 1000000},
     {"id": "c13-motion-960-6m", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 6000000},
     {"id": "c14-motion-960-rate255", "content": "motion", "width": 960, "height": 540, "flip": 0, "frames": 90, "bitrate": 25500000},
-    {"id": "c15-noise-480-bottomup", "content": "noise", "width": 480, "height": 270, "flip": 1, "frames": 90, "bitrate": 2500000}
+    {"id": "c15-noise-480-bottomup", "content": "noise", "width": 480, "height": 270, "flip": 1, "frames": 90, "bitrate": 2500000},
+    {"id": "c16-gop1-16", "content": "ui_static", "width": 16, "height": 16, "flip": 0, "frames": 36, "bitrate": 2500000, "gop": 1,
+      "input_sha256": "3b54e9ebca7829174eacd2b6752c0543dfca6de360e1f5ab4bcee2c53b33e49d",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "e886cfdb2b8340934284922f9b37638e9cdebf046948610443bc055ef73b3ba8", "stream_sha256": "7347555c35b6f5031861e96d5a3adfeeac2204816c6817d75db7eb27159c7bff"}}
+    },
+    {"id": "c17-gop2-176", "content": "ui_static", "width": 176, "height": 144, "flip": 1, "frames": 36, "bitrate": 2500000, "gop": 2,
+      "input_sha256": "b69ed4af0f209d1e026e54efd126c9dc649ffd6d2744e166f41b403f1925d619",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "b799763a85024ae5372ff367dc97596e25ae0ed8b2a2e1ade3acbb0d8bd27d7e", "stream_sha256": "664ce76c93669ed76df8fd3017942ac36c76362faebb199eccb97dba44287fce"}}
+    },
+    {"id": "c18-gop12-352", "content": "ui_static", "width": 352, "height": 288, "flip": 0, "frames": 37, "bitrate": 2500000, "gop": 12,
+      "input_sha256": "6c53a92ecfbe46a94497e3924c61531aa14dfefe7926f0951f31918fc2b75c76",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "7e1924644d262ccfc82c33b0cc0c90015b4aad193360f0eb6dc2693af1543ba9", "stream_sha256": "fd3d62ea570f778d66cffaba868072bba761707a514b7721203fe35df51f915b"}}
+    },
+    {"id": "c19-gop300-176", "content": "ui_static", "width": 176, "height": 144, "flip": 0, "frames": 60, "bitrate": 2500000, "gop": 300,
+      "input_sha256": "17ddf83f3d002572c268721123d55536f5cc437e2c523ac56c56d9fe1d21d786",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "1872d5d9b9e2e569773fff0c3327f13eb4ed25db53102647b1b13ea536336c1a", "stream_sha256": "f1850eaf2844dcd9f60c73ba7c396f70789b1d53777fac3845679226bc9f5ac5"}}
+    },
+    {"id": "c20-max-rate-720", "content": "motion", "width": 720, "height": 576, "flip": 0, "frames": 36, "bitrate": 2500000, "max_rate": 2500000,
+      "input_sha256": "bbb683b00804a7a3ce1b1cb5dd54068e14fe25236379aba1c24c8034c370a897",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "f0efaf8bc79d14e8f1ec75d576e40333fb2cb2919d8de3ec76b8d7e3d66861eb", "stream_sha256": "43f0813d55a8b204f2a3f51973b524496cb82512ae509bc54dd5b74c6d4ce19e"}}
+    },
+    {"id": "c21-vbv-min-16", "content": "ui_static", "width": 16, "height": 16, "flip": 0, "frames": 35, "bitrate": 2500000, "vbv_bits": 1,
+      "input_sha256": "7faf0251d08325475860b87b92ca91bfe3ea9aa1e1626db8122f49c021935638",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "242b347a7563beae1e7854a614d44af5bfccc0a80597a4b1142c21e1872ba299", "refusal": "VBV buffer too small for bitrate"}}
+    },
+    {"id": "c22-vbv-16x-1080", "content": "ui_static", "width": 1920, "height": 1080, "flip": 0, "frames": 30, "bitrate": 2500000, "vbv_bits": 5714272,
+      "input_sha256": "163a1536a7c9a429cc74223caa42df51fb3ac8c10352c5e6097b82bdb61af055",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "8d545a04e8766bf949cbc9a4bbe4118e732771803c6bc5cbcd5e9c6b5e536729", "stream_sha256": "3a55515fd693391f84cc61fc64f17d7c3f965612f071bdd21e68722cf46a14c1"}}
+    },
+    {"id": "c23-padded-968", "content": "ui_scroll", "width": 968, "height": 544, "flip": 1, "frames": 36, "bitrate": 2500000,
+      "input_sha256": "ceea6ba588c663e8d3f3fa5fe9b6c48422754bb61c2614d7d0bf917744826c91",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "1cc0611923265d0be97146b1497269aff936a9899844f6104cf4c5bc1396953c", "stream_sha256": "b44d9a5608b8868988131e721bd7968e8e46ea3e303256b5577c8bf16708bd1b"}}
+    },
+    {"id": "c24-mux-program-42", "content": "ui_static", "width": 176, "height": 144, "flip": 0, "frames": 36, "bitrate": 2500000, "mux": {"transport_stream_id": 7, "original_network_id": 9, "program_number": 42, "pmt_pid": 512, "video_pid": 768, "stream_type": 1, "provider_name": "Test Lab", "service_name": "Capture Test"},
+      "input_sha256": "b69ed4af0f209d1e026e54efd126c9dc649ffd6d2744e166f41b403f1925d619",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "e69ac7ed6786dd500d7360ab6d6ea7b5e546e9e86b3b3f539603539c7c0b22ac", "stream_sha256": "9187baf07eeb5389a880ed137e8c9fca105a2bf962fef7d63ad48aec16e3116d"}}
+    },
+    {"id": "c25-mux-program-65535", "content": "ui_static", "width": 352, "height": 288, "flip": 0, "frames": 37, "bitrate": 2500000, "mux": {"transport_stream_id": 65535, "original_network_id": 65534, "program_number": 65535, "pmt_pid": 4097, "video_pid": 8186, "stream_type": 2, "provider_name": "Capture Lab", "service_name": "Second Service"},
+      "input_sha256": "6c53a92ecfbe46a94497e3924c61531aa14dfefe7926f0951f31918fc2b75c76",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "7e1924644d262ccfc82c33b0cc0c90015b4aad193360f0eb6dc2693af1543ba9", "stream_sha256": "a4ba2bfd73156abb37f7c7e0e4f5c71096db567acfb6108dedfe4d58186f1198"}}
+    },
+    {"id": "c26-vbv-ref-floor-16", "content": "ui_static", "width": 16, "height": 16, "flip": 0, "frames": 36, "bitrate": 2500000, "vbv_bits": 83334,
+      "input_sha256": "3b54e9ebca7829174eacd2b6752c0543dfca6de360e1f5ab4bcee2c53b33e49d",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "e886cfdb2b8340934284922f9b37638e9cdebf046948610443bc055ef73b3ba8", "stream_sha256": "c7ad6af1647138caa4b550dd63fc4e5d6e5ccb1f0a224ce05d0177539126827b"}}
+    },
+    {"id": "c27-gop12-low-rate", "content": "motion", "width": 352, "height": 288, "flip": 0, "frames": 48, "bitrate": 750000, "gop": 12, "max_rate": 750000,
+      "input_sha256": "80e286ed73c22affb036b46089689bc14fd644e33876ac14d0c1ec4207414769",
+      "reference_pins": {"aarch64-unknown-linux-gnu": {"conversion_sha256": "00864432e4475a8072ec22ab715e292c7f96dbe24fce88d45d4e77156d1d1d65", "stream_sha256": "69803afc5808acc044c95ac07951c56dbb7e6ae9bc8f01c98ac1636bc2380d5f"}}
+    }
   ]
 }

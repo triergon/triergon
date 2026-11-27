@@ -6,6 +6,8 @@
 //! DIV truncates (`arithmetic`); control values and other font-unit values
 //! scale like outline points, rounding half away from zero (`control-values`).
 
+use crate::fixed;
+
 /// A unit vector in 2.14, x and y.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) struct Vector {
@@ -121,20 +123,10 @@ pub(super) fn div(a: i32, b: i32) -> Option<i32> {
     (b != 0).then(|| ((i64::from(a) << 6) / i64::from(b)) as i32)
 }
 
-/// `n / d`, rounded half away from zero; `d` must not be zero.
-pub(super) fn div_round(n: i64, d: i64) -> i64 {
-    let q = (n.unsigned_abs() + d.unsigned_abs() / 2) / d.unsigned_abs();
-    if (n < 0) != (d < 0) {
-        -(q as i64)
-    } else {
-        q as i64
-    }
-}
-
-/// `a b / c` in 64 bits, rounded half away from zero and wrapped to 32;
-/// `c` must not be zero.
+/// [`fixed::mul_div`] of three 32-bit values, wrapped to 32 bits; callers
+/// pass a nonzero `c`.
 pub(super) fn mul_div(a: i32, b: i32, c: i32) -> i32 {
-    div_round(i64::from(a) * i64::from(b), i64::from(c)) as i32
+    fixed::mul_div(a.into(), b.into(), c.into()) as i32
 }
 
 /// A font-unit value at a 16.16 scale, in 26.6, rounded half away from zero

@@ -12,7 +12,13 @@
 //! refusals are recorded per vector as they happen. Selection (in set or not)
 //! is applied afterwards by the summary, never by skipping inputs here.
 
+mod native_audio;
+mod pcm_policy;
+mod play;
+pub(super) mod session;
 mod video;
+
+use super::damage;
 
 use std::fs;
 use std::io::Write;
@@ -26,15 +32,74 @@ use crate::{numpy, python, sha256};
 /// Correctness manifest schema written by [`manifest`].
 pub const MANIFEST_SCHEMA: &str = "triergon.codecs.correctness-manifest.v1";
 
-const RUN_TIMEOUT: Duration = Duration::from_secs(900);
-const PROBE_TIMEOUT: Duration = Duration::from_secs(120);
+pub(super) const RUN_TIMEOUT: Duration = Duration::from_secs(900);
+pub(super) const PROBE_TIMEOUT: Duration = Duration::from_secs(120);
 /// One output picture: 1920x1080 RGBA.
 const CANVAS: usize = 1920 * 1080 * 4;
 const AAC_SINGLE_SCE_STEREO_SHA256: &str =
     "04947370585296a25c63f1e31252c4290328151a0fa2ecf3271518b4d4db8796";
+const AAC_CONTAINER_PRIMING: &str = "aac-container-priming";
+
+/// The example exposes a decoder policy the device-output worker does not select.
+pub(super) fn decoder_only_lane(lane: &str) -> bool {
+    matches!(lane, "aac-mov" | AAC_CONTAINER_PRIMING)
+        || pcm_policy::Policy::for_lane(lane).is_some()
+        || damage::recipe_manifest(lane).is_some()
+        || lane == "track-reset"
+}
 
 fn uses_initialized_aac_reference(lane: &str, name: &str, sha256: &str) -> bool {
-    lane == "aac" && name == "aac-sce-in-stereo.adts" && sha256 == AAC_SINGLE_SCE_STEREO_SHA256
+    matches!(lane, "aac" | "session-aac" | AAC_CONTAINER_PRIMING)
+        && name == "aac-sce-in-stereo.adts"
+        && sha256 == AAC_SINGLE_SCE_STEREO_SHA256
+}
+
+/// Which manifest vectors a lane uses when it changes a decoder option.
+pub fn vector_lane(lane: &str) -> &str {
+    match lane {
+        AAC_CONTAINER_PRIMING => "aac",
+        lane => lane,
+    }
+}
+
+/// Base manifest lanes a session comparison reuses.
+pub fn session_vector_lanes(lane: &str) -> &'static [&'static str] {
+    match lane {
+        "session-aac" => &["aac"],
+        "session-ac3" => &["ac3"],
+        "session-eac3" => &["eac3"],
+        "session-dts" => &["dts"],
+        "session-flac" => &["flac"],
+        "session-mp3" => &["mp1", "mp2", "mp3"],
+        "session-vorbis" => &["vorbis"],
+        "session-opus" => &["opus"],
+        "session-h264" => &["h264"],
+        "session-hevc" => &["hevc"],
+        _ => &[],
+    }
+}
+
+/// The pinned inputs of a lane that does not reuse the base manifest.
+pub fn variant_manifest(lane: &str) -> Option<&'static str> {
+    if let Some(policy) = pcm_policy::Policy::for_lane(lane) {
+        return Some(policy.manifest());
+    }
+    if play::lane(lane) {
+        return Some(play::MANIFEST);
+    }
+    damage::recipe_manifest(lane).or_else(|| {
+        (lane.starts_with("session-") || lane == "track-reset").then_some(session::CASES)
+    })
+}
+
+fn decoder_lane(lane: &str) -> &str {
+    match lane {
+        "flac-crc-reject" => "flac",
+        "ac3-crc-reject" => "ac3",
+        "eac3-crc-reject" => "eac3",
+        "dts-packed" => "dts",
+        lane => lane,
+    }
 }
 
 fn complete_single_sce_stereo(sample_bytes: usize, outputs: [(i64, usize); 2]) -> bool {
@@ -71,10 +136,10 @@ fn audio_suffixes(lane: &str) -> Option<&'static [&'static str]> {
 /// The demuxer FFmpeg is told to use for a lane's vectors; `None` lets it probe (Opus
 /// vectors come in Ogg and in Matroska).
 fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
-    Ok(match lane {
+    Ok(match decoder_lane(lane) {
         "ac3" => Some("ac3"),
         "eac3" => Some("eac3"),
-        "aac" => Some("aac"),
+        "aac" | AAC_CONTAINER_PRIMING => Some("aac"),
         "aac-mov" => Some("mov"),
         "dts" => Some("dts"),
         "flac" => Some("flac"),
@@ -89,7 +154,7 @@ fn audio_format(lane: &str) -> Result<Option<&'static str>, String> {
 /// it: the native decoders, and the float decoders for MPEG audio, whose Layer I and II
 /// defaults are fixed point with 16-bit output.
 fn reference_decoder(lane: &str) -> Option<&'static str> {
-    Some(match lane {
+    Some(match decoder_lane(lane) {
         "aac-mov" => "aac",
         "flac" => "flac",
         "mp3" => "mp3float",
@@ -102,16 +167,28 @@ fn reference_decoder(lane: &str) -> Option<&'static str> {
 }
 
 fn example(lane: &str) -> Option<&'static str> {
-    Some(match lane {
+    Some(match decoder_lane(lane) {
+        "ac3-nodither" => "codec-ac3-decode",
+        "track-reset" => "audio-decode",
+        lane if !session_vector_lanes(lane).is_empty() => "session_decode",
         "h264" => "codec-h264-decode",
         "hevc" => "codec-hevc-decode",
         "ac3" | "eac3" => "codec-ac3-decode",
-        "aac" => "codec-aac-decode",
+        "aac" | AAC_CONTAINER_PRIMING => "codec-aac-decode",
         "dts" => "codec-dca-decode",
         // File-format lanes decode through a container reader, as a player does.
         "aac-mov" | "flac" | "mp3" | "mp2" | "mp1" | "vorbis" | "opus" => "audio-decode",
         _ => return None,
     })
+}
+
+/// Whether the correctness runner can grade this lane.
+pub fn is_lane(lane: &str) -> bool {
+    example(lane).is_some() || play::lane(lane)
+}
+
+pub(super) fn output_only_lane(lane: &str) -> bool {
+    play::lane(lane)
 }
 
 fn operation(lane: &str) -> Option<&'static str> {
@@ -135,10 +212,6 @@ fn unknown(lane: &str) -> String {
 }
 
 /// SHA-256 of a file.
-pub fn file_sha(path: &Path) -> Result<String, String> {
-    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
-}
-
 /// Every path below `dir` as `Path.rglob('*')` lists it, sorted: symbolic
 /// links are listed but not entered.
 fn rglob(dir: &Path) -> Vec<PathBuf> {
@@ -194,7 +267,7 @@ pub fn manifest(out: &Path, lanes: &[String]) -> Result<(), String> {
                     ("name", Value::str(name.as_str())),
                     ("path", Value::str(python::path(&path))),
                     ("bytes", Value::int(bytes)),
-                    ("sha256", Value::str(file_sha(&path)?)),
+                    ("sha256", Value::str(crate::files::sha256(&path)?)),
                 ]));
             }
         }
@@ -229,12 +302,14 @@ pub struct Rules {
     pub lsb: i64,
     /// Lanes whose decoder output must equal the reference exactly.
     pub exact: Vec<String>,
+    /// Maximum absolute difference for the dither-free AC-3 controls.
+    pub ac3_dither_free_abs: f64,
 }
 
 impl Rules {
     pub fn load(root: &Path) -> Result<Rules, String> {
         let path = root.join("harness/codecs/numeric-rules.json");
-        let rules = crate::checks::read_json(&path)?;
+        let rules = json::read(&path)?;
         let number = |section: &str, key: &str| {
             rules
                 .get(section)
@@ -261,6 +336,7 @@ impl Rules {
             abs: number("audio_decode", "per_sample_abs_max")?,
             lsb: number("audio_device_path", "per_sample_abs_max_lsb")? as i64,
             exact,
+            ac3_dither_free_abs: number("ac3_dither_free_exact", "per_sample_abs_max")?,
         })
     }
 }
@@ -432,14 +508,79 @@ fn samples_per_channel(bytes: usize, channels: Option<&Value>) -> Result<Value, 
     }
 }
 
+fn crc_reject(lane: &str) -> bool {
+    matches!(
+        lane,
+        "flac-crc-reject" | "ac3-crc-reject" | "eac3-crc-reject"
+    )
+}
+
+/// FFmpeg's error detection in the CRC lanes. Those lanes compare decoders that refuse
+/// a frame whose embedded CRC fails (`CrcPolicy::Reject` on our side), so the reference
+/// runs with `crccheck` ("verify embedded CRCs") and `explode` ("abort decoding on minor
+/// error detection"), as `ffmpeg -h full` documents them. `crccheck` alone verifies and
+/// keeps the frame, which is the report-only policy and not what these lanes compare.
+const CRC_REJECTING_ERR_DETECT: &str = "crccheck+explode";
+
+fn reference_frames(
+    a: &Grade,
+    path: &str,
+    format: &str,
+) -> Result<(i64, Vec<Value>, String), Stop> {
+    let argv = [
+        a.ffprobe.as_str(),
+        "-v",
+        "error",
+        "-f",
+        format,
+        "-err_detect",
+        CRC_REJECTING_ERR_DETECT,
+        "-select_streams",
+        "a:0",
+        "-show_frames",
+        "-show_entries",
+        "frame=pts,nb_samples",
+        "-of",
+        "json",
+        path,
+    ]
+    .map(String::from);
+    let probe = run_text(&argv, PROBE_TIMEOUT)?;
+    let frames = python::loads(&probe.stdout)
+        .and_then(|doc| {
+            doc.get("frames")
+                .and_then(Value::as_array)
+                .map(<[Value]>::to_vec)
+        })
+        .unwrap_or_default();
+    Ok((probe.code, frames, probe.stderr))
+}
+
 fn audio_decoder(
     a: &Grade,
     lane: &str,
     path: &str,
     tmp: &Path,
     initialized_aac: bool,
+    vector: &Value,
+    source: Option<&str>,
 ) -> Result<Value, Stop> {
-    let format = audio_format(lane)?;
+    let through_session = lane.starts_with("session-");
+    let media_lane = if through_session || lane == "track-reset" {
+        session::base(lane, vector)?
+    } else {
+        decoder_lane(lane).to_owned()
+    };
+    let format = if lane == "ac3-nodither" {
+        vector.get("format").and_then(Value::as_str)
+    } else if lane == "track-reset" {
+        session::reset_audio_format(&media_lane, path)?
+    } else {
+        audio_format(&media_lane)?
+    };
+    let reject = crc_reject(lane);
+    let coreless = matches!(lane, "dts-packed" | "session-dts")
+        && vector.get("coreless") == Some(&Value::Bool(true));
     let (_, stream) = probe(&a.ffprobe, path, format, true)?;
     let (reference_path, ours_path) = (tmp.join("ref.f32"), tmp.join("ours.f32"));
     let mut reference_argv: Vec<String> = [
@@ -455,8 +596,11 @@ fn audio_decoder(
     if let Some(format) = format {
         reference_argv.extend(["-f".to_owned(), format.to_owned()]);
     }
-    if let Some(decoder) = reference_decoder(lane) {
+    if let Some(decoder) = reference_decoder(&media_lane) {
         reference_argv.extend(["-c:a".to_owned(), decoder.to_owned()]);
+    }
+    if coreless {
+        reference_argv.extend(["-core_only", "1"].map(String::from));
     }
     if lane == "aac-mov" {
         // Compare the complete decoder packets from the neutral MOV view.
@@ -470,6 +614,12 @@ fn audio_decoder(
             ]
             .map(String::from),
         );
+    }
+    if lane == AAC_CONTAINER_PRIMING {
+        reference_argv.extend(["-flags2".into(), "+skip_manual".into()]);
+    }
+    if reject {
+        reference_argv.extend(["-err_detect", CRC_REJECTING_ERR_DETECT].map(String::from));
     }
     reference_argv.extend(["-i", path].map(String::from));
     if lane == "aac-mov" {
@@ -486,7 +636,17 @@ fn audio_decoder(
         ]
         .map(String::from),
     );
-    let reference_run = if initialized_aac {
+    let reset_reference = session::reference_args(
+        a,
+        &media_lane,
+        path,
+        &python::path(&reference_path),
+        vector,
+        "planar",
+    );
+    let reference_run = if let Some(args) = &reset_reference {
+        run_text(args, RUN_TIMEOUT)?
+    } else if initialized_aac {
         let worker = Path::new(&a.reference).with_file_name(super::INITIALIZED_AAC_REFERENCE);
         run_text(
             &[
@@ -499,13 +659,56 @@ fn audio_decoder(
     } else {
         run_text(&reference_argv, RUN_TIMEOUT)?
     };
-    let ours_run = run_text(
-        &[a.example(lane)?, path.to_owned(), python::path(&ours_path)],
-        RUN_TIMEOUT,
-    )?;
-    let info = json_lines(&ours_run.stderr)
-        .pop()
-        .unwrap_or_else(|| Value::object::<&str>([]));
+    let no_noise = vector.get("noise_off") == Some(&Value::Bool(true));
+    let ours_input = if no_noise {
+        source.ok_or_else(|| "NoiseMode::Off needs the original stream".to_owned())?
+    } else {
+        path
+    };
+    let mut ours_argv = if through_session {
+        session::args(
+            a,
+            &media_lane,
+            ours_input,
+            &python::path(&ours_path),
+            tmp,
+            vector,
+            "planar",
+        )?
+    } else {
+        vec![
+            a.example(lane)?,
+            ours_input.to_owned(),
+            python::path(&ours_path),
+        ]
+    };
+    if lane == "track-reset" {
+        session::append_options(&mut ours_argv, vector);
+    }
+    match lane {
+        "flac-crc-reject" => ours_argv.extend(["--crc", "reject"].map(String::from)),
+        "ac3-crc-reject" | "eac3-crc-reject" => ours_argv.push("--reject-crc".into()),
+        "ac3-nodither" if no_noise => ours_argv.push("--no-noise".into()),
+        _ => {}
+    }
+    if lane == AAC_CONTAINER_PRIMING {
+        ours_argv.extend(["--priming".into(), "container".into()]);
+    }
+    if lane == "aac" && vector.get("reference_extensions") == Some(&Value::Bool(true)) {
+        ours_argv.extend(["--extensions".into(), "reference".into()]);
+    }
+    let ours_run = run_text(&ours_argv, RUN_TIMEOUT)?;
+    let mut diagnostics = json_lines(&ours_run.stderr);
+    let info = if through_session {
+        diagnostics
+            .iter()
+            .rev()
+            .find(|row| row.get("channels").is_some())
+            .cloned()
+    } else {
+        diagnostics.pop()
+    }
+    .unwrap_or_else(|| Value::object::<&str>([]));
     let ours_channels = present(info.get("channels"));
     let ours_rate = match info.get("sample_rate") {
         Some(rate) => present(Some(rate)),
@@ -571,6 +774,19 @@ fn audio_decoder(
             Value::str(python::tail(&reference_run.stderr, 300)),
         ),
     ];
+    if variant_manifest(lane).is_some() {
+        row.extend([
+            ("ours_pcm_bytes".into(), Value::int(candidate.len() as u64)),
+            (
+                "ffmpeg_pcm_bytes".into(),
+                Value::int(reference.len() as u64),
+            ),
+            (
+                "ours_stderr_tail".into(),
+                Value::str(python::tail(&ours_run.stderr, 500)),
+            ),
+        ]);
+    }
     if initialized_aac {
         row.push((
             "float_reference".into(),
@@ -580,6 +796,22 @@ fn audio_decoder(
     let status = |row: &mut Vec<(String, Value)>, status: &str| {
         row.push(("status".into(), Value::str(status)));
     };
+    if coreless {
+        let ours_refused = if through_session {
+            ours_run.code > 0 && ours_run.stderr.contains("no DTS core sync")
+        } else {
+            ours_run.code == 0 && info.get("frames").and_then(python::int) == Some(0)
+        };
+        let both_refuse =
+            candidate.is_empty() && ours_refused && no_dts_core(&reference_run, &reference);
+        let result = match (both_refuse, through_session) {
+            (true, true) => "ffmpeg-refused",
+            (true, false) => "pass",
+            (false, _) => "fail",
+        };
+        status(&mut row, result);
+        return Ok(Value::Object(row));
+    }
     if initialized_aac
         && !complete_single_sce_stereo(
             size_of::<f32>(),
@@ -591,6 +823,88 @@ fn audio_decoder(
     {
         status(&mut row, "fail");
         return Ok(Value::Object(row));
+    }
+    if through_session
+        && reference.is_empty()
+        && candidate.is_empty()
+        && ours_run.code > 0
+        && reference_run.code > 0
+    {
+        // The two commands independently refused the file before producing PCM.
+        status(&mut row, "ffmpeg-refused");
+        row.push((
+            "ours_stderr_tail".into(),
+            Value::str(python::tail(&ours_run.stderr, 300)),
+        ));
+        return Ok(Value::Object(row));
+    }
+    let mut same_frames = true;
+    if through_session {
+        let reset_rows = reset_reference
+            .as_ref()
+            .map(|_| json_lines(&reference_run.stderr));
+        let timeline =
+            session::timeline(a, path, &media_lane, &diagnostics, reset_rows.as_deref())?;
+        same_frames = timeline.get("status").and_then(Value::as_str) == Some("pass");
+        row.push(("timeline".into(), timeline));
+    }
+    if lane == "session-flac" && session::flac_depth_refusal(&ours_run, &reference_run) {
+        // Keep the entire decoded prefix, its frame clocks and the named refusal.
+        let same = same_frames && !candidate.is_empty() && candidate == reference;
+        row.push(("terminal".into(), Value::str("flac-bit-depth-change")));
+        status(&mut row, if same { "pass" } else { "fail" });
+        return Ok(Value::Object(row));
+    }
+    if lane == "session-flac"
+        && vector.get("on_refusal").and_then(Value::as_str) == Some("skip")
+        && reference_run.stderr.contains("Decode error rate")
+    {
+        // Compare the skipped frames and PCM independently of the CLI's error-rate ceiling.
+        let reference_refusals = session::flac_block_refusals(&reference_run);
+        if reference_refusals != 0 {
+            let ours_refusals = info.get("errors").and_then(python::int);
+            let same = ours_run.code == 0
+                && same_frames
+                && ours_refusals == Some(reference_refusals as i128)
+                && !candidate.is_empty()
+                && candidate == reference;
+            row.push((
+                "reference_block_refusals".into(),
+                Value::int(reference_refusals as u64),
+            ));
+            status(&mut row, if same { "pass" } else { "fail" });
+            return Ok(Value::Object(row));
+        }
+    }
+    if reject {
+        let format = format.ok_or_else(|| "CRC lane needs an explicit format".to_owned())?;
+        let (code, frames, errors) = reference_frames(a, path, format)?;
+        let candidate_count = info.get("frames").and_then(python::int);
+        let candidate_shape = diagnostics.iter().find_map(|v| v.get("frame_samples"));
+        let reference_shape = Value::Array(
+            frames
+                .iter()
+                .map(|v| v.get("nb_samples").cloned().unwrap_or(Value::Null))
+                .collect(),
+        );
+        same_frames = candidate_count == Some(frames.len() as i128)
+            && (lane != "flac-crc-reject" || candidate_shape == Some(&reference_shape));
+        row.extend([
+            ("ffmpeg_frame_probe_rc".into(), Value::int(code)),
+            ("ffmpeg_frames".into(), Value::Array(frames)),
+            (
+                "ffmpeg_frame_probe_errors".into(),
+                Value::str(python::tail(&errors, 300)),
+            ),
+            (
+                "ours_frame_samples".into(),
+                candidate_shape.cloned().unwrap_or(Value::Null),
+            ),
+        ]);
+        if reference.is_empty() && candidate.is_empty() && same_frames && ours_run.code == 0 {
+            status(&mut row, "pass");
+            return Ok(Value::Object(row));
+        }
     }
     if reference.is_empty() {
         status(&mut row, "ffmpeg-refused");
@@ -627,7 +941,9 @@ fn audio_decoder(
             Value::Bool(surround_pair_labels),
         ));
     }
-    let exact = same(ours_channels, reference_channels)
+    let exact = (!(through_session || lane == "track-reset")
+        || ours_run.code == 0 && reference_run.code == 0)
+        && same(ours_channels, reference_channels)
         && same(ours_rate, reference_rate)
         && candidate.len() == reference.len()
         && (lane != "aac-mov" && !initialized_aac
@@ -653,19 +969,52 @@ fn audio_decoder(
         ));
         row.push(("worst_rms".into(), Value::float(worst_rms)));
         row.push(("worst_abs".into(), Value::float(worst_abs)));
-        let pass = if a.rules.exact.iter().any(|exact| exact == lane) {
+        let pass = if lane == "ac3-nodither" && format == Some("ac3") {
+            worst_abs <= a.rules.ac3_dither_free_abs
+        } else if a.rules.exact.iter().any(|exact| exact == &media_lane) {
             worst_abs == 0.0
         } else {
             worst_rms <= a.rules.rms && worst_abs <= a.rules.abs
         };
-        status(&mut row, if pass { "pass" } else { "fail" });
+        let reference_clean =
+            lane != "ac3-nodither" || reference_run.code == 0 && reference_run.stderr.is_empty();
+        status(
+            &mut row,
+            if pass && same_frames && reference_clean {
+                "pass"
+            } else {
+                "fail"
+            },
+        );
     } else {
         row.push(("stats".into(), Value::Null));
         row.push(("worst_rms".into(), Value::Null));
         row.push(("worst_abs".into(), Value::Null));
         status(&mut row, "fail");
     }
+    if variant_manifest(lane).is_some()
+        && row
+            .last()
+            .is_some_and(|(key, value)| key == "status" && value.as_str() == Some("fail"))
+    {
+        row.extend([
+            (
+                "ours_pcm_sha256".into(),
+                Value::str(sha256::hex(&candidate)),
+            ),
+            (
+                "ffmpeg_pcm_sha256".into(),
+                Value::str(sha256::hex(&reference)),
+            ),
+        ]);
+    }
     Ok(Value::Object(row))
+}
+
+fn no_dts_core(reference: &crate::process::Text, pcm: &[u8]) -> bool {
+    pcm.is_empty()
+        && reference.code > 0
+        && reference.stderr.contains("No valid DCA sub-stream found")
 }
 
 fn output_path(
@@ -674,25 +1023,101 @@ fn output_path(
     path: &str,
     tmp: &Path,
     initialized_aac: bool,
+    vector: &Value,
 ) -> Result<Value, Stop> {
-    let decode = operation(lane).ok_or_else(|| unknown(lane))?;
+    let through_session = lane.starts_with("session-");
+    let media_lane = if through_session {
+        session::base(lane, vector)?
+    } else {
+        lane.to_owned()
+    };
+    let decode = operation(&media_lane).ok_or_else(|| unknown(lane))?;
     let op = format!("{decode}-raw");
     let worker = python::path(a.codec_workers.of(decode));
-    if video_extensions(lane).is_some() {
+    if video_extensions(&media_lane).is_some() {
         let argv = |w: &str| vec![w.to_owned(), op.clone(), path.to_owned(), OUT.to_owned()];
-        let ours = Frames::spawn(&argv(&worker), CANVAS, true, RUN_TIMEOUT)?;
-        let reference = Frames::spawn(&argv(&a.reference), CANVAS, true, RUN_TIMEOUT)?;
-        return video::output(ours, reference);
+        let ours_argv = if through_session {
+            session::args(a, &media_lane, path, OUT, tmp, vector, "device")?
+        } else {
+            argv(&worker)
+        };
+        let ours = Frames::spawn(&ours_argv, CANVAS, true, RUN_TIMEOUT)?;
+        let reference_argv = session::reference_args(a, &media_lane, path, OUT, vector, "device")
+            .unwrap_or_else(|| argv(&a.reference));
+        let reference = Frames::spawn(&reference_argv, CANVAS, true, RUN_TIMEOUT)?;
+        return if through_session {
+            video::rgba(ours, reference, true)
+        } else {
+            video::output(ours, reference)
+        };
     }
     let (o, r) = (tmp.join("ours.s16"), tmp.join("ref.s16"));
-    let po = run_text(
-        &[worker, op.clone(), path.to_owned(), python::path(&o)],
-        RUN_TIMEOUT,
-    )?;
-    let pr = run_text(
-        &[a.reference.clone(), op, path.to_owned(), python::path(&r)],
-        RUN_TIMEOUT,
-    )?;
+    let mut ours_argv = if through_session {
+        session::args(
+            a,
+            &media_lane,
+            path,
+            &python::path(&o),
+            tmp,
+            vector,
+            "device",
+        )?
+    } else {
+        vec![worker, op.clone(), path.to_owned(), python::path(&o)]
+    };
+    if lane == "aac" && vector.get("reference_extensions") == Some(&Value::Bool(true)) {
+        ours_argv.extend(["--extensions".into(), "reference".into()]);
+    }
+    let po = run_text(&ours_argv, RUN_TIMEOUT)?;
+    let coreless = lane == "session-dts" && vector.get("coreless") == Some(&Value::Bool(true));
+    let reference_argv =
+        session::reference_args(a, &media_lane, path, &python::path(&r), vector, "device")
+            .unwrap_or_else(|| {
+                if through_session && (media_lane == "mp3" || coreless) {
+                    // The CLI uses the same decoder selection as the PCM grade.
+                    // For MP3, it discovers the complete gapless trim before decoding.
+                    let mut args = [
+                        a.ffmpeg.as_str(),
+                        "-nostdin",
+                        "-v",
+                        "error",
+                        "-threads",
+                        "1",
+                        "-filter_threads",
+                        "1",
+                        "-f",
+                        if coreless { "dts" } else { "mp3" },
+                        "-c:a",
+                        if coreless { "dca" } else { "mp3float" },
+                    ]
+                    .map(String::from)
+                    .to_vec();
+                    if coreless {
+                        args.extend(["-core_only", "1"].map(String::from));
+                    }
+                    args.extend(
+                        [
+                            "-i",
+                            path,
+                            "-map",
+                            "0:a:0",
+                            "-af",
+                            "aformat=sample_fmts=s16:channel_layouts=stereo",
+                            "-f",
+                            "s16le",
+                            "-c:a",
+                            "pcm_s16le",
+                            "-y",
+                            &python::path(&r),
+                        ]
+                        .map(String::from),
+                    );
+                    args
+                } else {
+                    vec![a.reference.clone(), op, path.to_owned(), python::path(&r)]
+                }
+            });
+    let pr = run_text(&reference_argv, RUN_TIMEOUT)?;
     let co = fs::read(&o).unwrap_or_default();
     let cr = fs::read(&r).unwrap_or_default();
     let mut row = vec![
@@ -715,11 +1140,28 @@ fn output_path(
         row.push(("status".into(), Value::str("fail")));
         return Ok(Value::Object(row));
     }
+    if coreless {
+        let both_refuse = co.is_empty()
+            && po.code > 0
+            && po.stderr.contains("no DTS core sync")
+            && no_dts_core(&pr, &cr);
+        let result = if both_refuse {
+            "reference-produced-nothing"
+        } else {
+            "fail"
+        };
+        row.push(("status".into(), Value::str(result)));
+        return Ok(Value::Object(row));
+    }
     if cr.is_empty() {
         row.push(("status".into(), Value::str("reference-produced-nothing")));
         return Ok(Value::Object(row));
     }
-    if co.len() != cr.len() {
+    let same_refusal = lane == "session-flac" && session::flac_depth_refusal(&po, &pr);
+    if same_refusal {
+        row.push(("terminal".into(), Value::str("flac-bit-depth-change")));
+    }
+    if co.len() != cr.len() || through_session && !same_refusal && (po.code != 0 || pr.code != 0) {
         row.push(("status".into(), Value::str("fail")));
         return Ok(Value::Object(row));
     }
@@ -758,25 +1200,109 @@ fn timeout_row(argv: Vec<String>) -> Value {
     ])
 }
 
-/// The vector names a manifest lists in `open_cases`: vectors that fail today and
-/// that `summarize` requires to keep failing. Every name must be a vector of it.
+fn observation(value: Result<Value, Stop>, lane: &str) -> Result<Value, String> {
+    match value {
+        Ok(value) => Ok(value),
+        Err(Stop::Timeout(argv)) => Ok(timeout_row(argv)),
+        Err(Stop::Fatal(message)) if lane.starts_with("session-") || play::lane(lane) => {
+            Ok(Value::object([
+                ("status", Value::str("operation-error")),
+                ("message", Value::str(message)),
+            ]))
+        }
+        Err(Stop::Fatal(message)) => Err(message),
+    }
+}
+
+fn vector_name(lane: &str, vector: &Value) -> Option<String> {
+    if lane.starts_with("session-") && vector.get("base_lane").is_none() {
+        let path = vector.get("path")?.as_str()?;
+        Some(format!("{lane}:{path}"))
+    } else {
+        vector.get("name")?.as_str().map(str::to_owned)
+    }
+}
+
+/// Vectors that differ as listed: open cases, declared deviations and policy differences.
+/// Every name must be a vector of the manifest.
 fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>, String> {
     let mut open = Vec::new();
+    let mut admit = |case: &'a Value| -> Result<(), String> {
+        let name = case.as_str().ok_or("an open case is a vector name")?;
+        if open.contains(&name) {
+            return Err(format!("open case {name}: listed twice"));
+        }
+        if !vectors.iter().any(|v| {
+            v.get("name").and_then(Value::as_str) == Some(name)
+                || v.get("lane")
+                    .and_then(Value::as_str)
+                    .and_then(session::lane)
+                    .and_then(|lane| vector_name(lane, v))
+                    .as_deref()
+                    == Some(name)
+        }) {
+            return Err(format!("open case {name}: not a vector of the manifest"));
+        }
+        open.push(name);
+        Ok(())
+    };
     for case in manifest
         .get("open_cases")
         .and_then(Value::as_array)
         .unwrap_or_default()
     {
-        let name = case.as_str().ok_or("an open case is a vector name")?;
-        if !vectors
-            .iter()
-            .any(|v| v.get("name").and_then(Value::as_str) == Some(name))
-        {
-            return Err(format!("open case {name}: not a vector of the manifest"));
+        admit(case)?;
+    }
+    for (form, deviation) in deviations(manifest) {
+        let cases = deviation
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap_or_default();
+        if cases.is_empty() || deviation.get("targets").is_some() {
+            return Err(
+                "a codec deviation or policy difference names its cases and holds on every target"
+                    .into(),
+            );
         }
-        open.push(name);
+        if let Some(error) = crate::harness::registry::entry_error(form, deviation, false) {
+            return Err(error);
+        }
+        for case in cases {
+            admit(case)?;
+        }
     }
     Ok(open)
+}
+
+/// The entries of a manifest's `open_deviations` and `open_policies`, each with its
+/// form: the lists whose vectors both sides decode to pinned, differing output.
+pub(super) fn deviations(
+    manifest: &Value,
+) -> impl Iterator<Item = (crate::harness::registry::Form, &Value)> {
+    use crate::harness::registry::{Form, groups};
+    groups(manifest).filter(|(form, _)| matches!(form, Form::Departure | Form::Policy))
+}
+
+fn all_vectors(manifests: &[Value]) -> Result<Vec<Value>, String> {
+    let mut vectors = Vec::new();
+    for manifest in manifests {
+        vectors.extend_from_slice(
+            manifest
+                .get("vectors")
+                .and_then(Value::as_array)
+                .ok_or("manifest has no vectors")?,
+        );
+    }
+    Ok(vectors)
+}
+
+fn vector_lanes<'a>(vector: &'a Value, selected: Option<&[String]>) -> [Option<&'a str>; 3] {
+    let base = vector.get("lane").and_then(Value::as_str);
+    let priming = (base == Some("aac")
+        && selected.is_some_and(|lanes| lanes.iter().any(|lane| lane == AAC_CONTAINER_PRIMING)))
+    .then_some(AAC_CONTAINER_PRIMING);
+    let session = selected.and_then(|_| base.and_then(session::lane));
+    [base, priming, session]
 }
 
 /// Grade every manifest vector (or those of `--lanes` that `--only` selects),
@@ -784,27 +1310,62 @@ fn open_cases<'a>(manifest: &'a Value, vectors: &[Value]) -> Result<Vec<&'a str>
 /// A row of a vector the manifest lists in `open_cases` carries `"open_case": true`.
 /// A named lane without vectors fails.
 pub fn grade(a: &Grade) -> Result<(), String> {
-    let manifest = crate::checks::read_json(&a.manifest)?;
-    let vectors = manifest
-        .get("vectors")
-        .and_then(Value::as_array)
-        .ok_or("manifest has no vectors")?;
-    let open = open_cases(&manifest, vectors)?;
-    let in_lanes = |v: &Value| {
-        a.lanes.as_ref().is_none_or(|lanes| {
-            v.get("lane")
-                .and_then(Value::as_str)
-                .is_some_and(|lane| lanes.iter().any(|l| l == lane))
-        })
+    let manifest = json::read(&a.manifest)?;
+    let variant_manifests = a
+        .lanes
+        .iter()
+        .flatten()
+        .filter_map(|lane| variant_manifest(lane))
+        .filter(|path| !a.manifest.ends_with(path))
+        .collect::<std::collections::BTreeSet<_>>()
+        .into_iter()
+        .map(|path| json::read(Path::new(path)))
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut manifests = vec![manifest];
+    manifests.extend(variant_manifests);
+    let vectors = all_vectors(&manifests)?;
+    let open = manifests
+        .iter()
+        .map(|manifest| open_cases(manifest, &vectors))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
+    for manifest in &manifests {
+        for (id, refusal) in session::registered_refusals(manifest)? {
+            if open.contains(&id)
+                || !vectors.iter().any(|vector| {
+                    vector.get("sha256").and_then(Value::as_str) == Some(refusal.sha256)
+                        && vector_lanes(vector, Some(&[]))
+                            .into_iter()
+                            .flatten()
+                            .any(|lane| vector_name(lane, vector).as_deref() == Some(id))
+                })
+            {
+                return Err(format!(
+                    "{id}: registered session refusal overlaps or lacks a pinned vector"
+                ));
+            }
+        }
+    }
+    let in_lanes = |lane: Option<&str>| {
+        a.lanes
+            .as_ref()
+            .is_none_or(|lanes| lane.is_some_and(|lane| lanes.iter().any(|l| l == lane)))
     };
     for lane in a.lanes.iter().flatten() {
         if !vectors
             .iter()
-            .any(|v| v.get("lane").and_then(Value::as_str) == Some(lane))
+            .any(|v| vector_lanes(v, a.lanes.as_deref()).contains(&Some(lane)))
         {
             return Err(format!("lane {lane}: no vectors in the manifest"));
         }
     }
+    let scheduled = vectors.iter().flat_map(|vector| {
+        vector_lanes(vector, a.lanes.as_deref())
+            .into_iter()
+            .map(move |lane| (vector, lane))
+    });
     let only: Option<Vec<&str>> = a.only.as_deref().map(|o| o.split(',').collect());
     let mut out = fs::OpenOptions::new()
         .create(true)
@@ -817,14 +1378,31 @@ pub fn grade(a: &Grade) -> Result<(), String> {
             .map(str::to_owned)
             .ok_or_else(|| format!("vector without {key}"))
     };
-    for v in vectors.iter().filter(|v| in_lanes(v)) {
-        let (lane, name, relative) = (text(v, "lane")?, text(v, "name")?, text(v, "path")?);
+    let mut native_reference = None;
+    for (v, lane) in scheduled.filter(|(_, lane)| lane.is_some() && in_lanes(*lane)) {
+        let lane = lane.ok_or("vector without lane")?.to_owned();
+        let relative = text(v, "path")?;
+        let name = vector_name(&lane, v).ok_or("vector without name")?;
         if let Some(only) = &only
             && !only.iter().any(|o| name.contains(o) || *o == lane)
         {
             continue;
         }
-        let path = python::path(&a.root.join(&relative));
+        let tmp = TempDir::new(a.scratch.as_deref())?;
+        let original = v
+            .get("source")
+            .and_then(Value::as_str)
+            .map(|source| a.root.join(source));
+        let source = original.as_deref().map(python::path);
+        let path = if original.is_some() {
+            tmp.0.join(
+                Path::new(&relative)
+                    .file_name()
+                    .ok_or("variant file name")?,
+            )
+        } else {
+            a.root.join(&relative)
+        };
         let mut row = vec![
             ("lane".to_owned(), Value::str(lane.as_str())),
             ("name".to_owned(), Value::str(name.as_str())),
@@ -837,40 +1415,111 @@ pub fn grade(a: &Grade) -> Result<(), String> {
                 v.get("sha256").cloned().unwrap_or(Value::Null),
             ),
         ];
-        if open.contains(&name.as_str()) {
-            row.push(("open_case".into(), Value::Bool(true)));
-        }
-        let sha256 = file_sha(Path::new(&path))?;
-        if Some(sha256.as_str()) != v.get("sha256").and_then(Value::as_str) {
-            row.push(("status".into(), Value::str("input-hash-mismatch")));
+        let generated = if original.is_some() {
+            damage::materialize(
+                &damage::FixtureTools {
+                    root: &a.root,
+                    ffprobe: &a.ffprobe,
+                    strip_dither: &a.bin.join("strip_dither"),
+                },
+                v,
+                &path,
+            )
         } else {
-            let tmp = TempDir::new(a.scratch.as_deref())?;
-            let initialized_aac = uses_initialized_aac_reference(&lane, &name, &sha256);
-            let decoded = if video_extensions(&lane).is_some() {
-                video::decoder(&a.ffprobe, &a.ffmpeg, &a.example(&lane)?, &lane, &path)
-            } else {
-                audio_decoder(a, &lane, &path, &tmp.0, initialized_aac)
-            };
+            Ok(())
+        };
+        if let Err(error) = generated {
             row.push((
                 "decoder".into(),
-                match decoded {
-                    Ok(value) => value,
-                    Err(Stop::Timeout(argv)) => timeout_row(argv),
-                    Err(Stop::Fatal(message)) => return Err(message),
+                match error {
+                    Stop::Timeout(argv) => timeout_row(argv),
+                    Stop::Fatal(message) => Value::object([
+                        ("status", Value::str("fixture-error")),
+                        ("message", Value::str(message)),
+                    ]),
                 },
             ));
-            if lane != "aac-mov" {
+        } else if variant_manifest(&lane).is_some() && !path.is_file() {
+            row.push(("status".into(), Value::str("input-missing")));
+        } else if Some(crate::files::sha256(&path)?.as_str())
+            != v.get("sha256").and_then(Value::as_str)
+        {
+            row.push(("status".into(), Value::str("input-hash-mismatch")));
+        } else if let Some(policy) = pcm_policy::Policy::for_lane(&lane) {
+            row.push((
+                "decoder".into(),
+                observation(policy.compare(a, &path, &tmp.0), &lane)?,
+            ));
+        } else if play::lane(&lane) {
+            row.push((
+                "output".into(),
+                observation(play::grade(a, &path, &tmp.0, v), &lane)?,
+            ));
+        } else if let Some(base) = native_audio::selected(&lane, v) {
+            if native_reference.is_none() {
+                let directory = TempDir::new(a.scratch.as_deref())?;
+                let executable = native_audio::build(&directory.0, &a.ffmpeg)?;
+                native_reference = Some((directory, executable));
+            }
+            let executable = &native_reference
+                .as_ref()
+                .ok_or("missing native audio runner")?
+                .1;
+            let session = (lane != base).then_some(v);
+            match native_audio::grade(a, base, &python::path(&path), &tmp.0, executable, session) {
+                Ok((decoder, output)) => {
+                    row.extend([("decoder".into(), decoder), ("output".into(), output)]);
+                }
+                Err(error) => row.push(("decoder".into(), observation(Err(error), &lane)?)),
+            }
+        } else {
+            let path = python::path(&path);
+            let sha256 = text(v, "sha256")?;
+            let initialized_aac = uses_initialized_aac_reference(&lane, &text(v, "name")?, &sha256);
+            let session_video = matches!(lane.as_str(), "session-h264" | "session-hevc");
+            let output = if decoder_only_lane(&lane) {
+                None
+            } else {
                 let output_dir = tmp.0.join("o");
                 fs::create_dir(&output_dir).map_err(|e| e.to_string())?;
-                row.push((
-                    "output".into(),
-                    match output_path(a, &lane, &path, &output_dir, initialized_aac) {
-                        Ok(value) => value,
-                        Err(Stop::Timeout(argv)) => timeout_row(argv),
-                        Err(Stop::Fatal(message)) => return Err(message),
-                    },
-                ));
+                Some(observation(
+                    output_path(a, &lane, &path, &output_dir, initialized_aac, v),
+                    &lane,
+                )?)
+            };
+            let decoded = if session_video {
+                session::video_timeline(a, &path, &lane, v, output.as_ref())
+            } else if video_extensions(&lane).is_some() {
+                video::decoder(&a.ffprobe, &a.ffmpeg, &a.example(&lane)?, &lane, &path)
+            } else {
+                audio_decoder(
+                    a,
+                    &lane,
+                    &path,
+                    &tmp.0,
+                    initialized_aac,
+                    v,
+                    source.as_deref(),
+                )
+            };
+            row.push(("decoder".into(), observation(decoded, &lane)?));
+            if let Some(output) = output {
+                row.push(("output".into(), output));
             }
+        }
+        let comparison_started = row
+            .iter()
+            .any(|(key, _)| key == "decoder" || play::lane(&lane) && key == "output");
+        let infrastructure_error = row.iter().any(|(_, value)| {
+            matches!(
+                value.get("status").and_then(Value::as_str),
+                Some("operation-error" | "fixture-error" | "timeout")
+            )
+        });
+        // A listed difference is one both sides were observed to produce: a comparison
+        // that did not run, or whose tools failed, is a failure of the run.
+        if open.contains(&name.as_str()) && comparison_started && !infrastructure_error {
+            row.push(("open_case".into(), Value::Bool(true)));
         }
         let row = Value::Object(row);
         writeln!(out, "{}", json::to_python(&row, None))
@@ -898,6 +1547,26 @@ pub fn grade(a: &Grade) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn declared_codec_deviations_join_the_open_case_ratchet() {
+        let vectors = json::parse(r#"[{"name":"one"},{"name":"two"}]"#).unwrap();
+        let vectors = vectors.as_array().unwrap();
+        let manifest = |name, clause| {
+            json::parse(&format!(
+                r#"{{"open_cases":["one"],"open_deviations":[{{"reading":"reading",
+                "clause":"{clause}","candidate":"ours","reference":"theirs","cases":["{name}"]}}]}}"#
+            ))
+            .unwrap()
+        };
+        assert_eq!(
+            open_cases(&manifest("two", "§4"), vectors).unwrap(),
+            ["one", "two"]
+        );
+        assert!(open_cases(&manifest("one", "§4"), vectors).is_err());
+        assert!(open_cases(&manifest("other", "§4"), vectors).is_err());
+        assert!(open_cases(&manifest("two", ""), vectors).is_err());
+    }
 
     #[test]
     fn initialized_aac_reference_requires_the_pinned_input() {

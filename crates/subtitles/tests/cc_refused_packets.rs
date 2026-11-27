@@ -30,7 +30,7 @@ fn extract(
     let mut extractor = CaptionExtractor::new(&pool, coding, (1, 90_000));
     let mut frames = Vec::new();
     let mut collect = |extractor: &mut CaptionExtractor| {
-        while let Some(f) = extractor.pop().expect("pop") {
+        while let Some(f) = extractor.pop() {
             frames.push((f.pts, f.duration, f.data.to_vec()));
         }
     };

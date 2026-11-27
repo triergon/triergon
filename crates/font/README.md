@@ -13,7 +13,8 @@ errors. Shaping, rasterising and ASS parsing belong to other crates.
 
 ```rust,no_run
 use triergon_core::{Budget, Bytes};
-use triergon_font::{FaceInfo, Font, Limits, Outline, Request, Segment, select};
+use triergon_font::compat::libass::{self, FaceInfo, Request, select};
+use triergon_font::{Font, Limits, Outline, Segment};
 
 let pool = Budget::new(64 << 20)?;
 let file = Bytes::copy_from_slice(&pool, &std::fs::read("Arimo-Regular.ttf")?)?;
@@ -26,7 +27,8 @@ let infos: Vec<FaceInfo<'_>> = faces.iter().map(FaceInfo::new).collect();
 let request = Request { family: "Arimo", weight: 700, slant: 0, character: Some(u32::from('g')) };
 let font = &faces[select(&infos, &request).ok_or("no matching face")?];
 
-let glyph = font.glyph_index('g').ok_or("unmapped")?;
+let charmap = font.unicode_charmap().ok_or("no Unicode charmap")?;
+let glyph = charmap.glyph(u32::from('g')).ok_or("unmapped")?;
 let mut outline = Outline::new(&pool); // reuse it for every glyph
 let metrics = font.outline_into(glyph, &mut outline)?;
 for segment in outline.segments() {
@@ -37,11 +39,12 @@ let _advance = f64::from(metrics.advance) / em;
 
 // The glyph as libass draws it with hinting off: 256 pixels (16384 in 26.6),
 // then scaled.
-let sized = font.at_size(16_384)?;
+let sized = libass::at_size(font, 16_384)?;
 let mut scaled = Outline::new(&pool); // reuse it too
 let glyph_metrics = sized.outline_into(glyph, &mut scaled)?; // 26.6 pixels, y up
-sized.synthesize(&mut scaled, font.synthesis(request.weight, request.slant))?;
-let _shaping_advance = sized.default_advance(glyph)?; // what HarfBuzz receives
+let synthesis = libass::synthesis(font, request.weight, request.slant);
+libass::synthesize(&sized, &mut scaled, synthesis)?;
+let _shaping_advance = sized.default_advance(glyph)?; // the default load's
 let _drawn_advance = glyph_metrics.advance;
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
@@ -104,11 +107,10 @@ units, y up, as FreeType loads it with `FT_LOAD_NO_SCALE`, with its advance:
 header box as stored, or the box of every point a charstring draws, control
 points included, in unrounded 16.16 before the FontMatrix.
 
-**At a size.** `Font::at_size` takes a 26.6 pixel height and sets up the face as
-libass requests the size from FreeType (`ass_face_set_size`: `FT_Request_Size`,
-REAL_DIM), after libass's GDI face metrics (`Font::gdi_metrics`), with FreeType's
-fixed-point rounding. A `SizedFont` is a small copyable view that allocates
-nothing. It gives:
+**At a size.** `Font::at_height` takes a 26.6 pixel height and the face metrics
+whose ascender-to-descender span it scales to that height. Use
+`compat::libass::at_size` to request the size with libass's choice of face
+metrics. A `SizedFont` is a copyable view that allocates nothing. It gives:
 
 - `outline_into`: the outline libass draws with hinting off
   (`FT_LOAD_NO_HINTING | FT_LOAD_NO_BITMAP`), in an `Outline` of 26.6 points,
@@ -128,7 +130,7 @@ nothing. It gives:
   - TrueType glyphs of a face without bytecode (no `fpgm`, a `prep` of at most 7
     bytes) through FreeType's auto-hinter as built without HarfBuzz: the latin
     and CJK writing systems, in the normal render mode.
-- `synthesize`: libass's synthetic oblique and bold, as `Font::synthesis` decides
+- `synthesize`: libass's synthetic oblique and bold, as `compat::libass::synthesis` decides
   them from the requested weight and slant: the oblique shear, then
   `FT_Outline_EmboldenXY` with libass's strength (`embolden_strength`). It
   returns `false` for an outline of zero area FreeType refuses to embolden.
@@ -138,9 +140,10 @@ nothing. It gives:
   vertical advances libass uses for the glyphs of an `@` font it draws rotated
   (`vertical_advance`, `linear_vertical_advance`).
 - `metrics` (`FT_Size_Metrics`), `ascent_descent` (libass's line ascent and
-  descent), `harfbuzz_scale` (the scale libass sets on its HarfBuzz font),
-  `kerning` (`FT_KERNING_DEFAULT`), and `underline` and `strikeout` (the bands
-  libass adds from `post` and `OS/2`).
+  descent), `scale_y` (a face value scaled as libass scales it),
+  `harfbuzz_scale` (the scale libass sets on its HarfBuzz font), `kerning`
+  (`FT_KERNING_DEFAULT`), and `underline` and `strikeout` (the bands libass
+  adds from `post` and `OS/2`).
 
 At zero pixels per em, glyphs load unscaled and unhinted, in font units, as
 FreeType loads them.
@@ -149,7 +152,7 @@ FreeType loads them.
 `kern` table, at most 32, with the override bit replacing the sum; Apple's
 version 1 reads as no subtables. `kerning_pairs` lists the pairs.
 
-**Face matching.** `FaceInfo` and `select` score faces as libass 0.17.5 does for
+**Face matching.** `compat::libass::{FaceInfo, select}` score faces as libass 0.17.5 does for
 fonts it loads itself. A `Request` carries the family, the weight and slant of
 libass's font description (700 for the ASS bold values 1 and -1, 100 for the
 italic value 1, other values unsigned) and optionally a code the face's text
@@ -181,6 +184,14 @@ the least recently used values that only the store holds are dropped.
 - `text_lookup` is `Unsupported` for charmaps whose codes libass converts
   (Windows encodings 2 to 6 through iconv, and a Symbol charmap under a legacy
   Arabic character set).
+
+Glyph positions and advances use signed 32-bit coordinates in font units or
+26.6 pixels, depending on the load. The signed 16.16 size scales and whole-face
+26.6 metrics use 64 bits to cover large sizes at small units per em. The
+linear vertical advance also uses 64-bit storage for its sign-extended result.
+The translated hinters carry 32-bit values in integers and apply wrapping at
+the arithmetic boundaries. Retyping that arithmetic requires checking each
+intermediate wrap and rounding against the full outline and metric corpus.
 
 Known differences from FreeType: a face without a usable `glyf` or CFF table is
 `Error::Invalid`, where FreeType opens it and fails each glyph; a CFF2 face whose

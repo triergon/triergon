@@ -4,10 +4,10 @@
 //! target's TNS (cc_domain 0 / 1); independently switched CCEs are added in the time domain
 //! after the target's filterbank. The coupling channel's own spectrum is TNS-filtered first.
 
-use crate::decoder::{Core, ID_CPE};
+use crate::decoder::{Core, ElementId};
 use crate::error::{DecodeError, Result};
 use crate::huffman::books;
-use crate::ics::{ChannelData, CoreCfg, MAX_SFB, ZERO_HCB, parse_ics};
+use crate::ics::{ChannelData, CoreCfg, MAX_SFB, WindowShape, ZERO_HCB, parse_ics};
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{Budget, BudgetVec, Charged};
 
@@ -27,40 +27,45 @@ pub(crate) struct Target {
     pub r: bool,
 }
 
+/// Where the coupling signal is added to its target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum CouplingPoint {
+    BeforeTns,
+    AfterTns,
+    AfterFilterbank,
+}
+
 #[derive(Debug)]
 pub(crate) struct CceState {
     pub tag: u8,
-    pub ind_sw: bool,
-    pub domain: bool,
+    pub point: Option<CouplingPoint>,
     pub targets: BudgetVec<Target>,
     /// gains[list][g * MAX_SFB + sfb]; for independent coupling only [list][0] is used.
     pub gains: BudgetVec<[f32; 8 * MAX_SFB]>,
     pub cd: Charged<Box<ChannelData>>,
     pub overlap: [f32; 1024],
-    pub prev_shape: u8,
+    pub prev_shape: WindowShape,
     pub time: [f32; 1024],
-    pub decoded: bool,
 }
 
 impl CceState {
     pub(crate) fn new(budget: &Budget, tag: u8) -> Result<CceState> {
         Ok(CceState {
             tag,
-            ind_sw: false,
-            domain: false,
+            point: None,
             targets: BudgetVec::new(budget),
             gains: BudgetVec::try_filled(budget, [0.0; 8 * MAX_SFB], 16)?,
             cd: Charged::boxed(budget, ChannelData::new())?,
             overlap: [0.0; 1024],
-            prev_shape: 0,
+            prev_shape: WindowShape::Sine,
             time: [0.0; 1024],
-            decoded: false,
         })
     }
 
-    pub(crate) fn reset(&mut self, _aot: u8) {
+    pub(crate) fn reset(&mut self) {
         self.overlap.fill(0.0);
-        self.prev_shape = 0;
+        self.prev_shape = WindowShape::Sine;
     }
 }
 
@@ -70,22 +75,21 @@ pub(crate) fn parse_cce<const RAW: bool>(
     cfg: &CoreCfg,
 ) -> Result<usize> {
     let tag = br.read(4) as u8;
-    let ci = match core.cce.iter().position(|c| c.tag == tag) {
-        Some(i) => i,
-        None => {
-            if core.cce.len() >= 16 {
-                return Err(DecodeError::ResourceLimit("coupling channel elements"));
-            }
-            let mut c = CceState::new(&core.budget, tag)?;
-            if RAW {
-                c.targets.try_reserve_exact(8)?;
-            }
-            core.cce.push(Charged::boxed(&core.budget, c)?);
-            core.cce.len() - 1
+    let ci = if let Some(i) = core.cce.iter().position(|c| c.tag == tag) {
+        i
+    } else {
+        if core.cce.len() >= 16 {
+            return Err(DecodeError::Policy("coupling channel elements"));
         }
+        let mut c = CceState::new(&core.budget, tag)?;
+        if RAW {
+            c.targets.try_reserve_exact(8)?;
+        }
+        core.cce.push(Charged::boxed(&core.budget, c)?);
+        core.cce.len() - 1
     };
     let c: &mut CceState = &mut core.cce[ci];
-    c.ind_sw = br.bit();
+    let independent = br.bit();
     let n = br.read(3) as usize + 1;
     c.targets.clear();
     c.targets.try_resize(n, Target::default())?;
@@ -104,7 +108,12 @@ pub(crate) fn parse_cce<const RAW: bool>(
         }
         *target = Target { is_cpe, tag, l, r };
     }
-    c.domain = br.bit();
+    let after_tns = br.bit();
+    let point = match (independent, after_tns) {
+        (true, _) => CouplingPoint::AfterFilterbank,
+        (false, true) => CouplingPoint::AfterTns,
+        (false, false) => CouplingPoint::BeforeTns,
+    };
     let sign = br.bit();
     let scale = CC_SCALE[br.read(2) as usize];
     parse_ics(br, cfg, false, false, &mut c.cd, &mut core.random)?;
@@ -118,11 +127,11 @@ pub(crate) fn parse_cce<const RAW: bool>(
             }
             continue;
         }
-        let cge = if c.ind_sw { true } else { br.bit() };
+        let cge = independent || br.bit();
         if cge {
             let a = vlc
                 .decode(br)
-                .ok_or(DecodeError::InvalidData("cce gain code"))? as i32
+                .ok_or(DecodeError::Invalid("cce gain code"))? as i32
                 - 60;
             let gain = scale.powi(-a) as f32;
             for v in g0.iter_mut() {
@@ -139,7 +148,7 @@ pub(crate) fn parse_cce<const RAW: bool>(
                     }
                     let t = vlc
                         .decode(br)
-                        .ok_or(DecodeError::InvalidData("cce gain code"))?
+                        .ok_or(DecodeError::Invalid("cce gain code"))?
                         as i32
                         - 60;
                     if t != 0 {
@@ -158,18 +167,18 @@ pub(crate) fn parse_cce<const RAW: bool>(
             }
         }
     }
-    c.decoded = true;
+    c.point = Some(point);
     Ok(ci)
 }
 
 /// For each target channel (element index ei, channel ch) find the gain list index.
-fn list_for(c: &CceState, kind: u8, tag: u8, ch: usize) -> Option<usize> {
+fn list_for(c: &CceState, kind: ElementId, tag: u8, ch: usize) -> Option<usize> {
     let mut idx = 0;
     for t in c.targets.iter() {
         let tkind = if t.is_cpe {
-            ID_CPE
+            ElementId::Cpe
         } else {
-            crate::decoder::ID_SCE
+            ElementId::Sce
         };
         if tkind == kind && t.tag == tag {
             if !t.is_cpe {
@@ -190,14 +199,14 @@ fn list_for(c: &CceState, kind: u8, tag: u8, ch: usize) -> Option<usize> {
 /// Spectral-domain (dependently switched) coupling into a target channel.
 pub(crate) fn apply_spectral(
     cce: &[Charged<Box<CceState>>],
-    kind: u8,
+    kind: ElementId,
     tag: u8,
     ch: usize,
     cd: &mut ChannelData,
-    after_tns: bool,
+    point: CouplingPoint,
 ) {
     for c in cce {
-        if !c.decoded || c.ind_sw || c.domain != after_tns {
+        if c.point != Some(point) {
             continue;
         }
         let Some(list) = list_for(c, kind, tag, ch) else {
@@ -230,13 +239,13 @@ pub(crate) fn apply_spectral(
 /// Time-domain (independently switched) coupling into a target channel's output.
 pub(crate) fn apply_time(
     cce: &[Charged<Box<CceState>>],
-    kind: u8,
+    kind: ElementId,
     tag: u8,
     ch: usize,
     out: &mut [f32],
 ) {
     for c in cce {
-        if !c.decoded || !c.ind_sw {
+        if c.point != Some(CouplingPoint::AfterFilterbank) {
             continue;
         }
         let Some(list) = list_for(c, kind, tag, ch) else {
@@ -251,17 +260,14 @@ pub(crate) fn apply_time(
 
 /// Process the coupling channels themselves (TNS, and the filterbank for independent ones).
 pub(crate) fn process_cces(core: &mut Core) {
-    let cfg = CoreCfg {
-        aot: core.aot,
-        sf_index: core.sf_index,
-    };
+    let cfg = core.spectral_config();
     for c in &mut core.cce {
         let c: &mut CceState = c;
-        if !c.decoded {
+        let Some(point) = c.point else {
             continue;
-        }
+        };
         crate::ics::apply_tns(&mut c.cd, &cfg);
-        if c.ind_sw {
+        if point == CouplingPoint::AfterFilterbank {
             let info = c.cd.info;
             core.fb.synth(
                 &c.cd.coef,

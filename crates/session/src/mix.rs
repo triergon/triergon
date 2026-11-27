@@ -1,4 +1,4 @@
-//! Stereo downmix and 16-bit PCM for the device path (`-ac 2` to Pulse/ALSA).
+//! Stereo downmix and 16-bit PCM for an audio device.
 //!
 //! The coefficients are the conventional matrix (front pair unity, centre and
 //! surrounds at -3 dB, LFE omitted) normalised so no output row can exceed
@@ -9,6 +9,7 @@
 //! Float and 32-bit input mixes in `f32`. 16-bit input mixes in fixed point, as
 //! the reference's resampler does (`harness/codecs/downmix-integer.md`): Q15
 //! gains, one rounding per output sample and two's-complement wraparound.
+use triergon_codec::compat::ffmpeg::default_layout;
 use triergon_codec::{
     AudioFrame, ChannelLayout, DownmixLevels, SampleFormat, Speaker, SurroundEncoding,
 };
@@ -17,14 +18,11 @@ const SQRT_HALF: f32 = std::f32::consts::FRAC_1_SQRT_2;
 
 /// Left/right gains for every input plane.
 #[derive(Clone, Debug, PartialEq)]
-pub struct StereoMatrix {
-    pub gains: Vec<[f32; 2]>,
+struct StereoMatrix {
+    gains: Vec<[f32; 2]>,
 }
 
 impl StereoMatrix {
-    pub fn for_layout(speakers: &[Speaker]) -> Self {
-        Self::with_levels(speakers, DownmixLevels::default())
-    }
     /// Unity front pair; centre at `center`; back centre at `surround`/sqrt(2)
     /// to each side; back/side pairs at `surround` to their side (Pro Logic II:
     /// -sqrt(3/2)/-sqrt(1/2) and +sqrt(1/2)/+sqrt(3/2) times `surround`, Dolby:
@@ -32,14 +30,14 @@ impl StereoMatrix {
     /// LFE (and LFE2) at `lfe`/sqrt(2); top front pair at sqrt(1/2) to its side, every
     /// other height/wide channel dropped.
     /// Rows are normalised to an absolute sum of at most one.
-    pub fn with_levels(speakers: &[Speaker], levels: DownmixLevels) -> Self {
+    fn with_levels(speakers: &[Speaker], levels: DownmixLevels) -> Self {
         let DownmixLevels {
             center,
             surround: s,
             lfe,
             encoding,
         } = levels;
-        if speakers == [Speaker::FrontCenter] || speakers.len() == 1 {
+        if speakers.len() == 1 {
             return Self {
                 gains: vec![[SQRT_HALF, SQRT_HALF]],
             };
@@ -95,14 +93,14 @@ impl StereoMatrix {
         }
         Self { gains }
     }
-    pub fn is_identity_stereo(&self) -> bool {
+    fn is_identity_stereo(&self) -> bool {
         self.gains == [[1.0, 0.0], [0.0, 1.0]]
     }
 }
 
 /// Gains with 15 fractional bits, for mixing 16-bit samples.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Q15Matrix {
+struct Q15Matrix {
     /// Left/right gains for every input plane. Each side's absolute sum stays within
     /// a few units of `ONE`, so a mix of 16-bit samples cannot overflow `i32`.
     gains: Vec<[i32; 2]>,
@@ -116,7 +114,7 @@ impl Q15Matrix {
     /// For 5.1, 5.1(side) and 7.1 the reference gives the centre what remains of the
     /// row's rounded sum once the other gains are rounded (observed at the default
     /// levels: 9597 rather than 9598 for 5.1, 7424 rather than 7423 for 7.1).
-    pub fn with_levels(speakers: &[Speaker], levels: DownmixLevels) -> Self {
+    fn with_levels(speakers: &[Speaker], levels: DownmixLevels) -> Self {
         use Speaker::{
             BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency, SideLeft,
             SideRight,
@@ -159,9 +157,27 @@ enum Mixer {
     Q15(Q15Matrix),
 }
 
+impl Mixer {
+    fn new(layout: ChannelLayout, levels: DownmixLevels, format: SampleFormat) -> Self {
+        // FFmpeg's resampler mixes an unspecified order as its default layout.
+        let layout = if layout.mask() == 0 && layout.channels() >= 2 {
+            default_layout(layout.channels()).unwrap_or(layout)
+        } else {
+            layout
+        };
+        let matrix = StereoMatrix::with_levels(layout.speakers(), levels);
+        // A 16-bit stereo pair passes through exactly on either path.
+        if format == SampleFormat::S16 && !matrix.is_identity_stereo() {
+            Mixer::Q15(Q15Matrix::with_levels(layout.speakers(), levels))
+        } else {
+            Mixer::Float(matrix)
+        }
+    }
+}
+
 /// Stereo downmix of decoded frames; the matrix is rebuilt only when the layout,
 /// the stream's levels or the sample format change.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Downmix {
     cached: Option<(ChannelLayout, DownmixLevels, SampleFormat, Mixer)>,
 }
@@ -170,25 +186,19 @@ impl Downmix {
     /// Append `frame` to `out` as interleaved stereo s16.
     pub fn mix(&mut self, frame: &AudioFrame, levels: DownmixLevels, out: &mut Vec<i16>) {
         let format = frame.sample_format;
-        if !self.cached.as_ref().is_some_and(|(layout, cached, f, _)| {
-            *layout == frame.layout && *cached == levels && *f == format
-        }) {
-            // FFmpeg's resampler mixes an unspecified order as its default layout.
-            let layout = Some(frame.layout)
-                .filter(|layout| layout.mask() != 0 || layout.channels() < 2)
-                .or_else(|| ChannelLayout::default_for(frame.layout.channels()))
-                .unwrap_or(frame.layout);
-            let matrix = StereoMatrix::with_levels(layout.speakers(), levels);
-            // A 16-bit stereo pair passes through exactly on either path.
-            let mixer = if format == SampleFormat::S16 && !matrix.is_identity_stereo() {
-                Mixer::Q15(Q15Matrix::with_levels(layout.speakers(), levels))
-            } else {
-                Mixer::Float(matrix)
-            };
-            self.cached = Some((frame.layout, levels, format, mixer));
-        }
+        let mixer = match &mut self.cached {
+            Some((layout, cached, f, mixer))
+                if *layout == frame.layout && *cached == levels && *f == format =>
+            {
+                mixer
+            }
+            slot => {
+                let mixer = Mixer::new(frame.layout, levels, format);
+                &mut slot.insert((frame.layout, levels, format, mixer)).3
+            }
+        };
         let samples = frame.samples_per_channel;
-        match &self.cached.as_ref().expect("matrix").3 {
+        match mixer {
             Mixer::Float(matrix) => mix_into(matrix, &frame.planes, samples, out),
             Mixer::Q15(matrix) => mix_q15_into(matrix, &frame.planes, samples, out),
         }
@@ -196,7 +206,7 @@ impl Downmix {
 }
 
 /// Mix `samples` frames of planar float into interleaved stereo s16, appending.
-pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out: &mut Vec<i16>) {
+fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out: &mut Vec<i16>) {
     let start = out.len();
     out.resize(start + 2 * samples, 0);
     let frames = &mut out[start..];
@@ -233,6 +243,10 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
             if silent([gl, gr]) {
                 continue;
             }
+            #[expect(
+                clippy::expect_used,
+                reason = "a slice of `LANES` elements; measured loop"
+            )]
             let block: &[f32; LANES] = plane[start..start + LANES].try_into().expect("block");
             for (l, &v) in left.iter_mut().zip(block) {
                 *l += v * gl;
@@ -267,7 +281,7 @@ pub fn mix_into(matrix: &StereoMatrix, planes: &[Vec<f32>], samples: usize, out:
 
 /// Mix `samples` frames of planar 16-bit samples (each exactly `x / 2^15`) into
 /// interleaved stereo s16, appending: `(sum(x * gain) + 2^14) >> 15`, wrapped to 16 bits.
-pub fn mix_q15_into(matrix: &Q15Matrix, planes: &[Vec<f32>], samples: usize, out: &mut Vec<i16>) {
+fn mix_q15_into(matrix: &Q15Matrix, planes: &[Vec<f32>], samples: usize, out: &mut Vec<i16>) {
     const HALF: i32 = 1 << 14;
     let start = out.len();
     out.resize(start + 2 * samples, 0);
@@ -350,13 +364,17 @@ mod tests {
     use super::*;
     use Speaker::*;
 
+    fn for_layout(speakers: &[Speaker]) -> StereoMatrix {
+        StereoMatrix::with_levels(speakers, DownmixLevels::default())
+    }
+
     fn close(m: &StereoMatrix, left: &[f32]) {
         for (g, want) in m.gains.iter().zip(left) {
             assert!((g[0] - want).abs() < 2e-6, "{:?} vs {:?}", m.gains, left);
         }
     }
 
-    // Native observations (DOWNMIX-ADDENDUM-heights.json): al22_chCfg0PCE_44's
+    // Native observations (harness/codecs/downmix-heights.json): al22_chCfg0PCE_44's
     // 5.1.2(back) layout, and a lavfi superset with every id the decoders emit.
     #[test]
     fn matches_observed_height_matrices() {
@@ -393,8 +411,8 @@ mod tests {
         close(&m, &[1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]);
     }
 
-    // Reference matrices as FFmpeg 9.0.2 reports them for actual vectors
-    // (development observation; the native freeze is DOWNMIX-CONTRACT.json).
+    // Reference matrices as FFmpeg 9.0.2 reports them for actual vectors, as
+    // harness/codecs/downmix-contract.json records them.
     #[test]
     fn matches_observed_reference_matrices() {
         let ac3_51 = DownmixLevels {
@@ -418,7 +436,7 @@ mod tests {
             &[0.453082, 0.0, 0.320377, 0.0, 0.226541, 0.0],
         );
         close(
-            &StereoMatrix::for_layout(&[FrontLeft, FrontRight, FrontCenter, BackCenter]),
+            &for_layout(&[FrontLeft, FrontRight, FrontCenter, BackCenter]),
             &[0.453082, 0.0, 0.320377, 0.226541],
         );
         let seven = DownmixLevels {
@@ -619,7 +637,7 @@ mod tests {
             BackLeft,
             BackRight,
         ];
-        let matrix = StereoMatrix::for_layout(&five_one);
+        let matrix = for_layout(&five_one);
         let mut seed = 7_u32;
         for samples in [0, 1, 3, 4, 5, 1023, 1024] {
             let planes: Vec<Vec<f32>> = (0..6)
@@ -716,19 +734,14 @@ mod tests {
     fn stereo_and_mono_pass_at_reference_gains_and_saturate() {
         let mut out = Vec::new();
         mix_into(
-            &StereoMatrix::for_layout(&[FrontLeft, FrontRight]),
+            &for_layout(&[FrontLeft, FrontRight]),
             &[vec![0.5, 1.5], vec![-0.5, -1.5]],
             2,
             &mut out,
         );
         assert_eq!(out, [16384, -16384, 32767, -32768]);
         out.clear();
-        mix_into(
-            &StereoMatrix::for_layout(&[FrontCenter]),
-            &[vec![0.25]],
-            1,
-            &mut out,
-        );
+        mix_into(&for_layout(&[FrontCenter]), &[vec![0.25]], 1, &mut out);
         assert_eq!(out, [5792, 5792], "mono reaches each side at -3 dB");
     }
 }

@@ -29,7 +29,7 @@ it, prints what the operation folds before the result.
 | `progressive-` | CLOCK (`pts-only`, `pts-dts`) and PROGRESS (`before-eof`, `at-eof`) | a forward-only AVC/AAC TS188 session in 4 KiB windows; `bench` runs 50 sessions | `progressive-ts188` |
 | `mkv-audio-` | `aac`, `dolby` or `all` | Matroska discovery and the AAC-LC, AC-3 and E-AC-3 track clocks | `matroska-audio-clocks` |
 | `mp4-forward-` | `regular` or `progressive` | `Mp4Open` and `Mp4IndexJob` in the native MOV view, through `Engine::mp4` or a front-`moov` native plan | `mp4-forward` |
-| `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE,...` | explicit PIDs of program 1 in TS188 or M2TS192; native 90 kHz clocks | `ts-program` |
+| `ts-program-` | `ts188:PID=CARRIAGE,...` or `m2ts192:PID=CARRIAGE,...` | explicit PIDs of program 1 in TS188 or M2TS192; 90 kHz demux clocks with the original carrier offsets | `ts-program` |
 | `raw-video-` | `avc` or `hevc` | `RawVideoProbe`, `RawVideoSource` and `RawVideoFeed` over forward-only Annex B | `raw-annex-b` |
 
 A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
@@ -37,6 +37,16 @@ A capsule is `SMVCL001`, one operation byte (0 startup, 1 seek after discovery,
 `i64`, then the Matroska file. `cargo xtask fixtures` writes the capsules and the
 MP4 range inputs under `.research/`. In the `mkv-audio-`, `mp4-forward-`, `ts-program-`
 and `raw-video-` families `trace` prints one line per packet.
+
+With the `views` feature the crate also builds `playback-views-worker`, the candidate of
+the features that compare the public views of `triergon-playback`, `triergon-hls`,
+`triergon-raw-video` and `triergon-bridge`: probing (`probe-`, `probe-lifecycle-`),
+source views (`source-view-`), player delivery, selection, catalogues, MP4 seeks and
+indexes and TS opening (`delivery-`, `select-`, `catalogue-`, `mp4-seek-`, `mp4-index-`,
+`ts-pes-open-`), HLS views (`hls-views-`), decoder bridges (`access-units-`,
+`mp4-bridges-`, `mkv-discovery-`) and subtitle bridges (`text-bridge-`, `text-control-`,
+`subtitle-bridge-`). Each prefix is the `worker_operation` of features under
+`harness/features/`, such as `delivery-` of `playback-delivery`.
 
 The [transport worker](../transport-worker/README.md) runs the MPEG-TS PES and
 access-unit comparisons.

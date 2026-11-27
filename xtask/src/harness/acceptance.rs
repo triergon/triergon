@@ -10,7 +10,7 @@ use std::path::Path;
 use super::comparison::validate_case_evidence;
 use super::diff::equal;
 use super::gate_build;
-use super::policy::Runtime;
+use super::policy::Policy;
 use crate::json::Value;
 
 pub const LINUX_CPU_KEY: &str = "__linux_cpu__";
@@ -201,7 +201,17 @@ pub(crate) fn timing_outputs_match(raw: &Value, expected: &Value) -> bool {
 }
 
 /// Check exact key sets and field types for all four memory observer roles.
+#[cfg(test)]
 pub(crate) fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
+    selected_memory_outputs_match(raw, expected, super::memory::Selection::Both)
+}
+
+pub(super) fn selected_memory_outputs_match(
+    raw: &Value,
+    expected: &Value,
+    selection: super::memory::Selection,
+) -> bool {
+    let roles = selection.roles();
     output_roles(expected)
         && raw
             .get("samples")
@@ -209,17 +219,18 @@ pub(crate) fn memory_outputs_match(raw: &Value, expected: &Value) -> bool {
             .is_some_and(|samples| {
                 !samples.is_empty()
                     && samples.iter().all(|sample| {
-                        matches!(sample, Value::Object(entries) if entries.len() == 4)
-                            && ["candidate", "reference"].iter().all(|role| {
-                                ["heap", "rss"].iter().all(|mode| {
-                                    sample
-                                        .get(&format!("{role}_{mode}"))
-                                        .and_then(|value| value.get("work"))
-                                        .zip(expected.get(role))
-                                        .is_some_and(|(actual, expected)| {
-                                            output_matches(actual, expected, false)
-                                        })
-                                })
+                        matches!(sample, Value::Object(entries) if entries.len() == roles.len())
+                            && roles.iter().all(|name| {
+                                let expected = name
+                                    .split_once('_')
+                                    .and_then(|(role, _)| expected.get(role));
+                                sample
+                                    .get(name)
+                                    .and_then(|value| value.get("work"))
+                                    .zip(expected)
+                                    .is_some_and(|(actual, expected)| {
+                                        output_matches(actual, expected, false)
+                                    })
                             })
                     })
             })
@@ -280,25 +291,23 @@ pub(crate) fn grade_case(
     identity: &Value,
     target: &str,
 ) -> CaseVerdict {
-    match Runtime::load(root) {
-        Ok(runtime) => {
-            grade_case_with_runtime(root, contract, row, identity, target, Some(runtime))
-        }
+    match Policy::load(root) {
+        Ok(policy) => grade_case_with_policy(root, contract, row, identity, target, Some(policy)),
         Err(error) => {
-            let mut verdict = grade_case_with_runtime(root, contract, row, identity, target, None);
+            let mut verdict = grade_case_with_policy(root, contract, row, identity, target, None);
             verdict.reasons.insert(0, error);
             verdict
         }
     }
 }
 
-fn grade_case_with_runtime(
+fn grade_case_with_policy(
     root: &Path,
     contract: &Value,
     row: &Value,
     identity: &Value,
     target: &str,
-    runtime: Option<Runtime>,
+    policy: Option<Policy>,
 ) -> CaseVerdict {
     let mut reasons = Vec::new();
     let contract_id = s(contract, "id");
@@ -380,19 +389,25 @@ fn grade_case_with_runtime(
             contract,
             &selected,
             require_linux,
-            runtime.map(|gate| gate.ceiling),
+            policy.map(|policy| policy.runtime.ceiling),
         )
         && !timing.get("contaminants").is_some_and(Value::truthy)
         && upper.is_finite()
         && upper > 0.0
-        && runtime.is_some_and(|gate| upper <= gate.ceiling);
-    if !timing_ok {
+        && policy.is_some_and(|policy| upper <= policy.runtime.ceiling);
+    let not_measured = row.get("not_measured");
+    if !timing_ok
+        && not_measured
+            .and_then(|bounds| bounds.get("runtime"))
+            .is_none()
+    {
         reasons.push(format!("{id}: runtime gate unproven or failed"));
     }
     let memory = row.get("memory").unwrap_or(&Value::Null);
     // Graded as harness/policy.json states; RSS growth is reported only.
     let ratios = ["total_rss_ratio_upper_95", "heap_ratio_upper_95"]
         .map(|k| float(memory.get(k)).unwrap_or(f64::INFINITY));
+    let selection = super::memory::Selection::for_case(row);
     let memory_ok = super::memory::evidence_valid(
         root,
         row,
@@ -403,15 +418,26 @@ fn grade_case_with_runtime(
         require_linux,
     ) && row
         .get("expected_memory_outputs")
-        .is_none_or(|expected| memory_outputs_match(memory, expected))
+        .is_none_or(|expected| selected_memory_outputs_match(memory, expected, selection))
         && s(memory, "status") == Some("qualified")
-        && ratios.iter().all(|r| r.is_finite() && *r < 1.0)
-        && ratios[0] > 0.0
-        && ratios[1] >= 0.0;
-    if !memory_ok {
+        && policy.is_some_and(|policy| {
+            (!selection.rss() || (ratios[0] > 0.0 && ratios[0] < policy.memory.total_rss))
+                && (!selection.heap() || (ratios[1] >= 0.0 && ratios[1] < policy.memory.heap))
+        });
+    if !memory_ok
+        && !not_measured
+            .is_some_and(|bounds| bounds.get("heap").is_some() && bounds.get("total_rss").is_some())
+    {
         reasons.push(format!(
             "{id}: lower RSS/live allocation gate unproven or failed"
         ));
+    }
+    if let Some(Value::Object(bounds)) = not_measured {
+        for (bound, cause) in bounds {
+            if let Some(cause) = cause.as_str() {
+                reasons.push(format!("{id}: {bound} not measured: {cause}"));
+            }
+        }
     }
     CaseVerdict {
         timing_pass: prerequisites_pass && timing_ok,
@@ -560,10 +586,16 @@ pub(crate) fn acceptance_iter(
     additional: &[Value],
 ) -> Value {
     let mut reasons = Vec::new();
-    let runtime = Runtime::load(root)
-        .map_err(|error| reasons.push(error))
-        .ok();
+    let policy = Policy::load(root).map_err(|error| reasons.push(error)).ok();
     let registered = registered_refusals(contract)
+        .map_err(|error| reasons.push(error))
+        .unwrap_or_default();
+    // The rows are the manifest here: every listed id is checked against it when
+    // the report and the grade read the contract.
+    let listed = super::registry::read_unchecked(contract, target)
+        .map_err(|error| reasons.push(error))
+        .unwrap_or_default();
+    let fields = super::comparison::work_fields(contract)
         .map_err(|error| reasons.push(error))
         .unwrap_or_default();
     let mut ids = BTreeSet::new();
@@ -587,7 +619,27 @@ pub(crate) fn acceptance_iter(
             reasons.push("duplicate case identities".into());
         }
         all_parity &= parity_passes(&row);
-        if let Some(spec) = registered.get(id) {
+        let listing = listed.get(id);
+        if let Some(case) = listing.filter(|case| case.refusal()) {
+            // The report recorded the candidate's pin beside the proof it made of it;
+            // the grade replays the proof against the manifest's.
+            let pin = row
+                .get("parity")
+                .and_then(|parity| parity.get("candidate_expected"));
+            if parity_passes(&row) && super::fold_refusal::row_holds(&row, case, pin, &fields) {
+                refusals.insert(id.to_owned());
+                if let Some(profile) = s(&row, "profile") {
+                    passed.insert(profile.to_owned());
+                }
+            } else {
+                reasons.push(format!(
+                    "{id}: registered fold refusal proof missing or invalid"
+                ));
+            }
+            if let Err(error) = validate_case_evidence(&row, identity, s(contract, "id")) {
+                reasons.push(format!("{id}: {error}"));
+            }
+        } else if let Some(spec) = registered.get(id) {
             if refusal_valid(&row, spec, contract) {
                 refusals.insert(id.to_owned());
                 passed.insert(spec.profile.to_owned());
@@ -599,7 +651,10 @@ pub(crate) fn acceptance_iter(
             }
         } else {
             if s(&row, "outcome") == Some("refusal")
-                || row.get("parity").and_then(|proof| s(proof, "comparison")) == Some("refusal")
+                || matches!(
+                    row.get("parity").and_then(|proof| s(proof, "comparison")),
+                    Some("refusal" | super::fold_refusal::COMPARISON)
+                )
             {
                 reasons.push(format!("{id}: unregistered refusal"));
             }
@@ -608,16 +663,20 @@ pub(crate) fn acceptance_iter(
             {
                 passed.insert(profile.to_owned());
             }
-            if row.get("open_case") == Some(&Value::Bool(true)) {
-                // A listed open case has no timing or memory to grade; its failing
-                // parity already withholds acceptance.
-                reasons.push(format!("{id}: listed open case"));
+            if listing.is_some() || row.get("open_case") == Some(&Value::Bool(true)) {
+                // A listed case has no timing or memory to grade. Whatever its form,
+                // it is no pass: its parity already withholds acceptance, and the
+                // verdict names the lists that hold it.
+                reasons.push(match listing {
+                    Some(case) => format!("{id}: listed in {}", case.lists().join(", ")),
+                    None => format!("{id}: listed open case"),
+                });
                 if let Err(error) = validate_case_evidence(&row, identity, s(contract, "id")) {
                     reasons.push(format!("{id}: {error}"));
                 }
             } else {
                 let verdict =
-                    grade_case_with_runtime(root, contract, &row, identity, target, runtime);
+                    grade_case_with_policy(root, contract, &row, identity, target, policy);
                 reasons.extend(verdict.reasons);
             }
         }
@@ -625,7 +684,17 @@ pub(crate) fn acceptance_iter(
     if ids.is_empty() || !all_parity {
         reasons.push("selected-feature parity incomplete or failing".into());
     }
-    for id in registered.keys().filter(|id| !refusals.contains(**id)) {
+    let listed_refusals = listed
+        .ids()
+        .iter()
+        .map(String::as_str)
+        .filter(|id| listed.get(id).is_some_and(super::registry::Case::refusal));
+    for id in registered
+        .keys()
+        .copied()
+        .chain(listed_refusals)
+        .filter(|id| !refusals.contains(*id))
+    {
         reasons.push(format!("{id}: required refusal missing or invalid"));
     }
     let missing = missing_profiles(contract, &passed);
@@ -726,374 +795,7 @@ pub(crate) fn acceptance_iter(
 }
 
 #[cfg(test)]
-mod refusal_tests {
-    use super::*;
-
-    fn fixture() -> (Value, Value) {
-        let contract = Value::object([
-            (
-                "required_profiles",
-                Value::strings(["output", "refusal-profile"]),
-            ),
-            (
-                "required_refusals",
-                Value::Array(vec![Value::object([
-                    ("id", Value::str("refusal")),
-                    ("profile", Value::str("refusal-profile")),
-                    ("sha256", Value::str("a".repeat(64))),
-                ])]),
-            ),
-            (
-                "refusal",
-                Value::object([
-                    ("reference_exit_code", Value::int(1)),
-                    ("reference_error_code", Value::int(-7)),
-                    (
-                        "candidate_stderr_prefixes",
-                        Value::strings(["candidate: truncated"]),
-                    ),
-                ]),
-            ),
-        ]);
-        let trace = |stderr| {
-            Value::object([
-                ("status", Value::str("finished")),
-                ("exit_code", Value::int(1)),
-                ("stdout_sha256", Value::str(crate::sha256::hex(b""))),
-                ("stderr", Value::str(stderr)),
-            ])
-        };
-        let row = Value::object([
-            ("id", Value::str("refusal")),
-            ("profile", Value::str("refusal-profile")),
-            ("input_sha256", Value::str("a".repeat(64))),
-            ("outcome", Value::str("refusal")),
-            (
-                "parity",
-                Value::object([
-                    ("status", Value::str("pass")),
-                    ("source_timing_status", Value::str("pass")),
-                    ("comparison", Value::str("refusal")),
-                ]),
-            ),
-            ("candidate_trace", trace("candidate: truncated input")),
-            ("reference_trace", trace("reference: invalid (-7)")),
-        ]);
-        (contract, row)
-    }
-
-    fn set(value: &mut Value, key: &str, data: Value) {
-        let Value::Object(fields) = value else {
-            panic!("expected object");
-        };
-        if let Some((_, old)) = fields.iter_mut().find(|(name, _)| name == key) {
-            *old = data;
-        } else {
-            fields.push((key.into(), data));
-        }
-    }
-
-    #[test]
-    fn registered_refusal_requires_matching_source_and_actual_failure() {
-        let (contract, row) = fixture();
-        let registered = registered_refusals(&contract).unwrap();
-        let spec = &registered["refusal"];
-        assert!(refusal_valid(&row, spec, &contract));
-        for (key, data) in [
-            ("profile", Value::str("other")),
-            ("input_sha256", Value::str("b".repeat(64))),
-            ("timing", Value::object([] as [(&str, Value); 0])),
-        ] {
-            let mut changed = row.clone();
-            set(&mut changed, key, data);
-            assert!(!refusal_valid(&changed, spec, &contract), "{key}");
-        }
-        for role in ["candidate_trace", "reference_trace"] {
-            for (key, data) in [
-                ("exit_code", Value::int(0)),
-                (
-                    "stdout_sha256",
-                    Value::str(crate::sha256::hex(b"unexpected output")),
-                ),
-                ("stderr", Value::str("unrelated diagnostic")),
-                ("stderr_sha256", Value::str("wrong hash")),
-            ] {
-                let mut changed = row.clone();
-                let mut trace = changed.get(role).unwrap().clone();
-                set(&mut trace, key, data);
-                set(&mut changed, role, trace);
-                assert!(!refusal_valid(&changed, spec, &contract), "{role}/{key}");
-            }
-        }
-    }
-
-    #[test]
-    fn refusal_registration_requires_declared_profiles_and_unique_identities() {
-        let (mut contract, _) = fixture();
-        set(
-            &mut contract,
-            "required_profiles",
-            Value::strings(["output"]),
-        );
-        assert!(registered_refusals(&contract).is_err());
-        let (mut contract, _) = fixture();
-        let spec = contract
-            .get("required_refusals")
-            .unwrap()
-            .as_array()
-            .unwrap()[0]
-            .clone();
-        set(
-            &mut contract,
-            "required_refusals",
-            Value::Array(vec![spec.clone(), spec]),
-        );
-        assert!(registered_refusals(&contract).is_err());
-    }
-
-    #[test]
-    fn streaming_failure_cannot_omit_required_refusals() {
-        let (contract, _) = fixture();
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let verdict = acceptance_iter(
-            root,
-            &contract,
-            std::iter::once(Err("raw file unavailable".into())),
-            &Value::Null,
-            "host",
-            &[],
-            &[],
-        );
-        assert_eq!(verdict.get("slice_accepted"), Some(&Value::Bool(false)));
-        let reasons = verdict.get("slice_reasons").unwrap().as_array().unwrap();
-        assert!(reasons.contains(&Value::str(
-            "case evidence unavailable: raw file unavailable"
-        )));
-        assert!(reasons.contains(&Value::str("refusal: required refusal missing or invalid")));
-    }
-}
+mod refusal_tests;
 
 #[cfg(test)]
-mod policy_tests {
-    use super::*;
-
-    struct Fixture {
-        directory: crate::process::TempDir,
-        policy: Value,
-        contract: Value,
-        row: Value,
-        identity: Value,
-    }
-
-    impl Fixture {
-        fn new() -> Self {
-            let repository = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-            let policy = crate::checks::read_json(&repository.join("harness/policy.json")).unwrap();
-            let gate = Runtime::load(repository).unwrap();
-            let pairs = int(policy.get("runtime").unwrap().get("minimum_pairs")).unwrap();
-            let reference_ns = 1_000_000;
-            let candidate_ns =
-                ((gate.target + gate.ceiling) / 2.0 * f64::from(reference_ns)) as i128;
-            let work = |elapsed_ns| {
-                Value::object([
-                    ("status", Value::str("ok")),
-                    (
-                        "data",
-                        Value::object([
-                            ("elapsed_ns", Value::int(elapsed_ns)),
-                            ("iterations", Value::int(1)),
-                            ("packets", Value::int(1)),
-                            ("bytes", Value::int(10)),
-                            ("digest", Value::int(9)),
-                        ]),
-                    ),
-                ])
-            };
-            let mut stages = vec!["before-timing-session".to_owned()];
-            let mut warmups = Vec::new();
-            for (role, elapsed) in [
-                ("candidate", candidate_ns),
-                ("reference", i128::from(reference_ns)),
-            ] {
-                warmups.push(Value::object([
-                    ("worker", Value::str(role)),
-                    ("result", work(elapsed)),
-                ]));
-                stages.extend([
-                    format!("before-warmup:{role}"),
-                    format!("after-warmup:{role}"),
-                ]);
-            }
-            let samples = (0..pairs)
-                .map(|pair| {
-                    for role in ["candidate", "reference"] {
-                        stages.extend([
-                            format!("before-pair:{pair}:{role}"),
-                            format!("after-pair:{pair}:{role}"),
-                        ]);
-                    }
-                    Value::object([
-                        ("pair", Value::int(pair)),
-                        ("order", Value::strings(["candidate", "reference"])),
-                        ("candidate", work(candidate_ns)),
-                        ("reference", work(i128::from(reference_ns))),
-                        ("cpu_before", Value::Object(vec![])),
-                        ("cpu_after", Value::Object(vec![])),
-                    ])
-                })
-                .collect();
-            let hashes = Value::object([
-                ("candidate", Value::str("candidate-hash")),
-                ("reference", Value::str("reference-hash")),
-            ]);
-            let interval = crate::stats::ratio_interval(
-                &vec![
-                    (candidate_ns as f64, f64::from(reference_ns));
-                    usize::try_from(pairs).unwrap()
-                ],
-                0,
-                4000,
-            )
-            .unwrap();
-            let row = Value::object([
-                ("id", Value::str("policy-fixture")),
-                ("profile", Value::str("policy-fixture")),
-                (
-                    "parity",
-                    Value::object([
-                        ("status", Value::str("pass")),
-                        ("source_timing_status", Value::str("pass")),
-                    ]),
-                ),
-                (
-                    "timing",
-                    Value::object([
-                        ("status", Value::str("measured")),
-                        ("pairs", Value::int(pairs)),
-                        ("iterations", Value::int(1)),
-                        ("seed", Value::int(0)),
-                        ("worker_hashes", hashes.clone()),
-                        ("ratio", super::super::timing::interval_value(&interval)),
-                        ("warmups", Value::Array(warmups)),
-                        ("samples", Value::Array(samples)),
-                        (
-                            "timing_module_policy",
-                            Value::str(super::super::timing::MODULE_POLICY),
-                        ),
-                        (
-                            "timing_module_observations",
-                            Value::Array(
-                                stages
-                                    .into_iter()
-                                    .map(|stage| {
-                                        Value::object([
-                                            ("stage", Value::str(stage)),
-                                            (
-                                                "state",
-                                                Value::object([(
-                                                    "status",
-                                                    Value::str("not-applicable"),
-                                                )]),
-                                            ),
-                                        ])
-                                    })
-                                    .collect(),
-                            ),
-                        ),
-                    ]),
-                ),
-            ]);
-            let fixture = Self {
-                directory: crate::process::TempDir::new(None).unwrap(),
-                policy,
-                contract: Value::object([
-                    ("required_profiles", Value::strings(["policy-fixture"])),
-                    ("minimum_pairs", Value::int(pairs)),
-                    ("iterations", Value::int(1)),
-                ]),
-                row,
-                identity: Value::object([("binaries", hashes)]),
-            };
-            std::fs::create_dir(fixture.directory.0.join("harness")).unwrap();
-            fixture.write_policy();
-            fixture
-        }
-
-        fn write_policy(&self) {
-            std::fs::write(
-                self.directory.0.join("harness/policy.json"),
-                crate::json::canonical(&self.policy),
-            )
-            .unwrap();
-        }
-
-        fn set_runtime(&mut self, key: &str, value: f64) {
-            let Value::Object(fields) = &mut self.policy else {
-                unreachable!()
-            };
-            let Value::Object(runtime) = &mut fields
-                .iter_mut()
-                .find(|(name, _)| name == "runtime")
-                .unwrap()
-                .1
-            else {
-                unreachable!()
-            };
-            runtime.iter_mut().find(|(name, _)| name == key).unwrap().1 = Value::float(value);
-            self.write_policy();
-        }
-
-        fn verdict(&self) -> CaseVerdict {
-            grade_case(
-                &self.directory.0,
-                &self.contract,
-                &self.row,
-                &self.identity,
-                "host",
-            )
-        }
-
-        fn upper(&self) -> f64 {
-            self.row
-                .get("timing")
-                .unwrap()
-                .get("ratio")
-                .unwrap()
-                .get("upper_95")
-                .unwrap()
-                .as_f64()
-                .unwrap()
-        }
-    }
-
-    #[test]
-    fn lowering_policy_ceiling_regrades_valid_raw_timing() {
-        let mut fixture = Fixture::new();
-        assert!(fixture.verdict().timing_pass);
-        let gate = Runtime::load(&fixture.directory.0).unwrap();
-        fixture.set_runtime("ratio_max", (gate.target + fixture.upper()) / 2.0);
-        let verdict = fixture.verdict();
-        assert!(!verdict.timing_pass);
-        assert!(
-            verdict
-                .reasons
-                .iter()
-                .any(|reason| reason.ends_with("runtime gate unproven or failed"))
-        );
-    }
-
-    #[test]
-    fn changing_only_policy_target_does_not_refuse_or_regrade_runtime() {
-        let mut fixture = Fixture::new();
-        let before = fixture.verdict();
-        assert!(before.timing_pass);
-        let gate = Runtime::load(&fixture.directory.0).unwrap();
-        fixture.set_runtime(
-            "optimisation_target",
-            (fixture.upper() + gate.ceiling) / 2.0,
-        );
-        let after = fixture.verdict();
-        assert!(after.timing_pass);
-        assert_eq!(before.reasons, after.reasons);
-    }
-}
+mod policy_tests;

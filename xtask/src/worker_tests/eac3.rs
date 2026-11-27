@@ -33,7 +33,7 @@ pub(super) fn run(root: &Path) -> Outcome {
     let candidate = target
         .join(crate::harness::gate_build::release_subdir()?)
         .join("transport-worker");
-    let manifest = crate::checks::read_json(&scratch.path().join("inputs.json"))?;
+    let manifest = json::read(&scratch.path().join("inputs.json"))?;
     // Literal expected folds of the original authored inputs, in generator order.
     let folds: [u64; 10] = [
         4931118181656872344,

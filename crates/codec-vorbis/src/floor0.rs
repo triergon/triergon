@@ -5,9 +5,10 @@ use core::f32::consts::PI;
 use triergon_bitstream::LsbReader;
 use triergon_codec::{Budget, BudgetVec};
 
+use crate::DecodeError;
 use crate::codebook::Codebook;
+use crate::setup::{ilog, push};
 use crate::window::Block;
-use crate::{DecodeError, ilog, push};
 
 /// The highest LSP order the 8-bit field allows.
 pub(crate) const MAX_ORDER: usize = 255;

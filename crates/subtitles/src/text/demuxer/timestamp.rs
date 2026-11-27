@@ -89,7 +89,7 @@ fn milliseconds(hours: i64, minutes: i64, seconds: i64, fraction: i64) -> i64 {
 /// A SubRip timing line's start and end in milliseconds: `H:M:S,F --> H:M:S,F`
 /// with `,` or `.` before the fraction, white space around the arrow
 /// optional and anything after the end.
-pub(super) fn subrip(line: &[u8], width: TimestampFieldWidth) -> Option<(i64, i64)> {
+pub(crate) fn subrip(line: &[u8], width: TimestampFieldWidth) -> Option<(i64, i64)> {
     let mut scan = Scan { bytes: line, at: 0 };
     let start = scan.clock(b",.", width)?;
     scan.space();

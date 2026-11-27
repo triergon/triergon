@@ -189,14 +189,14 @@ use std::simd::simd_swizzle;
 
 /// Output destination for a block: (pred buffer, stride 64), (dst, offset, stride), other.
 pub(super) struct BlockOut<'a> {
-    pub pred: &'a mut [i16],
-    pub dst: &'a mut [u8],
-    pub dst_off: usize,
-    pub dst_stride: usize,
-    pub other: &'a [i16],
+    pub(crate) pred: &'a mut [i16],
+    pub(crate) dst: &'a mut [u8],
+    pub(crate) dst_off: usize,
+    pub(crate) dst_stride: usize,
+    pub(crate) other: &'a [i16],
     /// Samples stored to `dst` per 8-lane strip: 8, or 4 for the last strip of a block
     /// whose width is 4 mod 8 (prediction-buffer stores always write 8 lanes).
-    pub n: usize,
+    pub(crate) n: usize,
 }
 
 #[inline(always)]
@@ -296,7 +296,6 @@ fn ldb(r: &[u8], x: usize) -> U8x8 {
 /// `off` indexes the integer sample position of output (0, 0); `ss` is the source stride.
 /// Requires w % 8 == 0 and 16-sample loads to stay inside `src` (callers guarantee the
 /// 7 / 3 extra columns of filter support plus slack exist, see `inter::source`).
-#[allow(clippy::too_many_arguments)]
 pub(super) fn luma_block(
     src: &[u8],
     off: usize,
@@ -361,7 +360,6 @@ pub(super) fn luma_block(
     let _ = tmp;
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn chroma_block(
     src: &[u8],
     off: usize,
@@ -542,11 +540,11 @@ fn sum4w(w: &[U32x8; 4], m: &[U32x8; 4]) -> I32x8 {
 }
 
 pub(super) struct BlockOut16<'a> {
-    pub pred: &'a mut [i16],
-    pub dst: &'a mut [u16],
-    pub dst_off: usize,
-    pub dst_stride: usize,
-    pub other: &'a [i16],
+    pub(crate) pred: &'a mut [i16],
+    pub(crate) dst: &'a mut [u16],
+    pub(crate) dst_off: usize,
+    pub(crate) dst_stride: usize,
+    pub(crate) other: &'a [i16],
 }
 
 #[derive(Clone, Copy)]
@@ -601,7 +599,6 @@ fn put_hi(v: I32x8, x: usize, y: usize, mode: u8, o: &mut BlockOut16<'_>, k: &Hi
 }
 
 /// Fractional or integer MC for u16 samples (w % 8 == 0). `ntap` is 8 (luma) or 4 (chroma).
-#[allow(clippy::too_many_arguments)]
 pub(super) fn block_hi(
     src: &[u16],
     off: usize,
@@ -733,7 +730,6 @@ pub(super) fn block_hi(
 
 /// Explicit weighted uni-prediction (8-275) on i16 prediction rows (stride 64, offset by
 /// -PRED_OFFSET). Generic over the output sample type via `store`. w % 8 == 0.
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub(super) fn wuni<T>(
     dst: &mut [T],
@@ -770,7 +766,6 @@ pub(super) fn wuni<T>(
 }
 
 /// Explicit weighted bi-prediction (8-277).
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub(super) fn wbi<T>(
     dst: &mut [T],
@@ -822,7 +817,6 @@ pub(super) fn store_u16(p: I32x8, d: &mut [u16]) {
 }
 
 /// Fused integer-position explicit weighted uni-prediction: v = p << shift3, then 8-275.
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 pub(super) fn wcopy<T: Copy>(
     dst: &mut [T],

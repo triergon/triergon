@@ -1,19 +1,20 @@
 //! The third stage: a shaped event laid out as libass does. Every glyph's
-//! outline and metrics (`retrieve_glyphs`), the pen positions on one line
-//! (`preliminary_layout`), the lines ([`super::wrap`]), karaoke timing, the
-//! visual order (`reorder_text`), alignment (`align_lines`), the text box
-//! (`compute_string_bbox`) and the baseline shear (`apply_baseline_shear`).
+//! outline and metrics, the pen positions on one line, the lines
+//! ([`super::wrap`]), karaoke timing, the visual order, alignment, the text
+//! box and the baseline shear.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget, round_ties_even_i32};
+use triergon_raster::compat::libass::float_max;
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::Level;
 
 use super::fonts::Library;
+use super::from_26_6;
 use super::geometry::{Geometry, Scales};
 use super::outlines::{GlyphKey, KeptOutline, Outlines};
 use super::shaping::{Shaped, ShapedGlyph, Shaping};
 use super::text::{Char, Evaluated, Text};
-use super::units::{d6_to_double, fmax};
 use super::wrap::{Lines, WrapText, Wrapping};
 use crate::{
     EventState, HAlign, Justify, Karaoke, KaraokeGlyph, KaraokeMark, Limits, Margins, Rgba,
@@ -47,8 +48,8 @@ pub(super) struct LaidGlyph {
     pub(super) pos: Vector,
 }
 
-/// A character's karaoke at the event's time: libass's `effect_type` and
-/// `effect_timing` after `ass_process_karaoke_effects`.
+/// A character's karaoke at the event's time, as its syllable
+/// ([`Syllables`]) times it.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Timing {
     pub(super) effect: Option<Karaoke>,
@@ -80,14 +81,28 @@ impl Timing {
 /// A character laid out.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct LaidChar {
-    /// Shaping gave it a glyph and trimming kept it: it takes space on its
-    /// line.
-    pub(super) shown: bool,
-    /// Shown, and not scaled to nothing: it is drawn.
-    pub(super) drawn: bool,
+    pub(super) shows: Shows,
     /// A run starts here: a style run, or after a line's leading whitespace.
     pub(super) starts_run: bool,
     pub(super) karaoke: Timing,
+}
+
+/// Whether a laid-out character shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Shows {
+    /// Shaping gave it no glyph, or trimming hid it: it takes no space.
+    Hidden,
+    /// It takes space on its line, but is scaled to nothing.
+    Flat,
+    /// It takes space and is drawn.
+    Drawn,
+}
+
+impl Shows {
+    /// It takes space on its line.
+    pub(super) fn is_shown(self) -> bool {
+        self != Self::Hidden
+    }
 }
 
 /// The text box in pre-aspect pixels.
@@ -230,8 +245,8 @@ impl Layout {
         self.lines.fit()
     }
 
-    /// `retrieve_glyphs`: every glyph's outline, box, advance (for drawings)
-    /// and ascent and descent at its scale, cluster by cluster.
+    /// Every glyph's outline, box, advance (for drawings) and ascent and
+    /// descent at its scale, cluster by cluster.
     fn measure_glyphs(
         &mut self,
         input: &Input<'_, '_>,
@@ -254,9 +269,8 @@ impl Layout {
 
     /// Each cluster's advance: as shaped, or a drawing's width; widened
     /// after italic text that gives way to upright text to the box of the
-    /// last glyph with a width (`retrieve_glyphs`'s italic correction); and
-    /// letter spacing. Then each character's pen position on one unbroken
-    /// line (`preliminary_layout`).
+    /// last glyph with a width (the italic correction); and letter spacing.
+    /// Then each character's pen position on one unbroken line.
     fn measure_clusters(&mut self, text: &Text, shaped: &Shaped) -> Result<()> {
         let chars = text.chars();
         let own = |i: usize| &self.glyphs[shaped.clusters[i].glyphs.start];
@@ -298,8 +312,8 @@ impl Layout {
     }
 
     /// Each character's place in its line (shown, drawn, starting a run)
-    /// and its karaoke, timed by `ass_process_karaoke_effects` over its pen
-    /// position on one unbroken line.
+    /// and its karaoke, timed by [`Syllables`] over its pen position on one
+    /// unbroken line.
     fn lay_out_chars(&mut self, text: &Text, shaped: &Shaped, elapsed: i64) -> Result<()> {
         let chars = text.chars();
         self.karaoke.clear();
@@ -338,11 +352,16 @@ impl Layout {
                 },
                 _ => Timing::untimed(c.karaoke),
             };
-            let shown = !k.skip;
+            let shows = if k.skip {
+                Shows::Hidden
+            } else if text.style(c).is_flat() {
+                Shows::Flat
+            } else {
+                Shows::Drawn
+            };
             self.chars
                 .try_push(LaidChar {
-                    shown,
-                    drawn: shown && !text.style(c).is_flat(),
+                    shows,
                     starts_run: k.starts_new_run,
                     karaoke,
                 })
@@ -351,8 +370,7 @@ impl Layout {
         Ok(())
     }
 
-    /// `reorder_text`: the glyphs of shown characters placed in visual
-    /// order, line by line.
+    /// The glyphs of shown characters placed in visual order, line by line.
     fn reorder(&mut self, shaped: &Shaped, line_spacing: f64) {
         let mut pen = Vector::default();
         for (k, line) in self.lines.lines.iter().enumerate() {
@@ -367,7 +385,7 @@ impl Layout {
             }
             for &i in &self.order[line.chars.clone()] {
                 let i = i as usize;
-                if !self.chars[i].shown {
+                if !self.chars[i].shows.is_shown() {
                     continue;
                 }
                 let mut cluster = pen;
@@ -396,14 +414,14 @@ impl Layout {
         let mut width = 0.0;
         for i in range {
             let symbol = text.chars()[i].symbol;
-            if self.chars[i].shown && symbol != u32::from(b'\n') && symbol != 0 {
-                width += d6_to_double(self.advances[i].x);
+            if self.chars[i].shows.is_shown() && symbol != u32::from(b'\n') && symbol != 0 {
+                width += from_26_6(self.advances[i].x);
             }
         }
         width
     }
 
-    /// `align_lines`: each line shifted for its alignment and justification.
+    /// Each line shifted for its alignment and justification.
     fn align(
         &mut self,
         text: &Text,
@@ -412,7 +430,7 @@ impl Layout {
         max_text_width: f64,
     ) {
         let max_width = self.lines.lines.iter().fold(0.0, |max, line| {
-            fmax(max, self.line_width(text, line.chars.clone()))
+            float_max(max, self.line_width(text, line.chars.clone()))
         });
         for line in self.lines.lines.iter() {
             let width = self.line_width(text, line.chars.clone());
@@ -443,7 +461,7 @@ impl Layout {
         }
     }
 
-    /// `compute_string_bbox`: the shown characters' extent, and the lines'.
+    /// The shown characters' extent, and the lines'.
     fn measure_text_box(&self, shaped: &Shaped) -> TextBox {
         let y_min = -self.lines.first().asc;
         let (mut x_min, mut x_max) = (32000.0_f64, -32000.0_f64);
@@ -453,10 +471,10 @@ impl Layout {
             .zip(&*shaped.clusters)
             .zip(&*self.advances)
         {
-            if laid.shown {
-                let s = d6_to_double(self.glyphs[cluster.glyphs.start].pos.x);
+            if laid.shows.is_shown() {
+                let s = from_26_6(self.glyphs[cluster.glyphs.start].pos.x);
                 x_min = x_min.min(s);
-                x_max = x_max.max(s + d6_to_double(advance.x));
+                x_max = x_max.max(s + from_26_6(advance.x));
             }
         }
         TextBox {
@@ -467,10 +485,9 @@ impl Layout {
         }
     }
 
-    /// `apply_baseline_shear`: `\fay` raises each glyph by the advance before
-    /// it on its line or run, in visual order. libass resets at a run only
-    /// without the track's whole-text layout feature, which is never set
-    /// here.
+    /// `\fay` raises each glyph by the advance before it on its line or run,
+    /// in visual order. libass resets at a run only without the track's
+    /// whole-text layout feature, which is never set here.
     fn shear(&mut self, text: &Text, shaped: &Shaped) {
         for line in self.lines.lines.iter() {
             let mut shear: i32 = 0;
@@ -479,7 +496,7 @@ impl Layout {
                     shear = 0;
                 }
                 let at = self.order[i] as usize;
-                if !self.chars[at].drawn {
+                if self.chars[at].shows != Shows::Drawn {
                     continue;
                 }
                 let style = text.style(&text.chars()[at]);

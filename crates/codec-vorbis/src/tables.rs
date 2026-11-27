@@ -2,7 +2,10 @@
 
 /// `floor1_inverse_dB_table`: the linear amplitude of each of the 256 floor 1 dB steps.
 #[rustfmt::skip]
-#[allow(clippy::excessive_precision)] // Printed as the specification prints it.
+#[expect(
+    clippy::excessive_precision,
+    reason = "the digits the specification prints"
+)]
 pub(crate) static INVERSE_DB: [f32; 256] = [
     1.0649863e-07, 1.1341951e-07, 1.2079015e-07, 1.2863978e-07,
     1.3699951e-07, 1.4590251e-07, 1.5538408e-07, 1.6548181e-07,

@@ -23,7 +23,11 @@ The crate exposes two views:
   rewrites source facts.
 
 The non-default `reference-trace` feature adds `reference_trace`: comparison-only
-projections (`recovery`, `catalogue`, `packet_completion`, `dvb`, `input`).
+projections (`recovery`, `catalogue`, `dvb`).
+
+The `compat::pes` packet types expose feed ownership and admission facts for
+owned spans and compact carrier runs. Use `is_corrupt()` to identify damage or
+an incomplete payload.
 
 ## Usage
 
@@ -32,7 +36,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Bytes, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::{PacketFormat, ParseLimits, TraceEvent, TransportStream};
+use triergon_mpegts::{PacketFormat, ParseLimits};
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
 
 # let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../playback/tests/fixtures/hls/media-00.ts");
 let stream = std::fs::read(path)?; // any transport; the parser does no I/O
@@ -77,24 +82,31 @@ file.
 | Whole stream, one program | `TransportStream::{new, new_with_namespace}` |
 | One HLS segment (TS188, in-band PAT/PMT) | `TransportStream::new_single_program_segment`, `new_single_program_feed` |
 | Sequential TS188 playback input | `TransportStream::new_single_program_progressive_feed` |
-| Packets only | `parse_transport`, `TransportFramer`, `carrier::TransportInspector` |
-| Continuity | `Continuity::observe` → `ContinuityOutcome` |
-| PSI | `SectionAssembler`, `psi::{PatReader, PmtReader, PatCollector}` |
+| Packets only | `transport::{parse_transport, TransportFramer, TransportInspector}` |
+| Continuity | `transport::Continuity::observe` → `ContinuityOutcome` |
+| PSI | `psi::{SectionAssembler, PatReader, PmtReader, PatCollector}` |
 | Track classification | `psi::ElementaryStream` implements `triergon_core::container::TrackInfo` |
 | Descriptors | `psi::Descriptor::{registration, languages, avc_video, hevc_video, dvb_ac3, dvb_eac3, dvb_subtitling, dvb_dts_hd}` |
 | Stream codec | `psi::ElementaryStream::{codec, dvb_descriptor_codec}` → `triergon_core::CodecId` |
-| PES | `PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
+| PES | `pes::PesAssembler` → `Pes`, `PesHeader::{raw_pts_time, raw_dts_time}` |
 | Timestamps | `clock::source_timestamp` with `clock::SourceTimePolicy` |
 | FFmpeg-compatible PES | `compat::pes::DemuxObserver::{new_registered, new_private_audio, new_hls_private_audio, new_dvb_subtitles}`; `compat::pes::PesCutter` → `CutPes` for one PID of any stream type |
 | FFmpeg-compatible streams | `compat::stream::{ProgramReader, codec, configuration, is_video}`: programs, stream codecs (adds 0x81, 0x87, 0x90 and DVB tags outside a DVB namespace) and subtitle configuration |
 | FFmpeg-compatible clock | `compat::pes::DemuxClock::{project_header, place}`, `compat::pes::pcr_bounded_pts` (teletext PTS) |
-| FFmpeg-compatible start position | `compat::input::InputBootstrap` |
+| FFmpeg-compatible start position | `compat::input::InputBootstrap` → `InputContext::basis` (`PositionBasis`) |
 
 A PMT track reports the codec named by its stream type or, for private PES data in
 a DVB namespace, by the first descriptor that names one; others stay
 `CodecId::Other` with their tag. `poll_compact` coalesces null-packet runs; the feed
 polls (`poll_feed`, `poll_feed_carriers`, `poll_feed_with_payload_runs`) hand PES
 continuations directly to a `compat::pes::DemuxObserver`.
+
+The [PSI gate](../../harness/features/ts-psi-readers/contract.json) compares the
+standalone section and table readers with FFmpeg on TS188 and M2TS192, including
+current table versions, program membership, language flags and DVB services.
+In the active program, `ProgramStream::language` returns the first well-formed
+ISO 639 code from the PMT in source order. The descriptor iterator preserves
+every coded language and its role.
 
 ## Access units
 
@@ -110,6 +122,7 @@ every stream.
 | Carriage | Signalling | Access unit |
 | --- | --- | --- |
 | AVC, HEVC | stream types `0x1b`, `0x24` | Annex B access unit |
+| MPEG-1/2 video | stream type `0x01` or `0x02`, aligned finite PES, up to 175 payload bytes | `reader::MpegVideoPicture` |
 | MPEG-1/2 audio Layer I–III | stream types `0x03`, `0x04`, PES IDs `0xc0`–`0xdf` | `MpegAudioFrame` |
 | AAC-LC in ADTS | stream type `0x0f` | single-block ADTS frame |
 | LATM in LOAS | stream type `0x11`, PES IDs `0xc0`–`0xdf` | `LoasFrame` (multiplex element opaque) |
@@ -122,8 +135,8 @@ every stream.
 - **MPEG audio** frames may span PES; free-format frames are confirmed by two
   consecutive frame spacings.
 - **E-AC-3** (DVB) groups one independent substream with up to eight dependent
-  syncframes, at most 36,864 bytes by default; ATSC needs a six-block independent
-  syncframe with its dependents in one PES.
+  syncframes, at most 36,864 bytes by default. ATSC assembles six blocks from
+  one or more independent syncframes and their dependents within one finite PES.
 - **DTS** frames normal core frames, a core-bearing DTS-HD unit per aligned finite
   PES, or one to four extension substreams without a core, checking substream
   order, extents and header CRC; asset payloads stay opaque.
@@ -159,6 +172,10 @@ period zero (`RelativeEpochZero`); `Unanchored` and bounded policies are availab
 Missing DTS and unanchored per-frame timestamps stay absent; quarantined source
 clocks keep their raw fields with lifted values unresolved.
 
+The [PES assembler comparison](../../harness/features/ts-pes-assembler/contract.json)
+checks retained partial headers against transport payload bytes and compares
+the assembled packets, timestamps and payload with the demux reference.
+
 Source events arrive in order: `ReaderEvent::Transport` (each complete carrier),
 `Continuity`, `Source` (other trace events) and track catalogue changes with the
 PMT event that publishes them. Other events a caller handles:
@@ -169,7 +186,8 @@ PMT event that publishes them. Other events a caller handles:
 | `InterruptedPes` | a completed PES whose header predates a program boundary |
 | `VideoHeaders` | an Annex B group without an admitted picture |
 | `Unsupported` | no framer for this stream |
-| `IncompleteAudio`, `IncompleteVideo`, `DvbSubtitlePrefix`, `UnframedAudio` | EOF reports, only under the opt-in policies below |
+| `IncompleteAudio`, `DvbSubtitlePrefix` | EOF reports, only under the opt-in policies below |
+| `IncompleteVideo`, `UnframedAudio` | an unframed byte run that the source ended, only under the opt-in policies below |
 | `AdtsFragment`, `RecoveredAdts`, `LatmPes` | FFmpeg-compatible packet boundaries, only under the opt-in policies below |
 
 Logical EOF drains the framers before the original `Finished` event and the final
@@ -224,6 +242,8 @@ Sources must remain stable between requests. For one clear entity with a single
 Layer I/II, AVC or HEVC stream, the index can also hold restart checkpoints at
 in-band PAT/PMT carriers; a later seek compares those carriers byte for byte and
 reads no earlier bytes. Other landings replay the entity prefix.
+`SeekReceipt::replays_from_start` is true when delivery skips no packets before
+the landing.
 
 A LOAS envelope with an in-band version-zero AAC-LC configuration can
 be a seek entry. The reader accepts one program and layer with 1–64 nonempty
@@ -243,9 +263,9 @@ records its clocks, source positions and packet digest.
 | `ReaderLimits` field | Non-default choice |
 | --- | --- |
 | `audio_eof_policy` | `ReportIncomplete`: unfinished audio at logical EOF becomes `IncompleteAudio` instead of `Truncated` |
-| `video_eof_policy` | `ReportUnframed`: a final AVC/HEVC run without an Annex B start code becomes `IncompleteVideo` |
+| `unframed_video_policy` | `Report`: an AVC/HEVC byte run without an Annex B start code becomes `IncompleteVideo` when the source ends it, at logical EOF or at a fault, signalled discontinuity, clock epoch or table change (`IncompleteVideo::ended_by`) |
 | `dvb_subtitle_tail_policy` | `ReportCompletePrefix`: a PES with an unfinished final segment yields its complete segments as `DvbSubtitlePrefix` |
-| `unframed_audio_policy` | `ReportAtEof`: one opaque private-audio PES without a syncword becomes `UnframedAudio` |
+| `unframed_audio_policy` | `Report`: one opaque private-audio PES without a syncword becomes `UnframedAudio` when the source ends its byte run |
 | `adts_packet_policy` | `ReportFragments`: FFmpeg's parser framing, with opaque bytes as `AdtsFragment` |
 | `adts_pes_policy` | `ReportUnbounded`: assemble zero-length ADTS PES (a H.222.0 §2.4.3.7 violation) |
 | `latm_packet_policy` | `PreservePes`: one `LatmPes` per validated PES |
@@ -258,10 +278,21 @@ records its clocks, source positions and packet digest.
 (`DemuxScope`: program, PID, stream type and stream ID) into the packets FFmpeg's
 demuxer emits, beside the strict source view. A `DemuxPacket` may be partial and
 says why it ended. Carriages: `RegisteredCarriage` (AVC, HEVC, AAC ADTS and LATM),
-`PrivateAudioCarriage` (AC-3, E-AC-3) and `DvbSubtitlesDescriptors`. `PesCutter`
+`PrivateAudioCarriage` (AC-3, E-AC-3; `is_signalled_by_dvb_descriptor` tells the PES
+private data entries a DVB AC-3 or enhanced AC-3 descriptor signals) and
+`DvbSubtitlesDescriptors`. `PesCutter`
 cuts any stream type, including PGS (`0x90`), teletext and caption-carrying video.
+The [observer comparison](../../harness/features/ts-observer-forms/contract.json)
+checks each owned and borrowed span against its input carrier and checks the
+source context and ordering returned by the compact cursor.
+The [catalogue comparison](../../harness/features/ts-catalogue/contract.json)
+checks retained section and carrier bytes and the source evidence for each
+PSI compatibility policy alongside the strict program and stream rows.
 `DemuxClock` places timestamps in the demuxer's 33-bit interval beside the raw
 values. Contexts outside the observed profile return `Error::Unsupported`.
+The [recovery comparison](../../harness/features/ts-recovery-trace/contract.json)
+checks the raw fields and interval origin for encoded and diagnostic headers,
+and compares their projected packet clocks with the demux reference.
 
 Opt-in fault handling, each requiring the actual source diagnostic before output
 and never reconstructing source clocks or validated PES:
@@ -272,10 +303,31 @@ and never reconstructing source clocks or validated PES:
   (`confirm_source_timeline`) or a final partial carrier (`TransportTailConfirmation`).
 - `MalformedInputCompletion` reports AVC carriers with reserved adaptation control,
   an adaptation overrun, an invalid PES start code or an overlong PES header.
-- `PacketCompletion` confirms that an input held only control traffic
-  (`NoMediaConfirmation`).
+- `PacketCompletion` confirms that an input held only control traffic: PAT, PMT,
+  null and no-payload carriers (`NoMediaConfirmation`: the entity, its length, its
+  carrier count and the source context at its end).
 - `compat::annex_b::ContinuityReader` and `compat::opaque_video::OpaqueRecovery`
   report unframed video runs through continuity changes or a replayed fault.
+
+The [continuity reader comparison](../../harness/features/ts-reader-container/contract.json)
+checks the pending request and closure, then grades the residue's physical
+source end and typed confirming events alongside its paired packet result.
+
+The [source polling comparison](../../harness/features/ts-source-poll/contract.json)
+checks the five poll forms against original PSI, continuity counters, null
+carriers, selected PCR clock boundaries and physical entity ends.
+
+The [reader view comparison](../../harness/features/ts-reader-views/contract.json)
+checks track signalling against PMT carrier bytes and reconstructs the reported
+opaque or incomplete elementary ranges from the retained PES payload.
+
+The [fault and completion comparison](../../harness/features/ts-fault-facts/contract.json)
+checks physical ends, discarded carrier syntax and recovered source spans
+alongside the paired packet and terminal results.
+
+The [recovery comparison](../../harness/features/ts-recovery-trace/contract.json)
+checks selected PAT associations, initial and replacement PMT bindings, and
+diagnostic carrier and PES fields alongside recovered packet output.
 
 ## Writing TS
 
@@ -294,7 +346,8 @@ assert_eq!(out.len() % 188, 0);
 ```
 
 - Tables: PAT, PMT and a DVB SDT with one service descriptor (ETSI EN 300 468),
-  version 0, serialised once at `Muxer::new`. The SDT is repeated every 500 ms and
+  version 0, serialised once at `Muxer::new`. An SDT longer than one packet continues
+  in the next packets of its PID. The SDT is repeated every 500 ms and
   PAT/PMT every 100 ms of PCR time; PAT/PMT also precede a key picture that follows
   a non-key picture.
 - PES: stream_id 0xE0, unbounded length, PTS and DTS. The first packet's
@@ -305,10 +358,16 @@ assert_eq!(out.len() % 188, 0);
 - `MuxConfig::default()`: transport_stream_id 1, original_network_id 0xFF01,
   program 1, PMT PID 0x1000, video PID 0x0100, stream type 0x01, provider
   "Triergon", service "Service01".
-- `Muxer::new` returns `Error::Unsupported` for names that are not printable ASCII
-  or do not fit one SDT packet together (158 bytes), program number 0, a PMT or
-  video PID outside 0x0020–0x1FFE, equal PMT and video PIDs, and stream types other
-  than 0x01 and 0x02.
+- Names: printable ASCII is written as it is; other text as UTF-8 behind the 0x15
+  selector of EN 300 468 Annex A.
+- `Muxer::new` returns `Error::Unsupported` for names with control characters,
+  encoded names longer than 252 bytes together (one service descriptor), program
+  number 0, a PMT or video PID outside 0x0020–0x1FFE, equal PMT and video PIDs, and
+  stream types other than 0x01, 0x02 and 0x1b.
+
+The [mux read-back comparison](../../harness/features/ts-mux-readback/contract.json)
+checks the table cadence, continuity, PCR and PES headers, stuffing and coded
+picture bytes on the original transport stream before the reference demuxes it.
 
 | Item | FFmpeg 9.0.2 | `mux` | Reason |
 |---|---|---|---|
@@ -324,18 +383,85 @@ source spans 4096, programs 64, streams 64, descriptors 256.
 4 MiB and access unit 8 MiB (1024 NALs), 4096 PES per access unit, 32,000,000
 access units, a 64 KiB elementary input window and the 64 MiB seek scan.
 
+`compat::input::InputBootstrap` inspects at most 16 KiB of a finite input's initial
+window (`MAX_BORROWED_BYTES`) and exactly 8192 bytes for an M2TS prefix
+(`M2TS_PREFIX_BYTES`); a larger window fails with `Limit`.
+
 All storage is charged to one shared `Budget`; an emitted `Bytes` charges its
 whole backing allocation.
 
-## Errors and recovery
+## Recovery from nonconforming input
 
-- **Damage.** `TransportStream` reports each fault as `TraceEvent::Diagnostic` and
-  keeps going. TEI, scrambled, lost and excess-duplicate packets discard the
-  affected partial section or PES. A bad PSI pointer resumes at the next payload
-  unit start. The standalone assemblers keep a fault sticky until `discard`.
+The source view never repairs input. Every fault is one `TraceEvent::Diagnostic`
+(kind, PID when known, location, error) and the stream keeps going; what it drops
+and where it resumes is fixed per fault:
+
+| Input | Diagnostic | Dropped | Resumes at |
+|---|---|---|---|
+| A packet position without a sync byte (`0x47`) | `Transport`, `TS sync byte` | that carrier, every partial section and PES | the next position of the original 188/192-byte grid; the reader never searches for a new sync position |
+| A final partial carrier | `Transport`, `Truncated` | the partial carrier | — |
+| Reserved `adaptation_field_control`, an adaptation field longer than the packet, invalid PCR reserved bits or extension (unless `ReaderLimits::pcr_policy` ignores the reserved bits), an OPCR without a PCR | `Transport` | that carrier, every partial section and PES | the next carrier |
+| A set transport error indicator, a scrambled payload | `Transport` on the PID | that carrier and the PID's partial PES or section | the next payload unit start of the PID |
+| A continuity counter gap, or a repeated counter on a packet that is not a copy of the one before it (H.222.0 §2.4.3.3: byte for byte, its PCR apart; a changed OPCR is a change) | `Continuity` on the PID | the PID's partial PES or section | that packet when it starts a payload unit, else the next payload unit start |
+| A third copy of a packet | `Continuity` on the PID | the copy and the PID's partial PES or section | the next payload unit start |
+| A second copy of a packet (H.222.0 §2.4.3.3) | none | the copy | — |
+| A counter break that `discontinuity_indicator` announces (§2.4.3.5) | none; `Continuity` `SignalledDiscontinuity` | the PID's partial PES or section | that packet |
+| A PES without the start code, with forbidden `PTS_DTS_flags`, zero marker bits, a header beyond its declared length, or zero length on a non-video stream | `Pes` on the PID | the whole PES | the next payload unit start |
+| A finite PES whose last carrier holds bytes past its declared length (H.222.0 §2.4.3.7) | `Pes` on the PID, after the PES itself | the bytes past the declared length | the next payload unit start |
+| A PES or section cut off at the end of the source | `Pes` or `Psi`, `Truncated` | the partial PES or section | — |
+| A PSI section with a bad CRC, length, pointer or stuffing, a malformed PAT or PMT, a descriptor overrunning its loop, a PMT section other than 0 of 0 | `Psi` | the section | the next section |
+| A signalled PCR discontinuity | `TraceEvent::Timeline` (new clock epoch) | partial PES of the program | the carrier that brought the new PCR |
+
+PAT and PMT sections and the AVC and HEVC video descriptors in them are read whatever
+their reserved bits hold (H.222.0 §2.1 leaves those bits to the encoder): a malformed PAT
+or PMT is one whose lengths, section numbers or PIDs are out of range.
+
+The access-unit `Reader` adds one rule: it publishes complete access units only,
+and a PES is not one. Bytes of a track's elementary run that a fault, a clock
+epoch or a table change cuts before they complete an access unit are reported as
+`ReaderEvent::Interrupted` with their extent in the track's concatenated payload;
+the PES that carried them are still delivered as source events. Without the
+opt-in policies above, a PES whose payload is not the track's framing syntax
+(for example AVC bytes before the first start code) fails the reader with
+`Invalid`.
+
+With `UnframedVideo::Report`, a run of complete PES that holds no start
+code at all is not a cut access unit. The reader reports it whole as
+`IncompleteVideo` before the event that ends the run, which `ended_by` names: a
+fault on the PID or on the carrier grid, a signalled discontinuity, a new clock
+epoch, a table change, or the first PES of another byte run. Only what the
+source view delivered as complete PES is in it; the faulted carrier and a
+partial PES are not. A discontinuity the caller declares
+(`EntityTransition::Discontinuity`) is a flush: it reports what the reader held
+as `Interrupted`. A run that ends inside the stream is copied at once; when
+the pool refuses the copy, the reader counts what it holds itself, the open
+stream included, and reports `Limit` when the run can never fit beside that and
+`Backpressure` when output the caller holds is in the way.
+
+The FFmpeg-compatible `DemuxObserver` cuts what the demuxer cuts and refuses what
+its profile does not cover: a carrier with a transport error or scrambling returns
+`Unsupported` unless `TransportFaultRecovery` confirms the source fault first; a PES
+whose header fails its start code or length is dropped with its continuations up to
+the next payload unit start. A PCR discontinuity on its PID in a carrier that starts
+a PES begins a new time base: the packet before it ends there, and the observer
+follows the source to the next clock epoch at the first carrier of that epoch, so
+packets emitted from then on carry it. One in a carrier that continues a PES returns
+`Unsupported` (a PES does not span a change of time base); inside a
+`TransportFaultRecovery` every clock boundary waits for `confirm_source_timeline`.
+
+## Errors
+
+- **Assemblers.** The standalone section and PES assemblers keep a fault sticky until
+  `discard`.
 - **Backpressure and limits.** A rejected push returns the original bytes.
   `Backpressure` means caller-held output must be released; retry after releasing,
-  not in a loop. A total that cannot fit the pool returns `Limit`.
+  not in a loop. A request that cannot fit the pool by itself returns `Limit`. The
+  reader also counts what it holds itself when a PES of the stream grows, at the end
+  of the source and for an unframed run inside the stream, and returns `Limit` when
+  the request can never fit beside that. Its other copies inside the stream (an
+  access unit's bytes, a shared source event) report the pool's `Backpressure` as
+  it is: `Backpressure` while the caller holds no output means the pool is too small
+  for the stream.
 - **Cancellation.** Cancellation and backpressure preserve pending input.
 - **Clocks.** Invalid PCR signalling sets `clock_is_quarantined()` until an
   explicit `discontinuity()`. A signalled PCR discontinuity with a new PCR starts a
@@ -351,8 +477,8 @@ whole backing allocation.
 - Resynchronisation and packet-size auto-detection in the source view.
 - PES output for more than one program; SI tables beyond PAT/PMT (packets are
   still reported); descrambling; Blu-ray signalling; other ATSC signalling.
-- MPEG-1/2 video access units, MPEG-2.5 audio, shorter ATSC E-AC-3 independent
-  syncframes, other DTS-HD seek layouts.
+- MPEG-1/2 pictures outside the aligned short-PES profile, MPEG-2.5 audio,
+  other DTS-HD seek layouts.
 
 ## Standards
 

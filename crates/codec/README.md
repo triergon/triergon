@@ -2,7 +2,7 @@
 
 The decoder vocabulary shared by the codec crates: the `VideoDecoder` and
 `AudioDecoder` traits, decoded audio as `AudioFrame` with a `ChannelLayout` of
-`Speaker`s, stream downmix metadata, the codec selectors, and the windows, inverse MDCT
+`Speaker`s, stream downmix metadata, and the windows, inverse MDCT
 and run-time integer division several decoders share. It depends only on
 [triergon-core](../core/README.md), whose storage types it re-exports for the decoders'
 budgets, and [triergon-pixel](../pixel/README.md), whose picture views (`PictureView`,
@@ -12,9 +12,12 @@ nine decoders only through these traits.
 ## Usage
 
 ```rust
-use triergon_codec::{AudioDecoder, AudioFrame, DecodeFailure, Speaker, VideoDecoder};
+use triergon_codec::{
+    AudioDecoder, AudioFrame, DynAudioDecoder, DynVideoDecoder, Error, Speaker, VideoDecoder,
+};
 
-fn video(decoder: &mut dyn VideoDecoder, au: &[u8], pts: i64) -> Result<(), DecodeFailure> {
+// A decoder of a codec chosen at run time refuses with the workspace `Error`.
+fn video(decoder: &mut DynVideoDecoder, au: &[u8], pts: i64) -> Result<(), Error> {
     decoder.send(au, Some(pts))?;              // one Annex B access unit
     while let Some(picture) = decoder.receive() {
         // picture.width, .height, .bit_depth, .planes, .pts, .sar, .colour
@@ -22,7 +25,8 @@ fn video(decoder: &mut dyn VideoDecoder, au: &[u8], pts: i64) -> Result<(), Deco
     Ok(())
 }
 
-fn audio(decoder: &mut dyn AudioDecoder, au: &[u8]) -> Result<(), DecodeFailure> {
+// A concrete decoder refuses with its crate's own error.
+fn audio<D: AudioDecoder>(decoder: &mut D, au: &[u8]) -> Result<(), D::Error> {
     let mut frame = AudioFrame::default();
     let levels = decoder.decode(au, &mut frame)?.unwrap_or_default(); // DownmixLevels
     if let Some(i) = frame.layout.position(Speaker::LowFrequency) {
@@ -30,28 +34,34 @@ fn audio(decoder: &mut dyn AudioDecoder, au: &[u8]) -> Result<(), DecodeFailure>
     }
     Ok(())
 }
+
+// `boxed` turns the second into the first.
+fn erase(decoder: impl AudioDecoder<Error: Into<Error>> + 'static) -> Box<DynAudioDecoder> {
+    decoder.boxed()
+}
 ```
 
 Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decoder`
 (`VideoDecoder`); `triergon_codec_aac::Decoder`, `triergon_codec_ac3::Decoder` and
 `triergon_codec_dca::Decoder`, and the FLAC, Opus, Vorbis and MPEG audio decoders
-(`AudioDecoder`). `VideoCodec` (`H264`, `Hevc`) and `AudioCodec` (`Ac3`, `Eac3`, `Aac`,
-`Dts`, `Flac`, `Opus`, `Vorbis`, `MpegAudio`) name a decoder;
-[triergon-session](../session/README.md) maps them to boxed decoders.
+(`AudioDecoder`). [triergon-session](../session/README.md) selects the decoder for a codec.
 
 ## Supported
 
 | Item | Meaning |
 |---|---|
-| `VideoDecoder` | `send(au, pts)`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
-| `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, DecodeFailure>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
+| `VideoDecoder` | `send(au, pts) -> Result<(), Self::Error>`, `receive() -> Option<PictureView>`, `flush`, `reset`; `Send` |
+| `AudioDecoder` | `decode(au, &mut AudioFrame) -> Result<Option<DownmixLevels>, Self::Error>`, `reset`; `delay()` (samples a stream starts with that carry no signal, 0 by default) and `flush(&mut AudioFrame)` (samples held back at the end, none by default); `Send` |
 | `AudioFrame` | `sample_rate`, `layout`, `samples_per_channel`, `planes`: planar `f32`, full scale 1.0; `sample_format` (`SampleFormat::Float`, `S16`, `S32`): the decoder's native format, for mixing as FFmpeg mixes it |
-| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `default_for(n)` (FFmpeg's default), `speakers`, `channels`, `position`, `mask`, `name` (FFmpeg's layout name), `EMPTY`, `CAPACITY` |
-| `layout::{vorbis_order, flac_order, native_order}` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
+| `ChannelLayout` | speaker of each plane in plane order; `new`, `unspecified(n)` (no positions), `speakers`, `channels`, `position`, `mask`, `EMPTY`, `MONO`, `STEREO`, `CAPACITY` |
+| `vorbis_order`, `flac_order`, `native_order` | the Vorbis/Opus and FLAC coded channel orders, and the plane each coded channel goes to |
 | `mdct::Imdct` | inverse MDCT and DCT-IV for any `N` with `N / 4` a product of 2, 3 and 5: an iterative mixed-radix FFT over split real and imaginary planes; `new` charges its tables to a budget |
-| `Speaker` | loudspeaker position; `name()` gives FFmpeg's short name, `mask()` its `AV_CH_*` bit |
+| `Speaker` | loudspeaker position; `mask()` gives its WAVEFORMATEXTENSIBLE or extended bit |
 | `DownmixLevels` | `center`, `surround`, `lfe` gains and `SurroundEncoding` (`None`, `Dolby`, `ProLogicII`) |
-| `DecodeFailure` | the refusing codec error's `Debug` text; `from_error` builds one |
+| `Error` (associated) | the decoder's error type: `DecodeError`, or a codec crate's own `DecodeError` with the same classes and more detail; each is `Copy` and converts to `triergon_core::Error` without formatting or allocating |
+| `DecodeError` | `Unsupported`, `Invalid`, `Policy` (each with a `&'static str` naming the feature, check or cap) and `Budget` (a refused storage charge): the error of the H.264, DTS, MPEG audio, Opus and Vorbis decoders |
+| `boxed::<E>()` | the decoder behind a box with its errors converted to `E` |
+| `DynVideoDecoder`, `DynAudioDecoder` | `dyn VideoDecoder<Error = Error>` and `dyn AudioDecoder<Error = Error>`: a decoder of a codec chosen at run time |
 | `AudioFrame::try_resize` | sizes the planes, charging the frame's capacity to a decoder's `Reservation` first |
 | `kbd_window` | rising half of a Kaiser-Bessel-derived window of any length and alpha |
 | `vorbis_window` | rising slope of the power-complementary window Vorbis and CELT overlap by |
@@ -60,8 +70,10 @@ Implementations: `triergon_codec_h264::Decoder` and `triergon_codec_hevc::Decode
 
 ### Channel order
 
-A `Speaker`'s discriminant is FFmpeg's channel id (`AV_CHAN_*`), which is also the bit
-index of its `AV_CH_*` mask:
+A `Speaker`'s discriminant is its bit index in the channel mask. The first eighteen
+positions follow WAVEFORMATEXTENSIBLE. The optional `reference-trace` feature
+exposes `ChannelLayout::name()` and `Speaker::name()` for textual comparisons. The `compat::ffmpeg::default_layout` policy assigns positions
+by channel count when the stream supplies none.
 
 | Id | Speakers |
 |---|---|
@@ -78,7 +90,8 @@ then keeps the element order of the PCE, and so does the AAC decoder.
 
 - **Video.** `send` takes one Annex B access unit and a caller timestamp; the
   timestamp is carried through reordering to `PictureView::pts` and is never
-  interpreted. `receive` returns pictures in output order; the view borrows the
+  interpreted. A refusal stops the access unit at the first failing NAL unit.
+  `receive` returns pictures in output order; the view borrows the
   decoder until the next call. `flush` makes every remaining picture receivable at
   end of stream; `reset` drops all state except parameter sets after a
   discontinuity. How planes, strides and crop offsets are laid out is described in
@@ -97,9 +110,17 @@ then keeps the element order of the PCE, and so does the AAC decoder.
   it carries them (AC-3 and E-AC-3). `DownmixLevels::default()` is the conventional
   −3 dB centre and surrounds (1/√2) with LFE omitted and no surround encoding, for
   streams that carry none.
-- **Errors.** A refused access unit is a `DecodeFailure`; the decoder stays usable.
+- **Errors.** A refusal leaves the decoder usable. Convert the typed error to
+  `triergon_core::Error` to keep its class and detail across decoder kinds.
   Typed errors are available from each codec crate's own `decode`/`send`.
 
-Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`).
-Verification: [harness/codecs](../../harness/codecs/STATUS.md); results in
+## Conformance
+
+Speaker ids and names follow FFmpeg's channel layout API (`AV_CHAN_*`, `AV_CH_*`). The
+[inverse transforms](../../harness/features/dsp-imdct/contract.json) are compared with
+the cosine definitions and with FFmpeg's, the
+[windows](../../harness/features/dsp-windows/contract.json) and
+[divisions](../../harness/features/dsp-divide/contract.json) with their exact
+definitions, and the decoders through these traits in
+[harness/codecs](../../harness/codecs/STATUS.md); results are in
 [docs/status.md](../../docs/status.md).

@@ -6,23 +6,29 @@ mod aac_access_units;
 mod aac_ps_tables;
 mod aac_sources;
 pub mod correctness;
+mod damage;
 pub mod derived;
+pub(crate) mod dsp;
 pub mod equivalence;
 pub mod fuzz;
 pub mod isobmff_reader;
 pub mod memory;
+mod pins;
 pub mod readers;
 pub mod summary;
 pub mod timing;
 
 use std::path::{Path, PathBuf};
 
-use crate::json::Value;
+use crate::json::{self, Value};
 
 pub(crate) const INITIALIZED_AAC_REFERENCE: &str = "ffmpeg-aac-initialized-pcm";
 
 pub const USAGE: &str = "usage: cargo xtask codecs <command>
 
+  dsp --output DIR [--record-pins]
+                 compare inverse transforms with the public reference and the cosine definition;
+                 --record-pins records both outputs of each case listed as a deviation
   aac-access-units --out DIR [--record]
                  prepare the configured AAC-LC workloads and compare every native PCM plane
   aac-ps-tables [--check] [--ffmpeg FF] [--python PY] [--work DIR]
@@ -38,6 +44,8 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
                  hash every vector of each lane (h264, hevc, ac3, eac3, aac, aac-mov, dts, flac,
                  mp3, mp2, mp1, vorbis, opus; reader-ogg, reader-flac, reader-mp3,
                  reader-aac, reader-ac3, reader-eac3)
+  variant-pins --manifest F --root R --ffprobe FP --strip-dither S [--scratch DIR]
+                 record generated codec variant pins from their pinned source inputs
   grade --manifest M.json --root R --bin DIR --ffmpeg FF --ffprobe FP --codec-worker W
         [--codec-worker-for OPERATION=W2 ...] --reference R2 --out OUT.jsonl [--scratch DIR]
         [--only SUBSTR,...] [--lanes LANE,...]
@@ -47,17 +55,20 @@ pub const USAGE: &str = "usage: cargo xtask codecs <command>
   compare-hevc --decoder EXE --ffmpeg FF --ffprobe FP FILE...
                  stream individual files through the same planar decoder comparison as grade;
                  print one JSON row per file and return success only for exact matches
-  summarize RUN.jsonl OUT.json [--require-pass]
+  summarize RUN.jsonl OUT.json [--require-pass] [--record-pins]
                  classify a grading run against the declared lane selection; with
-                 --require-pass fail on any vector that fails and is not a listed open case
+                 --require-pass fail on any vector that fails and is not a listed open case;
+                 a listed vector must show what harness/codecs/open-pins.json pins of
+                 both sides, and --record-pins records the run's instead
   readers --manifest M.json --root R --ffprobe FP --codec-worker W --out OUT.jsonl
-          [--seeks S.json] [--only SUBSTR,...]
+          [--seeks S.json] [--views-worker W] [--only SUBSTR,...]
                  compare every packet the container readers emit, and Ogg's compat view,
                  with ffprobe by harness/codecs/reader-rules.json and the reviewed
                  difference lists of reader-differences.json, and the packets after
-                 each seek case of S.json (lane reader-ogg-seek); appends one row per
-                 case, writes the observed lists to OUT.differences.json, and fails
-                 when a case fails
+                 each seek case of S.json; appends one row per case and writes
+                 the observed lists to OUT.differences.json. Push, sequential Ogg
+                 and elementary seek lanes use --views-worker. Reviewed seek
+                 differences must reproduce their recorded observations.
   isobmff-reader --ffprobe FP --codec-worker W --out OUT.jsonl [--only SUBSTR,...]
                  compare every packet the neutral ISO BMFF reader emits, read through and
                  after a seek, with ffprobe by harness/features/isobmff-reader/rules.json and
@@ -102,7 +113,7 @@ impl Gate<'_> {
         full: bool,
         run: impl FnOnce() -> Result<(), String>,
     ) -> Result<i32, String> {
-        let list = crate::checks::read_json(self.workloads)?;
+        let list = json::read(self.workloads)?;
         let mut inputs = vec![self.workloads.to_path_buf()];
         for workload in list
             .get("workloads")
@@ -396,9 +407,35 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             let a = Args::parse(rest, &["out"], &[])?;
             aac_sources::run(root, &a.path("out")?)?;
         }
+        "dsp" => {
+            let a = Args::parse(rest, &["output"], &["record", "record-pins"])?;
+            let record = a.get("record").is_some();
+            let output = if record {
+                PathBuf::new()
+            } else {
+                a.path("output")?
+            };
+            return dsp::main(root, &output, record, a.get("record-pins").is_some());
+        }
         "derive" => {
             let a = Args::parse(rest, &["ffmpeg"], &[])?;
             derived::run(root, &a.path("ffmpeg")?)?;
+        }
+        "variant-pins" => {
+            let a = Args::parse(
+                rest,
+                &["manifest", "root", "ffprobe", "strip-dither", "scratch"],
+                &[],
+            )?;
+            damage::record(
+                &damage::FixtureTools {
+                    root: &a.path("root")?,
+                    ffprobe: a.required("ffprobe")?,
+                    strip_dither: &a.path("strip-dither")?,
+                },
+                &a.path("manifest")?,
+                a.get("scratch").map(Path::new),
+            )?;
         }
         "manifest" => {
             let a = Args::parse(rest, &["out"], &[])?;
@@ -464,6 +501,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                     "root",
                     "ffprobe",
                     "codec-worker",
+                    "views-worker",
                     "out",
                     "only",
                     "seeks",
@@ -475,6 +513,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 root: a.path("root")?,
                 ffprobe: a.required("ffprobe")?.to_owned(),
                 codec_worker: a.path("codec-worker")?,
+                views_worker: a.get("views-worker").map(PathBuf::from),
                 out: a.path("out")?,
                 only: a.get("only").filter(|o| !o.is_empty()).map(str::to_owned),
                 rules: readers::Rules::load(root)?,
@@ -552,10 +591,15 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
             return gate.run(root, a.get("full").is_some(), || memory::run(&options));
         }
         "summarize" => {
-            let a = Args::parse(rest, &[], &["require-pass"])?;
+            let a = Args::parse(rest, &[], &["require-pass", "record-pins"])?;
             match a.positional.as_slice() {
                 [run, out] => {
-                    summary::summarize(run, Path::new(out), a.get("require-pass").is_some())?;
+                    summary::summarize(
+                        run,
+                        Path::new(out),
+                        a.get("require-pass").is_some(),
+                        a.get("record-pins").is_some(),
+                    )?;
                 }
                 _ => return Err(USAGE.to_owned()),
             }

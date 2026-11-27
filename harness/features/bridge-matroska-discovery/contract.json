@@ -1,0 +1,212 @@
+{
+  "schema": 1,
+  "id": "bridge-matroska-discovery",
+  "gate": "required",
+  "operation": "bridge-matroska-discovery",
+  "candidate": "playback-views-worker",
+  "worker_operation": "mkv-discovery-",
+  "reference": "ffmpeg-playback-views-native",
+  "runner": "cargo xtask report",
+  "contract": [
+    "Compare Matroska stream discovery with avformat_find_stream_info on the formats build. Fold stream ordinal, codec, width, height and complete codec configuration. PGS canvas comes from buffered packets and the VobSub canvas from CodecPrivate.",
+    "Replay the discovery prefix and then continue playback in source order. Compare every stream ordinal, optional source PTS and DTS in nanoseconds, key flag, length and packet bytes. The reference reads a fresh raw demux pass. Matroska Blocks carry PTS only, including DVB packets for which the reference additionally reports a demux DTS equal to PTS.",
+    "Compact discovery checks that each buffered AVC or AAC feed selects the original event by ordinal, that a non-packet event or unselected track produces no packet, and that an invalid ordinal is refused. Consume the prefix and check the original event order, source, packet clocks, configuration and payload. Fold the original packet bytes and reconstruct legacy ASC from the first ADTS header emitted by the actual feed. The reference folds its discovered extradata and source packets.",
+    "Full discovery includes the HEVC/Dolby feed duration projection for Dolby packets. The indexed seek case folds the selected HEVC packets admitted from the landing keyframe and the gate's landed verdict.",
+    "Trace the candidate cutoff and buffered output count. The packet sequence is compared through the end independent of the readiness cutoff."
+  ],
+  "required_profiles": [
+    "compact",
+    "full",
+    "seek"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "aac-mpeg2-lc-laced",
+        "aac-mpeg2-lc",
+        "aac-mpeg4-lc-ambiguous-layout",
+        "aac-mpeg4-lc-empty-private",
+        "aac-mpeg4-lc-timed",
+        "aac-mpeg4-lc",
+        "audio-bad-first-discovery",
+        "audio-mixed-discovery",
+        "avc-reordered-discovery",
+        "hevc-dolby",
+        "hevc-indexed-seek",
+        "hevc-indexed-seek-seek",
+        "hevc-no-default-duration-discovery",
+        "hevc-repeated-configuration-in-band",
+        "hevc-repeated-configuration",
+        "hevc-repeated-parameter-sets",
+        "hevc-repeated-truncated-vps-configuration",
+        "hevc-single-configuration",
+        "hevc-truncated-pps",
+        "hevc-truncated-sps",
+        "hevc-truncated-vps",
+        "three-tracks",
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "avc-pgs-early-canvas",
+        "matroska-dvb-source-dts",
+        "matroska-dvb-ancillary"
+      ],
+      "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "aac-mpeg2-lc-laced",
+        "aac-mpeg2-lc",
+        "aac-mpeg4-lc-ambiguous-layout",
+        "aac-mpeg4-lc-empty-private",
+        "aac-mpeg4-lc-timed",
+        "aac-mpeg4-lc",
+        "audio-bad-first-discovery",
+        "audio-mixed-discovery",
+        "avc-reordered-discovery",
+        "hevc-dolby",
+        "hevc-indexed-seek",
+        "hevc-indexed-seek-seek",
+        "hevc-no-default-duration-discovery",
+        "hevc-repeated-configuration-in-band",
+        "hevc-repeated-configuration",
+        "hevc-repeated-parameter-sets",
+        "hevc-repeated-truncated-vps-configuration",
+        "hevc-single-configuration",
+        "hevc-truncated-pps",
+        "hevc-truncated-sps",
+        "hevc-truncated-vps",
+        "three-tracks",
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "avc-pgs-early-canvas",
+        "matroska-dvb-source-dts",
+        "matroska-dvb-ancillary"
+      ],
+      "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "aac-mpeg2-lc-laced",
+        "aac-mpeg2-lc",
+        "aac-mpeg4-lc-ambiguous-layout",
+        "aac-mpeg4-lc-empty-private",
+        "aac-mpeg4-lc-timed",
+        "aac-mpeg4-lc",
+        "audio-bad-first-discovery",
+        "audio-mixed-discovery",
+        "avc-reordered-discovery",
+        "hevc-dolby",
+        "hevc-indexed-seek",
+        "hevc-indexed-seek-seek",
+        "hevc-no-default-duration-discovery",
+        "hevc-repeated-configuration-in-band",
+        "hevc-repeated-configuration",
+        "hevc-repeated-parameter-sets",
+        "hevc-repeated-truncated-vps-configuration",
+        "hevc-single-configuration",
+        "hevc-truncated-pps",
+        "hevc-truncated-sps",
+        "hevc-truncated-vps",
+        "three-tracks",
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "avc-pgs-early-canvas",
+        "matroska-dvb-source-dts",
+        "matroska-dvb-ancillary"
+      ],
+      "cause": "Discovery runs inside matroska-startup-seek. This operation compares the discovery and replay fields."
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "Seven declared channels have no AAC-LC channel configuration of the legacy mapping",
+      "clause": "ISO/IEC 14496-3 Table 1.19: channelConfiguration 7 designates eight channels; RFC 9559 section 5.1.4.1.29.3 gives this track seven channels, and Matroska codec mappings draft 21 section 3.4.6 gives A_AAC/MPEG4/LC no initialization.",
+      "candidate": "Refuses before any descriptor with Unsupported (legacy Matroska AAC channel layout).",
+      "reference": "Publishes ASC 11b8 (channel configuration 7, eight channels) for the seven-channel track, then replays eight packets.",
+      "cases": [
+        "aac-mpeg4-lc-ambiguous-layout"
+      ]
+    },
+    {
+      "reading": "A negative PGS Block time is kept on replay",
+      "clause": "RFC 9559 section 11.2: the Block timestamp is signed, it SHOULD NOT be negative, and a frame with a negative timestamp MUST be decoded but not played.",
+      "candidate": "Replays the initial PGS packets with PTS -1000000 ns, including in the file that also carries DVB.",
+      "reference": "Leaves PTS absent on the same packets; sizes, key flags and payloads agree.",
+      "cases": [
+        "pgs-all-unknown",
+        "pgs-bad-first-canvas",
+        "pgs-combined-leading",
+        "pgs-duration-after-known",
+        "pgs-early-canvas",
+        "pgs-known-anchor",
+        "pgs-known-then-duration",
+        "pgs-known-zero",
+        "pgs-observed-relative",
+        "pgs-packet-cap",
+        "pgs-running-relative",
+        "matroska-dvb-source-dts"
+      ]
+    },
+    {
+      "reading": "Matroska discovery subtracts CodecDelay exactly",
+      "clause": "RFC 9559 section 5.1.4.1.25: CodecDelay is in nanoseconds and MUST be subtracted from each frame timestamp; section 11.2 gives the exact Block presentation time.",
+      "candidate": "Subtracts the exact delay: AAC -21333333 and -23219955 ns, AC-3 and E-AC-3 -5333333 ns and 26666667 ns; in audio-mixed-discovery and hevc-dolby it also returns the E-AC-3 syncframe duration 32000000 ns (ATSC A/52:2018 Annex E: six blocks of 256 samples at 48 kHz), a value it derives.",
+      "reference": "Reports times on the stream's millisecond grid (-21000000, -23000000, -5000000 and 27000000 ns); its raw pass leaves the E-AC-3 duration unknown, since av_get_audio_frame_duration2 gives none for E-AC-3.",
+      "cases": [
+        "audio-mixed-discovery",
+        "hevc-dolby",
+        "three-tracks"
+      ]
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "Triergon's Dolby feed refuses an AC-3 Block that does not start with the syncword",
+      "undecided": "ATSC A/52:2018 section 5.4.1.1: a syncframe begins with syncword 0x0B77; Matroska codec mappings draft 21 section 3.4.11 carries A_AC3 as syncframes.",
+      "rule": "Publishes both track descriptors, then refuses the first AC-3 Block (0077...) with Invalid, replaying no packet of either track.",
+      "documented": "crates/bridge/README.md#access-units",
+      "reference_rule": "Replays all 16 Blocks of both tracks, the damaged 768-byte Block with a 32000000 ns duration.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "audio-bad-first-discovery"
+      ]
+    }
+  ]
+}

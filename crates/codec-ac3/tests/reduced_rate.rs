@@ -4,9 +4,11 @@
 //! allocation); the expected samples were captured black-box from FFmpeg 9.0.2's decoder
 //! (`ffmpeg -i k.ac3 -f f32le`).
 
+use triergon_bitstream::crc::crc16_a52 as crc16;
+use triergon_codec_ac3::compat::ffmpeg::Policy;
 use triergon_codec_ac3::{
-    AudioFrame, Compat, DecodeError, Decoder, DecoderOptions, Feature, Speaker, Syntax,
-    access_unit_len, crc16, parse_header,
+    AudioFrame, DecodeError, Decoder, DecoderOptions, Feature, Speaker, Syntax, access_unit_len,
+    parse_header,
 };
 
 /// `gen_reduced_rate.py k9.ac3 9 0 1 2 1`: bsid 9, fscod 0 (24 kHz), 1/0 + LFE, frmsizecod 37.
@@ -173,7 +175,7 @@ fn bsid10_coupled_stereo_matches_ffmpeg() {
         (10, 8000, 1536)
     );
     assert!(info.crc_ok && info.concealed.is_none());
-    assert_eq!(triergon_codec_ac3::layout_name(&out.layout), "2.1");
+    assert_eq!(out.layout.name(), "2.1");
     for (p, want) in K10_FFMPEG.iter().enumerate() {
         for (&i, &w) in IDX.iter().zip(want) {
             let got = out.planes[p][i] as f64;
@@ -214,12 +216,12 @@ fn non_compatible_dependent_is_dropped() {
     assert_eq!(out.planes, decode(&core8).1.planes);
     // Strict mode refuses the access unit instead.
     let mut strict = Decoder::new().with_options(DecoderOptions {
-        compat: Compat::Specification,
+        compat: Policy::Specification,
         ..Default::default()
     });
     assert!(matches!(
         strict.decode(&au, &mut AudioFrame::default()),
-        Err(DecodeError::InvalidData(_))
+        Err(DecodeError::Invalid(_))
     ));
 }
 
@@ -241,7 +243,7 @@ fn eac3_reduced_sample_rate_is_refused_like_ffmpeg() {
     );
     // A/52 Annex E mode still decodes it.
     let mut strict = Decoder::new().with_options(DecoderOptions {
-        compat: Compat::Specification,
+        compat: Policy::Specification,
         ..Default::default()
     });
     assert_ne!(

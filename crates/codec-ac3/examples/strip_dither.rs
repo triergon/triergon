@@ -5,7 +5,8 @@
 //!
 //! usage: strip_dither <in> <out>
 
-use triergon_codec_ac3::{AudioFrame, Decoder, access_unit_len, crc16};
+use triergon_bitstream::crc::crc16_a52 as crc16;
+use triergon_codec_ac3::{AudioFrame, Decoder, access_unit_len};
 
 fn to_bits(b: &[u8]) -> Vec<bool> {
     b.iter()

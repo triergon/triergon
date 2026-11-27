@@ -1,0 +1,479 @@
+//! Feed packets for an explicitly selected Matroska track.
+
+mod aac_clock;
+mod discovery;
+mod hevc_dolby;
+mod probe_clock;
+mod superseded_aac;
+mod video_clock;
+mod video_seek;
+pub use discovery::{
+    MatroskaCompactDiscovered, MatroskaCompactDiscovery, MatroskaDiscovered, MatroskaDiscovery,
+    MatroskaDiscoveryCutoff, MatroskaDiscoveryLimits, MatroskaDiscoveryStep, MatroskaReplayPrefix,
+    MatroskaStartupSource,
+};
+pub use hevc_dolby::{
+    MatroskaDolbyLimits, MatroskaHevcClock, MatroskaHevcDolbyFeed, MatroskaHevcDolbyJob,
+    MatroskaHevcDolbyLimits, MatroskaHevcDolbyPacket, MatroskaHevcDolbyPayload,
+    MatroskaHevcDolbySetup,
+};
+pub use probe_clock::{
+    MatroskaClock, MatroskaClockPrefix, MatroskaClockProbe, MatroskaPacketTiming,
+};
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Budget, Bytes, Error, Result, SourceId, WorkBudget};
+use triergon_framing::{
+    BuildStep,
+    aac::{AacAdtsParameters, AacAscParser, AacConfigLimits, AacSource},
+    avc::{
+        AvcAnnexBAccessUnit, AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits,
+        AvcConfigParser, AvcConfigSource,
+    },
+};
+use triergon_matroska::{
+    Configuration, Event as MkvEvent, LegacyAacProfile, TypedPacket as Packet,
+};
+use triergon_playback::{Delivery, Event, Output};
+pub use video_clock::MatroskaAvcClock;
+pub use video_seek::MatroskaVideoSeekGate;
+// The demux clock and track binding the subtitle half reads Matroska packets with.
+pub(crate) use probe_clock::{DemuxPacketTiming, PacketClock, ProbeTimeline, Timeline};
+use superseded_aac::superseded_aac_lc_parameters;
+use superseded_aac::superseded_aac_lc_track_parameters;
+use triergon_framing::access::{AccessUnitLimits, AccessUnits, AccessUnitsSetup};
+
+/// Creates a framer from a Matroska track's configuration. For the superseded
+/// AAC-LC codec IDs, uses the Audio element's sample rate and channel count.
+/// Refuses an unsupported layout or an invalid configuration record.
+pub fn access_units(
+    pool: &Budget,
+    track: &triergon_matroska::Track,
+    limits: AccessUnitLimits,
+) -> Result<AccessUnitsSetup> {
+    match superseded_aac_lc_track_parameters(track)? {
+        Some(parameters) => Ok(AccessUnits::from_adts_parameters(pool, parameters, limits)),
+        None => AccessUnits::for_track(pool, track, limits),
+    }
+}
+
+/// Bounds of a Matroska AVC or AAC feed.
+#[derive(Clone, Copy, Debug)]
+pub struct MatroskaFeedLimits {
+    /// AVC decoder configuration record bounds.
+    pub avc_config: AvcConfigLimits,
+    /// AVC access unit bounds.
+    pub avc_packet: AvcAnnexBLimits,
+    /// AudioSpecificConfig bounds.
+    pub aac_config: AacConfigLimits,
+    /// The largest ADTS frame in bytes, header included.
+    pub aac_output_bytes: usize,
+}
+
+fn check_limit(requested: usize, maximum: usize) -> Result<()> {
+    if requested > maximum {
+        return Err(Error::Limit { requested, maximum });
+    }
+    Ok(())
+}
+
+/// A track of one Matroska configuration, which its packets must match.
+#[derive(Clone, Debug)]
+pub(crate) struct Association {
+    pub(crate) configuration: Configuration,
+    pub(crate) track: usize,
+}
+
+impl Association {
+    pub(crate) fn matches(&self, packet: &Packet) -> bool {
+        let a = &self.configuration;
+        let b = &packet.configuration;
+        self.track == packet.packet.track
+            && a.generation() == b.generation()
+            && a.revision() == b.revision()
+            && std::ptr::eq(a.tracks(), b.tracks())
+    }
+
+    fn selected_packet<'a>(&self, output: &'a Output) -> Result<Option<&'a Packet>> {
+        let Event::Matroska(MkvEvent::Packet(packet)) = output.event() else {
+            return Ok(None);
+        };
+        self.selected_source(packet, output.delivery())
+    }
+
+    fn selected_source<'a>(
+        &self,
+        packet: &'a Packet,
+        delivery: Delivery,
+    ) -> Result<Option<&'a Packet>> {
+        if delivery == Delivery::Unselected {
+            return Ok(None);
+        }
+        if !self.matches(packet) {
+            return Err(Error::Invalid("Matroska feed configuration changed"));
+        }
+        Ok(Some(packet))
+    }
+}
+
+#[derive(Debug)]
+enum Parser {
+    Avc(AvcConfigParser),
+    DerivedAac(AacAdtsParameters),
+    Aac {
+        parser: AacAscParser,
+        infer_duration: bool,
+    },
+    /// The feed was delivered, or the setup failed.
+    Done,
+}
+
+#[derive(Debug)]
+enum FeedCodec {
+    Avc(AvcAnnexBConfig),
+    Aac {
+        params: AacAdtsParameters,
+        infer_duration: bool,
+    },
+}
+
+/// Prepare a feed from the selected track's effective initialization. A later
+/// CodecState or seek generation can require a fresh setup.
+#[derive(Debug)]
+pub struct MatroskaFeedSetup {
+    association: Association,
+    parser: Parser,
+    limits: MatroskaFeedLimits,
+}
+
+impl MatroskaFeedSetup {
+    /// `source` is the player's input identity. Framing parsers address the
+    /// isolated initialization record from offset zero within that record.
+    pub fn new(
+        pool: &Budget,
+        source: SourceId,
+        configuration: &Configuration,
+        track: usize,
+        limits: MatroskaFeedLimits,
+    ) -> Result<Self> {
+        if !configuration.belongs_to(pool) {
+            return Err(Error::ForeignPool);
+        }
+        let descriptor = configuration
+            .tracks()
+            .get(track)
+            .ok_or(Error::Invalid("Matroska feed track index"))?;
+        let codec = descriptor.codec.as_str();
+        let (maximum_record_bytes, superseded_aac) = match (descriptor.kind, codec) {
+            (1, "V_MPEG4/ISO/AVC") => (limits.avc_config.maximum_record_bytes, false),
+            (2, "A_AAC") => (limits.aac_config.maximum_record_bytes, false),
+            (2, _) if descriptor.legacy_aac_profile() == Some(LegacyAacProfile::LowComplexity) => {
+                (limits.aac_config.maximum_record_bytes, true)
+            }
+            _ => return Err(Error::Unsupported("Matroska feed codec")),
+        };
+        let derived = if superseded_aac {
+            superseded_aac_lc_parameters(configuration, track)?
+        } else {
+            None
+        };
+        let init = configuration
+            .initialization(track)
+            .ok_or(Error::Invalid("missing Matroska initialization"))?;
+        let parser = if let Some(params) = derived {
+            check_limit(2, maximum_record_bytes)?;
+            if limits.aac_output_bytes < 7 {
+                return Err(Error::Invalid("Matroska AAC output limit"));
+            }
+            Parser::DerivedAac(params)
+        } else {
+            check_limit(init.data.len(), maximum_record_bytes)?;
+            let record = match configuration.initialization_bytes(track) {
+                Some(record) => record,
+                None => Bytes::copy_from_slice(pool, init.data)?,
+            };
+            if codec == "V_MPEG4/ISO/AVC" {
+                Parser::Avc(AvcConfigParser::new(
+                    pool,
+                    AvcConfigSource {
+                        source,
+                        generation: init.generation,
+                        offset: 0,
+                    },
+                    record,
+                    limits.avc_config,
+                )?)
+            } else {
+                if limits.aac_output_bytes < 7 {
+                    return Err(Error::Invalid("Matroska AAC output limit"));
+                }
+                Parser::Aac {
+                    parser: AacAscParser::new(
+                        pool,
+                        AacSource {
+                            source,
+                            generation: init.generation,
+                            offset: 0,
+                        },
+                        record,
+                        limits.aac_config,
+                    )?,
+                    // FFmpeg's Matroska demuxer leaves these IDs' missing durations unknown.
+                    infer_duration: !superseded_aac,
+                }
+            }
+        };
+        Ok(Self {
+            association: Association {
+                configuration: configuration.clone(),
+                track,
+            },
+            parser,
+            limits,
+        })
+    }
+
+    /// Parses the initialization within `work`; `Ready` yields the feed once.
+    pub fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<BuildStep<MatroskaTrackFeed>> {
+        match parse(&mut self.parser, work, cancel) {
+            Ok(BuildStep::Yield) => Ok(BuildStep::Yield),
+            Ok(BuildStep::Ready(codec)) => {
+                self.parser = Parser::Done;
+                Ok(BuildStep::Ready(MatroskaTrackFeed {
+                    association: self.association.clone(),
+                    codec,
+                    limits: self.limits,
+                }))
+            }
+            Err(error) => {
+                if !matches!(error, Error::Backpressure { .. } | Error::Allocation) {
+                    self.parser = Parser::Done;
+                }
+                Err(error)
+            }
+            Ok(BuildStep::Complete) => Ok(BuildStep::Complete),
+        }
+    }
+}
+
+/// The feed's codec once `parser` has read the initialization; `Complete` after
+/// `Done`.
+fn parse(
+    parser: &mut Parser,
+    work: &mut WorkBudget,
+    cancel: &AtomicBool,
+) -> Result<BuildStep<FeedCodec>> {
+    match parser {
+        Parser::Done => Ok(BuildStep::Complete),
+        Parser::Avc(parser) => Ok(match parser.step(work, cancel)? {
+            BuildStep::Ready(record) => {
+                BuildStep::Ready(FeedCodec::Avc(AvcAnnexBConfig::new(record)?))
+            }
+            BuildStep::Yield => BuildStep::Yield,
+            BuildStep::Complete => return Err(SETUP_LOST),
+        }),
+        Parser::DerivedAac(params) => {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            if !work.try_charge(1) {
+                return Ok(BuildStep::Yield);
+            }
+            Ok(BuildStep::Ready(FeedCodec::Aac {
+                params: *params,
+                infer_duration: false,
+            }))
+        }
+        Parser::Aac {
+            parser,
+            infer_duration,
+        } => Ok(match parser.step(work, cancel)? {
+            BuildStep::Ready(config) => {
+                let params = AacAdtsParameters::from_asc(config.facts())?;
+                if params.channel_configuration == 0 {
+                    return Err(Error::Unsupported(
+                        "Matroska AAC feed with program configuration element",
+                    ));
+                }
+                BuildStep::Ready(FeedCodec::Aac {
+                    params,
+                    infer_duration: *infer_duration,
+                })
+            }
+            BuildStep::Yield => BuildStep::Yield,
+            BuildStep::Complete => return Err(SETUP_LOST),
+        }),
+    }
+}
+
+/// A configuration parser that ended without its record.
+// A completed framing job must already have delivered its configuration.
+const SETUP_LOST: Error = Error::Invalid("AVC/AAC setup lost its configuration");
+
+/// The feed of one bound AVC or AAC track.
+#[derive(Debug)]
+pub struct MatroskaTrackFeed {
+    association: Association,
+    codec: FeedCodec,
+    limits: MatroskaFeedLimits,
+}
+
+impl MatroskaTrackFeed {
+    /// Use the player's current-generation and pause checks before submitting.
+    /// Unselected source packets remain available without producing feed work.
+    pub fn packet<'a>(&'a self, output: &'a Output) -> Result<Option<MatroskaFeedJob<'a>>> {
+        self.association
+            .selected_packet(output)?
+            .map(|source| self.prepare_packet(source))
+            .transpose()
+    }
+
+    fn prepare_packet<'a>(&'a self, source: &'a Packet) -> Result<MatroskaFeedJob<'a>> {
+        let payload = source.packet.data.as_ref();
+        let codec = match &self.codec {
+            FeedCodec::Avc(config) => {
+                PacketJob::Avc(AvcAnnexBJob::new(config, payload, self.limits.avc_packet)?)
+            }
+            FeedCodec::Aac { params, .. } => {
+                if payload.is_empty() {
+                    return Err(Error::Invalid("empty AAC access unit"));
+                }
+                let total = payload.len().checked_add(7).ok_or(Error::Overflow)?;
+                let maximum = self.limits.aac_output_bytes;
+                if total > maximum {
+                    return Err(Error::Limit {
+                        requested: total,
+                        maximum,
+                    });
+                }
+                PacketJob::Aac(Some(params.header_for_payload(payload.len())?))
+            }
+        };
+        Ok(MatroskaFeedJob {
+            source,
+            codec,
+            cancelled: false,
+        })
+    }
+}
+
+#[derive(Debug)]
+enum PacketJob<'a> {
+    Avc(AvcAnnexBJob<'a>),
+    Aac(Option<[u8; 7]>),
+}
+
+/// The framing of one packet, stepped within a work budget.
+#[derive(Debug)]
+pub struct MatroskaFeedJob<'a> {
+    source: &'a Packet,
+    codec: PacketJob<'a>,
+    cancelled: bool,
+}
+
+impl<'a> MatroskaFeedJob<'a> {
+    /// Frames the packet within `work`.
+    pub fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<BuildStep<MatroskaFeedPacket<'a>>> {
+        let payload = match &mut self.codec {
+            PacketJob::Avc(job) => match job.step(work, cancel)? {
+                BuildStep::Ready(unit) => MatroskaFeedPayload::Avc(unit),
+                BuildStep::Yield => return Ok(BuildStep::Yield),
+                BuildStep::Complete => return Ok(BuildStep::Complete),
+            },
+            PacketJob::Aac(slot) => {
+                let Some(header) = *slot else {
+                    return Ok(BuildStep::Complete);
+                };
+                if self.cancelled || cancel.load(Ordering::Relaxed) {
+                    self.cancelled = true;
+                    return Err(Error::Cancelled);
+                }
+                if !work.try_charge(1) {
+                    return Ok(BuildStep::Yield);
+                }
+                *slot = None;
+                MatroskaFeedPayload::Aac {
+                    header,
+                    raw: self.source.packet.data.as_ref(),
+                }
+            }
+        };
+        Ok(BuildStep::Ready(MatroskaFeedPacket {
+            source: self.source,
+            payload,
+        }))
+    }
+}
+
+/// One framed packet.
+#[derive(Debug)]
+pub struct MatroskaFeedPacket<'a> {
+    /// The source packet, with its container clocks.
+    pub source: &'a Packet,
+    /// The access unit the packet frames to, borrowed from it where it can be.
+    pub payload: MatroskaFeedPayload<'a>,
+}
+
+/// The framed payload of a packet.
+#[derive(Debug)]
+pub enum MatroskaFeedPayload<'a> {
+    /// An AVC access unit in Annex B form.
+    Avc(AvcAnnexBAccessUnit<'a>),
+    /// An AAC access unit behind its ADTS header.
+    Aac {
+        /// The seven-byte ADTS header, without CRC, for the unit's length.
+        header: [u8; 7],
+        /// The raw access unit, borrowed from the packet.
+        raw: &'a [u8],
+    },
+}
+
+impl MatroskaFeedPayload<'_> {
+    /// The payload length in bytes.
+    pub fn byte_len(&self) -> usize {
+        match self {
+            Self::Avc(unit) => unit.byte_len(),
+            Self::Aac { header, raw } => header.len() + raw.len(),
+        }
+    }
+
+    /// The sink can consume the spans or gather them into its owned feed buffer.
+    #[inline]
+    pub fn segments(&self) -> impl Iterator<Item = &[u8]> {
+        match self {
+            Self::Avc(unit) => FeedSegments::Avc(unit.segments()),
+            Self::Aac { header, raw } => FeedSegments::Aac([header.as_slice(), *raw].into_iter()),
+        }
+    }
+}
+
+enum FeedSegments<'a, Avc> {
+    Avc(Avc),
+    Aac(std::array::IntoIter<&'a [u8], 2>),
+}
+
+impl<'a, Avc: Iterator<Item = &'a [u8]>> Iterator for FeedSegments<'a, Avc> {
+    type Item = &'a [u8];
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Avc(iter) => iter.next(),
+            Self::Aac(iter) => iter.next(),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        match self {
+            Self::Avc(iter) => iter.size_hint(),
+            Self::Aac(iter) => iter.size_hint(),
+        }
+    }
+}

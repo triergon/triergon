@@ -1,20 +1,21 @@
-//! The encoder's own pictures (reference and reconstruction) in charged planes.
+//! The encoder's own pictures (reference and reconstruction) in charged planes, and
+//! fixed-size reads of sample rows.
 
 use triergon_core::{Budget, BudgetVec, Error};
-use triergon_pixel::{Colour, Geometry, PictureView, Plane};
+use triergon_pixel::{Colour, MacroblockGeometry, PictureView, Plane, SampleAspectRatio};
 
-/// A YUV 4:2:0 picture at the coded size, laid out like `triergon_pixel::Picture`.
+/// A YUV 4:2:0 picture at the coded size, laid out like `triergon_pixel::CodedPicture`.
 #[derive(Debug)]
 pub(crate) struct Planes {
-    geometry: Geometry,
+    geometry: MacroblockGeometry,
     y: BudgetVec<u8>,
     cb: BudgetVec<u8>,
     cr: BudgetVec<u8>,
 }
 
 impl Planes {
-    /// Black luma and neutral chroma, as `Picture::new`.
-    pub(crate) fn try_new(budget: &Budget, geometry: Geometry) -> Result<Planes, Error> {
+    /// Black luma and neutral chroma, as `CodedPicture::new`.
+    pub(crate) fn try_new(budget: &Budget, geometry: MacroblockGeometry) -> Result<Planes, Error> {
         let rows = geometry.macroblock_height() * 16;
         let chroma = geometry.chroma_stride() * rows / 2;
         Ok(Planes {
@@ -68,11 +69,17 @@ impl Planes {
                 plane(&self.cr[..], g.chroma_stride()),
             ],
             pts: None,
-            sar: (1, 1),
+            sar: Some(SampleAspectRatio::SQUARE),
             colour: Colour {
                 matrix: 2,
                 full_range: false,
             },
         }
     }
+}
+
+/// The `N` samples of `plane` from `at`; a range past the end panics as indexing does.
+#[inline(always)]
+pub(crate) fn samples<const N: usize>(plane: &[u8], at: usize) -> &[u8; N] {
+    &plane[at..at + N].as_chunks::<N>().0[0]
 }

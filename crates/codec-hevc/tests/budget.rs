@@ -3,11 +3,11 @@
 //! picture allocation as a typed error, decoding resuming after it, a shared pool returning
 //! to idle, and the default limit holding the largest DPB level 6.2 allows.
 
-use triergon_codec::{Budget, StorageError};
+use triergon_codec::{Budget, Error};
 use triergon_codec_hevc::{DecodeError, Decoder, Limits};
 
-mod common;
-use common::{access_unit, idr_access_unit, nal, p_slice};
+mod support;
+use support::{access_unit, idr_access_unit, nal, p_slice};
 
 /// Send `au`, which the filler slice data may make invalid, but not over budget.
 fn send_within_budget(decoder: &mut Decoder, au: &[u8]) {
@@ -22,10 +22,7 @@ fn a_budget_too_small_for_the_picture_is_a_typed_error() {
     })
     .unwrap();
     let error = decoder.send(&access_unit(), None).unwrap_err();
-    assert!(matches!(
-        error,
-        DecodeError::Budget(StorageError::Limit { .. })
-    ));
+    assert!(matches!(error, DecodeError::Budget(Error::Limit { .. })));
     decoder.flush();
     assert!(decoder.receive().is_none());
 }
@@ -39,7 +36,7 @@ fn decoding_resumes_once_a_refused_charge_fits() {
     let error = decoder.send(&access_unit(), None).unwrap_err();
     assert!(matches!(
         error,
-        DecodeError::Budget(StorageError::Backpressure { .. })
+        DecodeError::Budget(Error::Backpressure { .. })
     ));
     assert!(decoder.receive().is_none());
     drop(held);

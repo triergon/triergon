@@ -1,0 +1,291 @@
+{
+  "schema": 1,
+  "id": "ogg-tracks",
+  "gate": "required",
+  "operation": "ogg-tracks",
+  "candidate": "codec-views-worker",
+  "worker_operation": "ogg-tracks-",
+  "contract": [
+    "Open a seekable Ogg source and fold the track properties available at open. The reference forces the Ogg demuxer through memory AVIO, with no stream-info pass. Compare stream order, codec, rate and channels, reduced Theora frame rate, end in stream ticks, header error and configuration presence, and codec tag.",
+    "Project FLAC to STREAMINFO and take reference channels and rate from it. Compare OpusHead and the Speex identification packet byte for byte. Split Xiph lacing and the reference's Theora big-endian 16-bit length fields into identification and setup packets. Compare the comments through their dictionary projection.",
+    "Independently follow each logical stream's page sequence and lacing to check the exact comment bytes retained at open, including vendor and framing fields. Check coded channel counts and the full Theora rate fraction. A named stream whose headers are pending may still have no comment view. Grade the typed error for wrong Opus comment magic and a zero Theora rate.",
+    "Sort the UTF-8 comment pairs by ASCII-lowercased key and value. Map ALBUMARTIST, TRACKNUMBER, DISCNUMBER and DESCRIPTION to album_artist, track, disc and comment. Ignore the vendor string and any comment framing bit. A valid METADATA_BLOCK_PICTURE contributes its image payload in the separate attachment records, sorted by bytes after all track records.",
+    "For Opus, convert the reference duration to the end on the audible timeline by subtracting pre-skip. For other mappings use the stream end in ticks derived from the reference duration and any available start time. A demuxer that fails to open emits a refusal."
+  ],
+  "required_profiles": [
+    "authored",
+    "reader"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 20,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-codec-views-native",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "1.0-test-small.ogg",
+        "1.0.1-test-small.ogg",
+        "6.ogg",
+        "beta3-test-small.ogg",
+        "beta4-test-small.ogg",
+        "chain-test1-small.ogg",
+        "chain-test2-small.ogg",
+        "highrate-test-small.ogg",
+        "lsp-test2-small.ogg",
+        "lsp-test3-small.ogg",
+        "lsp-test4-small.ogg",
+        "lsp-test-small.ogg",
+        "mono-small.ogg",
+        "moog-small.ogg",
+        "rc1-test-small.ogg",
+        "rc2-test2-small.ogg",
+        "rc2-test-small.ogg",
+        "rc3-test-small.ogg",
+        "sleepzor-small.ogg",
+        "test-short2-small.ogg",
+        "vorbis-chapter-extension-demo.ogg",
+        "a-flac.oga",
+        "a-opus.opus",
+        "a-vorbis.ogg",
+        "b-opus.opus",
+        "b-vorbis.ogg",
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "crc-bad.opus",
+        "flac-51-24.oga",
+        "lost-page.opus",
+        "mc-opus.opus",
+        "mux2.opus",
+        "truncated.opus",
+        "bear.ogv",
+        "empty-theora-packets.ogv",
+        "offset-test.ogv",
+        "ogg-flac-chained-meta.ogg",
+        "ogg-opus-chained-meta.ogg",
+        "ogg-vorbis-chained-meta.ogg",
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx",
+        "speex-skeleton.spx",
+        "chain-speex.spx",
+        "comment-fields",
+        "comment-long",
+        "comment-picture",
+        "bad-comment",
+        "opus-family-255",
+        "theora-30000-1001",
+        "theora-0-0",
+        "comment-valid-picture"
+      ],
+      "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "1.0-test-small.ogg",
+        "1.0.1-test-small.ogg",
+        "6.ogg",
+        "beta3-test-small.ogg",
+        "beta4-test-small.ogg",
+        "chain-test1-small.ogg",
+        "chain-test2-small.ogg",
+        "highrate-test-small.ogg",
+        "lsp-test2-small.ogg",
+        "lsp-test3-small.ogg",
+        "lsp-test4-small.ogg",
+        "lsp-test-small.ogg",
+        "mono-small.ogg",
+        "moog-small.ogg",
+        "rc1-test-small.ogg",
+        "rc2-test2-small.ogg",
+        "rc2-test-small.ogg",
+        "rc3-test-small.ogg",
+        "sleepzor-small.ogg",
+        "test-short2-small.ogg",
+        "vorbis-chapter-extension-demo.ogg",
+        "a-flac.oga",
+        "a-opus.opus",
+        "a-vorbis.ogg",
+        "b-opus.opus",
+        "b-vorbis.ogg",
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "crc-bad.opus",
+        "flac-51-24.oga",
+        "lost-page.opus",
+        "mc-opus.opus",
+        "mux2.opus",
+        "truncated.opus",
+        "bear.ogv",
+        "empty-theora-packets.ogv",
+        "offset-test.ogv",
+        "ogg-flac-chained-meta.ogg",
+        "ogg-opus-chained-meta.ogg",
+        "ogg-vorbis-chained-meta.ogg",
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx",
+        "speex-skeleton.spx",
+        "chain-speex.spx",
+        "comment-fields",
+        "comment-long",
+        "comment-picture",
+        "bad-comment",
+        "opus-family-255",
+        "theora-30000-1001",
+        "theora-0-0",
+        "comment-valid-picture"
+      ],
+      "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "1.0-test-small.ogg",
+        "1.0.1-test-small.ogg",
+        "6.ogg",
+        "beta3-test-small.ogg",
+        "beta4-test-small.ogg",
+        "chain-test1-small.ogg",
+        "chain-test2-small.ogg",
+        "highrate-test-small.ogg",
+        "lsp-test2-small.ogg",
+        "lsp-test3-small.ogg",
+        "lsp-test4-small.ogg",
+        "lsp-test-small.ogg",
+        "mono-small.ogg",
+        "moog-small.ogg",
+        "rc1-test-small.ogg",
+        "rc2-test2-small.ogg",
+        "rc2-test-small.ogg",
+        "rc3-test-small.ogg",
+        "sleepzor-small.ogg",
+        "test-short2-small.ogg",
+        "vorbis-chapter-extension-demo.ogg",
+        "a-flac.oga",
+        "a-opus.opus",
+        "a-vorbis.ogg",
+        "b-opus.opus",
+        "b-vorbis.ogg",
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "crc-bad.opus",
+        "flac-51-24.oga",
+        "lost-page.opus",
+        "mc-opus.opus",
+        "mux2.opus",
+        "truncated.opus",
+        "bear.ogv",
+        "empty-theora-packets.ogv",
+        "offset-test.ogv",
+        "ogg-flac-chained-meta.ogg",
+        "ogg-opus-chained-meta.ogg",
+        "ogg-vorbis-chained-meta.ogg",
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx",
+        "speex-skeleton.spx",
+        "chain-speex.spx",
+        "comment-fields",
+        "comment-long",
+        "comment-picture",
+        "bad-comment",
+        "opus-family-255",
+        "theora-30000-1001",
+        "theora-0-0",
+        "comment-valid-picture"
+      ],
+      "cause": "Paired runtime, heap and total RSS collection remains due on the gate hosts."
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "Opus end is the last granule less pre-skip",
+      "clause": "RFC 7845 sections 4.3 and 4.4: the PCM sample position of a page is its granule position less pre-skip, at end of stream too; RFC 3533 section 6 gives the page granule.",
+      "candidate": "Publishes 59232 ticks: the EOS granule 59544 less 312 samples of pre-skip.",
+      "reference": "Reports a duration of 64032 ticks, one page more, after the CRC failure of the first audio page.",
+      "cases": [
+        "crc-bad.opus"
+      ]
+    },
+    {
+      "reading": "Speex end is the end-of-stream granule",
+      "clause": "RFC 3533 section 6 assigns granule_position to the logical stream; the Speex manual's Ogg mapping counts it in samples.",
+      "candidate": "Reports the EOS granules 9872, 9600 and 28800 samples.",
+      "reference": "Reports 9920, 10560 and 29149 ticks, estimated from the packet count.",
+      "cases": [
+        "speex-nb.spx",
+        "speex-wb.spx",
+        "speex-uwb-stereo.spx"
+      ]
+    },
+    {
+      "reading": "An empty comment value is a comment",
+      "clause": "Xiph Vorbis I section 5.2: comments are length-delimited UTF-8 name=value fields with no minimum value length.",
+      "candidate": "Reports TITLE with a zero-byte value among three pairs.",
+      "reference": "Omits the empty TITLE from its dictionary (two pairs).",
+      "cases": [
+        "comment-fields"
+      ]
+    },
+    {
+      "reading": "A zero Theora frame-rate fraction gives no frame clock",
+      "clause": "Theora I section 6.2: FRN and FRD are both nonzero; Track::header_error documents that a header which does not parse leaves the track configured from the headers before it.",
+      "candidate": "Reports a header error, no frame rate, no end and no configuration bytes (no header precedes the identification header).",
+      "reference": "Publishes a 25 Hz frame clock, end 157 and the identification, setup and comment headers.",
+      "cases": [
+        "theora-0-0"
+      ]
+    },
+    {
+      "reading": "Each link of a chain keeps its own end",
+      "clause": "RFC 3533 sections 4 and 6 separate chained logical streams and their granules; RFC 7845 sections 4.3 and 4.4, Xiph Vorbis I section A.2 and the Speex Ogg mapping give the codec clocks.",
+      "candidate": "Publishes the first link's own end: 59232 Opus, 54464 Vorbis and 9872 Speex ticks, including when a later link repeats the serial.",
+      "reference": "Models the chain as one stream and publishes 28800, 26496 and 4848 ticks, the last link's own end (for Opus its granule 29112 less 312 of pre-skip), which is the end of neither the first link nor the chain.",
+      "cases": [
+        "chain-opus.opus",
+        "chain-vorbis.ogg",
+        "chain-speex.spx"
+      ]
+    },
+    {
+      "reading": "CHAPTERxxx comments stay comments (a representation choice)",
+      "clause": "Xiph Vorbis I section 5.2 defines comment fields, and the VorbisComment chapter extension names the CHAPTERxxx and CHAPTERxxxNAME fields; neither asks a reader to move them out of the comments.",
+      "candidate": "Keeps the eight chapter fields among its twelve comment pairs.",
+      "reference": "Moves them into its chapter list, which this comparison does not fold, and keeps four pairs.",
+      "cases": [
+        "vorbis-chapter-extension-demo.ogg"
+      ]
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "The Skeleton identification packet is the configuration of its opaque track",
+      "undecided": "RFC 3533 section 3 and the Ogg Skeleton document define the fishead BOS packet; Track::configuration keeps the first packet of a mapping it does not decode.",
+      "rule": "Publishes the Skeleton track configured with its 64-byte fishead packet; the Speex track agrees.",
+      "documented": "crates/ogg/README.md#supported",
+      "reference_rule": "Publishes the Skeleton stream unconfigured, without configuration bytes.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "speex-skeleton.spx"
+      ]
+    },
+    {
+      "policy": "A short Opus comment header makes its stream invalid; the source still opens",
+      "undecided": "RFC 7845 section 5.2: implementations SHOULD treat a stream as invalid if its comment header lacks enough data for its fields; Track::header_error reports this per stream.",
+      "rule": "Opens the source and lists the Opus stream with its OpusHead and a header error, unconfigured, with an empty comment view.",
+      "documented": "crates/ogg/README.md#supported",
+      "reference_rule": "Refuses the whole open.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "bad-comment"
+      ]
+    }
+  ]
+}

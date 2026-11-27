@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "playback-probe-lifecycle",
+  "gate": "required",
+  "operation": "playback-probe-lifecycle",
+  "candidate": "playback-views-worker",
+  "worker_operation": "probe-lifecycle-",
+  "oracle": "playback-probe-lifecycle",
+  "contract": [
+    "Check the Probe, SelectedInput and Source ownership contracts on a seven-byte sequential source with unknown length.",
+    "An unfinished probe refuses handoff. A selected probe restarts the cursor at offset zero, keeps the only source owner and delivers all source bytes in order without rewinding the producer. Check a zero-work grant and a pending first source reply.",
+    "Verify that the handoff invalidates the old request and that invalidation on ReplaySource reaches the underlying source. All source owners abort before closing once. A failed or cancelled probe stays closed.",
+    "Rows 1 through 4 compare the ordered source callbacks on unfinished, selected, failed and cancelled probes. Row 5 compares the complete replay length and byte digest with the source file. Format and signature choices are compared separately in playback-probe."
+  ],
+  "required_profiles": ["sequential"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["sequential"], "cause": "The lifecycle oracle only compares parity."},
+    {"bound": "heap", "cases": ["sequential"], "cause": "The lifecycle oracle only compares parity."},
+    {"bound": "total_rss", "cases": ["sequential"], "cause": "The lifecycle oracle only compares parity."}
+  ]
+}

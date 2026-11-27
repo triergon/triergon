@@ -2,10 +2,14 @@
 //! code). Each scenario is a deterministic stream used to compare this decoder with the
 //! FFmpeg oracle (`harness/codecs/dca/run_all.sh`) or to recover codebooks
 //! (`harness/codecs/dca/recover_vq.py`, `recover_pr.py`).
-#![allow(dead_code, clippy::needless_range_loop, clippy::too_many_arguments)]
+#![allow(
+    dead_code,
+    clippy::too_many_arguments,
+    reason = "scenario builders that spell out every syntax field; not every test uses all of them"
+)]
 
 use super::synth::*;
-use triergon_codec_dca::Packing;
+use crate::Packing;
 
 pub struct Rng(pub u64);
 impl Rng {
@@ -44,7 +48,7 @@ fn no_post(_: &mut Frame, _: &mut Rng) {}
 
 /// Impulse response of an ADPCM codebook entry stays bounded.
 fn stable(pvq: usize) -> bool {
-    let c = triergon_codec_dca::vq::ADPCM_VQ[pvq].map(|v| f64::from(v) / 8192.0);
+    let c = crate::vq::ADPCM_VQ[pvq].map(|v| f64::from(v) / 8192.0);
     let mut x = [0f64; 96];
     x[4] = 1.0;
     for t in 5..96 {

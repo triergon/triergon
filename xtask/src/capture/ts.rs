@@ -56,7 +56,7 @@ fn timestamp(b: &[u8]) -> Result<i64, String> {
 }
 
 /// Independent TS walk: tables, PES, PCR, continuity.
-pub fn parse(data: &[u8]) -> Result<Facts, String> {
+pub fn parse(data: &[u8], pmt_pid: u16) -> Result<Facts, String> {
     let mut facts = Facts {
         errors: Vec::new(),
         pes: Vec::new(),
@@ -107,7 +107,7 @@ pub fn parse(data: &[u8]) -> Result<Facts, String> {
             }
         }
         let payload = from(p, offset);
-        if matches!(pid, 0x0000 | 0x0011 | 0x1000) {
+        if matches!(pid, 0x0000 | 0x0011) || pid == pmt_pid {
             if pusi {
                 let pointer = usize::from(at(payload, 0)?);
                 let section = from(payload, 1 + pointer);
@@ -190,7 +190,7 @@ const NONE_ARITHMETIC: &str = "unsupported operand type(s) for -: 'NoneType' and
 
 /// The contract's `mux` cadence and timing rules on one stream. Key pictures
 /// are read from each picture header (I = 1), so scene-change I pictures count.
-pub fn check_mux(facts: &Facts) -> Result<Vec<String>, String> {
+pub fn check_mux(facts: &Facts, pmt_pid: u16) -> Result<Vec<String>, String> {
     let mut problems = facts.errors.clone();
     let (mut last_pat, mut last_sdt): (Option<i64>, Option<i64>) = (None, None);
     let mut previous_key = false;
@@ -240,7 +240,7 @@ pub fn check_mux(facts: &Facts) -> Result<Vec<String>, String> {
                 Some(last) => pcr.ok_or(NONE_ARITHMETIC)? - last >= 2_700_000,
             };
         if pat_due {
-            want.extend([0x00, 0x1000]);
+            want.extend([0x00, pmt_pid]);
             last_pat = match last_pat {
                 None => pcr,
                 Some(last) => Some(last.max(
@@ -336,7 +336,7 @@ mod tests {
             &pes(3000, 0, &picture),
         ));
         stream.extend(packet(0x100, false, 2, None, false, &[7; 10]));
-        let facts = parse(&stream).unwrap();
+        let facts = parse(&stream, 0x1000).unwrap();
         assert_eq!(facts.errors, ["continuity pid 0x100 packet 4"]);
         assert_eq!(facts.pes.len(), 1);
         assert_eq!(
@@ -347,7 +347,7 @@ mod tests {
         assert_eq!(facts.tables.len(), 3);
         assert_eq!(facts.tables[0].section.len(), 2 * 6);
         assert_eq!(
-            check_mux(&facts).unwrap(),
+            check_mux(&facts, 0x1000).unwrap(),
             ["continuity pid 0x100 packet 4"]
         );
     }

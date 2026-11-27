@@ -1,6 +1,6 @@
 //! Complete pinned transport inputs for public-API automatic DTS admission.
 use super::R;
-use crate::corpus::write_json;
+use crate::json::write as write_json;
 use crate::json::{self, Value};
 use crate::sha256;
 use std::{fs, path::Path, process::Command};
@@ -23,7 +23,7 @@ pub(crate) fn prepared_inputs(root: &Path) -> R<Vec<(String, String)>> {
     if !contract.is_file() {
         return Ok(Vec::new());
     }
-    let contract = crate::checks::read_json(&contract)?;
+    let contract = json::read(&contract)?;
     let seed = contract
         .get("prepare_from")
         .ok_or("missing DTS preparation seed")?;
@@ -32,7 +32,7 @@ pub(crate) fn prepared_inputs(root: &Path) -> R<Vec<(String, String)>> {
     {
         return Err("DTS preparation seed differs from the registered fixture source".into());
     }
-    let manifest = crate::checks::read_json(&directory.join("corpus.json"))?;
+    let manifest = json::read(&directory.join("corpus.json"))?;
     let cases = manifest
         .get("cases")
         .and_then(Value::as_array)
@@ -157,7 +157,7 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
 fn generate(root: &Path, fate: &Path, reference: Option<&Path>) -> R<()> {
     let manifest_path = root.join(format!("harness/features/{FEATURE}/corpus.json"));
     let previous = if reference.is_none() {
-        Some(crate::checks::read_json(&manifest_path)?)
+        Some(json::read(&manifest_path)?)
     } else {
         None
     };

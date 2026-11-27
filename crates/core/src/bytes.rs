@@ -1,4 +1,5 @@
-//! Immutable shared spans and charged mutable construction/arena storage.
+//! Charged byte storage: shared immutable spans ([`Bytes`]) and the growable
+//! vector they are built in ([`BudgetVec`]).
 use crate::{Budget, Error, Reservation, Result};
 use std::{collections::VecDeque, ops::Range, sync::Arc};
 
@@ -10,15 +11,19 @@ struct Storage {
 }
 const STORAGE_BYTES: usize = size_of::<Storage>() + 2 * size_of::<usize>();
 
-/// A checked immutable span. All aliases keep one whole backing capacity charged.
+/// An immutable span of a shared, charged allocation.
+///
+/// Clones and slices share the allocation and cost no copy. Its whole capacity
+/// and a fixed header ([`Bytes::owner_overhead_bytes`]) stay charged to the pool
+/// until the last of them drops, however small the span each one shows.
 #[derive(Clone, Debug)]
 pub struct Bytes {
     storage: Arc<Storage>,
     range: Range<usize>,
 }
 
-/// A checked borrowed range. Copies borrow the original handle rather than
-/// incrementing its shared-storage count. Call `into_bytes` for independent retention.
+/// A borrowed range of a [`Bytes`]. Copying or slicing it touches no reference
+/// count; [`into_bytes`](Self::into_bytes) turns it into an owner.
 #[derive(Clone, Copy)]
 pub struct BytesView<'a> {
     backing: &'a Bytes,
@@ -26,27 +31,29 @@ pub struct BytesView<'a> {
 }
 
 impl<'a> BytesView<'a> {
-    /// Number of bytes in this borrowed range.
+    /// Bytes in the range.
     pub fn len(self) -> usize {
         self.data.len()
     }
-    /// Whether the checked range contains no bytes.
+    /// Whether the range holds no bytes.
     pub fn is_empty(self) -> bool {
         self.data.is_empty()
     }
-    /// Borrow the original handle, including its full retained allocation.
+    /// The handle this range was borrowed from, which may show more or other
+    /// bytes of the allocation.
     pub fn backing_bytes(self) -> &'a Bytes {
         self.backing
     }
-    /// Capacity of the backing allocation, including bytes outside this range.
+    /// [`Bytes::retained_capacity`] of the backing handle.
     pub fn retained_capacity(self) -> usize {
         self.backing.retained_capacity()
     }
-    /// Whether the backing allocation is charged to this budget pool.
+    /// [`Bytes::belongs_to`] of the backing handle.
     pub fn belongs_to(self, budget: &Budget) -> bool {
         self.backing.belongs_to(budget)
     }
-    /// Borrow a relative subrange, rejecting reversed or out-of-range bounds.
+    /// The sub-range `range`, relative to this one. A reversed range or one
+    /// past the end is [`Error::Invalid`].
     pub fn slice(self, range: Range<usize>) -> Result<Self> {
         let data = self
             .data
@@ -57,7 +64,7 @@ impl<'a> BytesView<'a> {
             data,
         })
     }
-    /// Retain this exact range independently, adding one shared handle.
+    /// An owner of exactly this range, sharing the allocation.
     pub fn into_bytes(self) -> Result<Bytes> {
         let start = self.offset()?;
         let end = start.checked_add(self.len()).ok_or(Error::Overflow)?;
@@ -94,22 +101,26 @@ impl AsRef<[u8]> for BytesView<'_> {
     }
 }
 
-/// A shared allocation's address. It can be reused after the last owner drops.
+/// The identity of a shared allocation, for telling whether two [`Bytes`] share
+/// one without keeping either alive. Equal values mean the same allocation only
+/// while an owner of it lives: the address can be reused afterwards.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ByteStorageAddress(usize);
 
 impl Bytes {
+    /// A copy of `input` in a new allocation charged to `budget`.
     pub fn copy_from_slice(budget: &Budget, input: &[u8]) -> Result<Self> {
         let BudgetVec { mut data, charge } =
             BudgetVec::try_with_owner_capacity(budget, input.len())?;
         data.extend_from_slice(input);
         Ok(Self::from_storage(data, charge))
     }
-    /// Transfers caller-owned storage. Rejection returns that exact allocation.
+    /// Adopts `input` without copying, charging its capacity and the header to
+    /// `budget`. A refused charge returns the vector in the error.
     pub fn try_from_vec(
         budget: &Budget,
         input: Vec<u8>,
-    ) -> std::result::Result<Self, TransferError> {
+    ) -> std::result::Result<Self, Refused<Vec<u8>>> {
         let charge = input
             .capacity()
             .checked_add(STORAGE_BYTES)
@@ -117,7 +128,10 @@ impl Bytes {
             .and_then(|size| budget.reserve(size));
         match charge {
             Ok(charge) => Ok(Self::from_storage(input, charge)),
-            Err(error) => Err(TransferError { error, input }),
+            Err(error) => Err(Refused {
+                error,
+                value: input,
+            }),
         }
     }
     fn from_storage(data: Vec<u8>, charge: Reservation) -> Self {
@@ -127,6 +141,8 @@ impl Bytes {
             range,
         }
     }
+    /// Another owner showing `range` of this span. A reversed range or one
+    /// past the end is [`Error::Invalid`].
     pub fn slice(&self, range: Range<usize>) -> Result<Self> {
         let range = self.subrange(range)?;
         Ok(Self {
@@ -134,7 +150,7 @@ impl Bytes {
             range,
         })
     }
-    /// Borrow a checked range without allocating or cloning shared storage.
+    /// [`slice`](Self::slice) as a borrow, which adds no owner.
     pub fn view(&self, range: Range<usize>) -> Result<BytesView<'_>> {
         let range = self.subrange(range)?;
         Ok(BytesView {
@@ -142,11 +158,8 @@ impl Bytes {
             data: &self.storage.data[range],
         })
     }
-    /// Consumes this handle and selects a checked subspan without cloning or
-    /// allocating a new shared owner. The complete backing capacity and header
-    /// remain charged, including for an empty successful view. Bounds are
-    /// relative to this view. An invalid range drops the consumed handle;
-    /// other aliases remain valid and retain their existing charge.
+    /// [`slice`](Self::slice) of this handle itself, which adds no owner. An
+    /// invalid range drops the handle.
     pub fn into_slice(mut self, range: Range<usize>) -> Result<Self> {
         self.range = self.subrange(range)?;
         Ok(self)
@@ -167,41 +180,47 @@ impl Bytes {
             .ok_or(Error::Overflow)?;
         Ok(start..end)
     }
+    /// Bytes in the span.
     pub fn len(&self) -> usize {
         self.range.end - self.range.start
     }
+    /// Whether the span holds no bytes.
     pub fn is_empty(&self) -> bool {
         self.range.is_empty()
     }
+    /// Capacity of the whole allocation in bytes, whatever part this span shows.
     pub fn retained_capacity(&self) -> usize {
         self.storage.data.capacity()
     }
-    /// Complete immutable owner's tracked charge, including backing capacity
-    /// and the fixed shared-owner header. Every slice reports the same charge;
-    /// use `shares_storage_with` to deduplicate aliases. This is not process RSS.
+    /// Bytes the allocation holds charged: its capacity and
+    /// [`owner_overhead_bytes`](Self::owner_overhead_bytes). Every owner of one
+    /// allocation reports the same figure, so count each allocation once
+    /// ([`shares_storage_with`](Self::shares_storage_with)).
     pub fn retained_storage_bytes(&self) -> usize {
         self.storage.charge.bytes()
     }
-    /// Fixed tracked header charge required when freezing mutable bytes into
-    /// an immutable shared owner, independently of its backing capacity.
+    /// Bytes charged for the header of every shared allocation, on top of its
+    /// capacity.
     pub const fn owner_overhead_bytes() -> usize {
         STORAGE_BYTES
     }
+    /// Whether both spans lie in one allocation.
     pub fn shares_storage_with(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.storage, &other.storage)
     }
-    /// Whether another live view retains this allocation.
+    /// Whether another owner of this allocation exists.
     pub fn has_shared_storage(&self) -> bool {
         Arc::strong_count(&self.storage) != 1
     }
-    /// Compare backing allocations without extending their lifetimes.
+    /// The allocation's identity, comparable after this handle is gone.
     pub fn storage_address(&self) -> ByteStorageAddress {
         ByteStorageAddress(Arc::as_ptr(&self.storage).addr())
     }
-    /// The pool that accounts for the backing allocation.
+    /// The pool the allocation is charged to.
     pub fn budget(&self) -> &Budget {
         &self.storage.charge.budget
     }
+    /// Whether the allocation is charged to `budget`.
     pub fn belongs_to(&self, budget: &Budget) -> bool {
         self.budget().same_pool(budget)
     }
@@ -235,7 +254,7 @@ impl Bytes {
     /// hold earlier contents, or zero where nothing was written yet; capacity and charge
     /// are unchanged. `None`, without calling `fill`, when another handle shares the
     /// allocation or its capacity is below `len`. A failed fill leaves an empty view.
-    pub fn try_refill<E>(
+    pub(crate) fn try_refill<E>(
         &mut self,
         len: usize,
         fill: impl FnOnce(&mut [u8]) -> std::result::Result<usize, E>,
@@ -261,10 +280,12 @@ impl Bytes {
 pub struct BytesWriter(Arc<Storage>);
 
 impl BytesWriter {
+    /// Capacity of the allocation in bytes.
     pub fn capacity(&self) -> usize {
         self.0.data.capacity()
     }
 
+    /// Whether the allocation is charged to `budget`.
     pub fn belongs_to(&self, budget: &Budget) -> bool {
         self.0.charge.budget.same_pool(budget)
     }
@@ -280,6 +301,8 @@ impl BytesWriter {
         len: usize,
         fill: impl FnOnce(&mut [u8]) -> std::result::Result<T, E>,
     ) -> std::result::Result<T, E> {
+        // Never refused: a writer is made only from a uniquely owned allocation, and no
+        // `Weak` to one exists.
         let storage = Arc::get_mut(&mut self.0).ok_or(Error::Invalid("byte writer shared"))?;
         let end = offset.checked_add(len).ok_or(Error::Overflow)?;
         if end > storage.data.capacity() {
@@ -309,6 +332,8 @@ impl BytesWriter {
         fill(&mut storage.data[offset..end])
     }
 
+    /// The allocation's bytes as a shared span: its earlier contents with
+    /// everything written since.
     pub fn finish(self) -> Bytes {
         Bytes {
             range: 0..self.0.data.len(),
@@ -317,10 +342,11 @@ impl BytesWriter {
     }
 }
 
-/// Capability for caller-provided immutable input storage. Construction only
-/// adopts a caller Vec; a produced Bytes/packet/metadata view cannot be converted
-/// into this capability. Its complete capacity and shared header stay charged
-/// while any input-window/output aliases exist.
+/// A caller's `Vec<u8>` lent as input, and the only way to get it back.
+///
+/// The vector is adopted without a copy and charged like any [`Bytes`]. Only
+/// this handle can return it ([`try_into_vec`](Self::try_into_vec)); the `Bytes`
+/// a parser produces from the input cannot be turned into one:
 ///
 /// ```compile_fail
 /// use triergon_core::{Budget, Bytes, OwnedInputBytes};
@@ -341,30 +367,21 @@ pub struct OwnedInputBytes {
     bytes: Bytes,
 }
 impl OwnedInputBytes {
-    /// Adopts an existing caller allocation, returning that same Vec on pressure.
+    /// Adopts `input`, as [`Bytes::try_from_vec`] does.
     pub fn try_from_vec(
         budget: &Budget,
         input: Vec<u8>,
-    ) -> std::result::Result<Self, TransferError> {
+    ) -> std::result::Result<Self, Refused<Vec<u8>>> {
         Bytes::try_from_vec(budget, input).map(|bytes| Self { bytes })
     }
-    /// Read-only input identity. Cloning a view retains its whole original charge.
+    /// The input as shared bytes, to clone or slice into windows.
     pub fn as_bytes(&self) -> &Bytes {
         &self.bytes
     }
-    /// Returns the original caller input allocation only after every produced
-    /// view drops. This capability cannot be made from a produced Bytes owner.
-    /// No copy/allocation occurs. Rejection preserves this capability and charge.
-    pub fn try_into_vec(mut self) -> std::result::Result<Vec<u8>, Self> {
-        if self.bytes.range.start != 0
-            || self.bytes.range.end != self.bytes.storage.data.len()
-            || Arc::get_mut(&mut self.bytes.storage).is_none()
-        {
-            return Err(self);
-        }
-        let Self {
-            bytes: Bytes { storage, range },
-        } = self;
+    /// The vector as it was adopted, its charge returned to the pool. Fails,
+    /// returning this handle unchanged, while any `Bytes` made from it lives.
+    pub fn try_into_vec(self) -> std::result::Result<Vec<u8>, Self> {
+        let Bytes { storage, range } = self.bytes;
         match Arc::try_unwrap(storage) {
             Ok(Storage { data, charge }) => {
                 drop(charge);
@@ -394,35 +411,38 @@ impl std::ops::Deref for Bytes {
     }
 }
 
+/// A value an operation could not take, handed back unchanged with the
+/// reason: the element of [`BudgetVec::try_push`], the buffer of
+/// [`BudgetVec::freeze`], the vector of [`Bytes::try_from_vec`]. `?` keeps the
+/// reason and drops the value.
 #[derive(Debug)]
-pub struct TransferError {
-    error: Error,
-    input: Vec<u8>,
+pub struct Refused<T> {
+    /// Why the value was refused.
+    pub error: Error,
+    /// The value, unchanged.
+    pub value: T,
 }
-impl TransferError {
-    pub fn error(&self) -> Error {
-        self.error
-    }
-    pub fn into_vec(self) -> Vec<u8> {
-        self.input
+
+impl<T> From<Refused<T>> for Error {
+    fn from(refused: Refused<T>) -> Self {
+        refused.error
     }
 }
 
-/// Capacity-accounted mutable storage. Growth temporarily charges both old and
-/// replacement buffers, preserving contents exactly if reservation/allocation fails.
+/// A vector whose capacity is charged to a [`Budget`].
+///
+/// It reads and writes as a slice. Every operation that may allocate is
+/// `try_`: the new capacity is charged before it is allocated, old and new
+/// buffer together while both exist, and a refused charge or allocation
+/// returns the error with the vector as it was.
 #[derive(Debug)]
 pub struct BudgetVec<T> {
     data: Vec<T>,
     charge: Reservation,
 }
 
-#[derive(Debug)]
-pub struct PushError<T> {
-    pub error: Error,
-    pub value: T,
-}
-
 impl<T> BudgetVec<T> {
+    /// An empty vector on `budget`; nothing is charged until it grows.
     pub fn new(budget: &Budget) -> Self {
         Self {
             data: Vec::new(),
@@ -449,9 +469,11 @@ impl<T> BudgetVec<T> {
         copy.data.extend_from_slice(&self.data);
         Ok(copy)
     }
+    /// Elements in the vector.
     pub fn len(&self) -> usize {
         self.data.len()
     }
+    /// Whether the vector holds no elements.
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
@@ -459,6 +481,7 @@ impl<T> BudgetVec<T> {
     pub fn budget(&self) -> &Budget {
         &self.charge.budget
     }
+    /// Elements the allocation holds without growing.
     pub fn capacity(&self) -> usize {
         self.data.capacity()
     }
@@ -469,22 +492,28 @@ impl<T> BudgetVec<T> {
     pub fn fits_reuse_for(&self, len: usize) -> bool {
         self.capacity() <= len.saturating_mul(2)
     }
+    /// The elements.
     pub fn as_slice(&self) -> &[T] {
         &self.data
     }
+    /// The elements, mutably.
     pub fn as_mut_slice(&mut self) -> &mut [T] {
         &mut self.data
     }
+    /// Drops every element; the allocation and its charge are kept.
     pub fn clear(&mut self) {
         self.data.clear();
     }
-    /// Shortens the vector; its allocation and charge are kept.
+    /// Drops the elements from `len` on; the allocation and its charge are kept.
     pub fn truncate(&mut self, len: usize) {
         self.data.truncate(len);
     }
+    /// Removes and returns the last element.
     pub fn pop(&mut self) -> Option<T> {
         self.data.pop()
     }
+    /// Room for `additional` more elements, growing to exactly that when the
+    /// capacity is short.
     #[inline]
     pub fn try_reserve_exact(&mut self, additional: usize) -> Result<()> {
         let target = self.len().checked_add(additional).ok_or(Error::Overflow)?;
@@ -533,21 +562,22 @@ impl<T> BudgetVec<T> {
         self.charge.shrink_by(old);
         Ok(())
     }
+    /// Appends `value`, growing as [`try_reserve`](Self::try_reserve) does; a
+    /// refusal returns the value in the error.
     #[inline]
-    pub fn try_push(&mut self, value: T) -> std::result::Result<(), PushError<T>> {
+    pub fn try_push(&mut self, value: T) -> std::result::Result<(), Refused<T>> {
         if self.len() == self.capacity()
             && let Err(error) = self.grow_for_push()
         {
-            return Err(PushError { error, value });
+            return Err(Refused { error, value });
         }
         self.data.push(value);
         Ok(())
     }
 
-    /// Room for `additional` more elements, grown as `try_push` grows: to
-    /// twice the capacity (at least 4) where that is more than needed, and
-    /// exactly what is needed where the budget allows no more. A refused
-    /// charge or allocation leaves the vector as it was.
+    /// Room for `additional` more elements. A short capacity grows to twice
+    /// itself (at least 4) where that is more than needed, and to exactly what
+    /// is needed where the pool allows no more.
     #[inline]
     pub fn try_reserve(&mut self, additional: usize) -> Result<()> {
         let needed = self.len().checked_add(additional).ok_or(Error::Overflow)?;
@@ -571,6 +601,8 @@ impl<T> BudgetVec<T> {
         let preferred = needed.max(self.capacity().saturating_mul(2).max(4));
         self.reallocate(preferred, needed)
     }
+    /// Appends a copy of `values`, growing to exactly the new length when the
+    /// capacity is short.
     #[inline]
     pub fn try_extend_from_slice(&mut self, values: &[T]) -> Result<()>
     where
@@ -584,22 +616,23 @@ impl<T> BudgetVec<T> {
         self.data.extend_from_slice(values);
         Ok(())
     }
-    /// Reserve space for all new elements before constructing any of them.
+    /// Appends `make(0)` to `make(count - 1)`. Room for all of them is reserved
+    /// first, so `make` does not run when that is refused.
     pub fn try_extend_with(&mut self, count: usize, make: impl FnMut(usize) -> T) -> Result<()> {
         self.try_reserve_exact(count)?;
         self.data.extend((0..count).map(make));
         Ok(())
     }
-    /// Move elements after reserving destination capacity. Both buffers stay
-    /// charged to their existing pools. A failed reserve leaves both intact.
+    /// Moves every element of `other` to the end of this vector, leaving
+    /// `other` empty with its allocation. A refusal leaves both as they were.
     pub fn try_append(&mut self, other: &mut Self) -> Result<()> {
         self.try_reserve_exact(other.len())?;
         self.data.append(&mut other.data);
         Ok(())
     }
 
-    /// Initializes new elements only after reserving their complete capacity.
-    /// Shrinking retains the allocation and its existing charge.
+    /// Sets the length to `new_len`, filling new elements with `value`.
+    /// Shortening keeps the allocation and its charge.
     pub fn try_resize(&mut self, new_len: usize, value: T) -> Result<()>
     where
         T: Clone,
@@ -670,8 +703,9 @@ impl<T> std::ops::DerefMut for BudgetVec<T> {
     }
 }
 
-/// Consuming traversal of a charged vector. Its allocation stays charged until
-/// the iterator releases it, including when only part of the vector is visited.
+/// The owning iterator of a [`BudgetVec`]. The allocation stays charged until
+/// the iterator drops or is [reclaimed](Self::reclaim), however many elements
+/// were taken.
 #[derive(Debug)]
 pub struct BudgetVecIntoIter<T> {
     // Elements leave from the front only, so the remaining ones stay contiguous.
@@ -680,7 +714,7 @@ pub struct BudgetVecIntoIter<T> {
 }
 
 impl<T> BudgetVecIntoIter<T> {
-    /// Borrow the remaining elements in traversal order without advancing.
+    /// The elements not yet taken, in order.
     pub fn as_slice(&self) -> &[T] {
         let (remaining, wrapped) = self.items.as_slices();
         debug_assert!(wrapped.is_empty());
@@ -691,11 +725,11 @@ impl<T> BudgetVecIntoIter<T> {
     /// so a consumer that has used a vector up can hand it back for the next
     /// one to fill without allocating. [`Bytes::try_reclaim`] is the same
     /// operation for frozen bytes.
-    pub fn reclaim(self) -> BudgetVec<T> {
-        let mut data = Vec::from(self.items);
-        data.clear();
+    pub fn reclaim(mut self) -> BudgetVec<T> {
+        // Emptied first, so that the conversion moves no element.
+        self.items.clear();
         BudgetVec {
-            data,
+            data: Vec::from(self.items),
             charge: self.charge,
         }
     }
@@ -728,11 +762,6 @@ impl<T> IntoIterator for BudgetVec<T> {
     }
 }
 
-#[derive(Debug)]
-pub struct FreezeError {
-    pub error: Error,
-    pub buffer: BudgetVec<u8>,
-}
 impl BudgetVec<u8> {
     /// An empty buffer of `capacity` bytes for output whose size is known
     /// before it is written. Its capacity and the shared-owner header that
@@ -752,9 +781,10 @@ impl BudgetVec<u8> {
         )?;
         Ok(Self { data, charge })
     }
-    /// Appends an LZ-style repetition from already materialized history. The
-    /// destination is reserved before any bytes change, including when the
-    /// repeated source overlaps the destination. Callers bound copy work.
+    /// Appends `count` bytes copied from `distance` bytes before the end, byte
+    /// by byte, so a `count` above `distance` repeats the last `distance` bytes
+    /// (an LZ77 match). A `distance` of zero or beyond the length is
+    /// [`Error::Invalid`]. The room is reserved before any byte changes.
     #[inline]
     pub fn try_extend_from_history(&mut self, distance: usize, count: usize) -> Result<()> {
         if distance == 0 || distance > self.len() {
@@ -778,27 +808,29 @@ impl BudgetVec<u8> {
         }
         Ok(())
     }
-    /// Moves the existing allocation into shared immutable storage, with no copy
-    /// and no interval in which the allocation loses its charge.
-    pub fn freeze(mut self) -> std::result::Result<Bytes, FreezeError> {
+    /// The bytes as a shared immutable span, without a copy. The header a
+    /// shared allocation adds is charged here; a refusal returns the buffer
+    /// in the error.
+    pub fn freeze(mut self) -> std::result::Result<Bytes, Refused<Self>> {
         let result = self
             .capacity()
             .checked_add(STORAGE_BYTES)
             .ok_or(Error::Overflow)
             .and_then(|size| self.charge.grow_to(size));
         if let Err(error) = result {
-            return Err(FreezeError {
-                error,
-                buffer: self,
-            });
+            return Err(Refused { error, value: self });
         }
         let Self { data, charge } = self;
         Ok(Bytes::from_storage(data, charge))
     }
 }
 
-/// Length of the leading run of nonzero bytes.
+/// Number of bytes before the first zero byte: `bytes.len()` when there is none.
 #[inline]
+#[expect(
+    clippy::expect_used,
+    reason = "chunks_exact(8) yields eight bytes; the loop keeps its measured form"
+)]
 pub fn nonzero_prefix_len(bytes: &[u8]) -> usize {
     let mut words = bytes.chunks_exact(8);
     for (index, chunk) in words.by_ref().enumerate() {
@@ -995,6 +1027,32 @@ mod tests {
             drop(bytes);
             assert_eq!(pool.used(), Budget::control_storage_bytes());
         }
+    }
+
+    #[test]
+    fn a_refill_rewrites_an_unshared_allocation_in_place() {
+        let budget = Budget::new(4096).unwrap();
+        let mut bytes = Bytes::copy_from_slice(&budget, b"abcdefgh").unwrap();
+        let address = bytes.as_ptr();
+        let charged = budget.used();
+        let alias = bytes.slice(0..2).unwrap();
+        let refused = bytes.try_refill(4, |_| Ok::<_, ()>(4));
+        assert!(refused.is_none());
+        drop(alias);
+        assert!(bytes.try_refill(9, |_| Ok::<_, ()>(9)).is_none());
+        let filled = bytes.try_refill(4, |buffer| {
+            assert_eq!(buffer, b"abcd");
+            buffer[..3].copy_from_slice(b"xyz");
+            Ok::<_, ()>(3)
+        });
+        assert_eq!(filled, Some(Ok(3)));
+        assert_eq!((bytes.as_ref(), bytes.as_ptr()), (&b"xyz"[..], address));
+        assert_eq!(bytes.try_refill(8, |_| Err(())), Some(Err(())));
+        assert!(bytes.is_empty());
+        // A count beyond the requested length is clamped to it.
+        assert_eq!(bytes.try_refill(2, |_| Ok::<_, ()>(5)), Some(Ok(2)));
+        assert_eq!(bytes.as_ref(), b"xy");
+        assert_eq!(budget.used(), charged);
     }
 
     #[test]

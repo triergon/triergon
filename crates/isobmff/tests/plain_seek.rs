@@ -2,15 +2,14 @@
 //! from the tables. They must land where a scan of every index entry lands,
 //! refuse where that scan refuses, with the same error, and continue as a
 //! replay of every track from its beginning continues.
-mod common;
-#[path = "support/demux.rs"]
-mod support;
+
+use crate::common::demux as support;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
-        packets::{CursorStatus, DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxProfile, DemuxTrack, PacketCursor, PacketLimits},
         seek::{
             GlobalSeekJob, GlobalSeekPlan, IndexCursor, IndexEntry, IndexLimits, SeekJob,
             SeekLanding, SeekLimits,
@@ -149,47 +148,58 @@ fn global_seek<'a>(
     }
 }
 
+/// How far the demuxer lowers a query of an unedited track before it searches,
+/// restated from the entries: the amount by which the index lowered a regular
+/// track's decode times, or the largest amount by which a fragment sample's
+/// composition time precedes its decode time.
+fn composition_shift(entries: &[IndexEntry]) -> i128 {
+    entries
+        .iter()
+        .map(|entry| {
+            let source = &entry.occurrence.source;
+            if source.fragment_flags.is_none() {
+                source.dts_ticks.unwrap() - entry.occurrence.demux.dts_field.exact_ticks
+            } else {
+                -source
+                    .composition_offset
+                    .map_or(0, triergon_isobmff::CompositionOffset::ticks)
+            }
+        })
+        .max()
+        .unwrap_or(0)
+        .max(0)
+}
+
 /// The entry a backward seek to `target` selects, restated from the seek's
-/// rule over every entry: the last key at or before the target, or else the
-/// first key, or a fragment track's first entry where `prefix` admits it. The
-/// seek refuses an entry with the null timestamp, a target at or after an
-/// entry out of timestamp order, and an index without a key to fall back to.
+/// rule over every entry in index order: the last key at or before the target
+/// lowered by `shift`, also where repeated edits put earlier times after later
+/// ones, or else the first key, or a fragment track's first entry where `prefix`
+/// admits it. Times compare as the index's signed field holds them. The seek
+/// refuses an index without a key to fall back to.
 fn select(
     entries: &[IndexEntry],
     target: i64,
+    shift: i128,
     fragments: bool,
     prefix: bool,
 ) -> Result<usize, Error> {
     let mut first = None;
     let mut best = None;
-    let mut previous = None;
-    let mut unordered: Option<i64> = None;
+    let target = i128::from(target) - shift;
     for (at, entry) in entries.iter().enumerate() {
-        if entry.timestamp == i64::MIN {
-            return Err(Error::Unsupported("native seek null index clock"));
-        }
         let key = entry.flags & 1 != 0;
         if at == 0 && !key && fragments {
             first = Some(at);
         }
-        if previous.is_some_and(|prior| entry.timestamp <= prior) || unordered.is_some() {
-            unordered = Some(unordered.map_or(entry.timestamp, |least| least.min(entry.timestamp)));
-        }
-        previous = Some(entry.timestamp);
         if key {
             first = first.or(Some(at));
-            if entry.timestamp <= target {
+            if i128::from(entry.timestamp) <= target {
                 best = Some(at);
             }
         }
     }
-    if unordered.is_some_and(|least| target >= least) {
-        return Err(Error::Unsupported(
-            "native seek overlapping index clock query",
-        ));
-    }
     best.or(first.filter(|&at| entries[at].flags & 1 != 0 || prefix))
-        .ok_or(Error::Unsupported("native seek no observed key fallback"))
+        .ok_or(Error::Unsupported("seek fallback is not a key packet"))
 }
 
 fn rows(cursor: &mut PacketCursor<'_>, count: usize) -> Result<Vec<Row>, Error> {
@@ -290,7 +300,12 @@ fn compare(name: &str, pool: &Budget, movie: &support::Movie) -> Compared {
             let landing = outcomes[1].as_ref();
             // Fragment edits move the query; the scan below does not.
             if !(fragments && track.edits.is_some()) {
-                let expected = select(entries, target, fragments, false);
+                let shift = if track.edits.is_none() {
+                    composition_shift(entries)
+                } else {
+                    0
+                };
+                let expected = select(entries, target, shift, fragments, false);
                 assert_eq!(
                     landing
                         .map(|landing| landing.selected.ordinal)
@@ -442,7 +457,7 @@ fn malformed_tables_refuse_as_full_scans_do() {
     check(
         "chunk offset past i64::MAX",
         &movie,
-        Error::Unsupported("native index signed position"),
+        Error::Unsupported("index signed position"),
     );
 
     // r-front-stco's last sample declares 0x2000_0000 bytes, one more than an
@@ -456,11 +471,14 @@ fn malformed_tables_refuse_as_full_scans_do() {
     check(
         "sample size past 0x1fff_ffff",
         &movie,
-        Error::Unsupported("native index signed size representation"),
+        Error::Unsupported("index signed size"),
     );
 
-    // f-tfdt64's fragments start at 2^63 ticks: the first entry's timestamp
-    // reads as i64::MIN, the index's null clock.
+    // f-tfdt64's fragments start at 2^63 ticks, a valid unsigned `tfdt` (ISO/IEC
+    // 14496-12 section 8.8.12) that the index's signed field holds as i64::MIN, its
+    // null value, and the following times as the negative numbers after it. The
+    // seek compares the field as the demuxer does: the first key is the landing
+    // just above i64::MIN, the second key from i64::MIN + 3000 on.
     let mut bytes = fixture("f-tfdt64.mp4");
     for (n, tfdt) in payloads(&bytes, b"tfdt").into_iter().enumerate() {
         // Version 1 and flags, then a 64-bit decode time; three samples of
@@ -471,11 +489,25 @@ fn malformed_tables_refuse_as_full_scans_do() {
     let movie = support::parse(&pool, &bytes);
     let entries = index(&pool, movie.demux()[0], &movie.media).unwrap();
     assert_eq!(entries[0].timestamp, i64::MIN);
-    check(
-        "timestamp at i64::MIN",
-        &movie,
-        Error::Unsupported("native seek null index clock"),
+    assert_eq!(
+        entries[3].occurrence.source.dts_ticks,
+        Some((1 << 63) + 3000)
     );
+    assert!(
+        compare("decode times from 2^63", &pool, &movie)
+            .refused
+            .is_empty()
+    );
+    for (target, entry) in [
+        (i64::MIN + 1, 0),
+        (i64::MIN + 2999, 0),
+        (i64::MIN + 3000, 3),
+        (0, 3),
+    ] {
+        let landing = seek(&pool, movie.demux()[0], &movie.media, target, 4096).unwrap();
+        assert!(!landing.used_first_fallback, "target {target}");
+        assert_eq!(landing.selected.ordinal, entry, "target {target}");
+    }
 
     // f-explicit's two fragments in reverse order: the second's ordinals,
     // 4 to 6, come before the first's.
@@ -485,6 +517,6 @@ fn malformed_tables_refuse_as_full_scans_do() {
     check(
         "fragment ordinals out of order",
         &movie,
-        Error::Invalid("native source ordinal order"),
+        Error::Invalid("source ordinal order"),
     );
 }

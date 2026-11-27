@@ -3,7 +3,7 @@
 
 use super::tables::WINDOW;
 use triergon_codec::mdct::Imdct;
-use triergon_codec::{Budget, StorageError};
+use triergon_codec::{Budget, Error};
 
 /// Window overlap between consecutive blocks.
 pub(crate) const OVERLAP: usize = WINDOW.len();
@@ -25,7 +25,7 @@ pub(crate) struct Synthesis {
 impl Synthesis {
     /// The transforms, with their tables charged to `budget`. Every size is a product
     /// of 2, 3 and 5, which the shared transform supports.
-    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, Error> {
         let imdct = |lm: usize| Imdct::new((2 * SHORT) << lm, 1.0, budget);
         Ok(Synthesis {
             imdct: [imdct(0)?, imdct(1)?, imdct(2)?, imdct(3)?],

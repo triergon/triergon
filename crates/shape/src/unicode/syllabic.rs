@@ -1,6 +1,7 @@
 //! Character categories of the syllabic shapers: the Indic, Khmer and Myanmar
 //! categories and positions, the Universal Shaping Engine categories and the
 //! vowel sequences that get a dotted circle, as HarfBuzz 14.6.0 tabulates them.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::syllabic_tables::{
     INDIC, INDIC_PROPERTIES, JOINING_SCRIPTS, USE, USE_CATEGORIES, USE_SCRIPTS, VOWEL_CONSTRAINTS,

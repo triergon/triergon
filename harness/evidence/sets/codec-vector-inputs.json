@@ -1,0 +1,1204 @@
+{
+ "name": "codec-vector-inputs",
+ "path": "codec-vector-inputs",
+ "retention": "retained",
+ "reason": "The inputs of the AAC, DTS and FLAC decoder vector suites (crates/codec-aac/tests/fate_vectors.rs, crates/codec-dca/tests/vectors.rs, crates/codec-flac/tests/vectors.rs), unpacked at the repository root of a gate host: the FATE AAC and DTS samples they read (.research/fate-samples/aac, .research/fate-samples/dts), each matching its source pin in harness/codecs/derived-streams.json; the IETF CELLAR FLAC test files (.research/flac-test-files subset, uncommon and faulty, CC0, github.com/ietf-wg-cellar/flac-test-files at aa7b0c6c) and the streams harness/codecs/flac/flac_vectors.py writes with the decode profile's ffmpeg and flac 1.4.3 (.research/flac-generated), each matching its codec manifest pin; and the AAC numeric comparison's 35 ADTS streams, copied from the codec-derived-streams set, beside the decode profile's float output of each (.research/aac-references, ffmpeg -f aac -i NAME.adts -f f32le -c:a pcm_f32le NAME.f32), which the gate's test step names in AAC_REF_DIR; the gate images are built with it",
+ "key": "evidence/codec-vector-inputs/35c2ac530436769941f99b217df6222a855348d29fcc470f156570ee05b96ef5.tar.gz",
+ "sha256": "35c2ac530436769941f99b217df6222a855348d29fcc470f156570ee05b96ef5",
+ "bytes": 559909106,
+ "unpacked_at": "repository",
+ "files": [
+  {
+   "path": ".research/aac-references/al04_44.adts",
+   "sha256": "ce01790c62e932cc33eb3a1092cece90df608e9f8b6b88baaa57b623488c8f1e"
+  },
+  {
+   "path": ".research/aac-references/al04_44.f32",
+   "sha256": "19300a71318a3d6b49dc8e7972c499d6ba4c068ed76eabbb1b9cce90305b818b"
+  },
+  {
+   "path": ".research/aac-references/al05_44.adts",
+   "sha256": "7b11acefbea0c1180b370405d4933ef06a80e3abbb558e1400bc264384146903"
+  },
+  {
+   "path": ".research/aac-references/al05_44.f32",
+   "sha256": "4add616e85b11cae7d2a73585ab8f6ac5b3fb12f8365dc266febda50cdcb3eaf"
+  },
+  {
+   "path": ".research/aac-references/al06_44.adts",
+   "sha256": "a28702cffbea3ade83390c2b8e83833261ca87468c139df3490ea9ef1dda399f"
+  },
+  {
+   "path": ".research/aac-references/al06_44.f32",
+   "sha256": "8437cd88a4d644e9971839fcd32a16dda9cdc190a80395c173462d1f1ea8eb98"
+  },
+  {
+   "path": ".research/aac-references/al07_96.adts",
+   "sha256": "77b8c71a77c98816f95a49b209264af383d4a515a5fd24486e9806bdfda2961a"
+  },
+  {
+   "path": ".research/aac-references/al07_96.f32",
+   "sha256": "5c213c694a7c2511a0cee14712b5d88782e4a3aeb7bf546e8493588962dd4413"
+  },
+  {
+   "path": ".research/aac-references/al15_44.adts",
+   "sha256": "b6646ef38d56f50824a0ad3108bff9d560d3cb75833fbe2bcd69daa4bb1072d0"
+  },
+  {
+   "path": ".research/aac-references/al15_44.f32",
+   "sha256": "f27ff98b7d99650e32899e346920ffe85aeda3e803f6be92f9491a81a2f2b962"
+  },
+  {
+   "path": ".research/aac-references/al17_44.adts",
+   "sha256": "15ce1b21c69691275140c4c0a474b660331716ba2b177f0c9abbbc8b8763be42"
+  },
+  {
+   "path": ".research/aac-references/al17_44.f32",
+   "sha256": "8e08d83eb31aa3475a8057e03efc223069353d947fd7797748355f4dc09a2669"
+  },
+  {
+   "path": ".research/aac-references/al18_44.adts",
+   "sha256": "17e6246f5e46613e903000b4387672586252b12128b3af882d8fa9b98ce127ba"
+  },
+  {
+   "path": ".research/aac-references/al18_44.f32",
+   "sha256": "f080d1bc65c543ea103147a7cc7ba54a52afa7f5af500ee62665bd86dc010eed"
+  },
+  {
+   "path": ".research/aac-references/al22_chCfg0PCE_44.adts",
+   "sha256": "bcc3a68808c793f9865d87b1ec3d895c5010b5f6a6bd206cb1426d4151f9bad6"
+  },
+  {
+   "path": ".research/aac-references/al22_chCfg0PCE_44.f32",
+   "sha256": "d2b9ff321ac427576d337b8dc2972cbb7bdbfa2458a4f683f9527af32f49ba51"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_cm_48_2.adts",
+   "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_cm_48_2.f32",
+   "sha256": "c61f72e6ab413c1382ff45325e2dde7ceda19d2fbfcff6ebec44d9dc951ec6a6"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_cm_48_5.1.adts",
+   "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_cm_48_5.1.f32",
+   "sha256": "93baa46cf87913a201b9ebebdf095885d1df25c5c06044fe19c00f40078689bc"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_ps_04_new.adts",
+   "sha256": "f95a16be6678ced08108ed788a3c4619501cea3936eabd831ad450b76b91f43f"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_ps_04_new.f32",
+   "sha256": "d35388130886aebd01792593a967df57eae1ee9e682530d9d1299df02ee228a1"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_ps_06_new.adts",
+   "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_ps_06_new.f32",
+   "sha256": "dda5999ce459426aba7bf221ae5830959c3bcb5e19a3166a90d9923e0bf30475"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_sr_48_2_fsaac48.adts",
+   "sha256": "10f2d0f66455a3b9dea8138a1f21d9c39cd9633fde3f31750b8e61e16a59fb75"
+  },
+  {
+   "path": ".research/aac-references/al_sbr_sr_48_2_fsaac48.f32",
+   "sha256": "f3549b13b1e5956daca5e6b9757e83cbee1571a781dc1e2120185e157465028f"
+  },
+  {
+   "path": ".research/aac-references/am00_88.adts",
+   "sha256": "1ff00000c44317a3eb32c7b6b67b1e2269e16e941cc3ff7990d473584c00688f"
+  },
+  {
+   "path": ".research/aac-references/am00_88.f32",
+   "sha256": "27c7a540f65b9b1aa6514095fc9727f62ef745800e4dd56896d829a9e2838c43"
+  },
+  {
+   "path": ".research/aac-references/am05_44.adts",
+   "sha256": "090ecd1da2493bd920536964870423719bf6061202b8a27d8033507d08a122c1"
+  },
+  {
+   "path": ".research/aac-references/am05_44.f32",
+   "sha256": "cdd770b8da81550e1a4f1fc8f9028accc4b595f6e584f70e72ef29f114949449"
+  },
+  {
+   "path": ".research/aac-references/ap05_48.adts",
+   "sha256": "ec4aa0192a7672510eeca67d733868ada88600124f8ca81777fba75e98952005"
+  },
+  {
+   "path": ".research/aac-references/ap05_48.f32",
+   "sha256": "1638b00b49c2d33c06b3960f9b8fdd01e8964a918fc6d54f97be61996da9e84c"
+  },
+  {
+   "path": ".research/aac-references/ct_File1_fixed_raw.adts",
+   "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d"
+  },
+  {
+   "path": ".research/aac-references/ct_File1_fixed_raw.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_File1_raw.adts",
+   "sha256": "2b7312468bef3ba96a41b51e6e43b54a3edb1f6638d4c6cb96331efb757818b4"
+  },
+  {
+   "path": ".research/aac-references/ct_File1_raw.f32",
+   "sha256": "a92e6778d4bf320c36d2f546c7cda6cc24450212c14b17a8138e1db354cc8aa8"
+  },
+  {
+   "path": ".research/aac-references/ct_File2.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_File2.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_File3.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_File3.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_File4.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_File4.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_File5.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_File5.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_File6.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_File6.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_File7.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_File7.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_faac-adts.adts",
+   "sha256": "052f9c7c5359d642fbba887d57fc72fe5745fc75b34cddc7a7adc0a912f9cf9c"
+  },
+  {
+   "path": ".research/aac-references/ct_faac-adts.f32",
+   "sha256": "fc815270d370cc07f8af0c9a8e6da067e19e97a7be55d7422783dc4f5cf30427"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_bc-ps_bc.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_bc-ps_bc.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_bc-ps_i.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_bc-ps_i.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_bic-ps_i.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_bic-ps_i.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_i-ps_bic.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_i-ps_bic.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_i-ps_i.adts",
+   "sha256": "aa49e70fa5dfa8465f14c857d7f92421c8df566d78775f1388656fe32fd3e6bb"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_i-ps_i.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_i-ps_i_raw.adts",
+   "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d"
+  },
+  {
+   "path": ".research/aac-references/ct_sbr_i-ps_i_raw.f32",
+   "sha256": "810c0afb0c50b528840c6f30300de5e9f016e609873a6d29ed313774aa9a1c00"
+  },
+  {
+   "path": ".research/aac-references/foo.adts",
+   "sha256": "4439c5a704ed599e45d3b88fe135f994d32d2b65f5d0c0f6a8eb329ea69c45ec"
+  },
+  {
+   "path": ".research/aac-references/foo.f32",
+   "sha256": "8b72bdd317d34a07242c441daa767fd399706e5a9a825248a424a5f11b999518"
+  },
+  {
+   "path": ".research/aac-references/id3v1.adts",
+   "sha256": "2a0fc1de29e543806699655fa35d0f30ae5796b125e371fa59fa2848a04d0bdd"
+  },
+  {
+   "path": ".research/aac-references/id3v1.f32",
+   "sha256": "7020bbb96f15f370cddc12c7afaef1f8131bf5874028ef16b65519c707d886d2"
+  },
+  {
+   "path": ".research/aac-references/id3v2.adts",
+   "sha256": "a671b99d08c1b7c78a77685fceb1824587fa7139cb42fe839c4b0bed113acd64"
+  },
+  {
+   "path": ".research/aac-references/id3v2.f32",
+   "sha256": "8070f11a967f196da30a29b6127972fa6aef16d6870846b9e71fcf6bac986c94"
+  },
+  {
+   "path": ".research/aac-references/id3v2_two_tags.adts",
+   "sha256": "ccaab043f75b6949dce4569da9a8d311d992e0c3da0d0989cc993100291eb281"
+  },
+  {
+   "path": ".research/aac-references/id3v2_two_tags.f32",
+   "sha256": "efef1db6ab643729a847b1278abafe247baf3584874fc86a869a6cca2b3aa508"
+  },
+  {
+   "path": ".research/fate-samples/aac/CT_DecoderCheck/File1.aac",
+   "sha256": "2b7312468bef3ba96a41b51e6e43b54a3edb1f6638d4c6cb96331efb757818b4"
+  },
+  {
+   "path": ".research/fate-samples/aac/CT_DecoderCheck/sbr_i-ps_i.aac",
+   "sha256": "76e84aa3e0d142696699bdb5d9bc8b037415065c604e2fa9f7d00e5f59bb597d"
+  },
+  {
+   "path": ".research/fate-samples/aac/ct_faac-adts.aac",
+   "sha256": "052f9c7c5359d642fbba887d57fc72fe5745fc75b34cddc7a7adc0a912f9cf9c"
+  },
+  {
+   "path": ".research/fate-samples/aac/foo.aac",
+   "sha256": "4439c5a704ed599e45d3b88fe135f994d32d2b65f5d0c0f6a8eb329ea69c45ec"
+  },
+  {
+   "path": ".research/fate-samples/aac/id3v1.aac",
+   "sha256": "2a0fc1de29e543806699655fa35d0f30ae5796b125e371fa59fa2848a04d0bdd"
+  },
+  {
+   "path": ".research/fate-samples/aac/id3v2.aac",
+   "sha256": "a671b99d08c1b7c78a77685fceb1824587fa7139cb42fe839c4b0bed113acd64"
+  },
+  {
+   "path": ".research/fate-samples/aac/id3v2_two_tags.aac",
+   "sha256": "ccaab043f75b6949dce4569da9a8d311d992e0c3da0d0989cc993100291eb281"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/core_51_24_48_768_0.dtshd",
+   "sha256": "95653e7d94307a9d467c28ae10883440dcc39f06ac79d7401b27eb422cd99009"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/core_51_24_48_768_1.dtshd",
+   "sha256": "3b85a3bd2723c93e4c341403a45c111bc6777cfc6de890108938580f59886cc4"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/x96_51_24_96_1509.dtshd",
+   "sha256": "d4d4df6d83042799df124fe48d3465381c57f4f3b2483cb0fe8aa52ea403a9f5"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/x96_xch_61_24_96_3840.dtshd",
+   "sha256": "3c68b08ca9809a589f6d5ad10cd75f1f6458bcef9ce5bbf97d9b0e2c3f9d4e7e"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/x96_xxch_71_24_96_3840.dtshd",
+   "sha256": "c8c1ddabb3850f4ff3d25bbed94259a2b53c0336ce0f2b0185a65761f82346a2"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xbr_51_24_48_3840.dtshd",
+   "sha256": "72af29c81314deeab71cd798f38fde136a01f72a1d6c57d981278c82fe1d3f27"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xbr_xch_61_24_48_3840.dtshd",
+   "sha256": "0ce33593cdf6914131f8b3eba664b215a6ce09ba66c444d6ce342301b214153e"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xbr_xxch_71_24_48_3840.dtshd",
+   "sha256": "b24e66db937a45b7ce522b773388d29492a88e83fc8680930be00c5987ac93a1"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xch_61_24_48_768.dtshd",
+   "sha256": "db7c44e47b3c01c57829ac9947a0e77aa93798475773e1f2fd74f99a607c48b7"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_51_16_192_768_0.dtshd",
+   "sha256": "34441a4f2df89e086f67a7b0f72aa871e1cbb3b04b301470a7727038bb91b618"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_51_16_192_768_1.dtshd",
+   "sha256": "ff9067cf5685d38f6d20d607559b69f14b43d6c5a20fa8438bd8862ab98f375d"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_51_24_48_768.dtshd",
+   "sha256": "c0830af121ec78a8271d008999cc54b99843f17b9b33203bb9adbcbc3271d0a9"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_51_24_48_none.dtshd",
+   "sha256": "c445bb746c6afc920761b55b00932053d64a96d3d08cd9cad4c759a892fae4cd"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_71_24_48_768_0.dtshd",
+   "sha256": "8d380d1323a6fff90a8885d65697217b1bbc4f2c027e30af870fa0dfa50f8eb3"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_71_24_48_768_1.dtshd",
+   "sha256": "267828d7db493d16a43d238a7e94c0c20ecd35426f11143683079e67bb2dab2b"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_71_24_96_768.dtshd",
+   "sha256": "d2911b34183f7379359cf914ee93228796894e0b0f0055e6ee5baefa4fd6a923"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_x96_51_24_96_1509.dtshd",
+   "sha256": "ac8de7e1f2875145aff90db2953f62fb4910e301d7fb48007eb3db0a36d09e90"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xll_xch_61_24_48_768.dtshd",
+   "sha256": "ab29359bd0fbb958ce730496243aa082f4e8cdbd4cf058fe59867db130d755ad"
+  },
+  {
+   "path": ".research/fate-samples/dts/dcadec-suite/xxch_71_24_48_2046.dtshd",
+   "sha256": "aa9055e58c50a055ed730b280b48c29ee447ae46af71f7c1ba71c621c0e742a1"
+  },
+  {
+   "path": ".research/fate-samples/dts/dts.ts",
+   "sha256": "749561299cf838d55f52d5697f78c273a6c381c5e6c8300f859dfe23252ae2c2"
+  },
+  {
+   "path": ".research/fate-samples/dts/dts_es.dts",
+   "sha256": "2e2530d220d51b914d1e7acb63badb5b2dae1578f3274116206fa1aa5e597638"
+  },
+  {
+   "path": ".research/fate-samples/dts/dtsx_7.1.4_24bit.dts",
+   "sha256": "f3b5ac8a758fbf341805d00878a91507c4c663f9466a1bb56a5a3a93813da517"
+  },
+  {
+   "path": ".research/fate-samples/dts/master_audio_7.1_24bit.dts",
+   "sha256": "227f1008f9529b2bdf937ce856d2562d0128162ac930e2579ef4b8fd7474ee18"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_block16.flac",
+   "sha256": "548054363fae3e66ad73b3d02909d1f5ca548a40b96d9009ac6f1c782e2f959d"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_block16384.flac",
+   "sha256": "fb8acf5a8c172a6c4bf4255492ce2ac9e7a253b2ae8c4b11e7eb4ee7f30ea860"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_block192.flac",
+   "sha256": "9bd59526cb74e88c358453ca87c01cb5beccf79c445e606f61b7e5892576cdb3"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_block32768.flac",
+   "sha256": "e90680b9245ad0dca98423753da3911d37e1ded023e2993cd0a0b362406aeab3"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_block4608.flac",
+   "sha256": "94e667f9699121d3f56225c6d60b4d880dfd23c4299fbf25d74f852b2acfbf8e"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_block576.flac",
+   "sha256": "b88d3145b2078ef88519130407733b5a3834c7222a4c31edd8b99f344da1132a"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch1.flac",
+   "sha256": "e2572bd922f520a88c2743e22da6c84f9746ba2c08342a1e8992fd820e392e5f"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch2.flac",
+   "sha256": "822a5b4df6458efa3b3ca9160bdc6a398d5d859cc6c73c2f4553cdf6abcfb67d"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch3.flac",
+   "sha256": "8741fea36f842fca66a27dd151e43cf903d4faf0d7bf64ec0fbc8c7162f0dade"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch4.flac",
+   "sha256": "3df23dae51a03aa7f6b871290977679ea061c0332f50e1826c587f95058b1a8a"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch5.flac",
+   "sha256": "c4e2ff9a2493c508a4c2f69adaf17bbfb3ca2226bff0e479b09e0636c5cfbc9e"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch6.flac",
+   "sha256": "cff18a774fb64c8423036ad36ff56c522b4be867701a9ad62926749240dbd81a"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch7.flac",
+   "sha256": "e997e05c739b0104a6efc26dc529a18edd291e144786a0f3def337312ba83f8c"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_ch8.flac",
+   "sha256": "9edc3f3a43f1c4821ffa5f216666fa305cbf99b261d07b9603ebf61eaeb5b710"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_exact_rice.flac",
+   "sha256": "1e021859d83a6e221e837b0609d79b6731fba8638a493e83f90686b5a8e3cda4"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_indep.flac",
+   "sha256": "b3a4216e1717b58be3e75968080e0a98020b3f4d208f76d49dbe9fa4b2ab0424"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_left_side.flac",
+   "sha256": "9b51bf7f46170a49d601457cbf212c0ffa1ec98e5fe7214a5bd2c7ded09103ae"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level0.flac",
+   "sha256": "3f950058f59a5ebd34a3bddd41632a71d5d9fec069fc6feb5b575815faa36307"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level1.flac",
+   "sha256": "4342de09d616d703d78c51c85d01566300365c4e68745cb31c4311ec9830e778"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level10.flac",
+   "sha256": "050b3577bfa9886b187e0e16244183fb9290c144b684388bbaec8943425dcc08"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level11.flac",
+   "sha256": "208f540bd2c16231e594bc8aa7ec7967868bc4cadf4d186d3ef97e0a4bd090c0"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level12.flac",
+   "sha256": "6def173a90a26b390aaf58ff05ea01ca602f1baf993b6a966d79fe347b2375a7"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level2.flac",
+   "sha256": "bf4a37c3bdc2562663185e14989491afaf6c2c5ba3a70c28e13e89c320ef4f74"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level3.flac",
+   "sha256": "ed317d269c8aee3c8f917257526a348930eb175b767c2cee48f17e8307179f84"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level4.flac",
+   "sha256": "ab21aea393eca66feecc9b2a571a5c723f2ba44265fa79ab10bf6b0ce230545f"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level5.flac",
+   "sha256": "4c55b1f461f2c865fdab156d7185a6419d2fd1319bb16f5bd23a8f32fc5274c1"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level6.flac",
+   "sha256": "1d810f1ca1a207676c31afc23c1f3483db57068b7683fa842da69ac296465e7a"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level7.flac",
+   "sha256": "dcf23b025b0c9e62596bbdc84541107b9f00a48ee37611db964b3b553805364c"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level8.flac",
+   "sha256": "b83f9a907078f200c15a968e4b081e32b3ddeb8eacba5a9fce70d44772277bad"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_level9.flac",
+   "sha256": "dc7b39cf4f145bb6db77a4941fca37b22e0da95554943e28e6e091797091cdd3"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_lpc_cholesky.flac",
+   "sha256": "6a2e75c52399d2a5c9b7f5f6215800434e5301cb5e33048ef4da81e899d8b263"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_lpc_fixed.flac",
+   "sha256": "4b0d80200ea522bfd0cb9994bd2959bf9b1fc0e32b86005deb02d48c1450de18"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_lpc_levinson.flac",
+   "sha256": "d3e36709f7741cb2e678fdf71def9ab063965f86b0ce35c407cab90c4bc8591a"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_lpc_none.flac",
+   "sha256": "ae0bcfe9fb938f87024a11b1b48530ef37d4de845b421c767cd975cdcf4288f3"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_mid_side.flac",
+   "sha256": "f844dff967e5a93e1be922b0ab0903426313bcb2e26a1a4e1ebc7d31cfaf3940"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_multi_dim_quant.flac",
+   "sha256": "d37b2f6012d36366985183d266660148dec71d825ad82881274e88bb6e329eeb"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_order_2level.flac",
+   "sha256": "c277537fbaf18f76e789bcf00953abfa939ad0ad42d6c10c9d0239705f68b55f"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_order_estimation.flac",
+   "sha256": "4cfd751c9b9a28519821fcbbd3395755810a0f21dab36de3fbf1239b371c803c"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_order_log.flac",
+   "sha256": "b5439e68aa7d2e8d55ae972c2f8ca8b28dcf7292f19ddce2ba6ccb00b3832c00"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_order_search.flac",
+   "sha256": "23574ab898a1a1998dc48bb7b1cf9e55a120f2d1ddefe3a8cf41e23cfd2b9305"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_partitions_0_0.flac",
+   "sha256": "eabd68c9a72c3b620859166da9b0b10b71653c83a1cca8e9e1655f92efd935ec"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_partitions_0_8.flac",
+   "sha256": "058fc1a24c6647d0284f10a9131469434dc2454028aad6ec71941a7993fbb643"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_partitions_8_8.flac",
+   "sha256": "40f4670f10480da5d6ff6385a4766438fa1e7eff364b7511bd4c6db556a5f02f"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate11025.flac",
+   "sha256": "309e9d19fe3b6f33370c6b105d9b8fa2283fa759a2f290e42bfdc06ed1db0164"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate176400.flac",
+   "sha256": "9361ce60edff58863639cc6271ff6b40f77a057df4f8813f3adaa6ba47b3b23d"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate192000.flac",
+   "sha256": "d36e59816ebc2d22efbbbad0f792046252f6029b1e32ad9909f9a246eb0030d9"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate22050.flac",
+   "sha256": "9cd6f31c9a8ba7811e1a173a3cc60953739e853d43ad0cc2accc0717920599d6"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate32000.flac",
+   "sha256": "95eaed2637cce53d2e2ac763c9db68e8e57ec147af13d20ba1339779415d76b1"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate37800.flac",
+   "sha256": "e0d4eae4f7a6ff283f792356fe6c2500012831f145e7411f10c21011df2bb93d"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate8000.flac",
+   "sha256": "ea264945397e3f2e11c60282bcca1d2ebc8a8d0c0fcadc166620c776eebccda9"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_rate88200.flac",
+   "sha256": "b07dad3095f0944219df7a160be6c3bc0ffa4ffeb86d4fac77fa8141aff2c3f1"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_right_side.flac",
+   "sha256": "20671462cf0d9d2c999f4ff8b330587075d0e883aeeeb160a62746ec6745ca13"
+  },
+  {
+   "path": ".research/flac-generated/ff_s16_wasted2.flac",
+   "sha256": "ebc7785dff177f21c91eb1a36440bd172beda390ddd2f4a1615f7bbf5db43866"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_ch1.flac",
+   "sha256": "5c704c0facc4fac3d723442b3c3e2f62b250f2b9df1250569e8d12d3c905b014"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_ch6.flac",
+   "sha256": "9432219736b7dbbc1f6d15f9e25b76e44e2872bda2b5c127d4a406bea27290b1"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_ch8.flac",
+   "sha256": "3fbb8c4a2c9272b3da67a5ce2fae2101e5674d1d0a92d21ad5417fbbdc8f26ef"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_indep.flac",
+   "sha256": "3860e4370bbb28506b2e52b47cb8ef6104ef4080be3b4dfab765f8c26a35398b"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_left_side.flac",
+   "sha256": "adafa194ae2332569b260f96cfec6da519a0eeeae2b241431f13e786455d22cc"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_mid_side.flac",
+   "sha256": "7283261a9de033f31fbf7c80501cb17c03d112378f43221958bbadf15c317956"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_order1.flac",
+   "sha256": "67de173e96c651740cabbd91d86d44696f3ee773125117aca190254e2208472e"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_order12.flac",
+   "sha256": "d07c0ed6cec52006cd2d92d464a95745930b60855d92f40fdc22c1ff337c8e80"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_order32.flac",
+   "sha256": "9924386b6c13f0a4f29d00e88883fd95d85b6c382a6202e20e3562c77586ef98"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_right_side.flac",
+   "sha256": "898097ae4729f45a4295564eae364dca37d7c3177c84292cad462befde587fdd"
+  },
+  {
+   "path": ".research/flac-generated/ff_s24_wasted8.flac",
+   "sha256": "03094ef0dea69375bf779e05e7c09e4d698f9da4a22d54bcf45d3afb392d120d"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_ch1.flac",
+   "sha256": "32dd1355c8e8ac6be74c6c27f3fd102a275cc7fa78ff9311a4603206fd0abab1"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_ch6.flac",
+   "sha256": "01ecc5387291d0e059eabdd02abf19b737d35d2430f57b914c41583e186db031"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_ch8.flac",
+   "sha256": "15ac9aee06187a081b9e28a42cee18273ab5feabbb81ce2584bfef25d66b19ad"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_indep.flac",
+   "sha256": "32ff8af7ee7c2b1240271e35be6661b3e17b2d7fbc4426ceb52b9faac797cdb3"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_left_side.flac",
+   "sha256": "38e02c90dc8b2e6051b1cfb9e38bb333b4b4acc0ecafbfe1117a24b692779ba8"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_mid_side.flac",
+   "sha256": "1751955ef7f50f04342dd2d4c59c416fa715d3cab14a58b2e7e588e33f265868"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_order32.flac",
+   "sha256": "811c62f212fb19d931d8ba730f0957f25220ed517cf9e2e83296227386bdc430"
+  },
+  {
+   "path": ".research/flac-generated/ff_s32_right_side.flac",
+   "sha256": "fc57c6e0e9faa97a1859603d984641a5d4c4f67c650af3b36d006b198cd9916e"
+  },
+  {
+   "path": ".research/flac-generated/flac_3ch_odd_mask.flac",
+   "sha256": "87e97b0c67626ee73d88345e60caa579ad712b4d3cb350b8caa2b1a3dbd5c087"
+  },
+  {
+   "path": ".research/flac-generated/flac_5ch_back_mask.flac",
+   "sha256": "46b58f8553252ac71271500937c2a7f1b6fa62ee42f7acd4d09cbab9b27aa144"
+  },
+  {
+   "path": ".research/flac-generated/flac_b12_ch7.flac",
+   "sha256": "e60b6a181cc50ac131534860cceeda69ed0da3c7e8a5e433b7750bce6d38e512"
+  },
+  {
+   "path": ".research/flac-generated/flac_b12_stereo.flac",
+   "sha256": "404783304e2124a405de7b276d44b828ef8e3f9a40d1fcf5544f4e5198114e14"
+  },
+  {
+   "path": ".research/flac-generated/flac_b15_stereo.flac",
+   "sha256": "a760b0266139626acc5d5758f086079efa1f27524497d67dce7c0dad418f72fa"
+  },
+  {
+   "path": ".research/flac-generated/flac_b16_stereo.flac",
+   "sha256": "7d41e98d4ebafcee67348280ea047d8bb272e52bec06b267747d9e1a0d525f81"
+  },
+  {
+   "path": ".research/flac-generated/flac_b20_ch7.flac",
+   "sha256": "e87d93f2ba06f74efbd3a6d67514cd297e4bbd8cb13c992ba35eb666409461eb"
+  },
+  {
+   "path": ".research/flac-generated/flac_b20_stereo.flac",
+   "sha256": "0a4d1e866cc47239e6df1d15414dd2fe966f53743e33d505a70282a11698ec46"
+  },
+  {
+   "path": ".research/flac-generated/flac_b24_stereo.flac",
+   "sha256": "da357d4634baca5d924a70638b7acf6aab35b6986654969a32024470aed1f287"
+  },
+  {
+   "path": ".research/flac-generated/flac_b28_stereo.flac",
+   "sha256": "c5b8cceb426b01250aa9415694529c0f91f9e00ae94f5443ca67dee8dc5eaec8"
+  },
+  {
+   "path": ".research/flac-generated/flac_b31_stereo.flac",
+   "sha256": "2d34e0f5ad927022d6b28873c4c0cabc23092144541a702f825edbb5e73215d0"
+  },
+  {
+   "path": ".research/flac-generated/flac_b32_stereo.flac",
+   "sha256": "44ead8e11d162c12e35d1d021f5c6587e253d53d9bae6cd5683910426b865652"
+  },
+  {
+   "path": ".research/flac-generated/flac_b4_stereo.flac",
+   "sha256": "8cfc3fee961265c839230c38edd95e0137fd6faf7491ed6add9ae861e5d81f45"
+  },
+  {
+   "path": ".research/flac-generated/flac_b5_stereo.flac",
+   "sha256": "5c3934c2e5a569168583d5e7a74e10f48a967f064dcd2d2ea10ff932e2831294"
+  },
+  {
+   "path": ".research/flac-generated/flac_b8_ch7.flac",
+   "sha256": "b04f63546b56858cec9a33af22f6fa12506c7b648a8b12a05bdbba32b41e460d"
+  },
+  {
+   "path": ".research/flac-generated/flac_b8_stereo.flac",
+   "sha256": "42469f93bd23c20ba4275fcf01fb5872a30fb9f69a63b11877cefd170ca01e22"
+  },
+  {
+   "path": ".research/flac-generated/flac_quad_side_mask.flac",
+   "sha256": "bc4f8a82c4d48cf015cde1e12cd52063f4a2d2d4375730df4fdeea8ee9b53dac"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_adaptive_mid_side.flac",
+   "sha256": "3b8e6f786f80db709f56c013cd3b0d44c52cf5d0de4ab13968a34ba2275e9bbc"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_block16.flac",
+   "sha256": "9693d2722d3c2c0d86b568621584e6230c70961b64043df8e963dc5b4355f78f"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_block65535.flac",
+   "sha256": "ecc66bf25625890684c64e8042d00d2c63ae75231870ffcfbab773170a66d94e"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch1.flac",
+   "sha256": "631ca35739a1c4cd1922c8e343e344f1b79c0cbb8ba9b0ae296f2c49204eb847"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch2.flac",
+   "sha256": "b61ba81d31f68d70ce7f8ca80544e364aa66405f8e91a9edb1350d865e943ffb"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch3.flac",
+   "sha256": "ec57dcf43828fdd4ae09150601a4e23eb98aea815fca63040e062fbfe24ab2e7"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch4.flac",
+   "sha256": "f1f88c8262da575049e15d9557b25025051cfe435c8bf1226401d16837092927"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch5.flac",
+   "sha256": "9561b0176da556d0dff463724f77887a36cb58e39ae23098f50e206e3f19ce8e"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch6.flac",
+   "sha256": "d800fa59e65da9aee53a61e878518f52e7cc5173ac8003f106e75e582e6f55b8"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch7.flac",
+   "sha256": "e9ef7aa20fd6c456baa868e9a7d5d8f16f1150ddeb97d4699273988bdd61652f"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_ch8.flac",
+   "sha256": "1fffdd88054f0964b839f8c84df54752b42a33d686a2b02044074f174cd50c7f"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_exhaustive.flac",
+   "sha256": "197229d7c0f6641fbb7077f58026aa73836592000c937c57ab00a3f591b3ca79"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_level0.flac",
+   "sha256": "c120d0b2c6a0b36ac896e0538cc3e79af52463f124051d09c7907da55c47109e"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_level3.flac",
+   "sha256": "16dfa93e3576f7516e1bea12ad86b3e4e76a515d498e510296b2711ed7384d68"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_level5.flac",
+   "sha256": "beab06952dd5b05bf800974e6fbcc8038a650ef6a1fcd5f9b6d987366f5b884c"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_no_mid_side.flac",
+   "sha256": "155898f16330c1dbc878546331a19cd4728ab2b74f1877d7dba1ab95feb3ef2d"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_partition15.flac",
+   "sha256": "a4759d7c67560e33c5d3153df5ed51f64b48caf49e735fd740159defa0082dc1"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_precision5.flac",
+   "sha256": "449f24301fcf5ad557c6321a6dd0de641504487849b2e9638f19187bd1ae0a2e"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_rate1.flac",
+   "sha256": "5a235bd079ae95f6317a9311aef06de4a067235f8fb213be4209be061fafae12"
+  },
+  {
+   "path": ".research/flac-generated/flac_s16_wasted3.flac",
+   "sha256": "415f469be74378e22775a6e722192982c8b4daa94bd91aa35b34046780311753"
+  },
+  {
+   "path": ".research/flac-generated/flac_s20_rate768k.flac",
+   "sha256": "ea3c5aa6fd530bd0b14f893f151904119d6d140d228bbfe67e4a1ac413f4bb0f"
+  },
+  {
+   "path": ".research/flac-generated/flac_s24_lax_order32.flac",
+   "sha256": "8149571f13902f4c38f7aa4dedae8cce5cc0ff4cf2d16ec6ebe5915f3cdc442d"
+  },
+  {
+   "path": ".research/flac-generated/flac_s32_lax_order32.flac",
+   "sha256": "cf908410b01401472170878dc3acf772724e8e40f3e50bf2bf2e1b591d0c4e5f"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/01 - wrong max blocksize.flac",
+   "sha256": "7abd0c6062b33949cc646bc887b5267d698ec8aff9cd8d8c2f270d40b7b63615"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/02 - wrong maximum framesize.flac",
+   "sha256": "1e7f0cb5e19b984d549beea65a9f074cc7693ff594e6ae4685bca43b48dc3143"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/03 - wrong bit depth.flac",
+   "sha256": "6d3258785ae23fe90958a7bd8eab8443d07d28f456b5d49b908772fa2f803a22"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/04 - wrong number of channels.flac",
+   "sha256": "5410a65f762a6c97a2f8c51fb0354bbde564f35d07ef95fee60e8a715d110efc"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/05 - wrong total number of samples.flac",
+   "sha256": "92f98457511f2f9413445f2fb3e236ae92eab86c38e0082dfbe9dd96d01ba92c"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/06 - missing streaminfo metadata block.flac",
+   "sha256": "53aed5e7fde7a652b82ba06a8382b2612b02ebbde7b0d2016276644d17cc76cd"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/07 - other metadata blocks preceding streaminfo metadata block.flac",
+   "sha256": "6d46725991ba5da477187fde7709ea201c399d00027257c365d7301226d851ea"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/08 - blocksize 65536.flac",
+   "sha256": "f6e3b6b72e86f259fcdafc50486b8bf9d4d85b193e18e6e4aa63a6e1ca9e7928"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/09 - blocksize 1.flac",
+   "sha256": "4a1e703e9ac7dc67ac82dc74087ba1d62a0f13e89d11e020e01e26306a0102af"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/10 - invalid vorbis comment metadata block.flac",
+   "sha256": "c79b0514a61634035a5653c5493797bbd1fcc78982116e4d429630e9e462d29b"
+  },
+  {
+   "path": ".research/flac-test-files/faulty/11 - incorrect metadata block length.flac",
+   "sha256": "3732151ba8c4e66a785165aa75a444aad814c16807ddc97b793811376acacfd6"
+  },
+  {
+   "path": ".research/flac-test-files/subset/01 - blocksize 4096.flac",
+   "sha256": "02c7e60ae7788c2cb6898a0a46985d759f1e62482ddd965a374dfd09a2a8390f"
+  },
+  {
+   "path": ".research/flac-test-files/subset/02 - blocksize 4608.flac",
+   "sha256": "f4e97914fb9a8cd95b9be90c9970f6d553d76ded55a7a443dbd0d5dfa7bd2819"
+  },
+  {
+   "path": ".research/flac-test-files/subset/03 - blocksize 16.flac",
+   "sha256": "164d0747e8c4855407990182b784fcd7475da228bf20a6cff67e947c683959b3"
+  },
+  {
+   "path": ".research/flac-test-files/subset/04 - blocksize 192.flac",
+   "sha256": "0f9f7e2fc262e16e8cd92de3e8869d13197a5e9c3ef7239f8ee749cbd2689980"
+  },
+  {
+   "path": ".research/flac-test-files/subset/05 - blocksize 254.flac",
+   "sha256": "8965c9616f769573d3bf8ef5b92ee5a2827e797c098a9436a5e3366feb9c9ae2"
+  },
+  {
+   "path": ".research/flac-test-files/subset/06 - blocksize 512.flac",
+   "sha256": "ba705cc365abf5b8bd6b4d4392a2668ae395844f82d04e74be3e19b60cb03260"
+  },
+  {
+   "path": ".research/flac-test-files/subset/07 - blocksize 725.flac",
+   "sha256": "ffc15a2ead7a6651e2cd36fa886edcffffc32e831077dce852fb7df6f131d2b3"
+  },
+  {
+   "path": ".research/flac-test-files/subset/08 - blocksize 1000.flac",
+   "sha256": "fa189c885be140510348f18899fe151a903f0199d502982ecc7863cb85810ba6"
+  },
+  {
+   "path": ".research/flac-test-files/subset/09 - blocksize 1937.flac",
+   "sha256": "8786ea66bf5d0083fcf760b874216ac566d0b2688ba58e5711f46525841a0028"
+  },
+  {
+   "path": ".research/flac-test-files/subset/10 - blocksize 2304.flac",
+   "sha256": "8ec67465e9041373a67f2440220825ba9d7706789584bffbbb3f109424df25ee"
+  },
+  {
+   "path": ".research/flac-test-files/subset/11 - partition order 8.flac",
+   "sha256": "07596315fc9b297702984deab49041f4695e1482ec3e1d081888d1bf13198e53"
+  },
+  {
+   "path": ".research/flac-test-files/subset/12 - qlp precision 15 bit.flac",
+   "sha256": "d33731350269929542c6e0a788c1b9a27eb91dcb3a20f5f960b8569be012c6fa"
+  },
+  {
+   "path": ".research/flac-test-files/subset/13 - qlp precision 2 bit.flac",
+   "sha256": "b60e113a6a3b97d7a3c48be90913ced8c85f1ee332c6c5dd5a79b46cdc38108a"
+  },
+  {
+   "path": ".research/flac-test-files/subset/14 - wasted bits.flac",
+   "sha256": "58fa05681bd646168ea2a19bc9a6f4ee9d6de295fd832c1f70da1bdbf32d74cb"
+  },
+  {
+   "path": ".research/flac-test-files/subset/15 - only verbatim subframes.flac",
+   "sha256": "80459f8ad5a9c7edf081a10f9269c55c29136749021e5a55483bc173aaaa82b0"
+  },
+  {
+   "path": ".research/flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac",
+   "sha256": "5562cff546a1b0d93cea31c0c375c5df65658311de1fc3d322d14b8a2c5ac930"
+  },
+  {
+   "path": ".research/flac-test-files/subset/17 - all fixed orders.flac",
+   "sha256": "d6f082cbbbcb03015f861b8fa30cf16708a62b85520905a126da28db29645feb"
+  },
+  {
+   "path": ".research/flac-test-files/subset/18 - precision search.flac",
+   "sha256": "562dd053a92a83bf64baf90ae5f9b3d0af58121c5534b3c05353d77b2ff25aaa"
+  },
+  {
+   "path": ".research/flac-test-files/subset/19 - samplerate 35467Hz.flac",
+   "sha256": "72ee52c82ee46eea28d659392ce75557e66df1051563fde1936d3e5a8fd8d2c2"
+  },
+  {
+   "path": ".research/flac-test-files/subset/20 - samplerate 39kHz.flac",
+   "sha256": "9c87394f650fda9d08bc6b4a7c56a4fd56dcac3531913aa536e7d4d576580ee0"
+  },
+  {
+   "path": ".research/flac-test-files/subset/21 - samplerate 22050Hz.flac",
+   "sha256": "a808ffa5c3cb99c7bc8268141f2d01fb7ccb4c3ced617fd7909f578fb9363f88"
+  },
+  {
+   "path": ".research/flac-test-files/subset/22 - 12 bit per sample.flac",
+   "sha256": "d9c385129c4253da4c0de34ed5b163b404523aa971773277b8b74ef92f7d4f44"
+  },
+  {
+   "path": ".research/flac-test-files/subset/23 - 8 bit per sample.flac",
+   "sha256": "d72ad54e1d0ebe5d65b1b1addd13ee873d38c58cb3357774a1943ced2d984cf9"
+  },
+  {
+   "path": ".research/flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac",
+   "sha256": "c6664710c935e4d862ab04f146ddd7f6df9e2278b651c17a432934e61488eaf7"
+  },
+  {
+   "path": ".research/flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac",
+   "sha256": "df5658969201d6867a1cc64d69e30a8ec833b53f7239345eda7eefff1a4a2ad8"
+  },
+  {
+   "path": ".research/flac-test-files/subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac",
+   "sha256": "355ddbac0f596623f805c3d3ff8cf4ba25d3a13c9d61e63719a8d02ebb647c19"
+  },
+  {
+   "path": ".research/flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac",
+   "sha256": "21b486a42dbf64c043d57dcd5a038163dc77f5eec398312d994643617ec3c5b6"
+  },
+  {
+   "path": ".research/flac-test-files/subset/28 - high resolution audio, default settings.flac",
+   "sha256": "62322a5c7821081bae99cc1a3f398f177a17cf9312131a5fbcfcc2ee38539346"
+  },
+  {
+   "path": ".research/flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac",
+   "sha256": "7551605d8a90a7e74e788b31273493ce5e24059d839b1d44dbad89cf9fb132a5"
+  },
+  {
+   "path": ".research/flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac",
+   "sha256": "d2e6b73cc0888419d709a03c317f59dfb8d48fcdc29e73fb0c099d5de7d512be"
+  },
+  {
+   "path": ".research/flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac",
+   "sha256": "caf84fbf740a98e3371a58df03422722a7d6058289b11a291f0b39103ea20133"
+  },
+  {
+   "path": ".research/flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac",
+   "sha256": "479474ac6a101725976aa9a4e94580040d650779da41db2981be03aa41ef7fdd"
+  },
+  {
+   "path": ".research/flac-test-files/subset/33 - samplerate 192kHz.flac",
+   "sha256": "4833aafc6a7d652bac05de6d304d3e63cc419a731df995b146d91294062bbcd0"
+  },
+  {
+   "path": ".research/flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac",
+   "sha256": "b32a7e21114034610fea4d43610980111dc9c40faa315a3111196102a7bac36e"
+  },
+  {
+   "path": ".research/flac-test-files/subset/35 - samplerate 134560Hz.flac",
+   "sha256": "ffe10b26321fdc1a1be31cfd7034a4f98b1c0cb3e32e9c1cc129b7ff4a259177"
+  },
+  {
+   "path": ".research/flac-test-files/subset/36 - samplerate 384kHz.flac",
+   "sha256": "63fc6b1ae16fc0285f7053f49ce967087f6a041630ee105d3d67fd8d34e45b7c"
+  },
+  {
+   "path": ".research/flac-test-files/subset/37 - 20 bit per sample.flac",
+   "sha256": "8d8c0526b7823099974a348a6ae80eff9c7eeb4be4e3da270e8e2e9e45d74b3c"
+  },
+  {
+   "path": ".research/flac-test-files/subset/38 - 3 channels (3.0).flac",
+   "sha256": "44d14d0efa374049fd9f56aaee3a068a30045e62a571df574c7b824ae596a3cf"
+  },
+  {
+   "path": ".research/flac-test-files/subset/39 - 4 channels (4.0).flac",
+   "sha256": "ac670ce52561023dca32f7bd20fbe94c1e1459f06188cd0f870801ea5fb23cee"
+  },
+  {
+   "path": ".research/flac-test-files/subset/40 - 5 channels (5.0).flac",
+   "sha256": "bf616e933caab9b7a5da64f9527390f83f208134d327c72a16225c0779ba0da0"
+  },
+  {
+   "path": ".research/flac-test-files/subset/41 - 6 channels (5.1).flac",
+   "sha256": "c12650fda54a384abf017d4b931491de043eaa7a815ae74c7a9b49d4087d6193"
+  },
+  {
+   "path": ".research/flac-test-files/subset/42 - 7 channels (6.1).flac",
+   "sha256": "07a5d7fc8c4dd74c634b2f0e912a063496f67dd2ba9fbe14f7b5fa37fee8f638"
+  },
+  {
+   "path": ".research/flac-test-files/subset/43 - 8 channels (7.1).flac",
+   "sha256": "9c39ff436f316b3a8e72200c8f38af2d9ef15418c25be555aa621d0c793a6254"
+  },
+  {
+   "path": ".research/flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac",
+   "sha256": "1a0e8c17392ae03b2cb04e8c82fcc1f924580fdc978884101faa3e9cf7ed9197"
+  },
+  {
+   "path": ".research/flac-test-files/subset/45 - no total number of samples set.flac",
+   "sha256": "336a18eb7a78f7fc0ab34980348e2895bc3f82db440a2430d9f92e996f889f9a"
+  },
+  {
+   "path": ".research/flac-test-files/subset/46 - no min-max framesize set.flac",
+   "sha256": "9dc39732ce17815832790901b768bb50cd5ff0cd21b28a123c1cabc16ed776cc"
+  },
+  {
+   "path": ".research/flac-test-files/subset/47 - only STREAMINFO.flac",
+   "sha256": "9a62c79f634849e74cb2183f9e3a9bd284f51e2591c553008d3e6449967eef85"
+  },
+  {
+   "path": ".research/flac-test-files/subset/48 - Extremely large SEEKTABLE.flac",
+   "sha256": "4417aca6b5f90971c50c28766d2f32b3acaa7f9f9667bd313336242dae8b2531"
+  },
+  {
+   "path": ".research/flac-test-files/subset/49 - Extremely large PADDING.flac",
+   "sha256": "7bc44fa2754536279fde4f8fb31d824f43b8d0b3f93d27d055d209682914f20e"
+  },
+  {
+   "path": ".research/flac-test-files/subset/50 - Extremely large PICTURE.flac",
+   "sha256": "1f04f237d74836104993a8072d4223e84a5d3bd76fbc44555c221c7e69a23594"
+  },
+  {
+   "path": ".research/flac-test-files/subset/51 - Extremely large VORBISCOMMENT.flac",
+   "sha256": "033160e8124ed287b0b5d615c94ac4139477e47d6e4059b1c19b7141566f5ef9"
+  },
+  {
+   "path": ".research/flac-test-files/subset/52 - Extremely large APPLICATION.flac",
+   "sha256": "0e45a4f8dbef15cbebdd8dfe690d8ae60e0c6abb596db1270a9161b62a7a3f1c"
+  },
+  {
+   "path": ".research/flac-test-files/subset/53 - CUESHEET with very many indexes.flac",
+   "sha256": "513fad18578f3225fae5de1bda8f700415be6fd8aa1e7af533b5eb796ed2d461"
+  },
+  {
+   "path": ".research/flac-test-files/subset/54 - 1000x repeating VORBISCOMMENT.flac",
+   "sha256": "b68dc6644784fac35aa07581be8603a360d1697e07a2265d7eb24001936fd247"
+  },
+  {
+   "path": ".research/flac-test-files/subset/55 - file 48-53 combined.flac",
+   "sha256": "a756b460df79b7cc492223f80cda570e4511f2024e5fa0c4d505ba51b86191f6"
+  },
+  {
+   "path": ".research/flac-test-files/subset/56 - JPG PICTURE.flac",
+   "sha256": "5cebe7a3710cf8924bd2913854e9ca60b4cd53cfee5a3af0c3c73fddc1888963"
+  },
+  {
+   "path": ".research/flac-test-files/subset/57 - PNG PICTURE.flac",
+   "sha256": "c6abff7f8bb63c2821bd21dd9052c543f10ba0be878e83cb419c248f14f72697"
+  },
+  {
+   "path": ".research/flac-test-files/subset/58 - GIF PICTURE.flac",
+   "sha256": "7c2b1a963a665847167a7275f9924f65baeb85c21726c218f61bf3f803f301c8"
+  },
+  {
+   "path": ".research/flac-test-files/subset/59 - AVIF PICTURE.flac",
+   "sha256": "7395d02bf8d9533dc554cce02dee9de98c77f8731a45f62d0a243bd0d6f9a45c"
+  },
+  {
+   "path": ".research/flac-test-files/subset/60 - mono audio.flac",
+   "sha256": "20539fbbd6ae28cea2b2182a4c60c6c70cbb710a136199fc83200c4e5fa00b1c"
+  },
+  {
+   "path": ".research/flac-test-files/subset/61 - predictor overflow check, 16-bit.flac",
+   "sha256": "9b15791a8b8ca14a6b9a2374ecf7c34be25bc7b9e64fa600eb5f7608194b0b61"
+  },
+  {
+   "path": ".research/flac-test-files/subset/62 - predictor overflow check, 20-bit.flac",
+   "sha256": "a6b3904e8bcce7a93ad529f9b07e64d06d6647ea7a775ba91490dbacc3c771b7"
+  },
+  {
+   "path": ".research/flac-test-files/subset/63 - predictor overflow check, 24-bit.flac",
+   "sha256": "d5e072373f2d9e80ca2e49b7dd349ebd4340929143d7e5f2c154a97f04755c38"
+  },
+  {
+   "path": ".research/flac-test-files/subset/64 - rice partitions with escape code zero.flac",
+   "sha256": "3ad0bf2e9b9c78cd04deb0a8e133f5d088db051e42cbf3ffb15e1b528f009ca6"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/01 - changing samplerate.flac",
+   "sha256": "9fa8f7c57186be8708f42620885a71d4c4871767ff55cfe063eb1cf3bad8d0a5"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/02 - increasing number of channels.flac",
+   "sha256": "fe70d5e324bea56e9569d4ff9d4b6fa9c33d3f763e7fec5b1f27904e648a0482"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/03 - decreasing number of channels.flac",
+   "sha256": "8e3c451d835cd9a0ef8914e027cf93c98985bd1bb4d7eea59deb15996b97be3b"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/04 - changing bitdepth.flac",
+   "sha256": "f614382d8bd33b881668f2384dff03478ec2f863cb7069c42120cf8586c145b7"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/05 - 32bps audio.flac",
+   "sha256": "de71cbd81f0be1743fc8264f159a521dfc1d92a5e2056c30a64d66001e055eec"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/06 - samplerate 768kHz.flac",
+   "sha256": "3e773546d57f7aa7d126a225f8db152a34196725b71ffb76bf2fe05bad6fbb9f"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/07 - 15 bit per sample.flac",
+   "sha256": "7defaacc8d1bcd3201081d7054de5df1665d17f79851c35b3c6360401d30aa71"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/08 - blocksize 65535.flac",
+   "sha256": "2c0825fc761db080dbfdc11ea2d2b02ee414c9ed83c6240ffbac62db22d08714"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/09 - Rice partition order 15.flac",
+   "sha256": "33ee6f02cc9d930dd421e02b716bc2d9d520c3facdf98030eb09c303227f8626"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/10 - file starting at frame header.flac",
+   "sha256": "d95f63e8101320f5ac7ffe249bc429a209eb0e10996a987301eaa63386a8faa1"
+  },
+  {
+   "path": ".research/flac-test-files/uncommon/11 - file starting with unparsable data.flac",
+   "sha256": "40c58b833fb07f0de41259d83cde78211e3faaf9e5f844aed43fa52c18435d2f"
+  }
+ ]
+}

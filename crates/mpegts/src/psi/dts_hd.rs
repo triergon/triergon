@@ -1,25 +1,31 @@
 //! DVB DTS-HD descriptor views from EN 300 468 Annex G.3.
-use super::{Descriptor, DescriptorNamespace, ElementaryStream, PES_PRIVATE_DATA};
+use super::descriptor_tag::{DVB_DTS, DVB_DTS_HD_EXTENSION, DVB_EXTENSION};
+use super::{Descriptor, DescriptorNamespace, ElementaryStream, stream_type};
 use triergon_core::{Error, Result};
-
-const EXTENSION_DESCRIPTOR: u8 = 0x7f;
-const DTS_HD_EXTENSION: u8 = 0x0e;
 
 /// Signalled DTS-HD substreams and the original descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbDtsHd<'a> {
+    /// The whole descriptor: tag, length and body.
     pub source: &'a [u8],
+    /// The core substream, when signalled; it always has exactly one asset.
     pub core: Option<DvbDtsHdSubstream<'a>>,
+    /// The four extension substreams, each present when its flag is set.
     pub extensions: [Option<DvbDtsHdSubstream<'a>>; 4],
+    /// Trailing additional info bytes; may be empty.
     pub additional: &'a [u8],
 }
 
 /// One advertised DTS-HD substream. The flags describe all its assets together.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbDtsHdSubstream<'a> {
+    /// The 5-bit channel count field.
     pub channels: u8,
+    /// Set when the substream signals a low-frequency effects channel.
     pub lfe: bool,
+    /// Coded sample-rate index, 0–15, in the DVB DTS-HD sample-rate table.
     pub sample_rate_code: u8,
+    /// Signalled sample depth exceeds 16 bits per sample.
     pub more_than_16_bits: bool,
     assets: &'a [u8],
 }
@@ -27,15 +33,22 @@ pub struct DvbDtsHdSubstream<'a> {
 /// One DTS-HD asset's signalling. The bit rate code keeps its source units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbDtsHdAsset {
+    /// The 5-bit asset construction field.
     pub construction: u8,
+    /// Set when the encoded rate describes a variable-rate asset.
     pub variable_bit_rate: bool,
+    /// Selects the scaled interpretation of the coded rate.
     pub scaled_bit_rate: bool,
+    /// Raw 13-bit rate value, interpreted with the scaling and variable-rate flags.
     pub bit_rate_code: u16,
+    /// The component type byte, when its flag is set.
     pub component_type: Option<u8>,
+    /// The ISO 639 language code bytes, when present.
     pub language: Option<[u8; 3]>,
 }
 
 impl<'a> DvbDtsHdSubstream<'a> {
+    /// Iterates the substream's assets in source order; the parser checked their count and extent.
     pub fn assets(self) -> impl Iterator<Item = DvbDtsHdAsset> + 'a {
         let mut remaining = self.assets;
         std::iter::from_fn(move || {
@@ -76,9 +89,11 @@ fn read_asset(bytes: &[u8]) -> Option<(DvbDtsHdAsset, &[u8])> {
 }
 
 impl<'a> Descriptor<'a> {
-    /// Parse an explicitly interpreted DVB DTS-HD extension descriptor.
+    /// Borrow the DTS-HD core, extension and asset fields of a DVB extension descriptor.
+    /// Wrong tags, invalid substream lengths and multiple core assets return `Invalid`.
+    /// Incomplete flagged fields or asset data return `Truncated`.
     pub fn dvb_dts_hd(self) -> Result<DvbDtsHd<'a>> {
-        if self.tag != EXTENSION_DESCRIPTOR || self.data.first() != Some(&DTS_HD_EXTENSION) {
+        if self.tag != DVB_EXTENSION || self.data.first() != Some(&DVB_DTS_HD_EXTENSION) {
             return Err(Error::Invalid("DVB DTS-HD descriptor tag"));
         }
         let (&[_, flags], mut remaining) =
@@ -125,10 +140,11 @@ impl<'a> Descriptor<'a> {
 }
 
 impl ElementaryStream {
-    /// DTS-HD signalling on DVB private-data PES. The elementary payload is
-    /// handled independently of the descriptor envelope.
+    /// Borrow DTS-HD signalling for a DVB private-data elementary stream. `None`
+    /// means the stream or descriptor is absent from this scope. A malformed, duplicate
+    /// or conflicting descriptor returns an error.
     pub fn dvb_dts_hd(&self) -> Result<Option<DvbDtsHd<'_>>> {
-        if self.stream_type != PES_PRIVATE_DATA
+        if self.stream_type != stream_type::PES_PRIVATE_DATA
             || !matches!(self.descriptor_namespace(), DescriptorNamespace::Dvb(_))
         {
             return Ok(None);
@@ -137,11 +153,11 @@ impl ElementaryStream {
         let mut core = false;
         for descriptor in self.descriptors() {
             let descriptor = descriptor?;
-            if descriptor.tag == 0x7b {
+            if descriptor.tag == DVB_DTS {
                 core = true;
             }
-            if descriptor.tag == EXTENSION_DESCRIPTOR
-                && descriptor.data.first() == Some(&DTS_HD_EXTENSION)
+            if descriptor.tag == DVB_EXTENSION
+                && descriptor.data.first() == Some(&DVB_DTS_HD_EXTENSION)
                 && hd.replace(descriptor.dvb_dts_hd()?).is_some()
             {
                 return Err(Error::Invalid("duplicate DVB DTS-HD descriptor"));
@@ -160,7 +176,7 @@ mod tests {
 
     fn descriptor(data: &[u8]) -> Descriptor<'_> {
         Descriptor {
-            tag: 0x7f,
+            tag: DVB_EXTENSION,
             data,
             source: data,
         }

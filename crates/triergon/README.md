@@ -1,139 +1,228 @@
 # triergon
 
-The consumer boundary of the workspace. It re-exports the shared vocabulary and the
-neutral container model of [triergon-core](../core/README.md), classifies a source
-from its first bytes (`probe`), opens it as one closed reader enum (`AnyReader`), and
-exposes each format crate behind its own Cargo feature. It is a composition-layer
-crate that depends on triergon-core and the enabled format crates. Those crates parse
-container packets. The blocking adapters handle I/O for callers that supply a reader.
+Triergon exposes container readers, packet playback, software decode, text and
+bitmap subtitles, and ASS rendering through one crate. Enable the groups you use.
+The default feature enables the Matroska and WebM reader, and the neutral container
+model is always available.
 
 ## Usage
 
-```rust
-use std::sync::atomic::AtomicBool;
-use triergon::{
-    AnyReader, Budget, Bytes, ContainerReader, Event, InputWindow, PacketInfo,
-    SourceCapabilities, SourceId, Step, TrackInfo, WorkBudget,
-};
+Open a file and read its packets, with the default `matroska` feature or any other
+reader feature:
 
-# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../media/tests/fixtures/seek/cues-front.mkv");
-let file = std::fs::read(path)?;                      // any transport; the reader does no I/O
+```rust,no_run
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use triergon::{Budget, PacketInfo, open_blocking};
+
 let pool = Budget::new(64 << 20)?;
-let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
-let mut reader = AnyReader::open(&file[..file.len().min(64)], &pool, SourceId(1), caps)?;
-let cancel = AtomicBool::new(false);
-loop {
-    match reader.step(&mut WorkBudget::new(1 << 16), &cancel)? {
-        Step::Ready(Event::Packet(p)) => {
-            // p.track(), p.payload(), p.pts(), p.dts(), p.time_base(), p.random_access()
-        }
-        Step::Ready(Event::Seek(receipt)) => { /* receipt.landing, receipt.discard_until */ }
-        Step::Ready(Event::Other(_)) => {}            // configuration, documents, structure
-        // Supply 1..=req.maximum bytes at req.offset, or finish at end of source.
-        Step::NeedInput(req) => match file.get(usize::try_from(req.offset)?..) {
-            Some(rest) if !rest.is_empty() => {
-                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
-                reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
-            }
-            _ => reader.finish(req.source, req.token)?,
-        },
-        Step::Yield => {}                             // step budget spent
-        Step::Backpressure(_) => { /* drop retained packets, then step again */ }
-        Step::End(_) => break,
-    }
+let mut source = open_blocking(std::fs::File::open("movie.mkv")?, &pool)?;
+while let Some(packet) = source.next_packet()? {
+    let (track, pts, bytes) = (packet.track(), packet.pts(), packet.payload().len());
+    # let _ = (track, pts, bytes);
 }
-for i in 0..reader.track_count() {
-    let track = reader.track(i).ok_or("no such track")?; // &dyn TrackInfo
-    // track.id(), track.kind(), track.codec(), track.codec_tag(), track.configuration()
-}
-# Ok::<(), Box<dyn std::error::Error>>(())
+# Ok(())
+# }
 ```
 
-A seek is `reader.request_seek(SeekRequest { track, target, policy })?`; the reader
-then asks for input and delivers `Event::Seek(SeekReceipt)` before the next packet.
+Track metadata becomes available as the reader consumes input. Before reading its
+opening events, `source.reader().track_count()` can be zero. ISO BMFF publishes
+its tracks with `ReaderEvent::Movie`. `next_event` lets you inspect the opening
+events before pulling packets.
+
+Use `triergon::access::AccessUnits` with `framing` or `codecs` when you have
+track metadata and packets from a container reader.
+
+To decode and render as well, with `playback,codecs,render`, open the source with
+`playback::probe::Probe` and
+read outputs from a `playback::Player`. Look up the packet's track with
+`Engine::track`, load the audio and video sessions with the matching decoders,
+and step `AccessUnits::for_track` once per selected track to obtain its framer.
+For indexed MP4, finish `PreparedMp4::identify_tracks` before selecting tracks
+or creating framers so their codec identities and sample descriptions are available.
+Use `run_build` to drive a framing job to its next output with a fresh work
+budget each time it yields.
+
+```rust,no_run
+# #[cfg(all(feature = "playback", feature = "codecs", feature = "render"))]
+# fn play_one(
+#     track: &dyn triergon::TrackInfo, packet: &impl triergon::PacketInfo,
+#     units: &mut triergon::access::AccessUnits,
+#     cancel: &std::sync::atomic::AtomicBool, video: &mut triergon::session::VideoSession,
+#     audio: &mut triergon::session::AudioSession, pcm: &mut triergon::session::PcmBlock,
+#     renderer: &mut triergon::render::ass::Renderer, script: &mut triergon::render::ass::Script,
+#     time_ms: i64,
+# ) -> Result<(), Box<dyn std::error::Error>> {
+use triergon::{Error, MediaKind, run_build};
+
+let mut job = units.packet(packet)?;
+let unit = run_build(|work| job.step(work, cancel))?
+    .ok_or(Error::Invalid("missing access unit"))?;
+match track.kind() {
+    MediaKind::Video => { video.feed_packet(&unit)?; while video.step(None) {} }
+    MediaKind::Audio => { audio.feed_packet(&unit)?; audio.pull(None, 0, pcm); }
+    _ => {}
+}
+let images = renderer.render(script, time_ms)?.images;
+# let _ = images;
+# Ok(())
+# }
+```
+
+The [play example](examples/play/main.rs) uses `open_blocking` to read a Matroska file.
+It shows track selection,
+decoder configuration, draining both sessions at EOF, and rendering an ASS
+script at a requested time. From the workspace root:
+
+```sh
+cargo run -p triergon --features playback,codecs,render --example play -- \
+  crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv \
+  harness/fixtures/ass-render/decorations-orientation.ass 500
+```
+
+For caller-driven input, use `AnyReader::open` with the source prefix and
+capabilities, or `AnyReader::of` with a format already selected by `probe`.
+Supply the ranges requested by `ContainerReader::step`. After
+`reader.request_seek(SeekRequest { track, target, policy })`, the reader delivers
+`Event::Seek(SeekReceipt)` before the next packet.
 
 `open_blocking(source, &pool)` does the probing and input handling for a
 `std::io::Read + Seek` source and returns a `Blocking` driver with `next_event`,
-`next_packet` and `seek`; `open_sequential` does the same for a pipe, which the readers
-then treat as FFmpeg treats one (no seeking, no known length). Both stop reading as
-soon as a fixed signature selects the format (Matroska needs four bytes, Ogg five,
-ISO BMFF eight; a native FLAC marker once higher-priority signatures are ruled out).
-Frame-based and ID3-prefixed inputs use the elementary probe at EOF or 64 KiB,
-whichever comes first; the seekable adapter then rewinds. The sequential adapter
-reserves its replay buffer (up to 64 KiB with elementary readers, 389 bytes without)
-before reading a pipe, so a refused reservation leaves the pipe untouched.
+`next_packet` and `seek`. `reader()` gives access to tracks and format-specific
+metadata. `into_inner()` returns the source at its current read position.
+`open_sequential` supports pipes without random access or a known length. Its
+`Replayed` source serves the unread prefix before the rest of the pipe. Calling
+`Replayed::into_inner()` yields the pipe at its current position and discards the
+unread prefix. Both adapters stop
+reading as soon as a fixed container signature selects the format, by the rules under
+[Behaviour and limits](#behaviour-and-limits). A native FLAC marker also suffices once
+higher-priority container signatures are ruled out. Frame-based and ID3-prefixed
+inputs use the elementary probe once at EOF or 64 KiB, whichever comes first.
+After the first 4 KiB of an elementary stream, the seekable adapter uses the reported
+file length to size its next read. It follows the bytes available through EOF or the
+probe limit if the file length changes, then rewinds the source. Before reading a pipe, the
+sequential adapter reserves room for the largest replay the pool can admit, up to 64 KiB
+with elementary readers or 389 bytes without them. A caller holding that room
+can release it and retry the same pipe. Fixed signatures allocate only the bytes
+consumed. Longer elementary probes use one buffer. The sequential adapter
+releases its retained capacity after replaying the last byte.
 
-## Supported
+The [facade probe comparison](../../harness/features/facade-probe/contract.json)
+checks prefix verdicts and the format selected by both adapters. For admitted inputs the
+comparison checks every supplied byte through EOF after a rewind or sequential replay,
+and for ISO BMFF on a sequential source it reads the movie: the tracks, every packet's
+track, size, times and bytes, and how the read ended, against FFmpeg's MOV demuxer on
+the same pipe.
+
+## Features and lower-level crates
 
 | Feature | Default | Module | Through `AnyReader` |
 |---|---|---|---|
-| `matroska` | yes | `triergon::matroska` ([triergon-matroska](../media/README.md)) | yes |
-| `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | yes, for seekable sources |
+| `matroska` | yes | `triergon::matroska` ([triergon-matroska](../matroska/README.md)) | yes |
+| `isobmff` | no | `triergon::isobmff` ([triergon-isobmff](../isobmff/README.md)) | yes; from a sequential source when `moov` comes first |
 | `mpegts` | no | `triergon::mpegts` ([triergon-mpegts](../mpegts/README.md)) | yes, source access units in TS188/M2TS192 |
 | `ogg` | no | `triergon::ogg` ([triergon-ogg](../ogg/README.md)) | yes |
-| `elementary` | no | `triergon::elementary` ([triergon-elementary](../elementary/README.md)): native FLAC, MPEG audio, ADTS, AC-3/E-AC-3 | yes |
+| `elementary` | no | `triergon::elementary` ([triergon-elementary](../elementary/README.md)): native FLAC, MPEG audio, ADTS, AC-3 | yes |
 | `framing` | no | `triergon::framing` ([triergon-framing](../framing/README.md)) | not a reader |
 | `subtitles` | no | `triergon::subtitles` ([triergon-subtitles](../subtitles/README.md)) | not a reader |
+| `playback` | no | `playback` ([engine and player](../playback/README.md)), `hls` ([segments and progressive feeds](../hls/README.md)), `raw_video` ([Annex B feeds and probing](../raw-video/README.md)), `bridge` ([decoder access units](../bridge/README.md)). Also enables `framing`. | independent |
+| `session` | no | `session` ([decode queues](../session/README.md)), `codec` ([decoder traits](../codec/README.md)) and `codec::pixel` ([picture and colour types](../pixel/README.md)) | independent |
+| `codecs` | no | Enables `session` and adds the built-in decoders under `codec` | independent |
+| `render` | no | `render::ass` ([scripts and images](../ass/README.md)), `render::font` ([font faces](../font/README.md)), `render::shape` ([shaping](../shape/README.md)), `render::raster` ([rasterising](../raster/README.md)) | independent |
+
+The decoder crates can also be selected individually.
+[AAC](../codec-aac/README.md), [AC-3 and E-AC-3](../codec-ac3/README.md),
+[DTS](../codec-dca/README.md), [FLAC](../codec-flac/README.md),
+[H.264](../codec-h264/README.md), [HEVC](../codec-hevc/README.md),
+[MPEG audio](../codec-mp3/README.md), [Opus](../codec-opus/README.md) and
+[Vorbis](../codec-vorbis/README.md).
+
+Using `default-features = false` without selecting another feature exposes the
+shared types and `probe`; `AnyReader` and the openers come with the first reader feature.
 
 Re-exported from triergon-core, independent of features:
 
 | Area | Items |
 |---|---|
 | Container model | `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, `SeekRequest`, `SeekPolicy`, `SeekReceipt`, `SeekMethod`, `ColourDescription`, `ColourRange`, `MasteringDisplay`, `ContentLight`, `Sourced`, `Origin` |
-| Input and work | `Step`, `Backpressure`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure`, `WorkBudget` |
-| Storage, time, errors | `Budget`, `Bytes`, `Time`, `TimeBase`, `Error`, `Result` |
-| Blocking I/O | `Blocking` (the driver `open_blocking` and `open_sequential` return) |
+| Input and work | `Step`, `Backpressure`, `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure`, `WorkBudget` |
+| Storage, time, errors | `Budget`, `BudgetVec`, `Bytes`, `Time`, `TimeBase`, `Rounding`, `Error`, `Result` |
 
 The meaning of each type is documented in
 [triergon-core](../core/README.md#container-model).
 
 ## Behaviour and limits
 
-- **Probing.** `probe` returns `Probe::Matroska` for an EBML header (`1A 45 DF A3`),
-  `Probe::Isobmff` when bytes 4–8 are `ftyp`, `styp`, `moov`, `moof`, `mdat`, `free`,
-  `skip` or `sidx`, and `Probe::Ts` when sync bytes `0x47` sit at offsets 0, 188 and 376
-  (at least 377 bytes). `Probe::M2ts` checks sync at offsets 4, 196 and 388 behind the
-  original arrival prefixes. When both patterns match, the facade selects TS188.
-  `Probe::Ogg` is an `OggS` page. With the `elementary` feature,
-  `triergon_elementary::probe` recognises native FLAC (`fLaC`, or a frame header that a
-  second one continues) and MPEG audio, ADTS and AC-3/E-AC-3 by two frames that agree,
-  after any ID3v2 tag. Anything else, including a prefix too short to decide, is
-  `Probe::Unknown`.
+- **Probing.** `probe(prefix)` answers `Probed::Format(SourceFormat::…)`,
+  `Probed::Need(n)` (wait for at least `n` bytes) or `Probed::Unrecognised`.
+  `Matroska` is an EBML header (`1A 45 DF A3`, four bytes); `Isobmff` a first box whose
+  type, bytes 4–8, is `ftyp`, `styp`, `moov`, `moof`, `mdat`, `free`, `skip`, `sidx` or
+  `wide`; `Ogg` an `OggS` page with its version byte (five bytes); `Ts` sync bytes `0x47`
+  at offsets 0, 188 and 376 (377 bytes) and `M2ts` at 4, 196 and 388 (389 bytes), behind
+  the arrival prefixes. When both spacings match, the facade selects TS188. With the
+  `elementary` feature, `triergon_elementary::probe` recognises native FLAC (`fLaC`, or a
+  frame header that a second one continues) and MPEG audio, ADTS and AC-3 by two frames
+  that agree, after any ID3v2 tag; a prefix shorter than 64 KiB that holds none of them
+  yet is `Need(65536)`, the most the openers read. `probe_whole(source)` decides a source
+  no more bytes follow: a container signature cut short is not one, and a transport
+  stream that ends before its third sync byte is selected by the first two (one packet
+  and all or part of a second). The openers and `AnyReader::open` with a prefix of the
+  source's known length decide the same way at the end of the input.
 - **Opening.** MPEG-TS opens through `AnyReader::MpegTs` with its `mpegts`
   feature. Its default program selection requires a single PAT media program;
-  use `mpegts::ReaderLimits` for an explicit selection. Unknown sources, a format
-  without its feature, and ISO BMFF on a source without random access are also
-  `Error::Unsupported`.
+  use `mpegts::ReaderLimits` for an explicit selection. An unrecognised source (`source
+  format not recognised`) and a format without its feature (`reader feature not
+  enabled`) are `Error::Unsupported`.
+- **ISO BMFF from a sequential source.** With random access the ISO BMFF reader reads
+  the movie index where it lies. Without it, a pipe through `open_sequential`
+  included, the reader only moves forward: `moov` must precede the first `mdat`, each
+  later `moof` is indexed as it arrives, and nothing is kept for the length of the
+  source. An `mdat` before `moov` fails with `Error::Unsupported("progressive MP4
+  needs front metadata")` when its header is read, and a sample that starts before
+  the read position with `Error::Unsupported("sample before the read position needs
+  random access")`. See [the reader's limits](../isobmff/README.md#container-reader).
 - **Defaults.** `open` builds each reader with its default limits
   (`triergon_matroska::Limits`, `triergon_isobmff::ReaderLimits`,
-  `triergon_mpegts::ReaderLimits`, `triergon_ogg::Limits`,
-  `triergon_elementary::Limits`) and the container readers ask for at most
+  `triergon_mpegts::ReaderLimits`) and asks for at most
   64 KiB per `NeedInput`. For other limits or windows, construct
-  `matroska::typed::Reader` or `isobmff::Reader` directly and wrap it as
+  `matroska::Reader` or `isobmff::Reader` directly and wrap it as
   `AnyReader::Matroska` or `AnyReader::Isobmff`.
 - **Dispatch.** Forwarding is one `match` per call with no allocation and no
   dynamic dispatch on the packet path. Tracks are returned as `&dyn TrackInfo`.
   `AnyPacket` implements `PacketInfo`; match `AnyPacket::Matroska(p)`,
-  `AnyPacket::Isobmff(p)`, `AnyPacket::MpegTs(p)`, `AnyPacket::Ogg(p)` or
-  `AnyPacket::Elementary(p)` for the format's own packet type.
+  `AnyPacket::Isobmff(p)`, `AnyPacket::MpegTs(p)`, `AnyPacket::Ogg(p)` or `AnyPacket::Elementary(p)` for the
+  format's own packet type.
 - **Other events.** `Event::Other` carries an `AnyOther`; match
-  `AnyOther::Matroska(event)` for Matroska configuration, documents and structure,
+  `AnyOther::Matroska(event)` for a Matroska `ReaderEvent` carrying configuration,
+  a validated document or envelope structure,
   or `AnyOther::Isobmff(event)` for root boxes and the end of opening. ISO BMFF has
   no tracks until `ReaderEvent::Movie`.
   `AnyOther::MpegTs(event)` retains source transport/PES events, header-only
   video bytes and explicit unsupported/interrupted framing outcomes. A PES
   never becomes a neutral packet. See the MPEG-TS README for admitted carriages.
-- **Seeking.** `request_seek` forwards to the format reader. For Matroska the
+- **Seeking.** `Blocking::seek` returns the receipt before packet delivery resumes.
+  Decode from `receipt.landing` and present from `receipt.discard_until`. Flush
+  the sessions and rebuild track framers before feeding packets from the landing
+  point. Use `Blocking::begin_seek` to read the format events and `Event::Seek`
+  yourself with `next_event`. For Matroska the
   `TrackId` is the TrackNumber, the target is floored to nanoseconds, and only
   video tracks can be seek targets. For ISO BMFF the `TrackId` is the `track_ID`, the
   target is on that track's media clock without edits, and any track can be a target.
-  For MPEG-TS the `TrackId` is the elementary PID; a selected AVC, HEVC, AAC-LC
-  (ADTS or LOAS), AC-3, E-AC-3, MPEG audio, DTS core or lossless-only DTS-HD XLL
-  track seeks within one length-known, seekable entity, landing on the last
-  random-access picture or complete audio frame at or before the target.
+  MPEG-TS can seek within a length-known, seekable entity for
+  [supported access units](../mpegts/README.md#access-units).
 
 ## Conformance
 
-The facade adds no parsing; format semantics and their FFmpeg comparisons live in the
-format crates, and the rules every reader follows are the
-[container contract](../../docs/architecture.md#container-contract).
+The facade adds no parsing: format semantics and their comparisons with FFmpeg live in
+the format crates, and every reader follows the
+[container contract](../../docs/architecture.md#container-contract). The facade's own
+comparisons check what it adds: probing and the two adapters
+([facade-probe](../../harness/features/facade-probe/contract.json)), source capabilities,
+restarts and sticky failures through `AnyReader`
+([facade-source-control](../../harness/features/facade-source-control/contract.json)),
+MPEG-TS access units and transport events through `AnyOther::MpegTs`
+([facade-mpegts](../../harness/features/facade-mpegts/contract.json),
+[facade-mpegts-controls](../../harness/features/facade-mpegts-controls/contract.json)),
+seeking ([facade-seek](../../harness/features/facade-seek/contract.json)), and the play
+example's decoded pictures, PCM and rendered subtitle images
+([play corpus](../../harness/codecs/play-manifest.json)). The gates are in
+[docs/quality.md](../../docs/quality.md).

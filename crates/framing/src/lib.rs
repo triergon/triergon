@@ -1,232 +1,202 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`.
 
+pub mod aac;
+pub mod ac3;
+pub mod access;
+pub mod av1;
+pub mod avc;
 pub mod compat;
-#[cfg(feature = "reference-trace")]
-mod dts_operation;
+pub mod dts;
+pub mod flac;
+pub mod hevc;
+pub mod mpeg_audio;
+pub mod nal;
+pub mod opus;
 pub mod picture_output;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
+pub mod vorbis;
+pub mod vp9;
 
-mod nal_packet;
-pub use nal_packet::{
-    NalPacket, NalPacketConfiguration, NalPacketFields, NalPacketJob, NalPacketLimits,
-    NalPacketOrigin, NalPacketOutput, NalPacketProgress, NalPacketReceiverErrorKind,
-    NalPacketRejection, NalPacketSegment, NalPacketSession,
-};
-
-mod ac3;
-mod ac3_config;
-mod annexb;
-mod audio_config;
-mod av1;
-mod av1_config;
-mod av1_temporal_unit;
-mod avc_picture;
-pub use avc_picture::{
-    AvcPocSyntax, AvcPps, AvcReading, AvcSliceDepth, AvcSliceHeader, AvcSps, AvcVui,
-    avc_slice_pps_id, read_avc_pps, read_avc_slice_header, read_avc_sps,
-};
-mod config;
-mod declared_config;
-mod dts_core;
-mod dts_extent;
-mod dts_inspect;
-mod dts_packing;
-mod dts_source;
-mod eac3_bsi;
-mod flac_config;
-mod header;
+mod canonical;
 mod inline_storage;
-mod mpeg_audio;
-mod nal_syntax;
-mod nal_units;
-mod opus_config;
-mod raw_annex_b;
-mod reader;
 mod record_input;
-mod vorbis_config;
-mod vp9_config;
 
-pub use ac3::{
-    Ac3Family, Ac3Frame, Ac3FrameDetails, Ac3FrameFacts, Ac3FrameHeader, Ac3FrameLimits,
-    Ac3FrameReader, Ac3HeaderIssues, Ac3StreamSelection, Eac3DualMono, probe_ac3_header,
-};
-pub use ac3_config::{
-    Ac3ConfigIssues, Ac3ConfigKind, Ac3ConfigLimits, Ac3ConfigParser, Ac3Configuration,
-    Dac3Configuration, Dac3Fields, Dec3Configuration, Dec3Substream,
-};
-pub use annexb::{AnnexBOutput, AnnexBWriter, BuildStep};
-pub use audio_config::{
-    canonical_flac_configuration, canonical_opus_configuration, canonical_vorbis_configuration,
+use triergon_core::{
+    Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputToken, Result, SourceFailure,
+    SourceId,
 };
 
-/// Progress of a configuration parser publishing into a caller-provided slot.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConfigProgress {
-    /// A complete configuration was placed in the previously empty slot.
-    Ready,
-    /// More work is needed; the slot remains empty.
+/// Whether a job may be stepped again after `error`: the pool refused storage it
+/// can grant once the caller frees some.
+#[inline]
+pub(crate) const fn retryable(error: Error) -> bool {
+    matches!(error, Error::Backpressure { .. } | Error::Allocation)
+}
+
+/// [`Error::Limit`] when `requested` exceeds `maximum`.
+#[inline]
+pub(crate) fn check_limit(requested: usize, maximum: usize) -> Result<()> {
+    if requested > maximum {
+        Err(Error::Limit { requested, maximum })
+    } else {
+        Ok(())
+    }
+}
+
+/// Freezes `output`, leaving an empty vector on its pool; a refused freeze leaves the
+/// charged bytes in `output` for retry.
+pub(crate) fn freeze_whole(output: &mut BudgetVec<u8>) -> Result<Bytes> {
+    let empty = BudgetVec::new(output.budget());
+    match std::mem::replace(output, empty).freeze() {
+        Ok(bytes) => Ok(bytes),
+        Err(refused) => {
+            *output = refused.value;
+            Err(refused.error)
+        }
+    }
+}
+
+/// The output a reader is building in `slot`; the first use after a freeze starts an
+/// empty one on `pool`.
+// An empty vector without a pool adds a drop-time null test and measured +0.85% on transport.
+#[inline(always)]
+pub(crate) fn started<'a>(
+    slot: &'a mut Option<BudgetVec<u8>>,
+    pool: &Budget,
+) -> &'a mut BudgetVec<u8> {
+    slot.get_or_insert_with(|| BudgetVec::new(pool))
+}
+
+/// Freezes the output in `slot`, leaving none; a refused freeze puts it back for retry.
+#[inline(always)]
+pub(crate) fn freeze_started(slot: &mut Option<BudgetVec<u8>>, pool: &Budget) -> Result<Bytes> {
+    match slot.take().unwrap_or_else(|| BudgetVec::new(pool)).freeze() {
+        Ok(bytes) => Ok(bytes),
+        Err(refused) => {
+            *slot = Some(refused.value);
+            Err(refused.error)
+        }
+    }
+}
+
+/// A reader's input: an [`InputCursor`] until the reader fails, then the request it
+/// had open and the error it returns from then on.
+#[derive(Debug)]
+pub(crate) enum ReaderInput {
+    Open(InputCursor),
+    Failed { request: InputRequest, error: Error },
+}
+
+impl ReaderInput {
+    /// The open request; once failed, the request that was open then.
+    pub(crate) fn request(&self) -> InputRequest {
+        match self {
+            Self::Open(cursor) => cursor.request(),
+            Self::Failed { request, .. } => request.clone(),
+        }
+    }
+    /// Source offset of the next byte the cursor yields.
+    pub(crate) fn position(&self) -> u64 {
+        match self {
+            Self::Open(cursor) => cursor.position(),
+            Self::Failed { request, .. } => request.offset,
+        }
+    }
+    /// Generation of the cursor's token.
+    pub(crate) fn generation(&self) -> u64 {
+        match self {
+            Self::Open(cursor) => cursor.generation(),
+            Self::Failed { request, .. } => request.token.generation(),
+        }
+    }
+    pub(crate) fn source(&self) -> SourceId {
+        match self {
+            Self::Open(cursor) => cursor.source(),
+            Self::Failed { request, .. } => request.source,
+        }
+    }
+    /// The error that ended the reader, if any.
+    pub(crate) fn failure(&self) -> Option<Error> {
+        match self {
+            Self::Open(_) => None,
+            Self::Failed { error, .. } => Some(*error),
+        }
+    }
+    /// The cursor, or the error that ended the reader.
+    pub(crate) fn cursor(&mut self) -> Result<&mut InputCursor> {
+        match self {
+            Self::Open(cursor) => Ok(cursor),
+            Self::Failed { error, .. } => Err(*error),
+        }
+    }
+    /// The token of the open request; once failed, of the request that was open then.
+    pub(crate) fn token(&self) -> InputToken {
+        match self {
+            Self::Open(cursor) => cursor.token(),
+            Self::Failed { request, .. } => request.token.clone(),
+        }
+    }
+    /// Ends the input with `error`, keeping the request that is open.
+    pub(crate) fn fail_with(&mut self, error: Error) {
+        let request = self.request();
+        *self = Self::Failed { request, error };
+    }
+    /// [`fail_with`](Self::fail_with), failing the cursor with
+    /// [`SourceFailure::Cancelled`] first when `error` is [`Error::Cancelled`].
+    pub(crate) fn cancel_and_fail_with(&mut self, error: Error) {
+        if let (Error::Cancelled, Self::Open(cursor)) = (error, &mut *self) {
+            let _ = cursor.fail(cursor.source(), cursor.token(), SourceFailure::Cancelled);
+        }
+        self.fail_with(error);
+    }
+}
+
+/// One step of a work-bounded job that requests no input.
+///
+/// `Ready` occurs exactly once; later calls return `Complete` unless the job was
+/// cancelled or failed.
+#[derive(Debug)]
+pub enum BuildStep<T> {
+    /// The work budget is spent; call again with more.
     Yield,
-    /// The configuration was already published; the slot remains empty.
+    /// The job's output.
+    Ready(T),
+    /// The output was already returned.
     Complete,
 }
 
-pub use av1::{
-    Av1Leb128, Av1Obu, Av1ObuExtension, Av1ObuFacts, Av1ObuFraming, Av1ObuHeader,
-    Av1ObuHeaderIssues, Av1ObuLimits, Av1ObuReader,
-};
-pub use av1_config::{
-    Av1ConfigFields, Av1ConfigLimits, Av1ConfigParser, Av1ConfigSyntaxIssues, Av1Configuration,
-};
-pub use av1_temporal_unit::{
-    Av1TemporalUnit, Av1TemporalUnitConfig, Av1TemporalUnitJob, Av1TemporalUnitLimits,
-};
-pub use avc_access_unit::{AvcAnnexBAccessUnit, AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits};
-pub use config::{
-    AnnexBConfigParser, ConfigEncoding, ConfigInspection, ConfigLimits, Configuration, ParameterSet,
-};
-pub use declared_config::{
-    DeclaredConfigArray, DeclaredConfigArrayView, DeclaredConfigLimits, DeclaredConfigNal,
-    DeclaredConfigNalView, DeclaredConfigParser, DeclaredConfiguration,
-};
-pub use dts_core::{
-    DtsCoreFrame, DtsCoreFrameFacts, DtsCoreFrameLimits, DtsCoreFrameReader, DtsCoreHeader,
-    probe_dts_core_header,
-};
-pub use dts_extent::{
-    DtsExtensionSubstreamExtent, DtsFrameExtent, DtsFrameExtentLimits,
-    probe_dts_extension_substream_extent, probe_dts_frame_extent,
-};
-pub use dts_inspect::{
-    DtsCoreField, DtsHeaderInspector, DtsInspection, DtsInspectionIdentity, DtsInspectionIssues,
-    DtsInspectionSourceStatus, DtsInspectionStep, DtsInspectionViews, FieldObservation,
-};
-pub use dts_packing::{
-    Dts14BitPayload, Dts14BitUnpacker, DtsPackedBitLocation, DtsPackingLimits, DtsWordOrder,
-};
-pub use dts_source::DtsSourceIdentity;
-pub use eac3_bsi::{
-    Eac3BitRange, Eac3BitSpan, Eac3Bsi, Eac3BsiFacts, Eac3BsiLimits, Eac3BsiParser, Eac3Trailer,
-};
-pub use flac_config::{
-    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacChannelAssignment, FlacFrameHeader,
-    FlacMetadataBlock, FlacStreamInfo, flac_configuration_from_dfla, flac_configuration_from_ogg,
-    flac_metadata_blocks, flac_stream_info,
-};
-pub use header::{Codec, NalHeader, ParameterSetKind, avc, hevc};
-pub use mpeg_audio::{
-    LameTag, MpegAudioHeader, MpegChannelMode, MpegEmphasis, MpegInfoFrame, MpegInfoKind,
-    MpegLayer, MpegVersion, mpeg_audio_crc_ok, mpeg_info_frame,
-};
-pub use nal_syntax::{
-    SyntaxError, skip_avc_scaling_matrix, skip_hevc_profile_tier_level, skip_vui_to_timing,
-};
-pub use nal_units::{AnnexBUnits, split_length_prefixed, start_code};
-pub use opus_config::{
-    OPUS_RATE, OpusHead, opus_frame_samples, opus_packet_frames, opus_packet_samples,
-};
-pub use reader::{Framing, LengthSize, NalFacts, NalFraming, NalReader, NalUnit, ReaderLimits};
-pub use vorbis_config::{
-    VorbisBlock, VorbisHeaders, VorbisIdentification, VorbisModes, vorbis_header_type,
-    vorbis_packet_blocksize, xiph_join, xiph_split,
-};
-pub use vp9_config::{
-    Vp9ConfigContext, Vp9ConfigFields, Vp9ConfigLimits, Vp9ConfigParser, Vp9ConfigSyntaxIssues,
-    Vp9Configuration,
-};
+/// Progress of a job that publishes its output into a caller-provided slot
+/// (`step_into` of the AVC and HEVC record parsers and of [`compat::nal::NalPacketJob`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotProgress {
+    /// The work budget is spent and the slot stays empty; call again with more.
+    Yield,
+    /// The output was placed in the previously empty slot.
+    Ready,
+    /// The output was already published; the slot stays empty.
+    Complete,
+}
 
-mod dts14_sync;
-pub use dts14_sync::{
-    Dts14BoundaryEvidence, Dts14SyncFacts, Dts14SyncFrame, Dts14SyncLimits, Dts14SyncReader,
-};
-
-mod dts_normal;
-mod dts_packed;
-mod dts_packed_header;
-
-pub use dts_normal::{
-    DtsCarrierTail, DtsExtentRelation, DtsNormalBoundary, DtsNormalFacts, DtsNormalLimits,
-    DtsNormalSourceFrame, DtsNormalSourceReader,
-};
-pub use dts_packed::{DtsPackedLimits, DtsPackedPayload, DtsPackedPayloadJob, DtsPacking};
-pub use dts_packed_header::{DtsPackedHeader, inspect_dts_header_bits};
-
-mod avc_access_unit;
-mod avc_config;
-pub use avc_config::{
-    AvcConfigArray, AvcConfigArrayKind, AvcConfigFields, AvcConfigLimits, AvcConfigNal,
-    AvcConfigParser, AvcConfigSource, AvcConfiguration,
-};
-
-mod dts14_carrier;
-pub use dts14_carrier::{
-    Dts14CarrierBoundary, Dts14CarrierLimits, Dts14CarrierPacket, Dts14CarrierProvision,
-    Dts14CarrierReader, Dts14CarrierSyntax,
-};
-#[cfg(feature = "reference-trace")]
-mod dts14_parser_view;
-
-mod hevc_access_unit;
-pub use hevc_access_unit::{
-    HevcAnnexBAccessUnit, HevcAnnexBConfig, HevcAnnexBJob, HevcAnnexBLimits,
-};
-
-mod hevc_config;
-pub use hevc_config::{
-    HvcConfigArray, HvcConfigFields, HvcConfigLimits, HvcConfigNal, HvcConfigParser,
-    HvcConfigSource, HvcConfiguration, inspect_hvc_config_prefix,
-};
-
-mod aac_config;
-pub use aac_config::{
-    AacAscFacts, AacAscParser, AacAudioSpecificConfig, AacBitRange, AacConfigLimits,
-    AacExtensionSignal, AacFrequency, AacGaSpecific, AacObjectType, AacPceElement,
-    AacPceElementKind, AacPceFacts, AacProgramConfig, AacSource, aac_fixed_channel_count,
-    indexed_aac_frequency,
-};
-
-mod aac_adts;
-pub use aac_adts::{
-    AacAdtsFrame, AacAdtsHeader, AacAdtsOutput, AacAdtsParameters, AacAdtsParser, AacAdtsWriter,
-    inspect_aac_adts_header,
-};
-pub use aac_adts::{AacAdtsStreamLimits, AacAdtsStreamReader};
-
-mod hevc_config_annexb;
-pub use hevc_config_annexb::{HvcAnnexBOutput, HvcAnnexBWriter};
-
-mod hevc_config_decoder;
-pub use hevc_config_decoder::{
-    HvcDecoderConfigOutput, HvcDecoderConfigRefusal, HvcDecoderConfigWriter,
-};
-mod aac_config_views;
-pub use aac_config_views::{
-    AacAscScopeOutcome, AacAscScopeParser, AacAscScopeViews, AacDecoderChannelReason,
-    AacDecoderChannelView, aac_decoder_channel_view,
-};
-
-pub use aac_adts::{
-    AacAdtsCarrier, AacAdtsCarrierBoundary, AacAdtsCarrierLimits, AacAdtsCarrierReader,
-};
-
-pub use aac_config_views::{
-    AacDecoderConfigDecision, AacDecoderConfigPolicy, AacDecoderConfigRefusal,
-    aac_decoder_configuration_view,
-};
-
-mod nal_packet_config;
-pub use nal_packet_config::{
-    NalPacketConfigOutput, NalPacketConfigRejection, NalPacketConfigWriter,
-};
-
-mod nal_receiver_config;
-
-pub use raw_annex_b::{RawAccessUnit, RawAnnexBLimits, RawAnnexBReader};
+// Typed publication via an output trait measured +0.36% on AVC packet framing.
+impl SlotProgress {
+    /// The [`BuildStep`] of a job that published into `ready`: the value the slot
+    /// received, or the progress without one.
+    pub(crate) fn into_build_step<T>(self, ready: Option<T>) -> BuildStep<T> {
+        match ready {
+            Some(value) => BuildStep::Ready(value),
+            None if self == Self::Complete => BuildStep::Complete,
+            None => BuildStep::Yield,
+        }
+    }
+}

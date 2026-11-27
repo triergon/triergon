@@ -1,5 +1,6 @@
 //! Mark positioning without GPOS: marks are placed around their base by
 //! combining class and glyph extents, as HarfBuzz's fallback does.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::{Buffer, Info, Position};
 use crate::metrics::{Extents, Scaled};

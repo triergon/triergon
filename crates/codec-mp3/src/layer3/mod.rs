@@ -11,7 +11,7 @@ mod side_info;
 mod stereo;
 
 use triergon_bitstream::CachedBitReader;
-use triergon_framing::{MpegAudioHeader, MpegVersion};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegVersion};
 
 use crate::DecodeError;
 use crate::synthesis::Synthesis;

@@ -1,7 +1,7 @@
 //! Synthetic 16×16 I/P/B picture carriage, authored from H.262 syntax tables.
 use super::{Codec, Input, PID, R, Transport, manifest, part};
-use crate::corpus::write_json;
 use crate::json::Value;
+use crate::json::write as write_json;
 use crate::sha256;
 use std::path::Path;
 

@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "id": "hls-compact-push",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "hls-compact-push",
+  "candidate": "playback-views-worker",
+  "worker_operation": "hls-views-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Read each complete AVC/AAC HLS segment and all five progressive TS188 inputs through a TS PES feed. Drive each standalone AVC and AAC assembler through push_compact and drain both at EOF.",
+    "The reference reads the same forward windows with the TS demuxer and the stock AVC and AAC parsers. Fold all units in per-lane order, video first, including the AVC source Annex B bytes, PES times, IDR and raster, and AAC frame bytes with exact duration.",
+    "Each operation constructs the feed and assemblers, processes and releases the complete input, retains units through drain and folds them. Input loading is outside the operation. Refusal is a single kind 8 record."
+  ],
+  "required_profiles": [
+    "continuous-44100",
+    "duplicate-control-44100",
+    "later-entry-48000",
+    "legal-duplicate-44100",
+    "reordered-48000",
+    "segment-avc-aac"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "awaiting native gate-host measurement"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "awaiting native gate-host measurement"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "replay-avc-aac-00",
+        "replay-avc-aac-01",
+        "replay-avc-aac-02",
+        "replay-avc-aac-03",
+        "replay-avc-aac-04",
+        "replay-avc-aac-05",
+        "replay-avc-aac-06",
+        "replay-avc-aac-07",
+        "replay-avc-aac-08",
+        "replay-avc-aac-09",
+        "allocating-control",
+        "continuous-44100",
+        "reordered-48000",
+        "later-entry-48000",
+        "duplicate-control-44100",
+        "legal-duplicate-44100"
+      ],
+      "cause": "awaiting native gate-host measurement"
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "A legal duplicate transport packet carries no new payload",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.4.3.3 permits two consecutive same-PID packets with one continuity_counter and adaptation_field_control 01 or 11 when their bytes match apart from a valid PCR.",
+      "candidate": "Returns 36 compact-input AAC and AVC access-unit records with 5573 source bytes, matching the nonduplicated control.",
+      "reference": "Reports a PES size mismatch, marks the AAC packet corrupt and ends with a refusal record.",
+      "cases": [
+        "legal-duplicate-44100"
+      ]
+    }
+  ],
+  "open_refusals": [
+    {
+      "reason": "The standalone compact AVC assembler refuses a stream whose first access unit has no access unit delimiter; the segment and progressive views of the same input accept it",
+      "clause": "ITU-T H.222.0 (08/2023) \u00a72.14.1 requires an access unit delimiter in every AVC access unit; ITU-T H.264 (08/2024) \u00a77.4.1.2.3 places it first",
+      "class": "unsupported",
+      "detail": "AVC TS access unit has no initial delimiter",
+      "cases": [
+        "reordered-48000"
+      ]
+    }
+  ]
+}

@@ -6,30 +6,31 @@ mod bit_allocation;
 mod block;
 mod bsi;
 mod coupling;
-#[cfg(feature = "debug-dump")]
-mod debug_dump;
 mod exponents;
 mod mantissas;
 mod reconstruct;
 
-use crate::bitalloc::{BaCache, BaParams, Dba};
+pub(crate) use exponents::ExpStrategy;
+
+use crate::bitalloc::{BaCache, BaParams, BaRerun, Dba};
 use crate::error::DecodeError;
+use crate::header::StreamType;
 use crate::imdct::Imdct;
 use crate::noise::Rng;
 use crate::quant::GroupTables;
+use crate::trace::{FrameTrace, Trace};
+use core::num::NonZeroU32;
 use triergon_bitstream::BitReader;
 
 pub(crate) const CPL: usize = 5;
 pub(crate) const LFE: usize = 6;
 pub(crate) const NCH: usize = 7;
 
-const REUSE: u8 = 0;
-
 type E = DecodeError;
 
 #[inline]
 fn bad(what: &'static str) -> E {
-    DecodeError::InvalidData(what)
+    DecodeError::Invalid(what)
 }
 
 /// Noise behaviour (diagnostic switch; normal decoding uses `Normal`).
@@ -42,95 +43,61 @@ pub enum NoiseMode {
     Off,
 }
 
-/// Bit positions recorded for test tooling (dither stripping).
-#[doc(hidden)]
-#[derive(Clone, Debug, Default)]
-pub struct Trace {
-    pub enabled: bool,
-    /// One record per decoded syncframe of the last access unit.
-    pub frames: Vec<FrameTrace>,
-}
-
-#[doc(hidden)]
-#[derive(Clone, Debug, Default)]
-pub struct FrameTrace {
-    /// Byte offset of the syncframe within the access unit.
-    pub offset: usize,
-    pub frame_bytes: usize,
-    pub eac3: bool,
-    pub num_blocks: usize,
-    pub nfchans: usize,
-    /// Bit positions (within the syncframe) of every dithflag bit.
-    pub dithflag_bits: Vec<usize>,
-    /// E-AC-3: bit position of dithflage, and where per-block dithflags would be inserted.
-    pub dithflage_bit: Option<usize>,
-    pub dithflag_insert_bits: Vec<usize>,
-    /// Bit position just after the last mantissa of the last block.
-    pub audio_end_bit: usize,
-    /// E-AC-3: bit positions of every ecplinu flag (blocks with a coupling strategy).
-    pub ecplinu_bits: Vec<usize>,
-    /// E-AC-3: bit position of transproce and of the (possibly absent) TPNP data.
-    pub transproce_bit: Option<usize>,
-    pub transproc_data_bit: Option<usize>,
-    pub dbaflde_bit: Option<usize>,
-    pub blocks: Vec<BlockTrace>,
-    pub features: FrameFeatures,
-}
-
-#[doc(hidden)]
-#[derive(Clone, Debug, Default)]
-pub struct BlockTrace {
-    pub blk: usize,
-    pub cplstre: bool,
-    pub phsflginu_bit: Option<usize>,
-    pub phsflg_bit: usize,
-    pub ncplbnd: usize,
-    pub cplcoe_any: bool,
-    pub dba_bit: usize,
-}
-
-impl Trace {
-    fn cur(&mut self) -> Option<&mut FrameTrace> {
-        if self.enabled {
-            self.frames.last_mut()
-        } else {
-            None
-        }
-    }
-}
-
 /// Downmix metadata as transmitted (raw codes; `None` when the field is absent).
 /// AC-3: cmixlev/surmixlev (Tables 5.9/5.10), and for bsid 6 the Annex D xbsi1 fields.
 /// E-AC-3: the mixmdate fields of Annex E Table E1.2 (code tables of Annex D).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DownmixCodes {
+    /// AC-3 center mix level code (Table 5.9).
     pub cmixlev: Option<u8>,
+    /// AC-3 surround mix level code (Table 5.10).
     pub surmixlev: Option<u8>,
+    /// Preferred stereo downmix mode (Table D2.2).
     pub dmixmod: Option<u8>,
+    /// Lt/Rt center mix level code (Table D2.3).
     pub ltrtcmixlev: Option<u8>,
+    /// Lt/Rt surround mix level code (Table D2.4).
     pub ltrtsurmixlev: Option<u8>,
+    /// Lo/Ro center mix level code (Table D2.5).
     pub lorocmixlev: Option<u8>,
+    /// Lo/Ro surround mix level code (Table D2.6).
     pub lorosurmixlev: Option<u8>,
+    /// E-AC-3 LFE mix level code (Annex E 2.3.1.11: 10 - code dB).
     pub lfemixlevcod: Option<u8>,
 }
 
 /// Coding tools used by a syncframe (diagnostics).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FrameFeatures {
+    /// Channel coupling.
     pub coupling: bool,
+    /// Coupling phase flags.
     pub phase_flags: bool,
+    /// Rematrixing with a set flag.
     pub rematrix: bool,
+    /// Block switching to the short transform.
     pub block_switch: bool,
+    /// Dither for zero-bit mantissas.
     pub dither: bool,
+    /// Delta bit allocation.
     pub delta_ba: bool,
+    /// A dynamic range word.
     pub dynrng: bool,
+    /// E-AC-3 spectral extension.
     pub spx: bool,
+    /// E-AC-3 spectral extension attenuation.
     pub spx_atten: bool,
+    /// E-AC-3 adaptive hybrid transform.
     pub aht: bool,
+    /// E-AC-3 gain-adaptive quantization.
     pub gaq: bool,
+    /// E-AC-3 transient pre-noise processing data (parsed, not applied).
     pub tpnp: bool,
+    /// E-AC-3 frame exponent strategy.
     pub frame_expstr: bool,
+    /// Skip fields.
     pub skip_fields: bool,
+    /// E-AC-3 enhanced coupling (refused).
     pub ecpl: bool,
     /// Some audio block read past the end of the syncframe (corrupt or patched data).
     pub overrun: bool,
@@ -140,7 +107,7 @@ pub struct FrameFeatures {
 pub(crate) struct Substream {
     // ---- frame configuration ----
     pub eac3: bool,
-    pub strmtyp: u8,
+    pub stream_type: StreamType,
     pub acmod: u8,
     pub lfeon: bool,
     pub nfchans: usize,
@@ -155,7 +122,7 @@ pub(crate) struct Substream {
     pub dialnorm: u8,
     pub chanmap: Option<u16>,
     pub downmix: DownmixCodes,
-    config_key: u32,
+    config_key: Option<NonZeroU32>,
 
     // ---- E-AC-3 audfrm ----
     ahte: bool,
@@ -169,7 +136,7 @@ pub(crate) struct Substream {
     cplstre_blk: [bool; 6],
     cplinu_blk: [bool; 6],
     /// Exponent strategy per channel (fbw, CPL, LFE) per block.
-    expstr: [[u8; 6]; NCH],
+    expstr: [[ExpStrategy; 6]; NCH],
     aht: [bool; NCH],
     aht_read: [bool; NCH],
     frmcsnroffst: u8,
@@ -223,8 +190,8 @@ pub(crate) struct Substream {
     endmant: [usize; NCH],
     strtmant: [usize; NCH],
     bap: [[u8; 256]; NCH],
-    /// Bit allocation stages to re-run per channel: 0 none, 1 bap, 2 mask+bap, 3 all.
-    ba_dirty: [u8; NCH],
+    /// Bit allocation stages to re-run per channel.
+    ba_rerun: [BaRerun; NCH],
     ba_cache: [BaCache; NCH],
     ba: BaParams,
     csnroffst: u8,
@@ -254,8 +221,6 @@ pub(crate) type PlaneMap = [Option<usize>; NCH];
 
 pub(crate) struct BlockSink<'a> {
     pub planes: &'a mut [Vec<f32>],
-    /// Sample offset of block 0 within each plane.
-    pub base: usize,
     pub map: PlaneMap,
     pub scratch: &'a mut [f32; 256],
 }
@@ -278,11 +243,14 @@ pub(crate) fn acmod_channels(acmod: u8) -> &'static [crate::Speaker] {
 pub(crate) const NFCHANS: [usize; 8] = [2, 1, 2, 3, 3, 4, 4, 5];
 
 impl Substream {
-    #[allow(clippy::large_stack_arrays)] // Built once per substream, then boxed.
+    #[expect(
+        clippy::large_stack_arrays,
+        reason = "built once per substream, then boxed"
+    )]
     pub(crate) fn new() -> Self {
         Substream {
             eac3: false,
-            strmtyp: 0,
+            stream_type: StreamType::Independent,
             acmod: 0,
             lfeon: false,
             nfchans: 0,
@@ -294,7 +262,7 @@ impl Substream {
             dialnorm: 0,
             chanmap: None,
             downmix: DownmixCodes::default(),
-            config_key: u32::MAX,
+            config_key: None,
             ahte: false,
             snroffststr: 0,
             blkswe: false,
@@ -305,7 +273,7 @@ impl Substream {
             skipflde: false,
             cplstre_blk: [false; 6],
             cplinu_blk: [false; 6],
-            expstr: [[0; 6]; NCH],
+            expstr: [[ExpStrategy::Reuse; 6]; NCH],
             aht: [false; NCH],
             aht_read: [false; NCH],
             frmcsnroffst: 0,
@@ -351,7 +319,7 @@ impl Substream {
             endmant: [0; NCH],
             strtmant: [0; NCH],
             bap: [[0; 256]; NCH],
-            ba_dirty: [3; NCH],
+            ba_rerun: [BaRerun::Psd; NCH],
             ba_cache: Default::default(),
             ba: BaParams::default(),
             csnroffst: 0,
@@ -374,8 +342,8 @@ impl Substream {
         for d in &mut self.delay {
             d.fill(0.0);
         }
-        self.config_key = u32::MAX;
-        self.ba_dirty = [3; NCH];
+        self.config_key = None;
+        self.ba_rerun = [BaRerun::Psd; NCH];
     }
 
     /// Coded channel indices of this substream in coded order (fbw..., LFE).
@@ -385,7 +353,10 @@ impl Substream {
 
     /// Decode one syncframe already copied (with zero padding) into `buf`.
     /// On error returns the number of blocks fully output before the error.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the decoder state a syncframe decodes against, borrowed field by field"
+    )]
     pub(crate) fn decode_frame(
         &mut self,
         buf: &[u8],
@@ -396,7 +367,7 @@ impl Substream {
         groups: &GroupTables,
         sink: &mut BlockSink<'_>,
         trace: &mut Trace,
-        quirk_armed: &mut bool,
+        mixed_transform_pending: &mut bool,
     ) -> Result<(), (usize, E)> {
         let mut br = BitReader::at(buf, 16);
         let eac3 = buf[5] >> 3 > 10;
@@ -407,7 +378,7 @@ impl Substream {
             self.parse_bsi_ac3(&mut br)
         };
         r.map_err(|e| (0, e))?;
-        if trace.enabled {
+        if trace.enabled() {
             trace.frames.push(FrameTrace {
                 frame_bytes,
                 eac3,
@@ -421,10 +392,10 @@ impl Substream {
                 .map_err(|e| (0, e))?;
         }
         // Delta bit allocation and dynamic range do not persist across syncframes.
-        for (d, dirty) in self.dba.iter_mut().zip(self.ba_dirty.iter_mut()) {
+        for (d, rerun) in self.dba.iter_mut().zip(self.ba_rerun.iter_mut()) {
             if d.active {
                 d.active = false;
-                *dirty = (*dirty).max(2);
+                *rerun = (*rerun).max(BaRerun::Mask);
             }
         }
         self.dynrng = [1.0; 2];
@@ -441,11 +412,11 @@ impl Substream {
                 }
             }
             self.reconstruct(rng, noise);
-            #[cfg(feature = "debug-dump")]
-            self.debug_dump_block();
-            if *quirk_armed && (1..self.nfchans).any(|ch| self.blksw[ch] != self.blksw[0]) {
-                *quirk_armed = false;
-                self.ffmpeg_first_mixed_transform_quirk();
+            if *mixed_transform_pending
+                && (1..self.nfchans).any(|ch| self.blksw[ch] != self.blksw[0])
+            {
+                *mixed_transform_pending = false;
+                self.remap_mixed_transform_overlap();
             }
             self.synthesize(blk, imdct, sink);
         }

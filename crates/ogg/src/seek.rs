@@ -163,6 +163,9 @@ pub(crate) struct Landing {
     keyframe: Option<i64>,
     /// The threshold was moved back to the keyframe the target needs.
     rewound: bool,
+    /// The landing moved to a chain link being read: search it once the track's first
+    /// page of media is.
+    pub followed: bool,
     pub method: SeekMethod,
     pub scanned: u64,
     pub replays_from_start: bool,
@@ -202,9 +205,10 @@ impl Landing {
             offset: 0,
             keyframe: None,
             rewound: false,
+            followed: false,
             method,
             scanned: 0,
-            replays_from_start: method == SeekMethod::Restart,
+            replays_from_start: false,
             time_base: track.time_base,
             held: None,
             last_end: None,
@@ -240,6 +244,7 @@ impl Landing {
     /// Offer a packet of any track.
     pub(crate) fn offer(&mut self, packet: Packet, out: &mut Queue<Output>) -> Result<Offer> {
         if packet.index != self.track {
+            self.replays_from_start = false;
             return Ok(Offer::Skipped);
         }
         let end = packet.end();
@@ -262,7 +267,10 @@ impl Landing {
         if end.is_none_or(|end| end <= self.threshold) {
             self.last_end = end.or(self.last_end);
             if self.primes {
+                self.replays_from_start &= self.held.is_none();
                 self.held = Some(packet);
+            } else {
+                self.replays_from_start = false;
             }
             return Ok(Offer::Skipped);
         }
@@ -298,6 +306,7 @@ impl Landing {
             Some(end) => Time::from_ticks(i128::from(end), self.time_base)?,
             None => self.requested,
         };
+        self.replays_from_start = false;
         out.push(Event::Seek(
             self.receipt(landing, landing.max(self.requested)),
         ))

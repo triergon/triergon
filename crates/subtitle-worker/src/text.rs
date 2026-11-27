@@ -11,6 +11,12 @@
 //!   milliseconds, its text and, for WebVTT, its identifier and settings.
 //!
 //! The digest is the ordered fold of a little-endian byte transcript.
+//!
+//! Each operation is a function of its own ([`session`] once for each codec,
+//! and [`document()`]), called from the measured loop and never inlined into
+//! it: a change to one decoder's code then leaves the code, and so the
+//! instruction counts, of the other operations as they were. A session's
+//! decoder is built where it is used and never moved.
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, TimeBase, WorkBudget};
@@ -25,18 +31,21 @@ const MAX_INPUT: u64 = 16 * 1024 * 1024;
 const MAX_POLLS: usize = 4_000_000;
 /// The work each decoder call gets when measured.
 const QUANTUM: u64 = 1 << 20;
+/// FFmpeg's `AVERROR_INVALIDDATA`, the decode call's return for a refused packet.
+const INVALID_DATA: i32 = -1_094_995_529;
+/// The `AVSubtitle` of a decoded text subtitle: format 1 (text) and one
+/// `SUBTITLE_ASS` (3) rectangle with zero geometry, flags and palette entries.
+const TEXT_FORMAT: u32 = 1;
+const ASS_RECTANGLE: u32 = 3;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Codec {
-    MovText,
-    Ass,
-}
-
+/// A decoder open and what the capsule does with that decoder.
 struct Open {
     timebase: Option<TimeBase>,
     width: u32,
     height: u32,
     extradata: Option<Bytes>,
+    /// The packets and flushes until the next open.
+    ops: Vec<Op>,
 }
 
 struct Packet {
@@ -45,19 +54,18 @@ struct Packet {
 }
 
 enum Op {
-    Open(Open),
     Packet(Packet),
     Flush,
 }
 
 struct Session {
-    codec: Codec,
     label: Option<Bytes>,
-    ops: Vec<Op>,
+    opens: Vec<Open>,
 }
 
 enum Prepared {
-    Session(Session),
+    MovText(Session),
+    Ass(Session),
     Document(Bytes, document::Syntax),
 }
 
@@ -139,30 +147,31 @@ impl<'a> Cursor<'a> {
 
 /// Parses a session capsule, loading every byte string outside the measured
 /// operation.
-fn parse(pool: &Budget, raw: &[u8]) -> Result<Session> {
+fn parse(pool: &Budget, raw: &[u8]) -> Result<Prepared> {
     let mut c = Cursor { bytes: raw, at: 0 };
     if c.take(8)? != b"TRSTXT01" {
         return Err("not a subtitle text capsule".into());
     }
-    let codec = match c.byte()? {
-        1 => Codec::MovText,
-        2 => Codec::Ass,
-        _ => return Err("capsule codec".into()),
-    };
+    let codec = c.byte()?;
+    if codec != mov_text::Decoder::CODEC && codec != ass::Decoder::CODEC {
+        return Err("capsule codec".into());
+    }
     let label = match c.u16()? {
         0 => None,
         size => Some(Bytes::copy_from_slice(pool, c.take(size.into())?)?),
     };
-    if codec == Codec::MovText && label.is_some() {
+    if codec == mov_text::Decoder::CODEC && label.is_some() {
         return Err("mov_text takes no charset label".into());
     }
     let count = c.u32()?;
     if count > 4096 {
         return Err("capsule operation limit".into());
     }
-    let mut ops = Vec::with_capacity(count as usize);
+    let mut opens: Vec<Open> = Vec::new();
+    // An operation before the first open.
+    let mut unopened = false;
     for _ in 0..count {
-        ops.push(match c.byte()? {
+        let op = match c.byte()? {
             b'O' => {
                 let numerator = c.u32()?;
                 let denominator = c.u32()?;
@@ -177,14 +186,16 @@ fn parse(pool: &Budget, raw: &[u8]) -> Result<Session> {
                     1 => Some(Bytes::copy_from_slice(pool, c.take(size)?)?),
                     _ => None,
                 };
-                Op::Open(Open {
+                opens.push(Open {
                     timebase: (numerator != 0)
                         .then(|| TimeBase::new(u64::from(numerator), u64::from(denominator)))
                         .transpose()?,
                     width,
                     height,
                     extradata,
-                })
+                    ops: Vec::new(),
+                });
+                continue;
             }
             b'P' => {
                 let pts = c.known()?;
@@ -201,84 +212,39 @@ fn parse(pool: &Budget, raw: &[u8]) -> Result<Session> {
             }
             b'F' => Op::Flush,
             _ => return Err("capsule operation".into()),
-        });
+        };
+        match opens.last_mut() {
+            Some(open) => open.ops.push(op),
+            None => unopened = true,
+        }
     }
-    if c.at != raw.len() || !matches!(ops.first(), Some(Op::Open(_))) {
+    if c.at != raw.len() || opens.is_empty() || unopened {
         return Err("capsule must start with an open and end with its last operation".into());
     }
-    Ok(Session { codec, label, ops })
+    let session = Session { label, opens };
+    Ok(if codec == mov_text::Decoder::CODEC {
+        Prepared::MovText(session)
+    } else {
+        Prepared::Ass(session)
+    })
 }
 
-/// A decoder of the session's codec, open with one configuration.
-// One lives at a time, on the stack: boxing it would add a heap allocation to
-// the measured operation.
-#[allow(clippy::large_enum_variant)]
-enum Decoder {
-    MovText(mov_text::Decoder),
-    Ass(ass::Decoder),
-}
+/// One codec's decoder as a session drives it.
+trait Receiver: Sized {
+    /// The codec's byte in the capsule and the transcript.
+    const CODEC: u8;
 
-impl Decoder {
     /// The decoder `open` configures, or `None` when the open is refused.
     fn open(
         pool: &Budget,
-        session: &Session,
+        label: Option<&Bytes>,
         open: &Open,
         work: &Work,
         cancel: &AtomicBool,
-    ) -> Option<Self> {
-        match session.codec {
-            Codec::MovText => {
-                let options = mov_text::Options {
-                    packet_timebase: open.timebase,
-                    frame_width: open.width,
-                    frame_height: open.height,
-                };
-                let mut decoder = mov_text::Decoder::new(
-                    pool,
-                    open.extradata.as_ref(),
-                    options,
-                    mov_text::Limits::default(),
-                    0,
-                )
-                .ok()?;
-                for _ in 0..MAX_POLLS {
-                    match decoder.poll(&mut work.budget(), cancel).ok()? {
-                        mov_text::Status::Pending => {}
-                        mov_text::Status::NeedInput => return Some(Self::MovText(decoder)),
-                        _ => return None,
-                    }
-                }
-                None
-            }
-            Codec::Ass => {
-                let options = ass::Options {
-                    packet_timebase: open.timebase,
-                };
-                let decoder = ass::Decoder::new(
-                    pool,
-                    open.extradata.as_ref(),
-                    session.label.as_ref(),
-                    options,
-                    ass::Limits::default(),
-                )
-                .ok()?;
-                Some(Self::Ass(decoder))
-            }
-        }
-    }
+    ) -> Option<Self>;
 
-    /// Folds the open: for mov_text whether it has a header, then the header.
-    fn fold_open(&self, work: &mut Work) {
-        match self {
-            Self::MovText(decoder) => {
-                let header = decoder.subtitle_header();
-                work.byte(u8::from(header.is_some()));
-                work.framed(header.map_or(&[][..], Bytes::as_ref));
-            }
-            Self::Ass(decoder) => work.framed(decoder.header()),
-        }
-    }
+    /// Folds the open.
+    fn fold_open(&self, work: &mut Work);
 
     /// Decodes and folds one packet; `Err` when the decoder fails.
     fn packet(
@@ -287,91 +253,178 @@ impl Decoder {
         packet: &Packet,
         cancel: &AtomicBool,
         work: &mut Work,
-    ) -> std::result::Result<(), ()> {
-        match self {
-            Self::MovText(decoder) => mov_text_packet(decoder, open, packet, cancel, work),
-            Self::Ass(decoder) => ass_packet(decoder, packet, cancel, work),
+    ) -> std::result::Result<(), ()>;
+
+    /// Flushes the decoder; `false` when it fails.
+    fn flush(&mut self, _cancel: &AtomicBool) -> bool {
+        true
+    }
+
+    /// Ends the decoder's input.
+    fn finish(&mut self, _cancel: &AtomicBool) {}
+}
+
+impl Receiver for mov_text::Decoder {
+    const CODEC: u8 = 1;
+
+    fn open(
+        pool: &Budget,
+        _label: Option<&Bytes>,
+        open: &Open,
+        work: &Work,
+        cancel: &AtomicBool,
+    ) -> Option<Self> {
+        let options = mov_text::Options {
+            packet_timebase: open.timebase,
+            frame_width: open.width,
+            frame_height: open.height,
+        };
+        let mut decoder = Self::new(
+            pool,
+            open.extradata.as_ref(),
+            options,
+            mov_text::Limits::default(),
+            0,
+        )
+        .ok()?;
+        for _ in 0..MAX_POLLS {
+            match decoder.poll(&mut work.budget(), cancel).ok()? {
+                mov_text::Status::Yield => {}
+                mov_text::Status::NeedInput => return Some(decoder),
+                _ => return None,
+            }
         }
+        None
+    }
+
+    /// Whether the decoder has a header, then the header.
+    fn fold_open(&self, work: &mut Work) {
+        let header = self.subtitle_header();
+        work.byte(u8::from(header.is_some()));
+        work.framed(header.map_or(&[][..], Bytes::as_ref));
+    }
+
+    fn packet(
+        &mut self,
+        open: &Open,
+        packet: &Packet,
+        cancel: &AtomicBool,
+        work: &mut Work,
+    ) -> std::result::Result<(), ()> {
+        let sample = Input {
+            format: Format::Tx3g,
+            encoding: Encoding::Tx3gInBand,
+            payload: packet.payload.clone(),
+            codec_id: None,
+            codec_private: open.extradata.clone(),
+            charset_label: None,
+            addition: None,
+            timing: Timing::unknown(),
+            source_id: SourceId(1),
+            generation: 0,
+            sequence: 0,
+            configuration_epoch: 0,
+            container_position: None,
+        };
+        self.provide(sample, packet.clock).map_err(drop)?;
+        for _ in 0..MAX_POLLS {
+            match self.poll(&mut work.budget(), cancel).map_err(drop)? {
+                mov_text::Status::Yield => {}
+                mov_text::Status::Ready => {
+                    let output = self.take_output(cancel).map_err(drop)?;
+                    // The decode call returns the packet size for a subtitle.
+                    let returned = match &output.decoded {
+                        mov_text::Decoded::Subtitle(_) => {
+                            i32::try_from(packet.payload.len()).map_err(drop)?
+                        }
+                        mov_text::Decoded::Nothing => 0,
+                        mov_text::Decoded::Refused => INVALID_DATA,
+                    };
+                    work.data(&returned.to_le_bytes());
+                    let mov_text::Decoded::Subtitle(subtitle) = output.decoded else {
+                        work.byte(0);
+                        return Ok(());
+                    };
+                    work.byte(1);
+                    work.u32(TEXT_FORMAT);
+                    fold_clock(work, &subtitle);
+                    work.u32(ASS_RECTANGLE);
+                    for value in [0_i32; 4] {
+                        work.data(&value.to_le_bytes());
+                    }
+                    work.u32(0);
+                    work.u32(0);
+                    work.text(subtitle.ass.as_ref());
+                    return Ok(());
+                }
+                _ => return Err(()),
+            }
+        }
+        Err(())
+    }
+
+    fn flush(&mut self, cancel: &AtomicBool) -> bool {
+        self.reset(0, cancel).is_ok()
+    }
+
+    fn finish(&mut self, cancel: &AtomicBool) {
+        let _ = self.finish_input(cancel);
     }
 }
 
-fn mov_text_packet(
-    decoder: &mut mov_text::Decoder,
-    open: &Open,
-    packet: &Packet,
-    cancel: &AtomicBool,
-    work: &mut Work,
-) -> std::result::Result<(), ()> {
-    let sample = Input {
-        format: Format::Tx3g,
-        encoding: Encoding::Tx3gInBand,
-        payload: packet.payload.clone(),
-        codec_id: None,
-        codec_private: open.extradata.clone(),
-        charset_label: None,
-        addition: None,
-        timing: Timing::unknown(),
-        source_id: SourceId(1),
-        generation: 0,
-        sequence: 0,
-        configuration_epoch: 0,
-        container_position: None,
-    };
-    decoder.provide(sample, packet.clock).map_err(drop)?;
-    for _ in 0..MAX_POLLS {
-        match decoder.poll(&mut work.budget(), cancel).map_err(drop)? {
-            mov_text::Status::Pending => {}
-            mov_text::Status::OutputReady => {
-                let output = decoder.take_output(cancel).map_err(drop)?;
-                work.data(&output.returned.to_le_bytes());
-                let Some(subtitle) = output.subtitle else {
+impl Receiver for ass::Decoder {
+    const CODEC: u8 = 2;
+
+    fn open(
+        pool: &Budget,
+        label: Option<&Bytes>,
+        open: &Open,
+        _work: &Work,
+        _cancel: &AtomicBool,
+    ) -> Option<Self> {
+        let options = ass::Options {
+            packet_timebase: open.timebase,
+        };
+        Self::new(
+            pool,
+            open.extradata.as_ref(),
+            label,
+            options,
+            ass::Limits::default(),
+        )
+        .ok()
+    }
+
+    fn fold_open(&self, work: &mut Work) {
+        work.framed(self.header());
+    }
+
+    fn packet(
+        &mut self,
+        _open: &Open,
+        packet: &Packet,
+        cancel: &AtomicBool,
+        work: &mut Work,
+    ) -> std::result::Result<(), ()> {
+        self.provide(&packet.payload, packet.clock).map_err(drop)?;
+        for _ in 0..MAX_POLLS {
+            match self.poll(&mut work.budget(), cancel).map_err(drop)? {
+                ass::Status::Yield => {}
+                ass::Status::NeedInput => return Err(()),
+                ass::Status::Ready(None) => {
                     work.byte(0);
                     return Ok(());
-                };
-                work.byte(1);
-                work.u32(u32::from(subtitle.format()));
-                fold_clock(work, &subtitle);
-                work.u32(u32::from(subtitle.rectangle_type()));
-                for value in subtitle.geometry() {
-                    work.data(&value.to_le_bytes());
                 }
-                work.u32(subtitle.flags());
-                work.u32(subtitle.palette_entries());
-                work.text(subtitle.ass.as_ref());
-                return Ok(());
-            }
-            _ => return Err(()),
-        }
-    }
-    Err(())
-}
-
-fn ass_packet(
-    decoder: &mut ass::Decoder,
-    packet: &Packet,
-    cancel: &AtomicBool,
-    work: &mut Work,
-) -> std::result::Result<(), ()> {
-    decoder
-        .provide(&packet.payload, packet.clock)
-        .map_err(drop)?;
-    for _ in 0..MAX_POLLS {
-        match decoder.poll(&mut work.budget(), cancel).map_err(drop)? {
-            ass::Status::Pending => {}
-            ass::Status::NeedInput => return Err(()),
-            ass::Status::Decoded(None) => {
-                work.byte(0);
-                return Ok(());
-            }
-            ass::Status::Decoded(Some(subtitle)) => {
-                work.byte(1);
-                fold_clock(work, &subtitle);
-                work.text(subtitle.ass.as_ref());
-                return Ok(());
+                ass::Status::Ready(Some(subtitle)) => {
+                    work.byte(1);
+                    fold_clock(work, &subtitle);
+                    work.text(subtitle.ass.as_ref());
+                    return Ok(());
+                }
             }
         }
+        Err(())
     }
-    Err(())
 }
 
 /// A subtitle's PTS, display times and rectangle count.
@@ -383,54 +436,59 @@ fn fold_clock(work: &mut Work, subtitle: &mov_text::Subtitle) {
     work.u32(1);
 }
 
-/// One measured session: every open, packet and flush in order.
-fn session(pool: &Budget, session: &Session, cancel: &AtomicBool, quantum: u64) -> Work {
+/// One measured session of codec `R`: every open, packet and flush in order.
+/// Each open's decoder lives until the next open; the last one's input is ended.
+#[inline(never)]
+fn session<R: Receiver>(
+    pool: &Budget,
+    session: &Session,
+    cancel: &AtomicBool,
+    quantum: u64,
+) -> Work {
     let mut work = Work::new(quantum);
     work.data(b"TXT1");
-    work.byte(match session.codec {
-        Codec::MovText => 1,
-        Codec::Ass => 2,
-    });
-    let mut current: Option<(&Open, Decoder)> = None;
-    let mut failed = false;
-    for op in &session.ops {
-        match op {
-            Op::Open(open) => {
-                drop(current.take());
-                failed = false;
-                work.byte(b'O');
-                current = Decoder::open(pool, session, open, &work, cancel).map(|d| (open, d));
-                work.byte(u8::from(current.is_some()));
-                if let Some((_, decoder)) = &current {
-                    decoder.fold_open(&mut work);
+    work.byte(R::CODEC);
+    let mut opens = session.opens.iter().peekable();
+    while let Some(open) = opens.next() {
+        work.byte(b'O');
+        let mut decoder = R::open(pool, session.label.as_ref(), open, &work, cancel);
+        work.byte(u8::from(decoder.is_some()));
+        if let Some(decoder) = &decoder {
+            decoder.fold_open(&mut work);
+        }
+        let mut failed = false;
+        for op in &open.ops {
+            match op {
+                Op::Flush => {
+                    work.byte(b'F');
+                    if let Some(decoder) = &mut decoder {
+                        failed |= !decoder.flush(cancel);
+                    }
                 }
-            }
-            Op::Flush => {
-                work.byte(b'F');
-                if let Some((_, Decoder::MovText(decoder))) = &mut current {
-                    failed |= decoder.reset(0, cancel).is_err();
-                }
-            }
-            Op::Packet(packet) => {
-                let Some((open, decoder)) = current.as_mut().filter(|_| !failed) else {
-                    continue;
-                };
-                work.byte(b'P');
-                if decoder.packet(open, packet, cancel, &mut work).is_err() {
-                    work.byte(b'X');
-                    failed = true;
+                Op::Packet(packet) => {
+                    let Some(decoder) = decoder.as_mut().filter(|_| !failed) else {
+                        continue;
+                    };
+                    work.byte(b'P');
+                    if decoder.packet(open, packet, cancel, &mut work).is_err() {
+                        work.byte(b'X');
+                        failed = true;
+                    }
                 }
             }
         }
-    }
-    if let Some((_, Decoder::MovText(decoder))) = &mut current {
-        let _ = decoder.finish_input(cancel);
+        if opens.peek().is_none()
+            && let Some(decoder) = &mut decoder
+        {
+            decoder.finish(cancel);
+        }
     }
     work.byte(b'Z');
     work
 }
 
 /// One measured document: every cue the reader publishes, then the outcome.
+#[inline(never)]
 fn document(
     pool: &Budget,
     raw: &Bytes,
@@ -455,8 +513,8 @@ fn document(
         loop {
             match reader.poll(&mut work.budget(), cancel)? {
                 document::Status::Yield => {}
-                document::Status::Cue(cue) => fold_cue(&mut work, &cue, syntax),
-                document::Status::Finished => return Ok(()),
+                document::Status::Ready(cue) => fold_cue(&mut work, &cue, syntax),
+                document::Status::End => return Ok(()),
             }
         }
     });
@@ -479,7 +537,7 @@ fn fold_cue(work: &mut Work, cue: &document::Cue, syntax: document::Syntax) {
 /// The input of `KIND`, outside the measured operation.
 fn prepare(pool: &Budget, raw: &[u8], kind: &str) -> Result<Prepared> {
     Ok(match kind {
-        "packets" => Prepared::Session(parse(pool, raw)?),
+        "packets" => parse(pool, raw)?,
         "srt" => Prepared::Document(Bytes::copy_from_slice(pool, raw)?, document::Syntax::SubRip),
         "vtt" => Prepared::Document(Bytes::copy_from_slice(pool, raw)?, document::Syntax::WebVtt),
         _ => return Err("expected KIND packets, srt or vtt".into()),
@@ -489,7 +547,8 @@ fn prepare(pool: &Budget, raw: &[u8], kind: &str) -> Result<Prepared> {
 /// One measured operation.
 fn operation(pool: &Budget, prepared: &Prepared, cancel: &AtomicBool, quantum: u64) -> Work {
     match prepared {
-        Prepared::Session(capsule) => session(pool, capsule, cancel, quantum),
+        Prepared::MovText(capsule) => session::<mov_text::Decoder>(pool, capsule, cancel, quantum),
+        Prepared::Ass(capsule) => session::<ass::Decoder>(pool, capsule, cancel, quantum),
         Prepared::Document(raw, syntax) => document(pool, raw, *syntax, cancel, quantum),
     }
 }

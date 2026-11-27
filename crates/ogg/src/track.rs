@@ -1,6 +1,6 @@
 //! Tracks and packets, and their neutral views.
-use crate::compat::ReferenceTiming;
-use crate::mapping::{Configuration, Mapping, Timeline};
+use crate::compat::clock::ReferenceTiming;
+use crate::mapping::{Configuration, Headers, Mapping, Timeline};
 use triergon_core::container::{
     CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo, Trim,
 };
@@ -24,12 +24,38 @@ pub struct Track {
     pub(crate) time_base: TimeBase,
     /// Ticks from this link's time zero to the physical stream's.
     pub(crate) offset: i64,
-    pub(crate) configured: bool,
-    pub(crate) header_error: Option<Error>,
+    pub(crate) headers: HeaderState,
     pub(crate) end: Option<i64>,
     /// Where the reference clock ended this track, for the next link.
     pub(crate) reference_end: Option<i64>,
     pub(crate) reference_shift: i64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum HeaderState {
+    Opening {
+        next: Headers,
+        error: Option<Error>,
+    },
+    /// Published configuration stays readable while a seek reads the headers again.
+    Ready {
+        next: Headers,
+        error: Option<Error>,
+    },
+}
+
+impl HeaderState {
+    pub(crate) fn expected(&self) -> Headers {
+        match *self {
+            Self::Opening { next, .. } | Self::Ready { next, .. } => next,
+        }
+    }
+
+    pub(crate) fn expect(&mut self, headers: Headers) {
+        match self {
+            Self::Opening { next, .. } | Self::Ready { next, .. } => *next = headers,
+        }
+    }
 }
 
 impl Track {
@@ -40,7 +66,7 @@ impl Track {
         mapping: Mapping,
         tag: &[u8],
         config: Configuration,
-        offset: i64,
+        error: Option<Error>,
     ) -> Track {
         let mut bytes = [0; 8];
         let tag_len = tag.len().min(8);
@@ -55,9 +81,11 @@ impl Track {
             tag_len: tag_len as u8,
             time_base: config.time_base(),
             config,
-            offset,
-            configured: false,
-            header_error: None,
+            offset: 0,
+            headers: HeaderState::Opening {
+                next: Headers::Done,
+                error,
+            },
             end: None,
             reference_end: None,
             reference_shift: 0,
@@ -78,18 +106,21 @@ impl Track {
         self.link
     }
 
-    pub fn mapping(&self) -> Mapping {
-        self.mapping
-    }
-
     /// Whether every header packet has been read (or the mapping has none).
     pub fn is_configured(&self) -> bool {
-        self.configured
+        matches!(self.headers, HeaderState::Ready { .. })
     }
 
-    /// Why the header packets could not be read; the track's packets then carry no time.
+    /// Why a header packet could not be read. A packet that is not the header its mapping
+    /// requires there makes the stream invalid: the track stays unconfigured and delivers
+    /// no packets. A header that does not parse or exceeds [`Limits::opening_bytes`]
+    /// leaves the track configured from the headers before it.
+    ///
+    /// [`Limits::opening_bytes`]: crate::Limits::opening_bytes
     pub fn header_error(&self) -> Option<Error> {
-        self.header_error
+        match self.headers {
+            HeaderState::Opening { error, .. } | HeaderState::Ready { error, .. } => error,
+        }
     }
 
     /// The sample rate the identification header states.
@@ -97,6 +128,7 @@ impl Track {
         self.config.sample_rate
     }
 
+    /// The channel count the identification header states.
     pub fn channels(&self) -> Option<u8> {
         self.config.channels
     }
@@ -128,6 +160,8 @@ impl Track {
         self.end
     }
 
+    /// The tick of the track's packet times: 1/sample rate, one Theora frame, or
+    /// nanoseconds for a mapping whose packets carry no time.
     pub fn time_base(&self) -> TimeBase {
         self.time_base
     }
@@ -145,11 +179,11 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         &self.tag[..usize::from(self.tag_len)]
     }
-    fn codec(&self) -> CodecId<'_> {
-        self.mapping.codec(self.codec_tag())
+    fn codec(&self) -> CodecId {
+        self.mapping.codec()
     }
-    /// The canonical configuration the header packets form (see [`crate::mapping`]);
-    /// for an unknown mapping, its first packet.
+    /// The canonical configuration the header packets form (see the crate
+    /// documentation's mapping table); for an unknown mapping, its first packet.
     fn configuration(&self) -> &[u8] {
         &self.config.bytes[self.config.configuration.clone()]
     }
@@ -160,9 +194,8 @@ impl TrackInfo for Track {
 /// Times are ticks of the track time base, 1/sample rate (Opus 1/48000), on the
 /// physical stream's timeline: a packet starts where the previous one's samples end,
 /// the duration counts every sample the packet completes, and [`PacketInfo::trim`]
-/// says how many of them are not presented. A Theora packet is one frame. Decode order
-/// is presentation order, so the DTS is the PTS. A packet of an uninterpreted mapping
-/// has no time.
+/// says how many of them are not presented. A Theora packet is one frame. Ogg carries
+/// no distinct decode timestamp. A packet of an uninterpreted mapping has no time.
 #[derive(Clone, Debug)]
 pub struct Packet {
     pub(crate) track: TrackId,
@@ -175,7 +208,7 @@ pub struct Packet {
     pub(crate) granule: Option<i64>,
     pub(crate) page: u64,
     pub(crate) random_access: RandomAccess,
-    pub(crate) reference: ReferenceTiming,
+    pub(crate) reference: Option<ReferenceTiming>,
 }
 
 impl Packet {
@@ -200,11 +233,11 @@ impl Packet {
         self.page
     }
 
-    /// Where the packet's samples end.
+    /// Where the packet's samples end; `None` when that is out of the `i64` range.
     pub fn end(&self) -> Option<i64> {
         self.pts
             .zip(self.duration)
-            .map(|(pts, duration)| pts + duration)
+            .and_then(|(pts, duration)| pts.checked_add(duration))
     }
 }
 
@@ -222,7 +255,7 @@ impl PacketInfo for Packet {
         self.pts
     }
     fn dts(&self) -> Option<i64> {
-        self.pts
+        None
     }
     fn duration(&self) -> Option<i64> {
         self.duration

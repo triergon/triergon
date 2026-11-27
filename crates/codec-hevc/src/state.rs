@@ -2,85 +2,79 @@
 
 use crate::cabac::ctx;
 use crate::picture::PuMotion;
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
-pub const F_INTRA: u8 = 1;
-pub const F_SKIP: u8 = 2;
+pub(crate) const F_INTRA: u8 = 1;
+pub(crate) const F_SKIP: u8 = 2;
 /// Samples must not be modified by the in-loop filters (PCM with pcm_loop_filter_disabled_flag,
 /// or cu_transquant_bypass_flag).
-pub const F_NOFILTER: u8 = 4;
-pub const F_PCM: u8 = 8;
+pub(crate) const F_NOFILTER: u8 = 4;
+pub(crate) const F_PCM: u8 = 8;
 /// The luma transform block covering this 4x4 block has non-zero coefficients.
-pub const F_NZ: u8 = 16;
+pub(crate) const F_NZ: u8 = 16;
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct BlkInfo {
-    pub flags: u8,
-    pub depth: u8,
-    pub ipm: u8,
-    pub qp: i8,
+pub(crate) struct BlkInfo {
+    pub(crate) flags: u8,
+    pub(crate) depth: u8,
+    pub(crate) ipm: u8,
+    pub(crate) qp: i8,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
-pub struct SaoParams {
-    pub type_idx: [u8; 3],
-    pub band_pos: [u8; 3],
-    pub eo_class: [u8; 3],
-    pub offset: [[i16; 4]; 3],
+pub(crate) struct SaoParams {
+    pub(crate) type_idx: [u8; 3],
+    pub(crate) band_pos: [u8; 3],
+    pub(crate) eo_class: [u8; 3],
+    pub(crate) offset: [[i16; 4]; 3],
 }
 
 /// Information about a slice segment of the current picture needed after parsing.
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // informative fields kept for diagnostics
-pub struct SliceInfo {
-    pub slice_addr_rs: u32,
-    pub deblocking_disabled: bool,
-    pub beta_offset_div2: i32,
-    pub tc_offset_div2: i32,
-    pub lf_across_slices: bool,
-    pub sao_luma: bool,
-    pub sao_chroma: bool,
-    pub ref_poc: [[i32; 16]; 2],
-    pub ref_lt: [[bool; 16]; 2],
+pub(crate) struct SliceInfo {
+    pub(crate) beta_offset_div2: i32,
+    pub(crate) tc_offset_div2: i32,
+    pub(crate) lf_across_slices: bool,
+    pub(crate) ref_poc: [[i32; 16]; 2],
+    pub(crate) ref_lt: [[bool; 16]; 2],
 }
 
-/// The per-picture maps are `BudgetVec`s sized when a picture starts and reused (grown,
-/// never shrunk) for later pictures.
+/// Per-picture block, motion, edge and CTB maps, sized when a picture starts and reused
+/// while the picture size stays the same.
 #[derive(Debug)]
-pub struct PicState {
-    pub w4: usize,
-    pub h4: usize,
-    pub blk: BudgetVec<BlkInfo>,
-    pub motion: BudgetVec<PuMotion>,
+pub(crate) struct PicState {
+    pub(crate) w4: usize,
+    pub(crate) h4: usize,
+    pub(crate) blk: BudgetVec<BlkInfo>,
+    pub(crate) motion: BudgetVec<PuMotion>,
     /// Vertical edge marks / boundary strengths at x multiple of 8, per 4 rows.
-    pub bs_v: BudgetVec<u8>,
+    pub(crate) bs_v: BudgetVec<u8>,
     /// Horizontal edge marks / boundary strengths at y multiple of 8, per 4 columns.
-    pub bs_h: BudgetVec<u8>,
-    pub bs_v_stride: usize,
-    pub bs_h_stride: usize,
-    pub ctb_slice_addr: BudgetVec<u32>,
-    pub ctb_slice_idx: BudgetVec<u16>,
-    pub sao: BudgetVec<SaoParams>,
-    pub slices: BudgetVec<SliceInfo>,
-    pub ctx_wpp: [u8; ctx::NUM],
-    pub ctx_ds: [u8; ctx::NUM],
-    pub ctx_wpp_valid: bool,
-    pub ctx_ds_valid: bool,
+    pub(crate) bs_h: BudgetVec<u8>,
+    pub(crate) bs_v_stride: usize,
+    pub(crate) bs_h_stride: usize,
+    pub(crate) ctb_slice_addr: BudgetVec<u32>,
+    pub(crate) ctb_slice_idx: BudgetVec<u16>,
+    pub(crate) sao: BudgetVec<SaoParams>,
+    pub(crate) slices: BudgetVec<SliceInfo>,
+    /// Contexts saved after the second CTB of a row for wavefront synchronisation (9.3.1).
+    pub(crate) ctx_wpp: Option<[u8; ctx::NUM]>,
+    /// Contexts saved at the end of a slice segment for a dependent one that follows.
+    pub(crate) ctx_ds: Option<[u8; ctx::NUM]>,
     /// qPY_PREV carried into a dependent slice segment.
-    pub ds_last_qp: i32,
-    pub any_deblock: bool,
-    pub any_sao: bool,
-    pub any_nofilter: bool,
-    pub decoded_ctbs: usize,
+    pub(crate) ds_last_qp: i32,
+    pub(crate) any_deblock: bool,
+    pub(crate) any_sao: bool,
+    pub(crate) any_nofilter: bool,
     /// Decoded CTBs per CTB row, and the next rows to deblock / to SAO (in-loop filters
     /// run row by row during decoding, see decoder::filter_ready).
-    pub row_done: BudgetVec<u16>,
-    pub filt_next: usize,
-    pub sao_next: usize,
+    pub(crate) row_done: BudgetVec<u16>,
+    pub(crate) filt_next: usize,
+    pub(crate) sao_next: usize,
 }
 
 impl PicState {
-    pub fn new(budget: &Budget) -> Self {
+    pub(crate) fn new(budget: &Budget) -> Self {
         PicState {
             w4: 0,
             h4: 0,
@@ -94,15 +88,12 @@ impl PicState {
             ctb_slice_idx: BudgetVec::new(budget),
             sao: BudgetVec::new(budget),
             slices: BudgetVec::new(budget),
-            ctx_wpp: [0; ctx::NUM],
-            ctx_ds: [0; ctx::NUM],
-            ctx_wpp_valid: false,
-            ctx_ds_valid: false,
+            ctx_wpp: None,
+            ctx_ds: None,
             ds_last_qp: 0,
             any_deblock: false,
             any_sao: false,
             any_nofilter: false,
-            decoded_ctbs: 0,
             row_done: BudgetVec::new(budget),
             filt_next: 0,
             sao_next: 0,
@@ -112,13 +103,13 @@ impl PicState {
     /// Prepare for a new picture of the given luma size, CTB count and CTB rows. Every
     /// map is sized before any of them changes, so a refused charge leaves the state as
     /// it was.
-    pub fn reset(
+    pub(crate) fn reset(
         &mut self,
         width: usize,
         height: usize,
         num_ctb: usize,
         ctb_rows: usize,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         let w4 = width / 4;
         let h4 = height / 4;
         let (bs_v_stride, bs_h_stride) = (width / 8 + 1, w4);
@@ -148,12 +139,11 @@ impl PicState {
         refill(&mut self.sao, sao, SaoParams::default());
         refill(&mut self.row_done, row_done, 0);
         self.slices.clear();
-        self.ctx_wpp_valid = false;
-        self.ctx_ds_valid = false;
+        self.ctx_wpp = None;
+        self.ctx_ds = None;
         self.any_deblock = false;
         self.any_sao = false;
         self.any_nofilter = false;
-        self.decoded_ctbs = 0;
         self.filt_next = 0;
         self.sao_next = 0;
         Ok(())
@@ -161,7 +151,7 @@ impl PicState {
 
     /// Make room for one more slice segment's `SliceInfo` (doubling), so that it is
     /// charged before the slice header changes any picture state.
-    pub fn reserve_slice(&mut self) -> Result<(), StorageError> {
+    pub(crate) fn reserve_slice(&mut self) -> Result<(), Error> {
         if self.slices.len() < self.slices.capacity() {
             return Ok(());
         }
@@ -171,11 +161,7 @@ impl PicState {
 
 /// New storage of `n` copies of `value` when `v` does not hold `n` elements, so a size
 /// change in either direction moves the charge; `None` keeps `v` (the steady state).
-fn resized<T: Clone>(
-    v: &BudgetVec<T>,
-    n: usize,
-    value: T,
-) -> Result<Option<BudgetVec<T>>, StorageError> {
+fn resized<T: Clone>(v: &BudgetVec<T>, n: usize, value: T) -> Result<Option<BudgetVec<T>>, Error> {
     if v.len() == n {
         return Ok(None);
     }

@@ -1,12 +1,12 @@
 //! The resumable Ogg reader.
-use crate::compat::ReferenceClock;
+use crate::compat::clock::ReferenceClock;
 use crate::mapping::{Configuration, HeaderStep, Headers, Mapping, Previous};
 use crate::packets::{Assembler, Completed, Continuity};
-use crate::page::{MAX_PAGE, Page, PageHeader, PageReader, PageStep};
+use crate::page::{CAPTURE_SCAN_LIMIT, MAX_PAGE, Page, PageHeader, PageReader};
 use crate::queue::Queue;
 use crate::seek::{Bisection, Landing, Offer, Output, Probe};
 use crate::timing::{Clock, PageClock, Slot};
-use crate::track::{Packet, Track};
+use crate::track::{HeaderState, Packet, Track};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
     ContainerReader, Event, ReaderStep, SeekMethod, SeekRequest, TrackInfo,
@@ -29,8 +29,9 @@ pub struct Limits {
     /// Largest packet. Ogg allows any size; 16 MiB holds any audio packet and a
     /// comment header with cover art.
     pub packet_bytes: usize,
-    /// Largest configuration of one track, its comment header included.
-    pub header_bytes: usize,
+    /// Largest configuration of one track, its comment header included. Also the
+    /// queued packet payload threshold at which blocking open returns.
+    pub opening_bytes: usize,
     /// Logical streams in one link.
     pub streams: usize,
     /// Tracks across every link of a chained source.
@@ -49,7 +50,7 @@ impl Default for Limits {
         Limits {
             live_storage_bytes: 64 << 20,
             packet_bytes: 16 << 20,
-            header_bytes: 16 << 20,
+            opening_bytes: 16 << 20,
             streams: 64,
             tracks: 1024,
             sync_scan_bytes: 2 * MAX_PAGE as u64,
@@ -65,14 +66,28 @@ pub enum ReaderEvent {
     /// The track at this index has read its headers (or its mapping has none) and is
     /// configured; its packets follow.
     Track(usize),
-    /// A chained link starts at this source offset; its tracks follow.
-    Link { index: u32, offset: u64 },
-    /// Bytes skipped before the page at `offset + bytes`: garbage, pages with a bad CRC,
-    /// or a partial page at the end of the input.
-    Resync { offset: u64, bytes: u64 },
-    /// Pages of the track were lost before the page at this offset; the packet they
-    /// carried is dropped.
-    Lost { track: usize, page: u64 },
+    /// A chained link starts; its tracks follow.
+    Link {
+        /// The link's position in the chain; the first link is 0 and is not announced.
+        index: u32,
+        /// Source offset of the link's first page.
+        offset: u64,
+    },
+    /// Bytes skipped before a page: garbage, pages with a bad CRC, or a partial page at
+    /// the end of the input.
+    Resync {
+        /// Source offset of the first skipped byte.
+        offset: u64,
+        /// Bytes skipped; the next page, if any, starts at `offset + bytes`.
+        bytes: u64,
+    },
+    /// Pages of a track were lost; the packet they carried is dropped.
+    Lost {
+        /// The index of the track.
+        track: usize,
+        /// Source offset of the first page after the loss.
+        page: u64,
+    },
 }
 
 /// The state of one logical stream of the current link.
@@ -81,7 +96,6 @@ struct Stream {
     serial: u32,
     track: Option<usize>,
     assembler: Assembler,
-    headers: Headers,
     previous: Previous,
     clock: Clock,
     reference: ReferenceClock,
@@ -93,15 +107,20 @@ impl Stream {
             serial,
             track: None,
             assembler: Assembler::new(pool, limits.packet_bytes),
-            headers: Headers::Done,
             previous: Previous::Start,
             clock: Clock::at(None),
             reference: ReferenceClock::default(),
         }
     }
 
-    fn configured(&self) -> bool {
-        self.track.is_some() && self.headers == Headers::Done
+    /// Whether the stream's headers are read, or ended in an invalid one.
+    fn headers_read(&self, tracks: &[Track]) -> bool {
+        self.track.is_some_and(|index| {
+            matches!(
+                tracks[index].headers.expected(),
+                Headers::Done | Headers::Invalid
+            )
+        })
     }
 }
 
@@ -120,6 +139,7 @@ enum Phase {
     EndScan {
         resume: u64,
         chained: bool,
+        contiguous: bool,
     },
     Ended(SourceLocation),
 }
@@ -141,11 +161,24 @@ impl AsMut<Slot> for Media {
 /// The page being processed; kept until every packet is handled, so a step that
 /// fails for want of memory resumes it.
 #[derive(Debug)]
+#[repr(C)]
 struct Current {
+    stage: Stage,
     page: Page,
-    stream: Option<usize>,
-    assembled: bool,
-    next: usize,
+}
+
+#[derive(Debug)]
+#[repr(u8)]
+enum Stage {
+    Unresolved,
+    Resolved {
+        stream: usize,
+    },
+    /// The page's packets are in `Reader::completed`. `next` is the first unhandled one.
+    Assembled {
+        stream: usize,
+        next: usize,
+    },
 }
 
 /// A resumable Ogg reader. Errors other than backpressure are sticky until
@@ -178,9 +211,8 @@ pub struct Reader {
     pending: Queue<Output>,
     phase: Phase,
     landing: Option<Landing>,
-    /// The landing moved to a link being read: search it once its first media page is.
-    follow: bool,
     end_scanned: bool,
+    reference_clock: bool,
     failed: Option<Error>,
 }
 
@@ -211,10 +243,15 @@ impl Reader {
             pending: Queue::new(pool),
             phase: Phase::Pages,
             landing: None,
-            follow: false,
             end_scanned: false,
+            reference_clock: false,
             failed: None,
         })
+    }
+
+    pub(crate) fn with_reference_clock(mut self) -> Self {
+        self.reference_clock = true;
+        self
     }
 
     /// Every track seen so far, in the order their logical streams began.
@@ -225,6 +262,11 @@ impl Reader {
     /// The request for the input the reader needs next.
     pub fn request(&self) -> InputRequest {
         self.input.request()
+    }
+
+    /// Whether every logical stream of the current link has read its headers.
+    pub(crate) fn headers_read(&self) -> bool {
+        !self.streams.is_empty() && self.streams.iter().all(|s| s.headers_read(&self.tracks))
     }
 
     fn advance(
@@ -247,27 +289,87 @@ impl Reader {
             let step = match &mut self.phase {
                 Phase::Ended(location) => return Ok(Step::End(*location)),
                 Phase::Pages => self.pages.next(&mut self.input, work, cancel)?,
-                Phase::Bisect(_) => match self.bisect(work, cancel)? {
-                    Some(step) => step,
-                    None => continue,
-                },
-                Phase::EndScan { .. } => match self.end_scan(work, cancel)? {
-                    Some(step) => step,
-                    None => continue,
-                },
+                Phase::Bisect(bisection) => {
+                    if !bisection.probing() {
+                        if let Some(offset) = bisection.next_probe() {
+                            self.input.request_range(offset)?;
+                            self.pages.clear();
+                        } else {
+                            let offset = bisection.resume();
+                            if let Some(landing) = self.landing.as_mut() {
+                                landing.scanned += bisection.scanned;
+                                landing.replays_from_start &= self
+                                    .links
+                                    .get(self.link)
+                                    .is_some_and(|link| link.start == offset);
+                            }
+                            self.resume(offset)?;
+                        }
+                        continue;
+                    }
+                    match self.pages.next(&mut self.input, work, cancel) {
+                        Ok(Step::Ready(page)) => {
+                            let serial = page.header.serial;
+                            let known = self.streams.iter().any(|s| s.serial == serial)
+                                || self.tracks.iter().any(|track| {
+                                    track.link as usize == self.link && track.serial == serial
+                                });
+                            if bisection.page(&page, known) == Probe::Settled {
+                                self.pages.clear();
+                            }
+                            continue;
+                        }
+                        Ok(Step::End(_)) | Err(CAPTURE_SCAN_LIMIT) => {
+                            bisection.exhausted();
+                            continue;
+                        }
+                        step => step?,
+                    }
+                }
+                Phase::EndScan {
+                    resume,
+                    chained,
+                    contiguous,
+                } => {
+                    match self.pages.next(&mut self.input, work, cancel) {
+                        Ok(Step::Ready(page)) => {
+                            Self::end_scan_page(
+                                page.header,
+                                chained,
+                                *contiguous,
+                                &self.streams,
+                                self.tracks.as_mut_slice(),
+                            );
+                            continue;
+                        }
+                        Ok(Step::End(_)) | Err(CAPTURE_SCAN_LIMIT) => {
+                            // A scan after a jump may have begun in a later link.
+                            if *chained && !*contiguous {
+                                for track in self.tracks.iter_mut() {
+                                    track.end = None;
+                                }
+                            }
+                            self.input.request_range(*resume)?;
+                            self.pages.clear();
+                            self.phase = Phase::Pages;
+                            continue;
+                        }
+                        step => step?,
+                    }
+                }
             };
             match step {
-                PageStep::Page(page) => {
+                Step::Ready(page) => {
                     self.current = Some(Current {
                         page,
-                        stream: None,
-                        assembled: false,
-                        next: 0,
+                        stage: Stage::Unresolved,
                     });
                 }
-                PageStep::NeedInput(request) => return Ok(Step::NeedInput(request)),
-                PageStep::Yield => return Ok(Step::Yield),
-                PageStep::End { location, skipped } => {
+                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::Yield => return Ok(Step::Yield),
+                Step::Backpressure(never) => match never {},
+                Step::End(location) => {
+                    let skipped = self.pages.take_skipped();
                     if skipped > 0 {
                         self.pending.push(Event::Other(ReaderEvent::Resync {
                             offset: location.offset - skipped,
@@ -304,38 +406,45 @@ impl Reader {
     fn process_page(&mut self, current: &mut Current) -> Result<()> {
         let header = current.page.header;
         let offset = current.page.offset;
-        let found = match current.stream {
-            Some(stream) => Some(stream),
-            None => self.stream_for(&header, offset)?,
-        };
-        let Some(stream) = found else {
-            return self.resync_event(&mut current.page);
-        };
-        current.stream = Some(stream);
-        if !current.assembled {
-            let s = &mut self.streams[stream];
-            let continuity = s
-                .assembler
-                .push(&header, &current.page.bytes, &mut self.completed)?;
-            current.assembled = true;
-            if continuity == Continuity::Lost {
-                s.previous = Previous::Unknown;
-                s.clock = Clock::at(None);
-            }
-            let track = s.track;
-            self.resync_event(&mut current.page)?;
-            if let (Continuity::Lost, Some(track)) = (continuity, track) {
-                self.pending.push(Event::Other(ReaderEvent::Lost {
-                    track,
-                    page: offset,
-                }))?;
+        loop {
+            match &mut current.stage {
+                Stage::Unresolved => {
+                    let Some(stream) = self.stream_for(&header, offset)? else {
+                        return self.resync_event(&mut current.page);
+                    };
+                    current.stage = Stage::Resolved { stream };
+                }
+                Stage::Resolved { stream } => {
+                    let s = &mut self.streams[*stream];
+                    let continuity =
+                        s.assembler
+                            .push(&header, &current.page.bytes, &mut self.completed)?;
+                    current.stage = Stage::Assembled {
+                        stream: *stream,
+                        next: 0,
+                    };
+                    if continuity == Continuity::Lost {
+                        s.previous = Previous::Unknown;
+                        s.clock = Clock::at(None);
+                    }
+                    let track = s.track;
+                    self.resync_event(&mut current.page)?;
+                    if let (Continuity::Lost, Some(track)) = (continuity, track) {
+                        self.pending.push(Event::Other(ReaderEvent::Lost {
+                            track,
+                            page: offset,
+                        }))?;
+                    }
+                }
+                Stage::Assembled { stream, next } => {
+                    while *next < self.completed.len() {
+                        self.packet(*stream, *next)?;
+                        *next += 1;
+                    }
+                    return self.finish_page(*stream, &current.page);
+                }
             }
         }
-        while current.next < self.completed.len() {
-            self.packet(stream, current.next)?;
-            current.next += 1;
-        }
-        self.finish_page(stream, &current.page)
     }
 
     /// Report the bytes skipped before a page, once.
@@ -393,7 +502,9 @@ impl Reader {
         for stream in self.streams.iter() {
             let Some(index) = stream.track else { continue };
             let track = &mut self.tracks[index];
-            track.reference_end = stream.reference.end();
+            if self.reference_clock {
+                track.reference_end = stream.reference.end();
+            }
             let ticks = stream
                 .clock
                 .end()
@@ -419,18 +530,27 @@ impl Reader {
         let Some(track) = self.streams[stream].track else {
             return self.attach(stream, &payload);
         };
-        let headers = self.streams[stream].headers;
+        let view = &mut self.tracks[track];
+        let headers = view.headers.expected();
         if headers != Headers::Done {
+            if headers == Headers::Invalid {
+                return Ok(());
+            }
             let step = headers.classify(&payload);
-            let configuring = !self.tracks[track].configured;
             match step {
-                Ok(HeaderStep::Media) => {}
+                // The headers ended before this media packet (FLAC without a count).
+                Ok(HeaderStep::Media) => {
+                    view.headers.expect(Headers::Done);
+                    self.configured(stream, track)?;
+                }
                 Ok(step) => {
-                    if configuring && self.tracks[track].header_error.is_none() {
-                        match self.tracks[track].config.header(headers, &payload) {
+                    if let HeaderState::Opening { error, .. } = &mut view.headers
+                        && error.is_none()
+                    {
+                        match view.config.header(headers, &payload) {
                             Ok(()) => {}
                             Err(error @ Error::Backpressure { .. }) => return Err(error),
-                            Err(error) => self.tracks[track].header_error = Some(error),
+                            Err(failed) => *error = Some(failed),
                         }
                     }
                     let next = if step == HeaderStep::Last {
@@ -438,25 +558,30 @@ impl Reader {
                     } else {
                         headers.next()
                     };
-                    self.streams[stream].headers = next;
+                    view.headers.expect(next);
                     if next == Headers::Done {
                         self.configured(stream, track)?;
                     }
                     return Ok(());
                 }
-                Err(error) => {
-                    if configuring {
-                        self.tracks[track].header_error = Some(error);
+                // Not the header the mapping requires here: the stream is invalid (RFC
+                // 7845 section 5, Vorbis I section 4.2.1, Theora I section 6.1). The
+                // track keeps its identification and the error; no packet follows.
+                Err(failed) => {
+                    if let HeaderState::Opening { error, .. } = &mut view.headers {
+                        *error = Some(failed);
                     }
+                    view.headers.expect(Headers::Invalid);
+                    return Ok(());
                 }
             }
-            self.streams[stream].headers = Headers::Done;
-            self.configured(stream, track)?;
         }
         let s = &mut self.streams[stream];
-        let durations = self.tracks[track]
-            .timeline()
-            .durations(&payload, &mut s.previous);
+        let durations = self.tracks[track].timeline().durations(
+            &payload,
+            &mut s.previous,
+            self.reference_clock,
+        );
         self.link_media = true;
         self.media.push(Media {
             payload,
@@ -483,23 +608,28 @@ impl Reader {
             None => self.new_track(serial, link, mapping, tag, first)?,
         };
         let track = &self.tracks[index];
-        let chain_end = link
-            .checked_sub(1)
-            .and_then(|previous| {
-                self.tracks
-                    .iter()
-                    .find(|t| t.link == previous && t.position == track.position)
-            })
-            .and_then(|previous| previous.reference_end);
-        let headers = if track.header_error.is_some() {
+        let reference = if self.reference_clock {
+            let chain_end = link
+                .checked_sub(1)
+                .and_then(|previous| {
+                    self.tracks
+                        .iter()
+                        .find(|t| t.link == previous && t.position == track.position)
+                })
+                .and_then(|previous| previous.reference_end);
+            ReferenceClock::new(chain_end)
+        } else {
+            ReferenceClock::default()
+        };
+        let headers = if track.header_error().is_some() {
             Headers::Done
         } else {
             Headers::after_first(mapping, first)
         };
         let s = &mut self.streams[stream];
         s.track = Some(index);
-        s.headers = headers;
-        s.reference = ReferenceClock::new(chain_end);
+        self.tracks[index].headers.expect(headers);
+        s.reference = reference;
         if headers == Headers::Done {
             self.configured(stream, index)?;
         }
@@ -520,7 +650,7 @@ impl Reader {
         }
         let pool = self.input.budget();
         let (config, error) =
-            match Configuration::first(pool, mapping, first, self.limits.header_bytes) {
+            match Configuration::first(pool, mapping, first, self.limits.opening_bytes) {
                 Ok(config) => (config, None),
                 Err(error @ Error::Backpressure { .. }) => return Err(error),
                 Err(error) => (Configuration::opaque(pool, 0), Some(error)),
@@ -530,16 +660,15 @@ impl Reader {
             .iter()
             .filter(|track| track.link == link)
             .count();
-        let mut track = Track::new(
+        let track = Track::new(
             serial,
             link,
             u32::try_from(position).map_err(|_| Error::Overflow)?,
             mapping,
             tag,
             config,
-            0,
+            error,
         );
-        track.header_error = error;
         self.tracks.try_push(track).map_err(|e| e.error)?;
         Ok(self.tracks.len() - 1)
     }
@@ -551,10 +680,13 @@ impl Reader {
         let s = &mut self.streams[stream];
         s.previous = Previous::Start;
         s.clock = Clock::at(start);
-        if track.configured {
+        let HeaderState::Opening { error, .. } = track.headers else {
             return Ok(());
-        }
-        track.configured = true;
+        };
+        track.headers = HeaderState::Ready {
+            next: Headers::Done,
+            error,
+        };
         track.time_base = track.config.time_base();
         if let Some(start) = self.link_start
             && track.timeline().timed()
@@ -572,7 +704,7 @@ impl Reader {
             && previous.position == track.position
         {
             landing.retarget(index, track)?;
-            self.follow = true;
+            landing.followed = true;
         }
         self.pending.push(Event::Other(ReaderEvent::Track(index)))
     }
@@ -598,16 +730,20 @@ impl Reader {
             };
             if self.media.is_empty() {
                 s.clock.pass(clock);
-                s.reference.header_page(granule);
+                if self.reference_clock {
+                    s.reference.header_page(granule);
+                }
             } else {
                 s.clock.page(&timeline, clock, &mut self.media);
-                s.reference.page(
-                    &timeline,
-                    granule,
-                    header.granule == 0,
-                    eos,
-                    &mut self.media,
-                );
+                if self.reference_clock {
+                    s.reference.page(
+                        &timeline,
+                        granule,
+                        header.granule == 0,
+                        eos,
+                        &mut self.media,
+                    );
+                }
                 let offset = track.offset;
                 // Only Theora's random access depends on the packet.
                 let keyed = timeline.keyframes();
@@ -648,45 +784,54 @@ impl Reader {
         }
         self.media.clear();
         if let Some(index) = self.streams[stream].track {
-            self.tracks[index].reference_shift = self.streams[stream].reference.shift();
-            // A landing followed into this link searches it once the track's first page
-            // of media has fixed where its reference clock starts.
-            if self.follow && delivered && self.landing.as_ref().is_some_and(|l| l.track == index) {
-                self.follow = false;
+            if self.reference_clock {
+                self.tracks[index].reference_shift = self.streams[stream].reference.shift();
+            }
+            // A landing followed into this link searches it after its first media page.
+            if delivered
+                && let Some(landing) = self.landing.as_mut()
+                && landing.followed
+                && landing.track == index
+            {
+                landing.followed = false;
                 again = true;
             }
         }
-        let configured = self.streams.iter().all(Stream::configured);
         if let Some(link) = self.links.get_mut(self.link)
             && link.data.is_none()
-            && configured
+            && self.streams.iter().all(|s| s.headers_read(&self.tracks))
         {
             link.data = Some(page.offset + page.bytes.len() as u64);
+        }
+        // A link's streams have all begun once a page begins none (RFC 3533 section 4),
+        // so the end scan waits for one and finds every stream's track.
+        if !self.end_scanned
+            && self.link == 0
+            && !page.header.begin_of_stream()
+            && self.links.first().is_some_and(|link| link.data.is_some())
+        {
             self.start_end_scan()?;
         }
-        if again && let Some(landing) = self.landing.take() {
-            let searched = self.search(&landing);
+        if again && let Some(mut landing) = self.landing.take() {
+            let searched = self.search(&mut landing);
             self.landing = Some(landing);
             searched?;
         }
         Ok(())
     }
 
-    /// Read the last pages of a seekable source once the first link's headers are read.
+    /// Read the last pages of a seekable source of known length once, when the first
+    /// link's headers are read and no seek is landing.
     fn start_end_scan(&mut self) -> Result<()> {
+        self.end_scanned = true;
         let capabilities = self.input.capabilities();
-        if self.end_scanned
-            || self.link != 0
-            || !capabilities.random_access
-            || self.limits.end_scan_bytes == 0
-            || self.landing.is_some()
+        if !capabilities.random_access || self.limits.end_scan_bytes == 0 || self.landing.is_some()
         {
             return Ok(());
         }
         let Some(length) = capabilities.length else {
             return Ok(());
         };
-        self.end_scanned = true;
         let resume = self.pages.position(&self.input);
         let from = length
             .saturating_sub(self.limits.end_scan_bytes)
@@ -699,89 +844,31 @@ impl Reader {
         self.phase = Phase::EndScan {
             resume,
             chained: false,
+            contiguous: from == resume,
         };
         Ok(())
     }
 
-    fn end_scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<PageStep>> {
-        let Phase::EndScan { resume, chained } = &mut self.phase else {
-            return Ok(None);
-        };
-        let resume = *resume;
-        let step = match self.pages.next(&mut self.input, work, cancel) {
-            Ok(PageStep::Page(page)) => {
-                let header = page.header;
-                if header.begin_of_stream()
-                    && !self.streams.iter().any(|s| s.serial == header.serial)
-                {
-                    *chained = true;
-                }
-                if !*chained
-                    && let Some(granule) = header.granule_position()
-                    && let Some(track) = self
-                        .tracks
-                        .iter_mut()
-                        .find(|track| track.link == 0 && track.serial == header.serial)
-                    && track.timeline().timed()
-                {
-                    track.end = track.timeline().ticks(granule).checked_add(track.offset);
-                }
-                return Ok(None);
-            }
-            Ok(PageStep::End { .. }) | Err(Error::Policy(_)) => None,
-            Ok(step @ (PageStep::NeedInput(_) | PageStep::Yield)) => return Ok(Some(step)),
-            Err(error) => return Err(error),
-        };
-        if *chained {
-            for track in self.tracks.iter_mut() {
-                track.end = None;
-            }
+    fn end_scan_page(
+        header: PageHeader,
+        chained: &mut bool,
+        contiguous: bool,
+        streams: &[Stream],
+        tracks: &mut [Track],
+    ) {
+        if header.begin_of_stream()
+            && (contiguous || !streams.iter().any(|s| s.serial == header.serial))
+        {
+            *chained = true;
         }
-        self.input.request_range(resume)?;
-        self.pages.clear();
-        self.phase = Phase::Pages;
-        Ok(step)
-    }
-
-    fn bisect(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Option<PageStep>> {
-        let Phase::Bisect(bisection) = &mut self.phase else {
-            return Ok(None);
-        };
-        if !bisection.probing() {
-            if let Some(offset) = bisection.next_probe() {
-                self.input.request_range(offset)?;
-                self.pages.clear();
-            } else {
-                let resume = bisection.resume();
-                if let Some(landing) = self.landing.as_mut() {
-                    landing.scanned += bisection.scanned;
-                }
-                self.resume(resume)?;
-            }
-            return Ok(None);
-        }
-        match self.pages.next(&mut self.input, work, cancel) {
-            Ok(PageStep::Page(page)) => {
-                let known = self.streams.iter().any(|s| s.serial == page.header.serial)
-                    || self
-                        .tracks
-                        .iter()
-                        .any(|t| t.link as usize == self.link && t.serial == page.header.serial);
-                if let Phase::Bisect(bisection) = &mut self.phase
-                    && bisection.page(&page, known) == Probe::Settled
-                {
-                    self.pages.clear();
-                }
-                Ok(None)
-            }
-            Ok(PageStep::End { .. }) | Err(Error::Policy(_)) => {
-                if let Phase::Bisect(bisection) = &mut self.phase {
-                    bisection.exhausted();
-                }
-                Ok(None)
-            }
-            Ok(step) => Ok(Some(step)),
-            Err(error) => Err(error),
+        if !*chained
+            && let Some(granule) = header.granule_position()
+            && let Some(track) = tracks
+                .iter_mut()
+                .find(|track| track.link == 0 && track.serial == header.serial)
+            && track.timeline().timed()
+        {
+            track.end = track.timeline().ticks(granule).checked_add(track.offset);
         }
     }
 
@@ -800,14 +887,21 @@ impl Reader {
         if !at_start {
             let link = self.link;
             for index in 0..self.tracks.len() {
-                let track = &self.tracks[index];
+                let track = &mut self.tracks[index];
                 if track.link as usize != link {
                     continue;
                 }
                 let mut stream = Stream::new(self.input.budget(), track.serial, &self.limits);
                 stream.track = Some(index);
+                track.headers.expect(if track.is_configured() {
+                    Headers::Done
+                } else {
+                    Headers::Invalid
+                });
                 stream.previous = Previous::Unknown;
-                stream.reference = ReferenceClock::resumed(track.reference_shift);
+                if self.reference_clock {
+                    stream.reference = ReferenceClock::resumed(track.reference_shift);
+                }
                 self.streams.try_push(stream).map_err(|e| e.error)?;
             }
             self.link_media = true;
@@ -819,7 +913,7 @@ impl Reader {
     /// Start delivery toward `landing`: bisect the link of its track for its threshold
     /// on a random-access source of known length, or read the source again from its
     /// start.
-    fn search(&mut self, landing: &Landing) -> Result<InputRequest> {
+    fn search(&mut self, landing: &mut Landing) -> Result<InputRequest> {
         let track = &self.tracks[landing.track];
         let capabilities = self.input.capabilities();
         let link = track.link as usize;
@@ -828,8 +922,10 @@ impl Reader {
             .filter(|_| capabilities.random_access)
             .zip(self.links.get(link).copied());
         let Some((length, start)) = bounds else {
+            landing.replays_from_start = true;
             return self.restart();
         };
+        landing.replays_from_start = link == 0;
         let end = self.links.get(link + 1).map_or(length, |next| next.start);
         let timeline = *track.timeline();
         // The bisection's goal only bounds the search, so it saturates.
@@ -848,14 +944,15 @@ impl Reader {
         );
         self.link = link;
         self.link_start = None;
-        match bisection.next_probe() {
-            Some(probe) => {
-                let request = self.input.request_range(probe)?;
-                self.pages.clear();
-                self.phase = Phase::Bisect(bisection);
-                Ok(request)
-            }
-            None => self.resume(bisection.resume()),
+        if let Some(probe) = bisection.next_probe() {
+            let request = self.input.request_range(probe)?;
+            self.pages.clear();
+            self.phase = Phase::Bisect(bisection);
+            Ok(request)
+        } else {
+            let offset = bisection.resume();
+            landing.replays_from_start &= offset == start.start;
+            self.resume(offset)
         }
     }
 
@@ -870,19 +967,6 @@ impl Reader {
         self.link_start = None;
         self.phase = Phase::Pages;
         Ok(request)
-    }
-}
-
-fn pressure(error: Error) -> Result<Step<Output, Backpressure>> {
-    match error {
-        Error::Backpressure {
-            requested,
-            available,
-        } => Ok(Step::Backpressure(Backpressure {
-            requested,
-            available,
-        })),
-        other => Err(other),
     }
 }
 
@@ -916,13 +1000,17 @@ impl ContainerReader for Reader {
         if let Some(error) = self.failed {
             return Err(error);
         }
-        self.advance(work, cancel)
-            .or_else(|error| pressure(error).inspect_err(|error| self.failed = Some(*error)))
+        self.advance(work, cancel).or_else(|error| {
+            error
+                .into_step()
+                .inspect_err(|error| self.failed = Some(*error))
+        })
     }
-    /// Seek a configured, timed track. The target is on the physical stream's timeline;
-    /// see [`crate::seek`] for the landing, and for the track of another chain link a
-    /// target outside the track's link lands on. Packets of other tracks resume after
-    /// the landing in source order. The receipt arrives before the first packet.
+    /// Seek a configured, timed track. The target is on the physical stream's timeline:
+    /// the seek lands on the packet whose output is needed first, in the chain link that
+    /// holds the target, on the track at the requested track's position in that link
+    /// (see the crate documentation's Seeking section). Packets of other tracks resume
+    /// after the landing in source order. The receipt arrives before the first packet.
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -933,7 +1021,7 @@ impl ContainerReader for Reader {
             .position(|track| track.id() == request.track)
             .ok_or(Error::Invalid("seek track is not in the source"))?;
         let track = &self.tracks[requested];
-        if !track.configured || !track.timeline().timed() {
+        if !track.is_configured() || !track.timeline().timed() {
             return Err(Error::Unsupported("seek on a track without packet times"));
         }
         // The track at the same position of the last known link starting by the target.
@@ -945,7 +1033,7 @@ impl ContainerReader for Reader {
             .rev()
             .find(|(_, t)| {
                 t.position == position
-                    && t.configured
+                    && t.is_configured()
                     && t.timeline().timed()
                     && Time::from_ticks(i128::from(t.offset), t.time_base)
                         .is_ok_and(|start| start <= request.target)
@@ -958,13 +1046,12 @@ impl ContainerReader for Reader {
         } else {
             SeekMethod::Restart
         };
-        let landing = Landing::new(index, track, request.target, request.policy, method)?;
+        let mut landing = Landing::new(index, track, request.target, request.policy, method)?;
         self.pending
             .retain(|output| matches!(output, Event::Other(_)));
         self.current = None;
         self.media.clear();
-        self.follow = false;
-        let next = self.search(&landing)?;
+        let next = self.search(&mut landing)?;
         self.landing = Some(landing);
         Ok(next)
     }

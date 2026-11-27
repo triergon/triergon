@@ -9,23 +9,24 @@ use triergon_core::{
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
 use triergon_isobmff::{
-    AacConfigurationJob, AacConfigurationStep, ConfigurationLimits, ObjectTypeScan,
+    CursorStatus, Next,
     compat::mov::{
         edits::{
             EncodedEditContext as EditContext, EncodedEditJob as EditJob,
             EncodedEditLimits as EditLimits, EncodedEditPlan,
         },
         encoded::{EncodedSelection as DescriptionSelection, EncodedStreamJob as ConfigurationJob},
-        packets::CursorStatus,
         seek::SeekLimits,
     },
+    config::{AacConfigurationJob, ConfigurationLimits, ObjectTypeScan},
 };
 use triergon_playback::{
-    ByteSource, Format, Mp4Event, Mp4NativeSeekRequest, Mp4Packet, Mp4RangeOpen, Mp4RangePlayer,
-    PlayerPolicy, Progress, RawEvent, Selection,
-    io::{SelectedInput, SourceOwner},
-    mp4_open::{Movie, MovieTrack, Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
-    mp4_plan::PlanLimits,
+    ByteSource, Event, Format, PlayerPolicy, Progress, Selection, SourceOwner,
+    mp4::{
+        Movie, MovieTrack, Mp4DemuxSeekRequest, Mp4Event, Mp4Open, Mp4Packet, Mp4RangeOpen,
+        Mp4RangePlayer, OpenLimits, OpenProgress, OpenedMp4, PlanLimits,
+    },
+    probe::SelectedInput,
 };
 
 pub const PREFIX: &str = "mp4-range-";
@@ -48,7 +49,10 @@ impl Work {
     }
 
     fn packet(&mut self, packet: &Mp4Packet) -> Result<()> {
-        let row = packet.native.as_ref().ok_or("missing projected packet")?;
+        let row = packet
+            .occurrence
+            .as_ref()
+            .ok_or("missing projected packet")?;
         let clock = &row.demux;
         let bytes = packet.source.payload.as_ref();
         let skip = packet.encoded_skip_samples.unwrap_or_default();
@@ -170,6 +174,7 @@ struct Tracks {
 
 /// Checks each track, folds the configurations the session compares and
 /// prepares the edit plans.
+// One function on purpose: the track setup inside the timed operation; a split is a hot-path change not yet measured.
 #[inline(never)]
 fn prepare_tracks(
     pool: &Budget,
@@ -243,12 +248,12 @@ fn prepare_tracks(
             let mut config = AacConfigurationJob::new(entry, ConfigurationLimits::default())?;
             loop {
                 match config.poll(&mut work(), cancel)? {
-                    AacConfigurationStep::Yield => {}
-                    AacConfigurationStep::Ready(config) => {
+                    Next::Yield => {}
+                    Next::Item(config) => {
                         result.configuration(entry.format, config.bytes.as_ref());
                         break;
                     }
-                    AacConfigurationStep::End => return Err("missing AAC configuration".into()),
+                    Next::End => return Err("missing AAC configuration".into()),
                 }
             }
             None
@@ -343,7 +348,7 @@ fn seek_to(
         let progress = player.read_output(&mut output, &mut work(), cancel)?;
         if output
             .take()
-            .is_some_and(|item| matches!(item.event(), RawEvent::Mp4(Mp4Event::Packet(_))))
+            .is_some_and(|item| matches!(item.event(), Event::Mp4(Mp4Event::Packet(_))))
         {
             break;
         }
@@ -359,7 +364,7 @@ fn seek_to(
         Seek::Mov(timestamp) => (timestamp, false),
         Seek::OpusRoll(timestamp) => (timestamp, true),
     };
-    let request = Mp4NativeSeekRequest {
+    let request = Mp4DemuxSeekRequest {
         video: tracks.video,
         timestamp,
         limits: SeekLimits::default(),
@@ -416,8 +421,8 @@ fn session(pool: &Budget, data: &Bytes, seek: Option<Seek>) -> Result<Totals> {
         let progress = player.read_output(&mut output, &mut work(), &cancel)?;
         if let Some(item) = output.take() {
             match item.event() {
-                RawEvent::Mp4(Mp4Event::Packet(packet)) => result.packet(packet)?,
-                RawEvent::Mp4(Mp4Event::Configuration(_)) | RawEvent::Seek(_) => {}
+                Event::Mp4(Mp4Event::Packet(packet)) => result.packet(packet)?,
+                Event::Mp4(Mp4Event::Configuration(_)) | Event::Seek(_) => {}
                 _ => return Err("unexpected range playback output".into()),
             }
         }
@@ -439,7 +444,7 @@ pub fn run(args: &[String]) -> Result<()> {
         _ => return Err("expected the opus-roll seek policy".into()),
     };
     let pool = Budget::new(2 * usize::try_from(MAX_INPUT)?)?;
-    let raw = Bytes::try_from_vec(&pool, invocation.input(MAX_INPUT)?).map_err(|e| e.error())?;
+    let raw = Bytes::try_from_vec(&pool, invocation.input(MAX_INPUT)?).map_err(|e| e.error)?;
     measure(&invocation, OPERATION, Some(&pool), || {
         session(&pool, &raw, seek)
     })

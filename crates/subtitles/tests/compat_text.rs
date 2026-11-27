@@ -35,7 +35,7 @@ fn read_with_width(
     for _ in 0..1_000_000 {
         match reader.poll(&mut WorkBudget::new(quantum), &cancel).unwrap() {
             document::Status::Yield => {}
-            document::Status::Cue(cue) => {
+            document::Status::Ready(cue) => {
                 let owned = |field: &Option<Bytes>| field.as_ref().map(|b| b.as_ref().to_vec());
                 cues.push((
                     cue.start_ms,
@@ -45,7 +45,7 @@ fn read_with_width(
                     owned(&cue.settings),
                 ));
             }
-            document::Status::Finished => {
+            document::Status::End => {
                 drop(reader);
                 assert_eq!(pool.used(), baseline);
                 return cues;
@@ -295,7 +295,7 @@ fn reader_limits_cancellation_and_zero_work() {
     ));
     assert!(matches!(
         reader.poll(&mut WorkBudget::new(1 << 20), &cancel).unwrap(),
-        document::Status::Cue(_)
+        document::Status::Ready(_)
     ));
 }
 
@@ -310,8 +310,8 @@ fn decode(decoder: &mut ass::Decoder, packet: &[u8], pool: &Budget) -> Option<as
     let cancel = AtomicBool::new(false);
     loop {
         match decoder.poll(&mut WorkBudget::new(3), &cancel).unwrap() {
-            ass::Status::Pending => {}
-            ass::Status::Decoded(subtitle) => return subtitle,
+            ass::Status::Yield => {}
+            ass::Status::Ready(subtitle) => return subtitle,
             ass::Status::NeedInput => panic!("no packet"),
         }
     }
@@ -395,7 +395,7 @@ fn an_ass_conversion_beyond_its_limits_is_an_error_not_a_refusal() {
     decoder.provide(&packet, ass::Clock::default()).unwrap();
     let error = loop {
         match decoder.poll(&mut WorkBudget::new(1), &cancel) {
-            Ok(ass::Status::Pending) => {}
+            Ok(ass::Status::Yield) => {}
             Ok(status) => panic!("{status:?}"),
             Err(error) => break error,
         }
@@ -423,11 +423,11 @@ fn an_ass_conversion_beyond_its_limits_is_an_error_not_a_refusal() {
 /// refused: `compat::document` reads the cues, `CharsetJob` converts each
 /// with the repertoire the reference build accepts.
 fn recoded(source: &[u8], label: &[u8]) -> Vec<Option<Vec<u8>>> {
-    use triergon_subtitles::compat::charset::receiver_charset_with_glibc_euc_kr;
+    use triergon_subtitles::compat::charset::receiver_charset;
     use triergon_subtitles::text::Limits;
     use triergon_subtitles::text::charset::{CharsetJob, CharsetStatus};
     let pool = Budget::new(1 << 20).unwrap();
-    let charset = receiver_charset_with_glibc_euc_kr(label).unwrap();
+    let charset = receiver_charset(label).unwrap();
     let label = Bytes::copy_from_slice(&pool, label).unwrap();
     let cancel = AtomicBool::new(false);
     let document = Bytes::copy_from_slice(&pool, source).unwrap();
@@ -442,7 +442,7 @@ fn recoded(source: &[u8], label: &[u8]) -> Vec<Option<Vec<u8>>> {
     loop {
         match reader.poll(&mut WorkBudget::new(7), &cancel).unwrap() {
             document::Status::Yield => {}
-            document::Status::Cue(cue) => {
+            document::Status::Ready(cue) => {
                 let mut job =
                     CharsetJob::new(&cue.text, Some(&label), charset, &pool, Limits::default())
                         .unwrap();
@@ -456,7 +456,7 @@ fn recoded(source: &[u8], label: &[u8]) -> Vec<Option<Vec<u8>>> {
                     }
                 });
             }
-            document::Status::Finished => return texts,
+            document::Status::End => return texts,
         }
     }
 }

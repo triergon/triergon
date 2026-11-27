@@ -1,13 +1,10 @@
-//! Unframed AVC and HEVC observations through logical source EOF.
-//!
-//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+//! Unframed AVC and HEVC bytes joined across continuity changes at logical EOF.
 
 mod continuity;
 
-use crate::{
-    CarrierObservation, EntityTransition, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent,
-    Track,
-};
+use crate::reader::{EntityTransition, UnframedVideo};
+use crate::stream::{CarrierObservation, TraceEvent};
+use crate::{Packet, Reader, ReaderEvent, ReaderLimits, Track};
 use continuity::{EofStep, Proof, SourceJob};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{ContainerReader, Event, ReaderStep, SeekRequest};
@@ -18,35 +15,25 @@ use triergon_core::{
 
 pub use continuity::{ContinuityEvidence, ContinuityResidue};
 
-/// Reporting of an unframed AVC or HEVC run at logical source EOF.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum VideoEofPolicy {
-    /// Keep the video framer's leading-byte error.
-    #[default]
-    RejectUnframed,
-    /// Report a nonempty run of validated PES payload with invalid leading bytes
-    /// and no Annex B start code anywhere in the run.
-    ReportUnframed,
-}
-
-/// Events from the original reader and the additional continuity observation.
+/// One step of [`ContinuityReader`].
 #[derive(Debug)]
 pub enum ContinuityEvent {
     /// An unchanged event from the source reader.
     Source(ReaderEvent),
-    /// An original interruption or diagnostic with a pending continuity proof.
-    /// The source event remains valid even if the proof later produces no residue.
+    /// A source interruption or diagnostic that a residue at the end of the source may
+    /// cover; the event stands whether or not a residue follows.
     Pending(ReaderEvent),
     /// One unframed run proved at the original logical EOF.
     Residue(ContinuityResidue),
 }
 
-/// Observe opaque video through continuity changes in one entity with one
-/// selected AVC or HEVC track. Owns the source reader and uses its original
-/// cursor, transport carriers and clock transitions. Neutral packets and source
-/// events remain those of that reader.
+/// A [`Reader`] of one entity with one selected AVC or HEVC track that also reports, at the
+/// logical end of the source, the unframed bytes the demuxer joins across the track's
+/// continuity changes ([`ContinuityResidue`]). Packets and source events are the reader's.
 ///
-/// The source reader uses [VideoEofPolicy::ReportUnframed]. A continuity
+/// The source reader uses [UnframedVideo::Report], so the run before each
+/// continuity change arrives as its own `IncompleteVideo`; the residue at EOF holds
+/// their bytes in order, with those the demuxer merges across the changes. A continuity
 /// difference must be observed within the first 16 selected carriers. A later
 /// start code, an unsupported source change, or unavailable proof storage
 /// retires the optional proof. Source backpressure still comes from the reader.
@@ -71,6 +58,10 @@ impl std::fmt::Debug for ContinuityReader {
 }
 
 impl ContinuityReader {
+    /// A continuity reader over `source`, with the same arguments as [`Reader::new`]; the source
+    /// reader always uses [`UnframedVideo::Report`].
+    ///
+    /// Fails as [`Reader::new`] does.
     pub fn new(
         pool: &Budget,
         source: SourceId,
@@ -78,7 +69,7 @@ impl ContinuityReader {
         mut limits: ReaderLimits,
         input_window: usize,
     ) -> Result<Self> {
-        limits.video_eof_policy = VideoEofPolicy::ReportUnframed;
+        limits.unframed_video_policy = UnframedVideo::Report;
         Ok(Self {
             reader: Reader::new(pool, source, caps, limits, input_window)?,
             limits,
@@ -88,12 +79,16 @@ impl ContinuityReader {
         })
     }
 
+    /// The input the source reader needs next.
+    ///
+    /// Fails with the reader's stopping error once it has failed or been closed.
     pub fn request(&self) -> Result<InputRequest> {
         self.reader.request()
     }
 
     /// Continue the ordinary reader across entities. The optional continuity
-    /// proof is confined to a single entity and is retired on a valid transition.
+    /// proof is confined to a single entity and ends on a valid transition. Request
+    /// and entity checks are those of [`Reader::finish_entity`].
     pub fn finish_entity(
         &mut self,
         source: SourceId,
@@ -133,7 +128,8 @@ impl ContinuityReader {
 
     /// Inspect carrier observations by reference and return the next packet,
     /// other source event or progress step. The continuity proof still sees
-    /// its original carriers and applies the same bounds.
+    /// its original carriers and applies the same bounds. The source reader’s validation
+    /// and cancellation errors propagate, as do errors from the continuity proof.
     pub fn step_with_carriers(
         &mut self,
         work: &mut WorkBudget,
@@ -186,7 +182,9 @@ impl ContinuityReader {
                         false
                     }
                 };
-                let job = self.pending.take().expect("processed source");
+                let Some(job) = self.pending.take() else {
+                    return Err(Error::Invalid("Annex B source job missing"));
+                };
                 if job.published {
                     continue;
                 }

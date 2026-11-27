@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use crate::harness::diff::{equal, python_str_len};
 use crate::json::{self, Value};
 use crate::pyrandom::PyRandom;
-use crate::sha256::hex as digest_bytes;
+use crate::sha256;
 
 type R<T> = Result<T, String>;
 
@@ -151,7 +151,7 @@ fn differences(actual: &Value, expected: &Value) -> Vec<Value> {
 /// Apply a recorded edit list to `seed`, checking every bound and both hashes.
 pub fn replay(seed: &[u8], recipe: &Value, maximum_bytes: usize) -> R<Vec<u8>> {
     if py_int(recipe.get("schema")) != Some(1)
-        || s(recipe, "seed_sha256") != Some(digest_bytes(seed).as_str())
+        || s(recipe, "seed_sha256") != Some(sha256::hex(seed).as_str())
     {
         return Err("mutation recipe does not bind this seed".into());
     }
@@ -198,7 +198,7 @@ pub fn replay(seed: &[u8], recipe: &Value, maximum_bytes: usize) -> R<Vec<u8>> {
         let (offset, remove) = (offset as usize, remove as usize);
         result.splice(offset..offset + remove, inserted);
     }
-    if s(recipe, "result_sha256") != Some(digest_bytes(&result).as_str()) {
+    if s(recipe, "result_sha256") != Some(sha256::hex(&result).as_str()) {
         return Err("mutation result hash disagrees with its recipe".into());
     }
     Ok(result)
@@ -313,9 +313,9 @@ pub fn mutation(
     }
     let recipe = Value::object([
         ("schema", Value::int(1)),
-        ("seed_sha256", Value::str(digest_bytes(seed))),
+        ("seed_sha256", Value::str(sha256::hex(seed))),
         ("edits", Value::Array(edits)),
-        ("result_sha256", Value::str(digest_bytes(&data))),
+        ("result_sha256", Value::str(sha256::hex(&data))),
     ]);
     if replay(seed, &recipe, maximum_bytes)? != data {
         return Err("generated mutation is not reproducible".into());
@@ -458,14 +458,8 @@ pub fn observe(
             "command".to_owned(),
             Value::strings(command.iter().map(|c| c.to_string_lossy().into_owned())),
         ),
-        (
-            "stdout_sha256".to_owned(),
-            Value::str(digest_bytes(&stdout)),
-        ),
-        (
-            "stderr_sha256".to_owned(),
-            Value::str(digest_bytes(&stderr)),
-        ),
+        ("stdout_sha256".to_owned(), Value::str(sha256::hex(&stdout))),
+        ("stderr_sha256".to_owned(), Value::str(sha256::hex(&stderr))),
         (
             "output_truncated".to_owned(),
             Value::Bool(state == "output-limit"),
@@ -674,7 +668,7 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
             *role,
             Value::object([
                 ("path", Value::str(relative(path))),
-                ("sha256", Value::str(sha(path)?)),
+                ("sha256", Value::str(crate::files::sha256(path)?)),
             ]),
         ));
     }
@@ -690,7 +684,7 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
     // A listed open case is one the candidate fails today: its builds reject it.
     // One open on some targets only (`targets`) is a difference from those
     // targets' reference, which the candidate completes.
-    let open: Vec<String> = crate::checks::read_json(&feature.contract)?
+    let open: Vec<String> = json::read(&feature.contract)?
         .get("open_cases")
         .and_then(Value::as_array)
         .unwrap_or_default()
@@ -751,7 +745,7 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
     files.extend(crate::harness::manifest::sources(root, &lane.manifest));
     let sources = files
         .iter()
-        .map(|path| Ok((relative(path), Value::str(sha(path)?))))
+        .map(|path| Ok((relative(path), Value::str(crate::files::sha256(path)?))))
         .collect::<R<Vec<_>>>()?;
     let manifest = Value::object([
         ("schema", Value::int(1)),
@@ -768,13 +762,13 @@ pub fn feature_manifest(root: &Path, feature: &Feature) -> R<(Value, usize)> {
 /// `manifest.json`, which replays it.
 pub fn feature_campaign(root: &Path, feature: &Feature, args: &Campaign) -> R<i32> {
     let (manifest, largest) = feature_manifest(root, feature)?;
-    let contract = crate::checks::read_json(&feature.contract)?;
+    let contract = json::read(&feature.contract)?;
     let declared = contract
         .get("timeout_seconds")
         .map(|_| crate::harness::worker::contract_timeout(&contract))
         .transpose()?;
     let path = std::env::temp_dir().join(format!("triergon-campaign-{}.json", std::process::id()));
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     let campaign = Campaign {
         manifest: path.clone(),
         output: args.output.clone(),
@@ -799,15 +793,9 @@ fn label(value: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'_' | b'-'))
 }
 
-fn sha(path: &Path) -> R<String> {
-    Ok(digest_bytes(
-        &fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?,
-    ))
-}
-
 fn write(path: &Path, value: &Value) -> R<()> {
     let temporary = path.with_extension("tmp");
-    crate::corpus::write_json(&temporary, value)?;
+    json::write(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| e.to_string())
 }
 
@@ -819,7 +807,7 @@ fn input_identity(path: &Path, expected: &str, expected_bytes: usize, maximum: u
             ("sha256", Value::Null),
             ("error", Value::str("input-size-limit")),
         ]),
-        Ok(meta) => match sha(path) {
+        Ok(meta) => match crate::files::sha256(path) {
             Ok(actual) => Value::object([
                 (
                     "matches",
@@ -888,7 +876,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
     };
     let manifest_bytes =
         fs::read(&args.manifest).map_err(|e| format!("{}: {e}", args.manifest.display()))?;
-    let manifest_digest = digest_bytes(&manifest_bytes);
+    let manifest_digest = sha256::hex(&manifest_bytes);
     let manifest = strict_json(&manifest_bytes)?;
     if py_int(manifest.get("schema")) != Some(1) {
         return Err("unknown mutation manifest schema".into());
@@ -923,7 +911,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         .map(|(role, w)| (role.clone(), resolve(s(w, "path").unwrap_or_default())))
         .collect();
     for ((role, path), (_, worker)) in worker_paths.iter().zip(workers) {
-        if Some(sha(path)?.as_str()) != s(worker, "sha256") {
+        if Some(crate::files::sha256(path)?.as_str()) != s(worker, "sha256") {
             return Err(format!("worker hash mismatch: {role}"));
         }
     }
@@ -932,7 +920,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         _ => return Err("explicit source/input-tool provenance hashes are required".into()),
     };
     for (path, digest) in &sources {
-        if Some(sha(&resolve(path))?.as_str()) != digest.as_str() {
+        if Some(crate::files::sha256(&resolve(path))?.as_str()) != digest.as_str() {
             return Err(format!("source provenance mismatch: {path}"));
         }
     }
@@ -941,7 +929,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         let id = s(row, "id").unwrap_or_default().to_owned();
         let data =
             fs::read(resolve(s(row, "path").unwrap_or_default())).map_err(|e| e.to_string())?;
-        if Some(digest_bytes(&data).as_str()) != s(row, "sha256")
+        if Some(sha256::hex(&data).as_str()) != s(row, "sha256")
             || data.len() > args.maximum_input_bytes
         {
             return Err(format!("seed hash or input-size mismatch: {id}"));
@@ -1035,11 +1023,11 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
     ];
     let mut controller = Vec::new();
     for relative in controller_files {
-        let digest = sha(&root.join(relative))?;
+        let digest = crate::files::sha256(&root.join(relative))?;
         let destination = output.join("controller-source").join(relative);
         fs::create_dir_all(destination.parent().expect("parent")).map_err(|e| e.to_string())?;
         fs::copy(root.join(relative), &destination).map_err(|e| e.to_string())?;
-        if sha(&destination)? != digest {
+        if crate::files::sha256(&destination)? != digest {
             return Err(format!(
                 "controller changed during preservation: {relative}"
             ));
@@ -1084,7 +1072,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         ("time_or_memory_measurement", Value::Bool(false)),
     ]);
     write(&output.join("identity.json"), &identity)?;
-    if sha(&args.manifest)? != manifest_digest {
+    if crate::files::sha256(&args.manifest)? != manifest_digest {
         return Err("campaign manifest changed after its initial read".into());
     }
     let mut rng = PyRandom::new(args.seed);
@@ -1106,7 +1094,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
             let path = case.join("input.bin");
             fs::write(&path, &data).map_err(|e| e.to_string())?;
             fs::write(case.join("initial-input.bin"), &data).map_err(|e| e.to_string())?;
-            let input_sha = digest_bytes(&data);
+            let input_sha = sha256::hex(&data);
             let mut entries = Vec::new();
             for operation in operations {
                 let op = s(operation, "id").unwrap_or_default();
@@ -1153,8 +1141,8 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
                                     command.iter().map(|c| c.to_string_lossy().into_owned()),
                                 ),
                             ),
-                            ("stdout_sha256", Value::str(digest_bytes(b""))),
-                            ("stderr_sha256", Value::str(digest_bytes(b""))),
+                            ("stdout_sha256", Value::str(sha256::hex(b""))),
+                            ("stderr_sha256", Value::str(sha256::hex(b""))),
                             ("skipped", Value::Bool(true)),
                         ]);
                         (record, vec![], vec![])
@@ -1287,17 +1275,19 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         );
     }
     for ((role, path), (_, worker)) in worker_paths.iter().zip(workers) {
-        if Some(sha(path)?.as_str()) != s(worker, "sha256") {
+        if Some(crate::files::sha256(path)?.as_str()) != s(worker, "sha256") {
             return Err(format!("worker changed during campaign: {role}"));
         }
     }
     for (path, digest) in &sources {
-        if Some(sha(&resolve(path))?.as_str()) != digest.as_str() {
+        if Some(crate::files::sha256(&resolve(path))?.as_str()) != digest.as_str() {
             return Err(format!("source provenance changed during campaign: {path}"));
         }
     }
     for row in seeds {
-        if Some(sha(&resolve(s(row, "path").unwrap_or_default()))?.as_str()) != s(row, "sha256") {
+        if Some(crate::files::sha256(&resolve(s(row, "path").unwrap_or_default()))?.as_str())
+            != s(row, "sha256")
+        {
             return Err(format!(
                 "seed changed during campaign: {}",
                 s(row, "id").unwrap_or_default()
@@ -1305,11 +1295,11 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
         }
     }
     for (relative, digest) in &controller {
-        if Some(sha(&root.join(relative))?.as_str()) != digest.as_str() {
+        if Some(crate::files::sha256(&root.join(relative))?.as_str()) != digest.as_str() {
             return Err(format!("controller changed during campaign: {relative}"));
         }
     }
-    if sha(&args.manifest)? != manifest_digest {
+    if crate::files::sha256(&args.manifest)? != manifest_digest {
         return Err("campaign manifest changed during execution".into());
     }
     let report = Value::object([
@@ -1333,7 +1323,7 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
             "findings_index",
             Value::object([
                 ("path", Value::str("findings.jsonl")),
-                ("sha256", Value::str(sha(&index)?)),
+                ("sha256", Value::str(crate::files::sha256(&index)?)),
             ]),
         ),
         ("source_workers_and_seeds_unchanged", Value::Bool(true)),
@@ -1353,448 +1343,4 @@ pub fn campaign(root: &Path, args: &Campaign) -> R<i32> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn mutations_replay_and_reject_tampered_recipes() {
-        let seed: Vec<u8> = (0..200u8).collect();
-        let mut rng = PyRandom::new(280);
-        for _ in 0..50 {
-            let (data, recipe) = mutation(&seed, &mut rng, 4096, 4).unwrap();
-            assert_ne!(data, seed);
-            assert_eq!(replay(&seed, &recipe, 4096).unwrap(), data);
-            let mut tampered = recipe.clone();
-            if let Value::Object(m) = &mut tampered {
-                m.retain(|(k, _)| k != "result_sha256");
-                m.push(("result_sha256".into(), Value::str("0".repeat(64))));
-            }
-            assert!(replay(&seed, &tampered, 4096).is_err());
-        }
-        let (empty, _) = mutation(&[], &mut rng, 16, 1).unwrap();
-        assert!(!empty.is_empty());
-        assert!(
-            mutation(&seed, &mut rng, 10, 4).is_err(),
-            "the seed exceeds the bound"
-        );
-    }
-
-    #[test]
-    fn mutations_match_the_recorded_python_stream() {
-        // The first recipe Python's generator writes for this seed and RNG state.
-        let seed = b"0123456789abcdef".to_vec();
-        let mut rng = PyRandom::new(7);
-        let (_, recipe) = mutation(&seed, &mut rng, 64, 4).unwrap();
-        assert_eq!(json::canonical(recipe.get("edits").unwrap()), PYTHON_EDITS);
-    }
-
-    const PYTHON_EDITS: &str = r#"[{"insert_hex":"","offset":12,"remove":1},{"insert_hex":"67","offset":13,"remove":1},{"insert_hex":"","offset":9,"remove":6}]"#;
-
-    #[test]
-    fn strict_json_bounds_documents() {
-        assert!(strict_json(b"{\"a\": [1, 2.50]}").is_ok());
-        assert!(
-            strict_json(
-                &[b'['; 300]
-                    .iter()
-                    .chain([b']'; 300].iter())
-                    .copied()
-                    .collect::<Vec<_>>()
-            )
-            .is_err()
-        );
-        assert!(strict_json(b"{\"a\": 1, \"a\": 1}").is_err());
-        assert!(strict_json(b"\xff").is_err());
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn observations_classify_bounded_runs() {
-        let sh = |script: &str| vec![OsString::from("sh"), "-c".into(), script.into()];
-        let (ok, stdout, _) =
-            observe(&sh("printf '{\"a\": 1.50}'"), Duration::from_secs(5), 1024).unwrap();
-        assert_eq!(s(&ok, "status"), Some("ok"));
-        assert_eq!(stdout, b"{\"a\": 1.50}");
-        assert_eq!(
-            s(
-                &observe(&sh("exit 3"), Duration::from_secs(5), 1024)
-                    .unwrap()
-                    .0,
-                "status"
-            ),
-            Some("rejected")
-        );
-        assert_eq!(
-            s(
-                &observe(&sh("exit 101"), Duration::from_secs(5), 1024)
-                    .unwrap()
-                    .0,
-                "status"
-            ),
-            Some("crash")
-        );
-        assert_eq!(
-            s(
-                &observe(&sh("kill -SEGV $$"), Duration::from_secs(5), 1024)
-                    .unwrap()
-                    .0,
-                "status"
-            ),
-            Some("crash")
-        );
-        assert_eq!(
-            s(
-                &observe(&sh("echo nope"), Duration::from_secs(5), 1024)
-                    .unwrap()
-                    .0,
-                "status"
-            ),
-            Some("invalid-json")
-        );
-        let (slow, _, _) = observe(&sh("sleep 10"), Duration::from_millis(200), 1024).unwrap();
-        assert_eq!(s(&slow, "status"), Some("timeout"));
-        let (big, stdout, _) = observe(
-            &sh("head -c 100000 /dev/zero"),
-            Duration::from_secs(5),
-            1000,
-        )
-        .unwrap();
-        assert_eq!(
-            (s(&big, "status"), stdout.len()),
-            (Some("output-limit"), 1000)
-        );
-    }
-
-    #[test]
-    fn comparisons_keep_rejections_ungraded_and_decimals_exact() {
-        let ok = |data: &str| {
-            Value::object([
-                ("status", Value::str("ok")),
-                ("data", json::parse_strict(data).unwrap()),
-            ])
-        };
-        let result = compare(&[
-            ("candidate".into(), ok(r#"{"v": 1.50}"#)),
-            ("reference".into(), ok(r#"{"v": 1.5}"#)),
-        ])
-        .unwrap();
-        assert_eq!(result.get("findings"), Some(&Value::Array(vec![])));
-        let result = compare(&[
-            ("candidate".into(), ok(r#"{"v": 1.50}"#)),
-            ("reference".into(), ok(r#"{"v": 1.25}"#)),
-        ])
-        .unwrap();
-        let shown = json::to_python(result.get("findings").unwrap(), None);
-        assert!(shown.contains(r#"{"json_decimal": "1.50"}"#), "{shown}");
-        // The reference's host-dependence flag is not work the candidate owes.
-        let result = compare(&[
-            ("candidate".into(), ok(r#"{"v": 1}"#)),
-            (
-                "reference".into(),
-                ok(r#"{"v": 1, "host_dependent": true}"#),
-            ),
-        ])
-        .unwrap();
-        assert_eq!(result.get("findings"), Some(&Value::Array(vec![])));
-        let rejected = Value::object([
-            ("status", Value::str("rejected")),
-            ("returncode", Value::int(2)),
-            ("stderr_sha256", Value::str("a")),
-        ]);
-        let both = compare(&[
-            ("candidate".into(), rejected.clone()),
-            ("reference".into(), rejected.clone()),
-        ])
-        .unwrap();
-        assert_eq!(both.get("findings"), Some(&Value::Array(vec![])));
-        let mixed = compare(&[
-            ("candidate".into(), ok("{}")),
-            ("reference".into(), rejected),
-        ])
-        .unwrap();
-        assert!(json::to_python(&mixed, None).contains("acceptance-disagreement"));
-        assert!(compare(&[("candidate".into(), ok("{}"))]).is_err());
-    }
-
-    #[test]
-    fn replay_rejects_edits_outside_the_current_input() {
-        let seed = b"abcdef".to_vec();
-        let recipe = |edits: &str, result: &[u8]| {
-            json::parse(&format!(
-                r#"{{"schema": 1, "seed_sha256": "{}", "edits": {edits}, "result_sha256": "{}"}}"#,
-                digest_bytes(&seed),
-                digest_bytes(result)
-            ))
-            .unwrap()
-        };
-        assert_eq!(
-            replay(
-                &seed,
-                &recipe(
-                    r#"[{"offset": 1, "remove": 2, "insert_hex": "ff"}]"#,
-                    b"a\xffdef"
-                ),
-                16
-            )
-            .unwrap(),
-            b"a\xffdef"
-        );
-        for edits in [
-            r#"[{"offset": 7, "remove": 0, "insert_hex": ""}]"#,
-            r#"[{"offset": -1, "remove": 0, "insert_hex": ""}]"#,
-            r#"[{"offset": 2, "remove": 5, "insert_hex": ""}]"#,
-            r#"[{"offset": 0, "remove": 0, "insert_hex": "zz"}]"#,
-            r#"[{"offset": 0, "remove": 0, "insert_hex": "f"}]"#,
-            r#"[{"offset": true, "remove": 0, "insert_hex": ""}]"#,
-            r#"[{"offset": 0, "remove": 0, "insert_hex": "", "extra": 1}]"#,
-            r"[]",
-        ] {
-            assert!(replay(&seed, &recipe(edits, &seed), 16).is_err(), "{edits}");
-        }
-        assert!(
-            replay(
-                &seed,
-                &recipe(
-                    r#"[{"offset": 0, "remove": 0, "insert_hex": "00000000000000000000"}]"#,
-                    b""
-                ),
-                8
-            )
-            .is_err(),
-            "over the bound"
-        );
-    }
-
-    #[test]
-    fn booleans_never_equal_numbers_and_long_decimals_stay_exact() {
-        let ok = |data: &str| {
-            Value::object([
-                ("status", Value::str("ok")),
-                ("data", json::parse_strict(data).unwrap()),
-            ])
-        };
-        let result = compare(&[
-            ("candidate".into(), ok(r#"{"a": true}"#)),
-            ("reference".into(), ok(r#"{"a": 1}"#)),
-        ])
-        .unwrap();
-        assert!(result.get("findings").is_some_and(Value::truthy));
-        let long = format!("0.{}", "1".repeat(300));
-        let result = compare(&[
-            ("candidate".into(), ok(&format!(r"[{long}]"))),
-            ("reference".into(), ok("[0.5]")),
-        ])
-        .unwrap();
-        assert!(
-            json::to_python(&result, None).contains(&long),
-            "a long decimal is kept, not elided"
-        );
-        let shown = compare(&[
-            ("candidate".into(), ok(&format!(r#""{}""#, "x".repeat(300)))),
-            ("reference".into(), ok(r#""y""#)),
-        ])
-        .unwrap();
-        assert!(json::to_python(&shown, None).contains("<large value>"));
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn a_finished_worker_leaves_no_descendants_behind() {
-        let dir = crate::walk::scratch("fuzz-group");
-        let marker = dir.join("child.pid");
-        let script = format!(
-            "sleep 30 >/dev/null 2>&1 & echo $! > {}; printf '{{}}'",
-            marker.display()
-        );
-        let (result, _, _) = observe(
-            &[OsString::from("sh"), "-c".into(), script.into()],
-            Duration::from_secs(5),
-            1024,
-        )
-        .unwrap();
-        assert_eq!(s(&result, "status"), Some("ok"));
-        let pid = fs::read_to_string(&marker).unwrap().trim().to_owned();
-        std::thread::sleep(Duration::from_millis(100));
-        let alive = Command::new("kill")
-            .args(["-0", &pid])
-            .stderr(Stdio::null())
-            .status()
-            .unwrap()
-            .success();
-        assert!(!alive, "the background child was not terminated");
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn labels_are_bounded_lowercase_identifiers() {
-        assert!(label("candidate") && label("debug-2") && label("a_b"));
-        for bad in ["", "Candidate", "../x", "a/b", "1abc", &"a".repeat(65)] {
-            assert!(!label(bad), "{bad}");
-        }
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn a_campaign_keeps_raw_streams_and_flags_input_tampering() {
-        use std::os::unix::fs::PermissionsExt;
-        let root = crate::walk::scratch("fuzz-campaign");
-        fs::create_dir_all(root.join(".research")).unwrap();
-        fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
-        for file in [
-            "xtask/src/fuzz.rs",
-            "xtask/src/json.rs",
-            "xtask/src/harness/diff.rs",
-            "xtask/src/pyrandom.rs",
-        ] {
-            fs::write(root.join(file), file).unwrap();
-        }
-        let worker = |name: &str, body: &str| {
-            let path = root.join(name);
-            fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-            path
-        };
-        let candidate = worker("candidate", "printf '{\"n\": 1.50}'");
-        let reference = worker("reference", "printf '{\"n\": 1.5}'");
-        let tamper = worker("tamper", "printf x >> \"$2\"; printf '{\"n\": 1.5}'");
-        fs::write(root.join("seed.bin"), b"seed bytes").unwrap();
-        let sha = |p: &Path| digest_bytes(&fs::read(p).unwrap());
-        let manifest = |comparator: &Path| {
-            format!(
-                r#"{{"schema": 1, "workers": {{"candidate": {{"path": "{}", "sha256": "{}"}}, "reference": {{"path": "{}", "sha256": "{}"}}}},
-                "source_files": {{"seed.bin": "{}"}},
-                "operations": [{{"id": "trace", "roles": {{"candidate": ["trace", "{{input}}"], "reference": ["trace", "{{input}}"]}}}}],
-                "seeds": [{{"id": "seed", "path": "seed.bin", "sha256": "{}", "rights": "authored-synthetic", "baseline_statuses": {{"trace": {{"candidate": "ok", "reference": "ok"}}}}}}]}}"#,
-                candidate.display(),
-                sha(&candidate),
-                comparator.display(),
-                sha(comparator),
-                sha(&root.join("seed.bin")),
-                sha(&root.join("seed.bin"))
-            )
-        };
-        let run = |name: &str, comparator: &Path| {
-            fs::write(root.join(format!("{name}.json")), manifest(comparator)).unwrap();
-            let args = Campaign {
-                manifest: root.join(format!("{name}.json")),
-                output: root.join(".research").join(name),
-                rounds: 3,
-                seed: 280,
-                maximum_input_bytes: 1024,
-                maximum_output_bytes: 1024,
-                timeout_seconds: Some(5.0),
-            };
-            (
-                campaign(&root, &args).unwrap(),
-                crate::checks::read_json(&root.join(".research").join(name).join("report.json"))
-                    .unwrap(),
-            )
-        };
-        let (code, report) = run("agree", &reference);
-        assert_eq!(code, 0);
-        assert_eq!(report.get("cases"), Some(&Value::int(4)));
-        assert_eq!(
-            report.get("collection_status").and_then(Value::as_str),
-            Some("complete")
-        );
-        assert!(
-            root.join(".research/agree/case-000003/trace/candidate.stdout")
-                .is_file()
-        );
-        let (code, report) = run("tamper", &tamper);
-        assert_eq!(code, 1);
-        assert_eq!(
-            report.get("collection_status").and_then(Value::as_str),
-            Some("input-identity-failed")
-        );
-        let outside = Campaign {
-            manifest: root.join("agree.json"),
-            output: root.join("elsewhere"),
-            rounds: 1,
-            seed: 1,
-            maximum_input_bytes: 1024,
-            maximum_output_bytes: 1024,
-            timeout_seconds: Some(1.0),
-        };
-        assert!(
-            campaign(&root, &outside).is_err(),
-            "output must be under .research"
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn seed_arguments_fill_the_arguments_slot_and_hangs_time_out() {
-        use std::os::unix::fs::PermissionsExt;
-        let root = crate::walk::scratch("fuzz-arguments");
-        fs::create_dir_all(root.join(".research")).unwrap();
-        fs::create_dir_all(root.join("xtask/src/harness")).unwrap();
-        for file in [
-            "xtask/src/fuzz.rs",
-            "xtask/src/json.rs",
-            "xtask/src/harness/diff.rs",
-            "xtask/src/pyrandom.rs",
-        ] {
-            fs::write(root.join(file), file).unwrap();
-        }
-        let worker = |name: &str, body: &str| {
-            let path = root.join(name);
-            fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
-            path
-        };
-        // `fold INPUT ARGUMENTS...`: echo the arguments; a mutated input hangs.
-        fs::write(root.join("seed.bin"), b"seed bytes").unwrap();
-        let body = format!(
-            "cmp -s \"$2\" '{}' || sleep 30; printf '{{\"a\": \"%s %s\"}}' \"$3\" \"$4\"",
-            root.join("seed.bin").display()
-        );
-        let (candidate, debug) = (worker("candidate", &body), worker("debug", &body));
-        let sha = |p: &Path| digest_bytes(&fs::read(p).unwrap());
-        let manifest = format!(
-            r#"{{"schema": 1, "workers": {{"candidate": {{"path": "{}", "sha256": "{}"}}, "debug": {{"path": "{}", "sha256": "{}"}}}},
-            "source_files": {{"seed.bin": "{}"}},
-            "operations": [{{"id": "fold", "roles": {{"candidate": ["fold", "{{input}}", "{{arguments}}"], "debug": ["fold", "{{input}}", "{{arguments}}"]}}}}],
-            "seeds": [{{"id": "seed", "path": "seed.bin", "sha256": "{}", "rights": "authored-synthetic", "arguments": ["x", "y"], "baseline_statuses": {{"fold": {{"candidate": "ok", "debug": "ok"}}}}}}]}}"#,
-            candidate.display(),
-            sha(&candidate),
-            debug.display(),
-            sha(&debug),
-            sha(&root.join("seed.bin")),
-            sha(&root.join("seed.bin"))
-        );
-        fs::write(root.join("campaign.json"), manifest).unwrap();
-        let args = Campaign {
-            manifest: root.join("campaign.json"),
-            output: root.join(".research/arguments"),
-            rounds: 1,
-            seed: 280,
-            maximum_input_bytes: 1024,
-            maximum_output_bytes: 1024,
-            timeout_seconds: Some(1.0),
-        };
-        assert_eq!(campaign(&root, &args).unwrap(), 1, "the hang is a finding");
-        let case = |n: usize| root.join(format!(".research/arguments/case-{n:06}/fold"));
-        assert_eq!(
-            fs::read(case(0).join("candidate.stdout")).unwrap(),
-            b"{\"a\": \"x y\"}"
-        );
-        let observed = crate::checks::read_json(
-            &root.join(".research/arguments/case-000001/observation.json"),
-        )
-        .unwrap();
-        let status = |role: &str| {
-            observed
-                .get("operations")
-                .and_then(Value::as_array)
-                .unwrap()[0]
-                .get("workers")
-                .and_then(|w| w.get(role))
-                .and_then(|r| s(r, "status"))
-                .map(str::to_owned)
-        };
-        assert_eq!(status("candidate").as_deref(), Some("timeout"));
-        fs::remove_dir_all(root).unwrap();
-    }
-}
+mod tests;

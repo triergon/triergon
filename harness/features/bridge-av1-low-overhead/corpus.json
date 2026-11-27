@@ -1,0 +1,51 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "range-dav1-0-av1",
+      "profile": "dolby-entry",
+      "file": ".research/mp4-range-fixtures/dav1.mp4",
+      "sha256": "10442e57ff92c76c30ed0bcd8e6be708e986208193c65442c44b05377916f191",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "av1"
+      ],
+      "expected": {
+        "trace_sha256": "2a9d5c6af7fa136b1d64dcc99b511c17f9bc19f401af5d771a46d4a89afa19a8"
+      }
+    },
+    {
+      "id": "mp4-six-frames-0-av1",
+      "profile": "mp4",
+      "file": "crates/playback/tests/fixtures/av1/six-frames.mp4",
+      "sha256": "76383e7d9d646a2873ed6e8af7e52b48903b7a9a1fc95f1d807575b90c66b9c6",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mp4",
+        "0",
+        "av1"
+      ],
+      "expected": {
+        "trace_sha256": "2a9d5c6af7fa136b1d64dcc99b511c17f9bc19f401af5d771a46d4a89afa19a8"
+      }
+    },
+    {
+      "id": "webm-six-frames-0-av1",
+      "profile": "mkv",
+      "file": "crates/playback/tests/fixtures/av1/six-frames.webm",
+      "sha256": "a04b2811dee4567c15123d2778393dc3bfe9131d3ff7689795a6a5af20fbed7e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "mkv",
+        "0",
+        "av1"
+      ],
+      "expected": {
+        "trace_sha256": "2a9d5c6af7fa136b1d64dcc99b511c17f9bc19f401af5d771a46d4a89afa19a8"
+      }
+    }
+  ]
+}

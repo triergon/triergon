@@ -1,15 +1,15 @@
-//! Synthetic oblique and bold for faces that lack the style, as libass applies
-//! them to scaled outlines: FreeType's `FT_Outline_Transform` and
-//! `FT_Outline_EmboldenXY`, bit for bit.
+//! The outline operations synthetic styles are made of: a 16.16 transform,
+//! which shears an outline into an oblique, emboldening, and the orientation
+//! emboldening goes by. Each gives FreeType 2.15.0's result, bit for bit; the
+//! module is translated from it (see `docs/provenance.md`).
 
-use crate::Font;
 use crate::fixed::{mul_div, mul_fix, norm_len};
 use crate::glyf::narrow;
-use crate::outline::{Outline, Point};
+use crate::outline::{Outline, OutlinePoint, Point};
 use triergon_core::Result;
 
 /// The fill rule direction of an outline's contours, from the signed area of
-/// its control polygon (`FT_Outline_Get_Orientation`).
+/// its control polygon.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Orientation {
     /// Filled contours run clockwise (y up), as TrueType draws them; also the
@@ -21,48 +21,10 @@ pub enum Orientation {
     None,
 }
 
-/// Which synthetic styles libass applies to a glyph of a face.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Synthesis {
-    /// Slant the outline (see [`Synthesis::shear`]).
-    pub oblique: bool,
-    /// Embolden the outline by the size's
-    /// [`embolden_strength`](crate::SizedFont::embolden_strength).
-    pub embolden: bool,
-}
-
-impl Synthesis {
-    /// The 16.16 horizontal shear libass applies for `oblique`: tan 10° for
-    /// PostScript (CFF) faces, and 0x5700, as GDI slants, for the others.
-    pub fn shear(font: &Font) -> i32 {
-        if font.is_postscript() { 0x2d24 } else { 0x5700 }
-    }
-}
-
-impl Font {
-    /// The synthetic styles libass applies for a requested weight and slant (as
-    /// [`Request::weight`](crate::Request::weight) and
-    /// [`Request::slant`](crate::Request::slant) give them): oblique when the
-    /// face is not italic and the slant exceeds 55, bold when the face is not
-    /// bold and the weight exceeds [`Font::weight`] by more than 150. Italic and
-    /// bold come from `OS/2.fsSelection` bits 0 and 5, or FreeType's style
-    /// without `OS/2`.
-    pub fn synthesis(&self, weight: u32, slant: u32) -> Synthesis {
-        let (italic, bold) = match self.os2() {
-            Some(os2) => (os2.selection.italic(), os2.selection.bold()),
-            None => (self.style().italic, self.style().bold),
-        };
-        Synthesis {
-            oblique: !italic && slant > 55,
-            embolden: !bold && weight > self.weight() + 150,
-        }
-    }
-}
-
 impl Outline {
     /// The orientation of the contours, by the shoelace sum over every point,
-    /// control points included, wrapping in 64 bits as FreeType's `FT_Int64`
-    /// sum does; a zero sum is [`Orientation::None`].
+    /// control points included, wrapping in 64 bits; a zero sum is
+    /// [`Orientation::None`].
     pub fn orientation(&self) -> Orientation {
         if self.is_empty() {
             return Orientation::TrueType;
@@ -138,15 +100,11 @@ impl Outline {
     }
 }
 
-/// One contour of `FT_Outline_EmboldenXY` with equal strengths.
-fn embolden_contour(
-    points: &mut [crate::outline::OutlinePoint],
-    strength: i64,
-    truetype: bool,
-) -> Result<()> {
+/// Emboldens one contour by `strength` on each side, in both directions.
+fn embolden_contour(points: &mut [OutlinePoint], strength: i64, truetype: bool) -> Result<()> {
     let last = points.len() - 1;
     let next = |j: usize| if j < last { j + 1 } else { 0 };
-    let at = |points: &[crate::outline::OutlinePoint], i: usize| {
+    let at = |points: &[OutlinePoint], i: usize| {
         (i64::from(points[i].point.x), i64::from(points[i].point.y))
     };
     let (mut incoming, mut l_in) = ((0, 0), 0);

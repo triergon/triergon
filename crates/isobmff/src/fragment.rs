@@ -1,23 +1,39 @@
-//! Legacy fragment syntax/default precedence from Adobe F4V 10.1 §§2.9, 2.12.
-//! tfdt: ETSI TS 126 244 V18.0.0 §13.5. The moof-base bit uses acquired ISO
-//! 14496-12:2008/FDAmd2 addition to §8.8.7.1, with the published ETSI profile's
-//! named flag semantics. Selected signed trun v1 uses FDAM3 replacement8.8.8.2
-//! and MPEG m76694 table9 Original, experimentally. Final clauses/brands stay open.
+//! Indexes a `traf` from its run metadata and [`Trex`] defaults without reading media.
+//! The index supports sequential and ordinal lookup. Version 1 `trun` composition
+//! offsets are signed.
+//!
+//! Specification: Adobe F4V 10.1 §§2.9, 2.12; ETSI TS 126 244 V18.0.0 §13.5 (`tfdt`);
+//! ISO/IEC 14496-12:2008/FDAmd2 §8.8.7.1 (moof-relative base); FDAM3 §8.8.8.2 and MPEG
+//! m76694 Table 9 (signed `trun`).
 use crate::{
-    Access, BoxChildren, BoxStep, BoxView, BuildStatus, FragmentDecodeTime, Limits, Sample,
-    SampleSpan, SampleStep, SpanStep, add_offset, fields, policy,
+    Access, BuildStatus, CompositionOffset, Limits, Next, Sample,
+    boxes::{BoxChildren, BoxView},
+    fields, policy,
+    sample::SampleSpan,
 };
+use std::borrow::Borrow;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
+mod decode_time;
+pub use decode_time::FragmentDecodeTime;
+
+/// A track's fragment defaults, from its `trex` box in `mvex`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Trex {
+    /// `track_ID` the defaults apply to; never zero.
     pub track_id: u32,
+    /// Default 1-based sample description index.
     pub description_index: u32,
+    /// Default sample duration in ticks of the media timescale.
     pub duration: u32,
+    /// Default sample size in bytes.
     pub size: u32,
+    /// Default `sample_flags` word.
     pub flags: u32,
 }
 impl Trex {
+    /// Reads a `trex` box. `Error::Invalid` for another box type, a zero track ID or
+    /// trailing bytes; `Error::Unsupported` for nonzero version or flags.
     pub fn parse(raw: &BoxView) -> Result<Self> {
         if raw.header().kind != *b"trex" {
             return Err(Error::Invalid("not trex"));
@@ -39,20 +55,31 @@ impl Trex {
     }
 }
 
+/// Where the data of a `traf` starts when it states neither a base data offset nor the
+/// moof-relative flag.
 #[derive(Clone, Copy, Debug)]
 pub enum ImplicitBase {
+    /// The first `traf` of its `moof`: at the `moof`'s first byte.
     FirstTraf,
-    /// Caller has established the preceding traf's data endpoint in this moof.
+    /// A later `traf`: at this absolute offset, the end of the preceding `traf`'s data in
+    /// the same `moof` ([`FragmentIndex::implicit_data_end`]).
     PreviousTraf(u64),
 }
+/// The place of a `traf` in its file and track, for [`FragmentBuilder`].
 #[derive(Clone, Copy, Debug)]
 pub struct FragmentContext {
+    /// Absolute file offset of the enclosing `moof`'s first byte.
     pub moof_start: u64,
+    /// Where the data starts if the `traf` does not say.
     pub implicit_base: ImplicitBase,
-    /// Independently established origin if tfdt is absent. When tfdt is present,
-    /// a supplied value must agree. Absence never silently implies time zero.
+    /// Decode time of the first sample in media ticks, if the caller knows it, for a
+    /// `traf` without `tfdt`. With `tfdt` present a supplied value must match it; without
+    /// either, sample times are unknown, not zero.
     pub decode_origin: Option<i128>,
+    /// 1-based track ordinal of the fragment's first sample; never zero.
     pub first_ordinal: u64,
+    /// Number of entries in the track's `stsd`, which the fragment's description index
+    /// must not exceed.
     pub description_count: u32,
 }
 
@@ -72,9 +99,7 @@ impl Tfhd {
         let b = raw.payload();
         let (version, flags) = fields::full(b)?;
         if version != 0 || flags & !0x03003b != 0 {
-            return Err(Error::Unsupported(
-                "tfhd version/flags outside acquired syntax",
-            ));
+            return Err(Error::Unsupported("tfhd version/flags"));
         }
         let mut at = 8usize;
         let base = if flags & 1 != 0 {
@@ -131,7 +156,7 @@ struct Values {
     duration: u32,
     size: u32,
     flags: u32,
-    cto: Option<crate::CompositionOffset>,
+    cto: Option<CompositionOffset>,
 }
 #[derive(Debug)]
 struct Run {
@@ -151,9 +176,7 @@ impl Run {
         // Experimental signed v1 field types from ISO FDAM3 replacement8.8.8.2
         // and MPEG m76694 table9 Original. No arbitrary nonzero-version rule.
         if version > 1 || flags & !0x000f05 != 0 {
-            return Err(Error::Unsupported(
-                "trun version/flags outside acquired syntax",
-            ));
+            return Err(Error::Unsupported("trun version/flags"));
         }
         if flags & 4 != 0 && flags & 0x400 != 0 {
             return Err(Error::Invalid("both first and per-sample flags"));
@@ -193,7 +216,7 @@ impl Run {
             stride,
         })
     }
-    fn values(&self, index: u32, defaults: Trex) -> Result<Values> {
+    fn values(&self, index: u32, defaults: &Trex) -> Result<Values> {
         if index >= self.count {
             return Err(Error::Invalid("fragment sample index"));
         }
@@ -227,7 +250,7 @@ impl Run {
         );
         let raw_cto = read(0x800, 0);
         let cto = if self.fields & 0x800 != 0 {
-            Some(crate::CompositionOffset::from_wire(self.version, raw_cto)?)
+            Some(CompositionOffset::from_wire(self.version, raw_cto)?)
         } else {
             None
         };
@@ -253,6 +276,8 @@ struct IndexedRun {
     duration: u64,
 }
 
+/// One `traf` indexed by run, from [`FragmentBuilder`]: its defaults, and where each run's
+/// data starts and its decode time. Nothing is stored per sample.
 #[derive(Debug)]
 pub struct FragmentIndex {
     raw: BoxView,
@@ -266,7 +291,7 @@ pub struct FragmentIndex {
     decode_end: Option<i128>,
 }
 impl FragmentIndex {
-    /// Format-local source syntax provenance; no demux distance semantics.
+    /// The `trun` flags of 0-based run `run`.
     pub(crate) fn run_flags(&self, run: usize) -> Result<u32> {
         self.runs
             .as_slice()
@@ -274,51 +299,47 @@ impl FragmentIndex {
             .map(|r| r.wire.fields)
             .ok_or(Error::Invalid("fragment source run absent"))
     }
+    /// Complete `traf`, including its run declarations and any children the index skips.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// The `tfdt` box, if the `traf` has one.
     pub fn decode_time(&self) -> Option<&FragmentDecodeTime> {
         self.decode_time.as_ref()
     }
+    /// Number of samples across all runs.
     pub fn sample_count(&self) -> u64 {
         self.count
     }
-    /// Original container sample ordinal, not a clock or request generation.
+    /// 1-based track ordinal of the first sample.
     pub(crate) fn first_ordinal(&self) -> u64 {
         self.first_ordinal
     }
+    /// `track_ID` from `tfhd`.
     pub fn track_id(&self) -> u32 {
         self.defaults.track_id
     }
-    pub fn description_index(&self) -> u32 {
-        self.defaults.description_index
-    }
+    /// Absolute file offset just past the data of the last run.
     pub fn data_end(&self) -> u64 {
         self.data_end
     }
-    /// The last source-order run endpoint is an unambiguous following-traf base
-    /// only in this nonempty, forward/nonoverlapping legacy run profile. Backward
-    /// explicit runs remain preserved but cannot silently establish this context.
+    /// [`data_end`](Self::data_end) as the implicit base of the next `traf` in the same
+    /// `moof`. `Error::Unsupported` when the fragment has no samples, an empty run, or a
+    /// run that starts before the previous one ends, since that end is then ambiguous.
     pub fn implicit_data_end(&self) -> Result<u64> {
-        if !self.implicit_safe || self.count == 0 {
-            return Err(Error::Unsupported(
-                "implicit predecessor with empty/backward/overlapping runs",
-            ));
-        }
-        Ok(self.data_end)
+        implicit_data_end(self.implicit_safe, self.count, self.data_end)
     }
+    /// Decode time just after the last sample, in media ticks; `None` when the fragment's
+    /// times are unknown.
     pub fn decode_end(&self) -> Option<i128> {
         self.decode_end
     }
+    /// Starts at the first sample and walks runs in `trun` order, without reading media.
     pub fn cursor(&self) -> FragmentCursor<'_> {
-        FragmentCursor {
-            index: self,
-            run: 0,
-            sample: 0,
-            byte: 0,
-            decode: None,
-        }
+        self.resume(FragmentCursorPosition::default())
     }
+    /// A locator for the sample with 1-based track `ordinal`; `Error::Invalid` outside
+    /// this fragment.
     pub fn locate(&self, ordinal: u64) -> Result<FragmentLocator<'_>> {
         let end = self
             .first_ordinal
@@ -340,29 +361,44 @@ impl FragmentIndex {
     }
 }
 
+/// Where an index build stands: reading the `traf`'s boxes, indexing its runs, or done.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
     Boxes,
-    Initialize,
-    StartRun,
-    Sum,
-    Commit,
+    Index(Step),
     Ready,
 }
 
+/// One work unit of indexing the runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Step {
+    /// Applying the `tfhd` and `tfdt`: the defaults, the base offset and decode origin.
+    Header,
+    /// Placing the next run after the one before.
+    StartRun,
+    /// Summing the run's sample sizes and durations.
+    Sum,
+    /// Recording the run's totals.
+    Commit,
+}
+
+/// Indexes one `traf` into a [`FragmentIndex`] under a work budget, reading no media.
+/// Poll until [`BuildStatus::Ready`], then call [`finish`](Self::finish). A failure other
+/// than backpressure is kept for later polls.
 #[derive(Debug)]
 pub struct FragmentBuilder {
     raw: BoxView,
     boxes: BoxChildren,
-    runs: Option<BudgetVec<IndexedRun>>,
+    runs: BudgetVec<IndexedRun>,
+    // Carrying the run in the phase enum adds up to 0.932% open instructions.
     pending: Option<IndexedRun>,
     header: Option<Tfhd>,
     decode_time: Option<FragmentDecodeTime>,
-    trex: Trex,
     context: FragmentContext,
     limits: Limits,
     phase: Phase,
-    defaults: Option<Trex>,
+    /// The defaults in effect: the track's `trex` until the `tfhd`'s overrides apply.
+    defaults: Trex,
     base: u64,
     byte: u64,
     decode: Option<i128>,
@@ -376,6 +412,9 @@ pub struct FragmentBuilder {
     failed: Option<Error>,
 }
 impl FragmentBuilder {
+    /// A builder for `raw`, a `traf` stored in `budget`, taking from `trex` the defaults
+    /// `tfhd` does not override. `Error::Invalid` for another box type or a zero first
+    /// ordinal, `Error::ForeignPool` for a box from another budget pool.
     pub fn new(
         raw: BoxView,
         trex: Trex,
@@ -383,13 +422,25 @@ impl FragmentBuilder {
         budget: Budget,
         limits: Limits,
     ) -> Result<Self> {
+        Self::new_with_inherited_decode_end(raw, trex, context, budget, limits, None)
+    }
+    /// Builds a fragment using `end`, the preceding track decode end in media ticks,
+    /// if this fragment omits `tfdt`. A coded `tfdt` supersedes `end`. An explicit
+    /// origin in [`FragmentContext`] takes precedence and must agree with `tfdt`.
+    /// Fails under the same conditions as [`Self::new`].
+    pub fn new_with_inherited_decode_end(
+        raw: BoxView,
+        trex: Trex,
+        context: FragmentContext,
+        budget: Budget,
+        limits: Limits,
+        end: Option<i128>,
+    ) -> Result<Self> {
         if raw.header().kind != *b"traf" {
             return Err(Error::Invalid("not traf"));
         }
         if !raw.bytes().belongs_to(&budget) {
-            return Err(Error::Invalid(
-                "fragment and index use different budget pools",
-            ));
+            return Err(Error::ForeignPool);
         }
         if context.first_ordinal == 0 {
             return Err(Error::Invalid("zero first fragment ordinal"));
@@ -398,18 +449,17 @@ impl FragmentBuilder {
         Ok(Self {
             raw,
             boxes,
-            runs: Some(BudgetVec::new(&budget)),
+            runs: BudgetVec::new(&budget),
             pending: None,
             header: None,
             decode_time: None,
-            trex,
             context,
             limits,
             phase: Phase::Boxes,
-            defaults: None,
+            defaults: trex,
             base: 0,
             byte: 0,
-            decode: context.decode_origin,
+            decode: context.decode_origin.or(end),
             ordinal: context.first_ordinal,
             run: 0,
             sample: 0,
@@ -420,22 +470,28 @@ impl FragmentBuilder {
             failed: None,
         })
     }
-    /// The reference MOV receiver rejects a zero-size sample in a fragment
-    /// reached during header opening. Source and packet-stage parsing retain it.
-    pub fn new_header_open(
+    /// [`new`](Self::new), also refusing a zero-size sample, as FFmpeg's MOV demuxer
+    /// does in the fragments it reads while opening a file.
+    pub(crate) fn new_header_open(
         raw: BoxView,
         trex: Trex,
         context: FragmentContext,
         budget: Budget,
         limits: Limits,
+        end: Option<i128>,
     ) -> Result<Self> {
-        let mut builder = Self::new(raw, trex, context, budget, limits)?;
+        let mut builder =
+            Self::new_with_inherited_decode_end(raw, trex, context, budget, limits, end)?;
         builder.reject_zero_size = true;
         Ok(builder)
     }
+    /// The `traf` box being indexed.
     pub fn raw(&self) -> &BoxView {
         &self.raw
     }
+    /// One bounded step. `Error::Invalid` for structural faults such as a missing or
+    /// duplicate `tfhd`, a misplaced `tfdt` or a description index outside the track;
+    /// `Error::Unsupported` for unknown `tfhd`, `tfdt` or `trun` versions or flags.
     pub fn poll(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -450,100 +506,86 @@ impl FragmentBuilder {
     }
     fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<BuildStatus> {
         loop {
-            if self.phase == Phase::Ready {
-                return Ok(BuildStatus::Ready);
-            }
-            if self.phase == Phase::Boxes {
-                if let Some(value) = self.pending.take() {
-                    if !work.try_charge(1) {
-                        self.pending = Some(value);
-                        return Ok(BuildStatus::Yield);
+            let step = match self.phase {
+                Phase::Ready => return Ok(BuildStatus::Ready),
+                Phase::Index(step) => step,
+                Phase::Boxes => {
+                    if let Some(value) = self.pending.take() {
+                        if !work.try_charge(1) {
+                            self.pending = Some(value);
+                            return Ok(BuildStatus::Yield);
+                        }
+                        // Most fragments hold one run or a few: each of the first
+                        // four takes exactly its own slot, where a push would take
+                        // four at once. Longer lists grow geometrically.
+                        if self.runs.len() < 4
+                            && let Err(error) = self.runs.try_reserve_exact(1)
+                        {
+                            self.pending = Some(value);
+                            return Err(error);
+                        }
+                        if let Err(error) = self.runs.try_push(value) {
+                            self.pending = Some(error.value);
+                            return Err(error.error);
+                        }
+                        continue;
                     }
-                    let runs = self
-                        .runs
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing fragment runs"))?;
-                    // Most fragments hold one run or a few: each of the first
-                    // four takes exactly its own slot, where a push would take
-                    // four at once. Longer lists grow geometrically.
-                    if runs.len() < 4
-                        && let Err(error) = runs.try_reserve_exact(1)
-                    {
-                        self.pending = Some(value);
-                        return Err(error);
-                    }
-                    if let Err(error) = runs.try_push(value) {
-                        self.pending = Some(error.value);
-                        return Err(error.error);
+                    match self.boxes.poll(work)? {
+                        Next::Yield => return Ok(BuildStatus::Yield),
+                        Next::End => {
+                            self.phase = Phase::Index(Step::Header);
+                        }
+                        Next::Item(raw) => match &raw.header().kind {
+                            b"tfhd" => {
+                                if self.header.is_some() {
+                                    return Err(Error::Invalid("duplicate tfhd"));
+                                }
+                                self.header = Some(Tfhd::parse(&raw)?);
+                            }
+                            b"trun" => {
+                                policy(
+                                    u32::try_from(self.runs.len())
+                                        .map_err(|_| Error::Overflow)?
+                                        .checked_add(1)
+                                        .ok_or(Error::Overflow)?,
+                                    self.limits.max_records,
+                                )?;
+                                self.pending = Some(IndexedRun {
+                                    wire: Run::parse(raw, self.limits)?,
+                                    byte: 0,
+                                    decode: None,
+                                    ordinal: 0,
+                                    bytes: 0,
+                                    duration: 0,
+                                });
+                            }
+                            b"tfdt" => {
+                                if self.decode_time.is_some() {
+                                    return Err(Error::Invalid("duplicate tfdt"));
+                                }
+                                if self.header.is_none() || !self.runs.is_empty() {
+                                    return Err(Error::Invalid(
+                                        "tfdt must follow tfhd and precede trun",
+                                    ));
+                                }
+                                self.decode_time = Some(FragmentDecodeTime::parse(raw)?);
+                            }
+                            _ => {} // Groups/private boxes remain byte-exact in raw traf.
+                        },
                     }
                     continue;
                 }
-                match self.boxes.poll(work)? {
-                    BoxStep::Yield => return Ok(BuildStatus::Yield),
-                    BoxStep::End => {
-                        self.phase = Phase::Initialize;
-                    }
-                    BoxStep::Box(raw) => match &raw.header().kind {
-                        b"tfhd" => {
-                            if self.header.is_some() {
-                                return Err(Error::Invalid("duplicate tfhd"));
-                            }
-                            self.header = Some(Tfhd::parse(&raw)?);
-                        }
-                        b"trun" => {
-                            let count = self
-                                .runs
-                                .as_ref()
-                                .ok_or(Error::Invalid("missing fragment runs"))?
-                                .len();
-                            policy(
-                                u32::try_from(count)
-                                    .map_err(|_| Error::Overflow)?
-                                    .checked_add(1)
-                                    .ok_or(Error::Overflow)?,
-                                self.limits.max_records,
-                            )?;
-                            self.pending = Some(IndexedRun {
-                                wire: Run::parse(raw, self.limits)?,
-                                byte: 0,
-                                decode: None,
-                                ordinal: 0,
-                                bytes: 0,
-                                duration: 0,
-                            });
-                        }
-                        b"tfdt" => {
-                            if self.decode_time.is_some() {
-                                return Err(Error::Invalid("duplicate tfdt"));
-                            }
-                            if self.header.is_none()
-                                || self.runs.as_ref().is_some_and(|r| !r.is_empty())
-                            {
-                                return Err(Error::Invalid(
-                                    "tfdt must follow tfhd and precede trun",
-                                ));
-                            }
-                            self.decode_time = Some(FragmentDecodeTime::parse(raw)?);
-                        }
-                        _ => {} // Groups/private boxes remain byte-exact in raw traf.
-                    },
-                }
-                continue;
-            }
-            let length = self
-                .runs
-                .as_ref()
-                .ok_or(Error::Invalid("missing fragment runs"))?
-                .len();
-            if self.phase == Phase::StartRun && self.run == length {
+            };
+            let length = self.runs.len();
+            if step == Step::StartRun && self.run == length {
                 self.phase = Phase::Ready;
                 continue;
             }
             if !work.try_charge(1) {
                 return Ok(BuildStatus::Yield);
             }
-            match self.phase {
-                Phase::Initialize => {
+            match step {
+                Step::Header => {
                     let header = self.header.ok_or(Error::Invalid("missing tfhd"))?;
                     if let Some(wire) = &self.decode_time {
                         let origin = i128::from(wire.ticks());
@@ -556,7 +598,7 @@ impl FragmentBuilder {
                         }
                         self.decode = Some(origin);
                     }
-                    let defaults = header.effective(self.trex)?;
+                    let defaults = header.effective(self.defaults)?;
                     if defaults.description_index == 0
                         || defaults.description_index > self.context.description_count
                     {
@@ -576,14 +618,12 @@ impl FragmentBuilder {
                         }
                     });
                     self.byte = self.base;
-                    self.defaults = Some(defaults);
-                    self.phase = Phase::StartRun;
+                    self.defaults = defaults;
+                    self.phase = Phase::Index(Step::StartRun);
                 }
-                Phase::StartRun => {
+                Step::StartRun => {
                     let run = self
                         .runs
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing runs"))?
                         .as_mut_slice()
                         .get_mut(self.run)
                         .ok_or(Error::Invalid("run index"))?;
@@ -599,24 +639,18 @@ impl FragmentBuilder {
                     self.sample = 0;
                     self.total_bytes = 0;
                     self.total_duration = 0;
-                    self.phase = Phase::Sum;
+                    self.phase = Phase::Index(Step::Sum);
                 }
-                Phase::Sum => {
+                Step::Sum => {
                     let run = self
                         .runs
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing runs"))?
                         .as_slice()
                         .get(self.run)
                         .ok_or(Error::Invalid("run index"))?;
-                    let defaults = self
-                        .defaults
-                        .ok_or(Error::Invalid("missing fragment defaults"))?;
+                    let defaults = &self.defaults;
                     if run.wire.constant_extents() {
                         if self.reject_zero_size && run.wire.count != 0 && defaults.size == 0 {
-                            return Err(Error::Invalid(
-                                "zero-size fragment sample in native MOV header",
-                            ));
+                            return Err(Error::Invalid("zero-size fragment sample while opening"));
                         }
                         self.total_bytes = u64::from(run.wire.count)
                             .checked_mul(u64::from(defaults.size))
@@ -624,14 +658,14 @@ impl FragmentBuilder {
                         self.total_duration = u64::from(run.wire.count)
                             .checked_mul(u64::from(defaults.duration))
                             .ok_or(Error::Overflow)?;
-                        self.phase = Phase::Commit;
+                        self.phase = Phase::Index(Step::Commit);
                     } else if self.sample < run.wire.count {
                         // One unit per sample: the first was charged above.
                         loop {
                             let value = run.wire.values(self.sample, defaults)?;
                             if self.reject_zero_size && value.size == 0 {
                                 return Err(Error::Invalid(
-                                    "zero-size fragment sample in native MOV header",
+                                    "zero-size fragment sample while opening",
                                 ));
                             }
                             self.total_bytes = self
@@ -648,14 +682,12 @@ impl FragmentBuilder {
                             }
                         }
                     } else {
-                        self.phase = Phase::Commit;
+                        self.phase = Phase::Index(Step::Commit);
                     }
                 }
-                Phase::Commit => {
+                Step::Commit => {
                     let run = self
                         .runs
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing runs"))?
                         .as_mut_slice()
                         .get_mut(self.run)
                         .ok_or(Error::Invalid("run index"))?;
@@ -680,15 +712,26 @@ impl FragmentBuilder {
                     self.decode = decode_end;
                     self.ordinal = ordinal;
                     self.run = self.run.checked_add(1).ok_or(Error::Overflow)?;
-                    self.phase = Phase::StartRun;
-                }
-                Phase::Boxes | Phase::Ready => {
-                    return Err(Error::Invalid("fragment phase invariant"));
+                    self.phase = Phase::Index(Step::StartRun);
                 }
             }
         }
     }
-    pub fn finish(mut self) -> Result<FragmentIndex> {
+    pub(crate) fn is_ready(&self) -> bool {
+        self.phase == Phase::Ready
+    }
+    /// Sample count and implicit base after the builder is ready.
+    pub(crate) fn opening_extent(&self) -> Result<(u64, u64)> {
+        let count = self
+            .ordinal
+            .checked_sub(self.context.first_ordinal)
+            .ok_or(Error::Overflow)?;
+        let end = implicit_data_end(self.implicit_safe, count, self.byte)?;
+        Ok((count, end))
+    }
+    /// The index; the error that stopped the build, or `Error::Invalid` before
+    /// [`BuildStatus::Ready`].
+    pub fn finish(self) -> Result<FragmentIndex> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -698,8 +741,8 @@ impl FragmentBuilder {
         Ok(FragmentIndex {
             raw: self.raw,
             decode_time: self.decode_time,
-            runs: self.runs.take().ok_or(Error::Invalid("missing runs"))?,
-            defaults: self.defaults.ok_or(Error::Invalid("missing defaults"))?,
+            runs: self.runs,
+            defaults: self.defaults,
             first_ordinal: self.context.first_ordinal,
             count: self
                 .ordinal
@@ -730,13 +773,13 @@ impl FragmentIndex {
         position: &mut RunPosition,
         maximum: u64,
         work: &mut WorkBudget,
-    ) -> Result<SpanStep> {
+    ) -> Result<Next<SampleSpan>> {
         loop {
             let Some(run) = self.runs.as_slice().get(position.run) else {
-                return Ok(SpanStep::End);
+                return Ok(Next::End);
             };
             if !work.try_charge(1) {
-                return Ok(SpanStep::Yield);
+                return Ok(Next::Yield);
             }
             if position.sample == run.wire.count {
                 position.run = position.run.checked_add(1).ok_or(Error::Overflow)?;
@@ -752,7 +795,7 @@ impl FragmentIndex {
                 .min(maximum.saturating_sub(1).min(work.remaining()) + 1);
             let (mut end, mut count, mut offset_minimum) = (start, 0u32, None::<i32>);
             while u64::from(count) < wanted {
-                let values = run.wire.values(position.sample + count, self.defaults)?;
+                let values = run.wire.values(position.sample + count, &self.defaults)?;
                 match end.checked_add(u64::from(values.size)) {
                     Some(next) => end = next,
                     None if count == 0 => return Err(Error::Overflow),
@@ -771,7 +814,7 @@ impl FragmentIndex {
                 .ok_or(Error::Overflow)?;
             position.sample += count;
             position.byte = end;
-            return Ok(SpanStep::Span(SampleSpan {
+            return Ok(Next::Item(SampleSpan {
                 first,
                 count: u64::from(count),
                 range: start..end,
@@ -782,36 +825,60 @@ impl FragmentIndex {
     }
 }
 
+/// Reads the samples of a [`FragmentIndex`] in run order; from [`FragmentIndex::cursor`].
 #[derive(Clone, Copy, Debug)]
+#[repr(transparent)]
 pub struct FragmentCursor<'a> {
-    index: &'a FragmentIndex,
-    run: usize,
-    sample: u32,
-    byte: u64,
-    decode: Option<i128>,
+    at: FragmentPosition<&'a FragmentIndex>,
 }
 impl FragmentCursor<'_> {
-    /// Source run ordinal for the most recently emitted fragment sample. The
-    /// storage reads this after Sample, before another poll can leave that run.
+    /// 0-based run of the sample the last poll returned, until the next poll.
     pub(crate) fn run_index(&self) -> usize {
-        self.run
+        self.at.run
     }
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
-        let Advance::Sample(next) = self.advance(work)? else {
-            return Ok(SampleStep::Yield);
+    /// The next sample, for one work unit per sample and per run passed.
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
+        self.at.poll(work)
+    }
+    /// Steps past the next sample without building it, as [`poll`](Self::poll)
+    /// does.
+    pub(crate) fn skip(&mut self, work: &mut WorkBudget) -> Result<RunSkip> {
+        let Advance::Sample(next) = self.at.advance(work)? else {
+            return Ok(RunSkip::Yield);
         };
         let Some(next) = next else {
-            return Ok(SampleStep::End);
+            return Ok(RunSkip::End);
+        };
+        self.at.commit(&next);
+        Ok(RunSkip::Sample(SkippedRunSample {
+            ordinal: next.ordinal,
+            dts: next.decode,
+            duration: next.values.duration,
+            start: next.start,
+            size: next.values.size,
+            sync: next.values.flags & 0x10000 == 0,
+        }))
+    }
+}
+
+impl<I: Borrow<FragmentIndex>> FragmentPosition<I> {
+    /// The next sample, for one work unit per sample and per run passed.
+    fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
+        let Advance::Sample(next) = self.advance(work)? else {
+            return Ok(Next::Yield);
+        };
+        let Some(next) = next else {
+            return Ok(Next::End);
         };
         let values = next.values;
-        let cto_ticks = values.cto.map(|value| value.ticks()).unwrap_or(0);
+        let cto_ticks = values.cto.map_or(0, CompositionOffset::ticks);
         let cts = next
             .decode
             .map(|d| d.checked_add(cto_ticks).ok_or(Error::Overflow))
             .transpose()?;
         let sample = Sample {
             ordinal: next.ordinal,
-            description_index: self.index.defaults.description_index,
+            description_index: self.index.borrow().defaults.description_index,
             range: next.start..next.end,
             dts_ticks: next.decode,
             cts_ticks: cts,
@@ -827,31 +894,13 @@ impl FragmentCursor<'_> {
             fragment_flags: Some(values.flags),
         };
         self.commit(&next);
-        Ok(SampleStep::Sample(sample))
-    }
-    /// Steps past the next sample without building it, as [`poll`](Self::poll)
-    /// does.
-    pub(crate) fn skip(&mut self, work: &mut WorkBudget) -> Result<RunSkip> {
-        let Advance::Sample(next) = self.advance(work)? else {
-            return Ok(RunSkip::Yield);
-        };
-        let Some(next) = next else {
-            return Ok(RunSkip::End);
-        };
-        self.commit(&next);
-        Ok(RunSkip::Sample(SkippedRunSample {
-            ordinal: next.ordinal,
-            dts: next.decode,
-            duration: next.values.duration,
-            start: next.start,
-            size: next.values.size,
-            sync: next.values.flags & 0x10000 == 0,
-        }))
+        Ok(Next::Item(sample))
     }
     /// Finds the next sample, passing exhausted runs, without moving past it.
     fn advance(&mut self, work: &mut WorkBudget) -> Result<Advance> {
+        let index = self.index.borrow();
         loop {
-            let Some(run) = self.index.runs.as_slice().get(self.run) else {
+            let Some(run) = index.runs.as_slice().get(self.run) else {
                 return Ok(Advance::Sample(None));
             };
             if !work.try_charge(1) {
@@ -872,7 +921,7 @@ impl FragmentCursor<'_> {
             } else {
                 self.decode
             };
-            let values = run.wire.values(self.sample, self.index.defaults)?;
+            let values = run.wire.values(self.sample, &index.defaults)?;
             let end = start
                 .checked_add(u64::from(values.size))
                 .ok_or(Error::Overflow)?;
@@ -905,7 +954,6 @@ impl FragmentCursor<'_> {
     }
 }
 
-/// The sample a [`FragmentCursor`] produces next.
 struct NextSample {
     ordinal: u64,
     start: u64,
@@ -940,9 +988,12 @@ pub(crate) struct SkippedRunSample {
     pub(crate) sync: bool,
 }
 
+/// Finds one sample of a [`FragmentIndex`] by ordinal without visiting the runs before
+/// its own; from [`FragmentIndex::locate`].
 #[derive(Debug)]
 pub struct FragmentLocator<'a> {
     index: &'a FragmentIndex,
+    // Holding the search and cursor in a phase enum adds up to 0.247% seek instructions.
     cursor: Option<FragmentCursor<'a>>,
     low: usize,
     high: usize,
@@ -976,7 +1027,8 @@ impl FragmentLocator<'_> {
     pub(crate) fn passed_sync(&self) -> Option<u64> {
         self.passed_sync
     }
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    /// The located sample once, then [`Next::End`]. A failure is kept for later polls.
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -986,14 +1038,14 @@ impl FragmentLocator<'_> {
         }
         result
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if self.done {
-            return Ok(SampleStep::End);
+            return Ok(Next::End);
         }
         loop {
             if self.cursor.is_none() {
                 if !work.try_charge(1) {
-                    return Ok(SampleStep::Yield);
+                    return Ok(Next::Yield);
                 }
                 if self.low < self.high {
                     let middle = self.low + (self.high - self.low) / 2;
@@ -1044,11 +1096,13 @@ impl FragmentLocator<'_> {
                     (0, run.byte, run.decode)
                 };
                 self.cursor = Some(FragmentCursor {
-                    index: self.index,
-                    run: self.low,
-                    sample,
-                    byte,
-                    decode,
+                    at: FragmentPosition {
+                        index: self.index,
+                        run: self.low,
+                        sample,
+                        byte,
+                        decode,
+                    },
                 });
             }
             let cursor = self
@@ -1060,12 +1114,12 @@ impl FragmentLocator<'_> {
                 .index
                 .runs
                 .as_slice()
-                .get(cursor.run)
+                .get(cursor.at.run)
                 .is_some_and(|run| {
-                    cursor.sample < run.wire.count
+                    cursor.at.sample < run.wire.count
                         && run
                             .ordinal
-                            .checked_add(u64::from(cursor.sample))
+                            .checked_add(u64::from(cursor.at.sample))
                             .is_some_and(|next| next < self.target)
                 })
             {
@@ -1076,20 +1130,20 @@ impl FragmentLocator<'_> {
                         }
                         continue;
                     }
-                    RunSkip::Yield => return Ok(SampleStep::Yield),
+                    RunSkip::Yield => return Ok(Next::Yield),
                     RunSkip::End => {
                         return Err(Error::Invalid("fragment locator exhausted unexpectedly"));
                     }
                 }
             }
             match cursor.poll(work)? {
-                SampleStep::Sample(sample) if sample.ordinal == self.target => {
+                Next::Item(sample) if sample.ordinal == self.target => {
                     self.done = true;
-                    return Ok(SampleStep::Sample(sample));
+                    return Ok(Next::Item(sample));
                 }
-                SampleStep::Sample(_) => {}
-                SampleStep::Yield => return Ok(SampleStep::Yield),
-                SampleStep::End => {
+                Next::Item(_) => {}
+                Next::Yield => return Ok(Next::Yield),
+                Next::End => {
                     return Err(Error::Invalid("fragment locator exhausted unexpectedly"));
                 }
             }
@@ -1097,91 +1151,96 @@ impl FragmentLocator<'_> {
     }
 }
 
-/// An owned iterator over one immutable fragment index. Reborrows the same source
-/// cursor on each poll; no self-reference, alternate parser or retained-state injection.
+/// A [`FragmentCursor`] that owns its index, from [`FragmentIndex::into_cursor`].
 #[derive(Debug)]
 pub struct OwnedFragmentCursor {
-    index: FragmentIndex,
-    run: usize,
-    sample: u32,
-    byte: u64,
-    decode: Option<i128>,
+    at: FragmentPosition<FragmentIndex>,
 }
 impl FragmentIndex {
+    /// A cursor over the samples that takes the index with it.
     pub fn into_cursor(self) -> OwnedFragmentCursor {
         OwnedFragmentCursor {
-            index: self,
-            run: 0,
-            sample: 0,
-            byte: 0,
-            decode: None,
+            at: FragmentCursorPosition::default().with_index(self),
         }
     }
 }
 impl OwnedFragmentCursor {
     pub(crate) fn restart(&mut self) {
-        self.run = 0;
-        self.sample = 0;
-        self.byte = 0;
-        self.decode = None;
+        self.at.run = 0;
+        self.at.sample = 0;
+        self.at.byte = 0;
+        self.at.decode = None;
     }
     pub(crate) fn run_index(&self) -> usize {
-        self.run
+        self.at.run
     }
     pub(crate) fn delivered_run_start(&self) -> bool {
-        self.sample == 1
+        self.at.sample == 1
     }
     pub(crate) fn remaining_in_delivered_run(&self) -> u32 {
-        self.index.runs.as_slice()[self.run].wire.count - self.sample
+        self.at.index.runs.as_slice()[self.at.run].wire.count - self.at.sample
     }
+    /// The index being read.
     pub fn index(&self) -> &FragmentIndex {
-        &self.index
+        &self.at.index
     }
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
-        let mut cursor = FragmentCursor {
-            index: &self.index,
-            run: self.run,
-            sample: self.sample,
-            byte: self.byte,
-            decode: self.decode,
-        };
-        let result = cursor.poll(work);
-        self.run = cursor.run;
-        self.sample = cursor.sample;
-        self.byte = cursor.byte;
-        self.decode = cursor.decode;
-        result
+    /// The next sample, as [`FragmentCursor::poll`] reports it.
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
+        self.at.poll(work)
     }
 }
 
-/// A [`FragmentCursor`]'s place in its index, kept without borrowing the index so
-/// an owner can hold both.
+/// A place in a fragment's runs, with an owned, borrowed or detached index.
+// The borrowed index fits beside the position's other fields without extra padding.
 #[derive(Clone, Copy, Debug, Default)]
-pub(crate) struct FragmentCursorPosition {
+pub(crate) struct FragmentPosition<I> {
+    index: I,
     run: usize,
     sample: u32,
     byte: u64,
     decode: Option<i128>,
 }
-impl FragmentIndex {
-    /// The cursor continuing from `position`, which must come from this index.
-    pub(crate) fn resume(&self, position: FragmentCursorPosition) -> FragmentCursor<'_> {
-        FragmentCursor {
-            index: self,
-            run: position.run,
-            sample: position.sample,
-            byte: position.byte,
-            decode: position.decode,
-        }
-    }
-}
-impl FragmentCursor<'_> {
-    pub(crate) fn position(&self) -> FragmentCursorPosition {
-        FragmentCursorPosition {
+impl<I> FragmentPosition<I> {
+    fn with_index<J>(&self, index: J) -> FragmentPosition<J> {
+        FragmentPosition {
+            index,
             run: self.run,
             sample: self.sample,
             byte: self.byte,
             decode: self.decode,
         }
     }
+}
+
+/// The position passed between cursor polls without borrowing the index.
+pub(crate) type FragmentCursorPosition = FragmentPosition<()>;
+
+impl FragmentIndex {
+    /// Continues from a position in this index.
+    pub(crate) fn resume(&self, position: FragmentCursorPosition) -> FragmentCursor<'_> {
+        FragmentCursor {
+            at: position.with_index(self),
+        }
+    }
+}
+impl FragmentCursor<'_> {
+    pub(crate) fn position(&self) -> FragmentCursorPosition {
+        self.at.with_index(())
+    }
+}
+
+fn implicit_data_end(implicit_safe: bool, count: u64, end: u64) -> Result<u64> {
+    if !implicit_safe || count == 0 {
+        return Err(Error::Unsupported(
+            "implicit predecessor with empty/backward/overlapping runs",
+        ));
+    }
+    Ok(end)
+}
+
+fn add_offset(base: u64, delta: i32) -> Result<u64> {
+    let end = i128::from(base)
+        .checked_add(i128::from(delta))
+        .ok_or(Error::Overflow)?;
+    u64::try_from(end).map_err(|_| Error::Overflow)
 }

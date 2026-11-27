@@ -31,8 +31,16 @@ assert!(pictures > 0);
 ```
 
 `send_nals` accepts Annex B data without an implied access-unit boundary; `send_nal`
-takes one NAL unit without start code. `reset` drops the DPB and keeps parameter sets.
+takes one NAL unit without start code. `send` and `send_nals` stop at the first refused
+NAL unit. Pictures completed before the refusal can still be drained.
+`reset` drops the DPB and keeps parameter sets.
 `examples/decode_h264.rs IN.264 OUT.yuv` writes raw yuv420p and one JSON line per picture.
+
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `inspect` | off | `inspect::StreamFeatures`: the coding features a stream's parameter sets and slice headers use, without decoding it |
 
 ## Supported
 
@@ -53,8 +61,9 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   frame buffer (no copy; `row(y)`, `data()`, `raw()`), `bit_depth`, `pts`, `poc`, `sar`,
   `colour` and `interlaced`. Each picture keeps the timestamp of the access unit that
   carried it through reordering.
-- Errors are typed: `Unsupported(&str)` names the feature, `InvalidData(&str)`,
-  `ResourceLimit(&str)`, `Budget(StorageError)`. The decoder does not panic on
+- Errors are `triergon_codec::DecodeError`: `Unsupported(&str)` names the feature,
+  `Invalid(&str)` the failed check, `Policy(&str)` the exceeded cap, and
+  `Budget(triergon_core::Error)` a refused storage charge. The decoder does not panic on
   malformed input.
 - Refused with `Unsupported`: bit depth above 8, 4:2:2 and 4:4:4, lossless transform
   bypass, flexible macroblock ordering (more than one slice group), SP/SI slices, data
@@ -72,7 +81,7 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   free once its picture is output and unused for reference; at most three more stores
   than the DPB size are made, and when every one holds a picture, pictures are output
   until one is free (a buffer of reference pictures none of which waits is
-  `ResourceLimit`).
+  `Policy`).
 - Storage: frame buffers (also while output pictures share them), motion and macroblock
   arrays, the decoded picture buffer, deblocking state, RBSP and slice lists are charged
   to a `Budget` before they are allocated. `Decoder::with_limits(Limits {
@@ -80,15 +89,20 @@ takes one NAL unit without start code. `reset` drops the DPB and keeps parameter
   a level 5.2 DPB plus five more 36864-macroblock frames, about 250 MiB) and
   `Decoder::new_in(&budget)` charges a caller's pool. A refused charge is
   `DecodeError::Budget`; that picture is not decoded and the decoder stays usable.
-- A damaged slice returns `InvalidData`; its macroblocks stay undecoded where FFmpeg
+- A damaged slice returns `Invalid`; its macroblocks stay undecoded where FFmpeg
   would conceal them. An unpaired field is output as a frame with the other field's lines
   unset.
 - Scaling and inverse transforms wrap on overflow, as FFmpeg's `int` arithmetic does; a
   conforming stream never overflows.
 
-## Standards
+## Conformance
 
 Rec. ITU-T H.264 (V15, 08/2024). Tables are transcribed from the text with the table
-number in a comment; Table 9-26 prints ctxIdx 641 where 541 is meant. Verification:
-[harness/codecs](../../harness/codecs/STATUS.md); results in
+number in a comment; Table 9-26 prints ctxIdx 641 where 541 is meant.
+
+The decoder is compared with FFmpeg's on the conformance streams of
+[harness/codecs](../../harness/codecs/STATUS.md); the
+[correctness manifest](../../harness/codecs/correctness-manifest.json) registers the
+slice-group, SP/SI, chroma and bit-depth streams it refuses, with the exact refusal and
+the pictures both sides produce before it. Results are in
 [docs/status.md](../../docs/status.md).

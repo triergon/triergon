@@ -103,10 +103,10 @@ fn video_extraction_takes_any_bytes() {
                 duration: None,
             };
             extractor.push(packet, &mut work).expect("push");
-            while extractor.pop().expect("pop").is_some() {}
+            while extractor.pop().is_some() {}
         }
         extractor.finish().expect("finish");
-        while extractor.pop().expect("pop").is_some() {}
+        while extractor.pop().is_some() {}
     };
     for _ in 0..200 {
         let mut mutated = es.clone();
@@ -162,7 +162,7 @@ fn an_h264_scaling_delta_out_of_range_rejects_the_parameter_set() {
         .push(packet, &mut WorkBudget::new(1 << 10))
         .expect("push");
     extractor.finish().expect("finish");
-    assert_eq!(extractor.pop().expect("pop"), None);
+    assert_eq!(extractor.pop(), None);
 }
 
 #[test]
@@ -185,7 +185,7 @@ fn nal_lengths_past_the_access_unit_or_of_no_size_frame_nothing() {
             .push(packet, &mut WorkBudget::new(1 << 10))
             .expect("push");
         extractor.finish().expect("finish");
-        assert_eq!(extractor.pop().expect("pop"), None);
+        assert_eq!(extractor.pop(), None);
     }
 }
 
@@ -222,7 +222,7 @@ fn extract_unpopped(stream: &[u8]) -> (u64, usize) {
     }
     extractor.finish().expect("finish");
     let mut frames = 0;
-    while extractor.pop().expect("pop").is_some() {
+    while extractor.pop().is_some() {
         frames += 1;
     }
     (work.spent(), frames)

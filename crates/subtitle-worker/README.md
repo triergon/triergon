@@ -57,8 +57,11 @@ extradata), packets (optional PTS and duration) and flushes. tx3g samples go
 through `compat::mov_text::Decoder` and ASS packets through `compat::ass::Decoder`,
 with the capsule's label if it has one. `srt` and `vtt` read one SubRip or WebVTT
 document through `compat::document::Reader`, folding every cue's start, duration,
-text and WebVTT identifier and settings. The inputs are written by
-`harness/subtitle_corpus.py`; the corpus is `harness/features/subtitle-text/`.
+text and WebVTT identifier and settings. A tx3g session, an ASS session and a
+document are each a function of their own, called from the measured loop, so a
+change to one decoder leaves the instruction counts of the other operations as they
+were. The inputs are written by `harness/subtitle_corpus.py`; the corpus is
+`harness/features/subtitle-text/`.
 
 ## Recorded PGS cases
 
@@ -69,7 +72,7 @@ byte transcript; a decoder refusal is a marker in the transcript. The input is a
 capsule (`SMBMO001`): the packet time base, the forced-only option and up to 64 records,
 each a complete PGS packet with its raw PTS and DTS or a hard reset that reopens the
 decoder. The fold is the digest of the byte transcript stored as `expected.bin` beside
-each case in `crates/subtitles/tests/native-compatibility-gold/`. The corpus is
+each case in `crates/subtitles/tests/pgs-receiver-recorded/`. The corpus is
 `harness/features/subtitle-pgs-capsules/`.
 
 ## Recording and verifying subtitle fixtures

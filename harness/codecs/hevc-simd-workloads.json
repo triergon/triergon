@@ -1,0 +1,46 @@
+{
+ "schema": "triergon.codecs.workloads.v1",
+ "frozen_utc": "2026-11-13T17:25:00Z",
+ "frozen_before_grading": true,
+ "root": "worktree root (paths relative)",
+ "gates": [
+  "correctness per NUMERIC-RULES.json / DOWNMIX-CONTRACT.json",
+  "paired TIME 30 pairs seed 280, upper95 within the runtime gate of harness/policy.json",
+  "MEM heap and attributable RSS upper95 < 1 (frozen memory engine)"
+ ],
+ "note": "The three HEVC workloads of workloads.json with the nightly SIMD decoder.",
+ "memory_timeout_seconds": {
+  "aarch64-unknown-linux-gnu": 221,
+  "thumbv7neon-unknown-linux-gnueabihf": 208
+ },
+ "open_workloads": [],
+ "workloads": [
+  {
+   "id": "hevc-main-1080p",
+   "path": ".research/codec-inputs/hevc-main-1080p.hevc",
+   "sha256": "d72d53118fcf832485201682dcb80c7bbaeabd392b5fe493ba5e4b1cb25f1421",
+   "bytes": 2525973,
+   "operation": "video-hevc",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "hevc-main10-1080p",
+   "path": ".research/codec-inputs/hevc-main10-1080p.hevc",
+   "sha256": "d00f2cabfd5a079d94d594c0f98c24d4fa474cf63d1ceef645949611ad23fcd9",
+   "bytes": 2301304,
+   "operation": "video-hevc",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "hevc-main10-2160p",
+   "path": ".research/codec-inputs/hevc-main10-2160p.hevc",
+   "sha256": "5fcd4a7ad7c95c5bb17e7cf6302b02b97fb547433460e4bff716ef565781f681",
+   "bytes": 1884534,
+   "operation": "video-hevc",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  }
+ ]
+}

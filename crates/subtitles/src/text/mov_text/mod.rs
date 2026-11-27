@@ -1,35 +1,55 @@
-//! Explicit, bounded mov_text packet-to-ASS conversion as the receiver does it.
+//! tx3g samples converted to the ASS events and header FFmpeg's `mov_text`
+//! decoder emits, re-exported as [`crate::compat::mov_text`].
 //!
-//! This is a separate receiver view. Raw Input, source timing and configuration
-//! are retained; neither Extractor nor the strict SemanticJob is changed.
+//! Each output keeps its input, clock and the decoder's extradata unchanged.
+//! The specification view of the same samples is
+//! [`tx3g_semantics`](crate::text::tx3g_semantics).
 mod config;
 mod packet;
 mod write;
 
 pub use super::decoded::{Clock, Subtitle};
-use super::{Format, Input, ProvideError, unicode::cancelled};
+use super::{Format, Input};
+use crate::cancelled;
 use config::Configuration;
 use packet::PacketJob;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Bytes, Error, Result, TimeBase, WorkBudget};
+use triergon_core::{Budget, Bytes, Error, Refused, Result, TimeBase, WorkBudget};
 
+/// The decoder options that change its output.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Options {
-    /// AVCodec packet timebase. None reproduces an unset native context clock;
-    /// no clock is inferred from Source Timing or a previous packet.
+    /// The packet time base; without one a subtitle has no PTS and its
+    /// display ends at 0. No time base is taken from the input's timing or
+    /// an earlier packet.
     pub packet_timebase: Option<TimeBase>,
+    /// Frame width in pixels, the header's `PlayResX`; at most `i32::MAX`.
+    /// The header has 384 × 288 when either dimension is 0, or when the
+    /// extradata is shorter than 40 bytes or than its font table.
     pub frame_width: u32,
+    /// Frame height in pixels, the header's `PlayResY`; at most `i32::MAX`.
     pub frame_height: u32,
 }
 
+/// Resource bounds of the decoder; a value beyond one is `Error::Limit`.
 #[derive(Clone, Copy, Debug)]
 pub struct Limits {
+    /// Payload bytes, and block addition bytes, of one input; 4 MiB by
+    /// default.
     pub maximum_input_bytes: usize,
+    /// Extradata bytes, and an input's `codec_private` bytes; 1 MiB by
+    /// default.
     pub maximum_config_bytes: usize,
+    /// Font table entries in the extradata; 65535 by default.
     pub maximum_fonts: usize,
+    /// Style records in one `styl` box; 65535 by default.
     pub maximum_styles: usize,
+    /// Modifier boxes read in one sample; 4096 by default.
     pub maximum_boxes: usize,
+    /// Bytes of one ASS event; 4 MiB by default.
     pub maximum_ass_bytes: usize,
+    /// Work units spent from opening or the last reset, across packets;
+    /// 64 × 1024 × 1024 by default.
     pub maximum_work: usize,
 }
 impl Default for Limits {
@@ -46,30 +66,54 @@ impl Default for Limits {
     }
 }
 
-/// A completed native API call, including clear/no-output and data refusal.
-/// Resource, generation and cancellation errors use core Error instead.
+/// One decoded packet: its input and clock, and what FFmpeg's decode call
+/// gives for it. Resource, generation and cancellation failures are errors
+/// instead.
 #[derive(Debug)]
 pub struct Output {
+    /// The packet, unchanged.
     pub input: Input,
+    /// The clock the packet was provided with.
     pub clock: Clock,
-    /// Native return value: complete physical size, zero clear/empty result, or
-    /// AVERROR_INVALIDDATA (-1094995529). No observer no-progress loop is hidden.
-    pub returned: i32,
-    pub subtitle: Option<Subtitle>,
+    /// The subtitle, none, or the packet's refusal.
+    pub decoded: Decoded,
 }
 
+/// What the decode call gives for one packet.
+#[derive(Debug)]
+pub enum Decoded {
+    /// The packet's subtitle.
+    Subtitle(Subtitle),
+    /// No subtitle: an empty packet, or a zero text length and nothing after
+    /// it.
+    Nothing,
+    /// The packet is refused as invalid data: shorter than its text length
+    /// field, a two-byte packet with a nonzero length, a modifier box smaller
+    /// than its header, or visible text or a font name it would write that is
+    /// not UTF-8 or holds U+FFFE.
+    Refused,
+}
+
+/// What [`Decoder::poll`] reports.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status {
-    Pending,
+    /// The work budget ran out; poll again.
+    Yield,
+    /// The pool could not hold the output; poll again once memory is free.
     NeedOutput,
+    /// No packet is being decoded; provide the next.
     NeedInput,
-    OutputReady,
-    Finished,
+    /// The packet is decoded; take it with
+    /// [`take_output`](Decoder::take_output).
+    Ready,
+    /// Input is finished and no packet is pending.
+    End,
 }
 
-/// Fresh native-compatible context with a bounded incremental open phase.
-/// Extradata must be the caller's AVCodec extradata, not an assumed SampleEntry.
-/// All caller-owned inputs rejected by provide are returned intact.
+/// FFmpeg's `mov_text` decoder over tx3g samples. The extradata is the codec
+/// extradata FFmpeg's demuxer hands the decoder, not a sample entry; the
+/// first polls read it into the subtitle header. A refused input is handed
+/// back unchanged.
 #[derive(Debug)]
 pub struct Decoder {
     pool: Budget,
@@ -85,6 +129,10 @@ pub struct Decoder {
 }
 
 impl Decoder {
+    /// Opens the decoder with `extradata`, accepting inputs of `generation`.
+    /// `Error::Overflow` when a frame dimension or a time base term exceeds
+    /// `i32::MAX`; `Error::ForeignPool` for extradata from another pool and
+    /// `Error::Limit` for more than `limits.maximum_config_bytes` of it.
     pub fn new(
         pool: &Budget,
         extradata: Option<&Bytes>,
@@ -113,23 +161,43 @@ impl Decoder {
         })
     }
 
+    /// The ASS header FFmpeg's decoder writes for the extradata; `None`
+    /// until [`poll`](Self::poll) has read the extradata.
     pub fn subtitle_header(&self) -> Option<&Bytes> {
         self.configuration.header.as_ref()
     }
+    /// The extradata the decoder was opened with, unchanged.
     pub fn extradata(&self) -> Option<&Bytes> {
         self.configuration.raw.as_ref()
     }
+    /// Work units spent since opening or the last reset, at most
+    /// [`Limits::maximum_work`].
     pub fn work_spent(&self) -> usize {
         self.work.spent
     }
 
+    /// Starts decoding `input` at `clock`. It is handed back unchanged with
+    /// the sticky error after a failure, `Error::Invalid` after
+    /// [`finish_input`](Self::finish_input) or while a packet is pending,
+    /// `Error::Unsupported` unless it is [`Format::Tx3g`],
+    /// `Error::StaleGeneration` for another generation, `Error::ForeignPool`
+    /// for bytes of another pool, `Error::Limit` for bytes beyond their limit
+    /// (256 for the codec identifier and charset label) and
+    /// `Error::Overflow` for a payload beyond `i32::MAX` bytes.
     #[expect(
         clippy::result_large_err,
-        reason = "Return the exact existing Input on rejection without allocating; ProvideError has an existing physical size guard."
+        reason = "A refused input goes back to the caller inline, without an allocation; its size is guarded in the text module."
     )]
-    pub fn provide(&mut self, input: Input, clock: Clock) -> std::result::Result<(), ProvideError> {
+    pub fn provide(
+        &mut self,
+        input: Input,
+        clock: Clock,
+    ) -> std::result::Result<(), Refused<Input>> {
         if let Err(error) = self.check(&input) {
-            return Err(ProvideError { error, input });
+            return Err(Refused {
+                error,
+                value: input,
+            });
         }
         self.job = Some(PacketJob::new(input, clock, &self.pool));
         Ok(())
@@ -139,10 +207,12 @@ impl Decoder {
             return Err(error);
         }
         if self.finished || self.job.is_some() {
-            return Err(Error::Invalid("native mov_text input state"));
+            return Err(Error::Invalid(
+                "mov_text packet provided while one is pending or after the end of input",
+            ));
         }
         if input.format != Format::Tx3g {
-            return Err(Error::Unsupported("native mov_text requires tx3g packet"));
+            return Err(Error::Unsupported("mov_text decodes tx3g samples only"));
         }
         if input.generation != self.generation {
             return Err(Error::StaleGeneration {
@@ -180,16 +250,19 @@ impl Decoder {
         Ok(())
     }
 
+    /// Reads the extradata, then decodes the pending packet, spending
+    /// `caller`. `Error::Cancelled` is resumable; any other error is
+    /// returned by every later call until [`reset`](Self::reset).
     pub fn poll(&mut self, caller: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {
             return Err(error);
         }
         if self.job.as_ref().is_some_and(PacketJob::ready) {
-            return Ok(Status::OutputReady);
+            return Ok(Status::Ready);
         }
         if caller.remaining() == 0 {
-            return Ok(Status::Pending);
+            return Ok(Status::Yield);
         }
         let result = self.inner(caller, cancel);
         match result {
@@ -208,11 +281,11 @@ impl Decoder {
             .configuration
             .poll(&self.pool, self.limits, &mut self.work, caller, cancel)?
         {
-            return Ok(Status::Pending);
+            return Ok(Status::Yield);
         }
         let Some(job) = self.job.as_mut() else {
             return Ok(if self.finished {
-                Status::Finished
+                Status::End
             } else {
                 Status::NeedInput
             });
@@ -229,27 +302,31 @@ impl Decoder {
             if job.advances_read_order() {
                 self.read_order = self.read_order.checked_add(1).ok_or(Error::Overflow)?;
             }
-            Ok(Status::OutputReady)
+            Ok(Status::Ready)
         } else {
-            Ok(Status::Pending)
+            Ok(Status::Yield)
         }
     }
+    /// The decoded packet, once [`poll`](Self::poll) reported
+    /// [`Status::Ready`]; `Error::Invalid` before then.
     pub fn take_output(&mut self, cancel: &AtomicBool) -> Result<Output> {
         cancelled(cancel)?;
-        if !self.job.as_ref().is_some_and(PacketJob::ready) {
-            return Err(Error::Invalid("native mov_text output not ready"));
+        match self.job.take_if(|job| job.ready()) {
+            Some(job) => job.take_output(self.options),
+            None => Err(Error::Invalid("mov_text output not ready")),
         }
-        self.job
-            .take()
-            .ok_or(Error::Invalid("native mov_text missing job"))?
-            .take_output(self.options)
     }
+    /// Ends input: once no packet is pending, [`poll`](Self::poll) returns
+    /// [`Status::End`].
     pub fn finish_input(&mut self, cancel: &AtomicBool) -> Result<()> {
         cancelled(cancel)?;
         self.finished = true;
         Ok(())
     }
-    /// Native public flush resets read order; previously returned owners survive.
+    /// Flushes the decoder as FFmpeg's flush does: drops the pending packet
+    /// and any sticky error, restarts the events' read order and the work
+    /// count, reopens input and accepts inputs of `generation`. The header
+    /// and outputs already taken stay valid.
     pub fn reset(&mut self, generation: u64, cancel: &AtomicBool) -> Result<()> {
         cancelled(cancel)?;
         self.job = None;
@@ -288,9 +365,7 @@ impl Funding {
                 maximum: self.maximum,
             });
         }
-        if !caller.try_charge(paid as u64) {
-            return Err(Error::Invalid("native mov_text funding"));
-        }
+        caller.take(paid as u64);
         self.spent = total;
         self.credit += paid;
         Ok(self.credit == cost)

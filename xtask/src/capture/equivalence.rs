@@ -16,10 +16,9 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use crate::codecs::correctness::file_sha;
 use crate::codecs::equivalence::{Job, cargo_build, finish, run_jobs, take_output};
 use crate::harness::worker;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::process::TempDir;
 use crate::pyrandom::PyRandom;
 use crate::{python, sha256};
@@ -120,7 +119,7 @@ pub fn run(
             .join(crate::harness::gate_build::release_dir()?)
             .join("capture-worker"),
     );
-    let cases = crate::checks::read_json(&root.join("harness/capture/cases.json"))?;
+    let cases = json::read(&root.join("harness/capture/cases.json"))?;
     let scratch = TempDir::new(None)?;
     let mut record: Vec<(String, Value)> = Vec::new();
     for (index, case) in cases
@@ -155,6 +154,7 @@ pub fn run(
         ];
         let rate = python::str(&field("bitrate")?);
         let input = python::path(&path);
+        let arguments = super::config::Config::read(case)?.arguments();
         let out = |kind: &str| scratch.0.join(format!("{id}.{kind}"));
         let job = |kind: &str, operation: &str, with_rate: bool, extension: &str| {
             let mut argv = vec![worker.clone(), operation.to_owned()];
@@ -163,6 +163,9 @@ pub fn run(
                 argv.push(rate.clone());
             }
             argv.extend([input.clone(), python::path(&out(extension))]);
+            if with_rate {
+                argv.extend(arguments.iter().cloned());
+            }
             Job {
                 name: format!("{id}/{kind}"),
                 argv,
@@ -182,7 +185,7 @@ pub fn run(
         }
         record.push((
             format!("{id}/input"),
-            Value::object([("sha256", Value::str(file_sha(&path)?))]),
+            Value::object([("sha256", Value::str(crate::files::sha256(&path)?))]),
         ));
         fs::remove_file(&path).map_err(|e| e.to_string())?;
     }

@@ -1,6 +1,5 @@
 //! The frame duration of a stream whose packets and SPS give none, estimated
-//! from the times of its first packets as the reference does (probes p58,
-//! p71-p73, p77-p83, p96-p100).
+//! from the times of its first packets as the reference does.
 //!
 //! The estimate takes the times of the first packets that carry one: 21 of
 //! them when the time base is 1/2000 s or finer, 41 when it is coarser. When
@@ -12,8 +11,8 @@
 //! time base.
 //!
 //! The times come from the packets read while fewer than 5,000,000 bytes of
-//! packets came before them (probes p93b, p100): the estimate settles once it
-//! has its times, once that much has been read, or at the end of the stream.
+//! packets came before them: the estimate settles once it has its times, once
+//! that much has been read, or at the end of the stream.
 //! Frames waiting for it hold only their caption bytes, not the packets the
 //! reference keeps until then.
 //!
@@ -21,18 +20,18 @@
 //! presentation times are taken in [`Shown`] order instead.
 
 /// The most times the estimate takes: those of a time base coarser than
-/// 1/2000 s (probes p96, p98).
+/// 1/2000 s.
 const TAKEN_MAX: usize = 41;
 
-/// The times the estimate takes in a time base of 1/2000 s or finer (probes
-/// p71, p77; p96, p98: TimestampScale 500000 ns takes 21, 500001 ns 41).
+/// The times the estimate takes in a time base of 1/2000 s or finer
+/// (TimestampScale 500000 ns takes 21, 500001 ns 41).
 const TAKEN_FINE: usize = 21;
 
 /// The estimate takes times from the packets read before this many bytes of
-/// packets (probes p93b, p100: untimed access units of 1000, 2000 and 4000
-/// bytes up to 4,980,000 bytes in all leave room for the times after them,
-/// 5,000,000 do not; p100c, p100d: a packet that starts below 5,000,000 bytes
-/// counts, also when it ends above, one that starts at it does not).
+/// packets (untimed access units of 1000, 2000 and 4000 bytes up to 4,980,000
+/// bytes in all leave room for the times after them, 5,000,000 do not; a
+/// packet that starts below 5,000,000 bytes counts, also when it ends above,
+/// one that starts at it does not).
 const LOOK_BYTES: u64 = 5_000_000;
 
 /// The times the estimate takes in `time_base`.
@@ -44,34 +43,32 @@ fn taken(time_base: (u32, u32)) -> usize {
     }
 }
 
-/// The divisor takes the steps from the fourth packet taken (probe p77:
-/// moving the second or third packet leaves the divisor).
+/// The divisor takes the steps from the fourth packet taken (moving the
+/// second or third packet leaves the divisor).
 const DIVISOR_FROM: usize = 3;
 
-/// The fit takes the times from the second packet taken (probes p73, p78:
-/// the second and third packets count in the fit, not in the divisor).
+/// The fit takes the times from the second packet taken (the second and
+/// third packets count in the fit, not in the divisor).
 const FIT_FROM: usize = 1;
 
 /// A divisor of the steps is the duration when longer than this fraction of
-/// a second (probes p73, p79: 180 ticks of 1/90000 s give the fit, 181 the
-/// divisor).
+/// a second (180 ticks of 1/90000 s give the fit, 181 the divisor).
 const DIVISOR_ABOVE: (u128, u128) = (1, 500);
 
 /// A rate below this fraction of the rate of the mean step over every step
-/// taken is left out (probes p80, p83: 0.799986 left out, 0.8 kept).
+/// taken is left out (0.799986 left out, 0.8 kept).
 const SLOWEST: f64 = 0.8;
 
-/// A rate's score must be below this (probe p83: 0.009972 kept, 0.010028
-/// not).
+/// A rate's score must be below this (0.009972 kept, 0.010028 not).
 const CLOSE: f64 = 0.01;
 
 /// The candidate rates in frames per second, as (numerator, denominator), in
 /// the order they are tried: twelfths of a frame per second from 1 to 30,
 /// whole rates from 31 to 60, 80, 120 and 240, and the NTSC rates of 12, 15,
-/// 24, 30, 48 and 60 (probes p79, p80: each is picked for packets at its own
-/// rate; rates below 1, between 30 and 31 off the twelfths, from 61 to 79, 81
-/// to 119, 121 to 239 and above 240, and the NTSC rates of 25, 50, 72, 90,
-/// 96, 100, 120, 144 and 240 are not).
+/// 24, 30, 48 and 60 (each is picked for packets at its own rate; rates below
+/// 1, between 30 and 31 off the twelfths, from 61 to 79, 81 to 119, 121 to
+/// 239 and above 240, and the NTSC rates of 25, 50, 72, 90, 96, 100, 120, 144
+/// and 240 are not).
 fn candidates() -> impl Iterator<Item = (u32, u32)> {
     let twelfths = (12..=360).map(|k| (k, 12));
     let whole = (31..=60).chain([80, 120, 240]).map(|k| (k, 1));
@@ -129,8 +126,8 @@ impl RateEstimate {
     }
 
     /// The estimated duration in ticks of `time_base`: one tick with fewer
-    /// than three times (probe p42: one or two packets last 1, three 3003;
-    /// probe p93: packets without any time last 1).
+    /// than three times (one or two packets last 1, three 3003; packets
+    /// without any time last 1).
     pub(super) fn duration(&self, time_base: (u32, u32)) -> i64 {
         estimate(&self.times[..self.taken], time_base)
     }
@@ -189,20 +186,19 @@ const SHOWN_CAP: usize = 128;
 
 /// The estimate of an H.264 stream in length-prefixed (Matroska) framing
 /// whose packets carry presentation times only, without durations or VUI
-/// timing (probes p86, p96-p98; `h264-nodur-mkv`).
+/// timing (`h264-nodur-mkv`).
 ///
 /// The packets up to the first picture output give no time. From the next
 /// packet on, the estimate takes the presentation times of 21 or 41 packets
 /// ([`taken`]), in presentation order among the packets read by then. A first
 /// B picture among those packets makes the estimate wait one packet more when
 /// it is in order and two when it is displaced; a first B picture before them
-/// (in the start hold) adds none, and later B pictures add none (probes p97,
-/// p98: B pictures at index 8 to 47, one or two at once). Until the estimate
-/// is settled each frame lasts 0 when a tick of the time base is 1/1000 s or
-/// shorter and one tick otherwise (probe p96: TimestampScale 1000000 ns gives
-/// 0, 1000001 ns 1), and at least one picture waits in the buffer (probes p96,
-/// p97: a B picture one below the last at index 21 to 27, or 47 at the coarser
-/// time base, is kept).
+/// (in the start hold) adds none, and later B pictures add none (B pictures
+/// at index 8 to 47, one or two at once). Until the estimate is settled each
+/// frame lasts 0 when a tick of the time base is 1/1000 s or shorter and one
+/// tick otherwise (TimestampScale 1000000 ns gives 0, 1000001 ns 1), and at
+/// least one picture waits in the buffer (a B picture one below the last at
+/// index 21 to 27, or 47 at the coarser time base, is kept).
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Shown {
     pts: [i64; SHOWN_CAP],
@@ -313,7 +309,7 @@ impl Shown {
 /// How far the times `seconds` lie from the frame grid of `rate`: the
 /// variance of each time's distance from its nearest frame boundary, in
 /// frames, the lower of that and the same with the boundaries half a frame on
-/// (probes p79, p80: a stream half a frame off the grid scores as one on it).
+/// (a stream half a frame off the grid scores as one on it).
 fn score(seconds: &[f64], rate: f64) -> f64 {
     let n = seconds.len() as f64;
     [0.0, 0.5]
@@ -381,8 +377,7 @@ mod tests {
 
     #[test]
     fn a_divisor_longer_than_a_five_hundredth_is_the_duration() {
-        // Probes p73 eq-180, eq-181 and p79 gcd-3100 (29 fps would fit
-        // 3103).
+        // Equal steps of 181, 180 and 3100 ticks (29 fps would fit 3103).
         let equal = |s: i64| (0..TAKEN as i64).map(move |n| 90_000 + n * s);
         assert_eq!(estimate(equal(181)), 181);
         assert_eq!(estimate(equal(180)), 1);
@@ -391,7 +386,6 @@ mod tests {
 
     #[test]
     fn each_candidate_is_picked_for_its_own_rate() {
-        // Probe p79.
         assert_eq!(estimate(at_rate(30_000, 1001)), 3003);
         assert_eq!(estimate(at_rate(359, 12)), 3008);
         assert_eq!(estimate(at_rate(80, 1)), 1125);
@@ -402,8 +396,7 @@ mod tests {
 
     #[test]
     fn fewer_than_three_times_give_one_tick() {
-        // Probe p42: streams of one, two and three packets 3003 apart; probe
-        // p93: none.
+        // Streams of none, one, two and three packets 3003 apart.
         assert_eq!(estimate([]), 1);
         assert_eq!(estimate([90_000]), 1);
         assert_eq!(estimate([90_000, 93_003]), 1);
@@ -412,7 +405,7 @@ mod tests {
 
     #[test]
     fn a_score_below_one_hundredth_is_close_enough() {
-        // Probe p83: every other packet A ticks late at 25 fps.
+        // Every other packet A ticks late at 25 fps.
         let late = |a: i64| (0..TAKEN as i64).map(move |n| 90_000 + 3600 * n + a * (n % 2));
         assert_eq!(estimate(late(719)), 3600);
         assert_eq!(estimate(late(721)), 1);
@@ -459,10 +452,10 @@ mod tests {
 
     #[test]
     fn times_count_from_packets_starting_below_five_million_bytes() {
-        // Probes p100c, p100d: after 4,996 untimed units of 1000 bytes and
-        // one of 2999 (4,997,999 bytes), the third timed unit starts at
-        // 4,999,999 and counts; after 4,998,000 bytes it starts at 5,000,000
-        // and does not, which leaves two times: one tick.
+        // After 4,996 untimed units of 1000 bytes and one of 2999 (4,997,999
+        // bytes), the third timed unit starts at 4,999,999 and counts; after
+        // 4,998,000 bytes it starts at 5,000,000 and does not, which leaves
+        // two times: one tick.
         for (untimed, expected) in [(4_997_999u64, 3003), (4_998_000, 1)] {
             let mut e = RateEstimate::new(TB);
             e.packet(usize::try_from(untimed).unwrap(), None);
@@ -481,8 +474,8 @@ mod tests {
 
     #[test]
     fn a_time_base_coarser_than_a_two_thousandth_takes_41_times() {
-        // Probes p96, p98: TimestampScale 500000 ns takes 21 times, 500001 ns
-        // 41; at 1 ms, 41 steps of 40 with one of 20 at the 30th.
+        // TimestampScale 500000 ns takes 21 times, 500001 ns 41; at 1 ms, 41
+        // steps of 40 with one of 20 at the 30th.
         let times = |n: i64| 1000 + 40 * n - if n >= 30 { 20 } else { 0 };
         let mut e = RateEstimate::new((1, 1000));
         let mut fine = RateEstimate::new((1, 2000));
@@ -520,9 +513,8 @@ mod tests {
 
     #[test]
     fn presentation_times_count_from_the_first_output_on() {
-        // Probes p96, p98 (25 fps, first output at index 6): 28 frames of 0
-        // at 0.1 ms, 48 at 1 ms; one tick of 1.000001 ms or more lasts 1
-        // until then.
+        // At 25 fps, the first output at index 6: 28 frames of 0 at 0.1 ms,
+        // 48 at 1 ms; one tick of 1.000001 ms or more lasts 1 until then.
         let pts = |tick_ns: i64| {
             (0..90)
                 .map(move |n| (1_000_000_000 + n * 40_000_000) / tick_ns)
@@ -535,8 +527,8 @@ mod tests {
         assert_eq!((lead(&coarse), coarse[0], coarse[89]), (48, 0, 40));
         let one = shown((1, 500), &pts(2_000_000), 6, &[]);
         assert_eq!((lead(&one), one[0], one[89]), (48, 1, 20));
-        // Probe p97: a first B picture at 10 adds one packet in order, two
-        // displaced; probe p98: a second adds none.
+        // A first B picture at 10 adds one packet in order, two displaced; a
+        // second adds none.
         assert_eq!(
             lead(&shown((1, 10_000), &pts(100_000), 6, &[(10, false)])),
             29
@@ -554,8 +546,8 @@ mod tests {
             )),
             29
         );
-        // Probe p98: a B picture in the start hold adds none (first output at
-        // 8 after a B picture at 2: 30 frames).
+        // A B picture in the start hold adds none (first output at 8 after a
+        // B picture at 2: 30 frames).
         assert_eq!(
             lead(&shown((1, 10_000), &pts(100_000), 8, &[(2, true)])),
             30
@@ -564,9 +556,9 @@ mod tests {
 
     #[test]
     fn presentation_times_are_taken_in_presentation_order() {
-        // Probe p97 (half): a B picture in order at 10 half a frame off enters
-        // the divisor (200); displaced one below at 10 it sorts before the
-        // fourth time and does not (400).
+        // A B picture in order at 10 half a frame off enters the divisor
+        // (200); displaced one below at 10 it sorts before the fourth time
+        // and does not (400).
         let mut pts: Vec<i64> = (0..90).map(|n| 10_000 + 400 * n).collect();
         pts[10] = pts[9] + 200;
         let lead = shown((1, 10_000), &pts, 6, &[(10, false)]);

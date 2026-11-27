@@ -11,8 +11,8 @@ Steps (each a scripted probe chain of its own, see harness/codecs/aac/ps/README.
    precision their fit established, structures as the probes found them. Any failed
    check stops the run.
 
-FFMPEG (the pinned FFmpeg 9.0.2 decode build) and PS_INPUT (this decoder's ps_input
-example) come from the environment. A step whose JSON is in WORKDIR from an earlier run is
+FFMPEG (the pinned FFmpeg 9.0.2 decode build) and PS_INPUT (the AAC unit test
+executable) come from the environment. A step whose JSON is in WORKDIR from an earlier run is
 not rerun, unless --rerun is given: then every step runs again in an emptied directory.
 
 usage: recover_tables.py [--rerun] WORKDIR OUT.json

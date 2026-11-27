@@ -8,7 +8,7 @@ use crate::stream::Limits;
 use crate::syntax::{Gap, Length, Probe, Syntax, TrackFacts};
 use triergon_core::container::CodecId;
 use triergon_core::{Budget, BudgetVec, Error, Result};
-use triergon_framing::{AacAdtsHeader, inspect_aac_adts_header};
+use triergon_framing::aac::{self, AacAdtsHeader};
 
 /// ADTS stream facts.
 #[derive(Debug)]
@@ -18,8 +18,8 @@ pub struct Adts {
 
 impl Adts {
     /// The first frame's header.
-    pub fn header(&self) -> Option<AacAdtsHeader> {
-        self.first
+    pub fn header(&self) -> Option<&AacAdtsHeader> {
+        self.first.as_ref()
     }
 }
 
@@ -31,6 +31,10 @@ impl Syntax for Adts {
     const CONFIRM: u8 = 1;
     /// The first frame of a decode overlaps with nothing.
     const PREROLL: u32 = 1;
+    /// The fixed header holds over a sequence (ISO/IEC 13818-7 section 6.2.1); a stream
+    /// that goes on with another sampling frequency or ID is a new one.
+    const NEW_SEQUENCE: Option<&'static str> =
+        Some("ADTS sequence with another sampling frequency or ID");
 
     fn new(_budget: &Budget, _limits: &Limits) -> Adts {
         Adts { first: None }
@@ -42,7 +46,7 @@ impl Syntax for Adts {
                 && bytes.get(1).is_none_or(|&b| b & 0xf6 == 0xf0);
             return if sync { Probe::Short } else { Probe::Invalid };
         }
-        let Ok(header) = inspect_aac_adts_header(bytes) else {
+        let Ok(header) = aac::inspect_adts_header(bytes) else {
             return Probe::Invalid;
         };
         let header_bytes = if header.protection_absent() { 7 } else { 9 };

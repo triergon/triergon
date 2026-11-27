@@ -1,13 +1,12 @@
 //! Additional demux global-seek boundaries.
-mod common;
-#[path = "support/demux.rs"]
-mod support;
+use crate::common;
+use crate::common::demux as support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
-        packets::{CursorStatus, DemuxProfile},
+        packets::DemuxProfile,
         seek::{
             GlobalSeekJob, GlobalSeekPlan, IndexCursor, IndexEntry, IndexLimits, SeekJob,
             SeekLimits,
@@ -284,7 +283,7 @@ fn fragmented_multitrack_seek_retains_exact_source_ranges_and_payloads() {
     }
 }
 #[test]
-fn unsupported_rescale_and_overlapping_query_never_guess_a_demux_time() {
+fn unsupported_rescale_never_guesses_a_demux_time() {
     let pool = Budget::new(4 * 1024 * 1024).unwrap();
     let movie = support::parse(&pool, include_bytes!("fixtures/r-multitrack.mov"));
     let mut tracks = movie.demux();
@@ -301,24 +300,110 @@ fn unsupported_rescale_and_overlapping_query_never_guess_a_demux_time() {
         ),
         Err(Error::Unsupported(_))
     ));
+}
+#[test]
+fn repeated_edit_seek_lands_on_the_last_key_at_or_before_the_target_in_index_order() {
+    // Index: 0@735 key, 1000@747, 2000@759 discard, 3000@771 key and discard,
+    // 2000@771 key, 3000@783, 4000@795 discard, 4000@735 key. The second edit replays
+    // media 3000 from 2000, the third media 0 from 4000 (ISO/IEC 14496-12 §8.6.6).
+    let pool = Budget::new(4 * 1024 * 1024).unwrap();
     let movie = support::parse(&pool, include_bytes!("fixtures/r-edits-repeat.mov"));
     let tracks = movie.demux();
-    let mut job = SeekJob::new_complete_source(
-        &pool,
-        tracks[0],
-        &movie.media,
-        3500,
-        SeekLimits::default(),
-        DemuxProfile::NoParseNoFillin,
-    )
-    .unwrap();
-    for _ in 0..4096 {
-        match job.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
-            Err(Error::Unsupported(_)) => return,
-            Err(e) => panic!("wrong refusal {e}"),
-            Ok(BuildStatus::Yield) => {}
-            Ok(BuildStatus::Ready) => panic!("overlapping native index query guessed"),
+    for (target, entry, timestamp, position) in [
+        (1500, 0, 0, 735),
+        (3500, 4, 2000, 771),
+        (4500, 7, 4000, 735),
+    ] {
+        let mut job = SeekJob::new_complete_source(
+            &pool,
+            tracks[0],
+            &movie.media,
+            target,
+            SeekLimits::default(),
+            DemuxProfile::NoParseNoFillin,
+        )
+        .unwrap();
+        let mut ready = false;
+        for _ in 0..4096 {
+            if job
+                .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
+                .unwrap()
+                == BuildStatus::Ready
+            {
+                ready = true;
+                break;
+            }
+        }
+        assert!(
+            ready,
+            "target {target} did not finish within the work bound"
+        );
+        let landing = job.finish().unwrap().landing().selected.clone();
+        assert_eq!(
+            (landing.ordinal, landing.timestamp, landing.position),
+            (entry, timestamp, position),
+            "target {target}"
+        );
+    }
+}
+
+#[test]
+fn seek_lowers_the_target_by_the_composition_shift() {
+    // The demuxer lowers a query by the largest amount a composition time it took into
+    // account precedes its decode time (ISO/IEC 14496-12 section 8.6.1.3). A regular
+    // track's index times are lowered by the same amount, so the key at decode time
+    // 3000 is the landing from 3000 on: with a smallest offset of -1000, and of -100
+    // where the -700 of a `ctts` table's last two rows is not taken into account. A
+    // fragmented track's index keeps its decode times, so its key at 3000 is the
+    // landing only from 4000 on.
+    type Landing = (i64, u64, i64, i64);
+    let cases: [(&[u8], [Landing; 2]); 3] = [
+        (
+            include_bytes!("fixtures/r-ctts-v1.mov"),
+            [(2999, 0, -1000, 731), (3000, 3, 2000, 767)],
+        ),
+        (
+            include_bytes!("fixtures/native-followup/follow-clock-later-minimum-four.mov"),
+            [(2999, 0, -100, 28), (3000, 3, 2900, 64)],
+        ),
+        (
+            include_bytes!("fixtures/f-ctts-v1.mp4"),
+            [(3999, 0, 0, 771), (4000, 3, 3000, 975)],
+        ),
+    ];
+    for (bytes, landings) in cases {
+        let pool = Budget::new(4 * 1024 * 1024).unwrap();
+        let movie = support::parse(&pool, bytes);
+        let tracks = movie.demux();
+        for (target, entry, timestamp, position) in landings {
+            // One work unit a poll takes the entry-by-entry seek, a large budget the
+            // seek that reads the tables.
+            for work in [1, 4096] {
+                let mut job = SeekJob::new_complete_source(
+                    &pool,
+                    tracks[0],
+                    &movie.media,
+                    target,
+                    SeekLimits::default(),
+                    DemuxProfile::NoParseNoFillin,
+                )
+                .unwrap();
+                let ready = (0..8192).any(|_| {
+                    job.poll(&mut WorkBudget::new(work), &AtomicBool::new(false))
+                        .unwrap()
+                        == BuildStatus::Ready
+                });
+                assert!(
+                    ready,
+                    "target {target} did not finish within the work bound"
+                );
+                let landing = job.finish().unwrap().landing().selected.clone();
+                assert_eq!(
+                    (landing.ordinal, landing.timestamp, landing.position),
+                    (entry, timestamp, position),
+                    "target {target}, work {work}"
+                );
+            }
         }
     }
-    panic!("ambiguous query refusal stalled");
 }

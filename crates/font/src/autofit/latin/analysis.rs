@@ -1,17 +1,20 @@
 //! Finding a glyph's features for the latin writing system: segments along
 //! a dimension, the stems and serifs they form, the edges they group into
 //! and the blue zones those edges lie in.
+//!
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use super::super::hints::{
-    AxisHints, Dimension, Edge, GlyphHints, Segment, Width, direction, edge, point,
+    AxisHints, Dimension, Edge, EdgeFlags, EdgeId, GlyphHints, Segment, SegmentId, Width,
+    direction, point,
 };
 use super::{Axis, Metrics, blue, constant};
-use crate::long::{abs, div_fix, mul_fix, wrap};
+use crate::fixed::wrap32::{abs, div_fix, mul_fix, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
-/// Where a segment ends while it is being found, and FreeType's copy of
-/// those values for the previous segment of the contour.
+/// Where a segment ends while it is being found; the walk keeps one for
+/// the previous segment of the contour too.
 #[derive(Clone, Copy, Debug)]
 struct Extent {
     min_pos: i64,
@@ -49,7 +52,7 @@ impl Extent {
         segment.pos = ((self.min_pos + self.max_pos) >> 1) as i16;
         segment.delta = ((self.max_pos - self.min_pos) >> 1) as i16;
         if self.round(flat_threshold) {
-            segment.flags |= edge::ROUND;
+            segment.flags.insert(EdgeFlags::ROUND);
         }
         segment.min_coord = self.min_coord as i16;
         segment.max_coord = self.max_coord as i16;
@@ -57,12 +60,12 @@ impl Extent {
     }
 }
 
-/// `af_latin_hints_compute_segments`: the runs of points along `dim` whose
-/// out direction is the dimension's major direction (or its opposite), in
-/// font units, with their positions across the run (`u`) and their extent
-/// along it (`v`); one-point contours give one-point segments. A glyph of
-/// more than 1000 segments gets none. Segment heights then grow by half the
-/// distance to the points just outside them, which helps tell serifs.
+/// The segments of `dim`: the runs of points whose out direction is the
+/// dimension's major direction (or its opposite), in font units, with their
+/// positions across the run (`u`) and their extent along it (`v`);
+/// one-point contours give one-point segments. A glyph of more than 1000
+/// segments gets none. Segment heights then grow by half the distance to
+/// the points just outside them, which helps tell serifs.
 pub(in super::super) fn compute_segments(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -215,7 +218,7 @@ pub(in super::super) fn compute_segments(
                     let segment = &mut segments[index];
                     segment.pos = p.u as i16;
                     if p.flags & point::CONTROL != 0 {
-                        segment.flags |= edge::ROUND;
+                        segment.flags.insert(EdgeFlags::ROUND);
                     }
                     segment.min_coord = p.v as i16;
                     segment.max_coord = p.v as i16;
@@ -252,10 +255,9 @@ pub(in super::super) fn compute_segments(
 }
 
 /// Merges segment `current`, which ends at `point`, with `previous`, which
-/// ended where it starts, as `af_latin_hints_compute_segments` does: with
-/// identical directions the two become one; otherwise the longer one stays,
-/// in `previous`'s place.
-#[expect(clippy::too_many_arguments, reason = "the state of the segment walk")]
+/// ended where it starts: with identical directions the two become one;
+/// otherwise the longer one stays, in `previous`'s place.
+#[allow(clippy::too_many_arguments, reason = "the state of the segment walk")]
 fn merge_segments(
     segments: &mut [Segment],
     previous: usize,
@@ -282,7 +284,7 @@ fn merge_segments(
         extent.max_on_coord = old.max_on_coord.max(new.max_on_coord);
         let segment = &mut segments[previous];
         segment.last = point;
-        segment.flags &= !edge::ROUND;
+        segment.flags.remove(EdgeFlags::ROUND);
         extent.close(segment, flat_threshold);
     } else if (old.max_coord - old.min_coord).abs() > (new.max_coord - new.min_coord).abs() {
         // Keep the previous segment.
@@ -304,12 +306,11 @@ fn merge_segments(
     }
 }
 
-/// `af_latin_hints_link_segments`: pairs each segment in the major
-/// direction with the facing segment of opposite direction to its right
-/// that scores best, by overlap along the axis and by distance against the
-/// widest standard width `widths` gives (or the plain distance without
-/// widths). A segment whose best partner prefers another becomes a serif of
-/// that other segment.
+/// Pairs each segment in the major direction with the facing segment of
+/// opposite direction to its right that scores best, by overlap along the
+/// axis and by distance against the widest standard width `widths` gives
+/// (or the plain distance without widths). A segment whose best partner
+/// prefers another becomes a serif of that other segment.
 pub(super) fn link_segments(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -359,33 +360,32 @@ pub(super) fn link_segments(
             let score = dist_demerit + len_score / len;
             if score < segments[i].score {
                 segments[i].score = score;
-                segments[i].link = Some(j);
+                segments[i].link = Some(SegmentId(j));
             }
             if score < segments[j].score {
                 segments[j].score = score;
-                segments[j].link = Some(i);
+                segments[j].link = Some(SegmentId(i));
             }
         }
     }
     for i in 0..segments.len() {
         if let Some(link) = segments[i].link
-            && segments[link].link != Some(i)
+            && segments[link.0].link != Some(SegmentId(i))
         {
             segments[i].link = None;
-            segments[i].serif = segments[link].link;
+            segments[i].serif = segments[link.0].link;
         }
     }
     Ok(())
 }
 
-/// `af_latin_hints_compute_edges`: groups the segments of `dim` into edges,
-/// sorted by position: a segment joins the first edge of its direction
-/// closer than the axis's edge threshold (at most 1/4 pixel), else starts
-/// one. Segments shorter than a pixel (horizontal edges only), wider than
-/// a pixel, or serifs shorter than 1.5 pixels are left out; one-point
-/// segments join an edge of any direction near them. Each edge then takes
-/// its links and serifs from its segments and is round where most of its
-/// segments are.
+/// Groups the segments of `dim` into edges, sorted by position: a segment
+/// joins the first edge of its direction closer than the axis's edge
+/// threshold (at most 1/4 pixel), else starts one. Segments shorter than a
+/// pixel (horizontal edges only), wider than a pixel, or serifs shorter
+/// than 1.5 pixels are left out; one-point segments join an edge of any
+/// direction near them. Each edge then takes its links and serifs from its
+/// segments and is round where most of its segments are.
 pub(super) fn compute_edges(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -453,13 +453,12 @@ pub(super) fn compute_edges(
     )
 }
 
-/// The second half of `af_latin_hints_compute_edges` and of
-/// `af_cjk_hints_compute_edges`, which agree: gives each segment its edge,
-/// then each edge the link and the serif its segments point to (the nearer
-/// where two do), marks the edges serifs point to, and makes each edge
-/// round where most of its segments are. A link or serif to a segment on
-/// no edge is passed over, which the CJK writing system, putting every
-/// segment on one, never needs.
+/// Finishes grouped edges, for the latin and CJK writing systems alike:
+/// gives each segment its edge, then each edge the link and the serif its
+/// segments point to (the nearer where two do), marks the edges serifs
+/// point to, and makes each edge round where most of its segments are. A
+/// link or serif to a segment on no edge is passed over, which the CJK
+/// writing system, putting every segment on one, never needs.
 pub(in super::super) fn edge_properties(
     segments: &mut [Segment],
     edges: &mut [Edge],
@@ -468,8 +467,8 @@ pub(in super::super) fn edge_properties(
     for (e, edge) in edges.iter().enumerate() {
         let mut s = edge.first;
         loop {
-            segments[s].edge = Some(e);
-            s = segments[s].edge_next.unwrap_or(edge.first);
+            segments[s.0].edge = Some(EdgeId(e));
+            s = segments[s.0].edge_next.unwrap_or(edge.first);
             if s == edge.first {
                 break;
             }
@@ -480,17 +479,19 @@ pub(in super::super) fn edge_properties(
         let (mut round, mut straight) = (0, 0);
         let mut s = edges[e].first;
         loop {
-            let segment = segments[s];
-            if segment.flags & edge::ROUND != 0 {
+            let segment = segments[s.0];
+            if segment.flags.contains(EdgeFlags::ROUND) {
                 round += 1;
             } else {
                 straight += 1;
             }
             // A serif segment's link is ignored.
-            let serif = segment
-                .serif
-                .filter(|&serif| segments[serif].edge.is_some_and(|other| other != e));
-            let link = segment.link.filter(|&link| segments[link].edge.is_some());
+            let serif = segment.serif.filter(|&serif| {
+                segments[serif.0]
+                    .edge
+                    .is_some_and(|other| other != EdgeId(e))
+            });
+            let link = segment.link.filter(|&link| segments[link.0].edge.is_some());
             if let Some(other) = serif.or(link) {
                 let current = if serif.is_some() {
                     edges[e].serif
@@ -502,21 +503,21 @@ pub(in super::super) fn edge_properties(
                 let target = match current {
                     Some(found) => {
                         let edge_delta =
-                            (i64::from(edges[e].fpos) - i64::from(edges[found].fpos)).abs();
+                            (i64::from(edges[e].fpos) - i64::from(edges[found.0].fpos)).abs();
                         let seg_delta =
-                            (i64::from(segment.pos) - i64::from(segments[other].pos)).abs();
+                            (i64::from(segment.pos) - i64::from(segments[other.0].pos)).abs();
                         if seg_delta < edge_delta {
-                            segments[other].edge
+                            segments[other.0].edge
                         } else {
                             Some(found)
                         }
                     }
-                    None => segments[other].edge,
+                    None => segments[other.0].edge,
                 };
                 if serif.is_some() {
                     edges[e].serif = target;
                     if let Some(target) = target {
-                        edges[target].flags |= edge::SERIF;
+                        edges[target.0].flags.insert(EdgeFlags::SERIF);
                     }
                 } else {
                     edges[e].link = target;
@@ -528,9 +529,9 @@ pub(in super::super) fn edge_properties(
             }
         }
         edges[e].flags = if round > 0 && round >= straight {
-            edge::ROUND
+            EdgeFlags::ROUND
         } else {
-            0
+            EdgeFlags::EMPTY
         };
         // Serifs give way to links.
         if edges[e].serif.is_some() && edges[e].link.is_some() {
@@ -540,9 +541,8 @@ pub(in super::super) fn edge_properties(
     Ok(())
 }
 
-/// Starts an edge of segment `s` alone, kept in order (`af_axis_hints_new_edge`
-/// for the segment's position and direction), at the segment's position
-/// scaled by `scale`.
+/// Starts an edge of segment `s` alone, placed in order by the segment's
+/// position and direction, at the segment's position scaled by `scale`.
 pub(in super::super) fn start_edge(
     axis: &mut AxisHints,
     s: usize,
@@ -557,22 +557,22 @@ pub(in super::super) fn start_edge(
         opos,
         pos: opos,
         dir: segment.dir,
-        first: s,
-        last: s,
+        first: SegmentId(s),
+        last: SegmentId(s),
         ..Edge::default()
     };
-    axis.segments[s].edge_next = Some(s);
+    axis.segments[s].edge_next = Some(SegmentId(s));
     Ok(())
 }
 
 /// Adds segment `s` to the circular segment list of `edge`.
 pub(in super::super) fn add_to_edge(segments: &mut [Segment], edge: &mut Edge, s: usize) {
     segments[s].edge_next = Some(edge.first);
-    segments[edge.last].edge_next = Some(s);
-    edge.last = s;
+    segments[edge.last.0].edge_next = Some(SegmentId(s));
+    edge.last = SegmentId(s);
 }
 
-/// `af_latin_hints_detect_features`: segments, their links and edges.
+/// Finds the features of `dim`: segments, their links and edges.
 pub(super) fn detect_features(
     hints: &mut GlyphHints,
     dim: Dimension,
@@ -586,11 +586,10 @@ pub(super) fn detect_features(
     compute_edges(hints, dim, latin, top_to_bottom, work)
 }
 
-/// `af_latin_hints_compute_blue_edges`: gives each horizontal edge the
-/// active blue zone edge nearest it within 1/40 em (at most half a pixel):
-/// the reference, or for a round edge beyond it the overshoot. Top zones
-/// take edges against the major direction, bottom zones edges along it, and
-/// neutral zones both.
+/// Gives each horizontal edge the active blue zone edge nearest it within
+/// 1/40 em (at most half a pixel): the reference, or for a round edge
+/// beyond it the overshoot. Top zones take edges against the major
+/// direction, bottom zones edges along it, and neutral zones both.
 pub(super) fn compute_blue_edges(
     hints: &mut GlyphHints,
     metrics: &Metrics,
@@ -602,7 +601,7 @@ pub(super) fn compute_blue_edges(
     let major_dir = axis.major_dir;
     charge(work, axis.edges.len() * (latin.blue_count + 1))?;
     for edge in axis.edges.iter_mut() {
-        if edge.flags & edge::NO_BLUE != 0 {
+        if edge.flags.contains(EdgeFlags::NO_BLUE) {
             continue;
         }
         let mut best_dist = mul_fix(i64::from(metrics.units_per_em / 40), scale).min(64 / 2);
@@ -624,7 +623,7 @@ pub(super) fn compute_blue_edges(
                 best = Some((zone.reference.fit, neutral));
             }
             // The overshoot, for a round edge beyond the reference.
-            if edge.flags & edge::ROUND != 0 && dist != 0 && !neutral {
+            if edge.flags.contains(EdgeFlags::ROUND) && dist != 0 && !neutral {
                 let under = fpos < zone.reference.org;
                 if top != under {
                     let dist = mul_fix(abs(fpos - zone.shoot.org), scale);
@@ -638,7 +637,7 @@ pub(super) fn compute_blue_edges(
         if let Some((fit, neutral)) = best {
             edge.blue_edge = Some(fit);
             if neutral {
-                edge.flags |= edge::NEUTRAL;
+                edge.flags.insert(EdgeFlags::NEUTRAL);
             }
         }
     }

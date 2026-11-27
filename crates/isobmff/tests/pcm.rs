@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::{child, roots, table};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
@@ -6,17 +6,45 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    SampleTable, TrackHeader,
-    compat::mov::{
-        packets::CursorStatus,
-        pcm::{PcmCursor, PcmLimits, PcmPacket, PcmProfile, PcmReader, PcmStream},
-    },
+    CursorStatus,
+    compat::mov::pcm::{PcmCursor, PcmLimits, PcmPacket, PcmReader, PcmStream},
+    movie::TrackHeader,
+    table::SampleTable,
 };
 
-const MONO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-u8-mono-front.mov");
-const STEREO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-s16be-stereo-front.mov");
-const SWITCH: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-description-1-2-1-unused3.mov");
-const LONG: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-long-chunk-2049.mov");
+const MONO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-u8-mono-front.mov");
+const STEREO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-s16be-stereo-front.mov");
+const SWITCH: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-description-1-2-1-unused3.mov");
+const LONG: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-long-chunk-2049.mov");
+
+#[test]
+fn version_one_sound_description_preserves_pcm_frames() {
+    assert_extended_pcm(include_bytes!(
+        "../../../harness/features/quicktime-pcm-samples/variants/sound-v1.mov"
+    ));
+}
+
+#[test]
+fn version_two_sound_description_uses_its_lpcm_layout() {
+    assert_extended_pcm(include_bytes!(
+        "../../../harness/features/quicktime-pcm-samples/variants/sound-v2.mov"
+    ));
+}
+
+fn assert_extended_pcm(raw: &[u8]) {
+    let parsed = Parsed::new(raw);
+    let stream = PcmStream::new(&parsed.header, &parsed.table, Some(*b"qt  ")).unwrap();
+    assert_eq!(stream.demux().codec, "pcm_s16be");
+    assert_eq!(stream.initial().channels(), 1);
+    let mut input = parsed.input();
+    let mut cursor = parsed.cursor(&input);
+    for (start, end) in [(28, 44), (44, 60)] {
+        let packet = next(&mut cursor, &mut input, 1).unwrap().unwrap();
+        assert_eq!(packet.source_range(), &(start..end));
+        assert_eq!(packet.demux_range(), &(start..end));
+    }
+    assert!(next(&mut cursor, &mut input, 1).unwrap().is_none());
+}
 
 struct Parsed {
     pool: Budget,
@@ -77,7 +105,6 @@ impl Parsed {
             input,
             self.media.clone(),
             PcmLimits::default(),
-            PcmProfile,
         )
         .unwrap()
     }
@@ -209,11 +236,44 @@ fn whole_and_work_one_plans_are_identical() {
     };
     assert_eq!(collect(1), collect(4096));
 }
+/// `MONO` with the entry code `twos` in place of `raw `: 8-bit signed samples.
+fn twos_mono() -> Vec<u8> {
+    let p = Parsed::new(MONO);
+    let at = p.table.descriptions()[0].raw().header().start as usize + 4;
+    let mut raw = MONO.to_vec();
+    raw[at..at + 4].copy_from_slice(b"twos");
+    raw
+}
+#[test]
+fn eight_bit_twos_packets_are_those_of_the_same_bytes_as_raw() {
+    let twos = twos_mono();
+    let rows = |raw: &[u8]| {
+        let p = Parsed::new(raw);
+        let mut input = p.input();
+        let mut cursor = p.cursor(&input);
+        let mut rows = Vec::new();
+        while let Some(packet) = next(&mut cursor, &mut input, 1).unwrap() {
+            rows.push((
+                packet.dts(),
+                packet.duration(),
+                packet.demux_range().clone(),
+            ));
+        }
+        rows
+    };
+    assert!(!rows(&twos).is_empty());
+    assert_eq!(rows(&twos), rows(MONO));
+}
 #[test]
 fn initial_demux_catalogue_retains_exact_source_entry() {
-    for (raw, codec) in [(MONO, "pcm_u8"), (STEREO, "pcm_s16be")] {
+    let twos = twos_mono();
+    for (raw, codec) in [
+        (MONO, "pcm_u8"),
+        (STEREO, "pcm_s16be"),
+        (twos.as_slice(), "pcm_s8"),
+    ] {
         let p = Parsed::new(raw);
-        let s = PcmStream::new(&p.header, &p.table, Some(*b"qt  "), PcmProfile).unwrap();
+        let s = PcmStream::new(&p.header, &p.table, Some(*b"qt  ")).unwrap();
         assert_eq!(s.demux().codec, codec);
         assert_eq!(s.demux().media_type, 1);
         assert!(s.demux().extradata.is_empty());
@@ -279,8 +339,7 @@ fn wrong_pool_is_rejected_before_plan_or_read() {
             &p.table,
             &input,
             p.media.clone(),
-            PcmLimits::default(),
-            PcmProfile
+            PcmLimits::default()
         ),
         Err(Error::ForeignPool)
     ));
@@ -362,14 +421,7 @@ fn source_sample_limit_is_checked_before_metadata_walk() {
         ..PcmLimits::default()
     };
     assert!(matches!(
-        PcmCursor::new(
-            &p.header,
-            &p.table,
-            &input,
-            p.media.clone(),
-            limits,
-            PcmProfile
-        ),
+        PcmCursor::new(&p.header, &p.table, &input, p.media.clone(), limits),
         Err(Error::Limit {
             requested: 2049,
             maximum: 2048
@@ -416,7 +468,7 @@ fn public_header_mutation_does_not_change_demux_catalogue() {
     let mut p = Parsed::new(MONO);
     p.header.timescale = 1;
     assert!(matches!(
-        PcmStream::new(&p.header, &p.table, Some(*b"qt  "), PcmProfile),
+        PcmStream::new(&p.header, &p.table, Some(*b"qt  ")),
         Err(Error::Invalid(_))
     ));
 }
@@ -424,7 +476,7 @@ fn public_header_mutation_does_not_change_demux_catalogue() {
 fn unsupported_brand_does_not_rewrite_source_pcm() {
     let p = Parsed::new(MONO);
     assert!(matches!(
-        PcmStream::new(&p.header, &p.table, Some(*b"isom"), PcmProfile),
+        PcmStream::new(&p.header, &p.table, Some(*b"isom")),
         Err(Error::Unsupported(_))
     ));
     assert_eq!(p.table.descriptions()[0].format, *b"raw ");
@@ -548,15 +600,7 @@ fn packet_policy_limit_preserves_source_and_poisoned_cursor() {
         max_packet_bytes: 3,
         ..PcmLimits::default()
     };
-    let mut c = PcmCursor::new(
-        &p.header,
-        &p.table,
-        &input,
-        p.media.clone(),
-        limits,
-        PcmProfile,
-    )
-    .unwrap();
+    let mut c = PcmCursor::new(&p.header, &p.table, &input, p.media.clone(), limits).unwrap();
     assert_eq!(
         next(&mut c, &mut input, 1).unwrap_err(),
         Error::Limit {

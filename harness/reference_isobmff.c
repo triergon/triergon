@@ -428,10 +428,8 @@ static int operation(Source *s, Options o, Stats *stats, int trace, const SeekRe
         fold(&stats->digest, (uint64_t)(int64_t)seek_result);
     }
     if (trace) {
-        printf("{\"schema\":33,\"operation\":\"%s\"", seek && seek->enabled
-                                                          ? "mov-native-seek-consumer-v33"
-                                                      : indexes ? "mov-native-index-consumer-v33"
-                                                                : "mov-native-open-consumer-v33");
+        printf("{\"schema\":33,\"operation\":\"%s\"",
+               seek && seek->enabled ? "mov-seek" : indexes ? "mov-index" : "mov-open");
         if (seek && seek->enabled)
             printf(",\"track_id\":%d,\"native_ticks\":%" PRId64
                    ",\"after_eof\":%s,\"seek_result\":%d,\"native_drain\":{\"packets\":%" PRIu64

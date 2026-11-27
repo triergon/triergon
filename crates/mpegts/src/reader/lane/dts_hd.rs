@@ -1,15 +1,15 @@
 //! DVB DTS-HD access units in aligned PES (TS 102 114 F.4.3).
 use super::{DtsAudioFrame, DtsExtensionFrame, aligned_audio};
-use crate::{Pes, psi::DvbDtsHd};
+use crate::pes::{Pes, stream_id};
+use crate::psi::DvbDtsHd;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::{BitCursor, BitSource};
 use triergon_core::{
     Budget, Error, InputCursor, InputRequest, InputWindow, Result, SourceCapabilities, SourceId,
     Step, Time, WorkBudget,
 };
-use triergon_framing::{
-    DtsCoreHeader, DtsExtensionSubstreamExtent, DtsFrameExtentLimits, probe_dts_core_header,
-    probe_dts_extension_substream_extent,
+use triergon_framing::dts::{
+    self, DtsCoreHeader, DtsExtensionSubstreamExtent, DtsFrameExtentLimits,
 };
 
 struct HeaderCrc {
@@ -125,7 +125,7 @@ impl Reader {
         if self.validation.is_none() {
             let size = self.pes_bytes;
             let frame = match self.input.step(work, cancel, |prefix| {
-                Ok((probe_dts_core_header(prefix)?, size))
+                Ok((dts::probe_core_header(prefix)?, size))
             })? {
                 Step::Ready(frame) => frame,
                 Step::Yield => return Ok(Step::Yield),
@@ -140,7 +140,10 @@ impl Reader {
                 crc: None,
             });
         }
-        let validation = self.validation.as_mut().expect("complete DTS-HD PES bytes");
+        let validation = self
+            .validation
+            .as_mut()
+            .ok_or(Error::Invalid("complete DTS-HD PES bytes"))?;
         match validation.check(self.input.maximum(), work, cancel) {
             Ok(false) => return Ok(Step::Yield),
             Err(Error::Truncated) => {
@@ -152,7 +155,11 @@ impl Reader {
                 result?;
             }
         }
-        let frame = self.validation.take().expect("validated DTS-HD PES").frame;
+        let frame = self
+            .validation
+            .take()
+            .ok_or(Error::Invalid("validated DTS-HD PES"))?
+            .frame;
         Ok(Step::Ready(DtsAudioFrame {
             core_bytes: frame.header.frame_bytes,
             bytes: frame.bytes,
@@ -203,7 +210,7 @@ impl Validation {
                 return Err(Error::Invalid("DTS-HD substream alignment"));
             }
             let tail = bytes.get(aligned..).ok_or(Error::Truncated)?;
-            let ext = probe_dts_extension_substream_extent(
+            let ext = dts::probe_extension_substream_extent(
                 tail,
                 DtsFrameExtentLimits {
                     maximum_header_bytes: 4096,
@@ -239,7 +246,7 @@ fn await_logical_end<T>(
 }
 
 fn check_pes(pes: &Pes, minimum: usize, maximum: usize) -> Result<()> {
-    if pes.header.stream_id != 0xbd
+    if pes.header.stream_id != stream_id::PRIVATE_STREAM_1
         || pes.header.declared_packet_length == 0
         || !pes.header.data_alignment_indicator
         || pes.payload_len < minimum
@@ -350,7 +357,10 @@ impl ExtensionReader {
                 current: None,
             });
         }
-        let batch = self.batch.as_mut().expect("complete DTS-HD PES");
+        let batch = self
+            .batch
+            .as_mut()
+            .ok_or(Error::Invalid("complete DTS-HD PES"))?;
         let bytes = batch.frame.bytes.as_ref();
         if batch.current.is_none() {
             if cancel.load(Ordering::Relaxed) {
@@ -369,7 +379,10 @@ impl ExtensionReader {
                 Err(error) => return Err(error),
             }
         }
-        let pending = batch.current.as_mut().expect("extension header");
+        let pending = batch
+            .current
+            .as_mut()
+            .ok_or(Error::Invalid("extension header"))?;
         match pending.check(bytes, self.input.maximum(), work, cancel) {
             Ok(false) => return Ok(Step::Yield),
             Err(Error::Truncated) => {
@@ -384,7 +397,10 @@ impl ExtensionReader {
         if self.extensions.count_ones() > 1 && pending.end != bytes.len() {
             return Err(Error::Invalid("DTS-HD PES access unit extent"));
         }
-        let pending = batch.current.take().expect("validated extension header");
+        let pending = batch
+            .current
+            .take()
+            .ok_or(Error::Invalid("validated extension header"))?;
         self.duration = pending.duration.or(self.duration);
         let unit = DtsExtensionFrame {
             bytes: batch.frame.bytes.slice(batch.cursor..pending.end)?,
@@ -406,7 +422,7 @@ fn next_extension(
     extensions: u8,
 ) -> Result<ExtensionPacket> {
     let tail = &bytes[cursor..];
-    let extent = probe_dts_extension_substream_extent(
+    let extent = dts::probe_extension_substream_extent(
         tail,
         DtsFrameExtentLimits {
             maximum_header_bytes: 4096,
@@ -464,7 +480,7 @@ impl ExtensionPacket {
                 return Err(Error::Invalid("DTS-HD substream alignment"));
             }
             let tail = bytes.get(aligned..).ok_or(Error::Truncated)?;
-            let extent = probe_dts_extension_substream_extent(
+            let extent = dts::probe_extension_substream_extent(
                 tail,
                 DtsFrameExtentLimits {
                     maximum_header_bytes: 4096,

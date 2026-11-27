@@ -2212,6 +2212,8 @@
    "path": ".research/elementary/eac3_stereo.eac3",
    "bytes": 120372,
    "sha256": "c6bf6e6e5ef80bffd809e6466a297adfdbcbf5aa99e5094eb4cb756cab21a571"
-  }
+  },
+  {"lane": "reader-mp3", "name": "mp3-vbr-v2.mp3", "path": ".research/codec-inputs/mp3-vbr-v2.mp3", "bytes": 477382, "sha256": "463afda155d878b8c56f94e522a1ee0533e86a2cff164a4d60c1cad82bf6e376", "seek_only": true},
+  {"lane": "reader-flac", "name": "flac-extra", "path": ".research/elementary-reader-authored/flac-extra.flac", "bytes": 157340, "sha256": "a7a7c8ad5895cb5b7cbbf2787166c3f8b4f2a4ca9cb31fcfca68adbe57a7260b", "seek_only": true}
  ]
 }

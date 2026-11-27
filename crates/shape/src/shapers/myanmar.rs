@@ -1,5 +1,6 @@
 //! Myanmar (fonts for the `mym2` OpenType tag): syllables, kinzi, and the
 //! reordering of medial Ra and pre-base vowels before the base.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Expr, Machine, for_each_syllable, syllable_type};

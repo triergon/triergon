@@ -6,6 +6,7 @@
 //! [1, 10, 5]: vertically then horizontally on the way down, in the opposite
 //! order on the way up. Every stage is a convolution of the zero-extended
 //! image, so the bitmap grows by the stages' support.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 mod coeff;
 
@@ -43,18 +44,7 @@ impl Blur {
         }
     }
 
-    pub(crate) fn retained_bytes(&self) -> usize {
-        (self.planes[0].capacity()
-            + self.planes[1].capacity()
-            + self.row.capacity()
-            + self.halves.capacity()
-            + self.zeros.capacity())
-            * 2
-            + self.acc.capacity() * 4
-            + self.lines.capacity() * 2
-    }
-
-    /// libass's `ass_synth_blur`; see [`Raster::blur`](crate::Raster::blur).
+    /// See [`Raster::blur`](crate::Raster::blur).
     pub(crate) fn apply(
         &mut self,
         bitmap: &mut Bitmap,
@@ -113,7 +103,7 @@ impl Blur {
         work: &mut WorkBudget,
     ) -> Result<()> {
         let mx = Method::new(r2x);
-        #[allow(clippy::float_cmp)] // libass reuses the method for equal variances
+        #[allow(clippy::float_cmp, reason = "identical variances share a blur method")]
         let my = if r2y == r2x { mx } else { Method::new(r2y) };
         let (w, h) = (bitmap.width(), bitmap.height());
         if w == 0 || h == 0 {

@@ -12,7 +12,8 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo};
-use triergon_codec_flac::{AudioFrame, ChannelLayout, CrcPolicy, Decoder};
+use triergon_codec_flac::compat::ffmpeg::CrcPolicy;
+use triergon_codec_flac::{AudioFrame, ChannelLayout, Decoder};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -76,7 +77,7 @@ fn main() -> ExitCode {
                 .map_err(|e| e.to_string())
                 .and_then(|pool| {
                     let mut configuration = triergon_codec::BudgetVec::new(&pool);
-                    triergon_framing::canonical_flac_configuration(
+                    triergon_framing::flac::canonical_configuration(
                         track.configuration(),
                         &mut configuration,
                     )
@@ -98,7 +99,7 @@ fn main() -> ExitCode {
         if packet.track() != *track {
             continue;
         }
-        match decoder.decode_float(packet.payload(), &mut frame) {
+        match decoder.decode(packet.payload(), &mut frame) {
             Ok(info) => {
                 if per_frame {
                     eprintln!(

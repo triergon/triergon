@@ -1,0 +1,12 @@
+owner 32
+bytes a 32
+clone b a
+split c b 3 8
+split bad c 2 6
+reserve d 1
+release a
+release b
+reserve d 1
+release c
+bytes e 0
+release e

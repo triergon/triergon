@@ -61,12 +61,13 @@ identical output.
 
 ## Behaviour and limits
 
-- `Picture` carries cropped `width`/`height`, `bit_depth`, `chroma`, three `Plane`s
+- `Picture` carries cropped `width`/`height`, `bit_depth`, three 4:2:0 `Plane`s
   sharing the decoder's frame buffers, `pts`, `poc`, `sar` and `colour`. Each picture
   keeps the timestamp of the access unit that carried it through reordering.
-- Errors are typed: `Unsupported(&str)` names the tool, `InvalidData(&str)`,
-  `ResourceLimit(&str)`, `MissingParameterSet(&str)`, `Budget(StorageError)`. The decoder
-  does not panic on malformed input.
+- Errors use `triergon_codec::DecodeError`. `Unsupported(&str)` names the feature,
+  `Invalid(&str)` the failed check or missing parameter set, `Policy(&str)` the exceeded
+  cap, and `Budget(triergon_core::Error)` a refused storage charge. Conversion to
+  `triergon_core::Error` preserves the error class and detail.
 - Refused with `Unsupported`: monochrome, 4:2:2, 4:4:4, separate colour planes, bit depth
   above 10, unequal luma and chroma bit depth, every SPS range-extension tool, PPS
   range-extension tools under RExt profiles, SCC extensions.
@@ -93,6 +94,11 @@ identical output.
 ## Conformance
 
 Rec. ITU-T H.265 (V11, 01/2026). Tables are transcribed or regenerated from the text with
-the table or equation number in a comment. The comparison commands are in
-[harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md); results in
+the table or equation number in a comment.
+
+The decoder is compared with FFmpeg's on the conformance streams; the commands are in
+[harness/codecs/hevc](../../harness/codecs/hevc/STATUS.md). The
+[correctness manifest](../../harness/codecs/correctness-manifest.json) registers the
+chroma, bit-depth, transform-skip rotation and malformed extension streams it refuses,
+with the exact refusal and the pictures both sides produce before it. Results are in
 [docs/status.md](../../docs/status.md).

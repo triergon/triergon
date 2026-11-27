@@ -24,7 +24,8 @@ use triergon_core::{
 use triergon_mpegts::compat::pes::{CutPes, DemuxClock, PesCutter};
 use triergon_mpegts::compat::stream::{self, Program, ProgramReader};
 use triergon_mpegts::psi::ElementaryStream;
-use triergon_mpegts::{PacketFormat, ParseLimits, TransportFramer};
+use triergon_mpegts::transport::TransportFramer;
+use triergon_mpegts::{PacketFormat, ParseLimits};
 use triergon_subtitles::compat::dvb::{PesParser, PesProgress};
 
 /// The largest window handed to the framer at once.
@@ -35,9 +36,9 @@ const WINDOW: usize = 64 * 1024;
 pub fn read(
     file: &Path,
     format: PacketFormat,
-    selection: Selection<'_>,
+    selection: Selection,
     ordinal: usize,
-) -> Result<(Track, Option<CodecId<'static>>)> {
+) -> Result<(Track, Option<CodecId>)> {
     let mut packets = Vec::new();
     let stream = for_each_packet(file, format, selection, ordinal, &mut |_, packet| {
         packets.push(packet);
@@ -54,7 +55,7 @@ pub fn read(
 /// A selected stream: the codec the demuxer opens for it and its
 /// configuration.
 pub struct Stream {
-    pub codec: Option<CodecId<'static>>,
+    pub codec: Option<CodecId>,
     pub configuration: Vec<u8>,
 }
 
@@ -65,7 +66,7 @@ pub struct Stream {
 pub fn for_each_packet(
     file: &Path,
     format: PacketFormat,
-    selection: Selection<'_>,
+    selection: Selection,
     ordinal: usize,
     packet_sink: &mut dyn FnMut(&Stream, Packet) -> Result<()>,
 ) -> Result<Stream> {
@@ -141,14 +142,14 @@ pub fn for_each_packet(
 }
 
 /// Counts the streams the PMTs introduce until the selected one.
-struct Finder<'a> {
-    selection: Selection<'a>,
+struct Finder {
+    selection: Selection,
     ordinal: usize,
     /// The PIDs of the streams seen so far.
     known: BudgetVec<u16>,
 }
 
-impl Finder<'_> {
+impl Finder {
     /// The selected stream, if `program` introduces it.
     fn find<'p>(&mut self, program: &'p Program) -> Result<Option<&'p ElementaryStream>> {
         for es in program.streams.as_slice() {
@@ -224,9 +225,9 @@ impl Selected {
         let cancel = AtomicBool::new(false);
         let packet = loop {
             match parser.step(&mut WorkBudget::new(u64::MAX), &cancel)? {
-                PesProgress::Packet(packet) => break packet,
+                PesProgress::Ready(packet) => break packet,
                 PesProgress::Yield => {}
-                PesProgress::NeedPacket => return Err("dvb: PES parser stalled".into()),
+                PesProgress::NeedInput => return Err("dvb: PES parser stalled".into()),
             }
         };
         let pts = packet.codec_pts().map(i64::try_from).transpose()?;

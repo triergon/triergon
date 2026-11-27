@@ -1,8 +1,13 @@
 //! The zero-extending reader of the decoders' inner loops.
 
-/// How a [`Reader`] gets the bits at its position. [`Direct`] and [`Cached`] are the two
-/// implementations.
-pub trait Window: Copy {
+mod sealed {
+    /// Keeps [`Window`](super::Window) to this crate's implementations.
+    pub trait Sealed {}
+}
+
+/// How a [`Reader`] gets the bits at its position. [`Direct`] and [`Cached`] are its only
+/// implementations: the trait is sealed.
+pub trait Window: Copy + sealed::Sealed {
     /// The window of a reader starting at bit `position` of `data`.
     fn new(data: &[u8], position: usize) -> Self;
 
@@ -22,6 +27,8 @@ pub trait Window: Copy {
 /// a short tail here instead costs AC-3 about 1% more instructions.
 #[derive(Clone, Copy, Debug)]
 pub struct Direct;
+
+impl sealed::Sealed for Direct {}
 
 impl Window for Direct {
     fn new(_: &[u8], _: usize) -> Self {
@@ -77,6 +84,8 @@ pub struct Cached {
     start: usize,
 }
 
+impl sealed::Sealed for Cached {}
+
 impl Window for Cached {
     fn new(data: &[u8], position: usize) -> Self {
         let start = position & !7;
@@ -118,15 +127,8 @@ pub struct Reader<'a, W> {
 /// describes.
 pub type BitReader<'a> = Reader<'a, Direct>;
 
-/// The reader for variable-length codes.
-///
-/// The DVB and DVD subtitle pixel decoders keep private readers: a 64-bit cache that
-/// each code shifts, refilled 32 bits at a time. On this reader their loops ran up to 11%
-/// (DVB) and 5% (DVD) more instructions (`instructions:u`, linux-arm64). A shared reader
-/// of the private shape cost 2.0 to 2.9% on their heaviest workloads at best. The
-/// two loops need different end-of-slice paths to keep their state in registers: an
-/// inline zero-filled copy for DVB (+1.0 to 1.5% shared, +11% for DVD), a cold in-place
-/// byte fill for DVD.
+/// The reader for variable-length codes. The DVB and DVD subtitle pixel decoders keep
+/// private readers, whose end-of-slice paths this one would cost them (measured).
 pub type CachedBitReader<'a> = Reader<'a, Cached>;
 
 impl<'a, W: Window> Reader<'a, W> {

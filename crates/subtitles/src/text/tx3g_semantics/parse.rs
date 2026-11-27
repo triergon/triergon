@@ -1,11 +1,12 @@
-//! Forward bounded modifier reader; physical box geometry is supplied only by
-//! the existing internally executed tx3g extractor/configuration parser.
+//! Reads the records of one modifier box forward, a byte at a time; the box
+//! ranges come from the tx3g extractor or the description parser.
 use super::super::{
     Encoding, Modifier,
     tx3g_config::StyleRecord,
-    unicode::{Cursor, Poll, cancelled},
+    unicode::{Cursor, Poll},
 };
 use super::{RecordSource, WrapMode};
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -23,18 +24,60 @@ pub(super) enum Item {
     Wrap(RecordSource, WrapMode),
     Disparity(RecordSource, i16),
 }
+/// The modifier boxes the reader resolves.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    Style,
+    Karaoke,
+    Highlight,
+    HighlightColour,
+    ScrollDelay,
+    Hyperlink,
+    TextBox,
+    Blink,
+    Wrap,
+    Disparity,
+}
+impl Kind {
+    fn of(kind: [u8; 4]) -> Option<Self> {
+        Some(match &kind {
+            b"styl" => Self::Style,
+            b"krok" => Self::Karaoke,
+            b"hlit" => Self::Highlight,
+            b"hclr" => Self::HighlightColour,
+            b"dlay" => Self::ScrollDelay,
+            b"href" => Self::Hyperlink,
+            b"tbox" => Self::TextBox,
+            b"blnk" => Self::Blink,
+            b"twrp" => Self::Wrap,
+            b"disp" => Self::Disparity,
+            _ => return None,
+        })
+    }
+    /// The bytes of the fields before any records or strings.
+    fn header(self) -> usize {
+        match self {
+            Self::Style | Self::Disparity => 2,
+            Self::Karaoke => 6,
+            Self::Highlight | Self::HighlightColour | Self::ScrollDelay | Self::Blink => 4,
+            Self::Hyperlink => 5,
+            Self::TextBox => 8,
+            Self::Wrap => 1,
+        }
+    }
+}
+#[derive(Debug)]
 enum Phase {
     Header,
-    Records,
-    Url,
+    Records { left: usize },
+    Url(Cursor),
     AltLength,
-    Alt,
+    Alt(Cursor),
     Done,
 }
 #[derive(Debug)]
 pub(super) struct Reader {
-    kind: [u8; 4],
+    kind: Kind,
     index: usize,
     at: usize,
     end: usize,
@@ -44,16 +87,15 @@ pub(super) struct Reader {
     buffer: [u8; 12],
     read: usize,
     need: usize,
-    count: usize,
-    current: usize,
-    utf8: Option<Cursor>,
     start: u16,
     finish: u16,
     url: Range<usize>,
     alternate: Range<usize>,
 }
 impl Reader {
-    pub(super) fn new(bytes: &[u8], modifier: &Modifier, index: usize) -> Result<Self> {
+    /// The reader of `modifier`, the box at `index`; `None` for a box it does
+    /// not resolve. `Error::Truncated` when the box does not fit `bytes`.
+    pub(super) fn new(bytes: &[u8], modifier: &Modifier, index: usize) -> Result<Option<Self>> {
         let start = modifier.range.start;
         let short = bytes
             .get(start..start.checked_add(4).ok_or(Error::Overflow)?)
@@ -63,39 +105,25 @@ impl Reader {
         if at > modifier.range.end || modifier.range.end > bytes.len() {
             return Err(Error::Truncated);
         }
-        let need = match &modifier.kind {
-            b"styl" => 2,
-            b"krok" => 6,
-            b"hlit" | b"hclr" | b"dlay" | b"blnk" => 4,
-            b"href" => 5,
-            b"tbox" => 8,
-            b"twrp" => 1,
-            b"disp" => 2,
-            _ => 0,
+        let Some(kind) = Kind::of(modifier.kind) else {
+            return Ok(None);
         };
-        Ok(Self {
-            kind: modifier.kind,
+        Ok(Some(Self {
+            kind,
             index,
             at,
             end: modifier.range.end,
             begin: at,
             body_start: at,
-            phase: if need == 0 {
-                Phase::Done
-            } else {
-                Phase::Header
-            },
+            phase: Phase::Header,
             buffer: [0; 12],
             read: 0,
-            need,
-            count: 0,
-            current: 0,
-            utf8: None,
+            need: kind.header(),
             start: 0,
             finish: 0,
             url: 0..0,
             alternate: 0..0,
-        })
+        }))
     }
     fn source(&self, start: usize) -> RecordSource {
         RecordSource {
@@ -149,159 +177,158 @@ impl Reader {
     ) -> Result<Poll<Item>> {
         loop {
             cancelled(cancel)?;
-            if self.phase == Phase::Done {
+            if let Phase::Done = self.phase {
                 return Ok(Poll::End);
             }
             if work.remaining() == 0 {
                 return Ok(Poll::Yield);
             }
-            if matches!(self.phase, Phase::Url | Phase::Alt) {
-                match self
-                    .utf8
-                    .as_mut()
-                    .ok_or(Error::Invalid("tx3g UTF8 field cursor"))?
-                    .poll(bytes, work, cancel)?
-                {
+            if let Phase::Url(cursor) | Phase::Alt(cursor) = &mut self.phase {
+                match cursor.poll(bytes, work, cancel)? {
                     Poll::Yield => return Ok(Poll::Yield),
                     Poll::Ready(_) => continue,
-                    Poll::End => self.utf8 = None,
+                    Poll::End => {}
                 }
-                if self.phase == Phase::Url {
+                if let Phase::Url(_) = self.phase {
                     self.phase = Phase::AltLength;
                     self.reset(1);
                     continue;
                 }
-                self.exact_end()?;
-                self.phase = Phase::Done;
-                return Ok(Poll::Ready(Item::Hyperlink(
-                    self.source(self.body_start),
-                    self.start,
-                    self.finish,
-                    self.url.clone(),
-                    self.alternate.clone(),
-                )));
+                return self
+                    .finish(Item::Hyperlink(
+                        self.source(self.body_start),
+                        self.start,
+                        self.finish,
+                        self.url.clone(),
+                        self.alternate.clone(),
+                    ))
+                    .map(Poll::Ready);
             }
             if !self.data(bytes, work, cancel)? {
                 return Ok(Poll::Yield);
             }
-            if self.phase == Phase::AltLength {
-                let end = self
-                    .at
-                    .checked_add(usize::from(self.buffer[0]))
-                    .ok_or(Error::Overflow)?;
-                if end > self.end {
-                    return Err(Error::Truncated);
+            match self.phase {
+                Phase::Records { left } => return self.record(left).map(Poll::Ready),
+                Phase::AltLength => {
+                    self.alternate = self.string_range(self.buffer[0])?;
+                    self.phase = Phase::Alt(Cursor::new(self.alternate.clone(), Encoding::Utf8));
                 }
-                self.alternate = self.at..end;
-                self.utf8 = Some(Cursor::new(self.alternate.clone(), Encoding::Utf8));
-                self.at = end;
-                self.phase = Phase::Alt;
-                continue;
-            }
-            if self.phase == Phase::Records {
-                if self.current == self.count {
-                    self.exact_end()?;
-                    self.phase = Phase::Done;
-                    continue;
-                }
-                let source = self.source(self.begin);
-                let item = if self.kind == *b"styl" {
-                    Item::Style(
-                        source,
-                        StyleRecord {
-                            start: self.u16(0),
-                            end: self.u16(2),
-                            font_id: self.u16(4),
-                            face_flags: self.buffer[6],
-                            font_size: self.buffer[7],
-                            rgba: self.buffer[8..12]
-                                .try_into()
-                                .map_err(|_| Error::Truncated)?,
-                        },
-                    )
-                } else {
-                    Item::Karaoke(source, self.u32(0), self.u16(4), self.u16(6))
-                };
-                self.current += 1;
-                self.reset(if self.kind == *b"styl" { 12 } else { 8 });
-                if self.current == self.count {
-                    self.exact_end()?;
-                    self.phase = Phase::Done;
-                }
-                return Ok(Poll::Ready(item));
-            }
-            let source = self.source(self.begin);
-            let item = match &self.kind {
-                b"styl" | b"krok" => {
-                    let karaoke = self.kind == *b"krok";
-                    self.count = usize::from(self.u16(if karaoke { 4 } else { 0 }));
-                    self.current = 0;
-                    let count = self
-                        .count
-                        .checked_mul(if karaoke { 8 } else { 12 })
-                        .ok_or(Error::Overflow)?;
-                    if self.at.checked_add(count).ok_or(Error::Overflow)? != self.end {
-                        return Err(Error::Invalid("tx3g modifier record count/size"));
-                    }
-                    let header =
-                        karaoke.then(|| Item::KaraokeHeader(source, self.u32(0), self.u16(4)));
-                    self.phase = if self.count == 0 {
-                        Phase::Done
-                    } else {
-                        Phase::Records
-                    };
-                    self.reset(if karaoke { 8 } else { 12 });
-                    if let Some(item) = header {
+                _ => {
+                    if let Some(item) = self.header()? {
                         return Ok(Poll::Ready(item));
                     }
-                    continue;
                 }
-                b"href" => {
-                    self.start = self.u16(0);
-                    self.finish = self.u16(2);
-                    let end = self
-                        .at
-                        .checked_add(usize::from(self.buffer[4]))
-                        .ok_or(Error::Overflow)?;
-                    if end > self.end {
-                        return Err(Error::Truncated);
-                    }
-                    self.url = self.at..end;
-                    self.utf8 = Some(Cursor::new(self.url.clone(), Encoding::Utf8));
-                    self.at = end;
-                    self.phase = Phase::Url;
-                    continue;
-                }
-                b"hlit" => Item::Highlight(source, self.u16(0), self.u16(2)),
-                b"blnk" => Item::Blink(source, self.u16(0), self.u16(2)),
-                b"hclr" => Item::HighlightColour(
-                    source,
-                    self.buffer[..4].try_into().map_err(|_| Error::Truncated)?,
-                ),
-                b"dlay" => Item::ScrollDelay(source, self.u32(0)),
-                b"tbox" => Item::TextBox(
-                    source,
-                    [
-                        self.u16(0) as i16,
-                        self.u16(2) as i16,
-                        self.u16(4) as i16,
-                        self.u16(6) as i16,
-                    ],
-                ),
-                b"twrp" => Item::Wrap(
-                    source,
-                    match self.buffer[0] {
-                        0 => WrapMode::NoWrap,
-                        1 => WrapMode::Soft,
-                        _ => return Err(Error::Unsupported("tx3g wrap flag")),
-                    },
-                ),
-                b"disp" => Item::Disparity(source, self.u16(0) as i16),
-                _ => return Err(Error::Invalid("tx3g semantic reader dispatch")),
-            };
-            self.exact_end()?;
-            self.phase = Phase::Done;
-            return Ok(Poll::Ready(item));
+            }
         }
+    }
+
+    fn finish(&mut self, item: Item) -> Result<Item> {
+        self.exact_end()?;
+        self.phase = Phase::Done;
+        Ok(item)
+    }
+
+    fn string_range(&mut self, length: u8) -> Result<Range<usize>> {
+        let end = self
+            .at
+            .checked_add(usize::from(length))
+            .ok_or(Error::Overflow)?;
+        if end > self.end {
+            return Err(Error::Truncated);
+        }
+        let range = self.at..end;
+        self.at = end;
+        Ok(range)
+    }
+
+    fn record(&mut self, left: usize) -> Result<Item> {
+        let source = self.source(self.begin);
+        let item = if self.kind == Kind::Style {
+            Item::Style(
+                source,
+                StyleRecord {
+                    start: self.u16(0),
+                    end: self.u16(2),
+                    font_id: self.u16(4),
+                    face_flags: self.buffer[6],
+                    font_size: self.buffer[7],
+                    rgba: [
+                        self.buffer[8],
+                        self.buffer[9],
+                        self.buffer[10],
+                        self.buffer[11],
+                    ],
+                },
+            )
+        } else {
+            Item::Karaoke(source, self.u32(0), self.u16(4), self.u16(6))
+        };
+        if left == 1 {
+            return self.finish(item);
+        }
+        self.phase = Phase::Records { left: left - 1 };
+        self.reset(self.need);
+        Ok(item)
+    }
+
+    fn header(&mut self) -> Result<Option<Item>> {
+        let source = self.source(self.begin);
+        let item = match self.kind {
+            Kind::Style | Kind::Karaoke => {
+                let karaoke = self.kind == Kind::Karaoke;
+                let count = self.u16(if karaoke { 4 } else { 0 });
+                let size = if karaoke { 8 } else { 12 };
+                let left = usize::from(count);
+                let end = self.at.checked_add(left * size).ok_or(Error::Overflow)?;
+                if end != self.end {
+                    return Err(Error::Invalid("tx3g modifier record count/size"));
+                }
+                self.phase = if left == 0 {
+                    Phase::Done
+                } else {
+                    Phase::Records { left }
+                };
+                self.reset(size);
+                return Ok(karaoke.then(|| Item::KaraokeHeader(source, self.u32(0), count)));
+            }
+            Kind::Hyperlink => {
+                self.start = self.u16(0);
+                self.finish = self.u16(2);
+                self.url = self.string_range(self.buffer[4])?;
+                self.phase = Phase::Url(Cursor::new(self.url.clone(), Encoding::Utf8));
+                return Ok(None);
+            }
+            Kind::Highlight => Item::Highlight(source, self.u16(0), self.u16(2)),
+            Kind::Blink => Item::Blink(source, self.u16(0), self.u16(2)),
+            Kind::HighlightColour => Item::HighlightColour(
+                source,
+                [
+                    self.buffer[0],
+                    self.buffer[1],
+                    self.buffer[2],
+                    self.buffer[3],
+                ],
+            ),
+            Kind::ScrollDelay => Item::ScrollDelay(source, self.u32(0)),
+            Kind::TextBox => Item::TextBox(
+                source,
+                [
+                    self.u16(0) as i16,
+                    self.u16(2) as i16,
+                    self.u16(4) as i16,
+                    self.u16(6) as i16,
+                ],
+            ),
+            Kind::Wrap => Item::Wrap(
+                source,
+                match self.buffer[0] {
+                    0 => WrapMode::NoWrap,
+                    1 => WrapMode::Soft,
+                    _ => return Err(Error::Unsupported("tx3g wrap flag")),
+                },
+            ),
+            Kind::Disparity => Item::Disparity(source, self.u16(0) as i16),
+        };
+        self.finish(item).map(Some)
     }
 }

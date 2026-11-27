@@ -6,23 +6,31 @@
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `clippy::expect_used`.
 
 pub mod digest;
 pub mod interleaved;
 pub mod md5;
+pub mod test_report;
 
 use std::{fmt::Write as _, io};
 
+/// The two lower-case hex digits of `byte`.
+fn hex_pair(byte: u8) -> [u8; 2] {
+    const DIGITS: &[u8; 16] = b"0123456789abcdef";
+    [
+        DIGITS[usize::from(byte >> 4)],
+        DIGITS[usize::from(byte & 15)],
+    ]
+}
+
 /// Append `bytes` as lower-case hex.
 pub fn push_hex(out: &mut String, bytes: &[u8]) {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
     out.reserve(bytes.len() * 2);
-    for byte in bytes {
-        out.push(char::from(DIGITS[usize::from(byte >> 4)]));
-        out.push(char::from(DIGITS[usize::from(byte & 15)]));
+    for &byte in bytes {
+        out.extend(hex_pair(byte).map(char::from));
     }
 }
 
@@ -35,14 +43,9 @@ pub fn hex(bytes: &[u8]) -> String {
 
 /// Stream `bytes` as lower-case hex.
 pub fn write_hex(out: &mut impl io::Write, bytes: &[u8]) -> io::Result<()> {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    for &byte in bytes {
-        out.write_all(&[
-            DIGITS[usize::from(byte >> 4)],
-            DIGITS[usize::from(byte & 15)],
-        ])?;
-    }
-    Ok(())
+    bytes
+        .iter()
+        .try_for_each(|&byte| out.write_all(&hex_pair(byte)))
 }
 
 /// Decode test-vector hex. `"~"` and `"-"` denote an empty payload. Panics on
@@ -76,7 +79,9 @@ pub fn push_quoted(out: &mut String, value: &str) {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
-            c if c < ' ' => write!(out, "\\u{:04x}", u32::from(c)).expect("String write"),
+            c if c < ' ' => {
+                let _ = write!(out, "\\u{:04x}", u32::from(c));
+            }
             c => out.push(c),
         }
     }

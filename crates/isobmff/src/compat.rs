@@ -1,56 +1,48 @@
-//! Reference-compatible policies.
-//!
-//! The types at the crate root follow the specifications and report every source
-//! fact. Where FFmpeg's MOV demuxer orders, times or recovers packets differently and
-//! a consumer needs FFmpeg's result, the policies here reproduce that demuxer for the
-//! input. They read the same parsed tables and never rewrite source facts. Each
-//! module is one policy family; its documentation names the FFmpeg build it
-//! reproduces.
-//!
-//! Projections that exist only to compare traces with FFmpeg are not policies. They
-//! are compiled only with the `reference-trace` feature.
+//! Opt-in policies that reproduce how FFmpeg orders, times and recovers MOV packets.
+//! They work over the parsed tables and preserve source samples. Trace projections
+//! are available with the `reference-trace` feature.
 
 pub mod mov {
-    //! FFmpeg's MOV demuxer.
-    //!
-    //! Each occurrence pairs the untouched source sample with the packet the demuxer
-    //! emits for it. [`packets`] walks tracks in the demuxer's order, [`clock`] holds
-    //! its signed clocks, [`edits`] applies edit lists, [`seek`] builds its index and
-    //! seeks, [`front`] reads a forward-only input, [`encoded`] admits encoded sample
-    //! entries, [`recovery`] keeps malformed files readable and [`pcm`] groups
-    //! QuickTime PCM samples into packets.
+    //! FFmpeg MOV packet, seek and stream metadata policies. Each packet occurrence
+    //! pairs the source sample with the demuxer's packet fields.
     //!
     //! Reference: the `mov` demuxer with `+noparse+nofillin`, FFmpeg git revision
     //! `d32b387f` on the 9.0 branch.
 
+    pub(crate) mod clocks;
+    pub(crate) mod cursor;
+    pub(crate) mod demux_edits;
+    pub(crate) mod edit_list;
+    pub(crate) mod encoded_configs;
+    pub(crate) mod encoded_contexts;
+    pub(crate) mod encoded_edits;
+    pub(crate) mod encoded_metadata;
+    pub(crate) mod encoded_recovery;
+    pub(crate) mod encoded_recovery_context;
+    pub(crate) mod encoded_stream;
+    pub(crate) mod field_recovery;
+    pub(crate) mod front_movie;
+    pub(crate) mod index;
+    pub(crate) mod pcm_packets;
+    pub(crate) mod physical_read;
+    pub(crate) mod view;
+
     pub mod clock {
-        //! The demuxer's signed clocks.
-        //!
-        //! [`ClockField`] is a packet time as the demuxer stores it, including its
-        //! null sentinel, beside the exact source tick. [`MediaClock`] is a track's
-        //! stream clock, with [`MediaClockCause`] saying why it differs from the
-        //! declared timescale. [`ClockOrigin`] says where a packet's decode time came
-        //! from and [`SchedulingClock`] orders heads across tracks;
-        //! [`seekable_head_precedes`] compares two heads as the demuxer does.
-        pub use crate::mov_clock::{
+        //! Exact and stored packet times, track time bases and the clocks used
+        //! by [`seekable_head_precedes`] to compare packets across tracks.
+        pub use super::clocks::{
             ClockField, MediaClock, MediaClockCause, SchedulingClock, SourceTimeBase,
         };
-        pub use crate::mov_cursor::{ClockOrigin, PredecessorClock, seekable_head_precedes};
+        pub use super::cursor::{ClockOrigin, PredecessorClock, seekable_head_precedes};
     }
 
     pub mod packets {
-        //! The demuxer's packet sequence.
-        //!
-        //! [`PacketCursor`] walks the selected [`DemuxTrack`]s in the order the demuxer
-        //! emits them and yields a [`PacketOccurrence`] for each packet: the source
-        //! sample, the [`PacketView`] the demuxer reports and their clocks. A
-        //! [`StreamView`] is a track's catalogue entry and [`PacketProjector`] projects
-        //! one source sample on its own.
-        pub use crate::mov_cursor::{
+        //! [`PacketCursor`] reproduces the demuxer's packet order across tracks.
+        //! Use [`PacketProjector`] for a single sample and [`StreamView`] for stream metadata.
+        pub use super::cursor::{
             DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence, ResumePoint,
         };
-        pub use crate::mov_edits::CursorStatus;
-        pub use crate::mov_view::{PacketProjector, PacketView, StreamView};
+        pub use super::view::{PacketProjector, PacketView, StreamView};
     }
 
     pub mod edits {
@@ -61,24 +53,21 @@ pub mod mov {
         //! scans the track's metadata once and returns an [`EncodedEditPlan`] for
         //! [`PacketCursor::new_encoded_regular`](super::packets::PacketCursor::new_encoded_regular)
         //! or [`PacketCursor::new_front_with_encoded_edits`](super::packets::PacketCursor::new_front_with_encoded_edits).
-        pub use crate::encoded_edits::{
+        pub use super::cursor::EditIdentity;
+        pub use super::demux_edits::DemuxEditsJob;
+        pub use super::edit_list::{DurationBasis, EditCursor, EditLimits, EditOccurrence};
+        pub use super::encoded_edits::{
             EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
-            EncodedEditProfile, fragment_aac::FragmentAacTrimJob,
+            fragment_aac::FragmentAacTrimJob,
         };
-        pub use crate::mov_cursor::EditIdentity;
-        pub use crate::mov_edits::{DurationBasis, EditCursor, EditLimits, EditOccurrence};
-        pub use crate::mov_view::ProjectedEdit;
+        pub use super::view::ProjectedEdit;
     }
 
     pub mod seek {
-        //! The demuxer's index and seek.
-        //!
-        //! [`IndexCursor`] builds one track's index. [`SeekJob`] seeks one track and
-        //! [`GlobalSeekJob`] all of them; both return a plan whose [`SeekLanding`] says
-        //! which entry was selected. [`RangeSeekJob`] does the same from a packet
-        //! cursor that recorded checkpoints.
-        pub use crate::mov_cursor::RangeSeekJob;
-        pub use crate::mov_index::{
+        //! Demux index entries and seek plans for one track or all tracks.
+        //! [`RangeSeekJob`] starts from a packet cursor's recorded checkpoints.
+        pub use super::cursor::RangeSeekJob;
+        pub use super::index::{
             GlobalSeekJob, GlobalSeekPlan, IndexCursor, IndexEntry, IndexLimits, SeekCursor,
             SeekJob, SeekLanding, SeekLimits, SeekPlan,
         };
@@ -92,7 +81,7 @@ pub mod mov {
         //! read a nonseekable input from its start. [`FrontTrack`] keeps one track's
         //! clock across [`FrontFragment`]s, and a [`FrontSample`] names the
         //! [`FrontReadBoundary`] up to which its payload can be read.
-        pub use crate::mov_front::{FrontFragment, FrontReadBoundary, FrontSample, FrontTrack};
+        pub use super::front_movie::{FrontFragment, FrontReadBoundary, FrontSample, FrontTrack};
     }
 
     pub mod encoded {
@@ -100,49 +89,41 @@ pub mod mov {
         //!
         //! [`EncodedStreamJob`] reads one sample entry and returns an [`EncodedStream`]:
         //! the demuxer's stream view, the source description and the metadata it reads
-        //! from the movie. Its constructors select what it admits:
-        //! [`EncodedStreamProfile`] one description, [`EncodedConfigProfile`] one of
-        //! several, [`EncodedMetadataProfile`] QuickTime sound entries and legacy
-        //! metadata, [`EncodedContextProfile`] the receiver's reading of a `wave` box.
-        //! [`EncodedRecoveryProfile`] adds the `roll` and `prol` groups of the table.
+        //! from the movie. Its constructors select what it admits: `new` the first
+        //! description, `new_description` one of several, `new_description_with_metadata`
+        //! QuickTime sound entries and legacy metadata, `new_description_with_contexts`
+        //! the receiver's reading of a `wave` box. An
+        //! [`EncodedEditJob`](super::edits::EncodedEditJob) from
+        //! `new_with_recovery_groups` adds the `roll` and `prol` groups of the table.
         //!
         //! [`EncodedInitial`] and [`EncodedConfigSequence`] follow the configuration of a
         //! track with more than one description.
-        pub use crate::encoded_configs::{
-            EncodedConfigProfile, EncodedConfigSequence, EncodedConfigStep, EncodedCreation,
-            EncodedInitial,
+        pub use super::encoded_configs::{
+            EncodedConfigSequence, EncodedConfigStep, EncodedInitial,
         };
-        pub use crate::encoded_contexts::{
-            EncodedContextProfile, SourceProfileFault, WaveObservation,
-        };
-        pub use crate::encoded_metadata::{
-            CreationCause, DependedOn, DependencyView, EncodedCreationSource,
-            EncodedMetadataProfile, EncodedSelection, EncodedSource, HandlerSource, LanguageCause,
+        pub use super::encoded_contexts::{SourceProfileFault, WaveObservation};
+        pub use super::encoded_metadata::{
+            EncodedCreationSource, EncodedSelection, EncodedSource, HandlerSource, LanguageCause,
             LanguageSource, SoundV1Source,
         };
-        pub use crate::encoded_recovery::{
-            DependencyCause, DependencyObservation, EncodedRecoveryProfile, RecoveryFacts,
-            RecoveryGroup,
-        };
-        pub use crate::encoded_recovery_context::RecoveryObservation;
-        pub use crate::encoded_stream::{
-            EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile,
-        };
+        pub use super::encoded_recovery::{RecoveryFacts, RecoveryGroup};
+        pub use super::encoded_recovery_context::RecoveryObservation;
+        pub use super::encoded_stream::{EncodedEntryKind, EncodedStream, EncodedStreamJob};
     }
 
     pub mod recovery {
         //! Malformed-MOV recovery.
         //!
         //! Strict parsing refuses these files; the types here read what the demuxer
-        //! reads from them and keep the strict error beside the result. Their entry
-        //! points take an explicit profile token.
+        //! reads from them and keep the strict error beside the result.
         //!
         //! - Field recovery. [`RecoveryTrackHeader`] accepts a zero timescale and
         //!   [`PartialSampleReader`] or
-        //!   [`SampleReader::poll_recovery`](crate::SampleReader::poll_recovery)
+        //!   [`SampleReader::poll_recovery`](crate::payload::SampleReader::poll_recovery)
         //!   return the part of a sample that exists ([`ShortSample`]).
         //! - Run recovery. [`RunRecoveryBuilder`] accepts overlong timing and sync
-        //!   tables. [`RunRecoveryTable`] keeps the raw tables with their
+        //!   tables and a decode table one sample short. [`RunRecoveryTable`] keeps the
+        //!   raw tables with their
         //!   [`RunCoverage`] and reads the usable prefix through
         //!   [`RecoveryPacketCursor`] and [`RecoveryIndexCursor`].
         //! - Direct recovery. [`RunRecoveryBuilder::new_direct`] also accepts a zero
@@ -153,34 +134,28 @@ pub mod mov {
         //!   [`DescriptionEvent`] for each declaration, including those the demuxer
         //!   drops from its catalogue, and [`PhysicalReader`] reads an event's bytes at
         //!   the physical end of the file.
-        pub use crate::metadata::RecoveryTrackHeader;
-        pub use crate::packet::{RecoverySampleExtent, RecoverySampleRead, ShortSample};
-        pub use crate::physical_read::{
-            PhysicalPayload, PhysicalRead, PhysicalReadProfile, PhysicalReader,
+        pub use super::field_recovery::{
+            PartialSampleReader, PayloadBounds, RecoveredPayload, RecoverySampleExtent,
+            RecoverySampleRead, RecoveryTrackHeader, ShortSample,
         };
-        pub use crate::recovery_payload::{PartialSampleReader, PayloadBounds, RecoveredPayload};
-        pub use crate::regular::{
+        pub use super::physical_read::{PhysicalPayload, PhysicalRead, PhysicalReader};
+        pub use crate::table::recovery::{
             DescriptionAssociation, DescriptionContext, DescriptionEmission, DescriptionEvent,
-            DescriptionIndexCursor, DescriptionIndexEvent, DescriptionPacketCursor,
-            DescriptionRead, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
+            DescriptionIndexCursor, DescriptionIndexEntry, DescriptionIndexEvent,
+            DescriptionPacketCursor, DescriptionRead, DescriptionRecoveryBuilder,
             DescriptionRecoveryTable, DescriptionRowDiagnostic, DirectAssociation, DirectContext,
             DirectIndexCursor, DirectIndexEntry, DirectOccurrence, DirectPacketCursor, DirectRead,
-            DirectRecoveryProfile, InitialDescriptionDiagnostic, NativeIndexEntry,
-            RecoveryIndexCursor, RecoveryIndexEntry, RecoveryOccurrence, RecoveryPacketCursor,
-            RecoverySourceCursor, RunCoverage, RunKind, RunRecoveryBuilder, RunRecoveryProfile,
-            RunRecoveryTable, SyncDiagnostic,
+            InitialDescriptionDiagnostic, RecoveryIndexCursor, RecoveryIndexEntry,
+            RecoveryOccurrence, RecoveryPacketCursor, RecoverySourceCursor, RunCoverage, RunKind,
+            RunRecoveryBuilder, RunRecoveryTable, SyncDiagnostic,
         };
     }
 
     pub mod pcm {
-        //! QuickTime PCM packets.
-        //!
-        //! [`PcmStream`] admits one track of [`QtSoundDescriptionV0`](crate::QtSoundDescriptionV0)
-        //! samples. [`PcmCursor`] groups them into the [`PcmPacket`]s the demuxer emits,
-        //! which do not match the source samples, and [`PcmReader`] reads one packet's
-        //! bytes as a [`PcmPayload`].
-        pub use crate::mov_pcm::{
-            PcmCursor, PcmLimits, PcmPacket, PcmPayload, PcmProfile, PcmReader, PcmStream,
+        //! [`PcmCursor`] groups QuickTime PCM samples into demux packets.
+        //! [`PcmReader`] reads the grouped payloads.
+        pub use super::pcm_packets::{
+            PcmCursor, PcmDescription, PcmLimits, PcmPacket, PcmPayload, PcmReader, PcmStream,
         };
     }
 }

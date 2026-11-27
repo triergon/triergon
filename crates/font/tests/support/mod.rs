@@ -1,13 +1,14 @@
 //! Small fonts built in memory, and the operations the robustness test runs on them.
 
-#![allow(dead_code)]
+#![allow(dead_code, reason = "each including test or example uses a part")]
 
 use triergon_core::{Budget, Bytes, WorkBudget};
-use triergon_font::{FaceInfo, Font, GlyphId, Limits, Load, Outline, Request, select};
+use triergon_font::compat::libass::{self, FaceInfo, Request, select};
+use triergon_font::{Font, GlyphId, Limits, Load, Outline};
 
 mod cff;
 
-use cff::{CffProgram, Part, charstring, n};
+use cff::{CffProgram, charstring};
 
 pub fn u16s(values: &[u16]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_be_bytes()).collect()
@@ -121,6 +122,11 @@ pub fn hmtx(metrics: &[(u16, i16)]) -> Vec<u8> {
 
 /// A Windows Unicode format 4 cmap mapping each (code, glyph).
 pub fn cmap(pairs: &[(u16, u16)]) -> Vec<u8> {
+    cmap_records(&[(3, 1, cmap_segments(pairs))])
+}
+
+/// A format 4 subtable with a segment for each (code, glyph).
+pub fn cmap_segments(pairs: &[(u16, u16)]) -> Vec<u8> {
     let segments = pairs.len() + 1;
     let mut ends: Vec<u16> = pairs.iter().map(|p| p.0).collect();
     ends.push(0xffff);
@@ -133,10 +139,7 @@ pub fn cmap(pairs: &[(u16, u16)]) -> Vec<u8> {
     sub.extend(u16s(&starts));
     sub.extend(u16s(&deltas));
     sub.extend(u16s(&vec![0; segments]));
-    let mut t = u16s(&[0, 1, 3, 1]);
-    t.extend(12_u32.to_be_bytes());
-    t.extend(sub);
-    t
+    sub
 }
 
 /// Windows (3, 1, 0x409) and Macintosh Roman records for each (id, text).
@@ -158,6 +161,13 @@ pub fn name(records: &[(u16, &str)]) -> Vec<u8> {
     }
     t.extend(storage);
     t
+}
+
+/// The family (1), style (2), full (4) and PostScript (6) names of a face.
+pub fn face_names(family: &str, style: &str) -> Vec<u8> {
+    let full = format!("{family} {style}");
+    let postscript = format!("{family}-{style}").replace(' ', "");
+    name(&[(1, family), (2, style), (4, &full), (6, &postscript)])
 }
 
 pub fn kern(pairs: &[(u16, u16, i16)]) -> Vec<u8> {
@@ -243,25 +253,29 @@ pub fn composite(components: &[(u16, u16, i16, i16, Option<f64>)]) -> Vec<u8> {
     g
 }
 
+/// A square at x 100..300 and y 0..200, as (x, y, on-curve) points.
+const SQUARE: &[(i16, i16, bool)] = &[
+    (100, 0, true),
+    (100, 200, true),
+    (300, 200, true),
+    (300, 0, true),
+];
+/// A quadratic bump 100 wide and 100 high.
+const BUMP: &[(i16, i16, bool)] = &[(0, 0, true), (50, 100, false), (100, 0, true)];
+/// A font program that does nothing (PUSHB_1 0; POP), which keeps the
+/// auto-hinter off a face.
+const IDLE_FONT_PROGRAM: [u8; 3] = [0xb0, 0, 0x21];
+
 /// A TrueType face: glyph 1 a square at x 100..300 with left side bearing 50,
 /// glyph 2 a quadratic bump, glyph 3 glyph 1 at half size offset by (10, 20) plus
 /// glyph 2 with its metrics. 'A' maps to 1, 'B' to 2, 'C' to 3.
 pub fn truetype_tables(weight: u16, fs_selection: u16, family: &str, subfamily: &str) -> Tables {
-    let square: &[(i16, i16, bool)] = &[
-        (100, 0, true),
-        (100, 200, true),
-        (300, 200, true),
-        (300, 0, true),
-    ];
-    let bump: &[(i16, i16, bool)] = &[(0, 0, true), (50, 100, false), (100, 0, true)];
     let (glyf, loca) = glyf(&[
         Vec::new(),
-        simple(&[square]),
-        simple(&[bump]),
+        simple(&[SQUARE]),
+        simple(&[BUMP]),
         composite(&[(0, 1, 10, 20, Some(0.5)), (0x0200, 2, 0, 0, None)]),
     ]);
-    let full = format!("{family} {subfamily}");
-    let postscript = format!("{family}-{subfamily}").replace(' ', "");
     vec![
         (*b"head", head(1000, false, 0)),
         (*b"hhea", hhea(4)),
@@ -269,10 +283,7 @@ pub fn truetype_tables(weight: u16, fs_selection: u16, family: &str, subfamily: 
         (*b"OS/2", os2(weight, fs_selection)),
         (*b"hmtx", hmtx(&[(500, 0), (400, 50), (300, 0), (600, 0)])),
         (*b"cmap", cmap(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
-        (
-            *b"name",
-            name(&[(1, family), (2, subfamily), (4, &full), (6, &postscript)]),
-        ),
+        (*b"name", face_names(family, subfamily)),
         (*b"kern", kern(&[(1, 2, -40)])),
         (*b"glyf", glyf),
         (*b"loca", loca),
@@ -298,15 +309,7 @@ pub fn cjk_tables() -> Tables {
         (*b"OS/2", os2(400, 0)),
         (*b"hmtx", hmtx(&[(500, 0), (400, 110), (400, 110)])),
         (*b"cmap", cmap(&[(0x0f40, 2), (0x4ed6, 1), (0x7530, 1)])),
-        (
-            *b"name",
-            name(&[
-                (1, "Test Han"),
-                (2, "Regular"),
-                (4, "Test Han Regular"),
-                (6, "TestHan-Regular"),
-            ]),
-        ),
+        (*b"name", face_names("Test Han", "Regular")),
         (*b"glyf", glyf),
         (*b"loca", loca),
     ]
@@ -316,56 +319,18 @@ pub fn cjk_tables() -> Tables {
 /// subroutine; glyph 2 a curve through a global subroutine and a flex.
 pub fn cff_table() -> Vec<u8> {
     CffProgram {
-        // Local subr 0 (biased -107): vlineto 100; return.
-        local: vec![vec![n(100), 7, 11]],
-        // Global subr 0: rrcurveto 10 20 30 0 20 -20; return.
-        global: vec![vec![n(10), n(20), n(30), n(0), n(20), n(-20), 8, 11]],
+        // Local and global subroutine 0, both called as -107 (biased).
+        local: vec![charstring("100 vlineto return")],
+        global: vec![charstring("10 20 30 0 20 -20 rrcurveto return")],
         glyphs: vec![
-            vec![14],
-            // width 10 (nominal 400), hstem 0 20, vstem 0 20, hintmask, rmoveto 50 0,
-            // hlineto 100, callsubr -107, hlineto -100, endchar.
-            vec![
-                n(10),
-                n(0),
-                n(20),
-                1,
-                n(0),
-                n(20),
-                3,
-                19,
-                0xc0,
-                n(50),
-                n(0),
-                21,
-                n(100),
-                6,
-                n(-107),
-                10,
-                n(-100),
-                6,
-                14,
-            ],
-            // rmoveto 0 0, callgsubr -107, rlineto 0 0 (dropped), hflex, endchar.
-            vec![
-                n(0),
-                n(0),
-                21,
-                n(-107),
-                29,
-                n(0),
-                n(0),
-                5,
-                n(10),
-                n(5),
-                n(5),
-                n(10),
-                n(10),
-                n(5),
-                n(10),
-                12,
-                34,
-                14,
-            ],
+            charstring("endchar"),
+            // Width 10 over the nominal 400.
+            charstring(
+                "10 0 20 hstem 0 20 vstem hintmask 0xc0 50 0 rmoveto 100 hlineto \
+                 -107 callsubr -100 hlineto endchar",
+            ),
+            // The line of zero length is dropped.
+            charstring("0 0 rmoveto -107 callgsubr 0 0 rlineto 10 5 5 10 10 5 10 hflex endchar"),
         ],
         charset: None,
         strings: Vec::new(),
@@ -383,244 +348,49 @@ pub fn cff_table() -> Vec<u8> {
 /// `sqrt` operators. Glyphs: .notdef, A, acute, D (A with an acute through
 /// `seac`), B (arithmetic), C (nested calls), E (flex and logic).
 fn cff_features_tables() -> Tables {
-    use Part::{Byte, Escape as E, N, Op};
-    let glyphs = vec![
-        charstring(&[Op(14)]),
+    let glyphs = [
+        "endchar",
         // A: width 600; a triangle.
-        charstring(&[
-            N(100),
-            N(100),
-            N(0),
-            Op(21),
-            N(200),
-            N(600),
-            N(200),
-            N(-600),
-            Op(5),
-            Op(14),
-        ]),
+        "100 100 0 rmoveto 200 600 200 -600 rlineto endchar",
         // acute: a quadrilateral above.
-        charstring(&[
-            N(250),
-            N(650),
-            Op(21),
-            N(100),
-            N(100),
-            N(-150),
-            N(0),
-            Op(5),
-            Op(14),
-        ]),
+        "250 650 rmoveto 100 100 -150 0 rlineto endchar",
         // D: seac with the acute offset by (50, 20): adx ady bchar achar.
-        charstring(&[N(50), N(20), N(65), N(194), Op(14)]),
-        // B: coordinates from arithmetic.
-        charstring(&[
-            N(100),
-            N(100),
-            Op(21),
-            N(600),
-            N(4),
-            E(12),
-            N(0),
-            Op(5), // 600/4 = 150
-            N(100),
-            N(3),
-            E(12),
-            N(50),
-            Op(5), // 33.33.., 50
-            N(7),
-            N(-9),
-            E(24),
-            E(9),
-            N(5),
-            E(14),
-            E(10),
-            N(0),
-            E(28),
-            Op(5), // |7*-9| + -5, exch
-            N(10),
-            E(27),
-            E(10),
-            N(-20),
-            Op(5), // dup add: 20, -20
-            N(3),
-            N(0),
-            E(20),
-            N(0),
-            E(21),
-            N(2),
-            N(1),
-            N(4),
-            N(3),
-            E(22),
-            N(9),
-            E(11),
-            Op(5), // put/get/ifelse/sub
-            N(11),
-            N(22),
-            N(33),
-            N(3),
-            N(1),
-            E(30),
-            N(1),
-            E(29),
-            E(18),
-            E(18),
-            Op(5), // roll, index, drop
-            Op(14),
-        ]),
+        "50 20 65 194 endchar",
+        // B: coordinates from arithmetic: 600/4 = 150, 0; 100/3 = 33.33..,
+        // 50; |7 × -9| + -5, then exchanged with 0; 10 dup add: 20, -20; put,
+        // get, ifelse and sub; roll, index and drop.
+        "100 100 rmoveto 600 4 div 0 rlineto 100 3 div 50 rlineto \
+         7 -9 mul abs 5 neg add 0 exch rlineto 10 dup add -20 rlineto \
+         3 0 put 0 get 2 1 4 3 ifelse 9 sub rlineto \
+         11 22 33 3 1 roll 1 index drop drop rlineto endchar",
         // C: twelve nested local subroutines, each drawing a line after its call.
-        charstring(&[N(100), N(100), Op(21), N(-107), Op(10), Op(14)]),
+        "100 100 rmoveto -107 callsubr endchar",
         // E: two stems and a counter mask over both, dotsection, the four flex
         // forms, then a line whose dx is ((1 and 1) + (0 or 1) + not 0 + (2 eq 2))
         // * 25 = 100 and whose dy is sqrt 81 = 9.
-        charstring(&[
-            N(0),
-            N(50),
-            N(100),
-            N(50),
-            Op(1),
-            Op(20),
-            Byte(0xc0),
-            E(0),
-            N(100),
-            N(100),
-            Op(21),
-            N(50),
-            N(50),
-            N(20),
-            N(50),
-            N(50),
-            N(50),
-            N(50),
-            E(34),
-            N(30),
-            N(10),
-            N(30),
-            N(10),
-            N(30),
-            N(0),
-            N(30),
-            N(0),
-            N(30),
-            N(-10),
-            N(30),
-            N(-10),
-            N(50),
-            E(35),
-            N(20),
-            N(10),
-            N(20),
-            N(10),
-            N(20),
-            N(20),
-            N(20),
-            N(-10),
-            N(20),
-            E(36),
-            N(10),
-            N(20),
-            N(10),
-            N(20),
-            N(10),
-            N(20),
-            N(10),
-            N(-20),
-            N(10),
-            N(-20),
-            N(10),
-            E(37),
-            N(1),
-            N(1),
-            E(3),
-            N(0),
-            N(1),
-            E(4),
-            E(10),
-            N(0),
-            E(5),
-            E(10),
-            N(2),
-            N(2),
-            E(15),
-            E(10),
-            N(25),
-            E(24),
-            N(81),
-            E(26),
-            Op(5),
-            N(-150),
-            Op(7),
-            Op(14),
-        ]),
+        "0 50 100 50 hstem cntrmask 0xc0 dotsection 100 100 rmoveto \
+         50 50 20 50 50 50 50 hflex \
+         30 10 30 10 30 0 30 0 30 -10 30 -10 50 flex \
+         20 10 20 10 20 20 20 -10 20 hflex1 \
+         10 20 10 20 10 20 10 -20 10 -20 10 flex1 \
+         1 1 and 0 1 or add 0 not add 2 2 eq add 25 mul 81 sqrt rlineto \
+         -150 vlineto endchar",
         // F: curve operators with operand counts the format does not allow,
         // read as FreeType's CFF engine reads them: vhcurveto with 11, vvcurveto
         // with 7, hhcurveto with 6, rlinecurve with 6, rcurveline with 9 and
         // hvcurveto with 7.
-        charstring(&[
-            N(100),
-            N(100),
-            Op(21),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(-11),
-            N(19),
-            N(-1),
-            N(18),
-            N(-1),
-            N(18),
-            Op(30),
-            N(1),
-            N(2),
-            N(3),
-            N(4),
-            N(5),
-            N(6),
-            N(7),
-            Op(26),
-            N(10),
-            N(20),
-            N(30),
-            N(40),
-            N(50),
-            N(60),
-            Op(27),
-            N(10),
-            N(0),
-            N(10),
-            N(10),
-            N(0),
-            N(10),
-            Op(25),
-            N(10),
-            N(10),
-            N(10),
-            N(10),
-            N(10),
-            N(10),
-            N(5),
-            N(5),
-            N(99),
-            Op(24),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            N(5),
-            Op(31),
-            Op(14),
-        ]),
-    ];
+        "100 100 rmoveto -11 -11 -11 -11 -11 -11 19 -1 18 -1 18 vhcurveto \
+         1 2 3 4 5 6 7 vvcurveto 10 20 30 40 50 60 hhcurveto \
+         10 0 10 10 0 10 rlinecurve 10 10 10 10 10 10 5 5 99 rcurveline \
+         5 5 5 5 5 5 5 hvcurveto endchar",
+    ]
+    .map(charstring)
+    .to_vec();
     // Local subroutines 0..12: subr k calls subr k + 1, then draws; the last draws.
     let mut local: Vec<Vec<u8>> = (0..12)
-        .map(|k| charstring(&[N(k + 1 - 107), Op(10), N(10), N(20), Op(5), Op(11)]))
+        .map(|k| charstring(&format!("{} callsubr 10 20 rlineto return", k - 106)))
         .collect();
-    local.push(charstring(&[N(50), N(0), Op(5), Op(11)]));
+    local.push(charstring("50 0 rlineto return"));
     let program = CffProgram {
         glyphs,
         global: Vec::new(),
@@ -663,36 +433,16 @@ fn cff_features_tables() -> Tables {
                 (0xb4, 2),
             ]),
         ),
-        (
-            *b"name",
-            name(&[
-                (1, "Authored CFF"),
-                (2, "Regular"),
-                (4, "Authored CFF Regular"),
-                (6, "AuthoredCFF-Regular"),
-            ]),
-        ),
+        (*b"name", face_names("Authored CFF", "Regular")),
         (*b"CFF ", program.build()),
     ]
 }
 
 /// A CFF face whose FontMatrix slants and halves its glyphs (2000 units per em).
 fn cff_matrix_tables() -> Tables {
-    use Part::{N, Op};
-    let square = charstring(&[
-        N(100),
-        N(100),
-        Op(21),
-        N(500),
-        Op(6),
-        N(500),
-        Op(7),
-        N(-500),
-        Op(6),
-        Op(14),
-    ]);
+    let square = charstring("100 100 rmoveto 500 hlineto 500 vlineto -500 hlineto endchar");
     let program = CffProgram {
-        glyphs: vec![charstring(&[Op(14)]), square],
+        glyphs: vec![charstring("endchar"), square],
         global: Vec::new(),
         local: Vec::new(),
         charset: None,
@@ -777,12 +527,7 @@ pub fn cmap_records(records: &[(u16, u16, Vec<u8>)]) -> Vec<u8> {
 
 /// A TrueType face with one subtable of each supported cmap format.
 fn cmap_formats_tables() -> Tables {
-    let mut tables = truetype_tables(400, 0x40, "Authored Cmap", "Regular");
-    let format4 = {
-        let full = cmap(&[(0x41, 1), (0x42, 2), (0x43, 3)]);
-        full[12..].to_vec()
-    };
-    let records = vec![
+    let records = [
         (0, 3, cmap_trimmed(6, 0x61, &[1, 2, 3])),
         (0, 4, cmap_trimmed(10, 0x1_0400, &[3, 2])),
         (
@@ -791,16 +536,23 @@ fn cmap_formats_tables() -> Tables {
             cmap_groups(13, &[(0x2000, 0x200f, 1), (0x1_f600, 0x1_f64f, 2)]),
         ),
         (1, 0, cmap_format0(&[(0x41, 1), (0x8e, 2)])),
-        (3, 1, format4),
+        (3, 1, cmap_segments(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
         (
             3,
             10,
             cmap_groups(12, &[(0x41, 0x43, 1), (0x1_d400, 0x1_d402, 1)]),
         ),
     ];
+    truetype_with_cmap("Authored Cmap", "Regular", &records)
+}
+
+/// The face of [`truetype_tables`] with a `cmap` of (platform, encoding,
+/// subtable) `records`.
+fn truetype_with_cmap(family: &str, style: &str, records: &[(u16, u16, Vec<u8>)]) -> Tables {
+    let mut tables = truetype_tables(400, 0x40, family, style);
     for table in &mut tables {
         if &table.0 == b"cmap" {
-            table.1 = cmap_records(&records);
+            table.1 = cmap_records(records);
         }
     }
     tables
@@ -813,13 +565,12 @@ fn cmap_formats_tables() -> Tables {
 /// later format 12 (0, 6)) or the first subtable. The subtables map 'A' (and
 /// 'B' and 'C') to different glyphs. An `fpgm` keeps the auto-hinter off them.
 fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
-    let bmp = |pairs: &[(u16, u16)]| cmap(pairs)[12..].to_vec();
     let faces = [
         (
             "Full",
             vec![
-                (0, 3, bmp(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
-                (3, 1, bmp(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
+                (0, 3, cmap_segments(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
+                (3, 1, cmap_segments(&[(0x41, 1), (0x42, 2), (0x43, 3)])),
                 (
                     3,
                     10,
@@ -838,24 +589,24 @@ fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
         (
             "BMP",
             vec![
-                (3, 0, bmp(&[(0xf041, 3), (0xf042, 2)])),
-                (3, 1, bmp(&[(0x41, 1), (0x42, 2)])),
+                (3, 0, cmap_segments(&[(0xf041, 3), (0xf042, 2)])),
+                (3, 1, cmap_segments(&[(0x41, 1), (0x42, 2)])),
                 (3, 1, cmap_trimmed(6, 0x41, &[2, 1])),
             ],
         ),
         (
             "Symbol",
             vec![
-                (0, 3, bmp(&[(0x41, 1)])),
+                (0, 3, cmap_segments(&[(0x41, 1)])),
                 (1, 0, cmap_format0(&[(0x41, 2)])),
-                (3, 0, bmp(&[(0xf041, 3)])),
+                (3, 0, cmap_segments(&[(0xf041, 3)])),
             ],
         ),
         (
             "ISO",
             vec![
-                (0, 3, bmp(&[(0x41, 1)])),
-                (2, 1, bmp(&[(0x41, 2)])),
+                (0, 3, cmap_segments(&[(0x41, 1)])),
+                (2, 1, cmap_segments(&[(0x41, 2)])),
                 (1, 0, cmap_format0(&[(0x41, 3)])),
             ],
         ),
@@ -864,7 +615,7 @@ fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
             vec![
                 (0, 4, cmap_groups(12, &[(0x41, 0x41, 1)])),
                 (0, 6, cmap_groups(12, &[(0x41, 0x41, 2)])),
-                (0, 3, bmp(&[(0x41, 3)])),
+                (0, 3, cmap_segments(&[(0x41, 3)])),
             ],
         ),
         (
@@ -878,14 +629,8 @@ fn cmap_order_faces() -> Vec<(&'static [u8; 4], Tables)> {
     faces
         .into_iter()
         .map(|(style, records)| {
-            let mut tables = truetype_tables(400, 0x40, "Authored Cmap Order", style);
-            for table in &mut tables {
-                if &table.0 == b"cmap" {
-                    table.1 = cmap_records(&records);
-                }
-            }
-            // PUSHB_1 0; POP
-            tables.push((*b"fpgm", vec![0xb0, 0, 0x21]));
+            let mut tables = truetype_with_cmap("Authored Cmap Order", style, &records);
+            tables.push((*b"fpgm", IDLE_FONT_PROGRAM.to_vec()));
             (b"\0\x01\0\0", tables)
         })
         .collect()
@@ -951,17 +696,10 @@ pub fn cmap_mixed(groups: &[(u32, u32, u32)]) -> Vec<u8> {
 ///
 /// An `fpgm` keeps the auto-hinter off them.
 fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
-    let square: &[(i16, i16, bool)] = &[
-        (100, 0, true),
-        (100, 200, true),
-        (300, 200, true),
-        (300, 0, true),
-    ];
-    let bump: &[(i16, i16, bool)] = &[(0, 0, true), (50, 100, false), (100, 0, true)];
     let (glyf, loca) = glyf(&[
         Vec::new(),
-        simple(&[square]),
-        simple(&[bump]),
+        simple(&[SQUARE]),
+        simple(&[BUMP]),
         composite(&[(0, 1, 10, 20, Some(0.5)), (0x0200, 2, 0, 0, None)]),
         composite(&[(0, 1, 0, 300, None)]),
     ]);
@@ -999,8 +737,6 @@ fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
     faces
         .into_iter()
         .map(|(style, vertical)| {
-            let full = format!("Authored Vertical {style}");
-            let postscript = format!("AuthoredVertical-{style}").replace(' ', "");
             let mut tables = vec![
                 (*b"head", head(1000, false, 0)),
                 (*b"hhea", hhea(5)),
@@ -1014,19 +750,10 @@ fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
                     *b"cmap",
                     cmap(&[(0x41, 1), (0x42, 2), (0x43, 3), (0x44, 4)]),
                 ),
-                (
-                    *b"name",
-                    name(&[
-                        (1, "Authored Vertical"),
-                        (2, style),
-                        (4, &full),
-                        (6, &postscript),
-                    ]),
-                ),
+                (*b"name", face_names("Authored Vertical", style)),
                 (*b"glyf", glyf.clone()),
                 (*b"loca", loca.clone()),
-                // PUSHB_1 0; POP
-                (*b"fpgm", vec![0xb0, 0, 0x21]),
+                (*b"fpgm", IDLE_FONT_PROGRAM.to_vec()),
             ];
             tables.extend(vertical);
             (b"\0\x01\0\0", tables)
@@ -1043,22 +770,13 @@ fn vertical_faces() -> Vec<(&'static [u8; 4], Tables)> {
 /// `Delta`, which FreeType maps twice, a name used by two glyphs and one that
 /// maps to no code point.
 fn charmaps_tables() -> Tables {
-    use Part::{N, Op};
     let square = |side: i16| {
-        charstring(&[
-            N(50),
-            N(0),
-            Op(21),
-            N(side),
-            Op(6),
-            N(side),
-            Op(7),
-            N(-side),
-            Op(6),
-            Op(14),
-        ])
+        charstring(&format!(
+            "50 0 rmoveto {side} hlineto {side} vlineto {} hlineto endchar",
+            -side
+        ))
     };
-    let mut glyphs = vec![charstring(&[Op(14)])];
+    let mut glyphs = vec![charstring("endchar")];
     glyphs.extend((1..10).map(|g| square(100 + 40 * g)));
     let program = CffProgram {
         glyphs,
@@ -1094,15 +812,7 @@ fn charmaps_tables() -> Tables {
                 ),
             ]),
         ),
-        (
-            *b"name",
-            name(&[
-                (1, "Authored Charmaps"),
-                (2, "Regular"),
-                (4, "Authored Charmaps Regular"),
-                (6, "AuthoredCharmaps-Regular"),
-            ]),
-        ),
+        (*b"name", face_names("Authored Charmaps", "Regular")),
         (*b"CFF ", program.build()),
     ]
 }
@@ -1234,16 +944,16 @@ pub fn exercise(data: &[u8], limits: Limits) {
         // Sizes: libass's 256 pixels, a small one and the extremes.
         let sized: Vec<_> = [16384, 538, 1, i32::MAX]
             .into_iter()
-            .filter_map(|height| font.at_size(height).ok())
+            .filter_map(|height| libass::at_size(font, height).ok())
             .collect();
-        let synthesis = font.synthesis(900, 110);
+        let synthesis = libass::synthesis(font, 900, 110);
         for size in &sized {
             let _ = (
-                size.ascent_descent(),
-                size.harfbuzz_scale(),
-                size.underline(),
+                libass::ascent_descent(size),
+                libass::harfbuzz_scale(size),
+                libass::underline(size),
             );
-            let _ = (size.strikeout(), size.embolden_strength());
+            let _ = (libass::strikeout(size), libass::embolden_strength(size));
         }
         for glyph in spread.map(GlyphId) {
             let _ = font.advance(glyph);
@@ -1257,12 +967,13 @@ pub fn exercise(data: &[u8], limits: Limits) {
                 let _ = size.load(glyph, Load::Default, &mut scaled, &mut work);
                 let _ = size.kerning(glyph, GlyphId(1));
                 if size.outline_into(glyph, &mut scaled).is_ok() {
-                    let _ = size.synthesize(&mut scaled, synthesis);
+                    let _ = libass::synthesize(size, &mut scaled, synthesis);
                     let _ = scaled.segments().count();
                 }
             }
         }
-        let _ = font.glyph_index('A');
+        let text = libass::text_charmap(font).map(|charmap| libass::text_lookup(font, charmap));
+        let _ = text.map(|text| text.map(|text| text.glyph(u32::from('A'))));
     }
     let faces: Vec<FaceInfo<'_>> = fonts.iter().map(FaceInfo::new).collect();
     for family in ["Test Sans", "x"] {

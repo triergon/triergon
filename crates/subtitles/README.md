@@ -13,12 +13,12 @@ glyphs, scale or composite bitmaps, or schedule presentation; those belong to th
 
 ## Usage
 
-Every operation follows the same cooperative model. Memory is charged to a
-shared `Budget`, each `step`/`poll` spends a caller `WorkBudget` and checks an
-`AtomicBool` for cancellation, and output is immutable `Bytes` that stay valid
-after the decoder is reset or dropped. Starvation (`NeedInput`/`NeedPacket`),
-work exhaustion (`Yield`) and output pressure (`NeedOutput`) are distinct,
-resumable states. Rejected input is handed back unchanged.
+Decoders charge storage to a shared `Budget` and spend a caller `WorkBudget` as
+they advance. Cooperative text and PGS calls take a cancellation flag. Owned
+`Bytes` stay valid after the decoder is reset or dropped. Borrowed views stay
+tied to the decoder. `NeedInput`, `Yield` and `NeedOutput` request more input,
+more work or more room for output respectively. `Ready` reports a completed
+result and `End` reports that the operation has finished.
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -32,9 +32,9 @@ let mut reader = Reader::new(&pool, srt, Syntax::SubRip, Limits::default())?;
 let mut cues = Vec::new();
 loop {
     match reader.poll(&mut WorkBudget::new(4096), &cancel)? {
-        Status::Cue(cue) => cues.push(cue),
+        Status::Ready(cue) => cues.push(cue),
         Status::Yield => {}
-        Status::Finished => break,
+        Status::End => break,
     }
 }
 assert_eq!(cues.len(), 1);
@@ -45,8 +45,8 @@ assert_eq!(cues[0].text.as_ref(), b"Hello");
 
 The FFmpeg-compatible receivers in `compat` take one codec packet per call and
 return the subtitle FFmpeg's decoder returns for it, if any:
-`compat::dvb::ReceiverDecoder::decode`, `compat::dvd::Decoder`,
-`compat::pgs::ReceiverDecoder`, `compat::cc::Decoder::decode` (fed by
+`compat::dvb::Decoder::decode`, `compat::dvd::Decoder`,
+`compat::pgs::Decoder`, `compat::cc::Decoder::decode` (fed by
 `compat::cc::CaptionExtractor` from video access units) and
 `compat::teletext::Decoder::decode`. The DVB and DVD receivers charge their work
 before doing it and return `Status::Yield` when the budget runs out; the caller
@@ -58,20 +58,21 @@ changes nothing. A DVB receiver rectangle carries its region depth's `palette`, 
 FFmpeg reports it, and `colours`, the colour of every pixel value. With
 `AutomaticPalette::WithoutClutOnce` (FFmpeg's `compute_clut` −2) a region's automatic
 palette is computed when the region is first presented and kept until a new epoch. The
-PGS receiver is polled: `push(&mut packet, clock, &cancel)`, then `poll` until
-`OutputReady` and `take_output`.
+PGS receiver takes ownership with `push(packet, &clock, &cancel)`. A refusal
+returns the original bytes in `Refused<Bytes>`. After admission, call `poll`
+until `Ready`, then `take_output`.
 
 | Module | Entry points |
 | --- | --- |
 | `text` | `Extractor` (packets), `charset::CharsetJob`, `tx3g_config::ConfigJob`, `tx3g_semantics::SemanticJob` |
 | `dvb` | `SourceConfiguration`, `DvbPacket`: a service's configuration and its packets with their original clocks |
-| `pgs` | `SegmentIter`: segments of a packet or SUP stream; `DisplayLimits`, `DisplayConfig` and the outputs of the PGS receiver |
+| `pgs` | `SegmentIter`: segments of a packet or SUP stream; `Clock`, the clock a bitmap receiver takes each packet with |
 | `dvd` | `vobsub` (`.idx` text), `program_stream` (MPEG-2 program streams) |
 | `cc` | `video::nal::{Codec, Framing}`: how a video stream carries its NAL units, for `compat::cc::VideoCoding` |
 | `context` | `Builder`: track header, metadata and attachment bytes handed to a renderer |
-| `compat::dvb` | `ReceiverDecoder`, `Status`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
-| `compat::pgs` | `ReceiverDecoder`, `Refusal` |
-| `compat::dvd` | `Decoder`, `Settings`, `ifo_palette`, `VobSubIndex`, `SubpictureParser`, `mp4_configuration` |
+| `compat::dvb` | `Decoder`, `Status`, `Options`, `AutomaticPalette`; `PesParser` (PES data field to codec packets) |
+| `compat::pgs` | `Decoder`, `Status`, `DecodedPacket`, `Subtitle`, `Rect`, `Refusal`, `Limits`, `Options` |
+| `compat::dvd` | `Decoder`, `Options`, `ifo_palette`, `VobSubIndex`, `SubpictureParser`, `mp4_configuration` |
 | `compat::cc` | `Decoder`, `Options`, `CaptionExtractor`, `SccPackets` |
 | `compat::teletext` | `Decoder`, `Options`, `Format`, `PageSelection` |
 | `compat::charset` | `AssPacketJob`, `receiver_charset` |
@@ -130,8 +131,23 @@ there is no detection from content, language or file name.
 | --- | --- |
 | Unicode | UTF-8, UTF-16 with BOM, UTF-16BE, UTF-16LE, tx3g in-band (UTF-8 or FEFF UTF-16BE) |
 | Single-byte | ASCII, ISO-8859-1, Windows-1251, Windows-1252 (`Charset::from_label`) |
-| Multibyte | GBK/CP936, Big5, Shift-JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
-| FFmpeg/glibc labels | `compat::charset::receiver_charset` and `receiver_charset_with_glibc_euc_kr` map ASS charset labels to the repertoire the reference build accepts |
+| Multibyte | GBK (with GB18030's four-byte codes), Big5, Shift_JIS, EUC-KR, Windows-932/949/950 (`MultibyteCharset::from_label`) |
+| FFmpeg/glibc labels | `compat::charset::receiver_charset` maps ASS charset labels to the repertoire the reference build accepts |
+
+A strict profile (`Charset::from_label`, `MultibyteCharset::from_label`) converts as the
+current definition of its charset does: `big5`, `shift_jis`, `euc-kr` and `gbk` as the
+decoders of the WHATWG Encoding Standard (with the Hong Kong supplement, Windows-31J,
+UHC and the four-byte codes of GB18030), and a Windows code page (`cp932`, `cp949`,
+`cp950`) as Windows converts it, its user-defined areas included.
+`compat::charset::Profile` selects a receiver repertoire for explicit multibyte
+conversion. `compat::charset::receiver_charset` resolves labels as the C library of the reference build
+does (glibc 2.39 `iconv`), and whatever a comparison pins of the reference's conversion
+runs through it: there `big5` and `cp950` are both glibc's Big5 charmap, `gbk` is CP936
+without four-byte codes, `shift_jis` the historical Shift-JIS with yen and overline,
+and `euc-kr` KS X 1001 with the C1 controls. The strict Big5 and GBK tables are written
+from the standard's index files (<https://encoding.spec.whatwg.org/>), which are not in
+the repository, by `cargo xtask subtitle-views charset-tables`; its Shift_JIS and EUC-KR
+are code pages 932 and 949, which the same command checks against their indexes.
 
 `charset::CharsetJob` counts the output first, allocates it exactly, then encodes.
 
@@ -146,6 +162,15 @@ bytes are errors; nothing is replaced with U+FFFD.
 | DVB (EN 300 743) | DDS, PCS, RCS, CDS and method-0 (pixel) ODS; 2/4/8-bit interlaced RLE with map tables; default CLUTs; page/region/CLUT/object state per epoch | FFmpeg's subtitles: indexed planes and ARGB palettes, with its display window, region order, automatic palette and `compute_edt`, `compute_clut`, `dvb_substream` |
 | PGS (Blu-ray) | PCS, PDS, ODS, END in packet or SUP framing; fragmented objects; palette updates; object cache; forced flags | Every packet FFmpeg decodes, malformed ones included: indexed planes and ARGB palettes, with its refusals and `forced_subs_only` |
 | DVD SPU / VobSub | SPU reassembly, control commands (start, forced start, stop, palette, alpha, area, field offsets), interlaced 2-bit and extended 8-bit RLE; `.idx`/`.sub` pairs, program streams, Matroska and MP4 configuration | FFmpeg's crop, colours carried between units, ARGB from the idx, private-data, `palette` or IFO palette, the canvas of the configuration's `size:` line (refused unless both sides are positive and (width + 128) × (height + 128) is below 2²⁸), the `.idx` `delay:` line, and `forced_subs_only`; out-of-range numbers read as FFmpeg built for 32-bit ARMv7 reads them |
+
+The [DVD gate](../../harness/features/subtitle-dvd/contract.json) compares the
+palette selected from the first program chain and the fallback used when its
+sector or table offset falls outside the IFO; the sector's byte offset is
+computed in 32 bits, as the reference computes it, so a sector of 2²¹ or more
+wraps to an offset inside the file.
+The [DVD text-field comparison](../../harness/features/subtitle-dvd-host/contract.json)
+checks palette saturation, oversized canvas refusal and delay saturation. These
+fields have fixed 32-bit bounds across targets.
 
 ### Closed captions and teletext
 

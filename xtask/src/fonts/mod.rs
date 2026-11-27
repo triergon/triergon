@@ -10,6 +10,7 @@
 
 mod manifest;
 pub(crate) mod probe;
+mod store;
 mod tables;
 
 pub use manifest::GENERATOR;
@@ -19,12 +20,14 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::fetch::{self, Transport};
-use crate::json::Value;
-use crate::prepare::{output, run, verify_xz_tree};
+use crate::json::{self, Value};
+use crate::prepare::{configure, verify_release_tree};
+use crate::process::{output, run};
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask fonts prepare [--jobs N]
        cargo xtask fonts fetch
+       cargo xtask fonts store fixtures | manifest --record
        cargo xtask fonts tables [--check]
        cargo xtask fonts manifest [--record] [--output DIR]
        cargo xtask fonts compare [--all] [REPORT OPTION]...
@@ -95,6 +98,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
         [command, rest @ ..] if command == "manifest" => {
             GENERATOR.manifest_command(root, rest, USAGE)
         }
+        [command, rest @ ..] if command == "store" => store::main(root, rest),
         [command, rest @ ..] if command == "tables" => tables::main(root, rest),
         [command, rest @ ..] if command == "assemble" => probe::assemble_command(root, rest),
         [command, rest @ ..] if command == "probe" => probe::probe_command(root, rest),
@@ -158,24 +162,19 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
             .arg("-C")
             .arg(&cache))?;
     }
-    verify_xz_tree(&archive_path, &cache)?;
+    verify_release_tree(&archive_path, &cache)?;
     let prefix = cache.join("install");
-    let argv = configure_argv(&prefix);
-    let wanted = Value::strings(argv.iter().cloned());
-    let record = cache.join("configure-argv.json");
-    let configured = source.join("config.mk").exists();
-    if !configured || crate::checks::read_json(&record).ok().as_ref() != Some(&wanted) {
-        if configured {
-            run(Command::new("make").arg("distclean").current_dir(&source))?;
-        }
-        run(Command::new(&argv[0]).args(&argv[1..]).current_dir(&source))?;
-        crate::corpus::write_json(&record, &wanted)?;
-    }
+    let wanted = configure(
+        &source,
+        "config.mk",
+        &configure_argv(&prefix),
+        &cache.join("configure-argv.json"),
+    )?;
     run(Command::new("make")
         .arg(format!("-j{jobs}"))
         .current_dir(&source))?;
     run(Command::new("make").arg("install").current_dir(&source))?;
-    verify_xz_tree(&archive_path, &cache)?;
+    verify_release_tree(&archive_path, &cache)?;
     let libs = output(
         Command::new("pkg-config")
             .args(["--static", "--libs", "freetype2"])
@@ -199,7 +198,7 @@ fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, Strin
         ),
     ]);
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     Ok(path)
 }
 
@@ -221,8 +220,7 @@ pub(crate) fn serves(source: &Value, lane: &str) -> bool {
 }
 
 pub(crate) fn corpus(root: &Path) -> Result<Vec<(Value, Vec<CorpusFile>)>, String> {
-    let manifest =
-        crate::checks::read_json(&root.join(CORPUS)).map_err(|e| format!("{CORPUS}: {e}"))?;
+    let manifest = json::read(&root.join(CORPUS)).map_err(|e| format!("{CORPUS}: {e}"))?;
     let sources = manifest
         .get("sources")
         .and_then(Value::as_array)

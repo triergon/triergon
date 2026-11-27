@@ -7,13 +7,17 @@
 mod video;
 
 use super::{Landing, Reader, ReaderEvent, Shared};
+use crate::SourceEpochs;
+use crate::pes::stream_id;
+use crate::psi::stream_type;
 use crate::reader::{AccessUnit, Packet, SourceEvent};
-use crate::{ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
+use crate::stream::TraceEvent;
+use crate::transport::{ContinuityOutcome, TransportPacket, pid};
 use triergon_core::container::{Event, PacketInfo, ReaderStep};
 use triergon_core::{
     Budget, BudgetVec, Charged, Error, Result, SourceCapabilities, SourceId, Step,
 };
-use triergon_framing::MpegLayer;
+use triergon_framing::mpeg_audio::MpegLayer;
 
 const WIDTH: usize = 188;
 // Video publication can look ahead into the next PES. Keep two bounded PES
@@ -173,7 +177,7 @@ impl Capture {
                 let slot = carrier_slot(self.next, self.width);
                 self.carriers[slot] = Some(carrier);
                 self.next += self.width as u64;
-                if packet.pid != 0 && packet.pid != 0x1fff
+                if packet.pid != pid::PAT && packet.pid != pid::NULL
                     && !self.map.as_ref().is_some_and(|map| {
                         map.map().streams.as_slice()[0].pid == packet.pid
                     })
@@ -200,9 +204,13 @@ impl Capture {
                     && map.streams.len() == 1
                     && matches!(
                         map.streams.as_slice()[0].stream_type,
-                        0x03 | 0x04 | 0x1b | 0x24
+                        stream_type::MPEG1_AUDIO
+                            | stream_type::MPEG2_AUDIO
+                            | stream_type::H264
+                            | stream_type::HEVC
                     )
-                    && (map.pcr_pid == 0x1fff || map.pcr_pid == map.streams.as_slice()[0].pid) =>
+                    && (map.pcr_pid == pid::NULL
+                        || map.pcr_pid == map.streams.as_slice()[0].pid) =>
                 {
                     self.map = Some(source.clone());
                 }
@@ -268,7 +276,7 @@ impl Capture {
                 != pes.header.as_bytes().len() + pes.payload_len
             || (nals != 0
                 && (!pes.header.data_alignment_indicator
-                    || !(0xe0..=0xef).contains(&pes.header.stream_id)))
+                    || !stream_id::VIDEO.contains(&pes.header.stream_id)))
             || packet.epochs()
                 != (SourceEpochs {
                     configuration: 2,
@@ -474,8 +482,9 @@ impl Direct {
             }
             ReaderEvent::Source(source) => match source.event() {
                 TraceEvent::Pat(table) => {
+                    // A typed PAT with a shared section measured +0.053% at capture and +0.147% at seal.
                     let TraceEvent::Pat(original) = self.index.pat.event() else {
-                        unreachable!("captured PAT")
+                        return crate::refuse(Error::SourceMismatch);
                     };
                     if self.carriers != 1
                         || table.header != original.header
@@ -499,11 +508,14 @@ impl Direct {
                     }
                     let checkpoint = &self.index.checkpoints.as_slice()[self.checkpoint];
                     let pid = self.index.map.map().streams.as_slice()[0].pid;
-                    reader
-                        .stream
-                        .as_mut()
-                        .ok_or(Error::SourceMismatch)?
-                        .resume_elementary_offset(pid, checkpoint.elementary)?;
+                    let crate::reader::Transport::Reading {
+                        stream: crate::reader::Stream::Open(stream),
+                        ..
+                    } = &mut reader.transport
+                    else {
+                        return Err(Error::SourceMismatch);
+                    };
+                    stream.resume_elementary_offset(pid, checkpoint.elementary)?;
                     reader.lanes.as_mut_slice()[0].resume_independent(
                         checkpoint.elementary,
                         checkpoint.frames,

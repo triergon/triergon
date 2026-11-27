@@ -1,19 +1,21 @@
 //! Font selection and fallback as libass does it without a system font
 //! provider: the attached and embedded fonts are matched by name, weight and
-//! slant (`ass_font_select`), then the default family, then the default font
-//! file; each requested font keeps the faces it was given and adds one for a
-//! character none of them maps (`ass_font_get_index`), and each of its faces
-//! keeps the charmap the last such lookup left it on.
+//! slant, then the default family, then the default font file; each
+//! requested font keeps the faces it was given and adds one for a character
+//! none of them maps, and each of its faces keeps the charmap the last such
+//! lookup left it on.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use triergon_core::{Budget, BudgetVec, Bytes, Reservation, Result, WorkBudget};
-use triergon_font::{Charmap, FaceInfo, Font, GlyphId, Limits, Request, select};
+use triergon_font::compat::libass::{self, FaceInfo, Request, select};
+use triergon_font::{Charmap, Font, GlyphId, Limits};
 
 use crate::{EmbeddedFont, FontDesc, charge};
 
-/// Faces libass keeps per requested font at most (`ASS_FONT_MAX_FACES`).
+/// Faces libass keeps per requested font at most.
 const MAX_FACES: usize = 10;
 
 /// The fonts a renderer draws with, as a player configures libass without a
@@ -37,21 +39,20 @@ pub struct Fonts {
 /// holds each face once.
 ///
 /// libass opens a face anew for each font that adds it and looks characters
-/// up through the charmap the face has selected, which a lookup can change
-/// (`ass_font_get_index`), so each font's copy keeps its own.
+/// up through the charmap the face has selected, which a lookup can change,
+/// so each font's copy keeps its own.
 #[derive(Clone, Debug)]
 pub(super) struct Face {
     pub(super) font: Arc<Font>,
     pub(super) uid: u32,
     /// The selected charmap's index in [`Font::charmaps`]: the one libass
-    /// selects on opening the face (`ass_charmap_magic`) until a lookup
-    /// leaves it on another.
+    /// selects on opening the face until a lookup leaves it on another.
     charmap: Option<usize>,
 }
 
 impl Face {
     fn new(font: Font, uid: u32) -> Self {
-        let charmap = font.text_charmap_index();
+        let charmap = libass::text_charmap_index(&font);
         Self {
             font: Arc::new(font),
             uid,
@@ -65,24 +66,23 @@ impl Face {
     }
 
     /// The glyph `symbol` maps to through the selected charmap, as libass
-    /// looks it up (`ass_font_index_magic`, then `FT_Get_Char_Index`).
+    /// looks it up ([`libass::text_lookup`]).
     fn glyph(&self, symbol: u32) -> Result<Option<GlyphId>> {
         match self.charmap() {
-            Some(charmap) => Ok(self.font.text_lookup(charmap)?.glyph(symbol)),
+            Some(charmap) => Ok(libass::text_lookup(&self.font, charmap)?.glyph(symbol)),
             None => Ok(None),
         }
     }
 
     /// libass's last resort for a face selected for `symbol` that does not
-    /// map it ("broken font? Trying all charmaps", `ass_font.c:681-692`):
-    /// each charmap is selected in turn, in FreeType's order, and `symbol`
-    /// looked up through it. The face keeps the one that maps it, or the
-    /// last one. A charmap is charged to `work` as it is tried.
+    /// map it: each charmap is selected in turn, in FreeType's order, and
+    /// `symbol` looked up through it. The face keeps the one that maps it, or
+    /// the last one. A charmap is charged to `work` as it is tried.
     fn try_every_charmap(&mut self, symbol: u32, work: &mut WorkBudget) -> Result<Option<GlyphId>> {
         for (index, charmap) in self.font.charmaps().enumerate() {
             charge(work, 1)?;
             self.charmap = Some(index);
-            if let Some(glyph) = self.font.text_lookup(charmap)?.glyph(symbol) {
+            if let Some(glyph) = libass::text_lookup(&self.font, charmap)?.glyph(symbol) {
                 return Ok(Some(glyph));
             }
         }
@@ -90,9 +90,9 @@ impl Face {
     }
 }
 
-/// One requested font (libass's `ASS_Font`): its description and the faces
-/// it has gathered, first the one selected for it, then one for each
-/// character none of the earlier ones mapped.
+/// One requested font: its description and the faces it has gathered, first
+/// the one selected for it, then one for each character none of the earlier
+/// ones mapped.
 #[derive(Debug)]
 pub(super) struct RequestedFont {
     key: Key,
@@ -146,7 +146,7 @@ impl Requested {
     }
 }
 
-/// libass's font description (`ASS_FontDesc`).
+/// A requested font's description: family, weight, slant and orientation.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Key {
     family: Box<[u8]>,
@@ -329,9 +329,9 @@ impl Library {
         self.charge_entries()
     }
 
-    /// The requested font for `desc` (`ass_font_new`): built and given its
-    /// first face on first request; `None` when no face can be found for it,
-    /// which makes an event that uses it fail.
+    /// The requested font for `desc`: built and given its first face on
+    /// first request; `None` when no face can be found for it, which makes
+    /// an event that uses it fail.
     pub(super) fn font(
         &mut self,
         desc: &FontDesc<'_>,
@@ -386,17 +386,16 @@ impl Library {
         &self.fonts[&id]
     }
 
-    /// The face and glyph of `symbol` in font `id` (`ass_font_get_index`):
-    /// the first face that maps it through the charmap it has selected, else
-    /// a face selected for it and added to the font (or found there), which
-    /// is tried through each of its charmaps if it does not, else glyph 0 of
-    /// that face or of the first.
+    /// The face and glyph of `symbol` in font `id`: the first face that maps
+    /// it through the charmap it has selected, else a face selected for it
+    /// and added to the font (or found there), which is tried through each of
+    /// its charmaps if it does not, else glyph 0 of that face or of the first.
     ///
     /// # Errors
     ///
     /// `Unsupported` where libass would look `symbol` up in a way this crate
     /// does not: through a charmap whose codes libass converts
-    /// ([`Font::text_lookup`]).
+    /// ([`libass::text_lookup`]).
     pub(super) fn glyph(
         &mut self,
         id: FontId,
@@ -438,8 +437,8 @@ impl Library {
         Ok((index, glyph.unwrap_or(GlyphId(0))))
     }
 
-    /// `ass_font_select` for `font` and `code` (any face for 0): the face to
-    /// add, opening the default font file if it is chosen.
+    /// The face to add for `key` and `code` (any face for 0), opening the
+    /// default font file if it is chosen.
     fn choose(&mut self, key: &Key, code: u32, work: &mut WorkBudget) -> Result<Option<Face>> {
         // The requested and the default family are each matched against
         // every registered face.

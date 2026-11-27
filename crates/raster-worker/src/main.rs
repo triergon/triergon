@@ -12,13 +12,15 @@ mod record;
 
 use case::{Case, Glyph};
 use perform::Runner;
-use record::{Dump, Kind, Sink, Work};
+use record::{Kind, Values};
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
-use std::time::Instant;
 use triergon_core::{Budget, Bytes};
+use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Limits};
+use triergon_harness_runner::records::Dump;
+use triergon_harness_runner::{Invocation, Mode as RunMode, Totals, measure};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -75,7 +77,7 @@ fn spread(total: usize, count: usize) -> Vec<u16> {
 /// after its GDI metrics, each outline unhinted (`FT_LOAD_NO_HINTING`).
 fn load(file: &Bytes, budget: &Budget, height: i32, count: usize) -> Selection {
     let font = Font::new(file.clone(), 0, budget, Limits::default()).ok()?;
-    let sized = font.at_size(height).ok()?;
+    let sized = libass::at_size(&font, height).ok()?;
     let mut outline = triergon_font::Outline::new(budget);
     let glyphs = spread(usize::from(font.glyph_count()), count)
         .into_iter()
@@ -94,19 +96,19 @@ fn load(file: &Bytes, budget: &Budget, height: i32, count: usize) -> Selection {
 }
 
 /// The records of the selection, before the cases.
-fn record_selection(selection: &Selection, sink: &mut impl Sink) -> io::Result<()> {
+fn record_selection(selection: &Selection, sink: &mut impl Values) -> io::Result<()> {
     sink.begin(Kind::Glyphs)?;
     let Some(glyphs) = selection else {
         sink.absent()?;
         return sink.end();
     };
-    sink.value(glyphs.len() as i64)?;
+    sink.int(glyphs.len() as i64)?;
     sink.end()?;
     for (id, glyph) in glyphs {
         sink.begin(Kind::Glyph)?;
-        sink.value((*id).into())?;
+        sink.int((*id).into())?;
         match glyph {
-            Some(glyph) => sink.value(glyph.points.len() as i64)?,
+            Some(glyph) => sink.int(glyph.points.len() as i64)?,
             None => sink.absent()?,
         }
         sink.end()?;
@@ -119,7 +121,7 @@ fn read(
     budget: &Budget,
     selection: Option<&Selection>,
     cases: &[Option<Case>],
-    sink: &mut impl Sink,
+    sink: &mut impl Values,
 ) -> io::Result<()> {
     if let Some(selection) = selection {
         record_selection(selection, sink)?;
@@ -147,14 +149,7 @@ fn lines(data: &[u8]) -> impl Iterator<Item = &[u8]> {
     })
 }
 
-enum Action {
-    Fold,
-    Bench(u64),
-    Memory,
-    Dump,
-}
-
-fn parse(args: &[String]) -> Result<(Action, &str, Input)> {
+fn parse(args: &[String]) -> Result<(Invocation<'_>, Input)> {
     let (mode, rest) = args.split_first().ok_or(USAGE)?;
     // The crate computes what libass's C engine does; `raster-simd` names the
     // same work for the feature whose reference runs the host's SIMD engine.
@@ -162,14 +157,8 @@ fn parse(args: &[String]) -> Result<(Action, &str, Input)> {
         .strip_prefix("raster-simd-")
         .or_else(|| mode.strip_prefix("raster-"))
         .ok_or(USAGE)?;
-    let (action, path, rest) = match (action, rest) {
-        ("bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), path, rest),
-        ("fold", [path, rest @ ..]) => (Action::Fold, path, rest),
-        ("memory", [path, rest @ ..]) => (Action::Memory, path, rest),
-        ("dump", [path, rest @ ..]) => (Action::Dump, path, rest),
-        _ => return Err(USAGE.into()),
-    };
-    let input = match rest {
+    let invocation = Invocation::parse_mode(action, rest, Some("dump"), || USAGE)?;
+    let input = match invocation.arguments {
         [mode, height, count, cases @ ..] if mode == "glyphs" => {
             let height: i32 = height.parse()?;
             let count: usize = count.parse()?;
@@ -185,24 +174,21 @@ fn parse(args: &[String]) -> Result<(Action, &str, Input)> {
         [mode] if mode == "lines" => Input::Lines,
         _ => return Err(USAGE.into()),
     };
-    Ok((action, path, input))
+    Ok((invocation, input))
 }
 
 fn run(args: &[String]) -> Result<()> {
-    let (action, path, input) = parse(args)?;
-    let iterations = match action {
-        Action::Bench(count) => count,
-        _ => 1,
-    };
-    if !(1..=1_000_000).contains(&iterations) {
-        return Err(USAGE.into());
-    }
+    let (invocation, input) = parse(args)?;
+    invocation.check_iterations(|| USAGE)?;
+    let Invocation {
+        mode: action, path, ..
+    } = invocation;
     let size = std::fs::metadata(path)?.len();
     if size > MAX_INPUT {
         return Err("input exceeds the size bound".into());
     }
     let budget = Budget::new(BUDGET_BYTES)?;
-    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error())?;
+    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error)?;
     let (selection, cases): (Option<Selection>, Vec<Option<Case>>) = match &input {
         Input::Glyphs {
             height,
@@ -219,56 +205,26 @@ fn run(args: &[String]) -> Result<()> {
             (None, cases)
         }
     };
-    let retained = budget.used();
-    let mut out = io::stdout().lock();
-    if let Action::Dump = action {
-        let mut dump = Dump(BufWriter::new(out));
+    if action == RunMode::Trace {
+        let mut dump = Dump(BufWriter::new(io::stdout().lock()));
         read(&budget, selection.as_ref(), &cases, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
-    let memory = matches!(action, Action::Memory);
-    if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
-    }
-    let start = matches!(action, Action::Bench(_)).then(Instant::now);
-    let mut total = Work::default();
-    for _ in 0..iterations {
-        let mut work = Work::default();
+    measure(&invocation, "raster", Some(&budget), || {
+        let mut work = Totals::default();
         read(
             &budget,
             selection.as_ref(),
             std::hint::black_box(&cases),
             &mut work,
         )?;
-        total.accumulate(&work);
-        if budget.used() != retained {
-            return Err("raster operation retained charged storage".into());
-        }
-    }
-    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
-    if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
-    }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"raster\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        total.packets, total.bytes, total.digest,
-    )?;
-    Ok(out.flush()?)
+        Ok(work)
+    })
 }
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("raster-worker: {error}");
-            ExitCode::FAILURE
-        }
-    }
+    triergon_harness_runner::command(Some("raster-worker"), 1, run)
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`

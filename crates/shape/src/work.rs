@@ -9,6 +9,7 @@
 //! system or feature record searched, each lookup a feature lists and each
 //! coverage record a lookup's digest reads. Loops bounded by a constant (the 64
 //! glyphs of one match, the 64 nesting levels) are not charged separately.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::face::Face;
 use triergon_core::{Error, Result, WorkBudget};
@@ -16,10 +17,8 @@ use triergon_core::{Error, Result, WorkBudget};
 /// Limits of one shaping call: its work is bounded by `work_per_char` units for
 /// each character of the item, and at least `minimum_work` in all, and its
 /// buffer by `glyphs_per_char` glyphs for each character, and at least
-/// `minimum_glyphs`. The defaults are HarfBuzz's operation and length limits
-/// (`HB_BUFFER_MAX_OPS_FACTOR`, `HB_BUFFER_MAX_OPS_MIN`,
-/// `HB_BUFFER_MAX_LEN_FACTOR` and `HB_BUFFER_MAX_LEN_MIN`); the work limit
-/// covers more of the steps than HarfBuzz's.
+/// `minimum_glyphs`. The defaults are HarfBuzz's operation and length limits;
+/// the work limit covers more of the steps than HarfBuzz's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Work units per character of the item.
@@ -46,12 +45,7 @@ impl Default for Limits {
 impl Limits {
     /// The work budget of an item of `chars` characters.
     pub(crate) fn budget(self, chars: usize) -> WorkBudget {
-        let chars = u64::try_from(chars).unwrap_or(u64::MAX);
-        WorkBudget::new(
-            chars
-                .saturating_mul(self.work_per_char)
-                .max(self.minimum_work),
-        )
+        per_char(self.work_per_char, self.minimum_work, chars)
     }
 
     /// The most glyphs the buffer may hold for an item of `chars` characters.
@@ -60,6 +54,13 @@ impl Limits {
             .saturating_mul(self.glyphs_per_char)
             .max(self.minimum_glyphs)
     }
+}
+
+/// A budget of `per_char` units for each of `chars` characters, and at least
+/// `minimum` in all.
+pub(crate) fn per_char(per_char: u64, minimum: u64, chars: usize) -> WorkBudget {
+    let chars = u64::try_from(chars).unwrap_or(u64::MAX);
+    WorkBudget::new(chars.saturating_mul(per_char).max(minimum))
 }
 
 /// Planning work per byte of a face's GSUB and GPOS tables.

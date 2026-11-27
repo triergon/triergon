@@ -5,6 +5,7 @@
 use crate::runner::{Invocation, Refusal, Result, Totals, measure, measure_repeated};
 use crate::ts::{au_recovery, confirm_control_only_entity, fold_payload};
 use crate::ts_input::{self, FIRST_SOURCE, Request};
+use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use triergon_core::container::{
@@ -14,19 +15,25 @@ use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputWindow, Rounding, SourceCapabilities, SourceId,
     SourceLocation, Step, TimeBase, WorkBudget,
 };
-use triergon_framing::{Ac3Family, Ac3FrameHeader, MpegLayer};
+use triergon_framing::{
+    ac3::{Ac3Family, Ac3FrameHeader},
+    mpeg_audio::MpegLayer,
+};
 use triergon_harness_protocol::digest::signed;
+use triergon_harness_runner::RefusalCause;
 use triergon_mpegts::compat::adts::{PacketPolicy, PesPolicy};
 use triergon_mpegts::compat::annex_b::{ContinuityEvent, ContinuityReader, ContinuityResidue};
+use triergon_mpegts::compat::input::PositionBasis;
 use triergon_mpegts::compat::input::{InputBootstrap, InputStep};
 use triergon_mpegts::compat::latm;
-use triergon_mpegts::compat::pes::{DemuxClock, UnframedAudioPolicy};
-use triergon_mpegts::reference_trace::input::PositionBasis;
-use triergon_mpegts::{
-    AccessUnit, AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, FaultKind,
-    IncompleteVideo, Packet, PacketClock, PacketFormat, PayloadSource, ReaderEvent, ReaderLimits,
-    SourceEpochs, TraceEvent, UnframedAudio,
+use triergon_mpegts::compat::pes::DemuxClock;
+use triergon_mpegts::reader::{
+    AudioEofPolicy, DvbSubtitleTailPolicy, EntityTransition, IncompleteVideo, PacketClock,
+    PayloadSource, UnframedAudio,
 };
+use triergon_mpegts::reader::{LatmPes, UnframedAudioPolicy};
+use triergon_mpegts::stream::{FaultKind, TraceEvent};
+use triergon_mpegts::{AccessUnit, Packet, PacketFormat, ReaderEvent, ReaderLimits, SourceEpochs};
 
 mod malformed;
 
@@ -40,6 +47,9 @@ enum SourceProof {
     ControlOnly,
     ReportedMalformed(malformed::Diagnostic),
     OpaqueRecovery(au_recovery::Trigger),
+    /// A recovery replay after an access-unit observation ended the reader's attempt:
+    /// should the replay fail, the refusal names that observation.
+    ObservedRecovery(au_recovery::Trigger),
 }
 
 struct TrackProjection {
@@ -49,13 +59,40 @@ struct TrackProjection {
     mpeg_audio_seen: bool,
 }
 
-#[derive(Clone, Copy)]
-struct PacketPosition<'a, const TRACE: bool> {
-    request: &'a Request,
-    basis: PositionBasis,
+trait Observation: Copy {
+    type Output: Observation; // Giving the explanation its own packet fold cost up to +0.114%.
+    const TRACE: bool = false;
+    const EXPLAIN: bool = false;
 }
 
-impl<const TRACE: bool> PacketPosition<'_, TRACE> {
+#[derive(Clone, Copy)]
+struct Fold;
+impl Observation for Fold {
+    type Output = Self;
+}
+
+#[derive(Clone, Copy)]
+struct Trace;
+impl Observation for Trace {
+    type Output = Self;
+    const TRACE: bool = true;
+}
+
+#[derive(Clone, Copy)]
+struct Explain;
+impl Observation for Explain {
+    type Output = Fold;
+    const EXPLAIN: bool = true;
+}
+
+#[derive(Clone, Copy)]
+struct PacketPosition<'a, Policy: Observation> {
+    request: &'a Request,
+    basis: PositionBasis,
+    policy: PhantomData<Policy>,
+}
+
+impl<Policy: Observation> PacketPosition<'_, Policy> {
     fn at(self, entity: SourceId, offset: u64) -> Result<i64> {
         let carrier = match self.request.format {
             PacketFormat::Ts188 => offset / 188 * 188,
@@ -91,7 +128,7 @@ fn ac3_header(packet: &Packet) -> Option<Ac3FrameHeader> {
     match packet.access_unit() {
         AccessUnit::Ac3(frame) => Some(frame.facts().header),
         AccessUnit::IncompleteAudio { bytes, .. } if is_ac3(packet) => {
-            triergon_framing::probe_ac3_header(bytes.as_ref()).ok()
+            triergon_framing::ac3::probe_header(bytes.as_ref()).ok()
         }
         _ => None,
     }
@@ -185,10 +222,10 @@ fn refused(mut totals: Totals, error: &dyn std::fmt::Display, at: SourceLocation
     totals.refusal.get_or_insert_with(|| {
         Box::new(Refusal {
             reason: error.to_string(),
-            cause: format!(
+            cause: RefusalCause::from_json(format!(
                 "{{\"phase\":\"access_units\",\"source\":{},\"input_window_offset\":{}}}",
                 at.source.0, at.offset,
-            ),
+            )),
         })
     });
     totals
@@ -207,7 +244,7 @@ enum Payload<'a> {
         bytes: &'a [u8],
         position: PositionSource,
     },
-    PreservedPes(&'a latm::PesPacket),
+    PreservedPes(&'a LatmPes),
 }
 
 struct PacketProjection<'a> {
@@ -274,8 +311,8 @@ impl<'a> From<&'a IncompleteVideo> for PacketProjection<'a> {
     }
 }
 
-impl<'a> From<&'a latm::PesPacket> for PacketProjection<'a> {
-    fn from(packet: &'a latm::PesPacket) -> Self {
+impl<'a> From<&'a LatmPes> for PacketProjection<'a> {
+    fn from(packet: &'a LatmPes) -> Self {
         let pes = packet.pes();
         Self {
             pid: pes.pid,
@@ -303,11 +340,12 @@ impl<'a> From<&'a UnframedAudio> for PacketProjection<'a> {
     }
 }
 
-fn fold_packet<const TRACE: bool>(
+// One function on purpose: the fold of each access unit inside the timed loop; a split is a hot-path change not yet measured.
+fn fold_packet<Policy: Observation>(
     totals: &mut Totals,
     packet: PacketProjection<'_>,
     index: usize,
-    position: PacketPosition<'_, TRACE>,
+    position: PacketPosition<'_, Policy>,
     duration: i64,
     clock: &mut DemuxClock,
     cancel: &AtomicBool,
@@ -382,7 +420,7 @@ fn fold_packet<const TRACE: bool>(
         bytes as u64,
     ];
     let stream_id = pes.header.stream_id;
-    if TRACE {
+    if Policy::TRACE {
         use std::io::Write;
         let mut out = std::io::stdout().lock();
         write!(
@@ -423,19 +461,19 @@ fn fold_packet<const TRACE: bool>(
     }
 }
 
-fn diagnostic_refusal(fault: &triergon_mpegts::TraceFault) -> Refusal {
+fn diagnostic_refusal(fault: &triergon_mpegts::stream::TraceFault) -> Refusal {
     Refusal {
         reason: format!("source diagnostic: {:?}", fault.kind),
-        cause: format!(
+        cause: RefusalCause::from_json(format!(
             "{{\"phase\":\"diagnostic\",\"source\":{},\"offset\":{}}}",
             fault.location.source.0, fault.location.offset,
-        ),
+        )),
     }
 }
 
-fn fold_continuity<const TRACE: bool>(
+fn fold_continuity<Policy: Observation>(
     residue: &ContinuityResidue,
-    position: PacketPosition<'_, TRACE>,
+    position: PacketPosition<'_, Policy>,
 ) -> Result<Totals> {
     let first = residue
         .chunks()
@@ -466,7 +504,24 @@ fn fold_continuity<const TRACE: bool>(
     Ok(totals)
 }
 
-fn operation<const TRACE: bool>(
+/// The replay that proves again the unframed run `event` reports, when a recoverable source
+/// fault ended that run.
+#[cold]
+#[inline(never)]
+fn replay_of_ended_run(event: &ReaderEvent) -> Option<au_recovery::Trigger> {
+    let ended_by = match event {
+        ReaderEvent::IncompleteVideo(video) => video.ended_by(),
+        ReaderEvent::UnframedAudio(audio) => audio.ended_by(),
+        _ => None,
+    }?;
+    match ended_by.event() {
+        TraceEvent::Diagnostic(fault) => au_recovery::Trigger::from_fault(fault),
+        _ => None,
+    }
+}
+
+// One function on purpose: the timed loop of every access-unit workload; a split is a hot-path change not yet measured.
+fn operation<Policy: Observation>(
     pool: &Budget,
     request: &Request,
     cancel: &AtomicBool,
@@ -480,7 +535,11 @@ fn operation<const TRACE: bool>(
         Ok(basis) => basis,
         Err(error) => return Ok(refused(totals, error.as_ref(), at)),
     };
-    let position = PacketPosition::<TRACE> { request, basis };
+    let position = PacketPosition::<Policy::Output> {
+        request,
+        basis,
+        policy: PhantomData,
+    };
     let limits = ReaderLimits {
         format: request.format,
         program: Some(request.program),
@@ -489,7 +548,7 @@ fn operation<const TRACE: bool>(
         probe_unlabelled_dts_core: request.probe_dts_core,
         pcr_policy: request.pcr_policy,
         audio_eof_policy: AudioEofPolicy::ReportIncomplete,
-        unframed_audio_policy: UnframedAudioPolicy::ReportAtEof,
+        unframed_audio_policy: UnframedAudioPolicy::Report,
         adts_packet_policy: PacketPolicy::ReportFragments,
         adts_pes_policy: PesPolicy::ReportUnbounded,
         latm_packet_policy: latm::PacketPolicy::PreservePes,
@@ -611,6 +670,16 @@ fn operation<const TRACE: bool>(
                 event @ (ReaderEvent::IncompleteVideo(_) | ReaderEvent::UnframedAudio(_)),
             ))) => {
                 observed_media = true;
+                // The replay proves a run that a recoverable fault ended again, with the
+                // bytes the fault cut. Should it fail, the rerun folds the run as it is.
+                if !Policy::EXPLAIN
+                    && single_entity
+                    && request.format == PacketFormat::Ts188
+                    && totals.packets == 0
+                    && let Some(trigger) = replay_of_ended_run(&event)
+                {
+                    break (SourceProof::ObservedRecovery(trigger), totals);
+                }
                 let (id, projection) = match &event {
                     ReaderEvent::IncompleteVideo(video) => (video.track_info().id(), video.into()),
                     ReaderEvent::UnframedAudio(audio) => (audio.track_info().id(), audio.into()),
@@ -792,12 +861,22 @@ fn operation<const TRACE: bool>(
                     }
                     _ => None,
                 };
+                // Holding the event for a failed replay cost up to +0.078% as a local and +0.154% boxed.
+                // The rerun formats it only when the replay fails.
+                if !Policy::TRACE
+                    && !Policy::EXPLAIN
+                    && let Some(trigger) = recovery
+                {
+                    break (SourceProof::ObservedRecovery(trigger), totals);
+                }
                 let refusal = refused(
                     totals,
                     &format!("incomplete access-unit observation: {event:?}"),
                     at,
                 );
-                if let Some(trigger) = recovery {
+                if !Policy::EXPLAIN
+                    && let Some(trigger) = recovery
+                {
                     break (SourceProof::OpaqueRecovery(trigger), refusal);
                 }
                 return Ok(refusal);
@@ -847,16 +926,8 @@ fn operation<const TRACE: bool>(
                 }
             }
             Step::Backpressure(pressure) => {
-                return Ok(deferred_continuity.unwrap_or_else(|| {
-                    refused(
-                        totals,
-                        &Error::Backpressure {
-                            requested: pressure.requested,
-                            available: pressure.available,
-                        },
-                        at,
-                    )
-                }));
+                return Ok(deferred_continuity
+                    .unwrap_or_else(|| refused(totals, &Error::Backpressure(pressure), at)));
             }
             Step::End(end) => {
                 if end.source != source
@@ -904,7 +975,21 @@ fn operation<const TRACE: bool>(
     // completed reader attempt before reserving storage for the replay.
     drop(reader);
     drop(tracks);
-    Ok(prove_source(pool, request, proof, cancel)?.unwrap_or(reader_refusal))
+    let observed = matches!(proof, SourceProof::ObservedRecovery(_));
+    match prove_source(pool, request, proof, cancel)? {
+        Some(totals) => Ok(totals),
+        None if observed => explain(pool, request, cancel),
+        None => Ok(reader_refusal),
+    }
+}
+
+/// The reader's attempt run again without its recovery, for the refusal of an
+/// observation whose recovery replay failed: the refusal the attempt writes when it does
+/// not recover.
+#[cold]
+#[inline(never)]
+fn explain(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<Totals> {
+    operation::<Explain>(pool, request, cancel)
 }
 
 #[cold]
@@ -922,7 +1007,7 @@ fn prove_source(
         SourceProof::ReportedMalformed(diagnostic) => {
             Ok(malformed::confirm(pool, request, diagnostic, cancel)?.map(|_| Totals::default()))
         }
-        SourceProof::OpaqueRecovery(trigger) => {
+        SourceProof::OpaqueRecovery(trigger) | SourceProof::ObservedRecovery(trigger) => {
             au_recovery::project(pool, request, trigger, cancel)
         }
     }
@@ -951,9 +1036,9 @@ pub fn run(args: &[String]) -> Result<()> {
         ts_input::parse_access_units(&pool, Path::new(invocation.path), invocation.arguments)?;
     // Select a monomorphization before measurement; ordinary folds carry no trace flag.
     let operation = if invocation.mode == triergon_harness_runner::Mode::Trace {
-        operation::<true>
+        operation::<Trace>
     } else {
-        operation::<false>
+        operation::<Fold>
     };
     let name = if eac3 {
         "mpegts-atsc-eac3-six-block"
@@ -976,7 +1061,7 @@ pub fn run(args: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Request, Totals, operation, ts_input};
+    use super::{Fold, Request, Totals, operation, ts_input};
     use std::path::Path;
     use std::sync::atomic::AtomicBool;
     use triergon_core::{Budget, BudgetVec, Bytes};
@@ -1003,7 +1088,7 @@ mod tests {
             following: BudgetVec::new(&pool),
         };
         let baseline = pool.used();
-        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<Fold>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(pool.used(), baseline);
         totals
     }
@@ -1033,7 +1118,7 @@ mod tests {
         let retained = pool.used();
         let mut first = None;
         for _ in 0..50 {
-            let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+            let totals = operation::<Fold>(&pool, &request, &AtomicBool::new(false)).unwrap();
             assert_eq!((totals.packets, totals.bytes, totals.digest), (0, 0, 0));
             let refusal = totals.refusal.expect("malformed DTS remains unsupported");
             assert!(
@@ -1089,7 +1174,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let totals = operation::<false>(&pool, &request, &AtomicBool::new(false)).unwrap();
+        let totals = operation::<Fold>(&pool, &request, &AtomicBool::new(false)).unwrap();
         assert_eq!(totals.packets, 0);
         assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Psi");
     }
@@ -1115,7 +1200,7 @@ mod tests {
             assert_eq!(totals.packets, 0);
             let refusal = totals.refusal.unwrap();
             assert!(refusal.reason.starts_with("source diagnostic:"));
-            assert!(refusal.cause.contains("\"phase\":\"diagnostic\""));
+            assert!(refusal.cause.as_json().contains("\"phase\":\"diagnostic\""));
         }
     }
 
@@ -1171,13 +1256,17 @@ mod tests {
         assert_eq!(totals.digest, 16_203_249_262_521_375_477);
 
         let mut raw = input.to_vec();
-        // Put a start code across the retained PES and its headerless continuation.
+        // Put a start code across the last two carriers of the finite PES. The source view
+        // delivers that PES before it reports the surplus, so the reader refuses its bytes.
         let next_carrier = 4 * 188;
         let continuation = next_carrier + 5 + usize::from(raw[next_carrier + 4]);
         raw[next_carrier - 2..next_carrier].fill(0);
         raw[continuation..continuation + 2].copy_from_slice(&[1, 0x65]);
         let totals = fold_single(&raw);
         assert_eq!(totals.packets, 0);
-        assert_eq!(totals.refusal.unwrap().reason, "source diagnostic: Pes");
+        assert_eq!(
+            totals.refusal.unwrap().reason,
+            "invalid data: Annex B leading bytes"
+        );
     }
 }

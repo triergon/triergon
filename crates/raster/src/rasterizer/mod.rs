@@ -8,6 +8,7 @@
 //! one with a single segment is a half-plane; otherwise its segments are summed
 //! as trapezoids. Two outlines can be rasterised together as the union of
 //! their own nonzero fills, which is how both border offsets combine.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 mod tile;
 
@@ -299,12 +300,7 @@ impl Rasterizer {
         }
     }
 
-    pub(crate) fn retained_bytes(&self) -> usize {
-        (self.lines[0].capacity() + self.lines[1].capacity()) * size_of::<Line>()
-    }
-
-    /// libass's `ass_outline_to_bitmap`; see
-    /// [`Raster::rasterize`](crate::Raster::rasterize).
+    /// See [`Raster::rasterize`](crate::Raster::rasterize).
     pub(crate) fn rasterize(
         &mut self,
         shape: &Shape,

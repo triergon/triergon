@@ -11,7 +11,8 @@
 use triergon_bitstream::{BitError, BitSource};
 use triergon_core::{Budget, BudgetVec};
 use triergon_framing::{
-    AnnexBUnits, Codec as Coding, avc, hevc, skip_vui_to_timing, split_length_prefixed,
+    avc, hevc,
+    nal::{AnnexBUnits, Codec as Coding, skip_vui_to_timing, split_length_prefixed},
 };
 
 /// How an access unit delimits its NAL units.
@@ -43,14 +44,16 @@ impl Framing {
 /// The video coding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Codec {
+    /// H.264 (ITU-T H.264).
     H264,
+    /// HEVC (ITU-T H.265).
     Hevc,
 }
 
 impl Codec {
     /// A NAL unit's `nal_unit_type`.
     #[must_use]
-    pub fn nal_type(self, nal: &[u8]) -> Option<u8> {
+    pub(crate) fn nal_type(self, nal: &[u8]) -> Option<u8> {
         let &first = nal.first()?;
         Some(match self {
             Self::H264 => first & 0x1f,
@@ -60,7 +63,7 @@ impl Codec {
 
     /// The NAL unit after its header.
     #[must_use]
-    pub fn payload(self, nal: &[u8]) -> &[u8] {
+    pub(crate) fn payload(self, nal: &[u8]) -> &[u8] {
         let header = match self {
             Self::H264 => 1,
             Self::Hevc => 2,
@@ -68,18 +71,9 @@ impl Codec {
         nal.get(header..).unwrap_or_default()
     }
 
-    /// True for a coded slice.
-    #[must_use]
-    pub fn is_slice(self, nal_type: u8) -> bool {
-        match self {
-            Self::H264 => matches!(nal_type, 1..=5),
-            Self::Hevc => hevc::is_slice(nal_type),
-        }
-    }
-
     /// True for an SEI NAL unit (HEVC: prefix or suffix).
     #[must_use]
-    pub fn is_sei(self, nal_type: u8) -> bool {
+    pub(crate) fn is_sei(self, nal_type: u8) -> bool {
         match self {
             Self::H264 => nal_type == avc::SEI,
             Self::Hevc => matches!(nal_type, hevc::PREFIX_SEI | hevc::SUFFIX_SEI),
@@ -111,36 +105,34 @@ pub(crate) fn vui_timing(
 }
 
 /// The payload of the last parameter set of a kind read, so that a repeated
-/// one is not read again.
+/// one is not read again; empty when none is remembered. An empty payload is
+/// never a repeat: no set is read from it.
 #[derive(Debug)]
 pub(crate) struct LastPayload {
     bytes: BudgetVec<u8>,
-    valid: bool,
 }
 
 impl LastPayload {
     pub(crate) fn new(pool: &Budget) -> Self {
         Self {
             bytes: BudgetVec::new(pool),
-            valid: false,
         }
     }
 
     /// True when `payload` repeats the last one remembered.
     pub(crate) fn repeats(&self, payload: &[u8]) -> bool {
-        self.valid && self.bytes.as_slice() == payload
+        !payload.is_empty() && self.bytes.as_slice() == payload
     }
 
+    /// Remembers `payload`; a payload the pool cannot hold leaves none
+    /// remembered.
     pub(crate) fn remember(&mut self, payload: &[u8]) -> triergon_core::Result<()> {
-        self.valid = false;
         self.bytes.clear();
-        self.bytes.try_extend_from_slice(payload)?;
-        self.valid = true;
-        Ok(())
+        self.bytes.try_extend_from_slice(payload)
     }
 
     pub(crate) fn forget(&mut self) {
-        self.valid = false;
+        self.bytes.clear();
     }
 }
 

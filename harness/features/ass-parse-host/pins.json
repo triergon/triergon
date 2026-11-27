@@ -209,5 +209,35 @@
         "host_dependent": true
       }
     }
+  },
+  "candidate_pins": {
+    "drawings-infinite-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 44,
+        "digest": 7102520413637202956
+      }
+    },
+    "drawings-int-min-x-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 31,
+        "digest": 7855372470377351486
+      }
+    },
+    "drawings-int-min-y-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 31,
+        "digest": 16898026539907838526
+      }
+    },
+    "drawings-int-min-ass": {
+      "aarch64-unknown-linux-gnu": {
+        "packets": 6,
+        "bytes": 44,
+        "digest": 15881649056746129386
+      }
+    }
   }
 }

@@ -6,13 +6,16 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use crate::files;
 use crate::json::{self, Value};
-use crate::walk;
+use crate::process::git;
+
+mod registry;
 
 /// Every relative link target in a tracked-style Markdown file must exist.
 pub fn links(root: &Path) -> Vec<String> {
     let mut errors = Vec::new();
-    for path in walk::files(root, &|rel| rel.extension().is_some_and(|e| e == "md")) {
+    for path in files::walk(root, &|rel| rel.extension().is_some_and(|e| e == "md")) {
         let rel = path.strip_prefix(root).expect("walked under root");
         let text = match fs::read_to_string(&path) {
             Ok(text) => text,
@@ -84,47 +87,54 @@ pub fn link_targets(text: &str) -> Vec<&str> {
 /// Harness data parses, and recorded gates keep their declared values.
 pub fn design(root: &Path) -> Result<String, Vec<String>> {
     let mut errors = Vec::new();
-    let research = root.join("research");
-    for path in walk::files(&research, &|rel| {
+    let mut data = Vec::new();
+    for path in files::walk(&root.join("harness"), &|rel| {
         rel.extension().is_some_and(|e| e == "json")
     }) {
         let rel = path.strip_prefix(root).expect("walked under root");
-        if let Err(error) = read_json(&path) {
-            errors.push(format!("{}: {error}", rel.display()));
+        // Named from the root, as every finding of this check is.
+        let text = fs::read_to_string(&path).map_err(|e| e.to_string());
+        match text.and_then(|text| json::parse(&text).map_err(|e| e.to_string())) {
+            Ok(document) => data.push((rel.display().to_string(), document)),
+            Err(error) => errors.push(format!("{}: {error}", rel.display())),
         }
     }
-    let gates = match (
-        read_json(&root.join("harness/policy.json")),
-        read_json(&root.join("harness/module-gates.json")),
-    ) {
-        (Ok(_), Ok(gates)) => gates,
-        (Err(error), _) => return Err(vec![format!("harness/policy.json: {error}")]),
-        (_, Err(error)) => return Err(vec![format!("harness/module-gates.json: {error}")]),
-    };
     errors.extend(runtime_mentions(root));
+    errors.extend(policy_values(root));
     errors.extend(contract_fields(root));
+    let document = |file: &str| {
+        data.iter()
+            .find(|(path, _)| path == file)
+            .map(|(_, document)| document)
+    };
+    errors.extend(crate::exceptions::check(
+        document(crate::exceptions::FILE),
+        &data,
+    ));
+    errors.extend(crate::exceptions::not_compared_errors(
+        root,
+        document(crate::exceptions::NOT_COMPARED),
+    ));
+    errors.extend(registry::compat_errors(root, &data));
+    errors.extend(registry::listing_errors(root, &data));
+    errors.extend(crate::status::check(root, &data));
+    errors.extend(crate::test_skips::design_errors(&data));
+    if let Some(lanes) = document(crate::gate::lanes::FILE) {
+        errors.extend(crate::gate::lanes::design_errors(root, lanes));
+    }
     // Generated manifests: the case ids and the pins match, in the recorded form.
     for generator in crate::generators::GENERATORS {
         errors.extend(generator.check(root));
     }
-    let modules = gates
-        .get("modules")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
-    if modules
+    let fate = data
         .iter()
-        .any(|m| m.get("accepted").is_some_and(Value::truthy))
-    {
-        errors.push("a module was marked accepted without implementation evidence".into());
-    }
-    let fate = match read_json(&root.join("harness/fate/index.json")) {
-        Ok(fate) => fate,
-        Err(error) => return Err(vec![format!("harness/fate/index.json: {error}")]),
+        .find(|(path, _)| path == "harness/fate/index.json")
+        .and_then(|(_, index)| index.get("cases"))
+        .and_then(Value::as_array);
+    let Some(cases) = fate else {
+        errors.push("harness/fate/index.json: no FATE cases".into());
+        return Err(errors);
     };
-    let cases = fate
-        .get("cases")
-        .and_then(Value::as_array)
-        .unwrap_or_default();
     let mapped = |c: &Value| {
         c.get("status").and_then(Value::as_str) != Some("unmapped")
             || c.get("rights").and_then(Value::as_str) != Some("unreviewed")
@@ -133,42 +143,49 @@ pub fn design(root: &Path) -> Result<String, Vec<String>> {
         errors.push("FATE index misrepresents coverage/rights".into());
     }
     if errors.is_empty() {
-        Ok(format!(
-            "Design integrity OK: JSON, {} unaccepted module gates, {} unmapped FATE identities.\n\
+        let mut summary = format!(
+            "Design integrity OK: {} harness data files, {} unmapped FATE identities.\n\
              This is not a feature-parity, performance, memory or FATE pass.",
-            modules.len(),
+            data.len(),
             cases.len()
-        ))
+        );
+        if let Some(unpinned) = registry::unpinned_summary(&data) {
+            summary.push('\n');
+            summary.push_str(&unpinned);
+        }
+        Ok(summary)
     } else {
         Err(errors)
     }
 }
 
-/// Why a contract's `open_bounds` are not valid against its feature's committed
-/// `corpus.json`, on any gate target; nothing for a contract that lists none.
-fn open_bounds_error(contract_path: &Path, contract: &Value) -> Option<String> {
-    contract.get("open_bounds")?;
+/// Why a contract's bound exceptions are invalid against its registered corpus.
+fn open_bounds_error(root: &Path, contract_path: &Path, contract: &Value) -> Option<String> {
+    if contract.get("open_bounds").is_none() && contract.get("open_unmeasured").is_none() {
+        return None;
+    }
     let corpus = contract_path.with_file_name("corpus.json");
-    let manifest = match read_json(&corpus) {
-        Ok(manifest) => manifest,
+    let manifest = match crate::harness::manifest::read(root, &corpus) {
+        Ok((manifest, _)) => manifest,
         Err(error) => {
             return Some(format!(
-                "open_bounds needs the committed corpus.json: {error}"
+                "bound exceptions need the registered corpus: {error}"
             ));
         }
     };
-    crate::gate::TARGETS
-        .iter()
-        .find_map(|target| crate::harness::bounds::open_bounds(contract, &manifest, target).err())
+    crate::gate::TARGETS.iter().find_map(|target| {
+        crate::harness::bounds::open_bounds(contract, &manifest, target)
+            .err()
+            .or_else(|| crate::harness::bounds::Unmeasured::read(contract, &manifest, target).err())
+    })
 }
 
 /// The fields every feature contract (`harness/features/<id>/contract.json`) may
 /// declare that the harness reads the same way for all of them: `timeout_seconds`,
-/// `measurement_reference` and, against the feature's committed `corpus.json`,
-/// `open_bounds`.
+/// `measurement_reference`, oracle pins and case-specific bound exceptions.
 fn contract_fields(root: &Path) -> Vec<String> {
     let features = root.join("harness/features");
-    walk::files(&features, &|rel| rel.ends_with("contract.json"))
+    files::walk(&features, &|rel| rel.ends_with("contract.json"))
         .into_iter()
         .flat_map(|path| {
             let rel = path
@@ -176,13 +193,27 @@ fn contract_fields(root: &Path) -> Vec<String> {
                 .expect("walked under root")
                 .display()
                 .to_string();
-            let errors = match read_json(&path) {
+            let errors = match json::read(&path) {
                 Ok(contract) => [
                     crate::harness::worker::contract_timeout(&contract)
                         .and(crate::harness::worker::contract_parity_timeout(&contract))
                         .err(),
                     crate::harness::build::measurement_reference_error(&contract),
-                    open_bounds_error(&path, &contract),
+                    open_bounds_error(root, &path, &contract),
+                    contract.get("oracle").and_then(|_| {
+                        crate::harness::oracle_compare::kind(&contract)
+                            .err()
+                            .or_else(|| {
+                                let manifest = json::read(&path.with_file_name("corpus.json"));
+                                manifest
+                                    .and_then(|manifest| {
+                                        crate::harness::manifest::validate_required(
+                                            &contract, &manifest,
+                                        )
+                                    })
+                                    .err()
+                            })
+                    }),
                 ]
                 .into_iter()
                 .flatten()
@@ -194,6 +225,52 @@ fn contract_fields(root: &Path) -> Vec<String> {
                 .map(move |error| format!("{rel}: {error}"))
         })
         .collect()
+}
+
+/// What `harness/policy.json` states beside the runtime gate agrees with the code that
+/// applies it: the memory ceilings admit nothing at or above the reference, and the
+/// pairs and targets it names are the ones the gate runs.
+fn policy_values(root: &Path) -> Vec<String> {
+    use crate::harness::policy::Memory;
+    let mut errors = Vec::new();
+    match Memory::load(root) {
+        Ok(memory) => {
+            if !(0.0 < memory.ceiling() && memory.heap <= 1.0 && memory.total_rss <= 1.0) {
+                errors.push(
+                    "harness/policy.json: a memory ceiling must lie above 0 and not above 1, \
+                     the reference"
+                        .into(),
+                );
+            }
+        }
+        Err(error) => errors.push(error),
+    }
+    let policy = json::read(&root.join("harness/policy.json")).unwrap_or(Value::Null);
+    let pairs = policy
+        .get("runtime")
+        .and_then(|runtime| runtime.get("minimum_pairs"))
+        .and_then(Value::as_f64);
+    let gate_pairs = crate::harness::timing::GATE_PAIRS;
+    #[allow(clippy::float_cmp)] // A small whole number.
+    if pairs != Some(gate_pairs as f64) {
+        errors.push(format!(
+            "harness/policy.json: runtime.minimum_pairs is not the gate's {gate_pairs} pairs"
+        ));
+    }
+    let targets: Vec<&str> = policy
+        .get("qualification_targets")
+        .and_then(Value::as_array)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    if targets != crate::gate::TARGETS {
+        errors.push(format!(
+            "harness/policy.json: qualification_targets are not the gate's targets {:?}",
+            crate::gate::TARGETS
+        ));
+    }
+    errors
 }
 
 /// `harness/policy.json` is the only definition of the runtime ceiling and target.
@@ -230,16 +307,15 @@ fn runtime_mentions(root: &Path) -> Vec<String> {
         }
     }
     for (area, cell) in status_runtimes(&read("docs/status.md")) {
-        let Some(runtime) = leading_ratio(&cell) else {
-            continue;
-        };
-        let above = runtime.parse().is_ok_and(|r: f64| r > gate.ceiling);
-        let claims_every_case = pass_count(&cell).is_none_or(|(passing, cases)| passing >= cases);
-        if above && claims_every_case {
-            errors.push(format!(
-                "docs/status.md: {area} runtime {runtime} is above the ceiling {ceiling}, \
-                 but the row does not say which cases fail"
-            ));
+        for (runtime, count) in cell_runtimes(&cell) {
+            let above = runtime.parse().is_ok_and(|r: f64| r > gate.ceiling);
+            let claims_every_case = count.is_none_or(|(passing, cases)| passing >= cases);
+            if above && claims_every_case {
+                errors.push(format!(
+                    "docs/status.md: {area} runtime {runtime} is above the ceiling {ceiling}, \
+                     but the row does not say which cases fail"
+                ));
+            }
         }
     }
     errors
@@ -283,7 +359,8 @@ fn mentions(text: &str, value: &str) -> bool {
     })
 }
 
-/// The area and runtime cell of every row of the status table.
+/// The area and runtime cell of every row of each status table with an "Area" and a
+/// "Runtime" column (one table per gate target).
 fn status_runtimes(status: &str) -> Vec<(String, String)> {
     let cells = |line: &str| -> Vec<String> {
         line.trim()
@@ -292,45 +369,103 @@ fn status_runtimes(status: &str) -> Vec<(String, String)> {
             .map(|cell| cell.trim().to_owned())
             .collect()
     };
+    let mut rows = Vec::new();
     let mut lines = status.lines();
-    let Some(column) = lines.by_ref().find_map(|line| {
+    while let Some(line) = lines.next() {
         let header = cells(line);
-        (header.first().is_some_and(|c| c == "Area"))
-            .then(|| header.iter().position(|c| c == "Runtime"))
-            .flatten()
-    }) else {
-        return Vec::new();
-    };
-    lines
-        .skip(1)
-        .take_while(|line| line.starts_with('|'))
-        .filter_map(|line| {
+        if header.first().is_none_or(|c| c != "Area") {
+            continue;
+        }
+        let Some(column) = header.iter().position(|c| c == "Runtime") else {
+            continue;
+        };
+        for line in lines
+            .by_ref()
+            .skip(1)
+            .take_while(|line| line.starts_with('|'))
+        {
             let row = cells(line);
-            Some((row.first()?.clone(), row.get(column)?.clone()))
-        })
-        .collect()
+            if let (Some(area), Some(cell)) = (row.first(), row.get(column)) {
+                rows.push((area.clone(), cell.clone()));
+            }
+        }
+    }
+    rows
 }
 
-/// The first decimal number in `cell`, such as 1.1808 in "1.1808 (71/71 pass)".
-fn leading_ratio(cell: &str) -> Option<&str> {
-    let start = cell.find(|c: char| c.is_ascii_digit())?;
-    let rest = &cell[start..];
-    let end = rest
-        .find(|c: char| !(c.is_ascii_digit() || c == '.'))
-        .unwrap_or(rest.len());
-    let number = rest[..end].trim_end_matches('.');
-    number.contains('.').then_some(number)
+/// Each runtime a status cell states, with the `n/m` of its cases that pass when it says.
+/// A cell holds one result or several, separated by `<br>`, `;` or a comma outside
+/// parentheses and code spans, as in "MP4 forward 0.7670 (51/51 pass), raw Annex B 0.6286
+/// (7/7 pass)". A result's runtime is its first decimal number outside parentheses and
+/// code spans, unless "of" follows it, as in "0.921 of main's instructions".
+fn cell_runtimes(cell: &str) -> Vec<(&str, Option<(u64, u64)>)> {
+    // The cell with code spans and parenthesised text blanked byte for byte, so that
+    // offsets into it are offsets into the cell.
+    let mut top = String::with_capacity(cell.len());
+    let (mut depth, mut code) = (0u32, false);
+    for c in cell.chars() {
+        let inside = code || depth > 0;
+        match c {
+            '`' => code = !code,
+            '(' if !code => depth += 1,
+            ')' if !code => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+        if inside || code || depth > 0 {
+            top.extend(std::iter::repeat_n(' ', c.len_utf8()));
+        } else {
+            top.push(c);
+        }
+    }
+    let top = top.replace("<br>", ";;;;");
+    let mut results = Vec::new();
+    let mut start = 0;
+    for end in top
+        .match_indices([';', ','])
+        .map(|(at, _)| at)
+        .chain([top.len()])
+    {
+        let (shown, result) = (&top[start..end], &cell[start..end]);
+        start = end + 1;
+        let runtime = decimals(shown).find(|&(_, after)| {
+            let rest = shown[after..].trim_start();
+            !(rest == "of" || rest.starts_with("of "))
+        });
+        if let Some((at, after)) = runtime {
+            results.push((&result[at..after], pass_count(result)));
+        }
+    }
+    results
 }
 
-/// The `n/m` before "pass", such as (45, 125) in "1.3846 (45/125 pass for AVC/HEVC)".
-fn pass_count(cell: &str) -> Option<(u64, u64)> {
-    let words: Vec<&str> = cell
+/// The start and end of every number with a decimal point in `text` that is not part of
+/// a word or a longer number, such as 0.7670 in "MP4 forward 0.7670" but not 264 in H.264.
+fn decimals(text: &str) -> impl Iterator<Item = (usize, usize)> + '_ {
+    let joined = |c: char| c.is_alphanumeric() || c == '.' || c == '_';
+    text.char_indices().filter_map(move |(at, c)| {
+        if !c.is_ascii_digit() || text[..at].chars().next_back().is_some_and(joined) {
+            return None;
+        }
+        let run = text[at..]
+            .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+            .map_or(text.len(), |end| at + end);
+        let number = text[at..run].trim_end_matches('.');
+        number.contains('.').then_some((at, at + number.len()))
+    })
+}
+
+/// The last `n/m` before "pass", such as (45, 125) in "1.3846 (45/125 pass for AVC/HEVC)"
+/// or (956, 956) in "0.7395 (956/956 timed operations pass)".
+fn pass_count(result: &str) -> Option<(u64, u64)> {
+    let words: Vec<&str> = result
         .split(|c: char| c.is_whitespace() || c == '(' || c == ')')
         .filter(|word| !word.is_empty())
         .collect();
-    let counted = words.windows(2).find(|pair| pair[1].starts_with("pass"))?[0];
-    let (passing, cases) = counted.split_once('/')?;
-    Some((passing.parse().ok()?, cases.parse().ok()?))
+    let pass = words.iter().position(|word| word.starts_with("pass"))?;
+    words[..pass].iter().rev().find_map(|word| {
+        let (passing, cases) = word.split_once('/')?;
+        Some((passing.parse().ok()?, cases.parse().ok()?))
+    })
 }
 
 /// Every commit `docs/status.md` cites is an ancestor of `HEAD`, so the
@@ -431,7 +566,7 @@ fn table_pipes(line: &str) -> impl Iterator<Item = usize> + '_ {
         .filter_map(move |(at, _)| (!line[..at].ends_with('\\')).then_some(at))
 }
 
-fn pipe_cells(line: &str) -> impl Iterator<Item = &str> {
+pub(crate) fn pipe_cells(line: &str) -> impl Iterator<Item = &str> {
     let line = line.trim();
     let row = line
         .strip_suffix('|')
@@ -493,28 +628,6 @@ fn cite_inline<'a>(mut text: &'a str, external: &[&str], cited: &mut Vec<&'a str
     }
 }
 
-fn git(root: &Path, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(root)
-        .output()
-        .map_err(|e| format!("cannot run git: {e}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git {} failed:\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-    let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
-    Ok(text.trim_end().to_owned())
-}
-
-pub fn read_json(path: &Path) -> Result<Value, String> {
-    let text = fs::read_to_string(path).map_err(|e| e.to_string())?;
-    json::parse(&text).map_err(|e| e.to_string())
-}
-
 /// The workspace has only owned packages, no build scripts, and no unsafe code.
 pub fn safety(root: &Path) -> Result<String, String> {
     let output = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
@@ -532,10 +645,6 @@ pub fn safety(root: &Path) -> Result<String, String> {
     let text = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
     let metadata = json::parse(&text).map_err(|e| format!("cargo metadata: {e}"))?;
     let owned = [root.join("crates"), root.join("xtask")];
-    let workspace_toml = fs::read_to_string(root.join("Cargo.toml")).map_err(|e| e.to_string())?;
-    let worker_lints = lint_table(&workspace_toml, "[workspace.lints.")
-        .replace("[workspace.lints.", "[lints.")
-        .replace("unsafe_code = \"forbid\"", "unsafe_code = \"deny\"");
     let packages = metadata
         .get("packages")
         .and_then(Value::as_array)
@@ -567,11 +676,8 @@ pub fn safety(root: &Path) -> Result<String, String> {
             fs::read_to_string(&manifest).map_err(|e| format!("{}: {e}", manifest.display()))?;
         if manifest.starts_with(root.join("crates"))
             && !cargo_toml.contains("[lints]\nworkspace = true\n")
-            && lint_table(&cargo_toml, "[lints.") != worker_lints
         {
-            return Err(format!(
-                "{name}: [lints] is neither the workspace's nor the workers' (the workspace's with unsafe_code denied)"
-            ));
+            return Err(format!("{name}: [lints] is not the workspace's"));
         }
         for target in package
             .get("targets")
@@ -609,7 +715,7 @@ pub fn safety(root: &Path) -> Result<String, String> {
     // The library crates are scanned as text as well; xtask relies on its
     // `forbid` attribute because its own tests spell out the patterns. A worker
     // binary's C entry point is the one unsafe item admitted.
-    for source in walk::files(&root.join("crates"), &|rel| {
+    for source in files::walk(&root.join("crates"), &|rel| {
         rel.extension().is_some_and(|e| e == "rs")
     }) {
         let text = fs::read_to_string(&source).map_err(|e| format!("{}: {e}", source.display()))?;
@@ -646,23 +752,6 @@ fn without_worker_entry(text: &str) -> Result<String, String> {
     }
 }
 
-/// The lint tables of a Cargo manifest whose headers start with `prefix`, without
-/// comments or blank lines.
-fn lint_table(manifest: &str, prefix: &str) -> String {
-    let mut table = String::new();
-    let mut inside = false;
-    for line in manifest.lines().map(str::trim) {
-        if line.starts_with('[') {
-            inside = line.starts_with(prefix);
-        }
-        if inside && !line.is_empty() && !line.starts_with('#') {
-            table.push_str(line);
-            table.push('\n');
-        }
-    }
-    table
-}
-
 /// `unsafe` as a word followed by a block, `impl`, `trait`, `fn`, `extern` or an
 /// attribute's parenthesis.
 pub fn has_unsafe_syntax(text: &str) -> bool {
@@ -679,282 +768,4 @@ pub fn has_unsafe_syntax(text: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn cites_hexadecimal_code_spans_of_commit_length() {
-        let text = "at `ceb5076` and `03f3efd3a0fde0d558c68f5408c521d632802fb7`, again \
-                    `ceb5076`; FFmpeg `d32b387f`; not `abc123`, `ABCDEF0`, `deadbeefx`, \
-                    `1000 ms`, a digest `6c0cc3a669152b3eeba9a1189939c53b1b68e2f5cb9ab6cb81f903ec4358634d` \
-                    or text between `spans` cafe1234 `here`";
-        assert_eq!(
-            cited_revisions(text, &["d32b387f2b0a484599d4587d651891f0c63c4238"]),
-            ["ceb5076", "03f3efd3a0fde0d558c68f5408c521d632802fb7"]
-        );
-    }
-
-    #[test]
-    fn pairs_backtick_runs_of_the_same_length() {
-        let text =
-            "at `` abc1234 `` and `def1234`, with ``embedded `bad1234` ticks`` and `cafe1234";
-        assert_eq!(cited_revisions(text, &[]), ["abc1234", "def1234"]);
-        assert_eq!(
-            cited_revisions("`` unmatched before `abc1234`", &[]),
-            ["abc1234"]
-        );
-    }
-
-    #[test]
-    fn escaped_openers_leave_later_citations_visible() {
-        assert_eq!(
-            cited_revisions(r"Literal \` marker. Measured at `deadbee`.", &[]),
-            ["deadbee"]
-        );
-        assert_eq!(cited_revisions(r"Slash \\`deadbee`.", &[]), ["deadbee"]);
-        assert_eq!(cited_revisions(r"Literal \```deadbee``.", &[]), ["deadbee"]);
-    }
-
-    #[test]
-    fn unclosed_delimiters_do_not_cross_status_blocks() {
-        let text = "Unclosed ` marker.\n \nMeasured at `deadbee`.\n\n\
-                    | Result | Revision |\n| --- | --- |\n\
-                    | Unclosed ` marker | `def1234` |\n\
-                    | Unclosed ` marker |\n| `abc1234` |";
-        assert_eq!(
-            cited_revisions(text, &[]),
-            ["deadbee", "def1234", "abc1234"]
-        );
-        assert_eq!(
-            cited_revisions("Measured at `\ndeadbee`.", &[]),
-            ["deadbee"]
-        );
-    }
-
-    #[test]
-    fn table_cells_can_omit_outer_pipes() {
-        let text = "| Result | Revision |\n| :--- | ---: |\n\
-                    Literal ` marker | `deadbee` |\n\
-                    Escaped \\| literal ` marker | `abc1234`";
-        assert_eq!(cited_revisions(text, &[]), ["deadbee", "abc1234"]);
-    }
-
-    #[test]
-    fn escaped_table_pipes_are_consumed_before_inline_escapes() {
-        let text = concat!(
-            "| Result | Notes |\n",
-            "| --- | --- |\n",
-            r"| `x\\|` measured at `deadbee` | ok |"
-        );
-        assert_eq!(cited_revisions(text, &[]), ["deadbee"]);
-    }
-
-    #[test]
-    fn atx_heading_can_interrupt_a_paragraph() {
-        assert_eq!(
-            cited_revisions("Unclosed ` marker.\n## Measured `deadbee`", &[]),
-            ["deadbee"]
-        );
-        assert_eq!(
-            cited_revisions("Start `\n#tag ` measured at `deadbee`.", &[]),
-            ["deadbee"]
-        );
-    }
-
-    #[test]
-    fn finds_link_targets_like_the_markdown_pattern() {
-        assert_eq!(
-            link_targets("[a](b.md) [c](d#e) ]() [f](g"),
-            vec!["b.md", "d#e"]
-        );
-        assert!(link_targets("[x]()(y)").is_empty());
-        assert_eq!(link_targets("[x](a\nb)"), vec!["a\nb"]);
-    }
-
-    #[test]
-    fn admits_one_worker_entry_point_in_a_denying_crate_root() {
-        let entry = "#![deny(unsafe_code)]\n#![cfg_attr(not(test), no_main)]\n\
-                     #[allow(unsafe_code)]\n#[unsafe(no_mangle)]\nextern \"C\" fn main() -> i32 { 0 }\n";
-        assert!(!has_unsafe_syntax(&without_worker_entry(entry).unwrap()));
-        assert!(without_worker_entry(&entry.replace("deny", "warn")).is_err());
-        let twice = format!("{entry}{}", &entry[entry.find("#[allow").unwrap()..]);
-        assert!(without_worker_entry(&twice).is_err());
-        let exported = entry.replace("#[allow(unsafe_code)]\n", "");
-        assert!(has_unsafe_syntax(&without_worker_entry(&exported).unwrap()));
-    }
-
-    #[test]
-    fn reads_lint_tables_without_comments() {
-        let manifest = "[package]\nname = \"x\"\n\n[lints.rust]\n# why\nunsafe_code = \"deny\"\n\n\
-                        [lints.clippy]\nall = \"warn\"\n\n[features]\nf = []\n";
-        assert_eq!(
-            lint_table(manifest, "[lints."),
-            "[lints.rust]\nunsafe_code = \"deny\"\n[lints.clippy]\nall = \"warn\"\n"
-        );
-    }
-
-    #[test]
-    fn detects_unsafe_syntax_only_at_word_starts() {
-        for text in [
-            "unsafe { x }",
-            "unsafe impl Send",
-            "pub unsafe fn f()",
-            "unsafe\n  extern \"C\"",
-            "unsafe trait T",
-            "#[unsafe(no_mangle)]",
-            "#[unsafe (export_name = \"f\")]",
-        ] {
-            assert!(has_unsafe_syntax(text), "{text}");
-        }
-        for text in [
-            "unsafe_code = forbid",
-            "#![forbid(unsafe_code)]",
-            "not_unsafe {",
-            "unsafety fn",
-            "unsafe code",
-        ] {
-            assert!(!has_unsafe_syntax(text), "{text}");
-        }
-    }
-
-    #[test]
-    fn design_names_each_contract_with_an_invalid_timeout() {
-        let root = walk::scratch("contract-fields");
-        for (id, contract) in [
-            ("absent", r#"{"id": "absent"}"#),
-            ("long", r#"{"id": "long", "timeout_seconds": 120}"#),
-            ("zero", r#"{"id": "zero", "timeout_seconds": 0}"#),
-            ("text", r#"{"id": "text", "timeout_seconds": "120"}"#),
-        ] {
-            let directory = root.join("harness/features").join(id);
-            fs::create_dir_all(&directory).unwrap();
-            fs::write(directory.join("contract.json"), contract).unwrap();
-        }
-        let errors = contract_fields(&root);
-        assert_eq!(errors.len(), 2, "{errors:?}");
-        assert!(errors[0].starts_with("harness/features/text/contract.json: timeout_seconds"));
-        assert!(errors[1].starts_with("harness/features/zero/contract.json: timeout_seconds"));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn reports_missing_links_outside_build_output() {
-        let root = walk::scratch("links");
-        fs::create_dir_all(root.join("docs")).unwrap();
-        fs::create_dir_all(root.join("target")).unwrap();
-        fs::write(
-            root.join("docs/a.md"),
-            "[ok](b.md#x) [web](https://x) [gone](missing.md) [self](#top)",
-        )
-        .unwrap();
-        fs::write(root.join("docs/b.md"), "").unwrap();
-        fs::write(root.join("target/t.md"), "[gone](missing.md)").unwrap();
-        assert_eq!(links(&root), vec!["docs/a.md: missing link missing.md"]);
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn link_components_must_match_case_exactly() {
-        let root = walk::scratch("links-case");
-        fs::create_dir_all(root.join("docs/Sub")).unwrap();
-        fs::write(root.join("docs/Sub/Note.md"), "").unwrap();
-        fs::write(root.join("README.md"), "").unwrap();
-        fs::write(
-            root.join("docs/a.md"),
-            "[ok](Sub/Note.md) [up](../README.md) [dir](./Sub) [file](sub/Note.md) [name](Sub/note.md) [parent](../readme.md)",
-        )
-        .unwrap();
-        assert_eq!(
-            links(&root),
-            vec![
-                "docs/a.md: missing link sub/Note.md",
-                "docs/a.md: missing link Sub/note.md",
-                "docs/a.md: missing link ../readme.md",
-            ]
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn design_reports_invalid_json_and_gate_changes() {
-        let root = walk::scratch("design");
-        fs::create_dir_all(root.join("research/sub")).unwrap();
-        fs::create_dir_all(root.join("harness/fate")).unwrap();
-        fs::create_dir_all(root.join("harness/features")).unwrap();
-        let policy = r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#;
-        let gates = r#"{"modules": [{"accepted": false}, {"accepted": false}]}"#;
-        fs::write(root.join("harness/policy.json"), policy).unwrap();
-        fs::write(root.join("harness/module-gates.json"), gates).unwrap();
-        fs::write(
-            root.join("harness/fate/index.json"),
-            r#"{"cases": [{"status": "unmapped", "rights": "unreviewed"}]}"#,
-        )
-        .unwrap();
-        stated_policy(&root);
-        let ok = design(&root).unwrap();
-        assert!(ok.starts_with(
-            "Design integrity OK: JSON, 2 unaccepted module gates, 1 unmapped FATE identities."
-        ));
-        fs::write(root.join("research/sub/bad.json"), "{").unwrap();
-        fs::write(
-            root.join("harness/policy.json"),
-            policy.replace("1.2", "1.25"),
-        )
-        .unwrap();
-        fs::write(
-            root.join("harness/module-gates.json"),
-            gates.replace("false}]", "true}]"),
-        )
-        .unwrap();
-        let errors = design(&root).unwrap_err();
-        assert_eq!(errors.len(), 3, "{errors:?}");
-        assert!(errors[0].starts_with("research/sub/bad.json: "));
-        assert!(errors.contains(&"docs/quality.md: does not state the policy value 1.25".into()));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    /// The quality guide stating the policy of 1.20 and 0.80, and one passing status row.
-    fn stated_policy(root: &Path) {
-        fs::create_dir_all(root.join("docs")).unwrap();
-        fs::write(
-            root.join("docs/quality.md"),
-            "Runtime at most **1.20** per case. The target is **0.80**.\n",
-        )
-        .unwrap();
-        fs::write(
-            root.join("docs/status.md"),
-            "| Area | Runtime | Open |\n|---|---|---|\n| HLS | 1.1808 (71/71 pass) | — |\n",
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn the_runtime_ceiling_is_stated_once_and_bounds_every_status_row() {
-        let root = walk::scratch("ceiling");
-        fs::create_dir_all(root.join("harness")).unwrap();
-        fs::write(
-            root.join("harness/policy.json"),
-            r#"{"runtime": {"ratio_max": 1.2, "optimisation_target": 0.8}}"#,
-        )
-        .unwrap();
-        stated_policy(&root);
-        fs::write(root.join("README.md"), "Measured at 1.2041 and 11.20.\n").unwrap();
-        assert_eq!(runtime_mentions(&root), Vec::<String>::new());
-        fs::write(root.join("README.md"), "At most 1.20× per case.\n").unwrap();
-        fs::write(
-            root.join("docs/status.md"),
-            "| Area | Runtime |\n|---|---|\n| HLS | 1.2125 (71/71 pass) |\n\
-             | Framing | 1.3846 (45/125 pass for AVC/HEVC) |\n| PGS | PGS 1.11 |\n| TS | not measured |\n",
-        )
-        .unwrap();
-        assert_eq!(
-            runtime_mentions(&root),
-            [
-                "README.md: restates the runtime ceiling 1.20; refer to docs/quality.md",
-                "docs/status.md: HLS runtime 1.2125 is above the ceiling 1.20, \
-                 but the row does not say which cases fail",
-            ]
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-}
+mod tests;

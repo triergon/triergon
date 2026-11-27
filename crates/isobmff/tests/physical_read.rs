@@ -1,15 +1,14 @@
-mod common;
+use crate::common;
 use common::{child, roots};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, Step, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, Limits,
+    BuildStatus, CursorStatus, Limits,
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DescriptionContext, DescriptionEvent, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, DescriptionRecoveryTable, PhysicalRead,
-            PhysicalReadProfile, PhysicalReader, RecoveryTrackHeader, RunRecoveryProfile,
+            DescriptionRecoveryTable, PhysicalRead, PhysicalReader, RecoveryTrackHeader,
         },
         seek::IndexLimits,
     },
@@ -34,17 +33,11 @@ impl Source {
             &child(&trak, b"tkhd").unwrap(),
             &child(&mdia, b"mdhd").unwrap(),
             &child(&mdia, b"hdlr").unwrap(),
-            RunRecoveryProfile,
         )
         .unwrap();
         let raw = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-        let mut job = DescriptionRecoveryBuilder::new(
-            raw,
-            pool.clone(),
-            Limits::default(),
-            DescriptionRecoveryProfile,
-        )
-        .unwrap();
+        let mut job =
+            DescriptionRecoveryBuilder::new(raw, pool.clone(), Limits::default()).unwrap();
         while job
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
@@ -77,7 +70,6 @@ impl Source {
                 &self.media,
                 PacketLimits::default(),
                 self.context(),
-                PhysicalReadProfile,
             )
             .unwrap();
         while cursor
@@ -100,14 +92,7 @@ impl Source {
         .unwrap()
     }
     fn plan(&self, input: &InputCursor, event: &DescriptionEvent) -> PhysicalRead {
-        PhysicalRead::from_event(
-            event,
-            input,
-            self.media[0].clone(),
-            16 * 1024 * 1024,
-            PhysicalReadProfile,
-        )
-        .unwrap()
+        PhysicalRead::from_event(event, input, self.media[0].clone(), 16 * 1024 * 1024).unwrap()
     }
 }
 fn offset(data: &[u8], start: u64) -> Vec<u8> {
@@ -142,7 +127,7 @@ fn original_refusal_and_invalid_source_declaration_are_both_retained() {
     assert!(
         source
             .table
-            .first_sample_physical_prefix(source.length, PhysicalReadProfile)
+            .first_sample_physical_prefix(source.length)
             .unwrap()
     );
     let mut old = source
@@ -153,7 +138,6 @@ fn original_refusal_and_invalid_source_declaration_are_both_retained() {
             &source.media,
             PacketLimits::default(),
             source.context(),
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     let error = loop {
@@ -187,14 +171,7 @@ fn physical_prefix_bytes_source_token_and_retention_survive_close_for_all_quanta
         assert_eq!(plan.available(), 746..747);
         assert!(plan.is_short_at_physical_end());
         assert!(plan.source_range_error().is_some());
-        let mut reader = PhysicalReader::new(
-            &mut input,
-            event,
-            plan,
-            16 * 1024 * 1024,
-            PhysicalReadProfile,
-        )
-        .unwrap();
+        let mut reader = PhysicalReader::new(&mut input, event, plan, 16 * 1024 * 1024).unwrap();
         let output = loop {
             match reader
                 .poll(
@@ -245,7 +222,7 @@ fn source_mdat_boundary_is_not_replaced_with_the_physical_file_boundary() {
 
 #[test]
 fn large_source_prefix_is_factual_without_a_small_buffer_alignment_model() {
-    let original = include_bytes!("fixtures/transport-v3/geometry-20.mov");
+    let original = include_bytes!("fixtures/transport/geometry-20.mov");
     let bytes = short(original);
     let source = Source::new(&bytes);
     let input = source.input();
@@ -264,13 +241,7 @@ fn physically_missing_start_is_not_inferred_to_be_demux_eof() {
     let event = source.event();
     assert_eq!(event.read, DescriptionRead::UnavailablePhysicalStart);
     assert!(matches!(
-        PhysicalRead::from_event(
-            &event,
-            &input,
-            source.media[0].clone(),
-            4096,
-            PhysicalReadProfile
-        ),
+        PhysicalRead::from_event(&event, &input, source.media[0].clone(), 4096),
         Err(Error::Unsupported(_))
     ));
 }
@@ -282,13 +253,7 @@ fn original_requested_size_limit_precedes_clipping_the_available_prefix() {
     let input = source.input();
     let event = source.event();
     assert!(matches!(
-        PhysicalRead::from_event(
-            &event,
-            &input,
-            source.media[0].clone(),
-            1,
-            PhysicalReadProfile
-        ),
+        PhysicalRead::from_event(&event, &input, source.media[0].clone(), 1),
         Err(Error::Limit {
             requested: 12,
             maximum: 1
@@ -307,37 +272,25 @@ fn foreign_pool_source_generation_and_request_are_refused_before_allocation() {
     let before = other.used();
     let mut foreign = InputCursor::new(&other, SourceId(41), input.capabilities(), 7).unwrap();
     assert!(matches!(
-        PhysicalReader::new(
-            &mut foreign,
-            event.clone(),
-            plan.clone(),
-            4096,
-            PhysicalReadProfile
-        ),
+        PhysicalReader::new(&mut foreign, event.clone(), plan.clone(), 4096),
         Err(Error::ForeignPool)
     ));
     assert_eq!(other.used(), before);
     let mut wrong_source =
         InputCursor::new(&source.pool, SourceId(42), input.capabilities(), 7).unwrap();
     assert!(matches!(
-        PhysicalReader::new(
-            &mut wrong_source,
-            event.clone(),
-            plan.clone(),
-            4096,
-            PhysicalReadProfile
-        ),
+        PhysicalReader::new(&mut wrong_source, event.clone(), plan.clone(), 4096),
         Err(Error::SourceMismatch)
     ));
     input.request_range(1).unwrap();
     assert!(matches!(
-        PhysicalReader::new(&mut input, event.clone(), plan, 4096, PhysicalReadProfile),
+        PhysicalReader::new(&mut input, event.clone(), plan, 4096),
         Err(Error::StaleRequest { .. })
     ));
     let plan = source.plan(&input, &event);
     input.reset(0).unwrap();
     assert!(matches!(
-        PhysicalReader::new(&mut input, event, plan, 4096, PhysicalReadProfile),
+        PhysicalReader::new(&mut input, event, plan, 4096),
         Err(Error::StaleGeneration { .. })
     ));
 }
@@ -349,8 +302,7 @@ fn zero_work_neither_reads_nor_allocates_after_reader_construction() {
     let mut input = source.input();
     let event = source.event();
     let plan = source.plan(&input, &event);
-    let mut reader =
-        PhysicalReader::new(&mut input, event, plan, 4096, PhysicalReadProfile).unwrap();
+    let mut reader = PhysicalReader::new(&mut input, event, plan, 4096).unwrap();
     let before = source.pool.used();
     let position = input.position();
     for _ in 0..3 {
@@ -373,8 +325,7 @@ fn cancellation_is_sticky_and_releases_the_private_byte_buffer() {
     let event = source.event();
     let plan = source.plan(&input, &event);
     let before = source.pool.used();
-    let mut reader =
-        PhysicalReader::new(&mut input, event, plan, 4096, PhysicalReadProfile).unwrap();
+    let mut reader = PhysicalReader::new(&mut input, event, plan, 4096).unwrap();
     let cancel = AtomicBool::new(true);
     assert!(matches!(
         reader.poll(&mut input, &mut WorkBudget::new(0), &cancel),
@@ -395,8 +346,7 @@ fn freeze_pressure_retries_do_not_repeat_paid_completion_work() {
     let mut input = source.input();
     let event = source.event();
     let plan = source.plan(&input, &event);
-    let mut reader =
-        PhysicalReader::new(&mut input, event, plan, 4096, PhysicalReadProfile).unwrap();
+    let mut reader = PhysicalReader::new(&mut input, event, plan, 4096).unwrap();
     let Step::NeedInput(request) = reader
         .poll(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
@@ -449,7 +399,6 @@ fn demux_index_keeps_original_sizes_and_all_six_entries_after_short_read() {
             &source.media,
             IndexLimits::default(),
             source.context(),
-            PhysicalReadProfile,
         )
         .unwrap();
     let mut entries = Vec::new();
@@ -481,17 +430,17 @@ fn short_prefix_does_not_discard_a_later_in_source_chunk_or_guess_a_far_seek() {
     let mut next = first.clone();
     next.read = DescriptionRead::UnavailablePhysicalStart;
     next.packet.as_mut().unwrap().source_range = 758..770;
-    assert!(plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(plan.following_eof(&next));
     next.read = DescriptionRead::Available;
     next.packet.as_mut().unwrap().source_range = 699..711;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next));
     next.read = DescriptionRead::UnavailablePhysicalStart;
     next.packet.as_mut().unwrap().source_range = 759..771;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next));
     next.packet.as_mut().unwrap().source_range = 33516..33528;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next));
     next.packet.as_mut().unwrap().source_range = 747..747;
-    assert!(!plan.modeled_following_eof(&next, PhysicalReadProfile));
+    assert!(!plan.following_eof(&next));
 }
 
 #[test]
@@ -504,13 +453,7 @@ fn empty_demux_request_cannot_mint_a_zero_progress_physical_prefix() {
     let before = source.pool.used();
     let token = input.token();
     assert!(matches!(
-        PhysicalRead::from_event(
-            &event,
-            &input,
-            source.media[0].clone(),
-            16 * 1024 * 1024,
-            PhysicalReadProfile
-        ),
+        PhysicalRead::from_event(&event, &input, source.media[0].clone(), 16 * 1024 * 1024),
         Err(Error::Unsupported(_))
     ));
     assert_eq!(source.pool.used(), before);

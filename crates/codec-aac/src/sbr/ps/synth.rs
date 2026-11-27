@@ -21,7 +21,7 @@
 use super::tables as t;
 use crate::error::Result;
 use crate::fft::Cpx;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_codec::{Budget, BudgetVec};
 
 #[cfg(test)]
@@ -201,8 +201,8 @@ fn layout(big: bool) -> Layout {
 
 /// The layouts of the 20- and 34-band configurations.
 pub(super) fn layouts() -> &'static [Layout; 2] {
-    static L: OnceLock<[Layout; 2]> = OnceLock::new();
-    L.get_or_init(|| [layout(false), layout(true)])
+    static L: LazyLock<[Layout; 2]> = LazyLock::new(|| [layout(false), layout(true)]);
+    &L
 }
 
 /// Per-slot mixing matrices of one frame, per parameter band: h11, h12, h21, h22 real parts,
@@ -363,27 +363,7 @@ impl Synth {
             let f = &lay.taps[i];
             let e = &ext[band.qmf];
             let pair = f[6].im == 0.0 && f[5].im == 0.0;
-            #[cfg(feature = "simd")]
-            crate::sbr::simd::hybrid_filter(f, e, pair, out);
-            #[cfg(not(feature = "simd"))]
-            for (t, o) in out.iter_mut().enumerate() {
-                // M[t] = sum_d f[d] X[t - d], X[t'] at e[t' + 6]
-                let w = &e[t..t + 13];
-                let mut acc = Cpx::default();
-                if pair {
-                    for (c, v) in f.iter().zip(w.iter().rev()) {
-                        acc.re += c.re * v.re;
-                        acc.im += c.re * v.im;
-                    }
-                } else {
-                    for (c, v) in f.iter().zip(w.iter().rev()) {
-                        let p = c.mul(*v);
-                        acc.re += p.re;
-                        acc.im += p.im;
-                    }
-                }
-                *o = acc;
-            }
+            crate::sbr::kernels::hybrid_filter(f, e, pair, out);
         }
     }
 

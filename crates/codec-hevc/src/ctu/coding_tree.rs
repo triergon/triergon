@@ -5,12 +5,12 @@ use super::{
     Cu, PART_2NX2N, PART_2NXN, PART_2NXND, PART_2NXNU, PART_NLX2N, PART_NRX2N, PART_NX2N, PART_NXN,
     SliceDecoder,
 };
-use crate::bits::{BitCursor, BitSource};
+use crate::bits::BitCursor;
 use crate::cabac::ctx;
-use crate::error::{DecodeError, Result};
 use crate::picture::{Pixel, PuMotion};
-use crate::slice::SLICE_I;
+use crate::slice::SliceType;
 use crate::state::*;
+use crate::{DecodeError, Result};
 
 impl<P: Pixel> SliceDecoder<'_, P> {
     #[inline(never)]
@@ -196,7 +196,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             false
         };
         let mut skip = false;
-        if self.sh.slice_type != SLICE_I {
+        if self.sh.slice_type != SliceType::I {
             let mut inc = 0;
             if self.avail(x0, y0, x0 as i32 - 1, y0 as i32)
                 && self.blk(x0 - 1, y0).flags & F_SKIP != 0
@@ -238,7 +238,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             self.fill_blk(x0, y0, n, n, info(F_SKIP));
             self.prediction_unit(&cu, x0, y0, n, n, 0, true)?;
         } else {
-            let intra = if self.sh.slice_type != SLICE_I {
+            let intra = if self.sh.slice_type != SliceType::I {
                 self.cabac.decision(&mut self.c[ctx::PRED_MODE]) != 0
             } else {
                 true
@@ -402,7 +402,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
     fn pcm_sample(&mut self, x0: u32, y0: u32, log2: u32) -> Result<()> {
         let pos = self.cabac.aligned_byte_position();
         if pos > self.data.len() {
-            return Err(DecodeError::InvalidData("PCM data overrun"));
+            return Err(DecodeError::Invalid("PCM data overrun"));
         }
         let mut r = BitCursor::new(&self.data[pos..]);
         let n = 1usize << log2;
@@ -432,7 +432,9 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             }
         }
         let consumed = r.position().div_ceil(8);
-        self.cabac.restart(pos + consumed)?;
+        self.cabac
+            .restart(pos + consumed)
+            .map_err(crate::cabac::invalid_offset)?;
         Ok(())
     }
 
@@ -472,8 +474,10 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                 [cand_a, cand_b, third]
             };
             let mode = if prev[i] {
-                // Each call reads the next bypass bin (truncated unary, 9.3.3.2).
-                #[allow(clippy::same_functions_in_if_condition)]
+                #[expect(
+                    clippy::same_functions_in_if_condition,
+                    reason = "each call reads a fresh bypass bin (truncated unary, 9.3.3.2)"
+                )]
                 let idx = if self.cabac.bypass() == 0 {
                     0
                 } else if self.cabac.bypass() == 0 {

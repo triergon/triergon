@@ -29,5 +29,10 @@
   "confidence": 0.95,
   "pending_module_requirements": [],
   "open_cases": [],
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["vertical-first-lookup-ass-1080p", "vertical-first-lookup-ass-720p"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "heap", "cases": ["vertical-first-lookup-ass-1080p", "vertical-first-lookup-ass-720p"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "total_rss", "cases": ["vertical-first-lookup-ass-1080p", "vertical-first-lookup-ass-720p"], "cause": "awaiting native gate-host measurement"}
+  ],
   "parity_timeout_seconds": 120
 }

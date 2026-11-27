@@ -1,32 +1,43 @@
 //! Single-program MPEG-TS writer (ITU-T H.222.0 | ISO/IEC 13818-1) for one
 //! video elementary stream, plus a DVB SDT (ETSI EN 300 468).
 //!
-//! Cadence and layout follow the `mux` contract in `harness/capture/contract.json`:
-//! every picture is one PES whose first TS packet carries a PCR equal to DTS·300
+//! Every picture is one PES whose first TS packet carries a PCR equal to DTS·300
 //! (and the random-access indicator on key pictures); SDT/PAT/PMT precede a PES
 //! when their period elapsed in PCR time, PAT/PMT also before a key picture
 //! following a non-key picture.
 
-use crate::psi::PsiCrc32;
+use crate::pes::stream_id;
+use crate::psi::{PsiCrc32, descriptor_tag, stream_type};
+use crate::transport::pid;
 use triergon_core::{Error, Result};
 
 const PACKET: usize = 188;
-const PAT_PID: u16 = 0x0000;
-const SDT_PID: u16 = 0x0011;
 const PCR_HZ_PER_90K: i64 = 300;
 const PAT_PERIOD: i64 = 27_000_000 / 10;
 const SDT_PERIOD: i64 = 27_000_000 / 2;
 
+/// Identifiers, PIDs and service names of the single program a [`Muxer`] writes.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MuxConfig {
+    /// The 16-bit transport stream ID written in the PAT and SDT.
     pub transport_stream_id: u16,
+    /// The 16-bit original network ID written in the SDT.
     pub original_network_id: u16,
+    /// The 16-bit program number of the single program; must be nonzero.
     pub program_number: u16,
+    /// The 13-bit PID of the PMT, in 0x0020..0x1FFF.
     pub pmt_pid: u16,
+    /// The 13-bit PID of the video stream, which also carries the PCR; in 0x0020..0x1FFF and
+    /// distinct from `pmt_pid`.
     pub video_pid: u16,
-    /// 0x01 (ISO/IEC 11172-2 video, normative default) or 0x02 (FFmpeg's choice).
+    /// [`stream_type::MPEG1_VIDEO`] (the default), [`stream_type::MPEG2_VIDEO`] or
+    /// [`stream_type::H264`]; the writer does not look inside the pictures.
     pub stream_type: u8,
+    /// The SDT service provider name. Printable ASCII is written as it is; any other name
+    /// without control characters as UTF-8 behind the 0x15 selector of EN 300 468 Annex A.
     pub provider_name: String,
+    /// The SDT service name, encoded as `provider_name`. The two encoded names together
+    /// take at most 252 bytes, the room one service descriptor has.
     pub service_name: String,
 }
 
@@ -38,7 +49,7 @@ impl Default for MuxConfig {
             program_number: 1,
             pmt_pid: 0x1000,
             video_pid: 0x0100,
-            stream_type: 0x01,
+            stream_type: stream_type::MPEG1_VIDEO,
             provider_name: "Triergon".into(),
             service_name: "Service01".into(),
         }
@@ -65,37 +76,32 @@ const CC_SDT: usize = 2;
 const CC_VIDEO: usize = 3;
 
 impl Muxer {
+    /// A muxer for the program `cfg` describes, with its PAT, PMT and SDT serialised once.
+    ///
+    /// Fails with `Unsupported` when a name has a control character, the encoded names exceed
+    /// the service descriptor, the program number is 0, a PID is outside 0x0020..0x1FFF or the
+    /// two PIDs are equal, or the stream type is not 0x01, 0x02 or 0x1B.
     pub fn new(cfg: &MuxConfig) -> Result<Muxer> {
-        // One complete SDT is supported per packet: 4-byte TS header, pointer,
-        // 25 bytes of section/descriptor/CRC overhead, then the two names.
-        for name in [&cfg.provider_name, &cfg.service_name] {
-            if name.len() > 255 {
-                return Err(Error::Unsupported("service name length"));
-            }
-            if !name.bytes().all(|b| (0x20..=0x7e).contains(&b)) {
-                return Err(Error::Unsupported(
-                    "service name encoding: printable ASCII required",
-                ));
-            }
-        }
-        let names = cfg
-            .provider_name
-            .len()
-            .checked_add(cfg.service_name.len())
-            .ok_or(Error::Unsupported("service descriptor length"))?;
-        if names > PACKET - 30 {
-            return Err(Error::Unsupported("SDT exceeds one packet"));
+        let provider = service_text(&cfg.provider_name)?;
+        let service = service_text(&cfg.service_name)?;
+        // The service descriptor's 8-bit length covers the type and both length-prefixed names.
+        if provider.len() + service.len() > 255 - 3 {
+            return Err(Error::Unsupported("service descriptor length"));
         }
         if cfg.program_number == 0 {
             return Err(Error::Unsupported("zero program number"));
         }
-        if !(0x20..0x1fff).contains(&cfg.pmt_pid) || !(0x20..0x1fff).contains(&cfg.video_pid) {
+        if !(0x20..pid::NULL).contains(&cfg.pmt_pid) || !(0x20..pid::NULL).contains(&cfg.video_pid)
+        {
             return Err(Error::Unsupported("PMT/video PID must be usable13-bit PID"));
         }
         if cfg.pmt_pid == cfg.video_pid {
             return Err(Error::Unsupported("PMT/video PID collision"));
         }
-        if !matches!(cfg.stream_type, 0x01 | 0x02) {
+        if !matches!(
+            cfg.stream_type,
+            stream_type::MPEG1_VIDEO | stream_type::MPEG2_VIDEO | stream_type::H264
+        ) {
             return Err(Error::Unsupported("unselected stream type"));
         }
 
@@ -118,15 +124,18 @@ impl Muxer {
             b.push(0xFF); // reserved_future_use
             b.extend_from_slice(&cfg.program_number.to_be_bytes()); // service_id
             b.push(0xFC); // reserved, no EIT schedule / present-following
-            let provider = cfg.provider_name.as_bytes();
-            let service = cfg.service_name.as_bytes();
             let descriptor = 3 + provider.len() + service.len();
             let loop_len = 2 + descriptor;
             b.extend_from_slice(&((4u16 << 13) | loop_len as u16).to_be_bytes()); // running, not scrambled
-            b.extend_from_slice(&[0x48, descriptor as u8, 0x01, provider.len() as u8]);
-            b.extend_from_slice(provider);
+            b.extend_from_slice(&[
+                descriptor_tag::DVB_SERVICE,
+                descriptor as u8,
+                0x01,
+                provider.len() as u8,
+            ]);
+            b.extend_from_slice(&provider);
             b.push(service.len() as u8);
-            b.extend_from_slice(service);
+            b.extend_from_slice(&service);
         });
         Ok(Muxer {
             video_pid: cfg.video_pid,
@@ -147,14 +156,14 @@ impl Muxer {
         if self.last_sdt.is_none_or(|last| pcr - last >= SDT_PERIOD) {
             self.last_sdt = Some(self.last_sdt.map_or(pcr, |l| l.max(pcr)));
             let sdt = std::mem::take(&mut self.sdt);
-            self.write_section(SDT_PID, CC_SDT, &sdt, out);
+            self.write_section(pid::DVB_SDT, CC_SDT, &sdt, out);
             self.sdt = sdt;
         }
         let force = key && !self.previous_key;
         if force || self.last_pat.is_none_or(|last| pcr - last >= PAT_PERIOD) {
             self.last_pat = Some(self.last_pat.map_or(pcr, |l| l.max(pcr)));
             let (pat, pmt) = (std::mem::take(&mut self.pat), std::mem::take(&mut self.pmt));
-            self.write_section(PAT_PID, CC_PAT, &pat, out);
+            self.write_section(pid::PAT, CC_PAT, &pat, out);
             self.write_section(self.pmt_pid, CC_PMT, &pmt, out);
             (self.pat, self.pmt) = (pat, pmt);
         }
@@ -168,17 +177,39 @@ impl Muxer {
         cc
     }
 
+    /// One section from a payload unit start with a zero pointer field, continued across
+    /// further packets of `pid` when it does not fit; the last one is stuffed with 0xFF.
     fn write_section(&mut self, pid: u16, which: usize, section: &[u8], out: &mut Vec<u8>) {
         let cc = self.next_cc(which);
         let start = out.len();
         out.extend_from_slice(&[0x47, 0x40 | (pid >> 8) as u8, pid as u8, 0x10 | cc, 0x00]);
-        out.extend_from_slice(section);
+        let (first, mut rest) = section.split_at(section.len().min(PACKET - 5));
+        out.extend_from_slice(first);
         out.resize(start + PACKET, 0xFF);
+        while !rest.is_empty() {
+            let cc = self.next_cc(which);
+            let start = out.len();
+            out.extend_from_slice(&[0x47, (pid >> 8) as u8, pid as u8, 0x10 | cc]);
+            let (part, tail) = rest.split_at(rest.len().min(PACKET - 4));
+            out.extend_from_slice(part);
+            out.resize(start + PACKET, 0xFF);
+            rest = tail;
+        }
     }
 
     fn write_pes(&mut self, es: &[u8], pts: i64, dts: i64, pcr: i64, key: bool, out: &mut Vec<u8>) {
         let mut header = [0u8; 19];
-        header[..9].copy_from_slice(&[0x00, 0x00, 0x01, 0xE0, 0x00, 0x00, 0x80, 0xC0, 10]);
+        header[..9].copy_from_slice(&[
+            0x00,
+            0x00,
+            0x01,
+            stream_id::VIDEO_FIRST,
+            0x00,
+            0x00,
+            0x80,
+            0xC0,
+            10,
+        ]);
         timestamp(&mut header[9..14], 0b0011, pts);
         timestamp(&mut header[14..19], 0b0001, dts);
         let mut payload = es;
@@ -227,6 +258,26 @@ impl Muxer {
             debug_assert_eq!(out.len() - packet_start, PACKET);
         }
     }
+}
+
+/// `name` as EN 300 468 Annex A text: printable ASCII as it is (the default character
+/// table agrees with ASCII there), any other text as UTF-8 behind the 0x15 selector.
+/// Control characters, which the table assigns to presentation codes, are refused.
+fn service_text(name: &str) -> Result<Vec<u8>> {
+    if name.chars().any(char::is_control) {
+        return Err(Error::Unsupported(
+            "service name encoding: control character",
+        ));
+    }
+    let mut text = Vec::new();
+    if !name.bytes().all(|b| (0x20..=0x7e).contains(&b)) {
+        text.push(0x15);
+    }
+    text.extend_from_slice(name.as_bytes());
+    if text.len() > 255 {
+        return Err(Error::Unsupported("service name length"));
+    }
+    Ok(text)
 }
 
 /// Build a long-form PSI/SI section with version 0, current, section 0 of 0.
@@ -279,7 +330,7 @@ mod tests {
     #[test]
     fn tables_match_observed_layout() {
         let ffmpeg = MuxConfig {
-            stream_type: 0x02,
+            stream_type: stream_type::MPEG2_VIDEO,
             provider_name: "FFmpeg".into(),
             ..MuxConfig::default()
         };
@@ -290,6 +341,73 @@ mod tests {
         assert!(hex(&m.sdt).starts_with(
             "42f0250001c10000ff01ff0001fc80144812010646466d70656709536572766963653031777c43"
         ));
+    }
+
+    #[test]
+    fn avc_stream_type_is_written_to_the_pmt() {
+        let m = Muxer::new(&MuxConfig {
+            stream_type: stream_type::H264,
+            ..MuxConfig::default()
+        })
+        .unwrap();
+        assert_eq!(m.pmt[12], stream_type::H264);
+        assert_eq!(PsiCrc32::of(&m.pmt), 0);
+    }
+
+    #[test]
+    fn names_outside_ascii_are_utf8_behind_the_annex_a_selector() {
+        let m = Muxer::new(&MuxConfig {
+            service_name: "Caf\u{e9}".into(),
+            ..MuxConfig::default()
+        })
+        .unwrap();
+        let service = [6, 0x15, b'C', b'a', b'f', 0xc3, 0xa9];
+        assert!(m.sdt.windows(service.len()).any(|w| w == service));
+        assert_eq!(PsiCrc32::of(&m.sdt), 0);
+        let refused = Muxer::new(&MuxConfig {
+            provider_name: "Test\tLab".into(),
+            ..MuxConfig::default()
+        });
+        assert_eq!(
+            refused.unwrap_err(),
+            Error::Unsupported("service name encoding: control character")
+        );
+    }
+
+    #[test]
+    fn an_sdt_longer_than_one_packet_continues_on_the_next() {
+        let config = MuxConfig {
+            provider_name: "P".repeat(80),
+            service_name: "S".repeat(79),
+            ..MuxConfig::default()
+        };
+        let mut m = Muxer::new(&config).unwrap();
+        assert!(m.sdt.len() > PACKET - 5);
+        let mut out = Vec::new();
+        m.write_picture(&[0; 10], 3000, 0, true, &mut out);
+        let sdt: Vec<&[u8]> = out
+            .chunks(PACKET)
+            .filter(|p| u16::from_be_bytes([p[1] & 0x1F, p[2]]) == pid::DVB_SDT)
+            .collect();
+        assert_eq!(sdt.len(), 2);
+        assert_eq!((sdt[0][1] & 0x40, sdt[1][1] & 0x40), (0x40, 0));
+        assert_eq!((sdt[0][3] & 0x0F, sdt[1][3] & 0x0F), (0, 1));
+        let mut section = sdt[0][5..].to_vec();
+        section.extend_from_slice(&sdt[1][4..]);
+        section.truncate(m.sdt.len());
+        assert_eq!(section, m.sdt);
+        assert!(
+            sdt[1][4 + m.sdt.len() - (PACKET - 5)..]
+                .iter()
+                .all(|&b| b == 0xFF)
+        );
+        assert!(
+            Muxer::new(&MuxConfig {
+                service_name: "S".repeat(173),
+                ..config
+            })
+            .is_err()
+        );
     }
 
     #[test]

@@ -2,9 +2,9 @@
 //! 8.3): one second-order lattice LMS predictor per spectral line, state kept in 16-bit
 //! (bfloat-like) precision with the rounding modes the standard prescribes.
 
-use crate::ics::{ChannelData, CoreCfg, EIGHT_SHORT, NOISE_HCB};
+use crate::ics::{ChannelData, CoreCfg, NOISE_HCB, WindowSequence};
 use crate::tables::PRED_SFB_MAX;
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 const ALPHA: f32 = 0.90625;
 const A: f32 = 0.953125;
@@ -34,7 +34,7 @@ pub(crate) struct PredState {
 }
 
 impl PredState {
-    pub(crate) fn new(budget: &Budget) -> Result<PredState, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<PredState, Error> {
         Ok(PredState {
             s: BudgetVec::try_filled(budget, RESET, 1024)?,
         })
@@ -92,7 +92,7 @@ fn predict(p: &mut P, coef: &mut f32, enable: bool) {
 
 pub(crate) fn apply(ps: &mut PredState, cd: &mut ChannelData, cfg: &CoreCfg) {
     let info = cd.info;
-    if info.window_sequence == EIGHT_SHORT {
+    if info.window_sequence == WindowSequence::EightShort {
         ps.s.fill(RESET);
         return;
     }

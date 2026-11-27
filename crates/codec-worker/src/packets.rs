@@ -4,7 +4,7 @@
 //! FORMAT names the reader as FFmpeg is told the demuxer: `ogg` opens
 //! `triergon_ogg::BlockingReader`; `flac`, `mp3`, `aac`, `ac3` and `eac3` open the
 //! `triergon_elementary` reader of that format; `mov` opens the neutral ISO BMFF reader
-//! and prints what [`super::isobmff_packets`] describes. Each packet line holds exactly what the
+//! and prints what the `isobmff_packets` module describes. Each packet line holds exactly what the
 //! reader reports: the track index, `pts`, `dts`, `duration` and `trim_start`/`trim_end`
 //! in the packet's time base, the payload size, the source position (Ogg: the page that
 //! completes the packet; elementary streams: the first byte) and whether the access unit
@@ -31,7 +31,8 @@ use std::sync::atomic::AtomicBool;
 use triergon::elementary::{self, Ac3, Adts, Flac, Format, MpegAudio};
 use triergon::ogg::{self, compat::clock};
 use triergon::{
-    Event, PacketInfo, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest, Time, TimeBase, TrackInfo,
+    CodecId, Event, PacketInfo, SeekMethod, SeekPolicy, SeekReceipt, SeekRequest, Time, TimeBase,
+    TrackInfo,
 };
 
 /// One packet as the reader reports it.
@@ -101,15 +102,18 @@ impl Row {
     }
 }
 
-pub(super) fn field(line: &mut String, name: &str, value: &str) {
+/// Append `,"name":value` to a JSON object being written, `value` already encoded.
+pub fn field(line: &mut String, name: &str, value: &str) {
     let _ = write!(line, ",\"{name}\":{value}");
 }
 
-pub(super) fn number(value: Option<i64>) -> String {
+/// A JSON number, or `null` for an absent value.
+pub fn number(value: Option<i64>) -> String {
     value.map_or_else(|| "null".to_owned(), |v| v.to_string())
 }
 
-pub(super) fn time_base(base: TimeBase) -> String {
+/// A time base as the JSON pair `[numerator,denominator]`.
+pub fn time_base(base: TimeBase) -> String {
     format!("[{},{}]", base.numerator(), base.denominator())
 }
 
@@ -131,15 +135,27 @@ pub(super) fn string(text: &str) -> String {
     out
 }
 
-pub(super) fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
+/// One track of the final line: its index, codec and codec tag, then `extra`, a run
+/// of `,"name":value` fields.
+pub fn track_line(index: usize, track: &dyn TrackInfo, extra: &str) -> String {
+    // An unnamed codec prints with its tag.
+    let codec = match track.codec() {
+        CodecId::Other => format!("Other({:?})", track.codec_tag()),
+        codec => format!("{codec:?}"),
+    };
     format!(
         "{{\"index\":{index},\"codec\":{},\"codec_tag\":{}{extra}}}",
-        string(&format!("{:?}", track.codec())),
+        string(&codec),
         string(&String::from_utf8_lossy(track.codec_tag())),
     )
 }
 
-pub(super) fn finish(
+/// The final line: the tracks and how reading ended.
+///
+/// # Errors
+///
+/// When `out` fails.
+pub fn finish(
     out: &mut impl Write,
     tracks: &[String],
     end: Result<(), triergon::Error>,
@@ -152,7 +168,7 @@ pub(super) fn finish(
 }
 
 /// A seek of `ogg_packets`: the track index, the target and the policy.
-pub struct Seek {
+pub(crate) struct Seek {
     track: usize,
     target: Time,
     policy: SeekPolicy,
@@ -160,7 +176,7 @@ pub struct Seek {
 
 impl Seek {
     /// `TRACK SECONDS POLICY` as `seek` takes them.
-    pub fn parse(track: &str, seconds: &str, policy: &str) -> Result<Seek, String> {
+    pub(crate) fn parse(track: &str, seconds: &str, policy: &str) -> Result<Seek, String> {
         let track = track.parse().map_err(|_| format!("track {track}"))?;
         let (whole, fraction) = seconds.split_once('.').unwrap_or((seconds, ""));
         let digits = format!("{whole}{fraction}");
@@ -203,7 +219,7 @@ fn receipt_line(receipt: &SeekReceipt) -> String {
 
 fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io::Result<()> {
     let cancel = AtomicBool::new(false);
-    let mut reader = match ogg::BlockingReader::open(BufReader::new(file), ogg::Limits::default()) {
+    let mut reader = match clock::open_seekable(BufReader::new(file), ogg::Limits::default()) {
         Ok(reader) => reader,
         Err(error) => return finish(out, &[], Err(error)),
     };
@@ -229,7 +245,7 @@ fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io
         match reader.next_event(&cancel) {
             Ok(Some(Event::Packet(packet))) => {
                 let mut row = Row::of(&packet, packet.track_index(), packet.page_offset(), true);
-                row.compat = Some(clock::packet_timing(&packet));
+                row.compat = clock::packet_timing(&packet);
                 row.granule = packet.granule();
                 row.write(out)?;
             }
@@ -264,7 +280,8 @@ fn ogg_packets(file: File, seek: Option<&Seek>, out: &mut impl Write) -> std::io
 }
 
 fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::Result<()> {
-    let mut reader = match elementary::BlockingReader::<F, _>::open(
+    let cancel = AtomicBool::new(false);
+    let mut reader = match elementary::BlockingReader::<F, _>::open_seekable(
         BufReader::new(file),
         elementary::Limits::default(),
     ) {
@@ -272,7 +289,7 @@ fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::R
         Err(error) => return finish(out, &[], Err(error)),
     };
     let end = loop {
-        match reader.next_packet() {
+        match reader.next_packet(&cancel) {
             Ok(Some(packet)) => {
                 Row::of(&packet, 0, packet.offset(), packet.is_complete()).write(out)?;
             }
@@ -295,7 +312,7 @@ fn elementary_packets<F: Format>(file: File, out: &mut impl Write) -> std::io::R
 /// Print the packets of `path` read as `format`, after the seek `seek` names (only
 /// `mov` seeks this way; Ogg seeks through [`seek`]); `Err` for an unknown format, an
 /// unreadable file or a bad seek.
-pub fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
+pub(crate) fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
     if let Some(seek) = seek
         && format != "mov"
     {
@@ -322,7 +339,7 @@ pub fn run(format: &str, path: &str, seek: Option<&str>) -> Result<(), String> {
 
 /// Print the receipt of `seek` in the Ogg file `path` and every event after it;
 /// `Err` for another format or an unreadable file.
-pub fn seek(format: &str, path: &str, seek: &Seek) -> Result<(), String> {
+pub(crate) fn seek(format: &str, path: &str, seek: &Seek) -> Result<(), String> {
     if format != "ogg" {
         return Err(format!("seek: no seeking reader for {format}"));
     }

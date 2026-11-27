@@ -19,6 +19,11 @@
     "aarch64-unknown-linux-gnu",
     "thumbv7neon-unknown-linux-gnueabihf"
   ],
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["vobsub-ifo-palette-sector-past-eof", "vobsub-ifo-palette-pgc-past-eof", "vobsub-ifo-palette-sector-overflow"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "heap", "cases": ["vobsub-ifo-palette-sector-past-eof", "vobsub-ifo-palette-pgc-past-eof", "vobsub-ifo-palette-sector-overflow"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "total_rss", "cases": ["vobsub-ifo-palette-sector-past-eof", "vobsub-ifo-palette-pgc-past-eof", "vobsub-ifo-palette-sector-overflow"], "cause": "awaiting native gate-host measurement"}
+  ],
   "iterations": 50,
   "minimum_pairs": 30,
   "confidence": 0.95

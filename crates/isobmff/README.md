@@ -2,10 +2,11 @@
 
 Bounded, incremental reader for ISO base media files: MP4, QuickTime MOV and
 fragmented MP4. It is a format-layer crate built on `triergon-core` (input
-cursor, budgets, exact time) and uses `triergon-framing` only for AC-3/E-AC-3
-configuration in encoded edit plans. It parses boxes, sample tables, fragments,
-edit lists and seek indexes, and reads sample payloads by byte range. It does no
-I/O of its own, decodes no codec, and does not apply edits to presentation.
+cursor, budgets, exact time) and uses `triergon-framing` for the AAC, AC-3 and
+Opus configuration parsers its FFmpeg-compatible encoded views read. It parses
+boxes, sample tables, fragments, edit lists and seek indexes, and reads sample
+payloads by byte range. It does no I/O of its own, decodes no codec, and does not
+apply edits to presentation.
 
 `Reader` implements the core `ContainerReader` over the source view, so the crate
 works in generic code and inside `triergon::AnyReader`. The parts below stay
@@ -25,13 +26,51 @@ available for finer control. The crate exposes two views of the same file:
 
 - `reference-trace` (off by default): values that only make sense when comparing
   traces with FFmpeg, such as its return codes, log lines and models of its input
-  layer, under `reference_trace::mov`. `examples/isobmff_consumer_worker.rs` needs it.
+  layer, under `reference_trace::mov`. `examples/isobmff_consumer_worker/main.rs` needs it.
 
 ## Usage
 
 All parsers are polled. Each `poll` takes a `WorkBudget` (and usually a cancel
 flag) and returns `Yield`, a result, or `Step::NeedInput` for the shared
 `InputCursor` to satisfy.
+
+Read every packet through the neutral container reader:
+
+```rust
+use std::sync::atomic::AtomicBool;
+use triergon_core::container::{ContainerReader, Event, PacketInfo};
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_isobmff::{Reader, ReaderLimits};
+
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/r-multitrack.mov");
+let file = std::fs::read(path)?; // any transport; the reader does no I/O
+let pool = Budget::new(64 << 20)?;
+let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
+let mut reader = Reader::new(&pool, SourceId(1), caps, ReaderLimits::default(), 64 * 1024)?;
+let cancel = AtomicBool::new(false);
+let mut bytes_read = 0;
+loop {
+    match reader.step(&mut WorkBudget::new(1 << 16), &cancel)? {
+        // packet.track(), packet.pts(), packet.dts(), packet.random_access(), packet.sample()
+        Step::Ready(Event::Packet(packet)) => bytes_read += packet.payload().len(),
+        Step::Ready(_) => {} // root boxes, tracks becoming available, seek receipts
+        Step::NeedInput(req) => match file.get(usize::try_from(req.offset)?..) {
+            Some(rest) if !rest.is_empty() => {
+                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+                reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
+            }
+            _ => reader.finish(req.source, req.token)?,
+        },
+        Step::Yield => {} // step budget spent
+        Step::Backpressure(_) => {} // drop retained packets, then step again
+        Step::End(_) => break,
+    }
+}
+assert!(bytes_read > 0 && !reader.tracks().is_empty());
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Read one sample through the box and sample readers:
 
 ```rust
 use std::sync::atomic::AtomicBool;
@@ -40,8 +79,10 @@ use triergon_core::{
     Step, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, Limits, SampleReader, SampleStep,
-    SampleTableBuilder,
+    BuildStatus, Limits, Next,
+    boxes::{BoxEvent, BoxReader, BoxView},
+    payload::SampleReader,
+    table::SampleTableBuilder,
 };
 
 # let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/r-multitrack.mov");
@@ -82,9 +123,9 @@ let child = |parent: &BoxView, kind: &[u8; 4]| -> triergon_core::Result<BoxView>
     let mut children = parent.children(0, Limits::default())?;
     loop {
         match children.poll(&mut WorkBudget::new(1 << 16))? {
-            BoxStep::Box(b) if &b.header().kind == kind => return Ok(b),
-            BoxStep::Box(_) | BoxStep::Yield => {}
-            BoxStep::End => return Err(Error::Invalid("missing box")),
+            Next::Item(b) if &b.header().kind == kind => return Ok(b),
+            Next::Item(_) | Next::Yield => {}
+            Next::End => return Err(Error::Invalid("missing box")),
         }
     }
 };
@@ -101,9 +142,9 @@ let mdat = mdat.ok_or("no mdat")?;
 let mut samples = table.cursor();
 loop {
     let sample = match samples.poll(&mut work)? {
-        SampleStep::Sample(sample) => sample,
-        SampleStep::Yield => { work = WorkBudget::new(1 << 16); continue }
-        SampleStep::End => break,
+        Next::Item(sample) => sample,
+        Next::Yield => { work = WorkBudget::new(1 << 16); continue }
+        Next::End => break,
     };
     let mut read = SampleReader::new(&mut input, sample, mdat.clone(), 1 << 20)?;
     let packet = loop {
@@ -124,24 +165,25 @@ of all tracks in file order through `PhysicalSampleCursor`.
 
 | Task | Entry points |
 | --- | --- |
-| Box framing | `BoxReader`, `BoxView::children`, `BoxChildren` |
-| Movie/track headers | `MovieHeader::parse`, `MovieHeader::declared_duration_ticks`, `TrackHeader::parse`, `SampleDescription` |
-| Regular sample tables | `SampleTableBuilder` → `SampleTable::{cursor, locate, previous_sync}` |
-| Fragments (`moof`/`traf`) | `Trex::parse`, `FragmentBuilder` → `FragmentIndex`, `OwnedFragmentCursor` |
-| One track, regular + fragments | `SourceTrack`, `TrackSampleCursor` |
-| All tracks in file order | `PhysicalSampleCursor::new_with_media_extents` |
-| Payload bytes | `SampleReader::{new, new_with_shared_window, new_terminal_mdat}` |
-| Edit lists | `EditList::parse`, `EditEntry::map_rate_one`, `MovieEditLocator` |
-| Seek | `SourceSeekPlanner`, `MovieSourceSeekPlanner`, `SourceCompositionLookup` |
-| Segment/fragment indexes | `SegmentIndex` (`sidx`), `TrackFragmentRandomAccess` (`tfra`), `MovieFragmentRandomAccessTail` (`mfro`) |
-| Recovery groups | `RecoveryDescriptions` (`sgpd`), `RecoveryMappings` (`sbgp`), `RecoveryLookup` |
-| Codec configuration | `SampleDescription::extensions`, `AacConfigurationJob`, `ObjectTypeScan`, `check_dts_core_description`, `QtSoundDescriptionV0` |
-| Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations |
+| Box framing | `boxes::{BoxReader, BoxView, BoxChildren}` |
+| Movie/track headers | `movie::{MovieHeader, TrackHeader, SampleDescription}` |
+| Regular sample tables | `table::SampleTableBuilder` → `table::SampleTable::{cursor, locate, previous_sync}` |
+| Fragments (`moof`/`traf`) | `fragment::{Trex, FragmentBuilder}` → `fragment::{FragmentIndex, OwnedFragmentCursor}` |
+| One track, regular + fragments | `interleave::{SourceTrack, TrackSampleCursor}` |
+| All tracks in file order | `interleave::PhysicalSampleCursor::new_with_media_extents` |
+| Payload bytes | `payload::SampleReader::{new, new_with_shared_window, new_terminal_mdat}` |
+| Edit lists | `movie::{EditList, EditEntry}`, `seek::MovieEditLocator` |
+| Seek | `seek::{SourceSeekPlanner, MovieSourceSeekPlanner, SourceCompositionLookup}` |
+| Segment/fragment indexes | `index::{SegmentIndex, TrackFragmentRandomAccess, MovieFragmentRandomAccessTail}` (`sidx`, `tfra`, `mfro`) |
+| Recovery groups | `sample_groups::{RecoveryDescriptions, RecoveryMappings, RecoveryLookup}` (`sgpd`, `sbgp`) |
+| Codec configuration | `SampleDescription::extensions`, `config::{AacConfigurationJob, ObjectTypeScan, check_dts_core_description}` |
+| QuickTime sound | `quicktime::{SoundDescriptionV0, PcmSampleReader}` |
+| Whole movie | `open::MovieOpen` → `open::Movie`, under `open::OpenLimits`; `new_progressive` stops at the first media after a front movie, `new_recovery` admits terminal media declarations. On a source without random access `new` keeps up to 32 KiB of media that precedes `moov` (`Movie::media_cache`, `open::CachedMedia`); `open::box_reader` and `open::PendingMedia` read the later root boxes and such media for a caller that continues after the open |
 | Neutral reader | `Reader`, `ReaderLimits`, `Track`, `Packet`, `ReaderEvent` |
 | FFmpeg-compatible packets | `compat::mov::packets::{PacketCursor, StreamView}`, `compat::mov::edits::EditCursor` |
 | FFmpeg-compatible seek | `compat::mov::seek::{IndexCursor, SeekJob, GlobalSeekJob}` |
 | FFmpeg-compatible recovery | `compat::mov::recovery::{RecoveryTrackHeader, RunRecoveryBuilder, PartialSampleReader}` |
-| Encoded tracks | `compat::mov::encoded::EncodedStreamJob`, `compat::mov::edits::EncodedEditJob` |
+| Encoded tracks | `compat::mov::encoded::EncodedStreamJob`, `compat::mov::edits::EncodedEditJob`; `compat::mov::edits::DemuxEditsJob` plans every edited audio and video track of a movie once and the movie keeps the plans |
 
 `SampleReader::new_with_shared_window` returns a view of a complete sample in an
 existing shared input window and retains the window's budget charge; samples split
@@ -149,17 +191,41 @@ across windows use a bounded packet buffer.
 
 ## Container reader
 
-`Reader::new` takes a seekable source, runs `open::MovieOpen` over it and then
-delivers samples in ascending byte order across tracks, each track in decode order.
-It retains `moov` and each `moof` under `ReaderLimits` (largest sample 64 MiB by
-default) and shares a sample's window where the whole sample fits in one.
+`Reader::new` runs `open::MovieOpen` over the source and then delivers samples in
+ascending byte order across tracks, each track in decode order. It reads under
+`ReaderLimits` (largest sample 64 MiB by default) and shares a sample's window where
+the whole sample fits in one. How it reads is chosen once, from the source's
+capabilities:
+
+| Source | The open reads | Samples are read |
+|---|---|---|
+| With random access | every root box, wherever `moov` lies; `moov` and each `moof` are retained | by a range request each |
+| Without (a pipe) | through the header of the first `mdat`, which `moov` must precede | as their bytes arrive; the bytes between two samples are passed over, and each later `moof` is indexed when the cursor reaches it |
+
+Without random access:
+
+- An `mdat` before `moov` is refused at its header
+  (`Error::Unsupported("progressive MP4 needs front metadata")`): its samples would
+  lie behind the cursor once `moov` named them. So is a `moof` before `moov`.
+- A sample that starts before the read position is
+  `Error::Unsupported("sample before the read position needs random access")`: a
+  track whose chunks go back in the file, two samples that share bytes, a fragment
+  whose samples precede its `moof`. A sample without bytes is delivered wherever the
+  cursor is.
+- A `moof` and its index are held until their samples are delivered, so memory does
+  not grow with the source, and `OpenLimits::roots` and `fragments` bound the open,
+  not the boxes after it. `Reader::media_extents` is the first `mdat`.
+- `ReaderEvent::Box` for an `mdat` follows its samples; one of size zero is passed at
+  the end of the source, which the reader reads to.
+- `request_seek` fails with the cursor's `Error::Unsupported("random-access input")`
+  and delivery goes on. `reset` restarts at offset zero.
 
 | Neutral item | ISO BMFF source |
 |---|---|
 | `TrackId` | `track_ID` |
 | `MediaKind` | `hdlr` handler; an unlisted handler is `MediaKind::Unknown` |
 | `codec_tag` | The first sample entry code |
-| `codec` | One mapping from handler and entry code, plus the object type `esds` states for `mp4a`. Anything else is `CodecId::Other` with the entry code |
+| `codec` | One mapping from handler and entry code, plus the object type `esds` states for `mp4a`. An unknown entry has `CodecId::Other` and retains its code in `codec_tag` |
 | `configuration` | The payload of `avcC`, `hvcC`, `av1C`, `vpcC`, `dac3`, `dec3` or `ddts`; AudioSpecificConfig for AAC; empty if the record is absent; the whole sample entry payload for any other entry |
 | `language` | The ISO 639-2/T code in `mdhd`; `None` for a QuickTime language code |
 | `pts`, `dts`, `duration` | Ticks of the media timescale, from the sample tables or `trun` and `tfdt`; the duration is the decode delta |
@@ -174,11 +240,11 @@ available through `SampleDescription::extensions`. See the
 `request_seek` finds the latest stated sync sample presented at or before the target
 on the track's media clock, or the first one if none is, without reading media. It
 reports `SeekMethod::Index`. Other tracks resume at their first sample at or after
-that time, which may not be a sync sample.
+that time, which may not be a sync sample. Fragment seeks keep each track’s
+own decode and presentation clocks.
 
 Limits of the reader:
 
-- Forward-only sources are refused, because `mdat` can precede the metadata.
 - Edit lists are not applied: times are media times and the list is on
   `Track::edits`. `compat::mov` gives FFmpeg's edited packets.
 - `TrackInfo` describes the first sample entry; `Packet::sample` names each
@@ -188,8 +254,10 @@ Limits of the reader:
   and `Reader::movie_box`.
 - External data references and media outside an `mdat` are refused; only a `url `
   entry flagged self-contained counts as this file. An empty `traf` fails the open.
-- A fragment without `tfdt` has `None` times and cannot be a seek landing. Times
-  beyond `i64` fail with `Error::Overflow`.
+- A fragment without `tfdt` starts where its track's preceding samples end: the
+  preceding fragment, or the `moov` table (zero when it is empty). After a fragment
+  whose times are unknown its times are unknown too, and it cannot be a seek landing.
+  Times beyond `i64` fail with `Error::Overflow`.
 - Encrypted entries (`encv`, `enca`), unwalkable QuickTime `mp4a` layouts and object
   types other than AAC or DTS with a core report `CodecId::Other`.
 
@@ -204,11 +272,20 @@ Limits of the reader:
 | Edit lists | `elst` v0/v1; empty edits; rate-one point mapping |
 | Seek and indexes | sync/preroll plans, movie-time and composition targets, `sidx`, `tfra`/`mfro`, `roll`/`prol` groups |
 | Codec configuration | AAC `AudioSpecificConfig` (incl. QuickTime `wave`), DTS core signalling, AC-3/E-AC-3, opaque `avcC`/`hvcC`/`av1C`/`vpcC` |
-| QuickTime PCM | v0 unsigned 8-bit and signed 16-bit big-endian (`QtPcmSampleReaderV0`) |
+| QuickTime PCM | Unsigned 8-bit, signed 8-bit and signed 16-bit big-endian. `quicktime::PcmSampleReader` reads version 0. `compat::mov::pcm::PcmCursor` also accepts uncompressed version 1 and packed, interleaved version 2 `lpcm` in these encodings. `PcmDescription` gives the frame size, channel count, source sample rate and original entry. |
 | FFmpeg-compatible view | AVC, HEVC, AV1, VP9, AAC, AC-3, E-AC-3, DTS (`compat::mov::encoded::EncodedEntryKind`), raw video, `tx3g`, PCM |
 
 `AacConfigurationJob` returns the AudioSpecificConfig bytes of an `mp4a` entry
 (including QuickTime v1/v2 `wave`) unvalidated; callers determine the object type.
+The MOV metadata view accepts a QuickTime MPEG-4 audio `wave` with its `esds`
+and no optional `frma` format atom.
+Empty `sbgp` runs associate no samples. Samples beyond the last run use the group
+default when present. The recovery view retains the version-1 grouping type
+parameter with its mapping. It skips unknown grouping types and refuses groups
+that can change the demux view's key-frame flags. A version-1 `sgpd` can state
+the length of each recovery description individually. The dependency view can report
+`sdtp` flags for tracks with their own roll groups. `EncodedCreationSource` gives the
+media header time and the creation tag the metadata view reports.
 
 ## Behaviour and limits
 
@@ -226,19 +303,23 @@ Limits of the reader:
   `FragmentContext::decode_origin` has unknown DTS/CTS, not zero.
   `CompositionOffset` keeps version, raw bits and the signed reading separate;
   an absent offset differs from an explicit zero.
-- **Table policies.** By default timing runs must cover the sample count exactly
-  and an out-of-range `stss` entry is refused. `SampleTableBuilder` can opt into
-  `TimingRunPolicy::BoundedPrefix` (QuickTime-style overlong runs, reported by
-  `SampleTable::timing_run_surplus`) and `SyncSamplePolicy::BoundedPrefix` (unused
-  entries counted by `SampleTable::unused_sync_entries`, never seek points). The
-  source seek planners and default physical cursors require exact coverage.
+- **Table policies.** A sample's times come from the `stts` and `ctts` runs that
+  cover it, and ISO/IEC 14496-12 puts no rule on what the runs total: by default
+  the runs of a nonempty table may count more samples than it has, the rest is not
+  read, and `SampleTable::timing_run_surplus` reports it. Runs that leave a sample
+  uncovered are refused. `TimingRunPolicy::Strict` refuses surplus runs too, for a
+  caller that checks a file's consistency. By default an out-of-range `stss` entry
+  is refused; `SyncSamplePolicy::BoundedPrefix` counts such entries in
+  `SampleTable::unused_sync_entries` and never seeks to them.
 - **Payload ranges.** `SampleReader::new` requires the sample inside the caller's
   `mdat` payload extent; `PhysicalSampleCursor::new_with_media_extents` checks every
   track first and returns `Unsupported` for valid backward-ordered layouts. Physical
   order and per-track decode order cannot both be maintained in such a track. After
-  this refusal, `resume_in_track_order` can traverse the validated samples in track
-  order; payload access may require backward range requests. It cannot resume when
-  media validation was deferred.
+  this refusal, `resume_in_decode_order` continues the merge with every track in
+  decode order, taking the track whose next sample starts first, and
+  `resume_in_track_order` traverses the validated samples track by track; payload
+  access may require backward range requests. Neither can resume when media validation
+  was deferred.
 - **Edits.** Source edit lists are parsed and mapped at rate one only; non-unit
   rates and dwell edits are refused. The source view never repeats or shifts
   packets; the FFmpeg-compatible view does, including AAC and Opus trim for range
@@ -247,10 +328,17 @@ Limits of the reader:
 - **Seek.** Seek planners select a preceding container sync sample, record
   available and missing preroll, and validate every media range before publishing
   a plan. A sync sample is a container fact, not proof of decoder recovery. `sidx`
-  and `tfra` entries are hints, not verified against the media.
-- **Refusals.** Unknown box versions, unknown flags, unselected `stz2` widths,
-  non-unit edits and unobserved FFmpeg-compatible profiles return
-  `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.
+  and `tfra` entries are hints, not verified against the media. The
+  FFmpeg-compatible `SeekJob` lands on the last key entry at or before the target
+  in index order, also where repeated edits put earlier times after later ones. As
+  the demuxer does, it first lowers the target of an unedited track by the track's
+  composition shift, the largest amount by which a composition time the demuxer took
+  into account precedes its decode time. Its index times are the demuxer's signed
+  64-bit field: a decode time from 2^63 on (a version-1 `tfdt` is unsigned) reads
+  there as a negative time and is compared as one.
+- **Refusals.** Unknown box versions, unknown flags, `stz2` widths other than 4, 8
+  and 16, non-unit edits and inputs the FFmpeg-compatible views do not reproduce
+  return `Error::Unsupported`. Structural damage returns `Invalid` or `Truncated`.
   Readers keep a failure sticky; build a new reader to continue.
 - **Not handled.** External data references (`dref` URLs), encryption,
   metadata (`udta`/`meta`) interpretation, decoder recovery and muxing.

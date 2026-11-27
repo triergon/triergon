@@ -2,7 +2,7 @@ pub type OpenWindowCase = (&'static [u8], usize, u64, u64, u64, bool);
 
 pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
     (
-        include_bytes!("../fixtures/transport-v3/geometry-00.mov"),
+        include_bytes!("../fixtures/transport/geometry-00.mov"),
         1,
         675,
         1,
@@ -10,7 +10,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-00.mov"),
+        include_bytes!("../fixtures/transport/geometry-00.mov"),
         3,
         676,
         2,
@@ -18,7 +18,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-00.mov"),
+        include_bytes!("../fixtures/transport/geometry-00.mov"),
         64,
         729,
         10,
@@ -26,7 +26,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-00.mov"),
+        include_bytes!("../fixtures/transport/geometry-00.mov"),
         65536,
         747,
         675,
@@ -34,7 +34,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-01.mov"),
+        include_bytes!("../fixtures/transport/geometry-01.mov"),
         1,
         683,
         1,
@@ -42,7 +42,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-01.mov"),
+        include_bytes!("../fixtures/transport/geometry-01.mov"),
         3,
         684,
         2,
@@ -50,7 +50,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-01.mov"),
+        include_bytes!("../fixtures/transport/geometry-01.mov"),
         64,
         736,
         11,
@@ -58,7 +58,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-01.mov"),
+        include_bytes!("../fixtures/transport/geometry-01.mov"),
         65536,
         755,
         683,
@@ -66,7 +66,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-02.mov"),
+        include_bytes!("../fixtures/transport/geometry-02.mov"),
         1,
         683,
         1,
@@ -74,7 +74,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-02.mov"),
+        include_bytes!("../fixtures/transport/geometry-02.mov"),
         3,
         685,
         1,
@@ -82,7 +82,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-02.mov"),
+        include_bytes!("../fixtures/transport/geometry-02.mov"),
         64,
         729,
         18,
@@ -90,7 +90,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-02.mov"),
+        include_bytes!("../fixtures/transport/geometry-02.mov"),
         65536,
         755,
         683,
@@ -98,7 +98,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-03.mov"),
+        include_bytes!("../fixtures/transport/geometry-03.mov"),
         1,
         683,
         1,
@@ -106,7 +106,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-03.mov"),
+        include_bytes!("../fixtures/transport/geometry-03.mov"),
         3,
         685,
         1,
@@ -114,7 +114,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-03.mov"),
+        include_bytes!("../fixtures/transport/geometry-03.mov"),
         64,
         729,
         18,
@@ -122,7 +122,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-03.mov"),
+        include_bytes!("../fixtures/transport/geometry-03.mov"),
         65536,
         755,
         683,
@@ -130,7 +130,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-04.mov"),
+        include_bytes!("../fixtures/transport/geometry-04.mov"),
         1,
         684,
         1,
@@ -138,7 +138,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-04.mov"),
+        include_bytes!("../fixtures/transport/geometry-04.mov"),
         3,
         685,
         2,
@@ -146,7 +146,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-04.mov"),
+        include_bytes!("../fixtures/transport/geometry-04.mov"),
         64,
         736,
         12,
@@ -154,7 +154,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-04.mov"),
+        include_bytes!("../fixtures/transport/geometry-04.mov"),
         65536,
         756,
         684,
@@ -162,7 +162,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-05.mov"),
+        include_bytes!("../fixtures/transport/geometry-05.mov"),
         1,
         684,
         1,
@@ -170,7 +170,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-05.mov"),
+        include_bytes!("../fixtures/transport/geometry-05.mov"),
         3,
         685,
         2,
@@ -178,7 +178,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-05.mov"),
+        include_bytes!("../fixtures/transport/geometry-05.mov"),
         64,
         729,
         19,
@@ -186,7 +186,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-05.mov"),
+        include_bytes!("../fixtures/transport/geometry-05.mov"),
         65536,
         756,
         684,
@@ -194,7 +194,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-06.mov"),
+        include_bytes!("../fixtures/transport/geometry-06.mov"),
         1,
         684,
         1,
@@ -202,7 +202,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-06.mov"),
+        include_bytes!("../fixtures/transport/geometry-06.mov"),
         3,
         685,
         2,
@@ -210,7 +210,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-06.mov"),
+        include_bytes!("../fixtures/transport/geometry-06.mov"),
         64,
         729,
         19,
@@ -218,7 +218,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-06.mov"),
+        include_bytes!("../fixtures/transport/geometry-06.mov"),
         65536,
         756,
         684,
@@ -226,7 +226,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-07.mov"),
+        include_bytes!("../fixtures/transport/geometry-07.mov"),
         1,
         739,
         1,
@@ -234,7 +234,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-07.mov"),
+        include_bytes!("../fixtures/transport/geometry-07.mov"),
         3,
         740,
         2,
@@ -242,7 +242,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-07.mov"),
+        include_bytes!("../fixtures/transport/geometry-07.mov"),
         64,
         793,
         10,
@@ -250,7 +250,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-07.mov"),
+        include_bytes!("../fixtures/transport/geometry-07.mov"),
         65536,
         811,
         739,
@@ -258,7 +258,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-08.mov"),
+        include_bytes!("../fixtures/transport/geometry-08.mov"),
         1,
         739,
         1,
@@ -266,7 +266,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-08.mov"),
+        include_bytes!("../fixtures/transport/geometry-08.mov"),
         3,
         739,
         3,
@@ -274,7 +274,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-08.mov"),
+        include_bytes!("../fixtures/transport/geometry-08.mov"),
         64,
         793,
         10,
@@ -282,7 +282,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-08.mov"),
+        include_bytes!("../fixtures/transport/geometry-08.mov"),
         65536,
         811,
         739,
@@ -290,7 +290,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-09.mov"),
+        include_bytes!("../fixtures/transport/geometry-09.mov"),
         1,
         739,
         1,
@@ -298,7 +298,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-09.mov"),
+        include_bytes!("../fixtures/transport/geometry-09.mov"),
         3,
         739,
         3,
@@ -306,7 +306,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-09.mov"),
+        include_bytes!("../fixtures/transport/geometry-09.mov"),
         64,
         793,
         10,
@@ -314,7 +314,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-09.mov"),
+        include_bytes!("../fixtures/transport/geometry-09.mov"),
         65536,
         811,
         739,
@@ -322,7 +322,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-10.mov"),
+        include_bytes!("../fixtures/transport/geometry-10.mov"),
         1,
         740,
         1,
@@ -330,7 +330,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-10.mov"),
+        include_bytes!("../fixtures/transport/geometry-10.mov"),
         3,
         741,
         2,
@@ -338,7 +338,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-10.mov"),
+        include_bytes!("../fixtures/transport/geometry-10.mov"),
         64,
         794,
         10,
@@ -346,7 +346,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-10.mov"),
+        include_bytes!("../fixtures/transport/geometry-10.mov"),
         65536,
         812,
         740,
@@ -354,7 +354,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-11.mov"),
+        include_bytes!("../fixtures/transport/geometry-11.mov"),
         1,
         740,
         1,
@@ -362,7 +362,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-11.mov"),
+        include_bytes!("../fixtures/transport/geometry-11.mov"),
         3,
         742,
         1,
@@ -370,7 +370,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-11.mov"),
+        include_bytes!("../fixtures/transport/geometry-11.mov"),
         64,
         793,
         11,
@@ -378,7 +378,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-11.mov"),
+        include_bytes!("../fixtures/transport/geometry-11.mov"),
         65536,
         812,
         740,
@@ -386,7 +386,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-12.mov"),
+        include_bytes!("../fixtures/transport/geometry-12.mov"),
         1,
         740,
         1,
@@ -394,7 +394,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-12.mov"),
+        include_bytes!("../fixtures/transport/geometry-12.mov"),
         3,
         742,
         1,
@@ -402,7 +402,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-12.mov"),
+        include_bytes!("../fixtures/transport/geometry-12.mov"),
         64,
         793,
         11,
@@ -410,7 +410,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-12.mov"),
+        include_bytes!("../fixtures/transport/geometry-12.mov"),
         65536,
         812,
         740,
@@ -418,7 +418,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-13.mov"),
+        include_bytes!("../fixtures/transport/geometry-13.mov"),
         1,
         4771,
         1,
@@ -426,7 +426,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-13.mov"),
+        include_bytes!("../fixtures/transport/geometry-13.mov"),
         3,
         4772,
         2,
@@ -434,7 +434,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-13.mov"),
+        include_bytes!("../fixtures/transport/geometry-13.mov"),
         64,
         4825,
         10,
@@ -442,7 +442,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-13.mov"),
+        include_bytes!("../fixtures/transport/geometry-13.mov"),
         65536,
         4843,
         4771,
@@ -450,7 +450,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-14.mov"),
+        include_bytes!("../fixtures/transport/geometry-14.mov"),
         1,
         4771,
         1,
@@ -458,7 +458,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-14.mov"),
+        include_bytes!("../fixtures/transport/geometry-14.mov"),
         3,
         4771,
         3,
@@ -466,7 +466,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-14.mov"),
+        include_bytes!("../fixtures/transport/geometry-14.mov"),
         64,
         4825,
         10,
@@ -474,7 +474,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-14.mov"),
+        include_bytes!("../fixtures/transport/geometry-14.mov"),
         65536,
         4843,
         4771,
@@ -482,7 +482,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-15.mov"),
+        include_bytes!("../fixtures/transport/geometry-15.mov"),
         1,
         4771,
         1,
@@ -490,7 +490,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-15.mov"),
+        include_bytes!("../fixtures/transport/geometry-15.mov"),
         3,
         4771,
         3,
@@ -498,7 +498,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-15.mov"),
+        include_bytes!("../fixtures/transport/geometry-15.mov"),
         64,
         4825,
         10,
@@ -506,7 +506,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-15.mov"),
+        include_bytes!("../fixtures/transport/geometry-15.mov"),
         65536,
         4843,
         4771,
@@ -514,7 +514,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-16.mov"),
+        include_bytes!("../fixtures/transport/geometry-16.mov"),
         1,
         675,
         1,
@@ -522,7 +522,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-16.mov"),
+        include_bytes!("../fixtures/transport/geometry-16.mov"),
         3,
         676,
         2,
@@ -530,7 +530,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-16.mov"),
+        include_bytes!("../fixtures/transport/geometry-16.mov"),
         64,
         729,
         10,
@@ -538,7 +538,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-16.mov"),
+        include_bytes!("../fixtures/transport/geometry-16.mov"),
         65536,
         748,
         675,
@@ -546,7 +546,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-17.mov"),
+        include_bytes!("../fixtures/transport/geometry-17.mov"),
         1,
         675,
         1,
@@ -554,7 +554,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-17.mov"),
+        include_bytes!("../fixtures/transport/geometry-17.mov"),
         3,
         676,
         2,
@@ -562,7 +562,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-17.mov"),
+        include_bytes!("../fixtures/transport/geometry-17.mov"),
         64,
         729,
         10,
@@ -570,7 +570,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-17.mov"),
+        include_bytes!("../fixtures/transport/geometry-17.mov"),
         65536,
         771,
         675,
@@ -578,7 +578,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-18.mov"),
+        include_bytes!("../fixtures/transport/geometry-18.mov"),
         1,
         675,
         1,
@@ -586,7 +586,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-18.mov"),
+        include_bytes!("../fixtures/transport/geometry-18.mov"),
         3,
         676,
         2,
@@ -594,7 +594,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-18.mov"),
+        include_bytes!("../fixtures/transport/geometry-18.mov"),
         64,
         729,
         10,
@@ -602,7 +602,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-18.mov"),
+        include_bytes!("../fixtures/transport/geometry-18.mov"),
         65536,
         803,
         675,
@@ -610,7 +610,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         true,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-19.mov"),
+        include_bytes!("../fixtures/transport/geometry-19.mov"),
         1,
         755,
         1,
@@ -618,7 +618,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         false,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-19.mov"),
+        include_bytes!("../fixtures/transport/geometry-19.mov"),
         3,
         755,
         1,
@@ -626,7 +626,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         false,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-19.mov"),
+        include_bytes!("../fixtures/transport/geometry-19.mov"),
         64,
         755,
         26,
@@ -634,7 +634,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         false,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-19.mov"),
+        include_bytes!("../fixtures/transport/geometry-19.mov"),
         65536,
         755,
         755,
@@ -642,7 +642,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         false,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-20.mov"),
+        include_bytes!("../fixtures/transport/geometry-20.mov"),
         1,
         66211,
         1,
@@ -650,7 +650,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         false,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-20.mov"),
+        include_bytes!("../fixtures/transport/geometry-20.mov"),
         3,
         66212,
         2,
@@ -658,7 +658,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         false,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-20.mov"),
+        include_bytes!("../fixtures/transport/geometry-20.mov"),
         64,
         66267,
         8,
@@ -666,7 +666,7 @@ pub const OPEN_WINDOWS: &[OpenWindowCase] = &[
         false,
     ),
     (
-        include_bytes!("../fixtures/transport-v3/geometry-20.mov"),
+        include_bytes!("../fixtures/transport/geometry-20.mov"),
         65536,
         66283,
         8,

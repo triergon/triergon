@@ -1,6 +1,8 @@
 //! Syncframe header probing (syncinfo plus the leading bsi fields) used for framing.
 
 use crate::error::{DecodeError, Feature};
+use triergon_bitstream::BitReader;
+use triergon_bitstream::crc::crc16_a52 as crc16;
 
 /// Nominal bit rates in kbit/s per frmsizecod/2 (A/52:2018 Table 5.18).
 pub(crate) const BITRATE_KBPS: [u16; 19] = [
@@ -37,6 +39,26 @@ pub(crate) fn ac3_rate_shift(bsid: u8) -> u32 {
     bsid.saturating_sub(8) as u32
 }
 
+// A/52 section 5.3.2: lfeon and dialnorm follow the optional mix and surround fields.
+#[inline]
+fn ac3_lfe_bit(acmod: u8) -> u32 {
+    let mut bit = 3;
+    if (acmod & 1) != 0 && acmod != 1 {
+        bit += 2;
+    }
+    if acmod & 4 != 0 {
+        bit += 2;
+    }
+    if acmod == 2 {
+        bit += 2;
+    }
+    bit
+}
+
+pub(crate) fn ac3_dialnorm(bsi_prefix: [u8; 2], acmod: u8) -> u8 {
+    ((u16::from_be_bytes(bsi_prefix) >> (10 - ac3_lfe_bit(acmod))) & 31) as u8
+}
+
 /// Which syntax a syncframe uses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Syntax {
@@ -52,27 +74,49 @@ pub enum Syntax {
 
 /// E-AC-3 stream type (Annex E Table E2.1); AC-3 frames report `Independent`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
 pub enum StreamType {
+    /// Independent substream (strmtyp 0), or an AC-3 syncframe.
     Independent,
+    /// Dependent substream (strmtyp 1), extending the preceding independent substream.
     Dependent,
     /// Independent substream converted from AC-3 (strmtyp 2).
     Converted,
 }
 
+impl StreamType {
+    pub(crate) fn from_bits(bits: u8) -> Result<Self, DecodeError> {
+        match bits {
+            0 => Ok(Self::Independent),
+            1 => Ok(Self::Dependent),
+            2 => Ok(Self::Converted),
+            _ => Err(DecodeError::Unsupported(Feature::ReservedStreamType)),
+        }
+    }
+}
+
 /// Leading header fields of one syncframe.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameHeader {
+    /// Syntax of the syncframe, from its bsid.
     pub syntax: Syntax,
+    /// Bit stream identification (0..=16).
     pub bsid: u8,
     /// Total syncframe length in bytes.
     pub frame_bytes: usize,
+    /// Sample rate in Hz.
     pub sample_rate: u32,
+    /// Sample rate code (0..=2; E-AC-3 3 = reduced rate given by fscod2).
     pub fscod: u8,
     /// Audio blocks (of 256 samples) per syncframe.
     pub num_blocks: usize,
+    /// Audio coding mode (A/52 Table 5.8).
     pub acmod: u8,
+    /// The syncframe carries an LFE channel.
     pub lfeon: bool,
+    /// E-AC-3 stream type; AC-3 syncframes are independent.
     pub stream_type: StreamType,
+    /// E-AC-3 substream identification (0..=7); 0 for AC-3.
     pub substream_id: u8,
     /// AC-3 only: frmsizecod.
     pub frmsizecod: u8,
@@ -104,24 +148,12 @@ pub fn parse_header(data: &[u8]) -> Result<FrameHeader, DecodeError> {
         let fscod = data[4] >> 6;
         let frmsizecod = data[4] & 0x3f;
         if fscod == 3 {
-            return Err(DecodeError::InvalidData("reserved fscod"));
+            return Err(DecodeError::Invalid("reserved fscod"));
         }
-        let words =
-            ac3_frame_words(fscod, frmsizecod).ok_or(DecodeError::InvalidData("frmsizecod"))?;
+        let words = ac3_frame_words(fscod, frmsizecod).ok_or(DecodeError::Invalid("frmsizecod"))?;
         let acmod = data[6] >> 5;
-        // lfeon follows optional cmixlev/surmixlev/dsurmod fields (2 bits each).
-        let mut bit = 3u32; // bits of data[6] consumed after acmod
-        if (acmod & 1) != 0 && acmod != 1 {
-            bit += 2;
-        }
-        if acmod & 4 != 0 {
-            bit += 2;
-        }
-        if acmod == 2 {
-            bit += 2;
-        }
         let w = u16::from_be_bytes([data[6], data[7]]);
-        let lfeon = (w >> (15 - bit)) & 1 != 0;
+        let lfeon = (w >> (15 - ac3_lfe_bit(acmod))) & 1 != 0;
         return Ok(FrameHeader {
             syntax: Syntax::Ac3,
             bsid,
@@ -152,17 +184,12 @@ pub fn parse_header(data: &[u8]) -> Result<FrameHeader, DecodeError> {
     } else {
         (SAMPLE_RATES[fscod as usize], [1, 2, 3, 6][code2 as usize])
     };
-    let stream_type = match strmtyp {
-        0 => StreamType::Independent,
-        1 => StreamType::Dependent,
-        2 => StreamType::Converted,
-        _ => return Err(DecodeError::Unsupported(Feature::ReservedStreamType)),
-    };
+    let stream_type = StreamType::from_bits(strmtyp)?;
     let acmod = (data[4] >> 1) & 7;
     let lfeon = data[4] & 1 != 0;
     let frame_bytes = (frmsiz + 1) * 2;
     if frame_bytes < 8 {
-        return Err(DecodeError::InvalidData("frmsiz too small"));
+        return Err(DecodeError::Invalid("frmsiz too small"));
     }
     Ok(FrameHeader {
         syntax: Syntax::Eac3,
@@ -204,6 +231,49 @@ pub fn access_unit_len(data: &[u8]) -> Result<usize, DecodeError> {
     Ok(len)
 }
 
+/// Returns (crc1 ok, crc2 ok). E-AC-3 has a single CRC; it is reported in both.
+pub(crate) fn check_crc(frame: &[u8], h: &FrameHeader) -> (bool, bool) {
+    let words = frame.len() / 2;
+    match h.syntax {
+        Syntax::Ac3 => {
+            let five8 = (words >> 1) + (words >> 3);
+            let c1 = crc16(0, &frame[2..five8 * 2]) == 0;
+            let c2 = crc16(0, &frame[2..]) == 0;
+            (c1, c2)
+        }
+        Syntax::Eac3 => {
+            let c = crc16(0, &frame[2..]) == 0;
+            (c, c)
+        }
+    }
+}
+
+/// Read the custom channel map of an E-AC-3 dependent substream (Annex E Table E1.2).
+pub(crate) fn peek_chanmap(frame: &[u8]) -> Option<u16> {
+    let mut b = [0u8; 24];
+    let n = frame.len().min(16);
+    b[..n].copy_from_slice(&frame[..n]);
+    let mut r = BitReader::at(&b, 16);
+    let strmtyp = r.read(2);
+    r.skip(3 + 11 + 2 + 2); // substreamid, frmsiz, fscod, fscod2 or numblkscod
+    let acmod = r.read(3);
+    r.skip(1 + 5 + 5); // lfeon, bsid, dialnorm
+    if r.bit() {
+        r.skip(8);
+    }
+    if acmod == 0 {
+        r.skip(5);
+        if r.bit() {
+            r.skip(8);
+        }
+    }
+    if strmtyp == 1 && r.bit() {
+        Some(r.read(16) as u16)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,12 +308,12 @@ mod tests {
         // fscod = 3 is reserved for AC-3.
         assert!(matches!(
             parse_header(&[0x0b, 0x77, 0, 0, 0xc0, 0x40, 0, 0]),
-            Err(DecodeError::InvalidData(_))
+            Err(DecodeError::Invalid(_))
         ));
         // frmsizecod 38 does not exist.
         assert!(matches!(
             parse_header(&[0x0b, 0x77, 0, 0, 38, 0x40, 0, 0]),
-            Err(DecodeError::InvalidData(_))
+            Err(DecodeError::Invalid(_))
         ));
         // bsid 17.
         assert_eq!(

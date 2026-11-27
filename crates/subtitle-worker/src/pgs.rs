@@ -5,7 +5,7 @@
 //! [`container::read_file_track`] a Matroska `S_HDMV/PGS` track or an MPEG-TS /
 //! M2TS stream of type 0x90 as one packet per PES. The readers stream the file,
 //! so only the packets stay resident. The operation runs the receiver
-//! ([`ReceiverDecoder`]) over every packet and reports each subtitle it outputs.
+//! ([`Decoder`]) over every packet and reports each subtitle it outputs.
 
 use crate::container::{self, Packet, Result, Track};
 use crate::sink::{Bitmap, EventHead, RectHead, RectKind, Sink};
@@ -18,10 +18,8 @@ use std::sync::atomic::AtomicBool;
 use triergon::{CodecId, TimeBase};
 use triergon_core::{Budget, Bytes, WorkBudget};
 use triergon_mpegts::PacketFormat;
-use triergon_subtitles::compat::pgs::{ReceiverDecoder, Refusal};
-use triergon_subtitles::pgs::{
-    DisplayConfig, DisplayLimits, PacketClock, RecoveredRect, RecoveryStatus,
-};
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Rect, Refusal, Status};
+use triergon_subtitles::pgs::Clock;
 
 /// The candidate's pool limit: the prepared packets and one display set.
 const POOL_BYTES: usize = 1 << 30;
@@ -31,7 +29,7 @@ struct Pgs {
     configuration: Vec<u8>,
     time_base: TimeBase,
     /// The prepared packets, moved into the pool; each operation clones them.
-    packets: Vec<(Bytes, PacketClock)>,
+    packets: Vec<(Bytes, Clock)>,
     forced_only: bool,
     /// The `sub-input` view, built from `packets` only when asked for.
     input: OnceCell<Track>,
@@ -56,13 +54,13 @@ pub fn prepare(file: &Path, args: &Args) -> Result<Box<dyn Prepared>> {
         .packets
         .into_iter()
         .map(|packet| {
-            let clock = PacketClock {
+            let clock = Clock {
                 pts: packet.pts,
                 dts: packet.dts,
                 timebase: track.time_base,
             };
             Ok((
-                Bytes::try_from_vec(&pool, packet.data).map_err(|e| e.error())?,
+                Bytes::try_from_vec(&pool, packet.data).map_err(|e| e.error)?,
                 clock,
             ))
         })
@@ -82,34 +80,35 @@ impl Prepared for Pgs {
         let cancel = AtomicBool::new(false);
         // The reference's own ceilings: objects no larger than a canvas it
         // accepts, 24-bit object lengths, no fragment, packet or work bound.
-        let limits = DisplayLimits {
+        let limits = Limits {
             max_object_pixels: 1 << 28,
             max_display_pixels: 1 << 29,
             max_encoded: 1 << 24,
             max_fragments: usize::MAX,
             max_packet_bytes: usize::MAX,
             max_work: usize::MAX,
-            ..DisplayLimits::default()
+            ..Limits::default()
         };
-        let config = DisplayConfig {
-            receiver_forced_only: self.forced_only,
+        let config = Options {
+            forced_only: self.forced_only,
         };
-        let mut decoder = ReceiverDecoder::new(&self.pool, limits, config)?;
+        let mut decoder = Decoder::new(&self.pool, config, limits)?;
         sink.header(self.packets.len(), None)?;
         for (index, (payload, clock)) in self.packets.iter().enumerate() {
             if payload.is_empty() {
                 continue;
             }
             decoder
-                .push(&mut Some(payload.clone()), *clock, &cancel)
+                .push(payload.clone(), clock, &cancel)
+                .map_err(|refused| refused.error)
                 .at(index)?;
             let out = loop {
                 match decoder
                     .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
                     .at(index)?
                 {
-                    RecoveryStatus::OutputReady => break decoder.take_output(&cancel).at(index)?,
-                    RecoveryStatus::Yield => {}
+                    Status::Ready => break decoder.take_output(&cancel).at(index)?,
+                    Status::Yield => {}
                     status => return Err(format!("pgs: unexpected {status:?}").into()),
                 }
             };
@@ -121,7 +120,7 @@ impl Prepared for Pgs {
                 };
                 sink.refused(index, code)?;
             }
-            if let Some(event) = out.receiver_output() {
+            if let Some(event) = out.subtitle() {
                 let rects = event.rectangles();
                 sink.begin(EventHead {
                     packet: index as u64,
@@ -142,7 +141,7 @@ impl Prepared for Pgs {
         while decoder
             .poll(&mut WorkBudget::new(crate::WORK_SLICE), &cancel)
             .at(end)?
-            != RecoveryStatus::Ended
+            != Status::End
         {}
         Ok(())
     }
@@ -180,7 +179,7 @@ impl Prepared for Pgs {
 
 /// One rectangle as the reference's API presents it: 256 palette words and
 /// the forced flag (`AV_SUBTITLE_FLAG_FORCED`).
-fn report(sink: &mut Sink<'_>, rect: &RecoveredRect) -> Result<()> {
+fn report(sink: &mut Sink<'_>, rect: &Rect) -> Result<()> {
     let bitmap = Bitmap {
         palette: rect.palette(),
         pixels: rect.pixels().as_ref(),

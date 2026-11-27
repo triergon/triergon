@@ -1,21 +1,23 @@
 //! The last stage: an event's placed glyphs drawn and combined run by run,
-//! as libass's `render_and_combine_glyphs` does, through a bitmap cache and
-//! a composite cache: each glyph's fill and border, then each run's fill,
-//! border and shadow composited.
+//! through a bitmap cache and a composite cache: each glyph's fill and
+//! border, then each run's fill, border and shadow composited.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
+use triergon_raster::compat::libass::{
+    BorderStroke, Composite, EffectsKey, FrameScale, GlyphBitmaps, GlyphRequest, GlyphSource,
+    PlacedBitmap, PlacedStroke, Run,
+};
 use triergon_raster::{
-    Bitmap, BitmapTransform, BorderStroke, EffectsKey, FrameScale, GlyphBitmaps, GlyphPlacement,
-    GlyphSource, Limits, Matrix, PlacedBitmap, Quantized, Raster, Run, Shape, Vector,
+    Bitmap, BitmapTransform, Limits, Matrix, OUTLINE_MAX, Quantized, Raster, Shape, Vector,
 };
 
 use super::CacheLimits;
-use super::cache::{Cache, CacheKey, Kept, sizes};
+use super::cache::{Cache, CacheKey, Found, Kept, sizes};
 use super::outlines::{KeptOutline, Outlines};
 use super::placement::{GlyphDrawing, PlacedRun, Placer, Runs};
-use super::units::d6_to_double;
 use crate::{Karaoke, Rgba, charge};
 
 /// The work of a lookup: of a bitmap, and of a composite per glyph of its
@@ -23,9 +25,9 @@ use crate::{Karaoke, Rgba, charge};
 /// besides.
 const LOOKUP_UNITS: usize = 1;
 
-/// A run composited (libass's `CompositeHashValue`): its fill, border and
-/// shadow, placed against the run's origin. Images show its bitmaps and are
-/// told apart by it, as libass's are by the composite's buffers.
+/// A run composited: its fill, border and shadow, placed against the run's
+/// origin. Images show its bitmaps and are told apart by it, as libass's
+/// are by the composite's buffers.
 #[derive(Debug)]
 pub(super) struct Composited {
     pub(super) fill: Option<Bitmap>,
@@ -33,14 +35,15 @@ pub(super) struct Composited {
     pub(super) shadow: Option<Bitmap>,
 }
 
-/// One run of glyphs composited together (libass's `CombinedBitmapInfo`),
-/// positioned in the frame.
+/// One run of glyphs composited together, positioned in the frame.
 #[derive(Debug)]
 pub(super) struct Combined {
     /// The colours, faded.
     pub(super) colours: [Rgba; 4],
     pub(super) effect: Option<Karaoke>,
-    /// For `\kf`, the frame column the fill gives way at.
+    /// The karaoke timing the run is drawn with
+    /// ([`PlacedRun::effect_timing`]): for `\kf` the frame column the fill
+    /// gives way at, for the other kinds the syllable's boundary.
     pub(super) effect_timing: i32,
     /// The frame position the composite's bitmaps'
     /// [`position`](Bitmap::position)s count from: the least origin of
@@ -59,9 +62,8 @@ enum BitmapSource {
     Border(KeptOutline, BorderStroke),
 }
 
-/// What identifies a bitmap (libass's `BitmapHashKey`): what it is drawn
-/// from and the quantised transform it is drawn under. Equal keys draw
-/// equal bitmaps.
+/// What identifies a bitmap: what it is drawn from and the quantised
+/// transform it is drawn under. Equal keys draw equal bitmaps.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct BitmapKey {
     source: BitmapSource,
@@ -80,9 +82,9 @@ impl CacheKey for BitmapKey {
     }
 }
 
-/// A bitmap kept (libass's `Bitmap`), empty when it draws nothing, with
-/// the stroked border it was drawn from, which libass's bitmap key holds as
-/// long as the bitmap is kept.
+/// A bitmap kept, empty when it draws nothing, with the stroked border it
+/// was drawn from, which libass's bitmap key holds as long as the bitmap is
+/// kept.
 #[derive(Debug)]
 struct KeptBitmap {
     bitmap: Bitmap,
@@ -102,9 +104,9 @@ impl Deref for SharedBitmap {
     }
 }
 
-/// One glyph of a run's composite key (libass's `BitmapRef`): the keys of
-/// its fill and border bitmaps, each `None` when it draws nothing, and
-/// their origins in the run. libass's key holds the bitmaps themselves;
+/// One glyph of a run's composite key: the keys of its fill and border
+/// bitmaps, each `None` when it draws nothing, and their origins in the
+/// run. libass's key holds the bitmaps themselves;
 /// their keys find the same composite, since an equal key draws an equal
 /// bitmap and the key holds the outlines it names, and they let the
 /// bitmaps leave the cache while the composite stays.
@@ -116,8 +118,8 @@ struct GlyphRef {
     border_origin: Vector,
 }
 
-/// A run's composite key (libass's `CompositeHashKey`): its effects and
-/// every glyph's bitmaps and place in the run.
+/// A run's composite key: its effects and every glyph's bitmaps and place
+/// in the run.
 #[derive(Debug)]
 struct RunKey {
     effects: EffectsKey,
@@ -203,9 +205,8 @@ impl Painter {
         }
     }
 
-    /// Cuts the composites and then the bitmaps to their limits, as
-    /// libass's `check_cache_limits` does when a frame starts
-    /// (`ass_render.c:3021-3026`); nothing but the last frame's images may
+    /// Cuts the composites and then the bitmaps to their limits, as libass
+    /// does when a frame starts; nothing but the last frame's images may
     /// hold them then.
     pub(super) fn cut(&mut self, limits: &CacheLimits) {
         self.composites.cut(limits.composite_bytes);
@@ -221,10 +222,9 @@ impl Painter {
     }
 
     /// The bitmap of `outline` under a plain matrix, placed on its own: a
-    /// vector clip, which libass draws through its bitmap cache too
-    /// (`blend_vector_clip`), and holds while it clips. `None` when the
-    /// matrix cannot be quantised; a drawing that draws nothing gives a
-    /// bitmap without pixels.
+    /// vector clip, which libass draws through its bitmap cache too, and
+    /// holds while it clips. `None` when the matrix cannot be quantised; a
+    /// drawing that draws nothing gives a bitmap without pixels.
     pub(super) fn draw_shape(
         &mut self,
         outline: &KeptOutline,
@@ -277,12 +277,15 @@ impl Painter {
         for (placed, glyphs) in runs.iter() {
             self.drawn.clear();
             let mut run = Run::default();
+            let mut leftmost_x = OUTLINE_MAX;
             for glyph in glyphs.iter().filter_map(|g| placer.glyph(g)) {
-                if let Some(drawn) = self.draw_glyph(&glyph, frame, outlines, &mut run, work)? {
+                let request = glyph.request(frame);
+                leftmost_x = glyph.leftmost_x(&request, leftmost_x);
+                if let Some(drawn) = self.draw_glyph(&glyph, &request, outlines, &mut run, work)? {
                     self.drawn.try_push(drawn).map_err(|e| e.error)?;
                 }
             }
-            self.finish(placed, &run, frame, out, work)?;
+            self.finish(placed, leftmost_x, frame, out, work)?;
             // The run's glyph bitmaps are let go once it is composited.
             self.drawn.clear();
             self.bitmaps.cache.settle();
@@ -290,13 +293,12 @@ impl Painter {
         Ok(())
     }
 
-    /// Places one glyph in `run` and draws its fill and border, as libass's
-    /// `get_bitmap_glyph` does, through the bitmap cache; `None` when it
-    /// draws nothing.
+    /// Places one glyph in `run` and draws its fill and border through the
+    /// bitmap cache; `None` when it draws nothing.
     fn draw_glyph(
         &mut self,
         glyph: &GlyphDrawing<'_>,
-        frame: &FrameScale,
+        request: &GlyphRequest<'_>,
         outlines: &mut Outlines,
         run: &mut Run,
         work: &mut WorkBudget,
@@ -308,8 +310,7 @@ impl Painter {
             fill: None,
             border: None,
         };
-        let request = glyph.request(frame);
-        let Some(bitmaps) = self.raster.render_with(&request, run, &mut source, work)? else {
+        let Some(bitmaps) = run.render_with(&mut self.raster, request, &mut source, work)? else {
             return Ok(None);
         };
         // A border that rounds to nothing is the fill's own bitmap.
@@ -330,28 +331,17 @@ impl Painter {
     fn finish(
         &mut self,
         placed: &PlacedRun,
-        run: &Run,
+        leftmost_x: i32,
         frame: &FrameScale,
         out: &mut BudgetVec<Combined>,
         work: &mut WorkBudget,
     ) -> Result<()> {
         let drawn = self.drawn.as_mut_slice();
-        let Some(origin) = drawn
-            .iter()
-            .map(|d| d.bitmaps.origin())
-            .reduce(|a, b| Vector::new(a.x.min(b.x), a.y.min(b.y)))
-        else {
+        let Some(origin) = Composite::origin_of(drawn.iter().map(|d| &d.bitmaps)) else {
             return Ok(());
         };
-        let mut effect_timing = placed.effect_timing;
-        if placed.effect == Some(Karaoke::Fill) {
-            effect_timing = (d6_to_double(run.leftmost_x())
-                + d6_to_double(effect_timing) * frame.pixel_aspect)
-                .round() as i32;
-        }
+        let effect_timing = placed.effect_timing(leftmost_x, frame.pixel_aspect);
         charge(work, LOOKUP_UNITS.saturating_mul(drawn.len()))?;
-        let in_run =
-            |at: Vector| Vector::new(at.x.wrapping_sub(origin.x), at.y.wrapping_sub(origin.y));
         let glyphs = &mut self.glyphs;
         glyphs.clear();
         glyphs.try_reserve_exact(drawn.len())?;
@@ -362,8 +352,8 @@ impl Painter {
                 .try_push(GlyphRef {
                     fill: glyph.fill.take(),
                     border: glyph.border.take(),
-                    origin: in_run(glyph.bitmaps.origin()),
-                    border_origin: in_run(glyph.bitmaps.border_origin()),
+                    origin: glyph.bitmaps.origin().offset_from(origin),
+                    border_origin: glyph.bitmaps.border_origin().offset_from(origin),
                 })
                 .map_err(|e| e.error)?;
         }
@@ -372,11 +362,12 @@ impl Painter {
             effects,
             glyphs: &self.glyphs,
         };
-        let composite = if let Some(composite) = self.composites.get(view) {
+        let composite = if let Some(Found::Value(composite)) = self.composites.get(view) {
             composite
         } else {
             let bitmaps = drawn.iter().map(|d| &d.bitmaps);
-            let composite = self.raster.compose(&placed.effects, frame, bitmaps, work)?;
+            let composite =
+                Composite::new(&mut self.raster, &placed.effects, frame, bitmaps, work)?;
             let parts = [&composite.fill, &composite.border, &composite.shadow];
             let size = sizes::composite(
                 drawn.len(),
@@ -437,8 +428,7 @@ impl GlyphSource for CachedBitmaps<'_> {
         at: Option<Quantized>,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
-        // libass looks the unit square up before it places the box
-        // (`ass_render.c:1531`).
+        // libass looks the unit square up before it places the box.
         let unit_box = self.outlines.unit_box()?;
         let Some(at) = at else {
             return Ok(None);
@@ -457,14 +447,14 @@ impl GlyphSource for CachedBitmaps<'_> {
         &mut self,
         raster: &mut Raster,
         _shape: &Shape,
-        stroke: BorderStroke,
-        placement: &GlyphPlacement,
+        placed: &PlacedStroke,
         work: &mut WorkBudget,
     ) -> Result<Option<PlacedBitmap<SharedBitmap>>> {
+        let stroke = placed.stroke();
         let Some(border) = self.outlines.border(self.glyph, stroke, raster, work)? else {
             return Ok(None);
         };
-        let Some(at) = placement.place_stroke(&border.shape) else {
+        let Some(at) = placed.place(&border.shape) else {
             return Ok(None);
         };
         let key = BitmapKey {
@@ -480,7 +470,7 @@ impl GlyphSource for CachedBitmaps<'_> {
     }
 }
 
-/// The bitmap cache (libass's `bitmap_cache`).
+/// The glyph and clip bitmaps kept between frames, by their keys.
 #[derive(Debug)]
 struct Bitmaps {
     budget: Budget,
@@ -502,7 +492,7 @@ impl Bitmaps {
         work: &mut WorkBudget,
     ) -> Result<PlacedBitmap<SharedBitmap>> {
         charge(work, LOOKUP_UNITS)?;
-        let kept = if let Some(kept) = self.cache.get(key) {
+        let kept = if let Some(Found::Value(kept)) = self.cache.get(key) {
             kept
         } else {
             let bitmap = match raster.draw(shape, &at.transform, work)? {
@@ -545,8 +535,7 @@ impl Bitmaps {
     }
 }
 
-/// The bytes libass counts for a bitmap's pixels: its stride times its
-/// height (`bitmap_size`).
+/// The bytes libass counts for a bitmap's pixels: its stride times its height.
 fn pixels(bitmap: &Bitmap) -> usize {
     bitmap.stride().saturating_mul(bitmap.height())
 }
@@ -554,7 +543,8 @@ fn pixels(bitmap: &Bitmap) -> usize {
 #[cfg(test)]
 mod tests {
     use triergon_core::{Budget, BudgetVec};
-    use triergon_raster::{Border, Effects, FrameScale, Shadow, Vector};
+    use triergon_raster::Vector;
+    use triergon_raster::compat::libass::{Border, Effects, FrameScale, Shadow};
 
     use super::{CacheKey, EffectsKey, GlyphRef, RunKey};
 

@@ -1,0 +1,118 @@
+{
+  "schema": 1,
+  "directory": "harness/features/ycbcr-palette/inputs",
+  "cases": [
+    {
+      "id": "bt601-nearest-rails",
+      "profile": "bt601-nearest",
+      "file": "rails.rgba-codes",
+      "sha256": "a509514c3fb1800529b72d0397b524d946520a0a3d27abcd8d97d5ccee8160fe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt601",
+        "nearest"
+      ],
+      "expected": {
+        "trace_sha256": "2b5ad9a17bb09aa79892d112b6dbdefd04991670a5722e8bcd212cc59222e6b2"
+      }
+    },
+    {
+      "id": "bt601-half-down-rails",
+      "profile": "bt601-half-down",
+      "file": "rails.rgba-codes",
+      "sha256": "a509514c3fb1800529b72d0397b524d946520a0a3d27abcd8d97d5ccee8160fe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt601",
+        "half-down"
+      ],
+      "expected": {
+        "trace_sha256": "87c4873e95066725e5e6d9c9730ea8a8ef5dd1021448755ed72f82f4eec73147"
+      }
+    },
+    {
+      "id": "bt709-nearest-rails",
+      "profile": "bt709-nearest",
+      "file": "rails.rgba-codes",
+      "sha256": "a509514c3fb1800529b72d0397b524d946520a0a3d27abcd8d97d5ccee8160fe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt709",
+        "nearest"
+      ],
+      "expected": {
+        "trace_sha256": "94fe3694a4574504c047d844e9c586d3b94334c4910af8028cf3a23849fd35f3"
+      }
+    },
+    {
+      "id": "bt709-half-down-rails",
+      "profile": "bt709-half-down",
+      "file": "rails.rgba-codes",
+      "sha256": "a509514c3fb1800529b72d0397b524d946520a0a3d27abcd8d97d5ccee8160fe",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt709",
+        "half-down"
+      ],
+      "expected": {
+        "trace_sha256": "6e826b6ac89dff1a14c3da3c91e882f4c95180bc8e472709b3bf957107a2f0db"
+      }
+    },
+    {
+      "id": "bt601-nearest-cube",
+      "profile": "bt601-nearest",
+      "file": "cube.rgba-codes",
+      "sha256": "d76b0307ad0f953a010ba008ab121c207c84a2fcd1b8aabf98d34cbdd4c44325",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt601",
+        "nearest"
+      ],
+      "expected": {
+        "trace_sha256": "a73668eeeec84235a2d2371daf85b1b557fa0e3fb6b6a9f9a83b0e6fe6a9b42d"
+      }
+    },
+    {
+      "id": "bt601-half-down-cube",
+      "profile": "bt601-half-down",
+      "file": "cube.rgba-codes",
+      "sha256": "d76b0307ad0f953a010ba008ab121c207c84a2fcd1b8aabf98d34cbdd4c44325",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt601",
+        "half-down"
+      ],
+      "expected": {
+        "trace_sha256": "5bb359318a3bf3a0027bbd204b312fd06387e9dd19ac8b513fb372a3804e8353"
+      }
+    },
+    {
+      "id": "bt709-nearest-cube",
+      "profile": "bt709-nearest",
+      "file": "cube.rgba-codes",
+      "sha256": "d76b0307ad0f953a010ba008ab121c207c84a2fcd1b8aabf98d34cbdd4c44325",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt709",
+        "nearest"
+      ],
+      "expected": {
+        "trace_sha256": "ad3bb1585f64bbffa83b96ef4a62463d53e6c5b1ac94b09ad3c04bc2362abbe7"
+      }
+    },
+    {
+      "id": "bt709-half-down-cube",
+      "profile": "bt709-half-down",
+      "file": "cube.rgba-codes",
+      "sha256": "d76b0307ad0f953a010ba008ab121c207c84a2fcd1b8aabf98d34cbdd4c44325",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "bt709",
+        "half-down"
+      ],
+      "expected": {
+        "trace_sha256": "8bb94253b80efc227275dbf3b2f6c1d1c9546e8a2c8d0b4b75c09df83f228217"
+      }
+    }
+  ]
+}

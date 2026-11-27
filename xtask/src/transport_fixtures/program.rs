@@ -1,6 +1,9 @@
 //! Complete M2TS program controls derived from the authored TS188 fixture.
 use super::{R, program_m2ts};
-use crate::{checks::read_json, corpus::write_json, json::Value, sha256};
+use crate::{
+    json::{Value, read as read_json, write as write_json},
+    sha256,
+};
 use std::{fs, path::Path, process::Command};
 
 const ID: &str = "m2ts-replay-avc-aac-00-program";

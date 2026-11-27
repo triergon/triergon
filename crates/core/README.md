@@ -49,7 +49,7 @@ assert_eq!(header, [0x1a, 0x45, 0xdf, 0xa3]);
 let base = TimeBase::new(1, 90_000)?;
 let pts = Time::from_ticks(183_003, base)?;               // exact, reduced
 assert_eq!(pts.to_nanoseconds(Rounding::NearestAway)?, 2_033_366_667);
-assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 2033);
+assert_eq!(base.rescale(183_003, TimeBase::MILLISECONDS, Rounding::Floor)?, 2033);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
@@ -60,12 +60,13 @@ assert_eq!(base.rescale(183_003, TimeBase::new(1, 1000)?, Rounding::Floor)?, 203
 | Time | `Time` (reduced `i128`/`u128` seconds), `TimeBase` (reduced positive `u64` ratio), `TickScale`, `Rounding`, `round_ties_even_i32` |
 | Storage | `Budget`, `Reservation`, `Charged<T>`, `Bytes`, `BytesWriter`, `BudgetVec<T>`, `BudgetVecIntoIter`, `BytesView`, `OwnedInputBytes`, `ByteStorageAddress`, `nonzero_prefix_len` |
 | Input | `InputCursor`, `InputRequest`, `InputWindow`, `InputToken`, `SourceId`, `SourceCapabilities`, `SourceLocation`, `SourceFailure` |
-| Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes and how to resolve ambiguous transport. |
+| Sources | module `source`: `Source` (a caller's transport, polled without blocking), `SourceReply` and `provide_to`, `Provide` (what takes replies: `InputCursor` or a reader), `SourceOwner`, `ByteSource` |
+| Source signatures | Module `signature` exposes the EBML and Ogg markers, the opening box type and the three sync bytes for each transport packet spacing. Each caller chooses its accepted boxes, how to resolve ambiguous transport and whether four-byte audio markers request a fifth byte. |
 | Steps | `Step<T, B>`, `Backpressure` |
 | Blocking I/O | module `blocking`: `Blocking` drives a `ContainerReader` from a `std::io::Read` (and `Seek`) source, `Feed` supplies an `InputCursor`, `seekable_capabilities` |
 | Work | `WorkBudget` |
 | Container model | module `container`: `ContainerReader`, `ReaderStep`, `Event`, `PacketInfo`, `TrackInfo`, `TrackId`, `MediaKind`, `CodecId`, `RandomAccess`, `Trim`, seek and colour types |
-| Errors | `Error`, `Result`, `FreezeError`, `PushError<T>`, `TransferError` |
+| Errors | `Error`, `Result`, `Refused<T>` retains a value whose operation failed |
 
 ## Behaviour and limits
 
@@ -76,7 +77,7 @@ result, and nothing allocates. Rounded views (`to_ticks`, `to_i64_ticks`,
 `to_nanoseconds`, `TimeBase::rescale`) take an explicit `Rounding`:
 `TowardZero`, `AwayFromZero`, `Floor`, `Ceil` or `NearestAway`. Results that do
 not fit return `Error::Overflow`; a zero timebase or denominator is `Invalid`.
-Use `TimeBase::MICROSECONDS` and `TimeBase::NANOSECONDS` for those fixed clocks.
+`TimeBase` provides constants for millisecond, microsecond and nanosecond clocks.
 
 **Budget and storage.** `Budget::new(limit)` creates one accounting pool; clones share
 it, and its limit includes its own control block (`Budget::control_storage_bytes()`).
@@ -91,10 +92,8 @@ hand an allocation back as an empty `BudgetVec` for reuse without allocating.
 `OwnedInputBytes` adopts a caller `Vec<u8>` as immutable input. `used()` and `peak()`
 report requested capacity, not RSS or allocator overhead.
 
-Two capacity errors are distinct. `Error::Limit` means the request can never fit
-the policy. `Error::Backpressure` means it fits once the caller releases retained
-output; the operation can be retried without losing state. Readers that own output
-storage report the same condition as `Step::Backpressure` (see below).
+[`Error`](src/error.rs) describes the three resource outcomes `Limit`, `Policy`
+and `Backpressure`. Readers can surface retryable pressure as `Step::Backpressure`.
 
 **Input cursor.** `InputCursor` holds at most one supplied window at a time
 (at most `maximum_window` bytes, or 12 inline bytes via `provide_inline`
@@ -164,15 +163,23 @@ numeric, and a conflict between container and bitstream colour is reported as tw
 descriptions, never resolved. Readers are concrete types used through generics or
 one closed enum; there is no registry and no dynamic dispatch on the packet path
 (`Track` may be `dyn TrackInfo` for a closed enum). Implementations:
-`triergon_matroska::typed::Reader`, `triergon_isobmff::Reader`,
+`triergon_matroska::Reader`, `triergon_isobmff::Reader`,
 `triergon_mpegts::Reader`, `triergon_ogg::Reader`, `triergon_elementary::Reader` and
 the facade's `triergon::AnyReader`. The
 semantic contract is described in
 [docs/architecture.md](../../docs/architecture.md#container-contract).
 
-## Verification
+## Conformance
 
 The arithmetic follows exact rational semantics; there is no external specification.
 `cargo xtask core-time` compares the time arithmetic with an independent Python
-`fractions.Fraction` oracle. The crate forbids `unsafe` code and has no dependencies.
-Project-wide gates: [docs/quality.md](../../docs/quality.md).
+`fractions.Fraction` oracle. The
+[reader protocol comparison](../../harness/features/core-reader-protocol/contract.json)
+checks input windows, refusals and restart transitions, checks `Feed` against the source
+bytes, and compares the packets, clocks, failures and seeks of `Blocking` over an ADTS
+reader. The [facade lifecycle comparison](../../harness/features/facade-source-control/contract.json)
+checks the `ContainerReader` failure and reset contract in four container readers, and
+the [source signature comparison](../../harness/features/source-signatures/contract.json)
+checks caller-selected box types, Ogg recognition, both transport tie policies and
+exact prefix requests against independent wire-field and policy observations. The gates
+are in [docs/quality.md](../../docs/quality.md).

@@ -2,12 +2,13 @@
 //! `mkv-audio-`).
 
 use crate::runner::Result;
+use triergon_bridge::matroska::{MatroskaDolbyLimits, MatroskaFeedLimits, MatroskaHevcDolbyLimits};
 use triergon_core::WorkBudget;
 use triergon_framing::{
-    AacConfigLimits, AvcAnnexBLimits, AvcConfigLimits, BuildStep, HvcConfigLimits,
-};
-use triergon_playback::matroska_feed::{
-    MatroskaDolbyLimits, MatroskaFeedLimits, MatroskaHevcDolbyLimits,
+    BuildStep,
+    aac::AacConfigLimits,
+    avc::{AvcAnnexBLimits, AvcConfigLimits},
+    hevc::HvcConfigLimits,
 };
 
 /// Work granted to each step of a session.

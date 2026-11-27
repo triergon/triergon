@@ -3,7 +3,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvb::{Options, ReceiverDecoder};
+use triergon_subtitles::compat::dvb::{Decoder, Options};
 
 struct SourcePacket {
     body: &'static [u8],
@@ -38,7 +38,7 @@ fn run(index: usize) {
     let case = &cases::ALL[index];
     let pool = Budget::new(4 << 20).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = ReceiverDecoder::new(&pool, &[0, 1, 0, 2, 0x14], Options::default());
+    let mut decoder = Decoder::new(&pool, &[0, 1, 0, 2, 0x14], Options::default());
     let mut expected = case.events.iter();
     for packet in case.packets {
         let mut work = WorkBudget::new(u64::MAX);

@@ -1,7 +1,7 @@
 //! Numbers in DICT data and charstrings (TN 5176 Table 3, TN 5177 3.2): the
-//! integer encodings both share, and DICT numbers read into 16.16 as FreeType's
-//! DICT parser reads them (`cff_parse_integer`, `cff_parse_real`, `do_fixed`,
-//! `cff_parse_fixed_dynamic` and `cff_parse_num`).
+//! integer encodings both share, and DICT numbers read into 16.16 with 32-bit
+//! integer arithmetic, as FreeType reads them on 32-bit ARM.
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 use crate::fixed::div_fix;
 use crate::read::Reader;
@@ -20,7 +20,7 @@ pub(super) const POWER_TENS: [i64; 10] = [
     1_000_000_000,
 ];
 
-/// `10^n`; FreeType's readings keep `n` within the table.
+/// `10^n`; the readings of a real keep `n` within the table.
 fn ten(n: i64) -> i64 {
     POWER_TENS[usize::try_from(n).unwrap_or(0).min(9)]
 }
@@ -38,9 +38,8 @@ pub(super) fn shared_integer(byte: u8, r: &mut Reader<'_>) -> Result<Option<i32>
     }))
 }
 
-/// `cff_parse_integer` as GCC builds it for 32-bit ARM, where `FT_Long` has
-/// 32 bits: a DICT integer, the five-byte form signed. It reads 27, which no
-/// format defines, as a one-byte number.
+/// A DICT integer in 32 bits, the five-byte form signed. 27, which no format
+/// defines, reads as a one-byte number.
 fn dict_integer(byte: u8, r: &mut Reader<'_>) -> Result<i32> {
     match byte {
         27 => Ok(i32::from(byte) - 139),
@@ -49,18 +48,17 @@ fn dict_integer(byte: u8, r: &mut Reader<'_>) -> Result<i32> {
     }
 }
 
-/// `(FT_Long)((FT_ULong)v << 16)` with a 32-bit `FT_Long`: an integer in
-/// 16.16, wrapping.
+/// An integer in 16.16, wrapping in 32 bits.
 const fn to_fixed(v: i32) -> i64 {
     ((v.cast_unsigned() << 16).cast_signed()) as i64
 }
 
-/// `FT_LONG_MAX / 10^scaling` with a 32-bit `FT_Long`.
+/// The largest value that times `10^scaling` fits 32 bits.
 fn power_ten_limit(scaling: usize) -> i32 {
     (i64::from(i32::MAX) / POWER_TENS[scaling.min(9)]) as i32
 }
 
-/// The digits of a real number as `cff_parse_real` collects them.
+/// The digits of a real number, as its nibbles give them.
 struct Real {
     negative: bool,
     number: i64,
@@ -140,7 +138,7 @@ impl Real {
         if self.negative { -v } else { v }
     }
 
-    /// `cff_parse_real` without a scale: 16.16, times `10^power_ten`.
+    /// The real in 16.16, times `10^power_ten`, saturating at ±`0x7fffffff`.
     fn fixed(self, power_ten: i64) -> i64 {
         if self.number == 0 {
             return 0;
@@ -185,8 +183,8 @@ impl Real {
         self.sign(result)
     }
 
-    /// `cff_parse_real` with a dynamic scale: the significant digits as 16.16
-    /// and the power of ten that scales them. Exponents past 1000 saturate.
+    /// The real's significant digits as 16.16 and the power of ten that
+    /// scales them. Exponents past 1000 saturate.
     fn dynamic(self) -> (i64, i64) {
         if self.number == 0 {
             return (0, 0);
@@ -252,8 +250,8 @@ impl Nibbles<'_, '_> {
     }
 }
 
-/// `cff_parse_fixed_dynamic`: a DICT number as a 16.16 value and the power of
-/// ten that scales it, keeping as many digits as fit.
+/// A DICT number as a 16.16 value and the power of ten that scales it,
+/// keeping as many digits as fit.
 pub(super) fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
     let byte = r.u8()?;
     let number = match byte {
@@ -272,8 +270,8 @@ pub(super) fn fixed_dynamic(r: &mut Reader<'_>) -> Result<(i64, i64)> {
     })
 }
 
-/// A DICT operand as FreeType's parser holds it: its encoding, or the 16.16
-/// result of a CFF2 `blend`, which it pushes as a 32-bit number.
+/// A DICT operand: its encoding, or the 16.16 result of a CFF2 `blend`, held
+/// as a 32-bit number.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Operand<'a> {
     /// The bytes from the operand's first on.
@@ -288,9 +286,8 @@ impl Default for Operand<'_> {
 }
 
 impl Operand<'_> {
-    /// `do_fixed` as GCC builds it for 32-bit ARM: the operand in 16.16,
-    /// times `10^scaling`, saturating as FreeType saturates. Its limit tests
-    /// shift and compare 32-bit values, wrapping as they do there.
+    /// The operand in 16.16, times `10^scaling`, saturating at ±`0x7fffffff`.
+    /// The limit tests shift and compare 32-bit values, which wrap.
     pub(crate) fn fixed(self, scaling: usize) -> i64 {
         let power = POWER_TENS[scaling.min(9)] as i32;
         let limit = power_ten_limit(scaling);
@@ -329,14 +326,14 @@ impl Operand<'_> {
         }
     }
 
-    /// The operand as an offset, count or index FreeType stores in an
-    /// unsigned field: `cff_parse_num`, cast to 32 bits.
+    /// The operand as an offset, count or index: [`Self::integer`], cast to
+    /// 32 bits unsigned.
     pub(crate) fn unsigned(self) -> usize {
         self.integer() as u32 as usize
     }
 
-    /// `cff_parse_num`: the operand as an integer, a real truncated toward
-    /// negative infinity and a blend rounded to 16 bits.
+    /// The operand as an integer, a real truncated toward negative infinity
+    /// and a blend rounded to 16 bits.
     pub(crate) fn integer(self) -> i64 {
         match self {
             Self::Encoded(bytes) => {
@@ -433,10 +430,10 @@ mod tests {
         assert_eq!(operand(&[29, 0, 1, 0, 0]).fixed(9), -0x7fff_ffff);
         // 70000 × 10: the shifted value wraps, but stays above the limit.
         assert_eq!(operand(&[29, 0, 1, 0x11, 0x70]).fixed(1), 0x7fff_ffff);
-        // A blend checks its 16.16 value against FT_LONG_MAX / 10^s in 32 bits.
+        // A blend checks its 16.16 value against (2^31 - 1) / 10^s in 32 bits.
         assert_eq!(Operand::Blended(0x0021_0000).fixed(3), 0x7fff_ffff);
         assert_eq!(Operand::Blended(0x0020_0000).fixed(3), 0x0020_0000 * 1000);
-        // `cff_parse_fixed_dynamic` shifts an integer into 16.16 in 32 bits.
+        // `fixed_dynamic` shifts an integer into 16.16 in 32 bits.
         let mut r = Reader::new(&[29, 0xff, 0xfe, 0x79, 0x60]);
         assert_eq!(fixed_dynamic(&mut r), Ok((2_036_334_592, 0)));
     }

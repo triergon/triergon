@@ -1,6 +1,6 @@
 //! Complete, independently configured LATM seek envelopes.
 use triergon_core::WorkBudget;
-use triergon_framing::indexed_aac_frequency;
+use triergon_framing::aac::indexed_frequency;
 
 // ISO/IEC 14496-3 §1.7.3, Tables 1.20–1.23 (2001/Cor.2:2004):
 // AudioMuxElement repeats PayloadLengthInfo then PayloadMux for each subframe.
@@ -26,7 +26,7 @@ impl Probe {
         if asc >> 11 != 2 || asc & 7 != 0 || !(1..=7).contains(&((asc >> 3) & 15)) {
             return None;
         }
-        indexed_aac_frequency(((asc >> 7) & 15) as u8)?;
+        indexed_frequency(((asc >> 7) & 15) as u8)?;
         // Variable byte lengths, with neither other data nor a CRC.
         if length_type >> 5 != 0 || flags & 0x18 != 0 {
             return None;

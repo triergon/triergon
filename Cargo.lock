@@ -9,6 +9,7 @@ dependencies = [
  "triergon-ass",
  "triergon-core",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-raster",
  "triergon-worker-entry",
 ]
@@ -18,6 +19,7 @@ name = "capture-worker"
 version = "0.0.0"
 dependencies = [
  "triergon-capture",
+ "triergon-harness-runner",
  "triergon-worker-entry",
 ]
 
@@ -26,10 +28,18 @@ name = "codec-worker"
 version = "0.0.0"
 dependencies = [
  "triergon",
+ "triergon-bitstream",
  "triergon-codec",
  "triergon-codec-aac",
  "triergon-codec-ac3",
+ "triergon-codec-dca",
+ "triergon-codec-h264",
+ "triergon-codec-hevc",
+ "triergon-codec-mpeg1",
+ "triergon-codec-opus",
+ "triergon-core",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-isobmff",
  "triergon-pixel",
  "triergon-session",
@@ -43,6 +53,7 @@ dependencies = [
  "triergon-core",
  "triergon-font",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-worker-entry",
 ]
 
@@ -50,7 +61,9 @@ dependencies = [
 name = "media-worker"
 version = "0.0.0"
 dependencies = [
+ "triergon-core",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-matroska",
  "triergon-worker-entry",
 ]
@@ -59,14 +72,19 @@ dependencies = [
 name = "playback-worker"
 version = "0.0.0"
 dependencies = [
+ "triergon-bridge",
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
  "triergon-harness-runner",
+ "triergon-harness-test-support",
+ "triergon-hls",
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
  "triergon-playback",
+ "triergon-raw-video",
+ "triergon-subtitles",
  "triergon-worker-entry",
 ]
 
@@ -77,6 +95,7 @@ dependencies = [
  "triergon-core",
  "triergon-font",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-raster",
  "triergon-worker-entry",
 ]
@@ -88,6 +107,7 @@ dependencies = [
  "triergon-core",
  "triergon-font",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-shape",
  "triergon-worker-entry",
 ]
@@ -100,6 +120,7 @@ dependencies = [
  "triergon-core",
  "triergon-harness-protocol",
  "triergon-harness-runner",
+ "triergon-harness-test-support",
  "triergon-mpegts",
  "triergon-subtitles",
  "triergon-worker-entry",
@@ -122,13 +143,34 @@ name = "triergon"
 version = "0.0.0"
 dependencies = [
  "triergon",
+ "triergon-ass",
+ "triergon-bitstream",
+ "triergon-bridge",
+ "triergon-codec",
+ "triergon-codec-aac",
+ "triergon-codec-ac3",
+ "triergon-codec-dca",
+ "triergon-codec-flac",
+ "triergon-codec-h264",
+ "triergon-codec-hevc",
+ "triergon-codec-mp3",
+ "triergon-codec-opus",
+ "triergon-codec-vorbis",
  "triergon-core",
  "triergon-elementary",
+ "triergon-font",
  "triergon-framing",
+ "triergon-hls",
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
  "triergon-ogg",
+ "triergon-pixel",
+ "triergon-playback",
+ "triergon-raster",
+ "triergon-raw-video",
+ "triergon-session",
+ "triergon-shape",
  "triergon-subtitles",
 ]
 
@@ -145,6 +187,22 @@ dependencies = [
 [[package]]
 name = "triergon-bitstream"
 version = "0.0.0"
+
+[[package]]
+name = "triergon-bridge"
+version = "0.0.0"
+dependencies = [
+ "triergon-bitstream",
+ "triergon-core",
+ "triergon-framing",
+ "triergon-isobmff",
+ "triergon-matroska",
+ "triergon-mpegts",
+ "triergon-playback",
+ "triergon-raw-video",
+ "triergon-session",
+ "triergon-subtitles",
+]
 
 [[package]]
 name = "triergon-capture"
@@ -170,6 +228,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -178,6 +237,7 @@ version = "0.0.0"
 dependencies = [
  "triergon-bitstream",
  "triergon-codec",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -185,6 +245,7 @@ name = "triergon-codec-dca"
 version = "0.0.0"
 dependencies = [
  "triergon-codec",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -196,6 +257,7 @@ dependencies = [
  "triergon-codec",
  "triergon-core",
  "triergon-framing",
+ "triergon-harness-protocol",
 ]
 
 [[package]]
@@ -285,6 +347,8 @@ dependencies = [
  "triergon-bitstream",
  "triergon-core",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
+ "triergon-harness-test-support",
  "triergon-worker-entry",
 ]
 
@@ -301,12 +365,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "triergon-harness-test-support"
+version = "0.0.0"
+
+[[package]]
+name = "triergon-hls"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-framing",
+ "triergon-mpegts",
+ "triergon-playback",
+ "triergon-raw-video",
+]
+
+[[package]]
 name = "triergon-isobmff"
 version = "0.0.0"
 dependencies = [
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
  "triergon-worker-entry",
 ]
 
@@ -317,6 +397,8 @@ dependencies = [
  "triergon-bitstream",
  "triergon-core",
  "triergon-harness-protocol",
+ "triergon-harness-runner",
+ "triergon-worker-entry",
 ]
 
 [[package]]
@@ -327,6 +409,7 @@ dependencies = [
  "triergon-core",
  "triergon-framing",
  "triergon-harness-protocol",
+ "triergon-harness-test-support",
 ]
 
 [[package]]
@@ -346,14 +429,10 @@ version = "0.0.0"
 name = "triergon-playback"
 version = "0.0.0"
 dependencies = [
- "triergon-bitstream",
  "triergon-core",
- "triergon-framing",
  "triergon-isobmff",
  "triergon-matroska",
  "triergon-mpegts",
- "triergon-session",
- "triergon-subtitles",
 ]
 
 [[package]]
@@ -362,6 +441,16 @@ version = "0.0.0"
 dependencies = [
  "triergon-core",
  "triergon-font",
+]
+
+[[package]]
+name = "triergon-raw-video"
+version = "0.0.0"
+dependencies = [
+ "triergon-core",
+ "triergon-framing",
+ "triergon-mpegts",
+ "triergon-playback",
 ]
 
 [[package]]
@@ -412,3 +501,6 @@ version = "0.0.0"
 [[package]]
 name = "xtask"
 version = "0.0.0"
+dependencies = [
+ "triergon-harness-test-support",
+]

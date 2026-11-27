@@ -2,7 +2,7 @@
 //! (ISO/IEC 14496-3 4.6.11), plus the forward MDCT used by LTP.
 
 use crate::fft::Mdct;
-use crate::ics::{EIGHT_SHORT, LONG_START, LONG_STOP};
+use crate::ics::{WindowSequence, WindowShape};
 
 /// Rising half (n < N/2) of the KBD window of length `n2 * 2` (ISO/IEC 14496-3 4.6.11.3.2).
 fn kbd_window(n2: usize, alpha: f64) -> Vec<f32> {
@@ -107,21 +107,21 @@ impl Filterbank {
     pub(crate) fn synth(
         &mut self,
         coef: &[f32],
-        seq: u8,
-        shape: u8,
-        prev_shape: u8,
+        seq: WindowSequence,
+        shape: WindowShape,
+        prev_shape: WindowShape,
         overlap: &mut [f32],
         out: &mut [f32],
     ) {
-        if seq != EIGHT_SHORT {
+        if seq != WindowSequence::EightShort {
             let w = &self.win;
-            let rise = if seq == LONG_STOP {
+            let rise = if seq == WindowSequence::LongStop {
                 &w.rise_stop
             } else {
                 &w.rise_long
             }[prev_shape as usize]
                 .as_slice();
-            let fall = if seq == LONG_START {
+            let fall = if seq == WindowSequence::LongStart {
                 &w.fall_start
             } else {
                 &w.fall_long
@@ -210,9 +210,9 @@ impl Filterbank {
     pub(crate) fn mdct_windowed(
         &mut self,
         time: &[f32],
-        seq: u8,
-        shape: u8,
-        prev_shape: u8,
+        seq: WindowSequence,
+        shape: WindowShape,
+        prev_shape: WindowShape,
         out: &mut [f32],
     ) {
         let wl_prev = &self.win.long[prev_shape as usize];
@@ -222,7 +222,7 @@ impl Filterbank {
         let buf = &mut self.buf;
         buf[..2048].copy_from_slice(&time[..2048]);
         match seq {
-            LONG_STOP => {
+            WindowSequence::LongStop => {
                 for v in &mut buf[0..448] {
                     *v = 0.0;
                 }
@@ -237,7 +237,7 @@ impl Filterbank {
             }
         }
         match seq {
-            LONG_START => {
+            WindowSequence::LongStart => {
                 for i in 0..128 {
                     buf[1472 + i] *= ws_cur[127 - i];
                 }
@@ -252,8 +252,8 @@ impl Filterbank {
             }
         }
         let b: &[f32] = &self.buf;
-        // MDCT of a windowed block; the spec forward MDCT has no extra factor, our time
-        // samples are float-scaled (1/32768) so the transform scale restores the spectral domain.
+        // MDCT of a windowed block. The specification's forward MDCT has no extra factor;
+        // the time samples are at float scale (1/32768), which the transform's scale undoes.
         self.mdct_long.mdct(b, out);
     }
 }

@@ -2,7 +2,7 @@
 
 use super::{Context, Outcome};
 use crate::capture::compare::ENCODER_RATE_FACTORS;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 /// The approved requested-rate factors of the encoder comparison rule.
 pub const APPROVED_RATE_FACTORS: [f64; 6] = [1.25, 1.6, 2.0, 2.6, 3.4, 4.5];
@@ -19,7 +19,7 @@ fn numbers(value: Option<&Value>) -> Option<Vec<f64>> {
 }
 
 pub fn encoder_rate_loop_matches_the_approved_contract(cx: &mut Context<'_>) -> Outcome {
-    let contract = crate::checks::read_json(&cx.root.join("harness/capture/contract.json"))?;
+    let contract = json::read(&cx.root.join("harness/capture/contract.json"))?;
     let factors = numbers(
         contract
             .get("comparison_rules")

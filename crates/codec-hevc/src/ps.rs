@@ -1,49 +1,48 @@
 //! Parameter sets: VPS (clause 7.3.2.1), SPS (7.3.2.2), PPS (7.3.2.3), profile/tier/level
 //! (7.3.3), scaling lists (7.3.4 / 7.4.5), short-term RPS (7.3.7 / 7.4.8), VUI (E.2.1).
 
-use crate::bits::{BitCursor, BitSource, Ranged};
-use crate::error::{DecodeError, Result};
+use crate::bits::BitCursor;
 use crate::tables::{DEFAULT_SCALING_INTER, DEFAULT_SCALING_INTRA, DIAG_SCAN_4X4, DIAG_SCAN_8X8};
+use crate::{DecodeError, Result};
 use triergon_codec::{Budget, BudgetVec};
 
 /// A parameter set as the decoder keeps it: charged for its size, and shared with the
 /// pictures and layout that use it.
-pub type Shared<T> = std::sync::Arc<triergon_codec::Charged<Box<T>>>;
+pub(crate) type Shared<T> = std::sync::Arc<triergon_codec::Charged<Box<T>>>;
 
-pub const MAX_SPS: usize = 16;
-pub const MAX_PPS: usize = 64;
-pub const MAX_VPS: usize = 16;
+pub(crate) const MAX_SPS: usize = 16;
+pub(crate) const MAX_PPS: usize = 64;
 /// Level 6.2 MaxLumaPs (Table A.8).
-pub const MAX_LUMA_PS: u64 = 35_651_584;
-pub const MAX_DIM: u32 = 16888;
+pub(crate) const MAX_LUMA_PS: u64 = 35_651_584;
+pub(crate) const MAX_DIM: u32 = 16888;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct ShortTermRps {
-    pub num_negative: u8,
-    pub num_positive: u8,
+pub(crate) struct ShortTermRps {
+    pub(crate) num_negative: u8,
+    pub(crate) num_positive: u8,
     /// DeltaPocS0 followed by DeltaPocS1.
-    pub delta_poc: [i32; 32],
-    pub used: [bool; 32],
+    pub(crate) delta_poc: [i32; 32],
+    pub(crate) used: [bool; 32],
 }
 
 impl ShortTermRps {
     #[inline]
-    pub fn num_delta_pocs(&self) -> usize {
+    pub(crate) fn num_delta_pocs(&self) -> usize {
         self.num_negative as usize + self.num_positive as usize
     }
     #[inline]
-    pub fn s0(&self, i: usize) -> (i32, bool) {
+    pub(crate) fn s0(&self, i: usize) -> (i32, bool) {
         (self.delta_poc[i], self.used[i])
     }
     #[inline]
-    pub fn s1(&self, i: usize) -> (i32, bool) {
+    pub(crate) fn s1(&self, i: usize) -> (i32, bool) {
         let j = self.num_negative as usize + i;
         (self.delta_poc[j], self.used[j])
     }
 }
 
 /// st_ref_pic_set( stRpsIdx ). `sets` holds candidate RPSs 0..stRpsIdx-1.
-pub fn parse_st_rps(
+pub(crate) fn parse_st_rps(
     r: &mut BitCursor<'_>,
     st_rps_idx: usize,
     num_short_term_ref_pic_sets: usize,
@@ -113,7 +112,7 @@ pub fn parse_st_rps(
             }
         }
         if s0.len() + s1.len() > 16 {
-            return Err(DecodeError::InvalidData("too many RPS entries"));
+            return Err(DecodeError::Invalid("too many RPS entries"));
         }
         out.num_negative = s0.len() as u8;
         out.num_positive = s1.len() as u8;
@@ -125,7 +124,7 @@ pub fn parse_st_rps(
         let nneg = r.ue_max(max_dec_pic_buffering_minus1.max(15), "num_negative_pics")?;
         let npos = r.ue_max(max_dec_pic_buffering_minus1.max(15), "num_positive_pics")?;
         if nneg + npos > 16 {
-            return Err(DecodeError::InvalidData("too many RPS entries"));
+            return Err(DecodeError::Invalid("too many RPS entries"));
         }
         out.num_negative = nneg as u8;
         out.num_positive = npos as u8;
@@ -149,15 +148,15 @@ pub fn parse_st_rps(
 
 /// Scaling factors (clause 7.4.5) expanded to full block sizes, stored as [y][x] row-major.
 #[derive(Debug, Clone)]
-pub struct ScalingList {
+pub(crate) struct ScalingList {
     /// sizeId 0: 6 matrices of 16.
-    pub sl4: [[u8; 16]; 6],
+    pub(crate) sl4: [[u8; 16]; 6],
     /// sizeId 1: 6 matrices of 64.
-    pub sl8: [[u8; 64]; 6],
+    pub(crate) sl8: [[u8; 64]; 6],
     /// sizeId 2: 6 matrices of 256.
-    pub sl16: [[u8; 256]; 6],
+    pub(crate) sl16: [[u8; 256]; 6],
     /// sizeId 3: 6 matrices of 1024 (only 0 and 3 used for 4:2:0).
-    pub sl32: [[u8; 1024]; 6],
+    pub(crate) sl32: [[u8; 1024]; 6],
 }
 
 #[derive(Clone)]
@@ -229,7 +228,7 @@ impl ScalingListRaw {
                         let delta = r.se_range(-128, 127, "scaling_list_delta_coef")?;
                         next = (next + delta + 256) % 256;
                         if next == 0 {
-                            return Err(DecodeError::InvalidData("scaling list entry zero"));
+                            return Err(DecodeError::Invalid("scaling list entry zero"));
                         }
                         *e = next as u8;
                     }
@@ -282,32 +281,19 @@ impl ScalingListRaw {
 }
 
 impl ScalingList {
-    pub fn default_list() -> ScalingList {
+    pub(crate) fn default_list() -> ScalingList {
         ScalingListRaw::default_lists().expand()
     }
 }
 
-#[derive(Clone, Debug, Default)]
-#[allow(dead_code)] // informative fields kept for diagnostics
-pub struct ProfileInfo {
-    pub profile_space: u8,
-    pub tier: bool,
-    pub profile_idc: u8,
-    pub compat: u32,
-    pub level_idc: u8,
-}
-
-fn parse_ptl(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<ProfileInfo> {
-    let mut p = ProfileInfo {
-        profile_space: r.read(2)? as u8,
-        tier: r.flag()?,
-        profile_idc: r.read(5)? as u8,
-        compat: r.read(32)?,
-        level_idc: 0,
-    };
-    // progressive/interlaced/non_packed/frame_only (4) + 43 bits + 1 bit.
-    r.skip(4 + 43 + 1)?;
-    p.level_idc = r.read(8)? as u8;
+/// profile_tier_level() (7.3.3); returns general_profile_idc, the one field used.
+fn parse_ptl(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<u8> {
+    // general_profile_space (2), general_tier_flag (1).
+    r.skip(3)?;
+    let profile_idc = r.read(5)? as u8;
+    // general_profile_compatibility_flag[32], progressive/interlaced/non_packed/frame_only
+    // (4), 43 constraint bits, one more and general_level_idc (8).
+    r.skip(32 + 4 + 43 + 1 + 8)?;
     let mut prof_present = [false; 8];
     let mut lvl_present = [false; 8];
     for i in 0..max_sub_layers_minus1 as usize {
@@ -327,32 +313,40 @@ fn parse_ptl(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<Profil
             r.skip(8)?;
         }
     }
-    Ok(p)
+    Ok(profile_idc)
 }
 
+/// Check that a VPS carries its `vps_video_parameter_set_id`; nothing else of it is used.
+pub(crate) fn parse_vps(rbsp: &[u8]) -> Result<()> {
+    BitCursor::new(rbsp).read(4)?;
+    Ok(())
+}
+
+/// The VUI fields the output pictures carry (E.2.1).
 #[derive(Clone, Debug)]
-pub struct Vps {
-    pub id: u8,
+pub(crate) struct Vui {
+    pub(crate) sar: (u32, u32),
+    pub(crate) video_signal_type_present: bool,
+    pub(crate) full_range: bool,
+    pub(crate) colour_description_present: bool,
+    pub(crate) colour_primaries: u8,
+    pub(crate) transfer_characteristics: u8,
+    pub(crate) matrix_coeffs: u8,
 }
 
-pub fn parse_vps(rbsp: &[u8]) -> Result<Vps> {
-    let mut r = BitCursor::new(rbsp);
-    let id = r.read(4)? as u8;
-    Ok(Vps { id })
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct Vui {
-    pub sar: (u32, u32),
-    pub video_signal_type_present: bool,
-    pub video_format: u8,
-    pub full_range: bool,
-    pub colour_description_present: bool,
-    pub colour_primaries: u8,
-    pub transfer_characteristics: u8,
-    pub matrix_coeffs: u8,
-    pub field_seq_flag: bool,
-    pub default_display_window: [u32; 4],
+impl Default for Vui {
+    /// The values of a stream that signals none of them.
+    fn default() -> Self {
+        Vui {
+            sar: (0, 1),
+            video_signal_type_present: false,
+            full_range: false,
+            colour_description_present: false,
+            colour_primaries: 2,
+            transfer_characteristics: 2,
+            matrix_coeffs: 2,
+        }
+    }
 }
 
 /// Table E.1 sample aspect ratio indicators.
@@ -433,14 +427,7 @@ fn parse_hrd(r: &mut BitCursor<'_>, common: bool, max_sub_layers_minus1: u32) ->
 }
 
 fn parse_vui(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
-    let mut v = Vui {
-        sar: (0, 1),
-        colour_primaries: 2,
-        transfer_characteristics: 2,
-        matrix_coeffs: 2,
-        video_format: 5,
-        ..Default::default()
-    };
+    let mut v = Vui::default();
     if r.flag()? {
         let idc = r.read(8)?;
         if idc == 255 {
@@ -458,7 +445,7 @@ fn parse_vui(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
     }
     if r.flag()? {
         v.video_signal_type_present = true;
-        v.video_format = r.read(3)? as u8;
+        r.skip(3)?; // video_format
         v.full_range = r.flag()?;
         if r.flag()? {
             v.colour_description_present = true;
@@ -472,11 +459,12 @@ fn parse_vui(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
         r.ue()?;
     }
     r.skip(1)?; // neutral_chroma_indication_flag
-    v.field_seq_flag = r.flag()?;
+    r.skip(1)?; // field_seq_flag
     r.skip(1)?; // frame_field_info_present_flag
     if r.flag()? {
-        for e in &mut v.default_display_window {
-            *e = r.ue()?;
+        // default_display_window offsets.
+        for _ in 0..4 {
+            r.ue()?;
         }
     }
     if r.flag()? {
@@ -500,87 +488,79 @@ fn parse_vui(r: &mut BitCursor<'_>, max_sub_layers_minus1: u32) -> Result<Vui> {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // informative fields kept for diagnostics
-pub struct Sps {
-    pub id: u8,
-    pub vps_id: u8,
-    pub max_sub_layers_minus1: u32,
-    pub profile: ProfileInfo,
-    pub chroma_format_idc: u32,
-    pub width: u32,
-    pub height: u32,
+pub(crate) struct Sps {
+    pub(crate) id: u8,
+    pub(crate) max_sub_layers_minus1: u32,
+    pub(crate) profile_idc: u8,
+    pub(crate) width: u32,
+    pub(crate) height: u32,
     /// Conformance window in luma samples (left, right, top, bottom).
-    pub conf_win: [u32; 4],
-    pub bit_depth_luma: u32,
-    pub bit_depth_chroma: u32,
-    pub log2_max_poc_lsb: u32,
-    pub max_dec_pic_buffering: [u32; 8],
-    pub max_num_reorder: [u32; 8],
-    pub max_latency_increase_plus1: [u32; 8],
-    pub log2_min_cb: u32,
-    pub log2_ctb: u32,
-    pub log2_min_tb: u32,
-    pub log2_max_tb: u32,
-    pub max_th_depth_inter: u32,
-    pub max_th_depth_intra: u32,
-    pub scaling_list_enabled: bool,
-    pub scaling_list: Option<ScalingList>,
-    pub amp: bool,
-    pub sao: bool,
-    pub pcm: bool,
-    pub pcm_bit_depth_luma: u32,
-    pub pcm_bit_depth_chroma: u32,
-    pub log2_min_pcm: u32,
-    pub log2_max_pcm: u32,
-    pub pcm_loop_filter_disabled: bool,
+    pub(crate) conf_win: [u32; 4],
+    pub(crate) bit_depth_luma: u32,
+    pub(crate) bit_depth_chroma: u32,
+    pub(crate) log2_max_poc_lsb: u32,
+    pub(crate) max_dec_pic_buffering: [u32; 8],
+    pub(crate) max_num_reorder: [u32; 8],
+    pub(crate) max_latency_increase_plus1: [u32; 8],
+    pub(crate) log2_min_cb: u32,
+    pub(crate) log2_ctb: u32,
+    pub(crate) log2_min_tb: u32,
+    pub(crate) log2_max_tb: u32,
+    pub(crate) max_th_depth_inter: u32,
+    pub(crate) max_th_depth_intra: u32,
+    /// The scaling factors when scaling_list_enabled_flag is set.
+    pub(crate) scaling_list: Option<ScalingList>,
+    pub(crate) amp: bool,
+    pub(crate) sao: bool,
+    pub(crate) pcm: bool,
+    pub(crate) pcm_bit_depth_luma: u32,
+    pub(crate) pcm_bit_depth_chroma: u32,
+    pub(crate) log2_min_pcm: u32,
+    pub(crate) log2_max_pcm: u32,
+    pub(crate) pcm_loop_filter_disabled: bool,
     /// st_ref_pic_set(i), i < num_short_term_ref_pic_sets.
-    pub st_rps: [ShortTermRps; 64],
-    pub num_short_term_ref_pic_sets: usize,
-    pub long_term_refs_present: bool,
+    pub(crate) st_rps: [ShortTermRps; 64],
+    pub(crate) num_short_term_ref_pic_sets: usize,
+    pub(crate) long_term_refs_present: bool,
     /// lt_ref_pic_poc_lsb_sps[i] and used_by_curr_pic_lt_sps_flag[i],
     /// i < num_long_term_ref_pics_sps.
-    pub lt_ref_pic_poc_lsb: [u32; 32],
-    pub lt_used_by_curr: [bool; 32],
-    pub num_long_term_ref_pics_sps: u32,
-    pub temporal_mvp: bool,
-    pub strong_intra_smoothing: bool,
-    pub vui: Vui,
+    pub(crate) lt_ref_pic_poc_lsb: [u32; 32],
+    pub(crate) lt_used_by_curr: [bool; 32],
+    pub(crate) num_long_term_ref_pics_sps: u32,
+    pub(crate) temporal_mvp: bool,
+    pub(crate) strong_intra_smoothing: bool,
+    pub(crate) vui: Vui,
     // Derived.
-    pub ctb_size: u32,
-    pub pic_w_ctb: u32,
-    pub pic_h_ctb: u32,
-    pub min_cb_w: u32,
-    pub min_cb_h: u32,
+    pub(crate) ctb_size: u32,
+    pub(crate) pic_w_ctb: u32,
+    pub(crate) pic_h_ctb: u32,
 }
 
 impl Sps {
     #[inline]
-    pub fn pic_size_ctb(&self) -> u32 {
+    pub(crate) fn pic_size_ctb(&self) -> u32 {
         self.pic_w_ctb * self.pic_h_ctb
     }
-    pub fn high_bit_depth(&self) -> bool {
+    pub(crate) fn high_bit_depth(&self) -> bool {
         self.bit_depth_luma > 8 || self.bit_depth_chroma > 8
     }
 }
 
-pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
+pub(crate) fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     let mut r = BitCursor::new(rbsp);
-    let vps_id = r.read(4)? as u8;
+    r.skip(4)?; // sps_video_parameter_set_id
     let max_sub_layers_minus1 = r.read(3)?;
     if max_sub_layers_minus1 > 6 {
-        return Err(DecodeError::InvalidData("sps_max_sub_layers_minus1"));
+        return Err(DecodeError::Invalid("sps_max_sub_layers_minus1"));
     }
     let _temporal_id_nesting = r.flag()?;
-    let profile = parse_ptl(&mut r, max_sub_layers_minus1)?;
+    let profile_idc = parse_ptl(&mut r, max_sub_layers_minus1)?;
     let id = r.ue_max(15, "sps_seq_parameter_set_id")? as u8;
     let chroma_format_idc = r.ue_max(3, "chroma_format_idc")?;
-    if chroma_format_idc == 3 {
-        let sep = r.flag()?;
-        if sep {
-            return Err(DecodeError::Unsupported(
-                "separate_colour_plane_flag (4:4:4 RExt)",
-            ));
-        }
+    if chroma_format_idc == 3 && r.flag()? {
+        return Err(DecodeError::Unsupported(
+            "separate_colour_plane_flag (4:4:4 RExt)",
+        ));
     }
     match chroma_format_idc {
         1 => {}
@@ -645,24 +625,22 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     let log2_min_tb = r.ue_max(3, "log2_min_luma_transform_block_size_minus2")? + 2;
     let log2_max_tb = log2_min_tb + r.ue_max(3, "log2_diff_max_min_luma_transform_block_size")?;
     if !(4..=6).contains(&log2_ctb) {
-        return Err(DecodeError::InvalidData("CTB size outside 16..64"));
+        return Err(DecodeError::Invalid("CTB size outside 16..64"));
     }
     if log2_min_tb >= log2_min_cb || log2_max_tb > 5 || log2_max_tb > log2_ctb {
-        return Err(DecodeError::InvalidData("transform block size range"));
+        return Err(DecodeError::Invalid("transform block size range"));
     }
     if width == 0
         || height == 0
         || width % (1 << log2_min_cb) != 0
         || height % (1 << log2_min_cb) != 0
     {
-        return Err(DecodeError::InvalidData(
+        return Err(DecodeError::Invalid(
             "picture size not a multiple of MinCbSizeY",
         ));
     }
     if width > MAX_DIM || height > MAX_DIM || (width as u64 * height as u64) > MAX_LUMA_PS {
-        return Err(DecodeError::ResourceLimit(
-            "picture size above level 6.2 limits",
-        ));
+        return Err(DecodeError::Policy("picture size above level 6.2 limits"));
     }
     let max_th_depth_inter = r.ue_max(
         log2_ctb - log2_min_tb,
@@ -672,9 +650,8 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         log2_ctb - log2_min_tb,
         "max_transform_hierarchy_depth_intra",
     )?;
-    let scaling_list_enabled = r.flag()?;
     let mut scaling_list = None;
-    if scaling_list_enabled {
+    if r.flag()? {
         if r.flag()? {
             scaling_list = Some(ScalingListRaw::parse(&mut r)?.expand());
         } else {
@@ -695,13 +672,13 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         pcm_bit_depth_luma = r.read(4)? + 1;
         pcm_bit_depth_chroma = r.read(4)? + 1;
         if pcm_bit_depth_luma > bit_depth_luma || pcm_bit_depth_chroma > bit_depth_chroma {
-            return Err(DecodeError::InvalidData("PCM bit depth exceeds bit depth"));
+            return Err(DecodeError::Invalid("PCM bit depth exceeds bit depth"));
         }
         log2_min_pcm = r.ue_max(2, "log2_min_pcm_luma_coding_block_size_minus3")? + 3;
         log2_max_pcm =
             log2_min_pcm + r.ue_max(2, "log2_diff_max_min_pcm_luma_coding_block_size")?;
         if log2_max_pcm > 5.min(log2_ctb) {
-            return Err(DecodeError::InvalidData("PCM size"));
+            return Err(DecodeError::Invalid("PCM size"));
         }
         pcm_lf = r.flag()?;
     }
@@ -727,15 +704,67 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
     let vui = if r.flag()? {
         parse_vui(&mut r, max_sub_layers_minus1)?
     } else {
-        Vui {
-            sar: (0, 1),
-            colour_primaries: 2,
-            transfer_characteristics: 2,
-            matrix_coeffs: 2,
-            video_format: 5,
-            ..Default::default()
-        }
+        Vui::default()
     };
+    parse_sps_extensions(&mut r)?;
+    let ctb_size = 1 << log2_ctb;
+    let pic_w_ctb = width.div_ceil(ctb_size);
+    let pic_h_ctb = height.div_ceil(ctb_size);
+    let sub = 2; // SubWidthC == SubHeightC == 2 for 4:2:0
+    if (conf_win[0] + conf_win[1]) * sub >= width || (conf_win[2] + conf_win[3]) * sub >= height {
+        return Err(DecodeError::Invalid("conformance window"));
+    }
+    let conf_win = [
+        conf_win[0] * sub,
+        conf_win[1] * sub,
+        conf_win[2] * sub,
+        conf_win[3] * sub,
+    ];
+    Ok(Sps {
+        id,
+        max_sub_layers_minus1,
+        profile_idc,
+        width,
+        height,
+        conf_win,
+        bit_depth_luma,
+        bit_depth_chroma,
+        log2_max_poc_lsb,
+        max_dec_pic_buffering,
+        max_num_reorder,
+        max_latency_increase_plus1,
+        log2_min_cb,
+        log2_ctb,
+        log2_min_tb,
+        log2_max_tb,
+        max_th_depth_inter,
+        max_th_depth_intra,
+        scaling_list,
+        amp,
+        sao,
+        pcm,
+        pcm_bit_depth_luma,
+        pcm_bit_depth_chroma,
+        log2_min_pcm,
+        log2_max_pcm,
+        pcm_loop_filter_disabled: pcm_lf,
+        st_rps,
+        num_short_term_ref_pic_sets: num_st,
+        long_term_refs_present,
+        lt_ref_pic_poc_lsb,
+        lt_used_by_curr,
+        num_long_term_ref_pics_sps: num_lt,
+        temporal_mvp,
+        strong_intra_smoothing,
+        vui,
+        ctb_size,
+        pic_w_ctb,
+        pic_h_ctb,
+    })
+}
+
+/// SPS range and screen-content extensions (7.3.2.2).
+fn parse_sps_extensions(r: &mut BitCursor<'_>) -> Result<()> {
     if r.flag()? {
         let range = r.flag()?;
         let _multilayer = r.flag()?;
@@ -765,115 +794,57 @@ pub fn parse_sps(rbsp: &[u8]) -> Result<Sps> {
         }
         // Multilayer / 3D extensions only constrain non-base layers; ignored for the base layer.
     }
-    let ctb_size = 1 << log2_ctb;
-    let pic_w_ctb = width.div_ceil(ctb_size);
-    let pic_h_ctb = height.div_ceil(ctb_size);
-    let sub = 2; // SubWidthC == SubHeightC == 2 for 4:2:0
-    if (conf_win[0] + conf_win[1]) * sub >= width || (conf_win[2] + conf_win[3]) * sub >= height {
-        return Err(DecodeError::InvalidData("conformance window"));
-    }
-    let conf_win = [
-        conf_win[0] * sub,
-        conf_win[1] * sub,
-        conf_win[2] * sub,
-        conf_win[3] * sub,
-    ];
-    Ok(Sps {
-        id,
-        vps_id,
-        max_sub_layers_minus1,
-        profile,
-        chroma_format_idc,
-        width,
-        height,
-        conf_win,
-        bit_depth_luma,
-        bit_depth_chroma,
-        log2_max_poc_lsb,
-        max_dec_pic_buffering,
-        max_num_reorder,
-        max_latency_increase_plus1,
-        log2_min_cb,
-        log2_ctb,
-        log2_min_tb,
-        log2_max_tb,
-        max_th_depth_inter,
-        max_th_depth_intra,
-        scaling_list_enabled,
-        scaling_list,
-        amp,
-        sao,
-        pcm,
-        pcm_bit_depth_luma,
-        pcm_bit_depth_chroma,
-        log2_min_pcm,
-        log2_max_pcm,
-        pcm_loop_filter_disabled: pcm_lf,
-        st_rps,
-        num_short_term_ref_pic_sets: num_st,
-        long_term_refs_present,
-        lt_ref_pic_poc_lsb,
-        lt_used_by_curr,
-        num_long_term_ref_pics_sps: num_lt,
-        temporal_mvp,
-        strong_intra_smoothing,
-        vui,
-        ctb_size,
-        pic_w_ctb,
-        pic_h_ctb,
-        min_cb_w: width >> log2_min_cb,
-        min_cb_h: height >> log2_min_cb,
-    })
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
-pub struct Pps {
-    pub id: u8,
-    pub sps_id: u8,
-    pub dependent_slice_segments_enabled: bool,
-    pub output_flag_present: bool,
-    pub num_extra_slice_header_bits: u32,
-    pub sign_data_hiding: bool,
-    pub cabac_init_present: bool,
-    pub num_ref_idx_l0_default: u32,
-    pub num_ref_idx_l1_default: u32,
-    pub init_qp: i32,
-    pub constrained_intra_pred: bool,
-    pub transform_skip: bool,
-    pub cu_qp_delta_enabled: bool,
-    pub diff_cu_qp_delta_depth: u32,
-    pub cb_qp_offset: i32,
-    pub cr_qp_offset: i32,
-    pub slice_chroma_qp_offsets_present: bool,
-    pub weighted_pred: bool,
-    pub weighted_bipred: bool,
-    pub transquant_bypass: bool,
-    pub tiles_enabled: bool,
-    pub entropy_coding_sync: bool,
-    pub num_tile_columns: u32,
-    pub num_tile_rows: u32,
-    pub uniform_spacing: bool,
+pub(crate) struct Pps {
+    pub(crate) id: u8,
+    pub(crate) sps_id: u8,
+    pub(crate) dependent_slice_segments_enabled: bool,
+    pub(crate) output_flag_present: bool,
+    pub(crate) num_extra_slice_header_bits: u32,
+    pub(crate) sign_data_hiding: bool,
+    pub(crate) cabac_init_present: bool,
+    pub(crate) num_ref_idx_l0_default: u32,
+    pub(crate) num_ref_idx_l1_default: u32,
+    pub(crate) init_qp: i32,
+    pub(crate) constrained_intra_pred: bool,
+    pub(crate) transform_skip: bool,
+    pub(crate) cu_qp_delta_enabled: bool,
+    pub(crate) diff_cu_qp_delta_depth: u32,
+    pub(crate) cb_qp_offset: i32,
+    pub(crate) cr_qp_offset: i32,
+    pub(crate) slice_chroma_qp_offsets_present: bool,
+    pub(crate) weighted_pred: bool,
+    pub(crate) weighted_bipred: bool,
+    pub(crate) transquant_bypass: bool,
+    pub(crate) tiles_enabled: bool,
+    pub(crate) entropy_coding_sync: bool,
+    pub(crate) num_tile_columns: u32,
+    pub(crate) num_tile_rows: u32,
+    pub(crate) uniform_spacing: bool,
     /// column_width_minus1[i], i < num_tile_columns - 1 (at most 19).
-    pub column_width_minus1: [u32; 19],
+    pub(crate) column_width_minus1: [u32; 19],
     /// row_height_minus1[i], i < num_tile_rows - 1 (at most 21).
-    pub row_height_minus1: [u32; 21],
-    pub loop_filter_across_tiles: bool,
-    pub loop_filter_across_slices: bool,
-    pub deblocking_override_enabled: bool,
-    pub deblocking_disabled: bool,
-    pub beta_offset_div2: i32,
-    pub tc_offset_div2: i32,
-    pub scaling_list: Option<ScalingList>,
-    pub lists_modification_present: bool,
-    pub log2_parallel_merge_level: u32,
-    pub slice_header_extension_present: bool,
+    pub(crate) row_height_minus1: [u32; 21],
+    pub(crate) loop_filter_across_tiles: bool,
+    pub(crate) loop_filter_across_slices: bool,
+    pub(crate) deblocking_override_enabled: bool,
+    pub(crate) deblocking_disabled: bool,
+    pub(crate) beta_offset_div2: i32,
+    pub(crate) tc_offset_div2: i32,
+    pub(crate) scaling_list: Option<ScalingList>,
+    pub(crate) lists_modification_present: bool,
+    pub(crate) log2_parallel_merge_level: u32,
+    pub(crate) slice_header_extension_present: bool,
     /// A range-extension tool signalled in pps_range_extension(), if any.
-    pub range_ext_tool: Option<&'static str>,
+    pub(crate) range_ext_tool: Option<&'static str>,
     /// pps_scc_extension_flag was set (refused for SCC profiles at activation).
-    pub scc_ext: bool,
+    pub(crate) scc_ext: bool,
 }
 
-pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
+pub(crate) fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
     let mut r = BitCursor::new(rbsp);
     let id = r.ue_max(63, "pps_pic_parameter_set_id")? as u8;
     let sps_id = r.ue_max(15, "pps_seq_parameter_set_id")? as u8;
@@ -978,8 +949,6 @@ pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
         }
     }
     Ok(Pps {
-        scc_ext,
-        range_ext_tool,
         id,
         sps_id,
         dependent_slice_segments_enabled,
@@ -1017,34 +986,31 @@ pub fn parse_pps(rbsp: &[u8]) -> Result<Pps> {
         lists_modification_present,
         log2_parallel_merge_level,
         slice_header_extension_present,
+        range_ext_tool,
+        scc_ext,
     })
 }
 
 /// Picture-level layout derived from an (SPS, PPS) pair: tile scan conversion (6.5.1) and
 /// z-scan order (6.5.2).
-#[allow(dead_code)] // informative fields kept for diagnostics
 #[derive(Debug)]
-pub struct Layout {
-    pub ctb_addr_rs_to_ts: BudgetVec<u32>,
-    pub ctb_addr_ts_to_rs: BudgetVec<u32>,
-    pub tile_id: BudgetVec<u16>, // indexed by ts
-    /// Column and row boundaries in CTBs (cols + 1 and rows + 1 entries).
-    pub col_bd: [u32; 21],
-    pub row_bd: [u32; 23],
+pub(crate) struct Layout {
+    pub(crate) ctb_addr_rs_to_ts: BudgetVec<u32>,
+    pub(crate) ctb_addr_ts_to_rs: BudgetVec<u32>,
+    pub(crate) tile_id: BudgetVec<u16>, // indexed by ts
     /// MinTbAddrZs[y * w + x] in min TB units.
-    pub min_tb_addr_zs: BudgetVec<u32>,
-    pub min_tb_w: u32,
-    pub min_tb_h: u32,
+    pub(crate) min_tb_addr_zs: BudgetVec<u32>,
+    pub(crate) min_tb_w: u32,
 }
 
 impl Layout {
-    pub fn new(sps: &Sps, pps: &Pps, budget: &Budget) -> Result<Layout> {
+    pub(crate) fn new(sps: &Sps, pps: &Pps, budget: &Budget) -> Result<Layout> {
         let w = sps.pic_w_ctb;
         let h = sps.pic_h_ctb;
         let cols = pps.num_tile_columns;
         let rows = pps.num_tile_rows;
         if cols > w || rows > h {
-            return Err(DecodeError::InvalidData("more tiles than CTBs"));
+            return Err(DecodeError::Invalid("more tiles than CTBs"));
         }
         // At most 20 tile columns and 22 rows (num_tile_columns_minus1 <= 19,
         // num_tile_rows_minus1 <= 21).
@@ -1064,7 +1030,7 @@ impl Layout {
                 rem -= col_w[i] as i64;
             }
             if rem <= 0 {
-                return Err(DecodeError::InvalidData("tile column widths"));
+                return Err(DecodeError::Invalid("tile column widths"));
             }
             col_w[cols as usize - 1] = rem as u32;
             let mut rem = h as i64;
@@ -1073,7 +1039,7 @@ impl Layout {
                 rem -= row_h[j] as i64;
             }
             if rem <= 0 {
-                return Err(DecodeError::InvalidData("tile row heights"));
+                return Err(DecodeError::Invalid("tile row heights"));
             }
             row_h[rows as usize - 1] = rem as u32;
         }
@@ -1148,11 +1114,8 @@ impl Layout {
             ctb_addr_rs_to_ts: rs_to_ts,
             ctb_addr_ts_to_rs: ts_to_rs,
             tile_id,
-            col_bd,
-            row_bd,
             min_tb_addr_zs: zs,
             min_tb_w: mtw,
-            min_tb_h: mth,
         })
     }
 }

@@ -1,5 +1,6 @@
 //! Script shapers: what HarfBuzz does differently for some scripts around the
 //! common pipeline.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 mod arabic;
 mod arabic_fallback;
@@ -63,7 +64,8 @@ pub(crate) enum ZeroMarks {
 }
 
 impl Shaper {
-    /// `hb_ot_shaper_categorize`.
+    /// The shaper HarfBuzz gives `script` in `direction`, with the GSUB script
+    /// tag the plan chose.
     pub(crate) fn categorize(script: Script, direction: Direction, gsub: Option<Tag>) -> Self {
         let dflt = gsub == Some(Tag::new(b"DFLT"));
         let latn = gsub == Some(Tag::new(b"latn"));

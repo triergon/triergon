@@ -15,7 +15,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo};
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::AudioFrame;
 use triergon_codec_opus::Decoder;
 
 /// The packets and final ranges of an RFC 6716 test vector.
@@ -61,7 +61,7 @@ impl Output {
         if let Some(range) = range {
             self.checked += 1;
             if let Err(error) = decoder.decode(packet, frame) {
-                self.fail(error.0);
+                self.fail(format!("{error:?}"));
                 return Ok(());
             }
             if range != decoder.final_range() {
@@ -69,7 +69,7 @@ impl Output {
                 self.first_mismatch.get_or_insert(self.checked - 1);
             }
         } else if let Err(error) = decoder.decode(packet, frame) {
-            self.fail(error.0);
+            self.fail(format!("{error:?}"));
             return Ok(());
         }
         self.write(frame)
@@ -211,10 +211,10 @@ fn decode_container(path: &str, out: &mut Output) -> Result<Decoder, String> {
             else {
                 continue;
             };
-            let pool = Budget::new(triergon_framing::OpusHead::MAX_BYTES)
+            let pool = Budget::new(triergon_framing::opus::OpusHead::MAX_BYTES)
                 .map_err(|e| format!("configuration: {e}"))?;
             let mut head = triergon_codec::BudgetVec::new(&pool);
-            triergon_framing::canonical_opus_configuration(track.configuration(), &mut head)
+            triergon_framing::opus::canonical_configuration(track.configuration(), &mut head)
                 .map_err(|e| format!("configuration: {e}"))?;
             let built = Decoder::new(&head).map_err(|e| format!("configuration: {e}"))?;
             decoder = Some((track.id(), built));

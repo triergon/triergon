@@ -1,31 +1,20 @@
 //! ISO BMFF opens from its first bytes and reads through the neutral model.
 #![cfg(feature = "isobmff")]
+mod common;
+
 use std::sync::atomic::AtomicBool;
 use triergon::{
-    AnyOther, AnyPacket, AnyReader, Budget, Bytes, CodecId, ContainerReader, Error, Event,
-    InputRequest, InputWindow, MediaKind, PacketInfo, SeekPolicy, SeekRequest, SourceCapabilities,
-    SourceId, Step, Time, TrackId, WorkBudget, isobmff::ReaderEvent,
+    AnyOther, AnyPacket, AnyReader, Budget, CodecId, ContainerReader, Error, Event, MediaKind,
+    PacketInfo, SeekPolicy, SeekRequest, SourceCapabilities, SourceFormat, SourceId, Step, Time,
+    TrackId, WorkBudget, isobmff::ReaderEvent, open_blocking, open_sequential,
 };
 
-const FILE: &[u8] =
-    include_bytes!("../../isobmff/tests/fixtures/encoded-config-v3/creation-all.mp4");
+const FILE: &[u8] = include_bytes!("../../isobmff/tests/fixtures/encoded-config/creation-all.mp4");
 
 fn capabilities() -> SourceCapabilities {
     SourceCapabilities {
         length: Some(FILE.len() as u64),
         random_access: true,
-    }
-}
-
-fn answer(reader: &mut AnyReader, pool: &Budget, request: InputRequest) {
-    let at = request.offset as usize;
-    if at >= FILE.len() {
-        reader.finish(request.source, request.token).unwrap();
-    } else {
-        let end = FILE.len().min(at + request.maximum);
-        let bytes = Bytes::copy_from_slice(pool, &FILE[at..end]).unwrap();
-        let window = InputWindow::new(request.source, request.token, request.offset, bytes);
-        reader.provide(&window.unwrap()).unwrap();
     }
 }
 
@@ -39,7 +28,7 @@ fn drain(reader: &mut AnyReader, pool: &Budget) -> (Vec<AnyPacket>, bool, Option
             Step::Ready(Event::Seek(receipt)) => landing = Some(receipt.landing),
             Step::Ready(Event::Other(AnyOther::Isobmff(ReaderEvent::Movie))) => movie = true,
             Step::Ready(Event::Other(_)) | Step::Yield => {}
-            Step::NeedInput(request) => answer(reader, pool, request),
+            Step::NeedInput(request) => common::answer(reader, pool, FILE, request, usize::MAX),
             Step::Backpressure(pressure) => panic!("{pressure:?}"),
             Step::End(_) => return (packets, movie, landing),
         }
@@ -49,7 +38,8 @@ fn drain(reader: &mut AnyReader, pool: &Budget) -> (Vec<AnyPacket>, bool, Option
 #[test]
 fn any_reader_reads_isobmff_through_the_neutral_model() {
     let pool = Budget::new(16 << 20).unwrap();
-    let mut reader = AnyReader::open(&FILE[..16], &pool, SourceId(1), capabilities()).unwrap();
+    let mut reader =
+        AnyReader::of(SourceFormat::Isobmff, &pool, SourceId(1), capabilities()).unwrap();
     let (packets, movie, _) = drain(&mut reader, &pool);
     assert!(movie);
     assert_eq!(reader.track_count(), 2);
@@ -96,14 +86,72 @@ fn any_reader_seeks_isobmff() {
 }
 
 #[test]
-fn a_forward_only_isobmff_source_is_refused_at_open() {
-    let pool = Budget::new(1 << 20).unwrap();
-    let forward = SourceCapabilities {
-        length: None,
-        random_access: false,
-    };
-    assert!(matches!(
-        AnyReader::open(&FILE[..16], &pool, SourceId(1), forward),
-        Err(Error::Unsupported(_))
-    ));
+fn blocking_seek_returns_the_receipt_before_delivery_resumes() {
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open_blocking(std::io::Cursor::new(FILE), &pool).unwrap();
+    let first = reader.next_packet().unwrap().unwrap();
+    let track = first.track();
+    let target = first.pts_time().unwrap().unwrap();
+    let receipt = reader
+        .seek(SeekRequest {
+            track,
+            target,
+            policy: SeekPolicy::PlaybackPreroll,
+        })
+        .unwrap();
+    assert_eq!(receipt.requested, target);
+    assert_eq!(receipt.landing, target);
+    assert_eq!(receipt.discard_until, target);
+    let mut next = std::iter::from_fn(|| reader.next_packet().transpose());
+    let replayed = next
+        .find_map(|packet| {
+            let packet = packet.unwrap();
+            (packet.track() == track).then_some(packet)
+        })
+        .unwrap();
+    assert_eq!(replayed.payload(), first.payload());
+}
+
+#[test]
+fn a_sequential_isobmff_source_delivers_the_packets_of_a_seekable_one() {
+    // The movie box first: one file with its samples in one `mdat`, one in fragments.
+    for file in [
+        &include_bytes!("../../isobmff/tests/fixtures/r-multitrack.mov")[..],
+        &include_bytes!("../../isobmff/tests/fixtures/f-multitrack.mp4")[..],
+    ] {
+        let pool = Budget::new(16 << 20).unwrap();
+        let mut seekable = open_blocking(std::io::Cursor::new(file), &pool).unwrap();
+        let mut pipe = open_sequential(file, &pool).unwrap();
+        assert_eq!(
+            pipe.reader().capabilities(),
+            SourceCapabilities {
+                length: None,
+                random_access: false,
+            }
+        );
+        let mut packets = 0;
+        while let Some(expected) = seekable.next_packet().unwrap() {
+            let packet = pipe.next_packet().unwrap().unwrap();
+            assert_eq!(packet.track(), expected.track());
+            assert_eq!(packet.pts(), expected.pts());
+            assert_eq!(packet.dts(), expected.dts());
+            assert_eq!(packet.payload(), expected.payload());
+            packets += 1;
+        }
+        assert!(pipe.next_packet().unwrap().is_none());
+        assert_eq!(packets, 12);
+    }
+}
+
+#[test]
+fn media_before_the_movie_is_refused_on_a_sequential_source() {
+    // `FILE` holds `mdat` before `moov`: only a source that can go back reads it.
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut seekable = open_blocking(std::io::Cursor::new(FILE), &pool).unwrap();
+    assert!(seekable.next_packet().unwrap().is_some());
+    let mut pipe = open_sequential(FILE, &pool).unwrap();
+    assert_eq!(
+        pipe.next_packet().unwrap_err(),
+        Error::Unsupported("progressive MP4 needs front metadata")
+    );
 }

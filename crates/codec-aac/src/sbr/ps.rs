@@ -45,9 +45,15 @@
 //! - A frame without PS data repeats the last PS frame; a header-less frame uses the last
 //!   header; a header with IID or ICC disabled resets those values to index 0 (t04..t07,
 //!   t12, t17..t19).
+//! - With the reference policy, a time-differential envelope reads the values kept per envelope index: each coded
+//!   envelope writes the first entries of its band count into its index's array, and
+//!   envelope 0 reads the array of the previous frame's last coded envelope, whose entries
+//!   above that frame's band count come from the last frame that wrote them at that index
+//!   (t29, o41, o43).
 //! - A frame with an invalid value, a decreasing border, a reserved mode or more data than
 //!   its extension holds outputs the mono signal on both channels, keeps the signal state
-//!   and resets the values; PS stays off until the next header (t08, t09, t11, t20, t21).
+//!   and resets the values. The reference policy retains the last IPD/OPD enable bit;
+//!   PS stays off until the next header (t08, t09, t11, t20, t21, o41, o42).
 //! - A frame whose configuration differs from that of the frame read before it converts
 //!   its start matrices to the new layout, restarts the decorrelator and resets the
 //!   IPD/OPD smoothing history; a frame without PS after it does so again (t13, t14,
@@ -64,16 +70,18 @@
 //!   there (o00, o31, o32; only kx = 32 is probed).
 
 mod synth;
+#[rustfmt::skip] // Laid out by the table generator.
 mod tables;
 #[cfg(test)]
 mod tests;
 
 use self::synth::{MAX_PAR, SLOTS, Synth, layouts};
 use self::tables as t;
+use crate::compat::ffmpeg::extensions::Policy;
 use crate::error::Result;
 use crate::fft::Cpx;
 use crate::huffman::books;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{Budget, BudgetVec};
 
@@ -187,8 +195,7 @@ enum Fault {
 
 /// Mixing matrices per (procedure, grid, IID index + 15, ICC index): h11, h12, h21, h22.
 fn matrices() -> &'static MatrixTable {
-    static M: OnceLock<MatrixTable> = OnceLock::new();
-    M.get_or_init(|| {
+    static M: LazyLock<MatrixTable> = LazyLock::new(|| {
         let sq2 = std::f64::consts::SQRT_2;
         std::array::from_fn(|second| {
             std::array::from_fn(|fine| {
@@ -241,7 +248,8 @@ fn matrices() -> &'static MatrixTable {
                 })
             })
         })
-    })
+    });
+    &M
 }
 
 /// Unit phasors of the IPD/OPD indices (steps of pi/4).
@@ -320,10 +328,13 @@ pub(crate) struct Ps {
     /// Some header enabled IID; the band count of the last IID mode.
     seen_iid: bool,
     iid_bands: usize,
-    /// Values of the last envelope read (dt reference and num_env 0): a frame writes the
-    /// first entries of its band count, the entries above keep older values.
-    last_iid: [i8; MAX_PAR],
-    last_icc: [i8; MAX_PAR],
+    /// Values per envelope index, the time-differential reference: a frame writes the first
+    /// entries of its band count in the array of each envelope it codes, the entries above
+    /// keep older values; envelope 0 reads the array of the previous frame's last coded
+    /// envelope, `kept_env`, which a frame without coded envelopes also reads (o41, o43).
+    kept_iid: Values,
+    kept_icc: Values,
+    kept_env: usize,
     last_ipd: [[u8; 17]; 2],
     /// IPD/OPD: enabled by the last extension; values per envelope index as coded, with
     /// their band count (mapped onto the configuration each frame); smoothing history by
@@ -347,22 +358,50 @@ pub(crate) struct Ps {
     start_re: [[f32; 4]; MAX_PAR],
     start_im: [[f32; 4]; MAX_PAR],
     status: Status,
-    /// The stereo synthesis, held by the single channel elements PS applies to.
-    synth: Option<Synth>,
+    pub(crate) policy: Policy,
+}
+
+/// What a single channel element holds to output Parametric Stereo: the stereo synthesis
+/// and the right channel's QMF matrix of 38 slots.
+#[derive(Debug)]
+pub(crate) struct Stereo {
+    synth: Synth,
+    pub(crate) right: BudgetVec<[Cpx; 64]>,
+}
+
+impl Stereo {
+    pub(crate) fn new(budget: &Budget) -> Result<Stereo> {
+        Ok(Stereo {
+            synth: Synth::new(budget)?,
+            right: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
+        })
+    }
+
+    /// Drop the signal history (after a discontinuity).
+    pub(crate) fn reset(&mut self) {
+        self.synth.reset();
+    }
+
+    /// Return to the state of `new`.
+    pub(crate) fn renew(&mut self) {
+        self.synth.reset();
+        self.right.fill([Cpx::default(); 64]);
+    }
 }
 
 impl Ps {
     /// PS state of an SBR element. Every element reads the PS extensions it carries; only a
-    /// single channel element (`synthesis`) holds the stereo synthesis that applies them.
-    pub(crate) fn new(budget: &Budget, synthesis: bool) -> Result<Ps> {
-        Ok(Ps {
+    /// single channel element holds the [`Stereo`] output that applies them.
+    pub(crate) fn new() -> Ps {
+        Ps {
             header: Header::default(),
             seen_header: false,
             active: false,
             seen_iid: false,
             iid_bands: 10,
-            last_iid: [0; MAX_PAR],
-            last_icc: [0; MAX_PAR],
+            kept_iid: [[0; MAX_PAR]; 4],
+            kept_icc: [[0; MAX_PAR]; 4],
+            kept_env: 0,
             last_ipd: [[0; 17]; 2],
             phase_on: false,
             phase: [[[0; MAX_PAR]; 2]; MAX_ENV],
@@ -379,16 +418,13 @@ impl Ps {
             start_re: [[0.0; 4]; MAX_PAR],
             start_im: [[0.0; 4]; MAX_PAR],
             status: Status::Absent,
-            synth: synthesis.then(|| Synth::new(budget)).transpose()?,
-        })
+            policy: Policy::default(),
+        }
     }
 
     /// Drop the signal history and the stored matrices (after a discontinuity); the next
     /// PS frame starts as the first one of a stream.
     pub(crate) fn reset(&mut self) {
-        if let Some(synth) = &mut self.synth {
-            synth.reset();
-        }
         self.store_re = [[[0.0; 4]; MAX_PAR]; MAX_ENV];
         self.store_im = [[[0.0; 4]; MAX_PAR]; MAX_ENV];
         self.start_re = [[0.0; 4]; MAX_PAR];
@@ -410,8 +446,9 @@ impl Ps {
         self.active = false;
         self.seen_iid = false;
         self.iid_bands = 10;
-        self.last_iid = [0; MAX_PAR];
-        self.last_icc = [0; MAX_PAR];
+        self.kept_iid = [[0; MAX_PAR]; 4];
+        self.kept_icc = [[0; MAX_PAR]; 4];
+        self.kept_env = 0;
         self.last_ipd = [[0; 17]; 2];
         self.phase_on = false;
         self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
@@ -636,19 +673,30 @@ impl Ps {
         self.big = Some(big);
     }
 
-    /// Keep the last envelope's values: the first entries of the frame's band counts.
-    fn keep(&mut self, h: Header, iid: &[i8; MAX_PAR], icc: &[i8; MAX_PAR]) {
-        if let Some(m) = h.iid {
-            let n = band_count(m);
-            self.last_iid[..n].copy_from_slice(&iid[..n]);
-        }
-        if let Some(m) = h.icc {
-            let n = band_count(m);
-            self.last_icc[..n].copy_from_slice(&icc[..n]);
+    /// Keep the values of the `coded` (at least one) envelopes read: the first entries of
+    /// the frame's band counts in each envelope's array.
+    fn keep(&mut self, h: Header, iid: &Values, icc: &Values, coded: usize) {
+        if self.policy == Policy::Reference {
+            for (kept, values, mode) in [
+                (&mut self.kept_iid, iid, h.iid),
+                (&mut self.kept_icc, icc, h.icc),
+            ] {
+                if let Some(m) = mode {
+                    let n = band_count(m);
+                    for (kept, values) in kept.iter_mut().zip(values).take(coded) {
+                        kept[..n].copy_from_slice(&values[..n]);
+                    }
+                }
+            }
+            self.kept_env = coded - 1;
+        } else {
+            self.kept_iid[0] = iid[coded - 1];
+            self.kept_icc[0] = icc[coded - 1];
+            self.kept_env = 0;
         }
     }
 
-    /// An error frame: mono output, values reset, PS off until the next header.
+    /// Conceals an error frame as mono and resets the parameters until the next header.
     fn fault(&mut self, fault: Option<Fault>) {
         match fault {
             Some(Fault::Read(n)) => {
@@ -662,8 +710,13 @@ impl Ps {
             }
             None => {}
         }
-        self.last_iid = [0; MAX_PAR];
-        self.last_icc = [0; MAX_PAR];
+        self.kept_iid = [[0; MAX_PAR]; 4];
+        self.kept_icc = [[0; MAX_PAR]; 4];
+        self.last_ipd = [[0; 17]; 2];
+        self.phase = [[[0; MAX_PAR]; 2]; MAX_ENV];
+        if self.policy == Policy::Conceal {
+            self.phase_on = false;
+        }
         self.active = false;
         self.status = Status::Mono;
     }
@@ -675,10 +728,12 @@ impl Ps {
         let mut icc = [[0; MAX_PAR]; 4];
         if let Some(m) = h.iid {
             let lim = if m >= 3 { 15 } else { 7 };
-            iid = Self::resolve(&raw.iid, n, band_count(m), &self.last_iid, -lim, lim)?;
+            let last = &self.kept_iid[self.kept_env];
+            iid = Self::resolve(&raw.iid, n, band_count(m), last, -lim, lim)?;
         }
         if let Some(m) = h.icc {
-            icc = Self::resolve(&raw.icc, n, band_count(m), &self.last_icc, 0, 7)?;
+            let last = &self.kept_icc[self.kept_env];
+            icc = Self::resolve(&raw.icc, n, band_count(m), last, 0, 7)?;
         }
         Some((iid, icc))
     }
@@ -697,11 +752,7 @@ impl Ps {
                 return;
             };
             if !overrun {
-                self.keep(
-                    self.header,
-                    &iid[raw.coded_env - 1],
-                    &icc[raw.coded_env - 1],
-                );
+                self.keep(self.header, &iid, &icc, raw.coded_env);
             }
         }
         if overrun {
@@ -731,23 +782,23 @@ impl Ps {
         };
         let big = self.config(h);
         if h.iid.is_none() {
-            self.last_iid = [0; MAX_PAR];
+            self.kept_iid = [[0; MAX_PAR]; 4];
         }
         if h.icc.is_none() {
-            self.last_icc = [0; MAX_PAR];
+            self.kept_icc = [[0; MAX_PAR]; 4];
         }
         let n = raw.coded_env;
         let (iid, icc) = if n == 0 {
             // one envelope holding the last values; kept fine values on the coarse grid fail
-            let kept = &self.last_iid[..h.iid.map_or(0, band_count)];
+            let kept = &self.kept_iid[self.kept_env][..h.iid.map_or(0, band_count)];
             if h.iid.is_some_and(|m| m < 3) && kept.iter().any(|v| v.abs() > 7) {
                 self.fault(Some(Fault::Read(n)));
                 return false;
             }
             let mut a = [[0; MAX_PAR]; 4];
             let mut c = [[0; MAX_PAR]; 4];
-            a[0] = self.last_iid;
-            c[0] = self.last_icc;
+            a[0] = self.kept_iid[self.kept_env];
+            c[0] = self.kept_icc[self.kept_env];
             (a, c)
         } else {
             let Some(v) = self.values(raw, h) else {
@@ -778,7 +829,10 @@ impl Ps {
                 to_config(&icc[src], band_count(m), big, &mut f.icc[e]);
             }
         }
-        self.keep(h, &iid[coded - 1], &icc[coded - 1]);
+        // a frame without coded envelopes repeats the kept values and writes none
+        if n > 0 {
+            self.keep(h, &iid, &icc, n);
+        }
         if let Some((on, env)) = &raw.ipd {
             self.phase_on = *on;
             if *on {
@@ -824,9 +878,11 @@ impl Ps {
         true
     }
 
-    /// Run the PS on one frame: `x` (38 slots) becomes the left channel, `x_r` the right.
+    /// Run the PS on one frame: `x` (38 slots) becomes the left channel, `stereo.right`
+    /// the right.
     #[inline(never)] // kept out of the SBR loops, which run without PS too
-    pub(crate) fn apply(&mut self, x: &mut BudgetVec<[Cpx; 64]>, x_r: &mut BudgetVec<[Cpx; 64]>) {
+    pub(crate) fn apply(&mut self, stereo: &mut Stereo, x: &mut BudgetVec<[Cpx; 64]>) {
+        let Stereo { synth, right: x_r } = stereo;
         let status = std::mem::replace(&mut self.status, Status::Absent);
         let run = match status {
             Status::Run => true,
@@ -843,12 +899,12 @@ impl Ps {
         // repeat of it) restarts the decorrelator and the ducking, and the IPD/OPD smoothing
         // history starts again from index 0 (o20, o21)
         if self.changed() {
-            self.synthesis().restart();
+            synth.restart();
             self.phase_history = [[[0; MAX_PAR]; 2]; 2];
         }
-        self.matrices();
+        self.matrices(synth);
         let big = self.frame.big;
-        self.synthesis().run(big, &mut x[..], &mut x_r[..]);
+        synth.run(big, &mut x[..], &mut x_r[..]);
     }
 
     fn changed(&self) -> bool {
@@ -856,7 +912,7 @@ impl Ps {
     }
 
     /// The frame's per-slot matrices into the synthesis scratch.
-    fn matrices(&mut self) {
+    fn matrices(&mut self, synth: &mut Synth) {
         let f = self.frame;
         let pars = layouts()[usize::from(f.big)].pars;
         let image_pars = layouts()[usize::from(f.big)].image_pars;
@@ -913,7 +969,7 @@ impl Ps {
             let last = usize::from(f.last_slot[e]);
             if last + 1 > first {
                 let width = (last + 1 - first) as f32;
-                let matrix = &mut self.synthesis().matrix;
+                let matrix = &mut synth.matrix;
                 for slot in first..=last {
                     let w = (slot + 1 - first) as f32 / width;
                     let row = &mut matrix[slot];
@@ -938,14 +994,7 @@ impl Ps {
                 first = last + 1;
             }
         }
-        self.synthesis().complex = has_phase;
-    }
-
-    /// The stereo synthesis, which `apply` needs: PS applies to single channel elements only.
-    fn synthesis(&mut self) -> &mut Synth {
-        self.synth
-            .as_mut()
-            .expect("PS applies to single channel elements")
+        synth.complex = has_phase;
     }
 
     /// Smoothed row phases (cos, sin) of envelope `e` in the first `phased` parameter bands,

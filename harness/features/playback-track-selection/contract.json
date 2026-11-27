@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "id": "playback-track-selection",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "playback-track-selection",
+  "candidate": "playback-views-worker",
+  "worker_operation": "select-",
+  "reference": "ffmpeg-playback-views-native",
+  "contract": [
+    "Select at most one video, audio and subtitle track by container track ID. Fold only delivered packets.",
+    "In the reference set the discard policy on unselected streams. The switch case reads a packet prefix, seeks backward on video and selects the other audio track."
+  ],
+  "required_profiles": [
+    "mkv-selected-video",
+    "mkv-video-and-audio",
+    "mkv-reordered-video",
+    "mkv-switch-audio",
+    "mp4-selected-video",
+    "mp4-selected-audio",
+    "mp4-selected-subtitle",
+    "ts-selected-video",
+    "ts-selected-audio"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "mkv-selected-video",
+        "mkv-video-and-audio",
+        "mkv-reordered-video",
+        "mkv-switch-audio",
+        "mp4-selected-video",
+        "mp4-selected-audio",
+        "mp4-selected-subtitle",
+        "ts-selected-video",
+        "ts-selected-audio"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "mkv-selected-video",
+        "mkv-video-and-audio",
+        "mkv-reordered-video",
+        "mkv-switch-audio",
+        "mp4-selected-video",
+        "mp4-selected-audio",
+        "mp4-selected-subtitle",
+        "ts-selected-video",
+        "ts-selected-audio"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "mkv-selected-video",
+        "mkv-video-and-audio",
+        "mkv-reordered-video",
+        "mkv-switch-audio",
+        "mp4-selected-video",
+        "mp4-selected-audio",
+        "mp4-selected-subtitle",
+        "ts-selected-video",
+        "ts-selected-audio"
+      ],
+      "cause": "Collector runs on isolated AArch64 and 32-bit ARMv7 gate hosts are due."
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "Selected Matroska AVC keeps the exact frame duration",
+      "clause": "RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
+      "candidate": "Keeps DefaultDuration at native precision, for example 41666666 ns.",
+      "reference": "Publishes 41000000 ns on the corresponding packets in its millisecond clock.",
+      "compat": "triergon_matroska::compat::clock::packet_timing",
+      "cases": [
+        "mkv-reordered-video"
+      ]
+    },
+    {
+      "reading": "Matroska AAC selection keeps the source clock, including after an audio switch",
+      "clause": "RFC 9559 sections 5.1.4.1.25 and 11.2 subtract nanosecond CodecDelay from the exact Block presentation timestamp. RFC 9559 section 5.1.4.1.13 expresses DefaultDuration in nanoseconds.",
+      "candidate": "Keeps DTS absent. First AAC PTS is -21333333 ns with duration 21333333 ns and the switch keeps the new track’s -23219955 ns delay.",
+      "reference": "Fills AAC DTS from PTS. First AAC PTS is -21000000 ns with duration 21000000 ns and AAC times after the switch are on its millisecond grid.",
+      "cases": [
+        "mkv-video-and-audio",
+        "mkv-switch-audio"
+      ]
+    }
+  ]
+}

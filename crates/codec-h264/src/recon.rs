@@ -4,6 +4,7 @@
 //! conforming stream keeps every value within 16 bits (8.5.12.1, 8.5.13.1), and a corrupt
 //! one's levels can take any i32.
 
+use crate::picture::array_mut;
 use std::num::Wrapping;
 
 /// A wrapping sample or coefficient of the scaling and transform kernels.
@@ -52,9 +53,7 @@ pub(crate) fn idct4_add(d: &[i32; 16], dst: &mut [u8], off: usize, stride: usize
     }
     let h = tr4(&u); // h[i][j]
     for i in 0..4 {
-        let row: &mut [u8; 4] = (&mut dst[off + i * stride..off + i * stride + 4])
-            .try_into()
-            .unwrap();
+        let row: &mut [u8; 4] = array_mut(dst, off + i * stride);
         for j in 0..4 {
             row[j] = (row[j] as i32 + ((h[i][j] + Wrapping(32)) >> 6).0).clamp(0, 255) as u8;
         }
@@ -196,12 +195,12 @@ pub(crate) fn chroma_dc_dequant(c: &mut [i32; 4], qp: i32, ls00: i32) {
 /// Neighbour samples for a 4x4 / 8x8 block: `top[0..n*2]` = p[x,-1], `left[0..n]` = p[-1,y],
 /// `tl` = p[-1,-1], with availability flags. Top-right substitution is done by the caller.
 pub(crate) struct Edge<const N: usize, const N2: usize> {
-    pub top: [u8; N2],
-    pub left: [u8; N],
-    pub tl: u8,
-    pub has_top: bool,
-    pub has_left: bool,
-    pub has_tl: bool,
+    pub(crate) top: [u8; N2],
+    pub(crate) left: [u8; N],
+    pub(crate) tl: u8,
+    pub(crate) has_top: bool,
+    pub(crate) has_left: bool,
+    pub(crate) has_tl: bool,
 }
 
 #[inline(always)]
@@ -527,7 +526,6 @@ pub(crate) fn pred8x8(mode: u8, e: &Edge<8, 16>, dst: &mut [u8], off: usize, str
 // ---------------------------------------------------------------- intra 16x16 / chroma
 
 /// Intra_16x16 prediction (8.3.3). `top` = p[0..15,-1], `left` = p[-1,0..15].
-#[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
 pub(crate) fn pred16x16(
     mode: u8,
     top: &[u8; 16],
@@ -602,7 +600,6 @@ pub(crate) fn pred16x16(
 }
 
 /// Intra chroma prediction for one 8x8 (4:2:0) component (8.3.4).
-#[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
 pub(crate) fn pred_chroma8(
     mode: u8,
     top: &[u8; 8],

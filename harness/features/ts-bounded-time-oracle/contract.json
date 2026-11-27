@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "id": "ts-bounded-time-oracle",
+  "gate": "required",
+  "operation": "ts-bounded-time",
+  "candidate": "transport-views-worker",
+  "worker_operation": "ts-bounded-time-",
+  "oracle": "ts-time",
+  "contract": [
+    "Compare the selected PID’s raw 33-bit PTS and DTS, lift outcome, signed ticks and reduced rational seconds with an independent H.222.0 §2.4.3.7 timestamp oracle. The oracle decodes the PES fields and chooses the nearer of the two congruent instants bracketing the anchor.",
+    "Each ADTS PES contains one complete access unit with explicit PTS and DTS. The legacy AVC control projects the PES header with source_timestamp and preserves absent DTS. Kind 3 records an anchored or absent field, kind 8 records a refused lift and kind 7 records clean end.",
+    "Exercise lifts across both sides of the wrap, an inclusive distance, a one-tick PCR fraction, half-period ambiguity and a mismatched clock epoch."
+  ],
+  "required_profiles": [
+    "fractional-anchor-boundary",
+    "half-period",
+    "half-period-fraction",
+    "inclusive-bound",
+    "legacy-absent-dts",
+    "negative-wrap",
+    "outside-one-pcr-tick",
+    "positive-wrap",
+    "wrong-clock-epoch"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "legacy-absent-dts",
+        "negative-wrap",
+        "positive-wrap",
+        "inclusive-bound",
+        "outside-one-pcr-tick",
+        "fractional-anchor-boundary",
+        "half-period",
+        "half-period-fraction",
+        "wrong-clock-epoch"
+      ],
+      "cause": "The independent timestamp oracle provides parity only."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "legacy-absent-dts",
+        "negative-wrap",
+        "positive-wrap",
+        "inclusive-bound",
+        "outside-one-pcr-tick",
+        "fractional-anchor-boundary",
+        "half-period",
+        "half-period-fraction",
+        "wrong-clock-epoch"
+      ],
+      "cause": "The independent timestamp oracle provides parity only."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "legacy-absent-dts",
+        "negative-wrap",
+        "positive-wrap",
+        "inclusive-bound",
+        "outside-one-pcr-tick",
+        "fractional-anchor-boundary",
+        "half-period",
+        "half-period-fraction",
+        "wrong-clock-epoch"
+      ],
+      "cause": "The independent timestamp oracle provides parity only."
+    }
+  ]
+}

@@ -2,12 +2,10 @@
 mod build;
 
 use crate::harness::{comparison, memory, report, timing, worker};
-use crate::json::Value;
-use crate::{checks, corpus, json, sha256};
+use crate::json::{self, Value};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-const USAGE: &str = "usage: cargo xtask session-queues build LIBRARY_TREE NEW_WORKER\n       cargo xtask session-queues check|time|memory BASE_WORKER CANDIDATE_WORKER NEW_OUTPUT_DIR";
 const STAGES: [&str; 4] = ["cycle", "starved", "full", "drain-full"];
 const TIMEOUT: Duration = Duration::from_secs(120);
 const SEED: u64 = 280;
@@ -65,7 +63,7 @@ fn check(
         };
         let id = text("id")?;
         let input = root.join(text("file")?);
-        if sha(&input)? != text("sha256")? {
+        if crate::files::sha256(&input)? != text("sha256")? {
             return Err(format!("{id}: fixture hash mismatch"));
         }
         for role in [workers.reference, workers.candidate] {
@@ -80,7 +78,7 @@ fn check(
             let expected = case
                 .get(if stage == "full" { "starved" } else { stage })
                 .ok_or("missing expected output extent")?;
-            corpus::write_json(
+            json::write(
                 &output.join(format!("{id}-{stage}-work.json")),
                 &Value::object([("baseline", base.clone()), ("candidate", candidate.clone())]),
             )?;
@@ -105,25 +103,17 @@ fn check(
     Ok(rows)
 }
 
-fn sha(path: &Path) -> Result<String, String> {
-    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
-}
-
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
-    if args == ["--help"] {
-        println!("{USAGE}");
-        return Ok(());
-    }
     if let [command, tree, worker] = args
         && command == "build"
     {
         return build::stage(root, Path::new(tree), Path::new(worker));
     }
     let [mode, baseline, candidate, dest] = args else {
-        return Err(USAGE.into());
+        return Err(crate::usage_of("session-queues"));
     };
     if !matches!(mode.as_str(), "check" | "time" | "memory") {
-        return Err(USAGE.into());
+        return Err(crate::usage_of("session-queues"));
     }
     let executable = |p: &str| Path::new(p).canonicalize().map_err(|e| format!("{p}: {e}"));
     let (baseline, candidate) = (executable(baseline)?, executable(candidate)?);
@@ -143,14 +133,23 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     let identity = Value::object([
         ("baseline_build", base_build),
         ("candidate_build", candidate_build),
-        ("baseline_sha256", Value::str(sha(&baseline)?)),
-        ("candidate_sha256", Value::str(sha(&candidate)?)),
-        ("manifest_sha256", Value::str(sha(&manifest)?)),
+        (
+            "baseline_sha256",
+            Value::str(crate::files::sha256(&baseline)?),
+        ),
+        (
+            "candidate_sha256",
+            Value::str(crate::files::sha256(&candidate)?),
+        ),
+        (
+            "manifest_sha256",
+            Value::str(crate::files::sha256(&manifest)?),
+        ),
         ("target", Value::str(report::gate_target()?)),
         ("mode", Value::str(mode)),
     ]);
-    corpus::write_json(&output.join("identity.json"), &identity)?;
-    let manifest = checks::read_json(&manifest)?;
+    json::write(&output.join("identity.json"), &identity)?;
+    let manifest = json::read(&manifest)?;
     let cases = manifest
         .as_array()
         .filter(|c| !c.is_empty())
@@ -160,6 +159,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     for row in &rows {
         let operation = timing::Operation {
             prefix: "queue-".into(),
+            reference_prefix: None,
             arguments: vec![row.id.as_str().into(), row.stage.into()],
             candidate_options: vec![],
             work: timing::Work {
@@ -235,7 +235,7 @@ pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
             _ => continue,
         };
         let name = format!("{}-{}-{mode}", row.id, row.stage);
-        corpus::write_json(&output.join(format!("{name}.json")), &result)?;
+        json::write(&output.join(format!("{name}.json")), &result)?;
         if !ok {
             failed.push(name);
         }

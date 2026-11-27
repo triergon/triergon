@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "id": "mkv-codec-state",
+  "gate": "required",
+  "operation": "mkv-codec-state",
+  "candidate": "matroska-views-worker",
+  "worker_operation": "mkv-codec-state-",
+  "corpus_directory": ".",
+  "contract": [
+    "Compare configuration events in delivery order and the active state on every packet, per track, through the typed reader.",
+    "State rows give presence, payload bytes, and known source, header offset, payload offset, length and Segment Position. The oracle applies CodecState before the affected block, including every lace, including a state larger than the structural metadata budget.",
+    "FFmpeg exposes no CodecState update on packets or their streams."
+  ],
+  "required_profiles": [
+    "state-first",
+    "state-late",
+    "state-two",
+    "state-empty",
+    "state-limit"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "state-first",
+        "state-late",
+        "state-two",
+        "state-empty",
+        "state-limit"
+      ],
+      "cause": "The independent source oracle supplies correctness parity for values outside the pinned FFmpeg public interface."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "state-first",
+        "state-late",
+        "state-two",
+        "state-empty",
+        "state-limit"
+      ],
+      "cause": "The independent source oracle supplies correctness parity for values outside the pinned FFmpeg public interface."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "state-first",
+        "state-late",
+        "state-two",
+        "state-empty",
+        "state-limit"
+      ],
+      "cause": "The independent source oracle supplies correctness parity for values outside the pinned FFmpeg public interface."
+    }
+  ],
+  "oracle": "mkv-codec-state"
+}

@@ -10,6 +10,7 @@
   "contract": [
     "Matroska open, stream discovery and first-video-track selection through the playback engine",
     "HEVC startup with byte-identical copies of the VPS, SPS and PPS in CodecPrivate",
+    "AVC startup with an 8×4 PGS composition after the eighth video packet; compare the selected video output",
     "selected AVC or HEVC packets with native PTS, DTS and duration, through a clean end of file and teardown",
     "backward seek after discovery and after reading to the end of file, at 0, 0.7, 1.42 and 2.7 seconds",
     "seekable preloaded input read in 4 KiB windows; every demuxed track is read in the timed operation",
@@ -21,6 +22,7 @@
     "startup-avc-high-b0",
     "startup-avc-high-b1",
     "startup-avc-mixed",
+    "startup-avc-pgs-early-canvas",
     "startup-avc-six-pictures",
     "startup-hevc-b0",
     "startup-hevc-b1",
@@ -65,6 +67,11 @@
   "required_targets": [
     "aarch64-unknown-linux-gnu",
     "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["startup-avc-pgs-early-canvas"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "heap", "cases": ["startup-avc-pgs-early-canvas"], "cause": "awaiting native gate-host measurement"},
+    {"bound": "total_rss", "cases": ["startup-avc-pgs-early-canvas"], "cause": "awaiting native gate-host measurement"}
   ],
   "iterations": 50,
   "minimum_pairs": 30,

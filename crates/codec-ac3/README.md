@@ -12,13 +12,12 @@ metadata. It does not downmix or resample.
 use triergon_codec_ac3::{AudioFrame, DecodeError, Decoder, access_unit_len};
 
 fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
-    let mut dec = Decoder::new(); // DecoderOptions::default(): Compat::Reference
+    let mut dec = Decoder::new();
     let mut frame = AudioFrame::default();
     let mut pos = 0;
     while pos < stream.len() {
         let len = access_unit_len(&stream[pos..])?;
-        frame.clear();
-        let info = dec.decode(&stream[pos..pos + len], &mut frame)?; // appends samples
+        let info = dec.decode(&stream[pos..pos + len], &mut frame)?;
         // info.sample_rate, info.layout, info.downmix, info.concealed
         pos += len;
     }
@@ -30,8 +29,14 @@ fn decode_stream(stream: &[u8]) -> Result<(), DecodeError> {
 pool and `Decoder::new_in(&budget)` charges a caller's `Budget`.
 `.with_options(DecoderOptions { crc, noise, compat })` selects the CRC policy
 (`CrcPolicy::Report` or `Reject`), the noise mode (`NoiseMode::Normal` or `Off`) and the
-output conventions (`Compat::Reference`, the default, or `Compat::Specification`).
+output conventions (`compat::ffmpeg::Policy`).
 `examples/decode_ac3.rs` writes interleaved f32le.
+
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `reference-trace` | off | `Decoder::set_trace` and `Decoder::trace`: the bit positions of each access unit's frames and blocks (`FrameTrace`, `BlockTrace`), for comparison |
 
 ## Supported
 
@@ -49,19 +54,20 @@ Further independent programs are skipped.
 
 ## Behaviour and limits
 
-- `decode` appends to `out`, which must be empty or hold the same rate and layout
-  (`OutputLayoutMismatch` otherwise). `reset` drops delay lines, concealment history and
-  noise state.
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
+  `reset` drops delay lines, concealment history and noise state.
 - Planes follow the triergon-codec [channel order](../codec/README.md#channel-order); 7.1
   is FL FR FC LFE BL BR SL SR.
 - Refused with `Unsupported(Feature)`: bsid > 16, reserved fscod2 and stream type 3, and
-  (with `Compat::Reference`) E-AC-3 reduced sample rates. Enhanced coupling conceals the
+  (with `Policy::Reference`) E-AC-3 reduced sample rates. Enhanced coupling conceals the
   frame and reports `Feature::EnhancedCoupling` in `FrameInfo::concealed`; FFmpeg does
   the same.
 - Concealment (A/52 7.10 block repeat): a damaged block repeats the previous block for
-  the rest of the frame; a truncated AC-3 frame outputs six copies of the last block; a
-  truncated E-AC-3 frame outputs nothing.
-- CRC failures are decoded and reported (`FrameInfo::crc_ok`) unless `CrcPolicy::Reject`.
+  the rest of the frame; under `CrcPolicy::Report` a truncated AC-3 frame outputs six
+  copies of the last block; a truncated E-AC-3 frame outputs nothing.
+- `CrcPolicy::Reject` refuses syncframes whose CRC fails with `DecodeError::CrcMismatch`,
+  and a truncated AC-3 frame, whose CRC words are missing, with `DecodeError::Truncated`;
+  `CrcPolicy::Report`, the default, decodes them and reports the failure.
 - Not applied, as in FFmpeg: dialnorm, compr, transient pre-noise processing (parsed).
 - `FrameInfo::downmix` mirrors FFmpeg's downmix side data: exported only for programs
   with more than two channels, taken from the last syncframe of the access unit.
@@ -70,42 +76,47 @@ Further independent programs are skipped.
   decoder sizes are charged to its budget first (`Limits::live_storage_bytes`, 4 MiB by
   default); a refused charge is `DecodeError::Budget` and the decoder stays usable.
 
-### FFmpeg compatibility (`Compat::Reference`, the default)
+### Reference compatibility
 
-`Compat::Reference` reproduces FFmpeg 9.0.2 conventions that A/52 leaves open or that
-differ from the text:
+The default, `Policy::Reference`, follows these conventions where A/52 leaves a choice
+or specifies a different result.
 
 - Noise: bap-0 dither, AHT zero-bin fill and SPX blending noise use FFmpeg's seed-zero
   noise stream (additive lagged generator, lags 24 and 55) in the same draw order, so
   dithered output matches sample for sample. AHT zero bins are filled regardless of
-  dithflag; LFE is never dithered. With `Compat::Specification` a private xorshift
+  dithflag; LFE is never dithered. With `Policy::Specification` a private xorshift
   generator is used; `NoiseMode::Off` replaces all noise with zero.
 - The first block of a stream that mixes transform lengths rewrites the delay lines as
   FFmpeg does.
 - hebap 4 vector quantization (Table E4.4) decodes index `i` with row `i + 1` and index 31
   as zero.
 - A dependent substream whose rate or block count differs from the core is dropped and
-  the core is output alone (`InvalidData` with `Compat::Specification`).
-- Reading past the frame end yields zero bits (an error with `Compat::Specification`).
-- E-AC-3 reduced sample rates are refused (decoded with `Compat::Specification`).
+  the core is output alone (`Invalid` with `Policy::Specification`).
+- Reading past the frame end yields zero bits (an error with `Policy::Specification`).
+- E-AC-3 reduced sample rates are refused (decoded with `Policy::Specification`).
 
 In both modes: coupling delta bit-allocation offsets count from the first coupling band
 (A/52 5.4.3.51); AC-3 bsid 9/10 shifts sdecay/fdecay right by `bsid − 8` and indexes the
 hearing threshold by `band >> (bsid − 8)`, as FFmpeg does.
 
-## Known gaps
+## Conformance
+
+ATSC A/52:2018; `src/spec_tables.rs` is generated from its text by
+`harness/codecs/ac3/gen_tables.py`. The decoder is compared with FFmpeg's in
+[harness/codecs](../../harness/codecs/STATUS.md), whose
+[ac3 notes](../../harness/codecs/ac3/STATUS.md) hold the derivations and tools.
+`examples/strip_dither.rs` rewrites a stream without dither, and the
+[dither-free comparison](../../harness/codecs/nodither-streams.json) checks the pinned
+rewritten stream and exact AC-3 PCM; it declares observed binary32 and truncation
+diagnostic differences, and one E-AC-3 diagnostic for bytes before the first syncframe.
+The `ac3-crc-reject` and `eac3-crc-reject` lanes of the
+[CRC comparison](../../harness/codecs/crc-damage.json) compare frame counts and PCM
+under `CrcPolicy::Reject` with FFmpeg under `crccheck+explode`. Results are in
+[docs/status.md](../../docs/status.md).
 
 - Not compared with FFmpeg: dual mono, 2/3-block E-AC-3 frames, `blkswe`, AHT on
   coupling and LFE channels, dependents without channel map, and E-AC-3 reduced sample
-  rates with `Compat::Specification` (its hearing-threshold column is a guess). bsid 9/10
+  rates with `Policy::Specification` (its hearing-threshold column is a guess). bsid 9/10
   has been compared on self-authored probe streams only.
 - Error concealment on corrupt mono/stereo/2.1 input can differ from FFmpeg in a few
   frames.
-
-## Standards
-
-ATSC A/52:2018; `src/spec_tables.rs` is generated from its text by
-`harness/codecs/ac3/gen_tables.py`. `examples/strip_dither.rs` rewrites a stream without
-dither. Derivation notes and tools:
-[harness/codecs/ac3](../../harness/codecs/ac3/STATUS.md); results in
-[docs/status.md](../../docs/status.md).

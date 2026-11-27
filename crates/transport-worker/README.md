@@ -2,7 +2,10 @@
 
 Harness worker for the public MPEG-TS PES and access-unit readers. It reads the original
 entities before measurement and emits their ordered packet counts, byte counts and
-digests; the FFmpeg reference worker uses the same input and operation.
+digests; the FFmpeg reference worker uses the same input and operation. It is tooling
+(`publish = false`), not part of the library.
+
+## Command line
 
 ```text
 transport-worker PREFIXfold   FILE SIZE PROGRAM [--dvb|--atsc] [[--discontinuity] ENTITY]...
@@ -35,10 +38,28 @@ worker.
 before the fold summary. Trace printing is selected once and absent from the
 ordinary per-packet fold.
 
-The [six-block ATSC E-AC-3 comparison](../../harness/eac3-proof.md) checks the
-complete grouped operation with a separate public-parser adapter. All ten
-authored inputs match every packet field and payload through EOF. The ordinary
-parser operation differs on all ten inputs. Both comparisons are available
-through `cargo xtask worker-tests transport::eac3-experiment`. The separate
-[six-block report](../../harness/features/mpegts-atsc-eac3-six-block/contract.json)
-pins all ten folds. Native timing and memory qualification remain open.
+The [six-block comparison](../../harness/features/mpegts-atsc-eac3-six-block/contract.json)
+pins the folds of its ten authored inputs against a separate reference adapter that
+groups FFmpeg's parser output into six-block access units
+([harness/eac3-proof.md](../../harness/eac3-proof.md)); `cargo xtask worker-tests
+transport::eac3-experiment` runs that adapter and FFmpeg's ordinary parser output on the
+same inputs.
+
+## Views worker
+
+With the `views` feature the crate also builds `transport-views-worker`, the candidate
+of the features that compare the public views of `triergon-mpegts`, with the same three
+modes:
+the catalogue, PSI and video descriptors (`ts-catalogue-`, `ts-psi-`,
+`ts-video-descriptors-`), packet fields (`ts-packets-`), source polling, PES assembly and
+observers (`ts-source-`, `ts-pes-assembler-`, `ts-observer-`), fault facts and recovery
+(`ts-facts-`, `ts-recovery-`), the reader's views, container events and seeks
+(`ts-reader-views-`, `ts-reader-container-`, `ts-epoch-index-seek-`,
+`ts-bounded-time-`) and the writer (`ts-mux-`). Each prefix is the `worker_operation` of
+one feature under `harness/features/`, such as `ts-psi-` of `ts-psi-readers`.
+
+An operation that meets a library refusal ends its fold with one kind 8 record (the
+source, assembler and observer forms put the error's text in it); a failed check of the
+worker's own (a span that differs from its carrier, a binding with another scope) ends
+the worker with status 2. A trailing `--report-refusal`, which the report adds for a
+registered refusal, makes the result line name the refusal's detail as `unsupported`.

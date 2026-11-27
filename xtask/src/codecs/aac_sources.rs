@@ -3,9 +3,8 @@
 use std::fs;
 use std::path::Path;
 
-use crate::{checks, corpus, json::Value, prepare, process};
-
-use super::correctness::file_sha;
+use crate::json::{self, Value};
+use crate::{prepare, process};
 
 const LAYOUTS: &[(u8, u8, &str)] = &[
     (1, 1, "mono"),
@@ -38,9 +37,9 @@ const PROGRAMS: &[(&str, u32, u8, &str)] = &[
 
 pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
     let reference = root.join(".research/reference-decode");
-    let build = checks::read_json(&reference.join("build.json"))?;
+    let build = json::read(&reference.join("build.json"))?;
     let ffmpeg = reference.join("install/bin/ffmpeg");
-    let hash = file_sha(&ffmpeg)?;
+    let hash = crate::files::sha256(&ffmpeg)?;
     if build.get("profile").and_then(Value::as_str) != Some("decode")
         || build.get("release").and_then(Value::as_str) != Some(prepare::RELEASE)
         || build.get("archive_sha256").and_then(Value::as_str) != Some(prepare::RELEASE_SHA256)
@@ -112,7 +111,7 @@ pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
         process::check_output(&arguments)?;
         vectors.push(Value::object([
             ("name", Value::str(name)),
-            ("sha256", Value::str(file_sha(&path)?)),
+            ("sha256", Value::str(crate::files::sha256(&path)?)),
             ("sample_rate", Value::int(rate)),
             ("channels", Value::int(channels)),
             ("configuration", Value::int(configuration)),
@@ -122,5 +121,5 @@ pub(super) fn run(root: &Path, out: &Path) -> Result<(), String> {
         ("license", Value::str("MIT OR Apache-2.0")),
         ("vectors", Value::Array(vectors)),
     ]);
-    corpus::write_json(&out.join("sources.json"), &manifest)
+    json::write(&out.join("sources.json"), &manifest)
 }

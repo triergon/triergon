@@ -15,7 +15,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use crate::json::{self, Value};
 
@@ -38,6 +38,44 @@ fn run(cmd: &mut Command) -> Result<(), String> {
     }
 }
 
+fn build_ps_input(root: &Path) -> Result<PathBuf, String> {
+    let output = Command::new(std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into()))
+        .current_dir(root)
+        .env("CARGO_INCREMENTAL", "0")
+        .args([
+            "build",
+            "--release",
+            "-p",
+            "triergon-codec-aac",
+            "--example",
+            "ps_input",
+            "--features",
+            "reference-trace",
+            "--message-format=json-render-diagnostics",
+        ])
+        .stderr(Stdio::inherit())
+        .output()
+        .map_err(|e| format!("build the AAC QMF input example: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "build the AAC QMF input example: {}",
+            output.status
+        ));
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| json::parse(line).ok())
+        .find_map(|artifact| {
+            let name = artifact.get("target")?.get("name")?.as_str()?;
+            if name == "ps_input" {
+                artifact.get("executable")?.as_str().map(PathBuf::from)
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| "cargo did not report the AAC QMF input executable".into())
+}
+
 pub(super) fn main(root: &Path, opts: &Options) -> Result<i32, String> {
     let ffmpeg = opts
         .ffmpeg
@@ -56,27 +94,8 @@ pub(super) fn main(root: &Path, opts: &Options) -> Result<i32, String> {
         .unwrap_or_else(|| root.join("target/aac-ps-tables"));
     fs::create_dir_all(&work).map_err(|e| format!("{}: {e}", work.display()))?;
     let work = fs::canonicalize(&work).map_err(|e| format!("{}: {e}", work.display()))?;
-    // this decoder's PS input, for the fits of the signal side
-    run(
-        Command::new(std::env::var("CARGO").unwrap_or_else(|_| "cargo".into()))
-            .current_dir(root)
-            .env("CARGO_INCREMENTAL", "0")
-            .args([
-                "build",
-                "--quiet",
-                "--release",
-                "-p",
-                "triergon-codec-aac",
-                "--features",
-                "inspect",
-                "--example",
-                "ps_input",
-            ]),
-    )?;
-    let target =
-        std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from);
     let ps_input = work.join("ps_input");
-    fs::copy(target.join("release/examples/ps_input"), &ps_input)
+    fs::copy(build_ps_input(root)?, &ps_input)
         .map_err(|e| format!("{}: {e}", ps_input.display()))?;
     let out = work.join("tables.json");
     let mut recover = Command::new(&opts.python);

@@ -1,0 +1,331 @@
+use super::HlsSegmentLimits;
+use crate::{
+    aac::{HlsAac, HlsAacFrame, MAXIMUM_ADTS_BYTES},
+    avc::{AvcRaster, AvcTsAccessUnit, AvcTsClock, AvcTsReader, AvcTsStep},
+    dolby::HlsDolby,
+    hevc::{HlsHevc, HlsHevcPicture},
+};
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, Error, Result, Time, WorkBudget};
+use triergon_mpegts::{
+    AssemblyStep,
+    compat::pes::{DemuxPacket, DemuxTimeView, RegisteredCarriage},
+};
+use triergon_playback::pes_feed::SpentLists;
+use triergon_playback::{compat::pes::AdmittedCarriage, compat::pes::Carriage};
+
+/// The AVC and AAC reader uses concrete lanes. Only the reader that takes its codecs
+/// from the PMT needs the variant dispatch and the larger lane and output storage.
+pub(super) trait LaneAssembler: Sized {
+    type Unit;
+
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self>;
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool>;
+    fn finish(&mut self);
+    fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Self::Unit>>;
+    fn unit_bytes(unit: &Self::Unit) -> usize;
+    /// The lists of the last consumed PES, for its observer to reuse.
+    fn take_spent(&mut self) -> SpentLists {
+        SpentLists::default()
+    }
+}
+
+pub(super) trait VideoPicture {
+    fn raster(&self) -> AvcRaster;
+    fn pts90(&self) -> Option<i64>;
+}
+
+impl VideoPicture for AvcTsAccessUnit {
+    fn raster(&self) -> AvcRaster {
+        self.raster
+    }
+
+    fn pts90(&self) -> Option<i64> {
+        self.clock.and_then(|clock| clock.pts90)
+    }
+}
+
+impl LaneAssembler for AvcTsReader {
+    type Unit = AvcTsAccessUnit;
+
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self> {
+        Self::new(pool, config, limits.avc)
+    }
+
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
+        Self::push(self, packet, clock)
+    }
+
+    fn finish(&mut self) {
+        Self::finish(self);
+    }
+
+    fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Self::Unit>> {
+        Ok(match self.step(work, cancel)? {
+            AvcTsStep::Ready(unit) => AssemblyStep::Output(unit),
+            AvcTsStep::NeedInput => AssemblyStep::NeedPayload,
+            AvcTsStep::Yield => AssemblyStep::Yield,
+            AvcTsStep::End => AssemblyStep::Finished,
+        })
+    }
+
+    fn unit_bytes(unit: &Self::Unit) -> usize {
+        unit.feed_spans().map(<[u8]>::len).sum()
+    }
+
+    fn take_spent(&mut self) -> SpentLists {
+        Self::take_spent(self)
+    }
+}
+
+impl LaneAssembler for HlsAac {
+    type Unit = HlsAacFrame;
+
+    fn bind(pool: &Budget, config: AdmittedCarriage, _: HlsSegmentLimits) -> Result<Self> {
+        Self::new(pool, config, MAXIMUM_ADTS_BYTES)
+    }
+
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
+        Self::push(self, packet, clock)
+    }
+
+    fn finish(&mut self) {
+        Self::finish(self);
+    }
+
+    fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Self::Unit>> {
+        Self::poll(self, work, cancel)
+    }
+
+    fn unit_bytes(unit: &Self::Unit) -> usize {
+        unit.bytes.len()
+    }
+
+    fn take_spent(&mut self) -> SpentLists {
+        Self::take_spent(self)
+    }
+}
+
+#[derive(Debug)]
+enum Picture {
+    Avc(AvcTsAccessUnit),
+    Hevc(HlsHevcPicture),
+}
+
+/// One AVC or HEVC picture of a media segment: an Annex B access unit, with any
+/// parameter sets its decoder needs inserted. It has no `PacketInfo` view, because
+/// an HEVC picture is several slices of the reader's input: [`Self::contiguous_feed`]
+/// gives a decoder the unit as one buffer, and [`Self::clock`] its PES times.
+#[derive(Debug)]
+pub struct HlsMediaVideoUnit(Picture);
+
+impl HlsMediaVideoUnit {
+    /// The PES timestamps of the picture.
+    pub fn clock(&self) -> Option<AvcTsClock> {
+        match &self.0 {
+            Picture::Avc(unit) => unit.clock,
+            Picture::Hevc(unit) => unit.clock,
+        }
+    }
+
+    /// Whether the picture is an AVC IDR or an HEVC random access point.
+    pub fn random_access(&self) -> bool {
+        match &self.0 {
+            Picture::Avc(unit) => unit.idr,
+            Picture::Hevc(unit) => unit.random_access,
+        }
+    }
+
+    /// Borrow the complete Annex B feed, including inserted parameter sets.
+    pub fn feed_spans(&self) -> impl Iterator<Item = &[u8]> {
+        let (avc, hevc) = match &self.0 {
+            Picture::Avc(unit) => (Some(unit), None),
+            Picture::Hevc(unit) => (None, Some(unit)),
+        };
+        avc.into_iter()
+            .flat_map(AvcTsAccessUnit::feed_spans)
+            .chain(hevc.into_iter().flat_map(HlsHevcPicture::feed_spans))
+    }
+
+    /// The Annex B feed as one buffer, shared with the unit when nothing is inserted.
+    /// Fails with `ForeignPool` when the unit is not charged to `pool`.
+    pub fn contiguous_feed(&self, pool: &Budget) -> Result<Bytes> {
+        match &self.0 {
+            Picture::Avc(unit) => unit.contiguous_feed(pool),
+            Picture::Hevc(unit) => unit.contiguous_feed(pool),
+        }
+    }
+}
+
+impl VideoPicture for HlsMediaVideoUnit {
+    fn raster(&self) -> AvcRaster {
+        match &self.0 {
+            Picture::Avc(unit) => unit.raster,
+            Picture::Hevc(unit) => unit.raster,
+        }
+    }
+
+    fn pts90(&self) -> Option<i64> {
+        self.clock().and_then(|clock| clock.pts90)
+    }
+}
+
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the HEVC assembler is held inline: a segment reader owns one and boxing it adds an uncharged allocation"
+)]
+pub(super) enum VideoAssembler {
+    Avc(AvcTsReader),
+    Hevc(HlsHevc),
+}
+
+impl LaneAssembler for VideoAssembler {
+    type Unit = HlsMediaVideoUnit;
+
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self> {
+        match config.carriage {
+            Carriage::Registered(RegisteredCarriage::Avc) => {
+                AvcTsReader::bind(pool, config, limits).map(Self::Avc)
+            }
+            Carriage::Registered(RegisteredCarriage::Hevc) => {
+                HlsHevc::new(pool, config, limits.avc).map(Self::Hevc)
+            }
+            _ => Err(Error::Unsupported("HLS video carriage")),
+        }
+    }
+
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
+        match self {
+            Self::Avc(reader) => reader.push(packet, clock),
+            Self::Hevc(reader) => reader.push(packet, clock),
+        }
+    }
+
+    fn finish(&mut self) {
+        match self {
+            Self::Avc(reader) => reader.finish(),
+            Self::Hevc(reader) => reader.finish(),
+        }
+    }
+
+    fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Self::Unit>> {
+        match self {
+            Self::Avc(reader) => Ok(reader
+                .poll(work, cancel)?
+                .map(|unit| HlsMediaVideoUnit(Picture::Avc(unit)))),
+            Self::Hevc(reader) => Ok(reader
+                .poll(work, cancel)?
+                .map(|unit| HlsMediaVideoUnit(Picture::Hevc(unit)))),
+        }
+    }
+
+    fn unit_bytes(unit: &Self::Unit) -> usize {
+        match &unit.0 {
+            Picture::Avc(unit) => AvcTsReader::unit_bytes(unit),
+            Picture::Hevc(unit) => unit.feed_size(),
+        }
+    }
+
+    fn take_spent(&mut self) -> SpentLists {
+        match self {
+            Self::Avc(reader) => reader.take_spent(),
+            Self::Hevc(_) => SpentLists::default(),
+        }
+    }
+}
+
+/// Complete feed bytes and the exact audio frame clock before playlist mapping.
+#[derive(Debug)]
+pub struct HlsMediaAudioUnit {
+    /// The complete ADTS frame or AC-3 or E-AC-3 syncframe.
+    pub bytes: Bytes,
+    /// The PES presentation time, on the first frame that starts after that PES's
+    /// header.
+    pub pts: Option<Time>,
+    /// The PES decode time, on the same frame as `pts`.
+    pub dts: Option<Time>,
+    /// How long the frame plays: its sample count at the stream's sample rate.
+    pub duration: Time,
+}
+
+impl From<HlsAacFrame> for HlsMediaAudioUnit {
+    fn from(frame: HlsAacFrame) -> Self {
+        Self {
+            bytes: frame.bytes,
+            pts: frame.pts,
+            dts: frame.dts,
+            duration: frame.duration,
+        }
+    }
+}
+
+pub(super) enum AudioAssembler {
+    Aac(HlsAac),
+    Dolby(HlsDolby),
+}
+
+impl LaneAssembler for AudioAssembler {
+    type Unit = HlsMediaAudioUnit;
+
+    fn bind(pool: &Budget, config: AdmittedCarriage, limits: HlsSegmentLimits) -> Result<Self> {
+        match config.carriage {
+            Carriage::Registered(RegisteredCarriage::AacAdts) => {
+                HlsAac::bind(pool, config, limits).map(Self::Aac)
+            }
+            Carriage::PrivateAudio(_) => HlsDolby::new(pool, config).map(Self::Dolby),
+            _ => Err(Error::Unsupported("HLS audio carriage")),
+        }
+    }
+
+    fn push(&mut self, packet: &mut Option<DemuxPacket>, clock: DemuxTimeView) -> Result<bool> {
+        match self {
+            Self::Aac(reader) => reader.push(packet, clock),
+            Self::Dolby(reader) => reader.push(packet, clock),
+        }
+    }
+
+    fn finish(&mut self) {
+        match self {
+            Self::Aac(reader) => reader.finish(),
+            Self::Dolby(reader) => reader.finish(),
+        }
+    }
+
+    fn poll(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<AssemblyStep<Self::Unit>> {
+        match self {
+            Self::Aac(reader) => Ok(reader.poll(work, cancel)?.map(Into::into)),
+            Self::Dolby(reader) => reader.poll(work, cancel),
+        }
+    }
+
+    fn unit_bytes(unit: &Self::Unit) -> usize {
+        unit.bytes.len()
+    }
+
+    fn take_spent(&mut self) -> SpentLists {
+        match self {
+            Self::Aac(reader) => reader.take_spent(),
+            Self::Dolby(_) => SpentLists::default(),
+        }
+    }
+}

@@ -1,14 +1,19 @@
+use crate::SourceEpochs;
 use crate::clock::{ClockKey, SourceTimestamp};
 use crate::compat::pes::PrivateAudioCarriage;
 use crate::psi::{ElementaryStream, ProgramMap};
-use crate::{CarrierObservation, ContinuityOutcome, SourceEpochs, TraceEvent, TransportPacket};
+use crate::stream::{CarrierObservation, TraceEvent};
+use crate::transport::{ContinuityOutcome, TransportPacket};
 use std::alloc::Layout;
 use std::ops::{Deref, Range};
 use std::sync::{Arc, atomic::AtomicUsize};
 use triergon_core::container::{CodecId, MediaKind, PacketInfo, RandomAccess, TrackId, TrackInfo};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Reservation, Result, Time, TimeBase};
 use triergon_framing::{
-    AacAdtsCarrier, AacAdtsFrame, Ac3Frame, Ac3FrameFacts, MpegAudioHeader, RawAccessUnit,
+    aac::{AacAdtsCarrier, AacAdtsFrame},
+    ac3::{Ac3Frame, Ac3FrameFacts},
+    mpeg_audio::MpegAudioHeader,
+    nal::RawAccessUnit,
 };
 
 #[derive(Debug)]
@@ -54,22 +59,86 @@ impl<T> Shared<T> {
     }
 }
 
+/// An unsplit PES observation with its exact source and clock facts.
+#[derive(Clone, Debug)]
+pub struct LatmPes {
+    track: Track,
+    source: SourceEvent,
+    clock_key: ClockKey,
+    clock_quarantined: bool,
+}
+
+impl LatmPes {
+    pub(crate) fn new(
+        track: Track,
+        source: SourceEvent,
+        clock_key: ClockKey,
+        clock_quarantined: bool,
+    ) -> Self {
+        Self {
+            track,
+            source,
+            clock_key,
+            clock_quarantined,
+        }
+    }
+
+    /// The retained PMT entry that identifies this LATM elementary stream.
+    pub fn track_info(&self) -> &Track {
+        &self.track
+    }
+
+    /// The source event owning the original LATM header, payload spans and byte ranges.
+    pub fn source(&self) -> &SourceEvent {
+        &self.source
+    }
+
+    /// Program, PCR PID and source epoch that apply to the encoded timestamps.
+    pub fn clock_key(&self) -> ClockKey {
+        self.clock_key
+    }
+
+    /// Whether the program clock was quarantined at this PES, leaving its timestamps
+    /// unresolved.
+    pub fn clock_is_quarantined(&self) -> bool {
+        self.clock_quarantined
+    }
+
+    /// The complete validated LATM PES, with its wire header and source ranges.
+    // Typed only with the PES shared apart from `TraceEvent::Pes`, as `SourceEvent::pes`.
+    pub fn pes(&self) -> &crate::pes::Pes {
+        let TraceEvent::Pes(pes) = self.source.event() else {
+            unreachable!("LATM packet owns its source PES");
+        };
+        pes
+    }
+}
+
 /// A shared original source event. Clones share its charged storage, including
 /// every ordered descriptor, source range, rejected carrier and PES span.
 #[derive(Clone, Debug)]
 pub struct SourceEvent(pub(super) Shared<TraceEvent>);
 
 impl SourceEvent {
+    /// Borrow the event and its original source facts for as long as this handle is held.
     pub fn event(&self) -> &TraceEvent {
         &self.0
     }
+    // The typed form shares the map apart from its event: `TraceEvent::ProgramMap` (public) holding
+    // it behind a charged handle, or a second charged copy of every accepted map; not built.
     pub(super) fn map(&self) -> &ProgramMap {
         match self.event() {
             TraceEvent::ProgramMap { map, .. } => map,
             _ => unreachable!("track owns a program map"),
         }
     }
-    pub(super) fn pes(&self) -> &crate::Pes {
+    // A checked PES view measured +0.70%, a validated PES source beside the event +0.040% (one
+    // match moves to admission; the typed form shares the PES apart from `TraceEvent::Pes`).
+    #[expect(
+        clippy::expect_used,
+        reason = "pieces and payload sources are built only from PES events"
+    )]
+    pub(super) fn pes(&self) -> &crate::pes::Pes {
         self.event()
             .pes_source()
             .expect("payload source owns a PES")
@@ -87,12 +156,15 @@ pub struct Track {
 }
 
 impl Track {
+    /// The elementary PID, stream type and descriptors that configure this track.
     pub fn stream(&self) -> &ElementaryStream {
         &self.source.map().streams.as_slice()[usize::from(self.index)]
     }
+    /// The retained program map for the track’s configuration, valid after reconfiguration.
     pub fn program_map(&self) -> &ProgramMap {
         self.source.map()
     }
+    /// The 16-bit program number from the retained PMT table extension.
     pub fn program(&self) -> u16 {
         self.program_map().header.extension
     }
@@ -118,7 +190,7 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         self.stream().codec_tag()
     }
-    fn codec(&self) -> CodecId<'_> {
+    fn codec(&self) -> CodecId {
         if self.unlabelled_dts_core {
             CodecId::Dts
         } else {
@@ -135,10 +207,11 @@ impl TrackInfo for Track {
 /// elementary offset and uninterrupted-byte-run epoch unchanged.
 #[derive(Clone, Debug)]
 pub struct PayloadSource {
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub elementary_range: Range<u64>,
-    /// Exact intersection within the original PES payload, independent of
-    /// the elementary view's restart position.
+    /// Half-open byte range relative to the original PES payload’s first byte.
     pub payload_range: Range<usize>,
+    /// Retains the PES header, source ranges and epoch of these payload bytes.
     pub pes: SourceEvent,
 }
 
@@ -156,6 +229,12 @@ impl PayloadSources {
         }
     }
 
+    // Cloning both sources into a reserved table measured +0.069 to +0.109%: `BudgetVec::try_push`
+    // leaves the lane step. The infallible push into reserved capacity this needs is not in core.
+    #[expect(
+        clippy::expect_used,
+        reason = "pushing the two sources one by one measured +0.08% (BudgetVec::try_push out of line)"
+    )]
     pub(super) fn try_push(&mut self, pool: &Budget, source: PayloadSource) -> Result<()> {
         match self {
             Self::Inline(first @ None) => *first = Some(source),
@@ -186,12 +265,16 @@ impl PayloadSources {
 /// the next frame start. Missing DTS is never inferred from PTS.
 #[derive(Clone, Debug)]
 pub struct PacketClock {
+    /// Program, PCR PID and epoch used to interpret both timestamps.
     pub key: ClockKey,
     /// Invalid source signalling quarantined interpretation at this PES.
     /// Raw fields remain available, while lifted timestamps stay unresolved.
     pub quarantined: bool,
+    /// The anchoring PTS, lifted under the reader's time policy.
     pub pts: SourceTimestamp,
+    /// The anchoring DTS, lifted under the reader's time policy; never inferred from the PTS.
     pub dts: SourceTimestamp,
+    /// The PES whose header supplied the timestamps.
     pub pes: SourceEvent,
 }
 
@@ -231,11 +314,7 @@ impl Ac3AccessUnit {
         &self.bytes
     }
 
-    pub fn into_bytes(self) -> Bytes {
-        self.bytes
-    }
-
-    /// Unchanged facts of the first primary syncframe.
+    /// Facts of the first primary syncframe.
     pub const fn facts(&self) -> Ac3FrameFacts {
         self.first
     }
@@ -259,7 +338,7 @@ impl Ac3AccessUnit {
             .filter(|facts| {
                 !matches!(
                     facts.header.details,
-                    triergon_framing::Ac3FrameDetails::Eac3 { stream_type: 1, .. }
+                    triergon_framing::ac3::Ac3FrameDetails::Eac3 { stream_type: 1, .. }
                 )
             })
             .map(|facts| u16::from(facts.header.blocks))
@@ -268,12 +347,6 @@ impl Ac3AccessUnit {
             i128::from(blocks) * 256,
             u128::from(self.first.header.sample_rate_hz),
         )
-    }
-
-    /// The primary syncframe's raw trailing word.
-    pub fn crc2_word(&self) -> u16 {
-        let end = self.first.header.frame_bytes;
-        u16::from_be_bytes([self.bytes[end - 2], self.bytes[end - 1]])
     }
 }
 
@@ -294,12 +367,13 @@ impl DvbSubtitleUnit {
         &self.bytes
     }
 
-    /// The number of complete segments in this unit.
+    /// Complete DVB segment envelopes, excluding the wrapper, end marker and unfinished tail.
     pub const fn segment_count(&self) -> usize {
         self.segment_count
     }
 
-    /// The unfinished final segment's range in the lane's elementary coordinates.
+    /// Half-open byte range of the unfinished final segment, when the tail policy reports one.
+    /// Offsets are relative to the track’s concatenated PES payload.
     pub fn truncated_tail(&self) -> Option<Range<u64>> {
         self.truncated.then_some(self.range.end..self.pes_end)
     }
@@ -314,14 +388,17 @@ pub struct LoasFrame {
 }
 
 impl LoasFrame {
+    /// The whole envelope: the 3-byte sync and length header, then the multiplex element.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
 
+    /// The LATM multiplex element after the 3-byte envelope header.
     pub fn multiplex_element(&self) -> &[u8] {
         &self.bytes.as_ref()[3..]
     }
 
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -341,12 +418,12 @@ impl MpegAudioFrame {
         &self.bytes
     }
 
-    /// Audio frame syntax and sample timing.
+    /// Header facts including layer, sampling rate in hertz and coded samples per frame.
     pub const fn header(&self) -> &MpegAudioHeader {
         &self.header
     }
 
-    /// Frame extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -377,7 +454,7 @@ impl DtsAudioFrame {
         self.duration
     }
 
-    /// Frame extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -402,7 +479,7 @@ impl DtsExtensionFrame {
         self.duration
     }
 
-    /// Frame extent in the track's concatenated PES payload.
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.offset..self.offset + self.bytes.len() as u64
     }
@@ -411,9 +488,12 @@ impl DtsExtensionFrame {
 /// Picture coding type from H.262 section 6.2.3.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum MpegPictureCoding {
+    /// An independently coded I picture.
     #[default]
     Intra,
+    /// A P picture using forward prediction.
     Predictive,
+    /// A B picture using bidirectional prediction.
     Bidirectional,
 }
 
@@ -422,21 +502,29 @@ pub enum MpegPictureCoding {
 pub struct MpegVideoPicture {
     pub(super) bytes: Bytes,
     pub(super) range: Range<u64>,
+    /// Coded width in luma samples.
     pub width: u16,
+    /// Coded height in luma samples.
     pub height: u16,
+    /// Ten-bit display-order reference within the group.
     pub temporal_reference: u16,
+    /// Prediction class declared by the picture header.
     pub coding: MpegPictureCoding,
     /// Picture start-code offset in the private elementary view.
     pub picture_offset: u64,
+    /// Number of coded slice start codes.
     pub slice_count: u8,
+    /// Whether the sequence uses MPEG-2 syntax.
     pub mpeg2: bool,
     pub(super) duration: Time,
 }
 
 impl MpegVideoPicture {
+    /// Original picture and sequence bytes, without the PES header.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
+    /// Byte range of the picture in the reader’s elementary view.
     pub fn elementary_range(&self) -> Range<u64> {
         self.range.clone()
     }
@@ -447,26 +535,40 @@ impl MpegVideoPicture {
 /// physical transport provenance is retained by [`Packet::sources`].
 #[derive(Debug)]
 pub enum AccessUnit {
+    /// An AVC or HEVC access unit as framed from Annex B.
     Video(RawAccessUnit),
+    /// One MPEG-1 or MPEG-2 picture with sequence setup.
     MpegVideo(MpegVideoPicture),
+    /// An AAC frame with its ADTS header.
     Adts(AacAdtsFrame),
+    /// A LOAS envelope with an opaque LATM multiplex element.
     Loas(LoasFrame),
+    /// An MPEG-1 or MPEG-2 audio frame.
     MpegAudio(MpegAudioFrame),
+    /// A DTS access unit with a core substream.
     Dts(DtsAudioFrame),
+    /// A DTS-HD access unit of extension substreams without a core.
     DtsExtension(DtsExtensionFrame),
     /// An opaque ADTS parser observation with its original source diagnostic.
     AdtsFragment(AacAdtsCarrier),
+    /// An AC-3 syncframe or a DVB E-AC-3 syncframe group.
     Ac3(Ac3AccessUnit),
+    /// The complete segments of one DVB subtitle PES.
     DvbSubtitle(DvbSubtitleUnit),
     /// Unfinished audio at logical EOF. This is a source fragment, not an AU.
     IncompleteAudio {
+        /// Extent of the unfinished bytes in the track's concatenated PES payload.
         range: Range<u64>,
+        /// The unfinished bytes.
         bytes: Bytes,
+        /// The framer's error that the bytes would otherwise have raised.
         reason: Error,
     },
 }
 
 impl AccessUnit {
+    // Holding every packet's bytes in `PacketData` (an `Arc` clone per audio frame) measured
+    // +0.63% on DTS-HD grouped reads.
     fn stored_bytes(&self) -> &Bytes {
         match self {
             Self::MpegVideo(frame) => frame.bytes(),
@@ -507,16 +609,10 @@ impl AccessUnit {
     }
     pub(super) fn anchor_offset(&self) -> u64 {
         match self {
-            Self::Video(unit) => {
-                unit.nals()
-                    .first()
-                    .map_or(unit.range.start, |nal| match nal.facts().framing {
-                        triergon_framing::NalFraming::AnnexB { prefix_offset, .. } => prefix_offset,
-                        triergon_framing::NalFraming::LengthPrefixed { .. } => {
-                            unreachable!("raw reader uses Annex B")
-                        }
-                    })
-            }
+            Self::Video(unit) => unit
+                .nals()
+                .first()
+                .map_or(unit.range.start, |nal| nal.facts().framing.offset),
             _ => self.range().start,
         }
     }
@@ -570,28 +666,36 @@ pub(super) struct PacketData {
 pub struct Packet(pub(super) Shared<PacketData>);
 
 impl Packet {
+    /// The track configuration that applies to this packet, including its retained PMT.
     pub fn track_info(&self) -> &Track {
         &self.0.track
     }
+    /// Framing syntax and source payload for this unit, before decoder-feed conversion.
     pub fn access_unit(&self) -> &AccessUnit {
         &self.0.unit
     }
+    /// Intersections of the unit with its original PES payloads, in elementary byte order.
     pub fn sources(&self) -> &[PayloadSource] {
         self.0.sources.as_slice()
     }
+    /// The applicable PES anchor, preserving whether its header had PTS and DTS.
     pub fn clock(&self) -> Option<&PacketClock> {
         self.0.clock.as_ref()
     }
+    /// The clock and configuration epochs in force for this unit.
     pub fn epochs(&self) -> SourceEpochs {
         self.0.epochs
     }
+    /// Half-open byte range of the unit in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.0.unit.range()
     }
-    /// Exact coded audio duration, including rates not integral in 90 kHz.
+    /// Exact coded audio duration in seconds, even when it is fractional in 90 kHz ticks.
+    /// Returns `None` when the unit supplies no usable sample count and rate.
     pub fn sample_duration(&self) -> Option<Time> {
         self.0.duration
     }
+    /// The unit's bytes: the assembled access unit for video, the framed source bytes otherwise.
     pub fn bytes(&self) -> &Bytes {
         self.0
             .video_bytes
@@ -608,7 +712,7 @@ impl PacketInfo for Packet {
         self.bytes().as_ref()
     }
     fn time_base(&self) -> TimeBase {
-        TimeBase::new(1, 90_000).expect("nonzero TS clock")
+        TimeBase::HZ_90000
     }
     fn pts(&self) -> Option<i64> {
         self.0.pts
@@ -642,69 +746,98 @@ pub(super) struct UnframedData {
     pub epochs: SourceEpochs,
 }
 
-/// A validated AVC or HEVC PES byte run with invalid leading bytes and no
-/// Annex B start code. Its original payload and first source anchor are
-/// retained at logical EOF. Clones share the charged storage.
+/// A run of validated AVC or HEVC PES payload with invalid leading bytes and no
+/// Annex B start code: every complete PES of the track between two ends of its byte
+/// run. It is reported when the source ends the run, with its original payload and
+/// first source anchor. Clones share the charged storage.
 #[derive(Clone, Debug)]
-pub struct IncompleteVideo(pub(super) Shared<UnframedData>);
+pub struct IncompleteVideo {
+    pub(super) data: Shared<UnframedData>,
+    pub(super) ended_by: Option<SourceEvent>,
+}
 
 impl IncompleteVideo {
+    /// The retained track configuration at the start of the unframed video run.
     pub fn track_info(&self) -> &Track {
-        &self.0.track
+        &self.data.track
     }
+    /// Half-open byte range of the run in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
-        self.0.range.clone()
+        self.data.range.clone()
     }
+    /// Original AVC or HEVC PES payload bytes, including the invalid leading bytes.
     pub fn bytes(&self) -> &Bytes {
-        &self.0.bytes
+        &self.data.bytes
     }
+    /// Intersections with original PES payloads, ordered by elementary byte offset.
     pub fn sources(&self) -> &[PayloadSource] {
-        self.0.sources.as_slice()
+        self.data.sources.as_slice()
     }
+    /// The applicable PES anchor at the start of the run, when available.
     pub fn clock(&self) -> Option<&PacketClock> {
-        self.0.clock.as_ref()
+        self.data.clock.as_ref()
     }
+    /// The clock and configuration epochs in force for the run.
     pub fn epochs(&self) -> SourceEpochs {
-        self.0.epochs
+        self.data.epochs
+    }
+    /// The source event that ended the run: a fault, a signalled discontinuity, a new
+    /// clock epoch, a table change or the first PES of another byte run. `None` for a run
+    /// that reached the logical end of the source.
+    pub fn ended_by(&self) -> Option<&SourceEvent> {
+        self.ended_by.as_ref()
     }
 }
 
-/// A validated private PES whose payload has no AC-3 or E-AC-3 syncword.
-/// The source track, PES and clock are retained at logical EOF. Clones share
-/// the charged storage.
+/// A validated private PES whose payload has no AC-3 or E-AC-3 syncword. It is
+/// reported when the source ends its byte run, with the source track, PES and clock.
+/// Clones share the charged storage.
 #[derive(Clone, Debug)]
 pub struct UnframedAudio {
     pub(super) data: Shared<UnframedData>,
     pub(super) carriage: PrivateAudioCarriage,
+    pub(super) ended_by: Option<SourceEvent>,
 }
 
 impl UnframedAudio {
-    /// Carriage selected by the compatibility policy.
+    /// The private AC-3 or E-AC-3 carriage admitted from the PMT’s signalling.
     pub fn carriage(&self) -> PrivateAudioCarriage {
         self.carriage
     }
+    /// The source event that ended the PES's byte run, as for [`IncompleteVideo::ended_by`];
+    /// `None` at the logical end of the source.
+    pub fn ended_by(&self) -> Option<&SourceEvent> {
+        self.ended_by.as_ref()
+    }
+    /// Track configuration retained from the PMT that admitted the private PES.
     pub fn track_info(&self) -> &Track {
         &self.data.track
     }
+    /// Half-open byte range in the track’s concatenated PES payload.
     pub fn elementary_range(&self) -> Range<u64> {
         self.data.range.clone()
     }
+    /// Original private PES payload bytes, including the bytes without an audio syncword.
     pub fn bytes(&self) -> &Bytes {
         &self.data.bytes
     }
+    /// The original PES and its contribution in track-relative elementary byte coordinates.
     pub fn sources(&self) -> &[PayloadSource] {
         self.data.sources.as_slice()
     }
+    /// The applicable PES anchor, including the presence or absence of its timestamp fields.
     pub fn clock(&self) -> Option<&PacketClock> {
         self.data.clock.as_ref()
     }
+    /// The clock and configuration epochs in force for the payload.
     pub fn epochs(&self) -> SourceEpochs {
         self.data.epochs
     }
 }
 
+/// A reader output other than a complete access unit.
 #[derive(Clone, Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "a carrier owns charged bytes and moves through without a separate allocation"
 )]
@@ -713,7 +846,9 @@ pub enum ReaderEvent {
     Transport(TransportPacket),
     /// A source counter observation with a `First` or `Continuous` outcome.
     Continuity {
+        /// The 13-bit PID of the observed carrier.
         pid: u16,
+        /// The counter outcome; `First` or `Continuous`.
         outcome: ContinuityOutcome,
     },
     /// Original source event with a shared budget charge.
@@ -722,18 +857,29 @@ pub enum ReaderEvent {
     /// Both source events remain available for recovery without asserting an AU
     /// association across the changed map or clock binding.
     InterruptedPes {
+        /// The completed PES with the header and original spans from before the boundary.
         source: SourceEvent,
+        /// The program boundary that the PES header predates.
         boundary: SourceEvent,
     },
     /// No complete AU framer is admitted for this stream. Its PMT and PES
     /// still surface as source events; no PES is relabelled as an AU.
-    Unsupported { track: Track, error: Error },
-    /// A PMT, clock or byte-run boundary interrupted unpublished elementary
-    /// bytes. Their original PES events were delivered unchanged. A loss
-    /// boundary is not logical EOF and never certifies a partial AU.
-    Interrupted {
+    Unsupported {
+        /// The retained PMT entry whose carriage has no admitted access-unit framer.
         track: Track,
+        /// The refusal returned when the track’s signalling was tested for framing support.
+        error: Error,
+    },
+    /// A PMT, clock or byte-run boundary, or a discontinuity the caller declared,
+    /// interrupted unpublished elementary bytes. Their original PES events were
+    /// delivered unchanged. A loss boundary is not logical EOF and never certifies a
+    /// partial AU.
+    Interrupted {
+        /// The track whose bytes were interrupted.
+        track: Track,
+        /// Extent of the interrupted bytes in the track's concatenated PES payload.
         elementary_range: Range<u64>,
+        /// The source event that interrupted the bytes.
         cause: SourceEvent,
     },
     /// An Annex-B source group without an admitted primary/base-layer picture.
@@ -749,12 +895,13 @@ pub enum ReaderEvent {
     /// The unit and its provenance remain outside the neutral packet stream.
     RecoveredAdts(Packet),
     /// Original LATM PES bytes under the explicit PES packet policy.
-    LatmPes(crate::compat::latm::PesPacket),
+    LatmPes(LatmPes),
     /// A proven segment prefix with an unfinished final segment in the source PES.
     DvbSubtitlePrefix(Packet),
-    /// The final unframed video run under the explicit EOF reporting policy.
+    /// An unframed video run that the source ended, under the explicit reporting policy.
     IncompleteVideo(IncompleteVideo),
-    /// One opaque private-audio PES admitted by the explicit EOF reporting policy.
+    /// One opaque private-audio PES whose byte run the source ended, under the explicit
+    /// reporting policy.
     UnframedAudio(UnframedAudio),
 }
 

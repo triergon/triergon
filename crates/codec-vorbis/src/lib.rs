@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,7 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 
 mod codebook;
 mod floor0;
@@ -21,29 +21,28 @@ mod tables;
 mod window;
 
 use triergon_bitstream::LsbReader;
-use triergon_codec::layout::{native_order, vorbis_order};
 use triergon_codec::mdct::Imdct;
 use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, BudgetVec, ChannelLayout, DecodeFailure, DownmixLevels,
-    Reservation, StorageError,
+    AudioDecoder, BudgetVec, DownmixLevels, Reservation, native_order, vorbis_order,
 };
-use triergon_framing::{VorbisHeaders, VorbisIdentification};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
+use triergon_framing::vorbis::{VorbisHeaders, VorbisIdentification};
 
 use floor0::Coefficients;
 use floor1::Points;
 use mapping::{Mapping, Mode, decouple};
 use residue::Member;
-use setup::{Floor, Setup};
+use setup::{Floor, Setup, ilog};
 use spectra::Spectra;
 use window::{Block, Slopes, fade_out, fold, overlap_add};
 
-/// Bounds of one decoder.
+/// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold, output frame included: the setup header's
-    /// codebook, floor and residue tables, the per-channel block buffers and the frame
-    /// it fills. The default, 32 MiB, holds 93 channels of 8192-sample blocks (about
-    /// 7 MiB) next to setup tables many times those of any encoder.
+    /// Bytes of storage that depends on the stream: the setup header's codebook, floor
+    /// and residue tables, the per-channel block buffers and the output frame the
+    /// decoder fills. The default, 32 MiB, holds 93 channels of 8192-sample blocks
+    /// (about 7 MiB) next to setup tables many times those of any encoder.
     pub live_storage_bytes: usize,
 }
 
@@ -53,45 +52,6 @@ impl Default for Limits {
             live_storage_bytes: 32 << 20,
         }
     }
-}
-
-/// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    /// A feature this decoder does not implement.
-    Unsupported(&'static str),
-    /// Malformed data.
-    Invalid(&'static str),
-    /// The storage budget refused an allocation.
-    Budget(StorageError),
-}
-
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
-        DecodeError::Budget(error)
-    }
-}
-
-impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            DecodeError::Unsupported(what) => write!(f, "unsupported: {what}"),
-            DecodeError::Invalid(what) => write!(f, "invalid data: {what}"),
-            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
-
-/// ilog (Vorbis I section 9.2.1): the position of the highest set bit.
-pub(crate) fn ilog(x: u32) -> u32 {
-    u32::BITS - x.leading_zeros()
-}
-
-/// Appends `value` to `list`, charging room for it unless reserved.
-pub(crate) fn push<T>(list: &mut BudgetVec<T>, value: T) -> Result<(), StorageError> {
-    list.try_push(value).map_err(|refused| refused.error)
 }
 
 /// The floor one channel decoded in the current packet.
@@ -116,7 +76,7 @@ struct ChannelFloor {
 ///
 /// Each audio packet yields the samples from the centre of the previous block to the
 /// centre of its own, `previous / 4 + current / 4` per channel; the first packet after
-/// construction or [`AudioDecoder::reset`] only primes the overlap and yields none.
+/// construction or [`Decoder::reset`] only primes the overlap and yields none.
 /// Planes follow FFmpeg's native channel order.
 #[derive(Debug)]
 pub struct Decoder {
@@ -153,7 +113,8 @@ impl Decoder {
         Decoder::with_limits(configuration, Limits::default())
     }
 
-    /// As [`Decoder::new`], with a pool of `limits.live_storage_bytes`.
+    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`. Fails as
+    /// `new` does, or for a limit below a pool's own charge.
     pub fn with_limits(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
         Decoder::new_in(configuration, &Budget::new(limits.live_storage_bytes)?)
     }
@@ -179,20 +140,17 @@ impl Decoder {
         budget: &Budget,
     ) -> Result<Decoder, DecodeError> {
         let id = VorbisIdentification::parse(identification).map_err(|error| match error {
-            StorageError::Unsupported(what) => DecodeError::Unsupported(what),
+            Error::Unsupported(what) => DecodeError::Unsupported(what),
             _ => DecodeError::Invalid("identification header"),
         })?;
         if !comment.starts_with(b"\x03vorbis") {
             return Err(DecodeError::Invalid("comment header"));
         }
         let channels = usize::from(id.channels);
-        if channels > ChannelLayout::CAPACITY {
-            return Err(DecodeError::Unsupported(
-                "more channels than an output layout holds",
-            ));
-        }
         let blocksizes = id.blocksize.map(usize::from);
-        let (layout, planes) = output_layout(channels);
+        let (layout, planes) = output_layout(channels).ok_or(DecodeError::Unsupported(
+            "more channels than an output layout holds",
+        ))?;
         let setup = Setup::parse(setup, channels, blocksizes, budget)?;
 
         let half = blocksizes[1] / 2;
@@ -247,9 +205,16 @@ impl Decoder {
         self.layout
     }
 
-    fn decode_packet(&mut self, packet: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let r = &mut LsbReader::new(packet);
-        let mode = self.read_mode(r)?;
+    /// Decodes the samples from the centre of the previous block to the centre of the
+    /// current block. The first packet after construction or reset primes the overlap.
+    /// Replaces `out`; a refusal leaves `samples_per_channel == 0`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an invalid audio packet or a storage charge the pool cannot cover.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        let r = &mut LsbReader::new(au);
+        let mode = self.read_mode(r).inspect_err(|_| out.clear())?;
         let block = mode.block;
         let half = self.blocksizes[block as usize] / 2;
         let Decoder {
@@ -260,7 +225,7 @@ impl Decoder {
             ..
         } = self;
         let mapping = &setup.mappings[usize::from(mode.mapping)];
-        decode_floors(setup, mapping, r, floors)?;
+        decode_floors(setup, mapping, r, floors).inspect_err(|_| out.clear())?;
         // Spectral lines past `coded` are zero in every channel until the transform.
         let coded = decode_residues(setup, mapping, r, half, floors, spectra, scratch);
         for step in mapping.coupling.iter().rev() {
@@ -269,7 +234,12 @@ impl Decoder {
             decouple(&mut magnitude[..coded], &mut angle[..coded]);
         }
         apply_floors(setup, mapping, block, floors, spectra, coded);
-        self.synthesize(block, out)
+        self.synthesize(block, out).inspect_err(|_| out.clear())
+    }
+
+    /// Drop the overlap after a discontinuity: the next packet primes it again.
+    pub fn reset(&mut self) {
+        self.previous = None;
     }
 
     /// Packet type, mode and window flags (section 4.3.1). The window shape follows from
@@ -372,7 +342,7 @@ fn decode_residues(
     spectra: &mut Spectra,
     scratch: &mut residue::Scratch,
 ) -> usize {
-    let mut coded = [false; 256];
+    let mut coded = [false; ChannelLayout::CAPACITY];
     for (coded, floor) in coded.iter_mut().zip(floors) {
         *coded = !matches!(floor.curve, Curve::Unused);
     }
@@ -384,8 +354,8 @@ fn decode_residues(
         }
     }
     let mut coded_lines = 0;
+    let mut members = [Member::default(); ChannelLayout::CAPACITY];
     for (number, submap) in mapping.submaps.iter().enumerate() {
-        let mut members = [Member::default(); 256];
         let mut count = 0;
         for (channel, _) in mapping
             .mux
@@ -438,30 +408,27 @@ fn apply_floors(
 /// FFmpeg's layout for `channels` coded channels and the output plane of each: the
 /// Vorbis order mapped to native order up to 8 channels; beyond that, coded order
 /// without positions.
-fn output_layout(channels: usize) -> (ChannelLayout, [u8; ChannelLayout::CAPACITY]) {
+fn output_layout(channels: usize) -> Option<(ChannelLayout, [u8; ChannelLayout::CAPACITY])> {
     if let Some(mapped) = vorbis_order(channels).and_then(native_order) {
-        return mapped;
+        return Some(mapped);
     }
-    let mut planes = [0u8; ChannelLayout::CAPACITY];
-    for (i, plane) in planes.iter_mut().enumerate() {
-        *plane = i as u8;
-    }
-    let layout = ChannelLayout::unspecified(channels).unwrap_or_default();
-    (layout, planes)
+    let layout = ChannelLayout::unspecified(channels)?;
+    Some((layout, core::array::from_fn(|i| i as u8)))
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_packet(au, out)
-            .map(|()| None)
-            .map_err(DecodeFailure::from_error)
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out)?;
+        Ok(None)
     }
 
     fn reset(&mut self) {
-        self.previous = None;
+        Decoder::reset(self);
     }
 }

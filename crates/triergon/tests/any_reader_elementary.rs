@@ -3,9 +3,10 @@
 mod common;
 
 use triergon::{
-    AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, Probe, open_blocking,
-    open_sequential, probe,
+    AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, Probed, SourceFormat,
+    open_blocking, open_sequential, probe,
 };
+use triergon_bitstream::crc::{crc8, crc16_a52};
 
 #[test]
 fn any_reader_reads_mpeg_audio_frames() {
@@ -13,7 +14,7 @@ fn any_reader_reads_mpeg_audio_frames() {
     let mut frame = vec![0u8; 417];
     frame[..4].copy_from_slice(&0xfffb_9064u32.to_be_bytes());
     let file = frame.repeat(3);
-    assert_eq!(probe(&file), Probe::MpegAudio);
+    assert_eq!(probe(&file), Probed::Format(SourceFormat::MpegAudio));
     let (reader, packets) = common::read(&file);
     let track = reader.track(0).unwrap();
     assert_eq!(track.kind(), MediaKind::Audio);
@@ -26,25 +27,10 @@ fn any_reader_reads_mpeg_audio_frames() {
 /// A FLAC frame without the stream marker: fixed blocking, 4096 samples, 44.1 kHz,
 /// mono, 16 bits, frame `number`, with valid CRCs.
 fn flac_frame(number: u8, len: usize) -> Vec<u8> {
-    fn crc(data: &[u8], width: u32, polynomial: u32) -> u32 {
-        let top = 1 << (width - 1);
-        let mask = (1u64 << width) as u32 - 1;
-        data.iter().fold(0, |mut crc, &byte| {
-            crc ^= u32::from(byte) << (width - 8);
-            for _ in 0..8 {
-                crc = if crc & top != 0 {
-                    (crc << 1) ^ polynomial
-                } else {
-                    crc << 1
-                } & mask;
-            }
-            crc
-        })
-    }
     let mut frame = vec![0xff, 0xf8, 0xc9, 0x08, number];
-    frame.push(crc(&frame, 8, 0x07) as u8);
+    frame.push(crc8(0, &frame));
     frame.extend((0..len).map(|i| (i % 97) as u8));
-    let check = crc(&frame, 16, 0x8005) as u16;
+    let check = crc16_a52(0, &frame);
     frame.extend(check.to_be_bytes());
     frame
 }
@@ -54,7 +40,7 @@ fn any_reader_reads_flac_that_starts_at_a_frame() {
     let frames: Vec<u8> = (0..4).flat_map(|i| flac_frame(i, 200)).collect();
     // Bytes before the first frame, as a stream joined mid-way has.
     let file = [vec![0x21; 300], frames].concat();
-    assert_eq!(probe(&file), Probe::Flac);
+    assert_eq!(probe(&file), Probed::Format(SourceFormat::Flac));
     let (reader, packets) = common::read(&file);
     let track = reader.track(0).unwrap();
     assert_eq!(track.codec(), CodecId::Flac);
@@ -77,7 +63,7 @@ fn blocking_probe_preserves_late_elementary_candidates_and_their_priority() {
     let mut mpeg = vec![0; 417];
     mpeg[..4].copy_from_slice(&0xfffb_9064u32.to_be_bytes());
     bytes.extend(mpeg.repeat(3));
-    assert_eq!(probe(&bytes), Probe::MpegAudio);
+    assert_eq!(probe(&bytes), Probed::Format(SourceFormat::MpegAudio));
     assert!(matches!(
         open_sequential(&bytes[..], &pool).unwrap().reader(),
         AnyReader::MpegAudio(_)

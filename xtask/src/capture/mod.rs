@@ -2,6 +2,7 @@
 //! the capture pipeline against the FFmpeg capture reference.
 
 pub mod compare;
+mod config;
 pub mod equivalence;
 pub mod qualify;
 pub mod summary;
@@ -19,7 +20,8 @@ pub const USAGE: &str = "usage: cargo xtask capture <command>
   qualify --candidate W --reference W [--reference-small W] --oracle-bin DIR --observer SO
           --inputs DIR --out DIR [--cases F] [--only ID...] [--pairs N] [--iterations N]
           [--memory-pairs N] [--seed N] [--full] [--no-early-stop]
-          [--stage timing | --stage memory --timing DIR] [--and RUN...]
+          [--stage parity | --stage timing | --stage memory --timing DIR] [--and RUN...]
+                 --stage parity compares outputs without collecting measurements
                  --stage timing runs correctness and timing alone (on one CPU); --stage
                  memory collects every case's memory in parallel from a timing run's
                  records in DIR; without --stage one run does both; memory runs
@@ -78,6 +80,7 @@ fn qualify_options(root: &Path, args: &[String]) -> Result<(qualify::Options, bo
     )?;
     let stage = match (a.get("stage"), a.get("timing")) {
         (None, None) => qualify::Stage::Both,
+        (Some("parity"), None) => qualify::Stage::Parity,
         (Some("timing"), None) => qualify::Stage::Timing,
         (Some("memory"), Some(timing)) => qualify::Stage::Memory {
             timing: PathBuf::from(timing),
@@ -163,14 +166,17 @@ pub fn main(root: &Path, args: &[String]) -> Result<i32, String> {
                 ],
                 &[],
             )?;
-            compare::run(&compare::Options {
-                candidate: a.required("candidate")?.to_owned(),
-                reference: a.required("reference")?.to_owned(),
-                ffmpeg_bin: a.required("ffmpeg-bin")?.to_owned(),
-                case: a.required("case")?.to_owned(),
-                input: a.required("input")?.to_owned(),
-                out: a.required("out")?.to_owned(),
-            })?;
+            compare::run(
+                root,
+                &compare::Options {
+                    candidate: a.required("candidate")?.to_owned(),
+                    reference: a.required("reference")?.to_owned(),
+                    ffmpeg_bin: a.required("ffmpeg-bin")?.to_owned(),
+                    case: a.required("case")?.to_owned(),
+                    input: a.required("input")?.to_owned(),
+                    out: a.required("out")?.to_owned(),
+                },
+            )?;
         }
         "qualify" => {
             let runs = rest

@@ -8,6 +8,7 @@
 //! answer depends on them: whether a lookup would substitute a glyph sequence
 //! ([`super::would_apply`]) is decided for some contextual subtables by the
 //! digest alone.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::data::Data;
 use super::layout::Lookup;

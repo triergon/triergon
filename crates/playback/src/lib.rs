@@ -1,64 +1,50 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
-#![warn(clippy::print_stdout, clippy::print_stderr, clippy::unwrap_used)]
-// Pending: `missing_docs`, `missing_debug_implementations`, `unreachable_pub`, `clippy::expect_used`.
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
 pub mod compat;
-mod engines;
-pub mod io;
-mod mp4_native_replay;
-pub mod mp4_open;
-pub mod mp4_plan;
+mod engine;
+mod event;
+pub mod mp4;
+pub mod pes_feed;
 mod player;
-mod sample_sort;
-pub use engines::{
-    BackendStep, Engine, Mp4Event, Mp4NativeEmptyPacket, Mp4NativeMissingSample,
-    Mp4NativeShortPacket, Mp4Packet, RawEvent, TsEvent, TsNativeCarriage, TsNativeConfiguration,
-    TsNativePrivateAudioSelection, TsNativeSelection, TsNativeTrackSelection,
-};
+pub mod probe;
+pub mod pump;
+
+pub use engine::{Engine, Track};
+pub(crate) use event::EngineStep;
+pub use event::{DemuxTimes, Event, Packet, TsEvent};
 pub use player::{
-    ClockChoice, Delivery, Mp4NativeSeekCommand, Mp4NativeSeekJob, Mp4NativeSeekRequest,
-    Mp4RangeOpen, Mp4RangePlayer, Mp4RangeSeek, Mp4RangeSeekJob, Mp4SyncSeekCommand,
-    Mp4SyncSeekJob, Mp4SyncSeekRequest, Output, Player, PlayerPolicy, Progress, SeekIntent,
-    Selection, State, TrackKey, TrackKind,
+    ClockChoice, Delivery, Output, OutputScope, Player, PlayerPolicy, Progress, SeekIntent,
+    Selection, State, TrackKey,
 };
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Format {
-    Matroska,
-    Mp4,
-    Ts(triergon_mpegts::PacketFormat),
-}
+pub use triergon_core::source::{ByteSource, Source, SourceOwner, SourceReply};
 pub use triergon_core::{Error, Result};
 
-pub mod progressive;
-pub mod pump;
-pub mod raw_video;
+/// The most tracks an engine works with. An MP4 plan holds at most this many
+/// ([`mp4::PlanLimits::tracks`]); a program map with more streams fails with `Limit`,
+/// and so does a Matroska segment with more tracks where a selection or a seek needs them.
+pub const MAXIMUM_TRACKS: usize = 64;
 
-pub mod native_startup;
+/// Matroska playback beside the reader's own events.
+pub mod matroska {
+    pub use crate::player::MatroskaReplayOutput as ReplayOutput;
+}
 
-pub mod aac_bridge;
-pub mod av1_bridge;
-pub mod matroska_feed;
-pub mod text_bridge;
-
-pub mod bitmap_bridge;
-pub mod caption_bridge;
-pub mod dvb_ts;
-pub mod mp4_dvd;
-pub mod pgs_ts;
-pub mod teletext_ts;
-mod ts_pes;
-
-pub mod input;
-pub use input::{ByteSource, Source, SourceReply};
-
-pub mod catalogue;
-
-pub mod hls_aac;
-pub mod hls_avc;
-pub mod hls_clock;
-mod hls_dolby;
-mod hls_hevc;
-mod hls_pes;
-pub mod hls_segment;
-mod ts_payload;
-pub mod ts_progressive;
+/// The container format of an input.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Format {
+    /// Matroska or WebM.
+    Matroska,
+    /// MP4 or QuickTime.
+    Mp4,
+    /// An MPEG transport stream in this packet format.
+    Ts(triergon_mpegts::PacketFormat),
+}

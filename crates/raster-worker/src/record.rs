@@ -1,14 +1,10 @@
-//! The values the operations produce, and the two ways of consuming them: the
-//! ordered work digest of the harness protocol and the readable line format.
-//! `harness/reference_raster.h` produces the same records in the same order.
+//! The records the operations produce, in the order `harness/reference_raster.h`
+//! produces them, and the outline and bitmap values they carry.
 
-use std::io::{self, Write};
-use triergon_harness_protocol::digest::{fold, signed};
-use triergon_raster::{Bitmap, Outline, PlacedBitmap, SegmentKind, Vector};
-
-/// The digest value of an absent outline or bitmap.
-const ABSENT: u64 = u64::MAX;
-const FNV_INIT: u64 = 0xcbf2_9ce4_8422_2325;
+use std::io;
+use triergon_harness_runner::records::{self, FNV_OFFSET, Sink, fnv};
+use triergon_raster::compat::libass::PlacedBitmap;
+use triergon_raster::{Bitmap, Outline, SegmentKind, Vector};
 
 /// What a record reports, with the tag it folds under.
 #[derive(Clone, Copy, Debug)]
@@ -33,8 +29,12 @@ pub enum Kind {
     Glyph,
 }
 
-impl Kind {
-    pub fn name(self) -> &'static str {
+impl records::Kind for Kind {
+    fn tag(self) -> u64 {
+        self as u64
+    }
+
+    fn name(self) -> &'static str {
         match self {
             Self::Convert => "convert",
             Self::Rotate => "rotate",
@@ -54,27 +54,21 @@ impl Kind {
             Self::Glyph => "glyph",
         }
     }
+
+    /// The glyph records of a font case describe the input, not work done.
+    fn counted(self) -> bool {
+        (self as u64) < Self::Glyphs as u64
+    }
 }
 
-/// Consumes the records of one operation: each a kind and values, an absent
-/// value standing for a missing outline or bitmap.
-pub trait Sink {
-    fn begin(&mut self, kind: Kind) -> io::Result<()>;
-    fn value(&mut self, value: i64) -> io::Result<()>;
-    fn absent(&mut self) -> io::Result<()>;
-    fn end(&mut self) -> io::Result<()>;
-    /// Counts produced bytes: outline points and bitmap pixels.
-    fn count_bytes(&mut self, bytes: usize);
-
-    fn values(&mut self, values: &[i64]) -> io::Result<()> {
-        values.iter().try_for_each(|&v| self.value(v))
-    }
-
+/// The values of an outline or a bitmap, an absent one standing for a missing
+/// outline or bitmap.
+pub trait Values: Sink<Kind> {
     /// Points and segments and their FNV-1a hash: each point's x and y as
     /// little-endian 32-bit values, then each segment as libass stores it (its
     /// order, plus 4 when it closes a contour).
     fn outline(&mut self, outline: &Outline) -> io::Result<()> {
-        let mut hash = FNV_INIT;
+        let mut hash = FNV_OFFSET;
         for p in outline.points() {
             hash = fnv(hash, &p.x.to_le_bytes());
             hash = fnv(hash, &p.y.to_le_bytes());
@@ -87,8 +81,8 @@ pub trait Sink {
             };
             hash = fnv(hash, &[order | (u8::from(s.closes_contour) << 2)]);
         }
-        self.count_bytes(outline.points().len());
-        self.values(&[
+        self.count(0, outline.points().len());
+        self.ints(&[
             outline.points().len() as i64,
             outline.segments().len() as i64,
             hash as i64,
@@ -106,11 +100,7 @@ pub trait Sink {
         let Some(placed) = placed else {
             return self.absent();
         };
-        let shift = Vector::new(
-            placed.origin.x.wrapping_sub(origin.x),
-            placed.origin.y.wrapping_sub(origin.y),
-        );
-        self.bitmap_at(Some(&placed.bitmap), shift)
+        self.bitmap_at(Some(&placed.bitmap), placed.origin.offset_from(origin))
     }
 
     /// A bitmap with its position moved by `shift`.
@@ -118,9 +108,9 @@ pub trait Sink {
         let Some(b) = bitmap else {
             return self.absent();
         };
-        let hash = fnv(FNV_INIT, b.data());
-        self.count_bytes(b.width() * b.height());
-        self.values(&[
+        let hash = fnv(FNV_OFFSET, b.data());
+        self.count(0, b.width() * b.height());
+        self.ints(&[
             b.position.x.wrapping_add(shift.x).into(),
             b.position.y.wrapping_add(shift.y).into(),
             b.width() as i64,
@@ -131,81 +121,4 @@ pub trait Sink {
     }
 }
 
-fn fnv(mut hash: u64, data: &[u8]) -> u64 {
-    for &b in data {
-        hash ^= u64::from(b);
-        hash = hash.wrapping_mul(0x100_0000_01b3);
-    }
-    hash
-}
-
-/// The work of one or more operations.
-#[derive(Debug, Default)]
-pub struct Work {
-    pub packets: u64,
-    pub bytes: u64,
-    pub digest: u64,
-}
-
-impl Work {
-    /// Adds the work of one operation, its digest folded as one value.
-    pub fn accumulate(&mut self, operation: &Work) {
-        self.packets += operation.packets;
-        self.bytes += operation.bytes;
-        fold(&mut self.digest, operation.digest);
-    }
-}
-
-impl Sink for Work {
-    fn begin(&mut self, kind: Kind) -> io::Result<()> {
-        if (kind as u64) < Kind::Glyphs as u64 {
-            self.packets += 1;
-        }
-        fold(&mut self.digest, kind as u64);
-        Ok(())
-    }
-
-    #[inline]
-    fn value(&mut self, value: i64) -> io::Result<()> {
-        fold(&mut self.digest, signed(value));
-        Ok(())
-    }
-
-    fn absent(&mut self) -> io::Result<()> {
-        fold(&mut self.digest, ABSENT);
-        Ok(())
-    }
-
-    fn end(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-
-    fn count_bytes(&mut self, bytes: usize) {
-        self.bytes += bytes as u64;
-    }
-}
-
-/// The readable form: one line per record, `kind value value ...`, `-` for an
-/// absent value.
-#[derive(Debug)]
-pub struct Dump<W: Write>(pub W);
-
-impl<W: Write> Sink for Dump<W> {
-    fn begin(&mut self, kind: Kind) -> io::Result<()> {
-        write!(self.0, "{}", kind.name())
-    }
-
-    fn value(&mut self, value: i64) -> io::Result<()> {
-        write!(self.0, " {value}")
-    }
-
-    fn absent(&mut self) -> io::Result<()> {
-        write!(self.0, " -")
-    }
-
-    fn end(&mut self) -> io::Result<()> {
-        writeln!(self.0)
-    }
-
-    fn count_bytes(&mut self, _bytes: usize) {}
-}
+impl<S: Sink<Kind>> Values for S {}

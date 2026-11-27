@@ -16,7 +16,7 @@
 #include <libavutil/log.h>
 #include <libavutil/mem.h>
 
-#define PROGRESSIVE_OPERATION "ProgressiveAvcAacTsOwnedFeedV1"
+#define PROGRESSIVE_OPERATION "progressive-avc-aac-ts188"
 enum {
     PROGRESSIVE_WINDOW = 4096,
     PROGRESSIVE_DEPTH = 2,

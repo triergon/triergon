@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "source-signatures",
+  "gate": "required",
+  "operation": "source-signatures",
+  "candidate": "transport-views-worker",
+  "worker_operation": "source-signatures-",
+  "oracle": "source-signatures",
+  "contract": [
+    "Compare every prefix length of the authored inputs against independent byte-field observations from RFC 8794 §11.2.1, ISO/IEC 14496-12 §4.2, RFC 3533 §6 and ITU-T H.222.0 §2.4.3.2. The M2TS carrier places the same TS sync byte after its four-byte arrival prefix.",
+    "Fold literal EBML and Ogg recognition, presence and bytes of the first box type, and each carrier's three-sync observation and required prefix length. Exercise a mismatch at every one of the six sync positions.",
+    "Apply the core signature selection policy to each prefix independently: empty, ordinary or caller-defined opening box lists, Ogg enabled or disabled, and both transport tie policies. Fold the exact Need length, selected format and transport spacing, ambiguity or rejection. The container probes compare their own fixed selection policies with AVIO."
+  ],
+  "required_profiles": ["preamble", "transport"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["ebml-over-box", "ordinary-box", "caller-box", "other-box", "ogg-or-box", "ogg-other-version", "both-grids", "ts-first-mismatch", "ts-second-mismatch", "ts-third-mismatch", "m2ts-first-mismatch", "m2ts-second-mismatch", "m2ts-third-mismatch", "neither-grid"], "cause": "The oracle applies caller-defined signature and tie policies that the reference probes do not expose."},
+    {"bound": "heap", "cases": ["ebml-over-box", "ordinary-box", "caller-box", "other-box", "ogg-or-box", "ogg-other-version", "both-grids", "ts-first-mismatch", "ts-second-mismatch", "ts-third-mismatch", "m2ts-first-mismatch", "m2ts-second-mismatch", "m2ts-third-mismatch", "neither-grid"], "cause": "The oracle applies caller-defined signature and tie policies that the reference probes do not expose."},
+    {"bound": "total_rss", "cases": ["ebml-over-box", "ordinary-box", "caller-box", "other-box", "ogg-or-box", "ogg-other-version", "both-grids", "ts-first-mismatch", "ts-second-mismatch", "ts-third-mismatch", "m2ts-first-mismatch", "m2ts-second-mismatch", "m2ts-third-mismatch", "neither-grid"], "cause": "The oracle applies caller-defined signature and tie policies that the reference probes do not expose."}
+  ]
+}

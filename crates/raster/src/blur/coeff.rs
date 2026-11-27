@@ -5,6 +5,7 @@
 //! (halving with [1, 5, 10, 10, 5, 1], the kernel, doubling with [5, 10, 1] and
 //! [1, 10, 5]) to the Gaussian's, as libass derives it, in the same floating
 //! point order.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use crate::fp;
 

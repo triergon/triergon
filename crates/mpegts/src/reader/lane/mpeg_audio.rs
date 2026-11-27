@@ -6,7 +6,7 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
     SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_framing::{MpegAudioHeader, MpegLayer, MpegVersion};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer, MpegVersion};
 
 const HEADER: usize = 4;
 
@@ -56,7 +56,7 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Step<MpegAudioFrame>> {
-        if let Some(free) = &mut self.free {
+        let free = if let Some(free) = &mut self.free {
             if let Some(base) = free.base
                 && free.buffer.is_empty()
             {
@@ -67,6 +67,7 @@ impl Reader {
                     Ok((header, free_size(header, base)?))
                 })?));
             }
+            free
         } else {
             match self.aligned.step(work, cancel, read_length)? {
                 Step::Ready(frame) => {
@@ -74,7 +75,7 @@ impl Reader {
                         return Ok(map_frame(Step::Ready(frame)));
                     }
                     let buffer = BudgetVec::new(self.aligned.input().budget());
-                    self.free = Some(FreeFormat {
+                    self.free.insert(FreeFormat {
                         buffer,
                         prefix: Some(frame.bytes),
                         first: frame.header,
@@ -83,19 +84,16 @@ impl Reader {
                         candidate: None,
                         base: None,
                         paid: 0,
-                    });
+                    })
                 }
                 Step::Yield => return Ok(Step::Yield),
                 Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
                 Step::End(location) => return Ok(Step::End(location)),
                 Step::Backpressure(never) => match never {},
             }
-        }
+        };
         let maximum = self.aligned.maximum();
-        self.free
-            .as_mut()
-            .expect("free-format reader initialized")
-            .step(self.aligned.input(), maximum, work, cancel)
+        free.step(self.aligned.input(), maximum, work, cancel)
     }
 }
 
@@ -259,10 +257,8 @@ impl FreeFormat {
                 0
             };
             if extra != 0 {
-                match input.read_append(&mut self.buffer, extra, work, cancel)? {
-                    Step::Ready(_) => (),
-                    _ => unreachable!("buffered lookahead within the work grant"),
-                }
+                // Whatever this reads, the search below covers the bytes buffered.
+                input.read_append(&mut self.buffer, extra, work, cancel)?;
             }
             let last = (self.buffer.len() - HEADER).min(maximum);
             let search =
@@ -325,7 +321,10 @@ impl FreeFormat {
         let header = self
             .header(0)
             .ok_or(Error::Invalid("free-format MPEG audio header changed"))?;
-        let size = free_size(header, self.base.expect("confirmed free-format spacing"))?;
+        let Some(base) = self.base else {
+            return Err(Error::Invalid("free-format MPEG audio spacing"));
+        };
+        let size = free_size(header, base)?;
         if size > maximum {
             return Err(crate::limit(size, maximum));
         }

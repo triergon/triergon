@@ -1,0 +1,336 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "flac-extra",
+      "profile": "flac",
+      "file": ".research/elementary-reader-authored/flac-extra.flac",
+      "sha256": "a7a7c8ad5895cb5b7cbbf2787166c3f8b4f2a4ca9cb31fcfca68adbe57a7260b",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "16774a2a8f249e29c59683e2c077e0da5b7622c8f0bb10505f2c931aed3b7160"
+      }
+    },
+    {
+      "id": "id3v1-plain",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/id3v1-plain.mp3",
+      "sha256": "83f1700fa8926d9c63d5ce3992c355277a996ad39ef2d4bbd006acdbdc8ad504",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "14e09d1d46b5d679e84547c08a652c2926b17bdc0582500b67e9134d6453ac81"
+      }
+    },
+    {
+      "id": "id3v1-track",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/id3v1-track.mp3",
+      "sha256": "f3665b5e97344435bf620b91d32d12e5d011bc001220a2495befe6d135b3dfbf",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "add21ddcf2f789c261e1c2c425cee2c614c8c3ca8756779a922bc162e2eccbe8"
+      }
+    },
+    {
+      "id": "apev2",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/apev2.mp3",
+      "sha256": "108ef0c01f1cd0ff9d3bb305fe1e42cedd7c4b19abe8935f20b391e069b5a270",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "2fab35b652fa6897880c2feae842a4c55b753a4154349629fb96ac536ccef952"
+      }
+    },
+    {
+      "id": "flac-id3v2",
+      "profile": "flac",
+      "file": ".research/elementary-reader-authored/flac-id3v2.flac",
+      "sha256": "d30e8541719d053ff75b29133ac2fbc70bd143182dd58c1405f8b84771be58d5",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "1fc0535e5493d9f4f20074fcc662a43c52755811267a4e8a4658e5138d5dbb5d"
+      }
+    },
+    {
+      "id": "mp3-id3v2",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/mp3-id3v2.mp3",
+      "sha256": "3970772488b2e9fab0cec2471340b9ea9baa7a3b0c0c0d27cd6ede8e22483215",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "4d7b1046978aea5480775bcf5d7cfc993cf2fe22f1cb29ce01d74692efaad7e9"
+      }
+    },
+    {
+      "id": "aac-id3v2",
+      "profile": "aac",
+      "file": ".research/elementary-reader-authored/aac-id3v2.aac",
+      "sha256": "05851b61309b39324df55a50792e30486350402e65b1c40a49400a10398442ac",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "321a78ad8f2f43f198addb478cc5bbc5dede7a745d77b96399d6b0be4cd80ead"
+      }
+    },
+    {
+      "id": "ac3-id3v2",
+      "profile": "ac3",
+      "file": ".research/elementary-reader-authored/ac3-id3v2.ac3",
+      "sha256": "12daad683b5ce61d8d4bdcbffef13d2537cf1d73740f648c6ce009c6d2677d99",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "ee05dad6961379922380be52104201a60c96c32b68a75c0eaa3af7798e11dc24"
+      }
+    },
+    {
+      "id": "eac3-id3v2",
+      "profile": "eac3",
+      "file": ".research/elementary-reader-authored/eac3-id3v2.eac3",
+      "sha256": "47078a7e2909cc068c0833827a86613eb906352d9a7fa05c756841f3fe9286ef",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "eac3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "74585dab8c5a3f6ce85ba759382993caed76ce7c4efa6faa4c5af867e6eead88"
+      }
+    },
+    {
+      "id": "flac-default.flac",
+      "profile": "flac",
+      "file": ".research/elementary/flac_default.flac",
+      "sha256": "e87f997ad8e462501f8695668ba6d95b1597499684d643abec62e258d83398c5",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "b1607f3411dbb56c5937760ed82825e6aa9df43a68208ed0af8d6c371a1d70a4"
+      }
+    },
+    {
+      "id": "flac-small-blocks.flac",
+      "profile": "flac",
+      "file": ".research/elementary/flac_small_blocks.flac",
+      "sha256": "aebccbe21e4263a94ed17a829b83497747d175d491b1c5ab1ff3ef8edb93b2db",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "flac",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "670d4f792e3cf72ae65de17d70b0d8f350ef5619b16605a117130074f7d33b56"
+      }
+    },
+    {
+      "id": "mp3-vbr-xing.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_vbr_xing.mp3",
+      "sha256": "d91b48d9f533b994550e0e21ff78a6a4e3dc8f81417695e667804cc3c0e941a3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "c5fcb0ab7cf5c951b8e755fdd9f77294b42466b56ad5743fcef4764abe582e89"
+      }
+    },
+    {
+      "id": "mp3-cbr-info.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/mp3_cbr_info.mp3",
+      "sha256": "db32767a99ec36f1e06291411c162857ffe145184df9a8b5c36d46bc3af07650",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "276002e39a21c723efb5db34b18ea0bdebcfaf2dfc5a264d4262a3dcda5fbb63"
+      }
+    },
+    {
+      "id": "adts-51.aac",
+      "profile": "aac",
+      "file": ".research/elementary/adts_51.aac",
+      "sha256": "0aafadbf51a54d1469565901477f707a8a1dca4653b070afab6456f098fc765e",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "a20430165d3ff17044b47915a508b256b9427394c2121fb3354ef29460ff923f"
+      }
+    },
+    {
+      "id": "adts-lc.aac",
+      "profile": "aac",
+      "file": ".research/elementary/adts_lc.aac",
+      "sha256": "756494f09100b66748cf57bbec30dadba0ccac66fe63832a1f5c75597a672695",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "aac",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "efef4e5f8dacebe53a3b7c664bba9fadbb71c3e94df90a6a108c623c63aa4474"
+      }
+    },
+    {
+      "id": "ac3-stereo.ac3",
+      "profile": "ac3",
+      "file": ".research/elementary/ac3_stereo.ac3",
+      "sha256": "ddf1e315305f096a5b5217ea123f69ae9106e7134e5066480090fc05c296f541",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "82d31770266efdbc05356bd4a1f03db20c1e1c1204c52a2726000c9233dca5de"
+      }
+    },
+    {
+      "id": "ac3-51.ac3",
+      "profile": "ac3",
+      "file": ".research/elementary/ac3_51.ac3",
+      "sha256": "41d6db5aab063d28f14a57b335a5dfb40deca9fb9b0dd5c6799acb9e079f7469",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "ac3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "38ed6ae6e683d071a04199361b51e2df3040918a2a2f78402a784dda3e7c77d8"
+      }
+    },
+    {
+      "id": "eac3-stereo.eac3",
+      "profile": "eac3",
+      "file": ".research/elementary/eac3_stereo.eac3",
+      "sha256": "c6bf6e6e5ef80bffd809e6466a297adfdbcbf5aa99e5094eb4cb756cab21a571",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "eac3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "aa7958a7f637c4addf249c68d66e957e07aff7fb7ed2447bc593ca4af4f59d83"
+      }
+    },
+    {
+      "id": "eac3-51.eac3",
+      "profile": "eac3",
+      "file": ".research/elementary/eac3_51.eac3",
+      "sha256": "ec9ca4c1ddbd8d42138931936eea6397789c5950a18f7b67e66c22c75aab4344",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "eac3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "a75565c14241d6a9108510e4e9f915798b5e78d67fd96fcbb24aada0b39aa086"
+      }
+    },
+    {
+      "id": "crafted-mp3-name-lame.mp3",
+      "profile": "mp3",
+      "file": ".research/elementary/crafted/mp3_name_lame.mp3",
+      "sha256": "412910d309db738799e38ec4d12e7c92b1ac8b2f29328bb6774e771e317a0b3f",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "686bd6f86713028eb9665c0dedd75aec84982ff7de837ad74d2ccb7019b632b1"
+      }
+    },
+    {
+      "id": "mp3-vbri",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/mp3-vbri.mp3",
+      "sha256": "a99bdb7d0ce98d0908159c4dc0f7f42ecb6c7b5055399f93ae61c0c9756062d3",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "3a61ec4bdbe03989d8834ec6a607b198eea73674aea1d7d5289a1bc6588d3b09"
+      }
+    },
+    {
+      "id": "mp3-id3-utf16",
+      "profile": "mp3",
+      "file": ".research/elementary-reader-authored/mp3-id3-utf16.mp3",
+      "sha256": "c712a813f67e5218b29422f0a866e158277837507c50d7574df0d6d742417037",
+      "rights": "authored-synthetic",
+      "required": true,
+      "arguments": [
+        "mp3",
+        "wire"
+      ],
+      "expected": {
+        "trace_sha256": "acf296421f0b89b14631daaa6ae3b17d97d28620b88e362e018889d920a1c932"
+      }
+    }
+  ]
+}

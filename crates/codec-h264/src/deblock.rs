@@ -2,19 +2,21 @@
 //! its slices are reconstructed. Supports frames, field pictures and MBAFF frames.
 
 use crate::mbinfo::{Kind, MbInfo, MbWidth, SliceDbk};
-use crate::picture::{FrameBuf, Motion};
+use crate::picture::{FrameBuf, Motion, Structure, array, array_mut, copied};
 use crate::slicedec::CurPic;
 use crate::tables::{ALPHA, BETA, TC0};
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// What the filter reads of the picture, borrowed beside its sample planes and the
 /// motion summaries it writes.
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 struct PicView<'a> {
     mbs: &'a [MbInfo],
     slices: &'a [SliceDbk],
-    motion: &'a Motion,
     w: MbWidth,
-    structure: u8,
+    motion: &'a Motion,
+    structure: Structure,
     mbaff: bool,
     chroma: bool,
 }
@@ -54,7 +56,7 @@ fn mb_origin(pic: &PicView<'_>, addr: usize) -> (usize, usize, usize, bool) {
         }
     } else {
         let (mbx, mby) = pic.w.split(addr);
-        (mbx, mby * 16, 1, pic.structure != 0)
+        (mbx, mby * 16, 1, pic.structure.is_field())
     }
 }
 
@@ -87,13 +89,13 @@ fn uniform_motion(m: &Motion, q: usize) -> Uni {
         mv: [[0; 2]; 2],
     };
     for l in 0..2 {
-        let r: &[i32; 4] = m.ref_id[l][q * 4..q * 4 + 4].try_into().unwrap();
+        let r: &[i32; 4] = array(&m.ref_id[l], q * 4);
         if r[1] != r[0] || r[2] != r[0] || r[3] != r[0] {
             return NOT_UNI;
         }
         u.rid[l] = r[0];
         if r[0] >= 0 {
-            let mv: &[[i16; 2]; 16] = m.mv[l][q * 16..q * 16 + 16].try_into().unwrap();
+            let mv: &[[i16; 2]; 16] = array(&m.mv[l], q * 16);
             if mv.iter().any(|v| *v != mv[0]) {
                 return NOT_UNI;
             }
@@ -140,14 +142,14 @@ impl BsCtx<'_> {
             }
             return out;
         }
-        let mvp0: &[[i16; 2]; 16] = m.mv[0][p * 16..p * 16 + 16].try_into().unwrap();
-        let mvp1: &[[i16; 2]; 16] = m.mv[1][p * 16..p * 16 + 16].try_into().unwrap();
-        let mvq0: &[[i16; 2]; 16] = m.mv[0][q * 16..q * 16 + 16].try_into().unwrap();
-        let mvq1: &[[i16; 2]; 16] = m.mv[1][q * 16..q * 16 + 16].try_into().unwrap();
-        let rp0: &[i32; 4] = m.ref_id[0][p * 4..p * 4 + 4].try_into().unwrap();
-        let rp1: &[i32; 4] = m.ref_id[1][p * 4..p * 4 + 4].try_into().unwrap();
-        let rq0: &[i32; 4] = m.ref_id[0][q * 4..q * 4 + 4].try_into().unwrap();
-        let rq1: &[i32; 4] = m.ref_id[1][q * 4..q * 4 + 4].try_into().unwrap();
+        let mvp0: &[[i16; 2]; 16] = array(&m.mv[0], p * 16);
+        let mvp1: &[[i16; 2]; 16] = array(&m.mv[1], p * 16);
+        let mvq0: &[[i16; 2]; 16] = array(&m.mv[0], q * 16);
+        let mvq1: &[[i16; 2]; 16] = array(&m.mv[1], q * 16);
+        let rp0: &[i32; 4] = array(&m.ref_id[0], p * 4);
+        let rp1: &[i32; 4] = array(&m.ref_id[1], p * 4);
+        let rq0: &[i32; 4] = array(&m.ref_id[0], q * 4);
+        let rq1: &[i32; 4] = array(&m.ref_id[1], q * 4);
         let mut out = [0u8; 4];
         for k in 0..4 {
             let (a, b) = (pb[k] & 15, qb[k] & 15);
@@ -175,7 +177,6 @@ impl BsCtx<'_> {
 
     /// Boundary strength between 4x4 block pb of MB p and block qb of MB q (8.7.2.1).
     #[inline]
-    #[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
     fn bs(
         &self,
         p: usize,
@@ -338,18 +339,16 @@ fn qp_avg(p: [i8; 2], q: [i32; 2]) -> [i32; 2] {
 /// Gather an edge whose lines run along a row (horizontal edge) into lanes `at..at + N`: lane
 /// k = row q0 + (k-4)*step.
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn load_h<const N: usize>(s: &[u8], q0: usize, step: usize, l: &mut Lanes, at: usize) {
     for k in 0..8 {
         let o = q0 + k * step - 4 * step;
-        let src: &[u8; N] = s[o..o + N].try_into().unwrap();
+        let src: &[u8; N] = array(s, o);
         l[k][at..at + N].copy_from_slice(src);
     }
 }
 
 /// Scatter rows `lo..hi` of a horizontal edge back from lanes `at..at + N`.
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn store_h<const N: usize>(
     s: &mut [u8],
     q0: usize,
@@ -361,7 +360,7 @@ fn store_h<const N: usize>(
 ) {
     for k in lo..hi {
         let o = q0 + k * step - 4 * step;
-        let dst: &mut [u8; N] = (&mut s[o..o + N]).try_into().unwrap();
+        let dst: &mut [u8; N] = array_mut(s, o);
         dst.copy_from_slice(&l[k][at..at + N]);
     }
 }
@@ -395,7 +394,11 @@ fn transpose8(r: &mut [u64; 8]) {
 /// column (k - 4).
 #[cfg(target_pointer_width = "64")]
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+// indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, at: usize) {
     for half in 0..N / 8 {
         let mut r = [0u64; 8];
@@ -414,7 +417,11 @@ fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, 
 /// are unchanged).
 #[cfg(target_pointer_width = "64")]
 #[inline(always)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+// indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn store_v<const N: usize>(s: &mut [u8], q0: usize, line_step: usize, l: &Lanes, at: usize) {
     for half in 0..N / 8 {
         let mut r = [0u64; 8];
@@ -450,6 +457,10 @@ fn transpose4(r: &mut [u32; 4]) {
 /// column (k - 4).
 #[cfg(not(target_pointer_width = "64"))]
 #[inline(always)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, at: usize) {
     for quarter in 0..N / 4 {
         // Columns p3..p0 and q0..q3 of four lines.
@@ -473,6 +484,10 @@ fn load_v<const N: usize>(s: &[u8], q0: usize, line_step: usize, l: &mut Lanes, 
 /// are unchanged).
 #[cfg(not(target_pointer_width = "64"))]
 #[inline(always)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "lengths fixed by the ranges; this form transposes fastest"
+)]
 fn store_v<const N: usize>(s: &mut [u8], q0: usize, line_step: usize, l: &Lanes, at: usize) {
     for quarter in 0..N / 4 {
         let lanes = at + quarter * 4..at + quarter * 4 + 4;
@@ -527,7 +542,7 @@ fn filter_luma(l: &mut Lanes, pr: &LineParams) -> bool {
 /// Luma filter of the lines flagged in `f` (8.7.2.3 and 8.7.2.4), in place: each lane reads
 /// only its own samples. Returns whether any sample changed.
 #[inline(always)]
-#[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+// The clamp assertion blocks vectorisation.
 fn filter_luma_lines(l: &mut Lanes, pr: &LineParams, f: &[i16; 16]) -> bool {
     let mut diff = [0u8; 16];
     for i in 0..16 {
@@ -596,7 +611,7 @@ fn filter_luma_lines(l: &mut Lanes, pr: &LineParams, f: &[i16; 16]) -> bool {
 /// and of Cr in lanes 8..16. Returns whether samples changed: bit 0 in Cb's lanes, bit 1 in
 /// Cr's.
 #[inline(never)]
-#[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+// The clamp assertion blocks vectorisation.
 fn filter_chroma(l: &mut Lanes, pr: &LineParams) -> u8 {
     let mut op = [0u8; 16];
     let mut oq = [0u8; 16];
@@ -626,7 +641,7 @@ fn filter_chroma(l: &mut Lanes, pr: &LineParams) -> u8 {
     }
     l[3] = op;
     l[4] = oq;
-    let [cb, cr]: [[u8; 8]; 2] = [diff[..8].try_into().unwrap(), diff[8..].try_into().unwrap()];
+    let [cb, cr]: [[u8; 8]; 2] = [copied(&diff, 0), copied(&diff, 8)];
     u8::from(cb != [0; 8]) | (u8::from(cr != [0; 8]) << 1)
 }
 
@@ -712,7 +727,7 @@ impl Progress {
     }
 
     /// Restarts for a picture of `w` x `h` macroblocks, reusing the arrays.
-    pub(crate) fn reset(&mut self, w: usize, h: usize, mbaff: bool) -> Result<(), StorageError> {
+    pub(crate) fn reset(&mut self, w: usize, h: usize, mbaff: bool) -> Result<(), Error> {
         let (unit, rows) = if mbaff { (2 * w, h / 2) } else { (w, h) };
         self.left.clear();
         self.left.try_resize(rows, unit as u32)?;
@@ -760,9 +775,9 @@ fn advance(pic: &mut CurPic, all: bool) {
         return;
     }
     pic.dbk.next = end;
-    let field_pic = pic.structure != 0;
+    let field_pic = pic.structure.is_field();
     let (vy, vc) = if field_pic {
-        let par = (pic.structure - 1) as usize;
+        let par = pic.structure.index();
         (
             View {
                 base: par * pic.buf.width,
@@ -863,10 +878,10 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize, t8: bool) -> ([[u8; 4]; 4], [[u8; 4]; 
     let mq = &ctx.mbs[q];
     let nz = mq.nzmask as u32;
     let m = ctx.motion;
-    let r0: [i32; 4] = m.ref_id[0][q * 4..q * 4 + 4].try_into().unwrap();
-    let r1: [i32; 4] = m.ref_id[1][q * 4..q * 4 + 4].try_into().unwrap();
-    let mv0: [[i16; 2]; 16] = m.mv[0][q * 16..q * 16 + 16].try_into().unwrap();
-    let mv1: [[i16; 2]; 16] = m.mv[1][q * 16..q * 16 + 16].try_into().unwrap();
+    let r0: [i32; 4] = copied(&m.ref_id[0], q * 4);
+    let r1: [i32; 4] = copied(&m.ref_id[1], q * 4);
+    let mv0: [[i16; 2]; 16] = copied(&m.mv[0], q * 16);
+    let mv1: [[i16; 2]; 16] = copied(&m.mv[1], q * 16);
     let limy = if mq.field || ctx.field_pic { 2 } else { 4 };
     let b8 = |b: usize| (b / 8) * 2 + (b % 4) / 2;
     let pair = |pb: usize, qb: usize| -> u8 {
@@ -893,8 +908,7 @@ fn internal_bs(ctx: &BsCtx<'_>, q: usize, t8: bool) -> ([[u8; 4]; 4], [[u8; 4]; 
     (v, h)
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
+// Factoring the vertical load and store ranges through an array helper added 2.7 KiB here on AArch64.
 fn deblock_mb(
     pic: &PicView<'_>,
     uni: &[Uni],
@@ -910,7 +924,7 @@ fn deblock_mb(
     if sp.disable_idc == 1 {
         return;
     }
-    let field_pic = pic.structure != 0;
+    let field_pic = pic.structure.is_field();
     let q_intra = q.kind.is_intra();
     let ctx = BsCtx {
         mbs: pic.mbs,
@@ -959,7 +973,7 @@ fn deblock_mb(
         } else {
             addr - 1
         };
-        if !(sp.disable_idc == 2 && !same_slice(p)) {
+        if sp.disable_idc != 2 || same_slice(p) {
             let bs4 = ctx.edge_bs(p, [3, 7, 11, 15], addr, [0, 4, 8, 12], true);
             if bs4 != [0; 4] {
                 let mp = &pic.mbs[p];
@@ -1082,7 +1096,7 @@ fn deblock_mb(
         } else {
             let prow_pic = yi - dy;
             let (p, prow) = mb_at_row(pic, mbx, prow_pic);
-            if !(sp.disable_idc == 2 && !same_slice(p)) {
+            if sp.disable_idc != 2 || same_slice(p) {
                 let mixed = pic.mbaff && pic.mbs[p].field != qfield;
                 let pr0 = (prow / 4) * 4;
                 let bs = if mixed {

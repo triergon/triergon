@@ -12,6 +12,7 @@ use std::process::Command;
 
 use crate::fetch::{self, Transport};
 use crate::json::{self, Value};
+use crate::process::{output, run};
 use crate::sha256;
 
 pub const REVISION: &str = "d32b387f2b0a484599d4587d651891f0c63c4238";
@@ -28,6 +29,8 @@ pub enum Profile {
     Matroska,
     /// An isolated MOV/TS/subtitle reference; the Matroska build is untouched.
     Formats,
+    /// Public bitstream filters, parsers and codec configuration views.
+    FramingViews,
     /// The Matroska reference plus the H.264 and HEVC decoders, which stream
     /// discovery uses to learn the B-picture delay; the Matroska build is untouched.
     Video,
@@ -62,6 +65,7 @@ impl Profile {
         match self {
             Profile::Matroska => ".research/reference",
             Profile::Formats => ".research/reference-formats",
+            Profile::FramingViews => ".research/reference-framing-views",
             Profile::TransportDts => ".research/reference-transport-dts",
             Profile::TransportMpegVideo => ".research/reference-transport-mpeg-video",
             Profile::Video => ".research/reference-video",
@@ -76,6 +80,7 @@ impl Profile {
         match self {
             Profile::Matroska
             | Profile::Formats
+            | Profile::FramingViews
             | Profile::Video
             | Profile::Subtitles
             | Profile::TransportDts
@@ -88,6 +93,7 @@ impl Profile {
         [
             Profile::Matroska,
             Profile::Formats,
+            Profile::FramingViews,
             Profile::TransportDts,
             Profile::TransportMpegVideo,
             Profile::Video,
@@ -104,6 +110,7 @@ impl Profile {
         match self {
             Profile::Matroska => "matroska",
             Profile::Formats => "formats",
+            Profile::FramingViews => "framing-views",
             Profile::TransportDts => "transport-dts",
             Profile::TransportMpegVideo => "transport-mpeg-video",
             Profile::Video => "video",
@@ -171,6 +178,7 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
         Profile::Decode => return release(&DECODE_ARGS),
         Profile::Matroska
         | Profile::Formats
+        | Profile::FramingViews
         | Profile::Video
         | Profile::Subtitles
         | Profile::TransportDts
@@ -197,6 +205,25 @@ pub fn configure_argv(prefix: &Path, profile: Profile) -> Vec<String> {
     .iter()
     .map(ToString::to_string)
     .collect();
+    if profile == Profile::FramingViews {
+        for flag in &mut argv {
+            *flag = match flag.as_str() {
+                "--enable-demuxer=matroska" => {
+                    "--enable-demuxer=mov,aac,eac3,dts,h264,hevc,ivf,obu"
+                }
+                "--enable-muxer=framecrc" => {
+                    "--enable-muxer=framecrc,null,obu,dts,md5,ivf,mp4,hevc"
+                }
+                "--enable-decoder=pcm_s16le" => "--enable-decoder=pcm_s16le,aac,eac3,dca",
+                "--enable-parser=h264,hevc,aac,ac3,vorbis" => {
+                    "--enable-parser=h264,hevc,aac,ac3,av1,vp9,dca"
+                }
+                other => other,
+            }
+            .to_owned();
+        }
+        argv.push("--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata,filter_units,trace_headers,aac_adtstoasc,dca_core".into());
+    }
     if profile == Profile::Formats {
         for flag in &mut argv {
             *flag = match flag.as_str() {
@@ -277,23 +304,6 @@ pub fn fate_list(listing: &str) -> String {
     names.join("\n") + "\n"
 }
 
-pub fn run(command: &mut Command) -> Result<(), String> {
-    let status = command.status().map_err(|e| format!("{command:?}: {e}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("{command:?}: {status}"))
-    }
-}
-
-pub fn output(command: &mut Command) -> Result<String, String> {
-    let out = command.output().map_err(|e| format!("{command:?}: {e}"))?;
-    if !out.status.success() {
-        return Err(format!("{command:?}: {}", out.status));
-    }
-    String::from_utf8(out.stdout).map_err(|e| e.to_string())
-}
-
 /// Every regular file of the archive must still match the unpacked tree, so the
 /// build cannot use a source that only carries the revision label.
 pub fn verify_tree(archive: &[u8], cache: &Path) -> Result<usize, String> {
@@ -327,7 +337,7 @@ pub fn prepare(
     let prefix = cache.join("install");
     let argv = configure_argv(&prefix, profile);
     let record = cache.join("configure-argv.json");
-    let recorded = crate::checks::read_json(&record).ok();
+    let recorded = json::read(&record).ok();
     let wanted = Value::strings(argv.iter().cloned());
     let configuration = Value::object([
         ("arguments", wanted.clone()),
@@ -436,7 +446,7 @@ pub fn prepare(
         ));
     }
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &Value::object(manifest))?;
+    json::write(&path, &Value::object(manifest))?;
     Ok(path.display().to_string())
 }
 
@@ -581,7 +591,7 @@ fn release_source(
             .arg("-C")
             .arg(cache))?;
     }
-    verify_xz_tree(&archive_path, cache)?;
+    verify_release_tree(&archive_path, cache)?;
     Ok((source, archive_sha))
 }
 
@@ -643,14 +653,31 @@ pub fn unpack_release(
     Ok(source)
 }
 
-/// Every regular file of a release archive must still match the tree
-/// unpacked under `cache`. For compressed releases, the concatenated
-/// contents of the files, in archive order as `tar` streams them, are compared
-/// with the same files on disk.
-pub fn verify_xz_tree(archive_path: &Path, cache: &Path) -> Result<(), String> {
-    verify_release_tree(archive_path, cache)
+/// Runs `argv` as configure in `source`, a release tree that `marker` shows configured,
+/// unless the arguments recorded in `record` match; a tree configured otherwise is
+/// cleaned first. Returns the arguments as recorded.
+pub fn configure(
+    source: &Path,
+    marker: &str,
+    argv: &[String],
+    record: &Path,
+) -> Result<Value, String> {
+    let wanted = Value::strings(argv.iter().cloned());
+    let configured = source.join(marker).exists();
+    if !configured || json::read(record).ok().as_ref() != Some(&wanted) {
+        if configured {
+            run(Command::new("make").arg("distclean").current_dir(source))?;
+        }
+        run(Command::new(&argv[0]).args(&argv[1..]).current_dir(source))?;
+        json::write(record, &wanted)?;
+    }
+    Ok(wanted)
 }
 
+/// Every regular file of a release archive must still match the tree unpacked under
+/// `cache`: the concatenated contents of the files, in archive order as `tar` streams
+/// them, are compared with the same files on disk, so a compression `tar` reads but
+/// xtask does not decode is verified as well.
 pub fn verify_release_tree(archive_path: &Path, cache: &Path) -> Result<(), String> {
     let listing = output(Command::new("tar").arg("-tvf").arg(archive_path))?;
     let streamed = Command::new("tar")
@@ -721,143 +748,9 @@ fn release_manifest(
         ),
     ]);
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     Ok(path.display().to_string())
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_release_is_fetched_from_its_address_then_its_mirrors() {
-        let release = PinnedRelease {
-            file: "x.tar.xz",
-            directory: "x",
-            url: "https://example.org/x.tar.xz",
-            mirrors: &[fetch::Source::GitHubAsset {
-                repo: "owner/x",
-                id: 7,
-            }],
-            sha256: "0",
-        };
-        let sources = format!("{:?}", release.sources());
-        assert_eq!(
-            sources,
-            r#"[Url("https://example.org/x.tar.xz"), GitHubAsset { repo: "owner/x", id: 7 }]"#
-        );
-    }
-
-    #[test]
-    fn lists_unique_sorted_fate_names_only() {
-        let listing = "make: noise\nfate-b\nfate-a.x_1\nfate-b\nfate-\nfate-bad name\n  fate-indented\nfate-c-d\n";
-        assert_eq!(fate_list(listing), "fate-a.x_1\nfate-b\nfate-c-d\n");
-    }
-
-    #[test]
-    fn formats_profile_extends_the_matroska_configuration() {
-        let prefix = Path::new("/p/install");
-        let matroska = configure_argv(prefix, Profile::Matroska);
-        let formats = configure_argv(prefix, Profile::Formats);
-        assert_eq!(matroska[1], "--prefix=/p/install");
-        assert_eq!(matroska.len() + 1, formats.len());
-        assert!(formats.contains(
-            &"--enable-parser=h264,hevc,aac,ac3,vorbis,dvdsub,dvbsub,mpegaudio".to_owned()
-        ));
-        assert!(formats.contains(
-            &"--enable-demuxer=matroska,mov,mpegts,h264,hevc,srt,ass,webvtt,sup,vobsub".to_owned()
-        ));
-        assert_eq!(
-            formats.last().unwrap(),
-            "--enable-bsf=h264_mp4toannexb,hevc_mp4toannexb,extract_extradata"
-        );
-    }
-
-    #[test]
-    fn transport_mpeg_video_isolates_the_ordinary_parser() {
-        let prefix = Path::new("/p/install");
-        let dts = configure_argv(prefix, Profile::TransportDts);
-        let video = configure_argv(prefix, Profile::TransportMpegVideo);
-        let expected: Vec<_> = dts
-            .into_iter()
-            .map(|arg| {
-                if arg == "--enable-parser=dca" {
-                    "--enable-parser=mpegvideo".to_owned()
-                } else {
-                    arg
-                }
-            })
-            .collect();
-        assert_eq!(video, expected);
-        assert!(video.contains(&"--enable-demuxer=mpegts".to_owned()));
-        assert!(Profile::TransportMpegVideo.source() == Source::Revision);
-        assert!(Profile::parse("transport-mpeg-video") == Some(Profile::TransportMpegVideo));
-        assert_ne!(
-            Profile::TransportMpegVideo.cache(),
-            Profile::Formats.cache()
-        );
-    }
-
-    #[test]
-    fn capture_profiles_differ_only_in_size_optimization() {
-        let prefix = Path::new("/p/install");
-        let speed = configure_argv(prefix, Profile::Capture);
-        let small = configure_argv(prefix, Profile::CaptureSmall);
-        assert!(speed.iter().any(|arg| arg == "--enable-static"));
-        assert!(speed.iter().any(|arg| arg == "--disable-shared"));
-        assert_eq!(
-            speed,
-            small
-                .into_iter()
-                .filter(|arg| arg != "--enable-small")
-                .collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn verifies_the_unpacked_tree_against_the_archive() {
-        let dir = crate::walk::scratch("tree");
-        fs::create_dir_all(dir.join("src")).unwrap();
-        fs::write(dir.join("src/a.c"), b"int a;").unwrap();
-        let mut header = vec![0u8; 512];
-        header[..7].copy_from_slice(b"src/a.c");
-        header[124..135].copy_from_slice(b"00000000006");
-        header[156] = b'0';
-        let mut tar = header;
-        tar.extend(b"int a;");
-        tar.resize(1024, 0);
-        tar.extend([0; 1024]);
-        let deflated = crate::zlib::compress(&tar, 6, crate::zlib::Strategy::Default).unwrap();
-        let mut gz = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3];
-        gz.extend_from_slice(&deflated[2..deflated.len() - 4]);
-        gz.extend(crate::zlib::crc32(&tar).to_le_bytes());
-        gz.extend((tar.len() as u32).to_le_bytes());
-        assert_eq!(verify_tree(&gz, &dir).unwrap(), 1);
-        fs::write(dir.join("src/a.c"), b"int b;").unwrap();
-        assert_eq!(
-            verify_tree(&gz, &dir).unwrap_err(),
-            "Pinned source was changed: src/a.c"
-        );
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn video_profile_adds_only_the_h264_and_hevc_decoders() {
-        let prefix = Path::new("/p");
-        let matroska = configure_argv(prefix, Profile::Matroska);
-        let video = configure_argv(prefix, Profile::Video);
-        let changed: Vec<_> = matroska
-            .iter()
-            .zip(&video)
-            .filter(|(a, b)| a != b)
-            .collect();
-        assert_eq!(matroska.len(), video.len());
-        assert_eq!(
-            changed,
-            [(
-                &"--enable-decoder=pcm_s16le".to_owned(),
-                &"--enable-decoder=pcm_s16le,h264,hevc".to_owned()
-            )]
-        );
-    }
-}
+mod tests;

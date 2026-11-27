@@ -2,10 +2,14 @@ use crate::{
     AssemblyStep, ParseLimits, SourceRange, checked_pid, commit_range, limit, prepare_range,
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-use triergon_core::{Budget, BudgetVec, Bytes, Error, PushError, Result, SourceId, WorkBudget};
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Refused, Result, SourceId, WorkBudget};
+
+/// A pointer field that points past the end of the payload.
+pub(crate) const POINTER_FIELD: &str = "PSI pointer";
 
 pub use triergon_bitstream::crc::Crc32Mpeg as PsiCrc32;
 
+/// One complete PSI section as assembled from transport payloads.
 #[derive(Debug)]
 pub struct Section {
     pid: u16,
@@ -15,15 +19,20 @@ pub struct Section {
     crc: Option<u32>,
 }
 impl Section {
+    /// The 13-bit PID that carried the section.
     pub fn pid(&self) -> u16 {
         self.pid
     }
+    /// The whole section bytes, from the table ID through the end of the section.
     pub fn bytes(&self) -> &Bytes {
         &self.source
     }
+    /// Where the section bytes lie in the source, one range per contiguous source run.
     pub fn source_ranges(&self) -> &[SourceRange] {
         self.ranges.as_slice()
     }
+    /// The CRC-32 remainder over the whole section for PAT and PMT sections (0 when the CRC
+    /// matches); `None` for other table IDs.
     pub fn crc_remainder(&self) -> Option<u32> {
         self.crc
     }
@@ -80,8 +89,9 @@ struct Payload {
     offset: u64,
 }
 
-/// One known section PID. Caller routes PAT/PMT PIDs and resets this on continuity
-/// loss. Several complete sections can be returned from a single supplied payload.
+/// Assembles the PSI sections of one PID from its transport payloads in source order. The
+/// caller routes that PID's payloads here and calls [`Self::discard`] after a loss of
+/// continuity; one payload can complete several sections.
 #[derive(Debug)]
 pub struct SectionAssembler {
     pid: u16,
@@ -97,6 +107,9 @@ pub struct SectionAssembler {
 }
 
 impl SectionAssembler {
+    /// An assembler for the sections on `pid`, charging retained bytes to `budget`.
+    ///
+    /// Fails with `Invalid` for a PID above 0x1FFE or invalid `limits`.
     pub fn new(pid: u16, budget: Budget, limits: ParseLimits) -> Result<Self> {
         checked_pid(pid)?;
         limits.validate()?;
@@ -119,14 +132,21 @@ impl SectionAssembler {
         ranges.checked_add(data).ok_or(Error::Overflow)
     }
 
-    /// Rejection returns the exact supplied charged span; no input was accepted.
+    /// Supplies the payload of the PID's next transport packet: `bytes` at byte `offset` of
+    /// `entity`, with `pusi` when the packet starts a section (its first byte is then the
+    /// pointer field). Drain [`Self::poll`] before the next push.
+    ///
+    /// Refuses the payload, returned unchanged, with `Invalid` while a pushed payload is not
+    /// drained, after [`Self::end_of_source`], for bytes of another pool or a pointer field past
+    /// the payload, with `Overflow` when the payload's end offset does not fit in a `u64`, and
+    /// with the sticky fault once assembly has failed.
     pub fn push(
         &mut self,
         bytes: Bytes,
         pusi: bool,
         entity: SourceId,
         offset: u64,
-    ) -> std::result::Result<(), PushError<Bytes>> {
+    ) -> std::result::Result<(), Refused<Bytes>> {
         let failure = if self.payload.is_some() {
             Some(Error::Invalid("PSI payload not drained"))
         } else if self.ended {
@@ -138,12 +158,12 @@ impl SectionAssembler {
         } else if offset.checked_add(bytes.len() as u64).is_none() {
             Some(Error::Overflow)
         } else if pusi && (bytes.is_empty() || usize::from(bytes.as_ref()[0]) + 1 > bytes.len()) {
-            Some(Error::Invalid("PSI pointer"))
+            Some(Error::Invalid(POINTER_FIELD))
         } else {
             None
         };
         if let Some(error) = failure {
-            return Err(PushError {
+            return Err(Refused {
                 error,
                 value: bytes,
             });
@@ -164,9 +184,11 @@ impl SectionAssembler {
         });
         Ok(())
     }
+    /// Declares logical end of the source; a later poll finishes or reports a partial section.
     pub fn end_of_source(&mut self) {
         self.ended = true;
     }
+    /// The bytes received so far for the section in progress; empty between sections.
     pub fn partial_bytes(&self) -> &[u8] {
         self.buffer.as_ref().map_or(&[], |buffer| buffer.as_slice())
     }
@@ -177,7 +199,9 @@ impl SectionAssembler {
             && !self.ended
             && self.buffer.as_ref().is_some_and(BudgetVec::is_empty)
     }
-    /// Explicit loss/recovery transition; normal EndSegment must not call this.
+    /// Drops the section in progress, a pushed payload, the sticky fault and a declared end of
+    /// the source, as after a loss of continuity. The end of an entity or segment needs no
+    /// discard: a section continues across it.
     pub fn discard(&mut self) {
         self.buffer = Some(BudgetVec::new(&self.budget));
         self.ranges = BudgetVec::new(&self.budget);
@@ -187,6 +211,17 @@ impl SectionAssembler {
         self.fault = None;
         self.ended = false;
     }
+    /// Advances assembly within `work`: returns a complete section, `NeedPayload` when the pushed
+    /// payload is drained, `Yield` when `work` is spent, or `Finished` after
+    /// [`end_of_source`](Self::end_of_source).
+    ///
+    /// Fails with `Invalid` for a bad section length, pointer or stuffing, `Truncated` for a
+    /// section
+    /// cut off by the end of the source, `Limit` beyond the section size limit, and `Cancelled`
+    /// when
+    /// `cancel` is set. `Backpressure`, `Allocation` and `Cancelled` can be retried; any other
+    /// error
+    /// is returned by every later poll.
     pub fn poll(
         &mut self,
         work: &mut WorkBudget,
@@ -197,10 +232,7 @@ impl SectionAssembler {
         }
         let result = self.poll_inner(work, cancel);
         if let Err(error) = result.as_ref()
-            && !matches!(
-                error,
-                Error::Backpressure { .. } | Error::Allocation | Error::Cancelled
-            )
+            && !crate::retryable(*error)
         {
             self.fault = Some(*error);
         }
@@ -228,7 +260,7 @@ impl SectionAssembler {
                 let source = match builder.freeze() {
                     Ok(source) => source,
                     Err(rejected) => {
-                        self.buffer = Some(rejected.buffer);
+                        self.buffer = Some(rejected.value);
                         return Err(rejected.error);
                     }
                 };

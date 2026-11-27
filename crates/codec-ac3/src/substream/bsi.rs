@@ -1,9 +1,12 @@
 //! Bit stream information (5.3.2, Annex E 2.3.1) and the E-AC-3 audio frame element
 //! (Annex E 2.3.2).
 
-use super::{CPL, DownmixCodes, E, LFE, NCH, NFCHANS, REUSE, Substream, Trace, bad};
+use super::{CPL, DownmixCodes, E, ExpStrategy, LFE, NCH, NFCHANS, Substream, bad};
 use crate::error::{DecodeError, Feature};
+use crate::header::StreamType;
 use crate::tables::{DEF_SPX_BNDSTRC, FRM_EXPSTR};
+use crate::trace::Trace;
+use core::num::NonZeroU32;
 use triergon_bitstream::BitReader;
 
 impl Substream {
@@ -68,7 +71,7 @@ impl Substream {
             br.skip((addbsil + 1) * 8);
         }
         self.eac3 = false;
-        self.strmtyp = 0;
+        self.stream_type = StreamType::Independent;
         let shift = crate::header::ac3_rate_shift(bsid);
         self.set_config(acmod, lfeon, fscod, (fscod as usize, shift), 6, bsid);
         self.dialnorm = dialnorm;
@@ -78,7 +81,7 @@ impl Substream {
     }
 
     pub(super) fn parse_bsi_eac3(&mut self, br: &mut BitReader<'_>) -> Result<(), E> {
-        let strmtyp = br.read(2) as u8;
+        let stream_type = StreamType::from_bits(br.read(2) as u8)?;
         let _substreamid = br.read(3);
         let _frmsiz = br.read(11);
         let fscod = br.read(2) as u8;
@@ -106,12 +109,44 @@ impl Substream {
             }
         }
         let mut chanmap = None;
-        if strmtyp == 1 && br.bit() {
+        if stream_type == StreamType::Dependent && br.bit() {
             chanmap = Some(br.read(16) as u16);
         }
+        let dm = Self::parse_mixing_metadata(br, acmod, lfeon, stream_type, num_blocks);
+        Self::skip_information_metadata(br, acmod, fscod);
+        if stream_type == StreamType::Independent && numblkscod != 3 {
+            br.skip(1); // convsync
+        }
+        if stream_type == StreamType::Converted {
+            let blkid = if numblkscod == 3 { true } else { br.bit() };
+            if blkid {
+                br.skip(6); // frmsizecod
+            }
+        }
+        if br.bit() {
+            let addbsil = br.read(6) as usize;
+            br.skip((addbsil + 1) * 8);
+        }
+        self.eac3 = true;
+        self.stream_type = stream_type;
+        self.set_config(acmod, lfeon, fscod, (hth_idx, 0), num_blocks, bsid);
+        self.dialnorm = dialnorm;
+        self.chanmap = chanmap;
+        self.downmix = dm;
+        Ok(())
+    }
+
+    /// mixmdate: downmix coefficients and per-program mixing data (Annex E 2.3).
+    #[inline(always)]
+    fn parse_mixing_metadata(
+        br: &mut BitReader<'_>,
+        acmod: u8,
+        lfeon: bool,
+        stream_type: StreamType,
+        num_blocks: usize,
+    ) -> DownmixCodes {
         let mut dm = DownmixCodes::default();
         if br.bit() {
-            // mixmdate
             if acmod > 2 {
                 dm.dmixmod = Some(br.read(2) as u8);
             }
@@ -126,7 +161,7 @@ impl Substream {
             if lfeon && br.bit() {
                 dm.lfemixlevcod = Some(br.read(5) as u8);
             }
-            if strmtyp == 0 {
+            if stream_type == StreamType::Independent {
                 if br.bit() {
                     br.skip(6); // pgmscl
                 }
@@ -159,7 +194,7 @@ impl Substream {
                 }
                 if br.bit() {
                     // frmmixcfginfoe
-                    if numblkscod == 0 {
+                    if num_blocks == 1 {
                         br.skip(5);
                     } else {
                         for _ in 0..num_blocks {
@@ -171,8 +206,13 @@ impl Substream {
                 }
             }
         }
+        dm
+    }
+
+    /// infomdate: production and source properties (Annex E 2.3).
+    #[inline(always)]
+    fn skip_information_metadata(br: &mut BitReader<'_>, acmod: u8, fscod: u8) {
         if br.bit() {
-            // infomdate
             br.skip(5); // bsmod, copyrightb, origbs
             if acmod == 2 {
                 br.skip(4); // dsurmod, dheadphonmod
@@ -190,26 +230,6 @@ impl Substream {
                 br.skip(1); // sourcefscod
             }
         }
-        if strmtyp == 0 && numblkscod != 3 {
-            br.skip(1); // convsync
-        }
-        if strmtyp == 2 {
-            let blkid = if numblkscod == 3 { true } else { br.bit() };
-            if blkid {
-                br.skip(6); // frmsizecod
-            }
-        }
-        if br.bit() {
-            let addbsil = br.read(6) as usize;
-            br.skip((addbsil + 1) * 8);
-        }
-        self.eac3 = true;
-        self.strmtyp = strmtyp;
-        self.set_config(acmod, lfeon, fscod, (hth_idx, 0), num_blocks, bsid);
-        self.dialnorm = dialnorm;
-        self.chanmap = chanmap;
-        self.downmix = dm;
-        Ok(())
     }
 
     fn set_config(
@@ -221,7 +241,9 @@ impl Substream {
         num_blocks: usize,
         bsid: u8,
     ) {
-        let key = (acmod as u32) | (lfeon as u32) << 3 | (fscod as u32) << 4 | rate_shift << 6;
+        let key = NonZeroU32::new(
+            1 << 31 | (acmod as u32) | (lfeon as u32) << 3 | (fscod as u32) << 4 | rate_shift << 6,
+        );
         if key != self.config_key {
             for d in &mut self.delay {
                 d.fill(0.0);
@@ -273,86 +295,16 @@ impl Substream {
         self.dbaflde = br.bit();
         self.skipflde = br.bit();
         let spxattene = br.bit();
-        // Coupling data.
-        if self.acmod > 1 {
-            self.cplstre_blk[0] = true;
-            self.cplinu_blk[0] = br.bit();
-            for blk in 1..nblk {
-                self.cplstre_blk[blk] = br.bit();
-                self.cplinu_blk[blk] = if self.cplstre_blk[blk] {
-                    br.bit()
-                } else {
-                    self.cplinu_blk[blk - 1]
-                };
-            }
-        } else {
-            self.cplstre_blk = [false; 6];
-            self.cplinu_blk = [false; 6];
-        }
-        let ncplblks = self.cplinu_blk[..nblk].iter().filter(|&&c| c).count();
-        // Exponent strategies.
-        if expstre {
-            for blk in 0..nblk {
-                self.expstr[CPL][blk] = if self.cplinu_blk[blk] {
-                    br.read(2) as u8
-                } else {
-                    REUSE
-                };
-                for ch in 0..nfch {
-                    self.expstr[ch][blk] = br.read(2) as u8;
-                }
-            }
-        } else {
-            self.features.frame_expstr = true;
-            if self.acmod > 1 && ncplblks > 0 {
-                let s = br.read(5) as usize;
-                for blk in 0..6 {
-                    self.expstr[CPL][blk] = FRM_EXPSTR[s][blk];
-                }
-            } else {
-                self.expstr[CPL] = [REUSE; 6];
-            }
-            for ch in 0..nfch {
-                let s = br.read(5) as usize;
-                self.expstr[ch] = FRM_EXPSTR[s];
-            }
-        }
-        if self.lfeon {
-            for blk in 0..nblk {
-                self.expstr[LFE][blk] = br.read(1) as u8;
-            }
-        }
+        let ncplblks = self.read_coupling_strategy(br, nblk);
+        self.read_frame_exponents(br, expstre, nblk, nfch, ncplblks);
         // Converter exponent strategy.
-        if self.strmtyp == 0 {
+        if self.stream_type == StreamType::Independent {
             let convexpstre = if nblk != 6 { br.bit() } else { true };
             if convexpstre {
                 br.skip(5 * nfch);
             }
         }
-        // AHT.
-        self.aht = [false; NCH];
-        self.aht_read = [false; NCH];
-        if ahte {
-            let ncplregs = (0..6)
-                .filter(|&b| self.cplstre_blk[b] || self.expstr[CPL][b] != REUSE)
-                .count();
-            if ncplblks == 6 && ncplregs == 1 {
-                self.aht[CPL] = br.bit();
-            }
-            for ch in 0..nfch {
-                let nregs = (0..6).filter(|&b| self.expstr[ch][b] != REUSE).count();
-                if nregs == 1 {
-                    self.aht[ch] = br.bit();
-                }
-            }
-            if self.lfeon {
-                let nregs = (0..6).filter(|&b| self.expstr[LFE][b] != REUSE).count();
-                if nregs == 1 {
-                    self.aht[LFE] = br.bit();
-                }
-            }
-            self.features.aht |= self.aht.iter().any(|&a| a);
-        }
+        self.read_hybrid_transform_flags(br, ahte, nfch, ncplblks);
         if self.snroffststr == 0 {
             self.frmcsnroffst = br.read(6) as u8;
             self.frmfsnroffst = br.read(4) as u8;
@@ -393,5 +345,107 @@ impl Substream {
         self.cplbndstrc_set_in_frame = false;
         self.spxbndstrc[..17].copy_from_slice(&DEF_SPX_BNDSTRC);
         Ok(())
+    }
+
+    /// Each block's coupling strategy and whether it uses coupling.
+    #[inline(always)]
+    fn read_coupling_strategy(&mut self, br: &mut BitReader<'_>, nblk: usize) -> usize {
+        if self.acmod > 1 {
+            self.cplstre_blk[0] = true;
+            self.cplinu_blk[0] = br.bit();
+            for blk in 1..nblk {
+                self.cplstre_blk[blk] = br.bit();
+                self.cplinu_blk[blk] = if self.cplstre_blk[blk] {
+                    br.bit()
+                } else {
+                    self.cplinu_blk[blk - 1]
+                };
+            }
+        } else {
+            self.cplstre_blk = [false; 6];
+            self.cplinu_blk = [false; 6];
+        }
+        self.cplinu_blk[..nblk].iter().filter(|&&c| c).count()
+    }
+
+    /// Explicit or frame-coded exponent strategy of each channel and block.
+    #[inline(always)]
+    fn read_frame_exponents(
+        &mut self,
+        br: &mut BitReader<'_>,
+        expstre: bool,
+        nblk: usize,
+        nfch: usize,
+        ncplblks: usize,
+    ) {
+        if expstre {
+            for blk in 0..nblk {
+                self.expstr[CPL][blk] = if self.cplinu_blk[blk] {
+                    ExpStrategy::from_code(br.read(2))
+                } else {
+                    ExpStrategy::Reuse
+                };
+                for ch in 0..nfch {
+                    self.expstr[ch][blk] = ExpStrategy::from_code(br.read(2));
+                }
+            }
+        } else {
+            self.features.frame_expstr = true;
+            if self.acmod > 1 && ncplblks > 0 {
+                let s = br.read(5) as usize;
+                for blk in 0..6 {
+                    self.expstr[CPL][blk] = FRM_EXPSTR[s][blk];
+                }
+            } else {
+                self.expstr[CPL] = [ExpStrategy::Reuse; 6];
+            }
+            for ch in 0..nfch {
+                let s = br.read(5) as usize;
+                self.expstr[ch] = FRM_EXPSTR[s];
+            }
+        }
+        if self.lfeon {
+            for blk in 0..nblk {
+                self.expstr[LFE][blk] = ExpStrategy::from_code(br.read(1));
+            }
+        }
+    }
+
+    /// Adaptive hybrid transform flags of the channels eligible to use it.
+    #[inline(always)]
+    fn read_hybrid_transform_flags(
+        &mut self,
+        br: &mut BitReader<'_>,
+        ahte: bool,
+        nfch: usize,
+        ncplblks: usize,
+    ) {
+        self.aht = [false; NCH];
+        self.aht_read = [false; NCH];
+        if ahte {
+            let ncplregs = (0..6)
+                .filter(|&b| self.cplstre_blk[b] || self.expstr[CPL][b] != ExpStrategy::Reuse)
+                .count();
+            if ncplblks == 6 && ncplregs == 1 {
+                self.aht[CPL] = br.bit();
+            }
+            for ch in 0..nfch {
+                let nregs = (0..6)
+                    .filter(|&b| self.expstr[ch][b] != ExpStrategy::Reuse)
+                    .count();
+                if nregs == 1 {
+                    self.aht[ch] = br.bit();
+                }
+            }
+            if self.lfeon {
+                let nregs = (0..6)
+                    .filter(|&b| self.expstr[LFE][b] != ExpStrategy::Reuse)
+                    .count();
+                if nregs == 1 {
+                    self.aht[LFE] = br.bit();
+                }
+            }
+            self.features.aht |= self.aht.iter().any(|&a| a);
+        }
     }
 }

@@ -62,6 +62,8 @@ the pre-skip or other container trims.
 
 ## Behaviour and limits
 
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
+
 - The header's output gain is applied after de-emphasis, once per packet. Its pre-skip
   is not: the decoder reports it as its start delay (`AudioDecoder::delay`), which a
   consumer discards together with the container's trims (Ogg's granule positions,
@@ -82,7 +84,7 @@ the pre-skip or other container trims.
     (the reference alternates the channels per band; both are within the conformance
     tolerance).
 - No packet loss concealment or forward error correction: every access unit is a packet.
-- Malformed packets return `DecodeFailure` (an `Invalid` error inside); streams of one
+- Malformed packets return `DecodeError::Invalid`; streams of one
   multistream packet with different durations are `Invalid`. A packet is checked whole
   (every stream's framing, each hybrid frame's redundant frame size, the durations, then
   the output frame's charge) before any stream decodes. A refused packet leaves every
@@ -97,8 +99,12 @@ the pre-skip or other container trims.
 
 Constant tables are taken from RFC 6716; see [THIRD-PARTY.md](THIRD-PARTY.md).
 
-## Standards
+## Conformance
 
 RFC 6716 with the RFC 8251 updates, and RFC 7845 for the identification header and the
-channel mappings. Verification: [harness/codecs](../../harness/codecs/STATUS.md); results
-in [docs/status.md](../../docs/status.md).
+channel mappings. The decoder is compared with FFmpeg's in
+[harness/codecs](../../harness/codecs/STATUS.md), and the
+[final range comparison](../../harness/features/opus-final-range/contract.json) checks
+`Decoder::final_range` of every packet of the RFC 8251 test vectors against the encoder's
+recorded final range, as RFC 6716 section 6.1 requires. Results are in
+[docs/status.md](../../docs/status.md).

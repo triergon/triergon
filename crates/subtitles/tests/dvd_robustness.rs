@@ -3,16 +3,16 @@
 //! bytes. Work is measured in charged `WorkBudget` units, never in time.
 
 use triergon_core::{Budget, WorkBudget};
-use triergon_subtitles::compat::dvd::{Decoder, Limits, Settings, Status};
+use triergon_subtitles::compat::dvd::{Decoder, Limits, Options, Status};
 
 /// Decode one packet with unbounded work: whether it presented a subtitle,
 /// and the work it was charged.
 fn charged(packet: &[u8]) -> (bool, u64) {
     let budget = Budget::new(1 << 26).unwrap();
-    let mut decoder = Decoder::new(&budget, Settings::default(), Limits::default());
+    let mut decoder = Decoder::new(&budget, Options::default(), Limits::default());
     let mut work = WorkBudget::new(u64::MAX);
     let shown = match decoder.decode(packet, &mut work).unwrap() {
-        Status::Subtitle(_) => true,
+        Status::Ready(_) => true,
         Status::Nothing => false,
         Status::Yield => panic!("unbounded work yielded"),
     };
@@ -86,7 +86,7 @@ fn charged_work_scales_with_the_work_the_input_demands() {
 /// they were charged in all.
 fn sliced(packet: &[u8], quantum: u64) -> (u64, u64) {
     let budget = Budget::new(1 << 26).unwrap();
-    let mut decoder = Decoder::new(&budget, Settings::default(), Limits::default());
+    let mut decoder = Decoder::new(&budget, Options::default(), Limits::default());
     let mut work = WorkBudget::new(quantum);
     let mut status = decoder.decode(packet, &mut work).unwrap();
     let (mut calls, mut spent) = (1, work.spent());
@@ -135,7 +135,7 @@ fn quadratic_control_areas_stop_at_the_work_budget() {
     let blocks = 13_000;
     let unit = chained(blocks, 0xffff - 4 - 5 * blocks);
     let budget = Budget::new(1 << 26).unwrap();
-    let mut decoder = Decoder::new(&budget, Settings::default(), Limits::default());
+    let mut decoder = Decoder::new(&budget, Options::default(), Limits::default());
     let quantum = 1 << 20;
     let mut work = WorkBudget::new(quantum);
     assert_eq!(decoder.decode(&unit, &mut work).unwrap(), Status::Yield);

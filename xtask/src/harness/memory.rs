@@ -25,13 +25,9 @@ use crate::stats;
 
 type R<T> = Result<T, String>;
 
-/// The memory gates' ratio ceiling: the candidate's peak heap and total resident
-/// peak must lie strictly below the reference's, so a gate collection stops
-/// early only when both settle below it.
-pub const CEILING: f64 = 1.0;
-
 /// Pairs of one collection that may be measured again after the kernel RSS bound
-/// voided them ([`voided_by_foreign_update`]); beyond this the collection fails.
+/// voided them because another task updated the worker's resident counters.
+/// Any further voided pairs fail the collection.
 pub const MAX_RETRIES: usize = 2;
 
 /// The RSS bound module's error for a resident counter update by a task other
@@ -42,26 +38,93 @@ const FOREIGN_UPDATE: i128 = 1;
 /// (`ERR_CONFIG` in `harness/allocations-linux.c`).
 const KERNEL_BOUND_REFUSED: i128 = 1 << 9;
 
+/// Which bounds this case must collect.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum Selection {
+    #[default]
+    Both,
+    Heap,
+    Rss,
+}
+
+impl Selection {
+    pub(crate) fn for_case(row: &Value) -> Self {
+        let deferred = |name| {
+            row.get("not_measured")
+                .and_then(|row| row.get(name))
+                .is_some()
+        };
+        Self::from_deferred(deferred("heap"), deferred("total_rss"))
+    }
+
+    pub(super) fn from_deferred(heap: bool, rss: bool) -> Self {
+        match (heap, rss) {
+            (true, false) => Self::Rss,
+            (false, true) => Self::Heap,
+            _ => Self::Both,
+        }
+    }
+
+    pub(super) fn heap(self) -> bool {
+        self != Self::Rss
+    }
+
+    pub(super) fn rss(self) -> bool {
+        self != Self::Heap
+    }
+
+    pub(super) fn roles(self) -> &'static [&'static str] {
+        match self {
+            Self::Both => &[
+                "candidate_heap",
+                "candidate_rss",
+                "reference_heap",
+                "reference_rss",
+            ],
+            Self::Heap => &["candidate_heap", "reference_heap"],
+            Self::Rss => &["candidate_rss", "reference_rss"],
+        }
+    }
+
+    fn reference(self) -> &'static str {
+        if self.heap() {
+            "reference_heap"
+        } else {
+            "reference_rss"
+        }
+    }
+
+    pub(super) fn reference_work(self, row: &Value) -> Option<&Value> {
+        row.get(self.reference())?.get("work")
+    }
+
+    fn pairs(self, pairs: Pairs) -> Pairs {
+        if self == Self::Both {
+            pairs
+        } else {
+            Pairs::fixed(pairs.planned)
+        }
+    }
+}
+
 /// Whether the kernel RSS bound alone voided this pair: every observation was
 /// measured and has a valid receipt, except resident runs on which the module
 /// reported that another task updated the worker's resident counters during the
 /// window. The module decides this from the update's task, never from the values,
 /// so measuring such a pair again cannot favour either worker; any other fault in
 /// the pair still fails the collection.
+#[cfg(test)]
 pub(super) fn voided_by_foreign_update(row: &Value, observer_sha256: Option<&Value>) -> bool {
+    foreign_update(row, observer_sha256, Selection::Both)
+}
+
+fn foreign_update(row: &Value, observer_sha256: Option<&Value>, selection: Selection) -> bool {
     let Value::Object(entries) = row else {
         return false;
     };
     let mut keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
     keys.sort_unstable();
-    if keys
-        != [
-            "candidate_heap",
-            "candidate_rss",
-            "reference_heap",
-            "reference_rss",
-        ]
-    {
+    if !selection.rss() || keys != selection.roles() {
         return false;
     }
     let mut voided = false;
@@ -145,10 +208,20 @@ fn host_memory_change(
 
 /// Whether a collection's discarded pairs (`retried_pairs`) were each voided by
 /// the kernel bound alone, within [`MAX_RETRIES`], at pairs it measured.
+#[cfg(test)]
 pub(super) fn retries_valid(
     retried: Option<&Value>,
     measured: usize,
     observer_sha256: Option<&Value>,
+) -> bool {
+    selected_retries_valid(retried, measured, observer_sha256, Selection::Both)
+}
+
+fn selected_retries_valid(
+    retried: Option<&Value>,
+    measured: usize,
+    observer_sha256: Option<&Value>,
+    selection: Selection,
 ) -> bool {
     let Some(retried) = retried else {
         return true;
@@ -158,7 +231,7 @@ pub(super) fn retries_valid(
             && list.iter().all(|r| {
                 py_int(r.get("pair")).is_some_and(|p| (0..measured as i128).contains(&p))
                     && r.get("sample")
-                        .is_some_and(|row| voided_by_foreign_update(row, observer_sha256))
+                        .is_some_and(|row| foreign_update(row, observer_sha256, selection))
             })
     })
 }
@@ -455,7 +528,7 @@ fn observe(
                 ("stderr", Value::str(String::from_utf8_lossy(&stderr))),
             ]));
         };
-        let sha = linux::file_sha(library)?;
+        let sha = crate::files::sha256(library)?;
         if !matches!(output, Value::Object(_)) {
             return Ok(obj(vec![
                 ("status", Value::str("observer-invalid")),
@@ -514,10 +587,6 @@ fn observe(
         ));
     }
     observation
-}
-
-fn file_sha(path: &Path) -> R<String> {
-    linux::file_sha(path)
 }
 
 fn probe_errors(heap: &Value, rss: &Value, errors: &mut Vec<String>, linux: bool) {
@@ -638,7 +707,7 @@ fn darwin_qualification(host: &dyn Host, root: &Path, candidate: &Path, referenc
             )),
         }
     }
-    let mut recorded = |path: &Path| match file_sha(path) {
+    let mut recorded = |path: &Path| match crate::files::sha256(path) {
         Ok(sha) => Value::str(sha),
         Err(error) => {
             errors.push(format!("{}: identity unavailable: {error}", path.display()));
@@ -702,12 +771,15 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
     let mut attempt = || -> R<()> {
         binding = host.environment()?;
         let worker_hashes = Value::object([
-            ("candidate", Value::str(file_sha(candidate)?)),
-            ("reference", Value::str(file_sha(reference)?)),
+            ("candidate", Value::str(crate::files::sha256(candidate)?)),
+            ("reference", Value::str(crate::files::sha256(reference)?)),
         ]);
         identities = vec![
-            ("observer_sha256", Value::str(file_sha(&library)?)),
-            ("probe_sha256", Value::str(file_sha(&probe)?)),
+            (
+                "observer_sha256",
+                Value::str(crate::files::sha256(&library)?),
+            ),
+            ("probe_sha256", Value::str(crate::files::sha256(&probe)?)),
             ("worker_hashes", worker_hashes),
         ];
         let roots = [
@@ -803,7 +875,10 @@ fn linux_qualification(host: &dyn Host, root: &Path, candidate: &Path, reference
                 details.push((format!("{role}:{target}"), parsed.clone()));
                 let owner = Value::object([
                     ("realpath", Value::str(&target)),
-                    ("sha256", Value::str(file_sha(Path::new(&target))?)),
+                    (
+                        "sha256",
+                        Value::str(crate::files::sha256(Path::new(&target))?),
+                    ),
                 ]);
                 if target == path {
                     let imports = parsed
@@ -1054,29 +1129,36 @@ pub fn evaluate(
     certificate: &Value,
     expected_outputs: Option<&Value>,
 ) -> Value {
-    evaluate_work(
+    evaluate_selected(
         root,
         samples,
         pairs,
         seed,
         certificate,
         expected_outputs,
+        Selection::Both,
         false,
     )
 }
 
-fn matched_refusal_work(row: &Value) -> bool {
+fn matched_refusal_work(row: &Value, selection: Selection) -> bool {
     let work = |key| row.get(key).and_then(|sample| sample.get("work"));
-    let (Some(candidate), Some(reference)) = (work("candidate_heap"), work("reference_heap"))
+    let candidate_role = if selection.heap() {
+        "candidate_heap"
+    } else {
+        "candidate_rss"
+    };
+    let (Some(candidate), Some(reference)) = (work(candidate_role), selection.reference_work(row))
     else {
         return false;
     };
     // Each role's observers must agree on the entire output. Across roles,
     // diagnostic details may differ for the same pinned zero-output refusal.
-    let comparable = |output: &Value| {
-        let Value::Object(fields) = output else {
-            unreachable!("a checked refusal is an object");
-        };
+    let (Value::Object(candidate_fields), Value::Object(reference_fields)) = (candidate, reference)
+    else {
+        return false;
+    };
+    let comparable = |fields: &[(String, Value)]| {
         Value::Object(
             fields
                 .iter()
@@ -1088,18 +1170,21 @@ fn matched_refusal_work(row: &Value) -> bool {
     super::parity::reports_zero_output_refusal(candidate)
         && super::parity::reports_zero_output_refusal(reference)
         && candidate.get("iterations") == Some(&Value::int(1))
-        && work("candidate_rss").is_some_and(|rss| equal(candidate, rss))
-        && work("reference_rss").is_some_and(|rss| equal(reference, rss))
-        && equal(&comparable(candidate), &comparable(reference))
+        && (selection != Selection::Both
+            || (work("candidate_rss").is_some_and(|rss| equal(candidate, rss))
+                && work("reference_rss").is_some_and(|rss| equal(reference, rss))))
+        && equal(&comparable(candidate_fields), &comparable(reference_fields))
 }
 
-fn evaluate_work(
+#[allow(clippy::too_many_arguments)] // The evaluation binds its observers and refusal policy.
+fn evaluate_selected(
     root: &Path,
     samples: &[Value],
     pairs: Pairs,
     seed: u64,
     certificate: &Value,
     expected_outputs: Option<&Value>,
+    selection: Selection,
     pinned_refusal: bool,
 ) -> Value {
     let linux = s(certificate, "platform") == Some("Linux");
@@ -1166,24 +1251,19 @@ fn evaluate_work(
         {
             return failed("invalid-memory-observation");
         }
+        let mut keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
+        keys.sort_unstable();
+        if keys != selection.roles() {
+            return failed("invalid-memory-observation");
+        }
         if linux {
-            let mut keys: Vec<&str> = entries.iter().map(|(k, _)| k.as_str()).collect();
-            keys.sort_unstable();
             let receipts_ok = entries.iter().all(|(k, v)| {
                 let mode = k.rsplit('_').next().unwrap_or_default();
                 v.get("observer")
                     .is_some_and(|o| linux::valid_receipt(o, mode))
                     && s(v, "instrument_sha256") == observer
             });
-            if keys
-                != [
-                    "candidate_heap",
-                    "candidate_rss",
-                    "reference_heap",
-                    "reference_rss",
-                ]
-                || !receipts_ok
-            {
+            if !receipts_ok {
                 return failed("invalid-memory-observation");
             }
         }
@@ -1193,12 +1273,12 @@ fn evaluate_work(
         {
             return failed("measurement-failed");
         }
-        let reference_output = row.get("reference_heap").and_then(|h| h.get("work"));
+        let reference_output = selection.reference_work(row);
         if expected_outputs.is_none() && reference_output.is_none() {
             return failed("invalid-memory-observation");
         }
         let work_matches = if pinned_refusal && expected_outputs.is_none() {
-            matched_refusal_work(row)
+            matched_refusal_work(row, selection)
         } else {
             entries.iter().all(|(key, sample)| {
                 let expected = match expected_outputs {
@@ -1214,15 +1294,22 @@ fn evaluate_work(
         if !work_matches {
             return failed("unequal-memory-work");
         }
-        let Some(pair) = pair_values(row, linux) else {
-            return failed("invalid-memory-observation");
-        };
-        if pair.total.0 <= 0 || pair.total.1 <= 0 {
-            return failed("total-rss-attribution-unresolved");
+        if selection.heap() {
+            let Some(heap) = heap_values(row) else {
+                return failed("invalid-memory-observation");
+            };
+            heaps.push(heap);
         }
-        rss.push(pair.growth);
-        heaps.push(pair.heap);
-        totals.push(pair.total);
+        if selection.rss() {
+            let Some((total, growth)) = rss_values(row, linux) else {
+                return failed("invalid-memory-observation");
+            };
+            if total.0 <= 0 || total.1 <= 0 {
+                return failed("total-rss-attribution-unresolved");
+            }
+            totals.push(total);
+            rss.push(growth);
+        }
     }
     let interval = |values: &[(i128, i128)], nonnegative: bool| -> R<Value> {
         let pairs: Vec<(f64, f64)> = values.iter().map(|&(a, b)| (a as f64, b as f64)).collect();
@@ -1241,7 +1328,7 @@ fn evaluate_work(
         values.iter().map(|&(a, b)| (a as f64, b as f64)).collect()
     };
     let (heap_ratios, total_ratios) = (as_f64(&heaps), as_f64(&totals));
-    let first_stop = (1..=samples.len())
+    let first_stop = (1..=heap_ratios.len().min(total_ratios.len()))
         .find_map(|n| settled(&heap_ratios[..n], &total_ratios[..n], pairs).map(|s| (n, s)));
     let (heap, total, growth) = match first_stop {
         Some((n, (heap, total))) if n == samples.len() => {
@@ -1250,7 +1337,14 @@ fn evaluate_work(
             (interval_value(&heap), interval_value(&total), growth)
         }
         None if samples.len() as i128 == pairs.planned as i128 => {
-            let (Ok(heap), Ok(total)) = (interval(&heaps, true), interval(&totals, false)) else {
+            let part = |values: &[_], nonnegative| {
+                if values.is_empty() {
+                    Ok(Value::Null)
+                } else {
+                    interval(values, nonnegative)
+                }
+            };
+            let (Ok(heap), Ok(total)) = (part(&heaps, true), part(&totals, false)) else {
                 return failed("invalid-memory-observation");
             };
             // The page allowance can make a growth bound nonpositive even when
@@ -1263,11 +1357,11 @@ fn evaluate_work(
         ("status", Value::str("qualified")),
         (
             "total_rss_ratio_upper_95",
-            total.get("upper_95").cloned().unwrap(),
+            total.get("upper_95").cloned().unwrap_or(Value::Null),
         ),
         (
             "heap_ratio_upper_95",
-            heap.get("upper_95").cloned().unwrap(),
+            heap.get("upper_95").cloned().unwrap_or(Value::Null),
         ),
         (
             "rss_growth_ratio_upper_95",
@@ -1278,9 +1372,10 @@ fn evaluate_work(
         (
             "heap_lower_in_each_pair",
             Value::Bool(
-                heaps
-                    .iter()
-                    .all(|(candidate, reference)| candidate < reference),
+                selection.heap()
+                    && heaps
+                        .iter()
+                        .all(|(candidate, reference)| candidate < reference),
             ),
         ),
         ("rss_growth_ratio", growth),
@@ -1321,19 +1416,15 @@ fn evaluate_work(
     obj(fields)
 }
 
-/// One pair's measured values, each as (candidate, reference).
-struct PairValues {
-    heap: (i128, i128),
-    /// Total resident peak: the candidate's ceiling plus two pages against the
-    /// reference's observed peak minus two pages.
-    total: (i128, i128),
-    /// Resident growth from the start, the same way.
-    growth: (i128, i128),
+type Pair = (i128, i128);
+
+fn heap_values(row: &Value) -> Option<Pair> {
+    let heap = |key| py_int(row.get(key)?.get("observer")?.get("heap_peak_bytes"));
+    Some((heap("candidate_heap")?, heap("reference_heap")?))
 }
 
-/// The values the gates compare in one pair, or `None` when an observation
-/// lacks them.
-fn pair_values(row: &Value, linux: bool) -> Option<PairValues> {
+/// Total resident peak and growth, with the policy's page allowances.
+fn rss_values(row: &Value, linux: bool) -> Option<(Pair, Pair)> {
     let observer = |key: &str| row.get(key).and_then(|r| r.get("observer"));
     let (a, b) = (observer("candidate_rss")?, observer("reference_rss")?);
     let field = |o: &Value, k: &str| py_int(o.get(k));
@@ -1348,15 +1439,13 @@ fn pair_values(row: &Value, linux: bool) -> Option<PairValues> {
         field(b, "hwm_end")?.max(field(b, "rss_peak_observed")?)
     };
     let (a_page, b_page) = (field(a, "page_size")?, field(b, "page_size")?);
-    let heap = |key: &str| observer(key).and_then(|o| field(o, "heap_peak_bytes"));
-    Some(PairValues {
-        heap: (heap("candidate_heap")?, heap("reference_heap")?),
-        total: (candidate_peak + 2 * a_page, reference_total - 2 * b_page),
-        growth: (
+    Some((
+        (candidate_peak + 2 * a_page, reference_total - 2 * b_page),
+        (
             candidate_peak - field(a, "rss_start")? + 2 * a_page,
             field(b, "rss_peak_observed")? - field(b, "rss_start")? - 2 * b_page,
         ),
-    })
+    ))
 }
 
 /// The heap and total resident intervals a collection stops with, if it stops
@@ -1426,6 +1515,7 @@ fn work_valid(
 }
 
 struct Invocation<'a> {
+    selection: Selection,
     operation: Option<&'a str>,
     input: &'a Path,
     arguments: &'a [String],
@@ -1472,7 +1562,7 @@ fn measure(
             ("certificate", certificate.clone()),
         ]);
     }
-    let input_sha = match file_sha(invocation.input) {
+    let input_sha = match crate::files::sha256(invocation.input) {
         Ok(hash) => hash,
         Err(error) => {
             return obj(vec![
@@ -1482,6 +1572,8 @@ fn measure(
             ]);
         }
     };
+    let selection = invocation.selection;
+    let pairs = selection.pairs(pairs);
     let mut rng = PyRandom::new(seed);
     let kernel = certificate
         .get("kernel_rss_required")
@@ -1519,12 +1611,11 @@ fn measure(
     let (mut heaps, mut totals) = (Vec::new(), Vec::new());
     let mut usable = true;
     for pair in 0..pairs.planned {
-        let mut jobs = [
-            ("candidate", "heap"),
-            ("candidate", "rss"),
-            ("reference", "heap"),
-            ("reference", "rss"),
-        ];
+        let mut jobs: Vec<_> = selection
+            .roles()
+            .iter()
+            .filter_map(|role| role.split_once('_'))
+            .collect();
         rng.shuffle(&mut jobs);
         // A pair the kernel bound alone voided is measured again in the same
         // order, at most MAX_RETRIES times per collection; the voided pair is kept.
@@ -1532,7 +1623,7 @@ fn measure(
             let row = observe_pair(&jobs);
             if kernel
                 && retried.len() < MAX_RETRIES
-                && voided_by_foreign_update(&row, observer_sha256)
+                && foreign_update(&row, observer_sha256, selection)
             {
                 println!(
                     "memory of {}: the kernel RSS bound voided pair {} (another task updated a worker's resident counters); measuring it again",
@@ -1549,12 +1640,16 @@ fn measure(
         };
         // A pair with no usable values never settles the session; the full
         // validation is evaluate's.
-        let values = pair_values(&row, linux);
+        let values = if pairs.stop_below.is_some() {
+            heap_values(&row).zip(rss_values(&row, linux))
+        } else {
+            None
+        };
         samples.push(row);
         match values {
-            Some(pair) if usable => {
-                heaps.push((pair.heap.0 as f64, pair.heap.1 as f64));
-                totals.push((pair.total.0 as f64, pair.total.1 as f64));
+            Some(((ah, bh), ((ar, br), _))) if usable => {
+                heaps.push((ah as f64, bh as f64));
+                totals.push((ar as f64, br as f64));
                 if let Some((heap, total)) = settled(&heaps, &totals, pairs) {
                     println!(
                         "memory of {}: stopped after {} of {} pairs, heap and total RSS order statistics {:.4} and {:.4} below 1",
@@ -1580,13 +1675,14 @@ fn measure(
             ("certificate", certificate.clone()),
         ])
     } else {
-        evaluate_work(
+        evaluate_selected(
             root,
             &samples,
             pairs,
             seed,
             certificate,
             invocation.expected_outputs,
+            selection,
             invocation.pinned_refusal,
         )
     };
@@ -1597,7 +1693,7 @@ fn measure(
         push(&mut result, "host_memory", memory);
     }
     push(&mut result, "input_sha256", Value::str(&input_sha));
-    match file_sha(invocation.input) {
+    match crate::files::sha256(invocation.input) {
         Ok(hash) if hash == input_sha => (),
         Ok(_) => push(&mut result, "status", Value::str("input-changed")),
         Err(error) => {
@@ -1874,7 +1970,32 @@ pub fn collect(
     operation: &Operation,
     pinned_refusal: bool,
 ) -> R<Value> {
-    if !operation.candidate_options.is_empty() {
+    collect_selected(
+        slot,
+        root,
+        workers,
+        input,
+        pairs,
+        seed,
+        operation,
+        Selection::Both,
+        pinned_refusal,
+    )
+}
+
+#[allow(clippy::too_many_arguments)] // A selected observer uses the same worker and pair bindings.
+pub(crate) fn collect_selected(
+    slot: &Slot,
+    root: &Path,
+    workers: WorkerPaths<'_>,
+    input: &Path,
+    pairs: Pairs,
+    seed: u64,
+    operation: &Operation,
+    selection: Selection,
+    pinned_refusal: bool,
+) -> R<Value> {
+    if !operation.candidate_options.is_empty() || operation.reference_prefix.is_some() {
         let arguments = |candidate| {
             operation
                 .worker_arguments(candidate, "memory", input, None)
@@ -1895,6 +2016,7 @@ pub fn collect(
             pairs,
             seed,
             Invocation {
+                selection,
                 operation: None,
                 input,
                 arguments: &reference_arguments,
@@ -1919,6 +2041,7 @@ pub fn collect(
         pairs,
         seed,
         Invocation {
+            selection,
             operation: Some(&name),
             input,
             arguments: &arguments,
@@ -1951,6 +2074,7 @@ pub(crate) fn collect_command(
         pairs,
         seed,
         Invocation {
+            selection: Selection::Both,
             operation: None,
             input,
             arguments,
@@ -1993,6 +2117,7 @@ pub(crate) fn collect_commands(
         pairs,
         seed,
         Invocation {
+            selection: Selection::Both,
             operation: None,
             input,
             arguments: commands.reference,
@@ -2133,6 +2258,10 @@ pub fn evidence_valid_with_outputs(
     expected_outputs: Option<&Value>,
 ) -> bool {
     let check = || -> Option<bool> {
+        let selection = Selection::for_case(row);
+        if selection != Selection::Both && memory.get("early_stop").is_some() {
+            return Some(false);
+        }
         let certificate = memory.get("certificate")?;
         let raw = memory.get("samples")?.as_array()?;
         let probe = certificate.get("probe_heap")?;
@@ -2174,10 +2303,11 @@ pub fn evidence_valid_with_outputs(
         if !(covered
             && py_int(memory.get("pairs")) == Some(raw.len() as i128)
             && planned >= minimum
-            && retries_valid(
+            && selected_retries_valid(
                 memory.get("retried_pairs"),
                 raw.len(),
                 certificate.get("observer_sha256"),
+                selection,
             ))
         {
             return Some(false);
@@ -2187,12 +2317,13 @@ pub fn evidence_valid_with_outputs(
             stop_below: match memory.get("early_stop") {
                 Some(stop) => {
                     // A collection may stop early only under the memory gates' own ceiling.
-                    #[allow(clippy::float_cmp)] // The record must carry the constant exactly.
-                    let named = stop.get("ceiling")?.as_f64()? == CEILING;
+                    let ceiling = super::policy::Memory::load(root).ok()?.ceiling();
+                    #[allow(clippy::float_cmp)] // The record must carry the policy value exactly.
+                    let named = stop.get("ceiling")?.as_f64()? == ceiling;
                     if s(stop, "rule") != Some(EARLY_STOP_RULE) || !named {
                         return Some(false);
                     }
-                    Some(CEILING)
+                    Some(ceiling)
                 }
                 None => None,
             },
@@ -2215,13 +2346,14 @@ pub fn evidence_valid_with_outputs(
         }
         let seed = py_int(memory.get("seed")).unwrap_or(280) as u64;
         let pinned_refusal = expected.is_some_and(super::parity::pins_zero_output_refusal);
-        let recomputed = evaluate_work(
+        let recomputed = evaluate_selected(
             root,
             raw,
             pairs,
             seed,
             certificate,
             expected_outputs,
+            selection,
             pinned_refusal,
         );
         let same = [
@@ -2245,384 +2377,4 @@ pub fn evidence_valid_with_outputs(
 }
 
 #[cfg(test)]
-mod command_tests {
-    use super::*;
-
-    #[test]
-    fn host_memory_records_available_memory_and_reclaim_changes() {
-        let counters = |scan: i128, steal: i128| {
-            vec![
-                ("pgscan_kswapd".to_owned(), scan),
-                ("pgsteal_kswapd".to_owned(), steal),
-            ]
-        };
-        let change = host_memory_change(
-            Some((8 << 30, counters(100, 40))),
-            Some((6 << 30, counters(160, 70))),
-        )
-        .unwrap();
-        assert_eq!(
-            py_int(change.get("mem_available_start_bytes")),
-            Some(8 << 30)
-        );
-        assert_eq!(py_int(change.get("mem_available_end_bytes")), Some(6 << 30));
-        let reclaim = change.get("reclaim").unwrap();
-        assert_eq!(py_int(reclaim.get("pgscan_kswapd")), Some(60));
-        assert_eq!(py_int(reclaim.get("pgsteal_kswapd")), Some(30));
-        assert!(host_memory_change(None, Some((1, vec![]))).is_none());
-        if cfg!(target_os = "linux") {
-            let (available, counters) = host_memory().unwrap();
-            assert!(available > 0 && counters.iter().any(|(n, _)| n == "pgscan_kswapd"));
-        }
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn eviction_leaves_the_workers_unchanged() {
-        let root = crate::walk::scratch("memory-worker-eviction");
-        fs::create_dir_all(&root).unwrap();
-        let workers = [root.join("candidate"), root.join("reference")];
-        for (worker, bytes) in workers.iter().zip([&b"candidate"[..], b"reference"]) {
-            fs::write(worker, bytes).unwrap();
-        }
-        let host = Native {
-            root: &root,
-            timeout: Duration::from_secs(5),
-        };
-        host.evict(&[&workers[0], &workers[1]]).unwrap();
-        assert_eq!(fs::read(&workers[0]).unwrap(), b"candidate");
-        assert_eq!(fs::read(&workers[1]).unwrap(), b"reference");
-        assert!(host.evict(&[&root.join("missing")]).is_err() || !host.linux());
-        let _ = fs::remove_dir_all(&root);
-    }
-
-    #[cfg(unix)]
-    #[test]
-    fn memory_preparation_replaces_both_files_and_keeps_certificate_paths() {
-        use std::os::unix::fs::MetadataExt;
-
-        let root = crate::walk::scratch("memory-worker-copies");
-        fs::create_dir_all(&root).unwrap();
-        let candidate = root.join("candidate");
-        let reference = root.join("longer-reference-name");
-        fs::write(&candidate, b"candidate").unwrap();
-        fs::write(&reference, b"reference").unwrap();
-        let slot = Slot {
-            index: 0,
-            cpu: None,
-        };
-        let paths = prepare_workers(&slot, &root, &candidate, &reference).unwrap();
-        let first = paths.each_ref().map(|path| fs::File::open(path).unwrap());
-        assert_eq!(paths[0].as_os_str().len(), paths[1].as_os_str().len());
-        assert_eq!(
-            paths,
-            prepare_workers(&slot, &root, &candidate, &reference).unwrap()
-        );
-        let other = prepare_workers(
-            &Slot {
-                index: 11,
-                cpu: None,
-            },
-            &root,
-            &candidate,
-            &reference,
-        )
-        .unwrap();
-        for (path, own) in other.iter().zip(&paths) {
-            assert_ne!(path, own);
-            assert_eq!(path.as_os_str().len(), own.as_os_str().len());
-        }
-        for (path, before) in paths.iter().zip(first) {
-            assert_ne!(
-                fs::metadata(path).unwrap().ino(),
-                before.metadata().unwrap().ino()
-            );
-        }
-        assert_eq!(fs::read(&paths[0]).unwrap(), fs::read(&candidate).unwrap());
-        assert_eq!(fs::read(&paths[1]).unwrap(), fs::read(&reference).unwrap());
-
-        let roles = ["candidate", "reference"];
-        let hashes = paths.each_ref().map(|path| file_sha(path).unwrap());
-        let certificate = Value::object([
-            (
-                "worker_hashes",
-                Value::object(roles.into_iter().zip(hashes.iter().map(Value::str))),
-            ),
-            (
-                "linked_libraries",
-                Value::object(roles.into_iter().zip(paths.iter().zip(&hashes).map(
-                    |(path, hash)| {
-                        Value::object([(
-                            "inspected_artifact",
-                            Value::object([
-                                ("path", Value::str(path.display().to_string())),
-                                ("sha256", Value::str(hash)),
-                            ]),
-                        )])
-                    },
-                ))),
-            ),
-        ]);
-
-        fs::write(&reference, b"rebuilt reference").unwrap();
-        let rebuilt = prepare_workers(&slot, &root, &candidate, &reference).unwrap();
-        assert_ne!(rebuilt, paths);
-        assert!(linux::measured_workers_current(&certificate));
-        fs::write(&paths[1], b"different bytes").unwrap();
-        assert!(!linux::measured_workers_current(&certificate));
-        fs::remove_file(&paths[1]).unwrap();
-        assert!(!linux::measured_workers_current(&certificate));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn a_memory_session_settles_only_when_heap_and_total_rss_both_do() {
-        let heaps = vec![(0.0, 4096.0); 20];
-        let mut totals: Vec<(f64, f64)> = (0..20)
-            .map(|i| (if i % 2 == 0 { 900.0 } else { 910.0 }, 1000.0))
-            .collect();
-        let gate = Pairs::gate(30, CEILING);
-        assert!(settled(&heaps[..19], &totals[..19], gate).is_none());
-        assert!(settled(&heaps, &totals, gate).is_some());
-        assert!(settled(&heaps, &totals, Pairs::fixed(30)).is_none());
-        assert!(settled(&heaps, &totals, Pairs::gate(20, CEILING)).is_none());
-        // Equal to the reference is not lower; two of the first ten may be.
-        totals[2] = (1000.0, 1000.0);
-        totals[5] = (1100.0, 1000.0);
-        assert!(settled(&heaps, &totals, gate).is_some());
-        totals[12] = (1000.0, 1000.0);
-        assert!(settled(&heaps, &totals, gate).is_none());
-        totals[12] = (900.0, 1000.0);
-        let mut heavy = heaps.clone();
-        heavy[15] = (4096.0, 4096.0);
-        assert!(settled(&heavy, &totals, gate).is_none());
-    }
-
-    #[test]
-    fn slots_never_outnumber_the_kernel_sessions() {
-        let module = fs::read_to_string(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../harness/rss-bound/triergon_rss_bound.c"),
-        )
-        .unwrap();
-        assert!(module.contains(&format!("#define MAX_SESSIONS {MAX_SLOTS}\n")));
-    }
-
-    #[test]
-    fn jobs_sharing_a_file_share_a_group_in_job_order() {
-        let workers = WorkerPaths {
-            candidate: Path::new("candidate"),
-            reference: Path::new("reference"),
-            registered: true,
-        };
-        let job = |files: &[&str]| {
-            Job::new(&workers, files.iter().map(PathBuf::from), |_: &Slot| {
-                Ok(Value::Null)
-            })
-        };
-        let jobs = vec![
-            job(&["a"]),
-            job(&["b"]),
-            job(&["c", "d"]),
-            job(&["e"]),
-            job(&["d", "b"]),
-            job(&["a"]),
-        ];
-        // Missing workers are not relocatable: their own files join every job.
-        assert_eq!(shared_file_groups(&jobs), vec![vec![0, 1, 2, 3, 4, 5]]);
-        let relocated_jobs: Vec<Job<'_>> =
-            [&["a"][..], &["b"], &["c", "d"], &["e"], &["d", "b"], &["a"]]
-                .into_iter()
-                .map(|files| Job {
-                    files: files.iter().map(PathBuf::from).collect(),
-                    collect: Box::new(|_: &Slot| Ok(Value::Null)),
-                })
-                .collect();
-        assert_eq!(
-            shared_file_groups(&relocated_jobs),
-            vec![vec![0, 5], vec![1, 2, 4], vec![3]]
-        );
-    }
-
-    #[test]
-    fn collections_return_in_job_order() {
-        let jobs = (0..40)
-            .map(|n| Job {
-                files: vec![PathBuf::from(format!("input-{}", n % 7))],
-                collect: Box::new(move |_: &Slot| Ok(Value::int(n))),
-            })
-            .collect();
-        let results: Vec<Value> = run_in_slots(jobs)
-            .unwrap()
-            .into_iter()
-            .map(Result::unwrap)
-            .collect();
-        assert_eq!(results, (0..40).map(Value::int).collect::<Vec<_>>());
-    }
-
-    #[test]
-    fn unreadable_memory_input_returns_a_failed_row() {
-        let root = crate::walk::scratch("unreadable-memory-input");
-        let input = root.join("missing.ts");
-        let certificate = Value::object([("status", Value::str("qualified-selected-workers"))]);
-        let result = measure(
-            &Native {
-                root: &root,
-                timeout: worker::DEFAULT_TIMEOUT,
-            },
-            &root,
-            &root,
-            &root,
-            Pairs::fixed(1),
-            0,
-            &certificate,
-            Invocation {
-                operation: Some("memory"),
-                input: &input,
-                arguments: &[],
-                candidate_arguments: None,
-                expected_outputs: None,
-                pinned_refusal: false,
-                work_fields: None,
-                timeout: worker::DEFAULT_TIMEOUT,
-            },
-        );
-        assert_eq!(s(&result, "status"), Some("input-check-failed"));
-        assert!(s(&result, "input_error").unwrap().contains("missing.ts"));
-        assert_eq!(result.get("certificate"), Some(&certificate));
-    }
-
-    #[test]
-    fn memory_work_requires_both_digests_even_when_all_roles_omit_the_second() {
-        let expected = json::parse(r#"{"packets":1,"bytes":2,"digest":3,"digest_b":4}"#).unwrap();
-        let fields = vec!["digest_b".to_owned()];
-        let observed = Value::object([("work", expected.clone())]);
-        let sample = Value::object(
-            [
-                "candidate_heap",
-                "candidate_rss",
-                "reference_heap",
-                "reference_rss",
-            ]
-            .map(|role| (role, observed.clone())),
-        );
-        assert!(work_valid(
-            std::slice::from_ref(&sample),
-            &fields,
-            Some(&expected),
-            &[]
-        ));
-        for bad in [Some(Value::int(5)), None] {
-            for roles in [
-                vec!["candidate_rss"],
-                vec!["reference_heap"],
-                vec![
-                    "candidate_heap",
-                    "candidate_rss",
-                    "reference_heap",
-                    "reference_rss",
-                ],
-            ] {
-                let Value::Object(mut entries) = sample.clone() else {
-                    unreachable!()
-                };
-                for (role, observed) in &mut entries {
-                    if roles.contains(&role.as_str()) {
-                        let Value::Object(wrapper) = observed else {
-                            unreachable!()
-                        };
-                        let Value::Object(work) =
-                            &mut wrapper.iter_mut().find(|(k, _)| k == "work").unwrap().1
-                        else {
-                            unreachable!()
-                        };
-                        work.retain(|(k, _)| k != "digest_b");
-                        if let Some(bad) = &bad {
-                            work.push(("digest_b".into(), bad.clone()));
-                        }
-                    }
-                }
-                assert!(!work_valid(
-                    &[Value::Object(entries)],
-                    &fields,
-                    Some(&expected),
-                    &[]
-                ));
-            }
-        }
-    }
-
-    #[test]
-    fn distinct_commands_keep_compatibility_options_on_the_candidate() {
-        let reference = ["open-memory", "input.mov", "1"].map(String::from);
-        let candidate = ["--bounded-timing", "open-memory", "input.mov", "1"].map(String::from);
-        let invocation = Invocation {
-            operation: None,
-            input: Path::new("input.mov"),
-            arguments: &reference,
-            candidate_arguments: Some(&candidate),
-            expected_outputs: None,
-            pinned_refusal: false,
-            work_fields: None,
-            timeout: worker::DEFAULT_TIMEOUT,
-        };
-        assert_eq!(invocation.arguments_for(true), candidate);
-        assert_eq!(invocation.arguments_for(false), reference);
-    }
-
-    #[test]
-    fn shared_commands_remain_identical_for_both_roles() {
-        let arguments = ["avc", "aac"].map(String::from);
-        let invocation = Invocation {
-            operation: Some("hls-memory"),
-            input: Path::new("input.ts"),
-            arguments: &arguments,
-            candidate_arguments: None,
-            expected_outputs: None,
-            pinned_refusal: false,
-            work_fields: None,
-            timeout: worker::DEFAULT_TIMEOUT,
-        };
-        assert_eq!(invocation.arguments_for(true), arguments);
-        assert_eq!(invocation.arguments_for(false), arguments);
-    }
-}
-#[test]
-fn pinned_refusals_compare_equal_work_and_keep_role_diagnostics() {
-    let pair = |candidate: &Value, reference: &Value, candidate_rss: &Value| {
-        let measured = |work: &Value| Value::object([("work", work.clone())]);
-        Value::object([
-            ("candidate_heap", measured(candidate)),
-            ("candidate_rss", measured(candidate_rss)),
-            ("reference_heap", measured(reference)),
-            ("reference_rss", measured(reference)),
-        ])
-    };
-    let output = |refusal, packets, eof, iterations, diagnostic| {
-        Value::object([
-            ("refusal", Value::str(refusal)),
-            ("packets", Value::int(packets)),
-            ("bytes", Value::int(0)),
-            ("digest", Value::int(0)),
-            ("eof", Value::Bool(eof)),
-            ("iterations", Value::int(iterations)),
-            (diagnostic, Value::str("details")),
-        ])
-    };
-    let candidate = output("typed refusal", 0, false, 1, "cause");
-    let reference = output("refused", 0, false, 1, "error");
-    assert!(matched_refusal_work(&pair(
-        &candidate, &reference, &candidate
-    )));
-    for different in [
-        output("refused", 1, false, 1, "error"),
-        output("refused", 0, true, 1, "error"),
-        output("refused", 0, false, 2, "error"),
-    ] {
-        assert!(!matched_refusal_work(&pair(
-            &candidate, &different, &candidate
-        )));
-    }
-    assert!(!matched_refusal_work(&pair(
-        &candidate, &reference, &reference
-    )));
-}
+mod command_tests;

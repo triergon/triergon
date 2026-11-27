@@ -25,9 +25,10 @@ assert!(report.picture.key && out.len() == report.ts_bytes && out.len() % 188 ==
 `SessionConfig` holds `width`, `height`, `bit_rate`, `max_rate`, `vbv_bits`, `gop` and
 `mux` (a `mux::MuxConfig`). `SessionConfig::with_rate_rule(width, height, b)` sets
 `max_rate = b·7/5`, `vbv_bits = b/7`, `gop = 30` and the default multiplex. The
-component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session` also gives
-`geometry()`, `converted()` (the last converted input), `reconstruction()` and
-`vbv_underflow_bits()`.
+component crates are re-exported as `pixel`, `mpeg1` and `mux`. `Session::geometry()`
+gives the visible and coded sizes. The optional `reference-trace` feature exposes the
+last converted input, reconstructed picture and accumulated VBV underflow bits through
+`converted()`, `reconstruction()` and `vbv_underflow_bits()`.
 
 `Session::open` selects the chroma conversion by width, as the reference does on 32-bit
 ARMv7; `Session::open_filtered` uses the centre-sited chroma filter at every width, as it
@@ -60,15 +61,6 @@ does on Linux AArch64.
 
 - The session's buffers and the encoder's budgeted storage are reused across frames.
 
-### Differences from FFmpeg
-
-| Item | FFmpeg 9.0.2 | This crate | Reason |
-|---|---|---|---|
-| Latency | frame k's bytes are written at call k+1; the last frame is never written | frame k at call k | lower latency, same timestamps |
-
-Multiplex differences (PMT stream type, SDT provider) are listed under
-[Writing TS](../mpegts/README.md#writing-ts).
-
 ## Conformance
 
 The reference is FFmpeg 9.0.2 (`swscale` with `SWS_BILINEAR`, `mpeg1video` with an I/P
@@ -76,3 +68,10 @@ GOP of 30, `mpegts`). The comparison rules are in
 [harness/capture](../../harness/capture/README.md) and the results in
 [docs/status.md](../../docs/status.md). [capture-worker](../capture-worker/README.md) runs
 a session from the harness command line.
+
+| Difference | FFmpeg 9.0.2 | This crate | Reason |
+|---|---|---|---|
+| Latency | frame k's bytes are written at call k+1; the last frame is never written | frame k at call k | lower latency, same timestamps |
+
+The multiplex differences (PMT stream type, SDT provider) are listed under
+[Writing TS](../mpegts/README.md#writing-ts).

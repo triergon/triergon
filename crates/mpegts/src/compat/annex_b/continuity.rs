@@ -1,12 +1,13 @@
 use crate::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DemuxTimeView,
-    PesFaultPolicy, RegisteredCarriage, SourceContext, TransportFaultRecovery,
-    TransportObservation,
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DemuxTimeView, PesFaultPolicy,
+    RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
-use crate::{
-    AssemblyStep, ContinuityOutcome, FaultKind, Reader, ReaderEvent, ReaderLimits, SourceEvent,
-    TraceEvent, TransportPacket, TransportStream,
-};
+use crate::pes::stream_id;
+use crate::psi::stream_type;
+use crate::reader::SourceEvent;
+use crate::stream::{FaultKind, TraceEvent, TransportStream};
+use crate::transport::{ContinuityOutcome, TransportPacket};
+use crate::{AssemblyStep, Reader, ReaderEvent, ReaderLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     BudgetVec, Charged, Error, InputCursor, InputToken, Result, SourceLocation, WorkBudget,
@@ -15,17 +16,21 @@ use triergon_core::{
 const HISTORY: usize = 16;
 const UNOBSERVED: Error = Error::Unsupported("unobserved video continuity context");
 
-/// Original evidence that admitted a continuity change. The carrier includes
-/// its complete original bytes and the event retains any strict diagnostic.
+/// The carrier and source event at which a continuity change was observed.
 #[derive(Debug)]
 pub struct ContinuityEvidence {
+    /// The last selected carrier before the change, with its complete original bytes.
     pub carrier: TransportPacket,
+    /// Event ordinal and epochs of the last selected carrier before the change.
     pub carrier_context: SourceContext,
+    /// The source event that admitted the change.
     pub event: SourceEvent,
+    /// Event ordinal and epochs when the source reported the change.
     pub context: SourceContext,
 }
 
-/// One nonempty unframed video run at the original logical EOF.
+/// The unframed video bytes the demuxer joins across the continuity changes of a track,
+/// reported at the logical end of the source.
 #[derive(Debug)]
 pub struct ContinuityResidue(Charged<Box<ResidueData>>);
 
@@ -39,6 +44,7 @@ struct ResidueData {
 }
 
 impl ContinuityResidue {
+    /// Where the source ended: the logical EOF the residue was proved at.
     pub fn source_end(&self) -> SourceLocation {
         self.0.end
     }
@@ -55,14 +61,17 @@ impl ContinuityResidue {
         self.0.chunks.as_slice()
     }
 
+    /// The carriers and events that admitted each continuity change, in source order.
     pub fn evidence(&self) -> &[ContinuityEvidence] {
         self.0.evidence.as_slice()
     }
 
+    /// Total payload bytes across the chunks.
     pub fn payload_len(&self) -> usize {
         self.0.bytes
     }
 
+    /// The payload bytes, one slice per chunk payload span, in parser order.
     pub fn payload(&self) -> impl Iterator<Item = &[u8]> {
         self.chunks().iter().flat_map(DemuxPacket::payload)
     }
@@ -253,8 +262,8 @@ impl Proof {
                     return Err(UNOBSERVED);
                 };
                 let carriage = match stream.stream_type {
-                    0x1b => RegisteredCarriage::Avc,
-                    0x24 => RegisteredCarriage::Hevc,
+                    stream_type::H264 => RegisteredCarriage::Avc,
+                    stream_type::HEVC => RegisteredCarriage::Hevc,
                     _ => return Err(UNOBSERVED),
                 };
                 let source = source.ok_or(UNOBSERVED)?;
@@ -266,7 +275,7 @@ impl Proof {
                         program: map.header.extension,
                         pid: stream.pid,
                         stream_type: stream.stream_type,
-                        stream_id: 0xe0,
+                        stream_id: stream_id::VIDEO_FIRST,
                         entity: input.source(),
                         epochs: source.source_epochs(),
                     },
@@ -337,7 +346,7 @@ impl Proof {
         else {
             return Ok(EofStep::Yield);
         };
-        let run = route.run.take().expect("finished continuity run");
+        let run = route.run.take().ok_or(UNOBSERVED)?;
         let pool = run.chunks.budget().clone();
         let residue = Charged::boxed(
             &pool,
@@ -445,7 +454,7 @@ impl Route {
                 return Ok(Effect::Evidence(context));
             }
             TraceEvent::Diagnostic(_) if self.matches(event) && self.unresolved_diagnostic() => {
-                self.last.as_mut().expect("matching carrier").confirmed = true;
+                self.last.as_mut().ok_or(UNOBSERVED)?.confirmed = true;
                 return Ok(Effect::Evidence(context));
             }
             TraceEvent::Timeline { .. } if self.matches(event) => {
@@ -505,7 +514,6 @@ impl Route {
         }
         let pool = input.budget();
         let demux = DemuxObserver::new_registered(
-            DemuxProfile::PesPackets,
             self.scope,
             self.carriage,
             pool.clone(),
@@ -609,7 +617,7 @@ impl Run {
                 return Ok(Progress::Yield);
             }
             match self.observer.poll(work, cancel)? {
-                AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
+                AssemblyStep::Output(RecoveredPes::Accepted(packet)) => {
                     let end = self
                         .bytes
                         .checked_add(packet.payload_len)
@@ -645,7 +653,7 @@ impl Run {
     }
 
     fn scan(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
-        let scan = self.scan.as_mut().expect("pending continuity scan");
+        let scan = self.scan.as_mut().ok_or(UNOBSERVED)?;
         while let Some(span) = scan.packet.spans.as_slice().get(scan.span) {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -692,7 +700,7 @@ impl Run {
         if !work.try_charge(1) {
             return Ok(false);
         }
-        let scan = self.scan.take().expect("complete continuity scan");
+        let scan = self.scan.take().ok_or(UNOBSERVED)?;
         self.chunks
             .try_push(scan.packet)
             .map_err(|error| error.error)?;

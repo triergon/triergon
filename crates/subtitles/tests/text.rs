@@ -242,7 +242,7 @@ fn run_case(index: usize) {
             let mut parser = Extractor::new(&pool, limits, input.generation);
             if let Err(rejected) = parser.provide(input) {
                 check_error(rejected.error, case.error, case.id);
-                same_input(&rejected.input, &original);
+                same_input(&rejected.value, &original);
                 assert!(case.events.is_empty());
             } else {
                 parser.finish_input();
@@ -256,7 +256,7 @@ fn run_case(index: usize) {
                     assert!(work.spent() <= units);
                     match status {
                         Ok(Status::Yield) => assert!(work.spent() != 0),
-                        Ok(Status::Cue(cue)) => {
+                        Ok(Status::Ready(cue)) => {
                             let expected = case
                                 .events
                                 .get(output.len())
@@ -267,7 +267,7 @@ fn run_case(index: usize) {
                             }
                             output.push(cue);
                         }
-                        Ok(Status::Finished) => {
+                        Ok(Status::End) => {
                             finished = true;
                             break;
                         }
@@ -323,7 +323,7 @@ fn opaque(pool: &Budget, bytes: &[u8], generation: u64) -> Input {
 fn next_opaque(parser: &mut Extractor) -> Cue {
     let mut work = WorkBudget::new(4096);
     match parser.step(&mut work, &AtomicBool::new(false)).unwrap() {
-        Status::Cue(cue) => cue,
+        Status::Ready(cue) => cue,
         other => panic!("expected opaque event, got {other:?}"),
     }
 }
@@ -351,7 +351,7 @@ fn explicit_finish_is_distinct_from_empty_packet() {
         parser
             .step(&mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        Status::Finished
+        Status::End
     ));
 }
 
@@ -402,7 +402,7 @@ fn busy_input_rejection_returns_exact_owner() {
         rejection.error,
         Error::Invalid("text input already pending")
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
     assert_eq!(next_opaque(&mut parser).input.payload.as_ref(), b"first");
 }
 
@@ -420,7 +420,7 @@ fn stale_generation_returns_exact_owner() {
             received: 1
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
 }
 
 #[test]
@@ -446,7 +446,7 @@ fn every_source_owner_must_belong_to_the_same_pool() {
         let mut parser = Extractor::new(&pool, Limits::default(), 1);
         let rejection = parser.provide(input).unwrap_err();
         assert_eq!(rejection.error, Error::ForeignPool);
-        same_input(&rejection.input, &original);
+        same_input(&rejection.value, &original);
     }
 }
 
@@ -468,7 +468,7 @@ fn input_limit_rejection_does_not_consume_input() {
             maximum: 3
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
     parser.provide(opaque(&pool, b"ok", 1)).unwrap();
     assert_eq!(next_opaque(&mut parser).input.payload.as_ref(), b"ok");
 }
@@ -492,7 +492,7 @@ fn configuration_limit_is_independent_of_payload_limit() {
             maximum: 1
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
 }
 
 #[test]
@@ -575,7 +575,7 @@ fn resource_failure(id: &str, limits: Limits, expected_cues: usize) {
                 assert!(work.spent() <= units);
                 match result {
                     Ok(Status::Yield) => assert!(work.spent() != 0),
-                    Ok(Status::Cue(cue)) => {
+                    Ok(Status::Ready(cue)) => {
                         same_input(&cue.input, &original);
                         cues += 1;
                     }
@@ -622,7 +622,7 @@ fn first_cue(parser: &mut Extractor, units: u64) -> Cue {
         let mut work = WorkBudget::new(units);
         match parser.step(&mut work, &AtomicBool::new(false)).unwrap() {
             Status::Yield => assert!(work.spent() != 0),
-            Status::Cue(cue) => return cue,
+            Status::Ready(cue) => return cue,
             other => panic!("expected cue, got {other:?}"),
         }
     }
@@ -744,7 +744,7 @@ fn long_utf8_validation_yields_and_charges_every_source_byte() {
                 yielded += 1;
                 assert_eq!(work.spent(), 1);
             }
-            Status::Cue(cue) => {
+            Status::Ready(cue) => {
                 assert_eq!(cue.decoded_utf8.unwrap().as_ref(), original.as_ref());
                 emitted = true;
                 break;
@@ -772,7 +772,7 @@ fn oversized_charset_label_returns_exact_unconsumed_source() {
             maximum: 256
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
 }
 
 #[test]
@@ -793,5 +793,21 @@ fn addition_limit_returns_all_source_facts_without_reclassification() {
             maximum: 16
         }
     );
-    same_input(&rejection.input, &original);
+    same_input(&rejection.value, &original);
+}
+
+#[test]
+fn byte_reversed_utf16_tx3g_text_is_unsupported() {
+    // TS 26.245 5.1 does not require terminals to read byte-reversed UTF-16.
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut extractor = Extractor::new(&pool, Limits::default(), 0);
+    let mut input = opaque(&pool, &[0, 4, 0xff, 0xfe, b'A', 0], 0);
+    input.format = Format::Tx3g;
+    input.encoding = Encoding::Tx3gInBand;
+    extractor.provide(input).unwrap();
+    let result = extractor.step(&mut WorkBudget::new(4096), &AtomicBool::new(false));
+    assert_eq!(
+        result.unwrap_err(),
+        Error::Unsupported("byte-reversed UTF-16")
+    );
 }

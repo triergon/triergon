@@ -20,7 +20,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::correctness::file_sha;
 use super::readers::{
     COLUMNS, DIFFERENCES_SCHEMA, Key, Pair, align, differences_text, list_sha256,
 };
@@ -73,7 +72,7 @@ pub fn inputs(root: &Path) -> Result<Vec<(PathBuf, String)>, String> {
 pub fn verify_inputs(root: &Path) -> Result<String, String> {
     let inputs = inputs(root)?;
     for (path, pin) in &inputs {
-        let actual = file_sha(path)?;
+        let actual = crate::files::sha256(path)?;
         if actual != *pin {
             return Err(format!(
                 "{}: SHA-256 {actual}, pinned {pin}",
@@ -86,7 +85,7 @@ pub fn verify_inputs(root: &Path) -> Result<String, String> {
 
 /// The cases of `corpus.json`, checked against the counts the contract states.
 pub fn corpus(root: &Path) -> Result<Vec<Case>, String> {
-    let manifest = crate::checks::read_json(&root.join(FEATURE).join("corpus.json"))?;
+    let manifest = json::read(&root.join(FEATURE).join("corpus.json"))?;
     if manifest.get("schema").and_then(Value::as_str) != Some(CORPUS_SCHEMA) {
         return Err(format!(
             "{FEATURE}/corpus.json: schema is not {CORPUS_SCHEMA}"
@@ -123,7 +122,7 @@ pub fn corpus(root: &Path) -> Result<Vec<Case>, String> {
             seek,
         });
     }
-    let contract = crate::checks::read_json(&root.join(FEATURE).join("contract.json"))?;
+    let contract = json::read(&root.join(FEATURE).join("contract.json"))?;
     let stated = |key: &str| {
         contract
             .get("counts")
@@ -298,11 +297,8 @@ impl Rules {
     pub fn load(root: &Path) -> Result<Rules, String> {
         let rules = root.join(FEATURE).join("rules.json");
         let differences = root.join(FEATURE).join("differences.json");
-        Rules::parse(
-            &crate::checks::read_json(&rules)?,
-            &crate::checks::read_json(&differences)?,
-        )
-        .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
+        Rules::parse(&json::read(&rules)?, &json::read(&differences)?)
+            .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
     }
 
     fn parse(document: &Value, differences: &Value) -> Result<Rules, String> {
@@ -1076,11 +1072,7 @@ fn grade(rules: &Rules, comparison: &Comparison<'_>, found: &[Difference], case:
     let considered: Vec<&Disposition> = rules
         .dispositions
         .iter()
-        .filter(|d| {
-            reviewed
-                .filter(|r| r.difference_sha256 == digest)
-                .is_none_or(|r| r.dispositions.contains(&d.id))
-        })
+        .filter(|d| reviewed.is_none_or(|r| r.dispositions.contains(&d.id)))
         .collect();
     let (mut proposed, _, _) = attribute(comparison, found, &considered, seek);
     // A difference several scopes cover is proposed under the one disposition among
@@ -1276,7 +1268,7 @@ pub fn run(options: &Options) -> Result<i32, String> {
         }
         let status = if !Path::new(&path).is_file() {
             "input-missing"
-        } else if file_sha(Path::new(&path))? != case.sha256 {
+        } else if crate::files::sha256(Path::new(&path))? != case.sha256 {
             "input-hash-mismatch"
         } else {
             match compare_case(options, &rules, case, &path) {
@@ -1353,7 +1345,7 @@ mod tests {
         // one is committed, with the bytes its pin names.
         for case in cases.iter().filter(|c| !c.path.starts_with(".research/")) {
             assert_eq!(
-                file_sha(&root.join(&case.path)).unwrap(),
+                crate::files::sha256(&root.join(&case.path)).unwrap(),
                 case.sha256,
                 "{}",
                 case.name

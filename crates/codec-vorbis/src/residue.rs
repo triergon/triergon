@@ -4,9 +4,10 @@
 use triergon_bitstream::LsbReader;
 use triergon_codec::{Budget, BudgetVec};
 
+use crate::DecodeError;
 use crate::codebook::Codebook;
+use crate::setup::push;
 use crate::spectra::Spectra;
-use crate::{DecodeError, push};
 
 /// How a residue lays its VQ vectors out over the coded vectors.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -14,9 +14,9 @@ use std::{collections::HashMap, env, fs::File, io::Read, sync::atomic::AtomicBoo
 use triergon_core::{
     Budget, Bytes, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
-use triergon_mpegts::{
-    PacketFormat, ParseLimits, TraceEvent, TransportStream, psi::DescriptorNamespace,
-};
+use triergon_mpegts::psi::DescriptorNamespace;
+use triergon_mpegts::stream::{TraceEvent, TransportStream};
+use triergon_mpegts::{PacketFormat, ParseLimits};
 
 fn optional(value: Option<u64>) -> String {
     value.map_or_else(|| "-".to_owned(), |v| v.to_string())

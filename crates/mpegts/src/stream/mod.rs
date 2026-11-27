@@ -1,0 +1,385 @@
+//! The source view of a transport stream: [`TransportStream`], its events and its feed
+//! interfaces.
+mod clock;
+mod end;
+pub(crate) mod entity;
+mod event;
+mod feed;
+mod held;
+mod poll;
+mod program;
+mod storage;
+mod tables;
+
+pub use entity::{MediaEntityEnd, ObservedTrace};
+pub use event::{CarrierObservation, CompactTraceEvent, FaultKind, TraceEvent, TraceFault};
+pub use feed::{FeedCarrier, FeedContinuation, FeedItem, FeedPayloadRun};
+use held::{Held, Stage};
+pub use program::{ActiveProgram, ProgramStream};
+use tables::PsiWork;
+
+pub(crate) use storage::{StorageItem, TransportStorageCursor};
+
+use crate::pes::PesAssembler;
+use crate::psi::SectionAssembler;
+use crate::psi::{DescriptorNamespace, PatCollector, stream_type};
+use crate::transport::{Continuity, TransportFramer};
+use crate::{PacketFormat, ParseLimits, SourceEpochs};
+use std::sync::atomic::AtomicUsize;
+use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation};
+
+#[derive(Debug)]
+struct PsiRoute {
+    pid: u16,
+    continuity: Continuity,
+    assembler: SectionAssembler,
+}
+impl PsiRoute {
+    fn new(pid: u16, budget: &Budget, limits: ParseLimits) -> Result<Self> {
+        Ok(Self {
+            pid,
+            continuity: Continuity::new(pid)?,
+            assembler: SectionAssembler::new(pid, budget.clone(), limits)?,
+        })
+    }
+}
+#[derive(Debug)]
+struct PesRoute {
+    pid: u16,
+    stream_type: u8,
+    descriptors: Bytes,
+    epochs: SourceEpochs,
+    continuity: Option<Continuity>,
+    assembler: Option<PesAssembler>,
+    reuse: Option<usize>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Route {
+    Pat,
+    Pmt,
+    Pes(usize),
+    Clock,
+    Ignore,
+}
+
+/// The PCR PID's edge-detected discontinuity indicator.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u16)]
+enum DiscontinuityFlag {
+    Clear = 0,
+    Raised = 1,
+    Pending = 2,
+}
+
+/// PCR samples since the last accepted discontinuity, saturating at two.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum PcrSamples {
+    Untracked = 0,
+    One = 1,
+    Two = 2,
+}
+
+/// The source view of one transport stream: frames packets, checks continuity, reads
+/// PAT and PMT and assembles the PES of one program, reporting every packet, section,
+/// table, PES and fault as a `TraceEvent` in source order. The program is given or
+/// discovered from a single-program PAT.
+#[repr(C)]
+#[derive(Debug)]
+pub struct TransportStream {
+    feed_omissions: Option<u64>,
+    framer: TransportFramer,
+    pat: PsiRoute,
+    collector: PatCollector,
+    entity_end: Option<SourceLocation>,
+    trace_generation: Option<u64>,
+    pmt: Option<PsiRoute>,
+    held: Option<Held>,
+    route: Route,
+    routes: BudgetVec<PesRoute>,
+    psi: PsiWork,
+    budget: Budget,
+    limits: ParseLimits,
+    deferred_feed_events: u64,
+    pmt_source: Option<Bytes>,
+    clock_epoch: u64,
+    config_epoch: u64,
+    eof_route: usize,
+    trace_issuer: AtomicUsize,
+    tsid: Option<u16>,
+    pcr_pid: Option<u16>,
+    pmt_version: Option<u8>,
+    // Untracked until the first explicitly accepted new-clock boundary; then saturate
+    // at the normative minimum of two samples before another boundary.
+    clock_samples: PcrSamples,
+    clock_continuity: Option<Continuity>,
+    program: u16,
+    format: PacketFormat,
+    discover_program: bool,
+    feed_validated_carriers: bool,
+    unbounded_adts: bool,
+    clock_flag: DiscontinuityFlag,
+    clock_quarantined: bool,
+    logical_end: bool,
+    finished: bool,
+    boundary_event: bool,
+    descriptor_namespace: DescriptorNamespace,
+}
+// The field order above is load-bearing for the per-carrier loops; a change that moves it
+// shows here first.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<TransportStream>() == 3216 && align_of::<TransportStream>() == 8);
+
+impl TransportStream {
+    /// A stream of `format` packets that demultiplexes `program`, with private
+    /// descriptors left uninterpreted (`DescriptorNamespace::Unspecified`).
+    ///
+    /// Fails with `Invalid` for program 0, which names the network PID, and for `limits`
+    /// out of range.
+    pub fn new(
+        budget: Budget,
+        format: PacketFormat,
+        limits: ParseLimits,
+        program: u16,
+    ) -> Result<Self> {
+        Self::new_with_namespace(
+            budget,
+            format,
+            limits,
+            program,
+            DescriptorNamespace::Unspecified,
+        )
+    }
+    /// Read a selected nonzero program with an explicit namespace for every PMT descriptor.
+    /// The PID and clock facts are read from the source. Program zero and invalid limits
+    /// return `Invalid`, as in [`Self::new`].
+    pub fn new_with_namespace(
+        budget: Budget,
+        format: PacketFormat,
+        limits: ParseLimits,
+        program: u16,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        if program == 0 {
+            return Err(Error::Invalid("network PID is not a selected program"));
+        }
+        Self::new_with_program(budget, format, limits, Some(program), descriptor_namespace)
+    }
+
+    /// Read a TS188 segment with an in-band PAT and PMT. The complete PAT
+    /// must identify exactly one media program, excluding the network PID entry.
+    /// Invalid limits fail construction, and a multi-program PAT fails during polling.
+    pub fn new_single_program_segment(
+        budget: Budget,
+        limits: ParseLimits,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        Self::new_with_program(
+            budget,
+            PacketFormat::Ts188,
+            limits,
+            None,
+            descriptor_namespace,
+        )
+    }
+
+    /// Read one independent segment, sharing complete carriers with the
+    /// input window and validating source PES without retaining it. Feed
+    /// callers still receive transport packets, program tables and faults. Limits and
+    /// program selection follow [`Self::new_single_program_segment`].
+    pub fn new_single_program_feed(
+        budget: Budget,
+        limits: ParseLimits,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        let mut stream = Self::new_single_program_segment(budget, limits, descriptor_namespace)?;
+        stream.framer.share_input();
+        stream.feed_omissions = Some(0);
+        Ok(stream)
+    }
+
+    /// Read a sequential TS188 input for a progressive feed: continuation carriers of a PES
+    /// are offered to the feed once their continuity is checked
+    /// ([`Self::poll_feed_carriers`]); PAT, PMT, continuity breaks, clock transitions and
+    /// faults are published as events. Limits and program selection follow
+    /// [`Self::new_single_program_segment`].
+    pub fn new_single_program_progressive_feed(
+        budget: Budget,
+        limits: ParseLimits,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        let mut stream = Self::new_single_program_segment(budget, limits, descriptor_namespace)?;
+        stream.framer.compact_progressive_input();
+        stream.feed_omissions = Some(0);
+        stream.feed_validated_carriers = true;
+        Ok(stream)
+    }
+
+    /// Count source events suppressed since the last call, for consumers
+    /// that track positions in the full source trace.
+    pub fn take_feed_omissions(&mut self) -> u64 {
+        // Typing the delivery tag added 3.77% to PSI fault reads even with the constructors inlined.
+        self.feed_omissions.as_mut().map_or(0, std::mem::take)
+    }
+
+    fn omit_feed_events(&mut self, count: u64) -> Result<()> {
+        let omissions = self
+            .feed_omissions
+            .as_mut()
+            .ok_or(Error::Invalid("feed event omitted from source trace"))?;
+        *omissions = omissions.checked_add(count).ok_or(Error::Overflow)?;
+        Ok(())
+    }
+
+    // Constructing PSI in locals and forcing inlining measured +5.695% on short PSI fault reads.
+    pub(crate) fn new_with_program(
+        budget: Budget,
+        format: PacketFormat,
+        limits: ParseLimits,
+        program: Option<u16>,
+        descriptor_namespace: DescriptorNamespace,
+    ) -> Result<Self> {
+        limits.validate()?;
+        Ok(Self {
+            framer: TransportFramer::new(budget.clone(), format),
+            pat: PsiRoute::new(0, &budget, limits)?,
+            collector: PatCollector::new(budget.clone(), limits)?,
+            routes: BudgetVec::new(&budget),
+            budget,
+            format,
+            limits,
+            program: program.unwrap_or_default(),
+            discover_program: program.is_none(),
+            feed_omissions: None,
+            feed_validated_carriers: false,
+            unbounded_adts: false,
+            deferred_feed_events: 0,
+            descriptor_namespace,
+            pmt: None,
+            pmt_source: None,
+            pmt_version: None,
+            tsid: None,
+            pcr_pid: None,
+            clock_continuity: None,
+            clock_flag: DiscontinuityFlag::Clear,
+            clock_samples: PcrSamples::Untracked,
+            clock_quarantined: false,
+            clock_epoch: 0,
+            config_epoch: 0,
+            held: None,
+            route: Route::Ignore,
+            psi: PsiWork::Idle,
+            entity_end: None,
+            logical_end: false,
+            eof_route: 0,
+            finished: false,
+            boundary_event: false,
+            trace_issuer: AtomicUsize::new(0),
+            trace_generation: None,
+        })
+    }
+    /// Zero until the first complete PAT in single-program discovery mode.
+    pub fn selected_program(&self) -> u16 {
+        self.program
+    }
+    /// The clock and configuration epochs in force at the current position.
+    pub fn source_epochs(&self) -> SourceEpochs {
+        SourceEpochs {
+            clock: self.clock_epoch,
+            configuration: self.config_epoch,
+        }
+    }
+    /// Whether invalid PCR signalling has quarantined the program clock: timestamps keep their
+    /// raw values but are not interpreted until [`Self::discontinuity`].
+    pub fn clock_is_quarantined(&self) -> bool {
+        self.clock_quarantined
+    }
+    pub(crate) fn has_active_map(&self) -> bool {
+        self.pmt_source.is_some()
+    }
+
+    /// Sets the elementary offset of the single route of a stream that a seek checkpoint
+    /// restarts, after its in-band PMT; `SourceMismatch` unless the route and clock state are
+    /// those of that restart.
+    pub(crate) fn resume_elementary_offset(&mut self, pid: u16, offset: u64) -> Result<()> {
+        let [route] = self.routes.as_mut_slice() else {
+            return Err(Error::SourceMismatch);
+        };
+        if route.pid != pid
+            || !matches!(
+                route.stream_type,
+                stream_type::MPEG1_AUDIO
+                    | stream_type::MPEG2_AUDIO
+                    | stream_type::H264
+                    | stream_type::HEVC
+            )
+            || route.epochs
+                != (SourceEpochs {
+                    configuration: 2,
+                    clock: 0,
+                })
+            || self.clock_flag == DiscontinuityFlag::Pending
+            || self.clock_quarantined
+            || self.clock_samples != PcrSamples::Untracked
+        {
+            return Err(Error::SourceMismatch);
+        }
+        route
+            .assembler
+            .as_mut()
+            .ok_or(Error::SourceMismatch)?
+            .resume_elementary_offset(offset)
+    }
+    pub(crate) fn route_state(
+        &self,
+        index: usize,
+        pid: u16,
+    ) -> Option<(SourceEpochs, Option<SourceLocation>)> {
+        self.routes
+            .as_slice()
+            .get(index)
+            .filter(|route| route.pid == pid)
+            .map(|route| {
+                let pending = route
+                    .assembler
+                    .as_ref()
+                    .and_then(PesAssembler::pending_header_location);
+                (route.epochs, pending)
+            })
+    }
+    fn location(&self) -> SourceLocation {
+        self.held.as_ref().map_or(
+            self.entity_end.unwrap_or(SourceLocation {
+                source: SourceId(0),
+                offset: 0,
+            }),
+            |held| SourceLocation {
+                source: held.packet.source_id.unwrap_or(SourceId(0)),
+                offset: held.packet.source_offset,
+            },
+        )
+    }
+    fn diagnostic(&self, kind: FaultKind, pid: Option<u16>, error: Error) -> TraceEvent {
+        TraceEvent::Diagnostic(TraceFault {
+            kind,
+            pid,
+            error,
+            rejected: None,
+            location: self.location(),
+        })
+    }
+    pub(crate) fn allow_unbounded_adts(&mut self) {
+        self.unbounded_adts = true;
+    }
+
+    pub(crate) fn set_pcr_policy(&mut self, policy: crate::compat::pes::PcrPolicy) {
+        self.framer.set_pcr_policy(policy);
+    }
+
+    pub(crate) fn share_input(&mut self) {
+        self.framer.share_input();
+    }
+}
+
+#[cfg(test)]
+mod tests;

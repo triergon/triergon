@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "id": "facade-seek",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "mpegts-previous-picture",
+  "candidate": "play-views-worker",
+  "worker_operation": "ts-seek-",
+  "reference": "ffmpeg-ts-seek",
+  "contract": [
+    "Open the sole-program TS188 or M2TS192 entity through AnyReader. Exercise reset and Blocking::seek, which routes the request through AnyReader::request_seek.",
+    "Compare the requested, landing and discard times and every selected picture packet through EOF with the unchanged MPEG-TS picture seek reference. Fold source presentation time, effective decode time, neutral random access and payload. Repeated cases seek again after EOF.",
+    "The transport report covers the sole-program single-entity cases. Explicit transport epochs and split entities require format-specific APIs. Matroska and ISO BMFF compare the facade's receipt and every delivered packet with the reference's own backward seek to the requested time: the Matroska worker's native seek, and for ISO BMFF av_seek_frame with AVSEEK_FLAG_BACKWARD at the requested ticks on the requested track. Each packet compares stream, track, PTS, DTS, duration (a reference duration of 0 is unknown), key flag and payload. The facade's extra Matroska preroll packets are verified against a sequential reference pass and the Block timing oracle and counted as a difference. container-pins.json pins the reference output of every case and, for each listed case, the candidate output and the differences its entry declares."
+  ],
+  "required_profiles": [
+    "avc-earliest-picture",
+    "avc-between-keyframes",
+    "hevc-m2ts-preroll",
+    "avc-late-preroll",
+    "avc-repeated-preroll",
+    "hevc-m2ts-repeated-preroll",
+    "avc-physical-repeated-preroll",
+    "hevc-physical-repeated-preroll"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "avc-earliest-picture",
+        "avc-between-keyframes",
+        "hevc-m2ts-preroll",
+        "avc-late-preroll",
+        "avc-repeated-preroll",
+        "hevc-m2ts-repeated-preroll",
+        "avc-physical-repeated-preroll",
+        "hevc-physical-repeated-preroll"
+      ],
+      "cause": "Paired runtime, peak live heap and total RSS need isolated AArch64 and ARMv7 gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "avc-earliest-picture",
+        "avc-between-keyframes",
+        "hevc-m2ts-preroll",
+        "avc-late-preroll",
+        "avc-repeated-preroll",
+        "hevc-m2ts-repeated-preroll",
+        "avc-physical-repeated-preroll",
+        "hevc-physical-repeated-preroll"
+      ],
+      "cause": "Paired runtime, peak live heap and total RSS need isolated AArch64 and ARMv7 gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "avc-earliest-picture",
+        "avc-between-keyframes",
+        "hevc-m2ts-preroll",
+        "avc-late-preroll",
+        "avc-repeated-preroll",
+        "hevc-m2ts-repeated-preroll",
+        "avc-physical-repeated-preroll",
+        "hevc-physical-repeated-preroll"
+      ],
+      "cause": "Paired runtime, peak live heap and total RSS need isolated AArch64 and ARMv7 gate hosts."
+    }
+  ]
+}

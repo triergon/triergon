@@ -1,69 +1,54 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `missing_docs`, `clippy::expect_used`.
 
-pub mod carrier;
 pub mod clock;
 pub mod compat;
-mod continuity;
-#[cfg(feature = "reference-trace")]
-mod demux_catalogue;
-mod demux_clock;
-mod demux_input;
-mod demux_pes;
-#[cfg(feature = "reference-trace")]
-mod demux_recovery;
-mod demux_stream;
-mod demux_transport;
-mod framer;
-mod media_entity;
 pub mod mux;
-mod packet_completion;
 pub mod pes;
 pub mod psi;
-mod reader;
+pub mod reader;
 #[cfg(feature = "reference-trace")]
 pub mod reference_trace;
-mod stream;
-mod transport;
+pub mod stream;
+pub mod transport;
 
-pub use carrier::TransportObservation;
-pub use carrier::{RejectedTransport, TransportInspection, TransportInspector};
-pub use continuity::{Continuity, ContinuityOutcome};
-pub use framer::{FrameState, FrameStep, NullCarrierRun, TransportFramer};
-pub use media_entity::{MediaEntityEnd, ObservedTrace};
-pub use pes::{Pes, PesAssembler, PesHeader, PesSpan};
-pub use psi::SectionAssembler;
-pub use reader::{
-    Ac3AccessUnit, AccessUnit, AudioEofPolicy, DtsAudioFrame, DtsExtensionFrame,
-    DvbSubtitleTailPolicy, DvbSubtitleUnit, EntityTransition, IncompleteVideo, LoasFrame,
-    MpegAudioFrame, MpegPictureCoding, MpegVideoPicture, Packet, PacketClock, PayloadSource,
-    Reader, ReaderEvent, ReaderLimits, SeekEntity, SourceEvent, Track, UnframedAudio,
-};
-pub use stream::{
-    CarrierObservation, CompactTraceEvent, FaultKind, FeedCarrier, FeedContinuation, FeedItem,
-    FeedPayloadRun, TraceEvent, TraceFault, TransportStream,
-};
-pub use transport::{Adaptation, PacketFormat, Pcr, TransportPacket, parse_transport};
+pub use reader::{AccessUnit, Packet, Reader, ReaderEvent, ReaderLimits, Track};
+pub use transport::PacketFormat;
 
 use triergon_core::{BudgetVec, Error, Result, SourceId};
 
-/// Format policy, independent from the shared live-capacity Budget.
+/// Format bounds on sections, PES packets and tables, independent from the shared
+/// live-capacity budget.
+///
+/// Input beyond a bound fails with `Limit`. Building a parser fails with `Invalid` when
+/// `section_bytes` is outside 3..=4096, `pes_bytes` is below 6 or any count is zero.
 #[derive(Clone, Copy, Debug)]
 pub struct ParseLimits {
-    /// PAT/PMT still have a normative 1024-byte total, even under this private limit.
+    /// Maximum bytes of one PSI section, from its table ID through its CRC; 3 to 4096,
+    /// default 4096. PAT and PMT sections keep their normative 1024-byte limit even when
+    /// this is larger.
     pub section_bytes: usize,
+    /// Maximum bytes of one PES packet, from its start code through its payload; at least
+    /// 6, default 16 MiB. Also bounds an unbounded video PES.
     pub pes_bytes: usize,
+    /// Maximum source ranges of one section, and of one PES header or payload span list;
+    /// default 4096.
     pub source_spans: usize,
+    /// Maximum program entries in one PAT version, across its sections; default 64.
     pub programs: usize,
+    /// Maximum elementary streams in one PMT; default 64.
     pub streams: usize,
+    /// Maximum descriptors in one PMT section, program and stream loops together; default
+    /// 256.
     pub descriptors: usize,
 }
 
@@ -98,13 +83,16 @@ impl ParseLimits {
 /// Container-local provenance. Entity identity is not an I/O generation or epoch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceRange {
+    /// The source entity the bytes were read from.
     pub entity: SourceId,
+    /// Byte offset of the first byte in that entity.
     pub offset: u64,
+    /// Length of the range in bytes.
     pub bytes: usize,
 }
 
 impl SourceRange {
-    pub fn end(self) -> Result<u64> {
+    pub(crate) fn end(self) -> Result<u64> {
         self.offset
             .checked_add(u64::try_from(self.bytes).map_err(|_| Error::Overflow)?)
             .ok_or(Error::Overflow)
@@ -114,23 +102,53 @@ impl SourceRange {
 /// Source facts supplied by the format coordinator; neither is an I/O token.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SourceEpochs {
+    /// Advances at each accepted PCR discontinuity and each explicit stream
+    /// discontinuity; 0 for the initial time base.
     pub clock: u64,
+    /// Advances with each accepted program map, each PAT that changes the selected
+    /// program's PMT PID or transport stream ID, and each explicit stream discontinuity;
+    /// 0 before the first PAT.
     pub configuration: u64,
 }
 
 /// One parser poll produces at most one owned object and never performs source I/O.
 #[derive(Debug)]
 pub enum AssemblyStep<T> {
+    /// A completed object.
     Output(T),
+    /// The pushed payload is used up; push the next payload before polling again.
     NeedPayload,
+    /// The work grant is spent; poll again with a new grant.
     Yield,
+    /// The source has ended and every object has been returned.
     Finished,
 }
 
-pub(crate) const ELEMENTARY_PID_RANGE: std::ops::RangeInclusive<u16> = 0x0010..=0x1ffe;
+impl<T> AssemblyStep<T> {
+    /// The same step, with a completed object converted by `f`.
+    #[inline]
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> AssemblyStep<U> {
+        match self {
+            Self::Output(output) => AssemblyStep::Output(f(output)),
+            Self::NeedPayload => AssemblyStep::NeedPayload,
+            Self::Yield => AssemblyStep::Yield,
+            Self::Finished => AssemblyStep::Finished,
+        }
+    }
+}
+
+/// Fails with `error` at a state that the operation's own earlier steps exclude.
+///
+/// Out of line and cold, as a panic is: the same error written inline changes how the
+/// surrounding loop is compiled (+0.9% on DTS reads at the framer dispatch).
+#[cold]
+#[inline(never)]
+pub(crate) fn refuse<T>(error: Error) -> Result<T> {
+    Err(error)
+}
 
 pub(crate) fn checked_pid(pid: u16) -> Result<()> {
-    if pid > 0x1ffe {
+    if pid >= transport::pid::NULL {
         Err(Error::Invalid("assembly PID"))
     } else {
         Ok(())
@@ -142,6 +160,15 @@ pub(crate) fn table_storage<T>(table: &BudgetVec<T>) -> Result<usize> {
         .capacity()
         .checked_mul(size_of::<T>())
         .ok_or(Error::Overflow)
+}
+
+/// Whether an operation that failed with `error` can be retried unchanged: the pool
+/// was full, an allocation failed or the caller cancelled.
+pub(crate) fn retryable(error: Error) -> bool {
+    matches!(
+        error,
+        Error::Backpressure(..) | Error::Allocation | Error::Cancelled
+    )
 }
 
 pub(crate) fn limit(requested: usize, maximum: usize) -> Error {

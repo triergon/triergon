@@ -4,9 +4,9 @@ The source in this package is available under your choice of MIT or
 Apache-2.0. The two complete licence texts follow.
 
 Most modules outside src/bidi are Rust translations of HarfBuzz 14.6.0, or
-tables generated from its source files, and the font functions in
-src/metrics.rs and the rotation decisions in src/rotations.rs follow libass
-0.17.5. Those parts are also under the licence of the project they derive
+tables generated from its source files, and the font functions and rotation
+decisions in src/compat/libass.rs and src/compat/libass/ follow libass 0.17.5.
+Those parts are also under the licence of the project they derive
 from: HarfBuzz's "Old MIT" licence and libass's ISC licence, whose notices
 follow the two licence texts. The derived modules are listed in
 docs/provenance.md:

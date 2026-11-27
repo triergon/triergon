@@ -26,7 +26,7 @@ name = "text_carriage"
 required-features = ["reference-trace"]
 
 [[test]]
-name = "text_carriage_native40"
+name = "text_carriage_recorded"
 required-features = ["reference-trace"]
 
 [[test]]

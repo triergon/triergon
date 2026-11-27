@@ -1,6 +1,6 @@
 //! DVB subtitle PES envelopes (EN 300 743, §§6.2 and 7.2).
 use super::{Piece, pes_storage::Storage};
-use crate::Pes;
+use crate::pes::{Pes, stream_id};
 use crate::reader::{DvbSubtitleTailPolicy, DvbSubtitleUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{BudgetVec, Bytes, Error, Result, WorkBudget};
@@ -22,6 +22,12 @@ impl Reader {
         }
     }
 
+    // `get_or_insert_with` and field reads with one cold refusal measured +0.59%: the MPEG video
+    // reader's `materialize` then inlines into `Lane::step`.
+    #[expect(
+        clippy::expect_used,
+        reason = "error returns +0.12 to +0.14%; typed staging +0.056 to +0.59%"
+    )]
     pub(super) fn step(
         &mut self,
         pieces: &BudgetVec<Piece>,
@@ -34,7 +40,7 @@ impl Reader {
             if !work.try_charge(1) {
                 return Ok(None);
             }
-            if pes.header.stream_id != 0xbd
+            if pes.header.stream_id != stream_id::PRIVATE_STREAM_1
                 || pes.header.declared_packet_length == 0
                 || !pes.header.data_alignment_indicator
                 || pes.header.pts_raw33.is_none()
@@ -215,6 +221,12 @@ impl Envelope {
         }
     }
 
+    // Cold refusals here and in `step` measured +0.19% (the MPEG video `materialize` inlines into
+    // `Lane::step`, 5,368 -> 5,898 instructions).
+    #[expect(
+        clippy::expect_used,
+        reason = "error returns +0.12 to +0.14%; cold refusals +0.19%"
+    )]
     fn materialize(
         &mut self,
         pes: &Pes,
@@ -276,7 +288,7 @@ impl Envelope {
         match self.buffer.take().expect("DVB subtitle buffer").freeze() {
             Ok(bytes) => Ok(Some(bytes)),
             Err(error) => {
-                self.buffer = Some(error.buffer);
+                self.buffer = Some(error.value);
                 Err(error.error)
             }
         }

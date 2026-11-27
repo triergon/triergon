@@ -8,7 +8,7 @@ mov_text sessions, ASS packets and documents the script authors itself:
 
 | Directory | Source |
 | --- | --- |
-| `mov-text/` | `crates/subtitles/tests/native-mov-text-fixtures/`: each case's extradata, packets, flushes, time base, frame size and clock from `PROVENANCE.json` |
+| `mov-text/` | `crates/subtitles/tests/mov-text-fixtures/`: each case's extradata, packets, flushes, time base, frame size and clock from `PROVENANCE.json` |
 | `mov-text-tags/` | the sessions `tx3g_sessions` authors, one per rule of the override tags the decoder writes where a style record or the highlight starts or ends: a sample description and samples with chosen `styl`, `hlit` and `hclr` boxes; clock 1/1000, PTS 1000, duration 2000 |
 | `tx3g/` | the samples and configurations each test in `crates/subtitles/tests/text_tx3g_semantics.rs` builds, recorded by running that test with `TRIERGON_TX3G_SAMPLES=SAMPLES`; consecutive repeats are folded into one packet, and each packet uses the tests' clock (1/90000, PTS 0, duration 135000) |
 | `charset/` | the label and packet of each case in `crates/subtitles/tests/receiver-mapping-data/cases74.rs`, clock 1/1000, PTS 1000, duration 2000 |

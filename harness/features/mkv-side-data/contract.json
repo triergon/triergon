@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "id": "mkv-side-data",
+  "gate": "required",
+  "operation": "mkv-side-data",
+  "candidate": "matroska-views-worker",
+  "worker_operation": "mkv-side-data-",
+  "corpus_directory": ".",
+  "contract": [
+    "Each side opens the same preloaded seekable file, reads every packet, folds the stream index and its published additions, and tears the reader down.",
+    "Kind 4 subtypes are opaque BlockAdditional wire bytes (including the 8-byte big-endian ID), LCEVC NAL bytes and HDR10+ fields, in that order.",
+    "HDR10+ rows contain application version, window count, targeted display luminance, targeted and mastering grids, and each window in order.",
+    "A grid contributes presence, dimensions and row-major samples over 15. A window contributes geometry presence, corners over 1 and ellipse fields when present, MaxSCL and average over 100000, then count and ordered percentile pairs, and bright-pixel fraction over 1000.",
+    "Tone-curve presence precedes both knee coordinates over 4095 and counted anchors over 1023. Saturation presence precedes weight over 8. Rationals fold numerator and denominator in that order.",
+    "Triergon derives the side data from each typed packet and checks the HDR result against the direct T.35 entry point. A terminal row distinguishes EOF from an input refusal."
+  ],
+  "required_profiles": [
+    "hdr-webm-00",
+    "hdr-matroska-01",
+    "hdr-webm-02",
+    "hdr-matroska-03",
+    "hdr-webm-04",
+    "hdr-matroska-05",
+    "hdr-webm-06",
+    "hdr-matroska-07",
+    "hdr-webm-08",
+    "hdr-matroska-09",
+    "hdr-webm-10",
+    "hdr-matroska-11",
+    "hdr-webm-12",
+    "hdr-matroska-13",
+    "hdr-webm-14",
+    "hdr-matroska-15",
+    "hdr-truncated",
+    "lcevc",
+    "mixed-hdr-opaque",
+    "laced-opaque-lcevc",
+    "laced-valid-opaque-lcevc",
+    "opaque-mapped",
+    "opaque-identity",
+    "opaque-default",
+    "opaque-empty",
+    "opaque-webm",
+    "opaque-unmapped"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "hdr-webm-00",
+        "hdr-matroska-01",
+        "hdr-webm-02",
+        "hdr-matroska-03",
+        "hdr-webm-04",
+        "hdr-matroska-05",
+        "hdr-webm-06",
+        "hdr-matroska-07",
+        "hdr-webm-08",
+        "hdr-matroska-09",
+        "hdr-webm-10",
+        "hdr-matroska-11",
+        "hdr-webm-12",
+        "hdr-matroska-13",
+        "hdr-webm-14",
+        "hdr-matroska-15",
+        "hdr-truncated",
+        "lcevc",
+        "mixed-hdr-opaque",
+        "laced-opaque-lcevc",
+        "laced-valid-opaque-lcevc",
+        "opaque-mapped",
+        "opaque-identity",
+        "opaque-default",
+        "opaque-empty",
+        "opaque-webm",
+        "opaque-unmapped"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "hdr-webm-00",
+        "hdr-matroska-01",
+        "hdr-webm-02",
+        "hdr-matroska-03",
+        "hdr-webm-04",
+        "hdr-matroska-05",
+        "hdr-webm-06",
+        "hdr-matroska-07",
+        "hdr-webm-08",
+        "hdr-matroska-09",
+        "hdr-webm-10",
+        "hdr-matroska-11",
+        "hdr-webm-12",
+        "hdr-matroska-13",
+        "hdr-webm-14",
+        "hdr-matroska-15",
+        "hdr-truncated",
+        "lcevc",
+        "mixed-hdr-opaque",
+        "laced-opaque-lcevc",
+        "laced-valid-opaque-lcevc",
+        "opaque-mapped",
+        "opaque-identity",
+        "opaque-default",
+        "opaque-empty",
+        "opaque-webm",
+        "opaque-unmapped"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "hdr-webm-00",
+        "hdr-matroska-01",
+        "hdr-webm-02",
+        "hdr-matroska-03",
+        "hdr-webm-04",
+        "hdr-matroska-05",
+        "hdr-webm-06",
+        "hdr-matroska-07",
+        "hdr-webm-08",
+        "hdr-matroska-09",
+        "hdr-webm-10",
+        "hdr-matroska-11",
+        "hdr-webm-12",
+        "hdr-matroska-13",
+        "hdr-webm-14",
+        "hdr-matroska-15",
+        "hdr-truncated",
+        "lcevc",
+        "mixed-hdr-opaque",
+        "laced-opaque-lcevc",
+        "laced-valid-opaque-lcevc",
+        "opaque-mapped",
+        "opaque-identity",
+        "opaque-default",
+        "opaque-empty",
+        "opaque-webm",
+        "opaque-unmapped"
+      ],
+      "cause": "Runtime, heap and total RSS have not yet been collected on the gate hosts."
+    }
+  ],
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-matroska-views-native",
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_policies": [
+    {
+      "policy": "Triergon refuses a truncated HDR10+ BlockAdditional",
+      "undecided": "RFC 9559 section 5.1.3.5.2 with BlockAddIDType 4 (section 5.1.4.1.17): the BlockAdditional is an ITU-T T.35 HDR10+ message, here cut after 13 bytes, inside its syntax.",
+      "rule": "Returns the first packet and the affected packet, then refuses with Truncated.",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Returns the first packet, then reports the end of the stream without the affected packet.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "hdr-truncated"
+      ]
+    },
+    {
+      "policy": "Triergon refuses two BlockMore elements with the same effective BlockAddID",
+      "undecided": "RFC 9559 section 5.1.3.5.2.3: each BlockAddID MUST be unique among the BlockMore elements of a BlockAdditions element, and an omitted BlockAddID is 1.",
+      "rule": "Returns the first packet, then refuses the BlockAdditions that repeats BlockAddID 1 with Invalid.",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Keeps the last BlockMore (last) and attaches it, with the LCEVC data, to both laces.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "laced-opaque-lcevc"
+      ]
+    },
+    {
+      "policy": "Triergon refuses a BlockAddID above the track maximum",
+      "undecided": "RFC 9559 section 5.1.4.1.16: MaxBlockAdditionID is the maximum BlockAddID of the track, default 0, where 0 means the track has no BlockAdditions; this file declares none and carries BlockMores with IDs 1, 2, 3 and 8.",
+      "rule": "Returns the first packet, then refuses the second with Invalid (BlockAddID exceeds track maximum).",
+      "documented": "crates/matroska/README.md#behaviour-and-limits",
+      "reference_rule": "Returns every packet and exports only the last BlockMore (ID 8, eight) on the second.",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "opaque-webm"
+      ]
+    }
+  ]
+}

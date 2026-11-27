@@ -14,15 +14,13 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_harness_protocol::digest::fold_bytes;
-use triergon_playback::{
-    Source, SourceReply,
-    ts_progressive::{
-        TsProgressiveLimits, TsProgressiveReader, TsProgressiveStep, TsProgressiveUnit,
-    },
+use triergon_hls::progressive::{
+    TsProgressiveLimits, TsProgressiveReader, TsProgressiveStep, TsProgressiveUnit,
 };
+use triergon_playback::{Source, SourceReply};
 
 pub const PREFIX: &str = "progressive-";
-const OP: &str = "ProgressiveAvcAacTsOwnedFeedV1";
+const OP: &str = "progressive-avc-aac-ts188";
 const WINDOW: usize = 4096;
 const DEPTH: usize = 2;
 const LIVE_BYTES: usize = 256 * 1024;
@@ -328,6 +326,7 @@ struct Work {
     digest: u64,
 }
 
+// One function on purpose: the timed operation of the progressive workloads; a split is a hot-path change not yet measured.
 fn operation(
     path: &Path,
     has_dts: bool,

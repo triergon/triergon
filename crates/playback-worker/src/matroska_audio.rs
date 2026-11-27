@@ -1,7 +1,7 @@
 //! Matroska audio startup and forward clocks through the playback engine: open a
 //! preloaded seekable input read in 4 KiB windows, discover the streams, bind every
 //! selected AAC-LC, AC-3 or E-AC-3 track to its feed, project the discovery prefix
-//! through `native_aac_clock_probe` or `native_dolby_clock_probe`, continue with the
+//! through `demux_aac_clock_probe` or `demux_dolby_clock_probe`, continue with the
 //! forward clock through the end of file and fold every selected packet with its
 //! native PTS, DTS and duration in nanoseconds.
 //!
@@ -12,20 +12,18 @@ use crate::matroska::{AVC_AAC, HEVC_DOLBY, WORK, ready};
 use crate::packet_fold::{Packet, Work, drive};
 use crate::runner::Result;
 use std::sync::atomic::AtomicBool;
+use triergon_bridge::matroska::{
+    MatroskaClock, MatroskaClockPrefix, MatroskaCompactDiscovery, MatroskaDiscoveryLimits,
+    MatroskaDiscoveryStep, MatroskaFeedSetup, MatroskaHevcDolbyFeed, MatroskaHevcDolbySetup,
+    MatroskaPacketTiming, MatroskaTrackFeed,
+};
 use triergon_core::container::{CodecId, MediaKind, TrackInfo};
 use triergon_core::{Budget, Bytes, SourceCapabilities, SourceId, WorkBudget};
 use triergon_matroska::{
-    matroska::LegacyAacProfile,
-    typed::{Configuration, Event, Packet as MatroskaPacket},
+    Configuration, Event as MkvEvent, LegacyAacProfile, TypedPacket as MatroskaPacket,
 };
 use triergon_playback::{
-    ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection,
-    io::SourceOwner,
-    matroska_feed::{
-        MatroskaClock, MatroskaClockPrefix, MatroskaCompactDiscovery, MatroskaDiscoveryLimits,
-        MatroskaDiscoveryStep, MatroskaFeedSetup, MatroskaHevcDolbyFeed, MatroskaHevcDolbySetup,
-        MatroskaPacketTiming, MatroskaTrackFeed,
-    },
+    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, SourceOwner,
 };
 
 pub const PREFIX: &str = "mkv-audio-";
@@ -52,7 +50,7 @@ impl Select {
     fn family(
         self,
         kind: MediaKind,
-        codec: CodecId<'_>,
+        codec: CodecId,
         legacy_aac: Option<LegacyAacProfile>,
     ) -> Option<Family> {
         match (kind, codec) {
@@ -86,15 +84,15 @@ enum Clock<'a> {
 }
 
 fn output_packet(output: &Output) -> Option<&MatroskaPacket> {
-    let RawEvent::Matroska(event) = output.event() else {
+    let Event::Matroska(event) = output.event() else {
         return None;
     };
     source_packet(event)
 }
 
-fn source_packet(event: &Event) -> Option<&MatroskaPacket> {
+fn source_packet(event: &MkvEvent) -> Option<&MatroskaPacket> {
     match event {
-        Event::Packet(packet) => Some(packet),
+        MkvEvent::Packet(packet) => Some(packet),
         _ => None,
     }
 }
@@ -151,10 +149,11 @@ fn feeds(
     Ok(feeds)
 }
 
+// One function on purpose: the timed operation of the Matroska audio workloads; a split is a hot-path change not yet measured.
 fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Result<Work> {
     let cancel = AtomicBool::new(false);
     let id = SourceId(41);
-    let engine = Engine::matroska(
+    let engine = Engine::matroska(triergon_matroska::Reader::new(
         pool,
         id,
         SourceCapabilities {
@@ -163,7 +162,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
         },
         triergon_matroska::Limits::default(),
         QUANTUM,
-    )?;
+    )?);
     let mut discovery = MatroskaCompactDiscovery::new(
         engine,
         SourceOwner::new(ByteSource::new(id, raw.clone(), QUANTUM)?),
@@ -181,7 +180,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
     let configuration = prefix
         .events()
         .find_map(|event| match event {
-            Event::Configuration(configuration) => Some(configuration),
+            MkvEvent::Configuration(configuration) => Some(configuration),
             _ => None,
         })
         .ok_or("no Matroska configuration before the first packet")?;
@@ -201,7 +200,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
             None => None,
             Some(Feed::Aac(feed)) => {
                 let mut probe = feed
-                    .native_aac_clock_probe(pool, count)?
+                    .demux_aac_clock_probe(pool, count)?
                     .ok_or("AAC clock probe")?;
                 for (ordinal, event) in prefix.events().enumerate() {
                     if source_packet(event).is_some_and(|p| p.packet.track == track) {
@@ -215,7 +214,7 @@ fn operation(pool: &Budget, raw: &Bytes, select: Select, mut work: Work) -> Resu
             }
             Some(Feed::Dolby(feed)) => {
                 let mut probe = feed
-                    .native_dolby_clock_probe(pool, count)?
+                    .demux_dolby_clock_probe(pool, count)?
                     .ok_or("Dolby clock probe")?;
                 for packet in prefix.events().filter_map(source_packet) {
                     if packet.packet.track == track {
@@ -301,7 +300,7 @@ pub fn operate(pool: &Budget, raw: &Bytes, argument: &str, work: Work) -> Result
 mod tests {
     use super::{Family, Select};
     use triergon_core::container::{CodecId, MediaKind};
-    use triergon_matroska::matroska::LegacyAacProfile;
+    use triergon_matroska::LegacyAacProfile;
 
     #[test]
     fn selection_follows_the_codec_family_the_reader_identifies() {
@@ -329,10 +328,7 @@ mod tests {
             assert_eq!(select.family(audio, CodecId::Eac3, None), dolby);
             assert_eq!(select.family(MediaKind::Video, CodecId::Aac, None), None);
             assert_eq!(select.family(audio, CodecId::Opus, None), None);
-            assert_eq!(
-                select.family(audio, CodecId::Other(b"A_AAC/MPEG4/LC/UNKNOWN"), None),
-                None
-            );
+            assert_eq!(select.family(audio, CodecId::Other, None), None);
         }
     }
 }

@@ -1,10 +1,10 @@
-mod common;
+use crate::common;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure, SourceId, Step,
     WorkBudget,
 };
-use triergon_isobmff::{Access, Sample, SampleReader};
+use triergon_isobmff::{Access, Sample, payload::SampleReader};
 
 fn sample(range: std::ops::Range<u64>) -> Sample {
     Sample {

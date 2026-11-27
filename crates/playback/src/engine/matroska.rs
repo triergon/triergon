@@ -1,0 +1,61 @@
+//! The Matroska engine: the reader's own steps.
+
+use crate::{Result, SeekIntent, TrackKey};
+use std::sync::atomic::AtomicBool;
+use triergon_core::container::{MediaKind, TrackInfo};
+use triergon_core::source::Provide;
+use triergon_core::{
+    Backpressure, Error, InputToken, InputWindow, SourceFailure, SourceId, Step, WorkBudget,
+};
+use triergon_matroska::{Event as MkvEvent, Reader};
+/// The Matroska reader as an engine: the engine of
+/// [`Engine::Matroska`](crate::Engine::Matroska).
+#[derive(Debug)]
+pub struct MkvEngine {
+    pub(crate) reader: Reader,
+    pub(crate) source: SourceId,
+}
+
+impl MkvEngine {
+    pub(crate) fn step(
+        &mut self,
+        w: &mut WorkBudget,
+        c: &AtomicBool,
+    ) -> Result<Step<MkvEvent, Backpressure>> {
+        self.reader.step(w, c)
+    }
+    /// Repositions the reader at the Cue of the video track before the target.
+    pub(crate) fn begin_seek(&mut self, intent: &SeekIntent) -> Result<()> {
+        let TrackKey::Matroska(number) = intent.track else {
+            return Err(Error::Invalid("seek track format"));
+        };
+        let at = self
+            .reader
+            .tracks()
+            .iter()
+            .position(|t| t.number == number && t.kind() == MediaKind::Video)
+            .ok_or(Error::Invalid("seek needs source video track"))?;
+        self.reader.seek_for_playback(
+            at,
+            intent
+                .target
+                .to_nanoseconds(triergon_core::Rounding::Floor)?,
+        )?;
+        Ok(())
+    }
+}
+
+impl Provide for MkvEngine {
+    #[inline]
+    fn provide(&mut self, window: &InputWindow) -> Result<()> {
+        self.reader.provide(window)
+    }
+    #[inline]
+    fn finish(&mut self, source: SourceId, token: InputToken) -> Result<()> {
+        self.reader.finish(source, token)
+    }
+    #[inline]
+    fn fail(&mut self, source: SourceId, token: InputToken, failure: SourceFailure) -> Result<()> {
+        self.reader.fail(source, token, failure)
+    }
+}

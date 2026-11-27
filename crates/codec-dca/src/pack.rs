@@ -4,7 +4,7 @@
 //! Every packing is normalized to the canonical 16-bit big-endian bitstream before
 //! parsing. Normalization reuses a caller-owned scratch buffer.
 
-use triergon_codec::{BudgetVec, StorageError};
+use triergon_codec::{BudgetVec, Error};
 
 /// Word packing of a DTS core frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,7 +50,7 @@ pub(crate) fn normalize<'a>(
     au: &[u8],
     packing: Packing,
     scratch: &'a mut BudgetVec<u8>,
-) -> Result<&'a [u8], StorageError> {
+) -> Result<&'a [u8], Error> {
     let len = match packing {
         Packing::Be16 => au.len(),
         Packing::Le16 => au.len() / 2 * 2,

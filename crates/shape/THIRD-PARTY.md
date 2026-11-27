@@ -44,6 +44,6 @@ The Unicode 17.0.0 and 18.0.0 data files are under the Unicode License V3. The U
 ## HarfBuzz and libass
 
 Most modules outside `src/bidi` are translations of HarfBuzz 14.6.0, or tables generated
-from its source files, and `src/metrics.rs` and `src/rotations.rs` follow libass 0.17.5.
+from its source files, and `src/compat/libass.rs` and `src/compat/libass/` follow libass 0.17.5.
 [LICENSE](LICENSE) holds both projects' notices, and
 [docs/provenance.md](../../docs/provenance.md) lists the modules.

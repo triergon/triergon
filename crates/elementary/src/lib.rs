@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,7 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 
 mod ac3;
 mod adts;
@@ -26,7 +26,7 @@ pub use ac3::Ac3;
 pub use adts::Adts;
 pub use blocking::BlockingReader;
 pub use flac::{Flac, FlacBlockKind, FlacMetadata, FlacSeekPoint};
-pub use mpeg::{Gapless, InfoFrame, MpegAudio};
+pub use mpeg::{InfoFrame, MpegAudio};
 pub use probe::{Kind, probe};
 pub use reader::{Format, Reader};
 pub use stream::{Limits, Packet, ReaderEvent, SeekDetail, TRACK, Track};

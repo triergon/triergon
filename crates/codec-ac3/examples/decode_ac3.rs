@@ -75,7 +75,7 @@ fn main() {
                 if first.is_none() {
                     first = Some((
                         info.sample_rate,
-                        triergon_codec_ac3::layout_name(&info.layout),
+                        info.layout.name(),
                         info.layout.speakers().iter().map(|s| s.name()).collect(),
                         info.layout.channels(),
                     ));

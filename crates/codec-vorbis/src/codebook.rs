@@ -15,7 +15,8 @@ use core::iter::repeat_n;
 use triergon_bitstream::{LsbReader, LsbWindow};
 use triergon_codec::{Budget, BudgetVec};
 
-use crate::{DecodeError, ilog};
+use crate::DecodeError;
+use crate::setup::ilog;
 
 /// Codeword lengths resolved by a single table lookup.
 const FAST_BITS: u32 = 10;

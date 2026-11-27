@@ -15,8 +15,9 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::fetch::{Source, Transport};
-use crate::json::Value;
-use crate::prepare::{PinnedRelease, output, run, unpack_release, verify_xz_tree};
+use crate::json::{self, Value};
+use crate::prepare::{PinnedRelease, unpack_release, verify_release_tree};
+use crate::process::{output, run};
 use crate::sha256;
 
 pub const CACHE: &str = ".research/libass";
@@ -101,7 +102,7 @@ fn configured(
 ) -> Result<(PathBuf, Value), String> {
     let wanted = Value::strings(argv.iter().cloned());
     let record = cache.join("configure-argv.json");
-    let current = crate::checks::read_json(&record).ok();
+    let current = json::read(&record).ok();
     let source = cache.join(LIBASS.directory);
     if current.as_ref() != Some(&wanted) && source.exists() {
         fs::remove_dir_all(&source).map_err(|e| format!("{}: {e}", source.display()))?;
@@ -112,7 +113,7 @@ fn configured(
             .args(&argv[1..])
             .env("PKG_CONFIG_LIBDIR", pkgconfig)
             .current_dir(&source))?;
-        crate::corpus::write_json(&record, &wanted)?;
+        json::write(&record, &wanted)?;
     }
     Ok((source, wanted))
 }
@@ -150,7 +151,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
     let mut dependencies = Vec::new();
     for (profile, command, files) in DEPENDENCIES {
         let build = root.join(profile).join("build.json");
-        let recorded = crate::checks::read_json(&build)
+        let recorded = json::read(&build)
             .map_err(|_| format!("{profile}: not built; run `{command}` first"))?;
         for file in files {
             let from = root.join(profile).join("install/lib/pkgconfig").join(file);
@@ -166,7 +167,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
             .args(target)
             .current_dir(&source))?;
     }
-    verify_xz_tree(&cache.join(LIBASS.file), &cache)?;
+    verify_release_tree(&cache.join(LIBASS.file), &cache)?;
 
     // The private headers and flags of the internal stages the worker calls.
     let cflags = library_cflags(&source)?;
@@ -220,7 +221,7 @@ pub fn prepare(root: &Path, jobs: u32, net: &dyn Transport) -> Result<PathBuf, S
         ),
     ]);
     let path = cache.join("build.json");
-    crate::corpus::write_json(&path, &manifest)?;
+    json::write(&path, &manifest)?;
     Ok(path)
 }
 

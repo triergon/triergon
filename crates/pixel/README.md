@@ -3,10 +3,15 @@
 Picture types and the fixed pixel conversions shared by the capture, playback and
 subtitle sides: borrowed views of decoded pictures, a macroblock-aligned YUV 4:2:0
 picture, RGBA → YUV 4:2:0 with ITU-R BT.601 coefficients, a letterbox that converts a
-decoded 4:2:0 picture into a 1920×1080 RGBA canvas exactly as FFmpeg's scale/pad
-chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel layer
-below the codec crates and depends only on `std`. It does no general scaling, colour
-management or other canvas sizes.
+decoded 4:2:0 picture into an RGBA canvas (1920×1080 by default) exactly as FFmpeg's
+scale/pad chain does, and the Y'CbCr → RGB of subtitle palette entries. It is the pixel
+layer below the codec crates and depends only on `std`. It does no other scaling and no
+colour management.
+
+The conversions are reproductions: the letterbox, the RGBA → YUV filters and the palette
+rounding give FFmpeg's results bit for bit, because no specification defines a scaler's
+taps or rounding. With no specification form to keep apart from them, they live at the
+crate root rather than in a `compat` module.
 
 ## Usage
 
@@ -14,11 +19,11 @@ RGBA in, coded YUV 4:2:0 out (the encoder input of
 [triergon-codec-mpeg1](../codec-mpeg1/README.md)):
 
 ```rust
-use triergon_pixel::{Converter, Geometry, Orientation, Picture};
+use triergon_pixel::{Converter, MacroblockGeometry, Orientation, CodedPicture};
 
-let geometry = Geometry::new(960, 540)?;           // even, 2..=4094
+let geometry = MacroblockGeometry::new(960, 540)?;           // even, 2..=4094
 let rgba = vec![128u8; geometry.rgba_len()];        // the caller's frame: mid grey
-let mut picture = Picture::new(geometry);
+let mut picture = CodedPicture::new(geometry);
 let mut converter = Converter::new(geometry);       // reusable scratch
 converter.convert(&rgba, Orientation::BottomUp, &mut picture)?;
 // picture.y(), cb(), cr(): coded planes, strides geometry.luma_stride() / chroma_stride()
@@ -27,14 +32,14 @@ assert!(picture.cb().iter().chain(picture.cr()).all(|&c| c == 128)); // grey sta
 ```
 
 `rgba_to_yuv420(&rgba, orientation, &mut picture)` is the same conversion with its
-own scratch. `Picture::visible_yuv420()` packs the visible planes (Y, Cb, Cr) for
+own scratch. `CodedPicture::visible_yuv420()` packs the visible planes (Y, Cb, Cr) for
 comparisons.
 
 Decoded picture in, letterboxed RGBA out:
 
 ```rust
-use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler, fit};
-use triergon_pixel::{Colour, PictureView, Plane};
+use triergon_pixel::letterbox::{Canvas, Scaler};
+use triergon_pixel::{Colour, PictureView, Plane, SampleAspectRatio};
 
 // A 64x36 8-bit 4:2:0 picture, lent the way a decoder lends its output.
 let (luma, chroma) = (vec![235u8; 64 * 36], vec![128u8; 32 * 18]);
@@ -48,13 +53,14 @@ let view = PictureView {
         Plane::U8 { data: &chroma, stride: 32, offset: 0 },
     ],
     pts: None,
-    sar: (1, 1),
+    sar: Some(SampleAspectRatio::SQUARE),
     colour: Colour { matrix: 1, full_range: false },
 };
-let mut scaler = Scaler::default();                 // caches per-geometry filter plans
-let mut canvas = vec![0u8; CANVAS_BYTES];
-scaler.letterbox(&view, &mut canvas);               // writes the whole canvas
-let placed = fit(view.width, view.height);          // Fit { width, height, x, y }
+let canvas = Canvas::default();                     // 1920x1080; Canvas::new(w, h) for another size
+let mut scaler = Scaler::new(canvas);               // caches per-geometry filter plans
+let mut rgba = vec![0u8; canvas.bytes()];
+scaler.letterbox(&view, &mut rgba);                 // writes the whole canvas
+let placed = canvas.fit(view.width, view.height);   // Fit { width, height, x, y }
 assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0));
 ```
 
@@ -62,8 +68,8 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 
 | Area | Coverage |
 |---|---|
-| Picture views | `PictureView`: cropped `width`/`height`, `bit_depth`, three `Plane`s (`U8` or `U16` samples with `stride` and `offset`), caller `pts`, `sar`, `Colour` (H.273 `matrix` code and `full_range`) |
-| Coded picture | `Picture` at the macroblock-aligned size of a `Geometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
+| Picture views | `PictureView`: cropped `width`/`height`, `bit_depth`, three `Plane`s (`U8` or `U16` samples with `stride` and `offset`), caller `pts`, `sar` (`Option<SampleAspectRatio>`), `Colour` (H.273 `matrix` code and `full_range`) |
+| Coded picture | `CodedPicture` at the macroblock-aligned size of a `MacroblockGeometry`; padding replicates the nearest visible edge sample (`pad_edges`) |
 | RGBA → YUV | BT.601 matrix, limited range (Y 16–235, Cb/Cr 16–240), alpha ignored; top-down or bottom-up rows (`Orientation`), read without a separate flip pass; width-dependent conversion or filtering at every width |
 | Letterbox input | 4:2:0, 8-bit and high bit depth (10-bit verified); limited and full range |
 | Palette Y'CbCr → RGB | `YcbcrMatrix::BT601` and `BT709`, studio range in, full range out, `ChannelRounding::Nearest` or `HalfDown`; `rgb(y, cr, cb, rounding)` gives `0xRRGGBB` |
@@ -71,7 +77,7 @@ assert_eq!((placed.width, placed.height, placed.x, placed.y), (1920, 1080, 0, 0)
 
 ## Behaviour and limits
 
-**Geometry.** `Geometry::new` accepts non-zero even sizes that fit the 12-bit MPEG-1
+**Macroblock geometry.** `MacroblockGeometry::new` accepts non-zero even sizes that fit the 12-bit MPEG-1
 size fields (at most 4094) and refuses others with `Error::Geometry`. The coded size
 rounds each dimension up to 16; `luma_stride` is `16 × macroblock_width()` and
 `chroma_stride` half of it.
@@ -112,8 +118,8 @@ and PGS subtitle decoders convert palette entries, and how its MP4 demuxer conve
 a DVD colour table (half a step below).
 
 **Letterbox.** `Scaler::letterbox` writes the complete canvas: opaque black padding and
-the fitted picture. It reproduces FFmpeg's
-`scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,format=rgba`
+the fitted picture. For a canvas of W×H it reproduces FFmpeg's
+`scale=W:H:force_original_aspect_ratio=decrease,pad=W:H:(ow-iw)/2:(oh-ih)/2,format=rgba`
 bit for bit:
 
 - `fit` scales the display size to fit, rounded to nearest; the offset is
@@ -126,8 +132,9 @@ bit for bit:
   32-byte aligned; the scaler widens the picture by the part of a left crop FFmpeg
   keeps, read from the plane `offset`.
 
-`letterbox` panics if the canvas is not exactly `CANVAS_BYTES` long. Plane data must
-cover the declared size and offsets. Filter plans are cached per width, height and
+`Canvas::new` refuses a side of zero or above `Canvas::MAX_SIDE` (65535). `letterbox`
+panics unless the RGBA slice is `Canvas::bytes()` long and the plane data covers the
+declared size and offsets. Filter plans are cached per width, height and
 bit depth.
 
 ## Conformance

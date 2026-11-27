@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::{child, roots};
 use std::{
     ops::Range,
@@ -6,12 +6,13 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, Limits, SampleStep,
+    BuildStatus, CursorStatus, Limits, Next,
+    boxes::BoxView,
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
-            DirectAssociation, DirectContext, DirectRead, DirectRecoveryProfile,
-            RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile, RunRecoveryTable,
+            DirectAssociation, DirectContext, DirectRead, RecoveryTrackHeader, RunRecoveryBuilder,
+            RunRecoveryTable,
         },
         seek::IndexLimits,
     },
@@ -27,7 +28,6 @@ fn parts(bytes: &[u8], pool: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Rang
         &child(&track, b"tkhd").unwrap(),
         &child(&mdia, b"mdhd").unwrap(),
         &child(&mdia, b"hdlr").unwrap(),
-        RunRecoveryProfile,
     )
     .unwrap();
     (
@@ -40,8 +40,7 @@ fn parts(bytes: &[u8], pool: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Rang
     )
 }
 fn build(raw: BoxView, p: &Budget) -> Result<RunRecoveryTable, Error> {
-    let mut b =
-        RunRecoveryBuilder::new_direct(raw, p.clone(), Limits::default(), DirectRecoveryProfile)?;
+    let mut b = RunRecoveryBuilder::new_direct(raw, p.clone(), Limits::default())?;
     for _ in 0..100_000 {
         if b.poll(&mut WorkBudget::new(1), &AtomicBool::new(false))? == BuildStatus::Ready {
             return b.finish();
@@ -61,8 +60,8 @@ fn positions(bytes: &[u8]) -> Vec<(u64, u64, i64)> {
             PacketLimits::default(),
             DirectContext {
                 physical_length: bytes.len() as u64,
+                read_position: m[0].start,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let mut rows = Vec::new();
@@ -93,7 +92,7 @@ fn strict_and_run_description_zero_rejections_are_unchanged() {
         common::table(raw.clone(), &p, 1).unwrap_err(),
         Error::Invalid("stsc order/count/description")
     );
-    let mut b = RunRecoveryBuilder::new(raw, p, Limits::default(), RunRecoveryProfile).unwrap();
+    let mut b = RunRecoveryBuilder::new(raw, p, Limits::default()).unwrap();
     assert_eq!(
         b.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Invalid("stsc order/count/description"))
@@ -124,9 +123,9 @@ fn raw_description_counts_ranges_and_configuration_are_not_repaired() {
     let mut raw_rows = Vec::new();
     loop {
         match source.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Yield => {}
-            SampleStep::End => break,
-            SampleStep::Sample(s) => raw_rows.push(s),
+            Next::Yield => {}
+            Next::End => break,
+            Next::Item(s) => raw_rows.push(s),
         }
     }
     assert_eq!(raw_rows.len(), 6);
@@ -141,8 +140,8 @@ fn raw_description_counts_ranges_and_configuration_are_not_repaired() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let mut n = 0;
@@ -184,27 +183,27 @@ fn source_declared_six_demux_observed_five_whole_positions() {
 fn following_row_count_controls_not_singleton_or_whole_chunk_drop() {
     for (b, want) in [
         (
-            include_bytes!("fixtures/recovery-v2/counts-2,2,2.mov").as_slice(),
+            include_bytes!("fixtures/direct-recovery/counts-2,2,2.mov").as_slice(),
             vec![675, 687, 699, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-3,1,2.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-3,1,2.mov"),
             vec![675, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-1,3,2.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-1,3,2.mov"),
             vec![675, 687, 699, 687, 699, 711],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-3,2,1.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-3,2,1.mov"),
             vec![675, 687, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-2,3,1.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-2,3,1.mov"),
             vec![675, 687, 699, 699, 711, 723],
         ),
         (
-            include_bytes!("fixtures/recovery-v2/counts-4,1,1.mov"),
+            include_bytes!("fixtures/direct-recovery/counts-4,1,1.mov"),
             vec![675, 723, 735],
         ),
     ] {
@@ -215,7 +214,7 @@ fn following_row_count_controls_not_singleton_or_whole_chunk_drop() {
 fn variable_size_prefix_is_demux_ordinal_not_source_payload_association() {
     assert_eq!(
         positions(include_bytes!(
-            "fixtures/recovery-v2/desc-zero-variable-sizes.mov"
+            "fixtures/direct-recovery/desc-zero-variable-sizes.mov"
         )),
         vec![
             (675, 5, 0),
@@ -229,7 +228,7 @@ fn variable_size_prefix_is_demux_ordinal_not_source_payload_association() {
 #[test]
 fn vfr_clock_prefix_is_read_from_raw_runs() {
     assert_eq!(
-        positions(include_bytes!("fixtures/recovery-v2/desc-zero-vfr.mov")),
+        positions(include_bytes!("fixtures/direct-recovery/desc-zero-vfr.mov")),
         vec![
             (715, 12, 0),
             (739, 12, 333),
@@ -243,11 +242,11 @@ fn vfr_clock_prefix_is_read_from_raw_runs() {
 fn noninitial_multiple_or_other_invalid_descriptions_remain_errors() {
     let p = Budget::new(1 << 20).unwrap();
     for b in [
-        include_bytes!("fixtures/recovery-v2/desc-1,0,1.mov").as_slice(),
-        include_bytes!("fixtures/recovery-v2/desc-0,0,0.mov"),
-        include_bytes!("fixtures/recovery-v2/desc-0,1,0.mov"),
-        include_bytes!("fixtures/recovery-v2/desc-2,1,1.mov"),
-        include_bytes!("fixtures/recovery-v2/desc-4294967295,1,1.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-1,0,1.mov").as_slice(),
+        include_bytes!("fixtures/direct-recovery/desc-0,0,0.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-0,1,0.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-2,1,1.mov"),
+        include_bytes!("fixtures/direct-recovery/desc-4294967295,1,1.mov"),
     ] {
         let (r, _, _) = parts(b, &p);
         assert!(build(r, &p).is_err());
@@ -277,8 +276,8 @@ fn outside_source_is_invalid_source_but_observed_forward_eof() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     loop {
@@ -309,8 +308,8 @@ fn invalid_index_positions_are_not_clipped_sorted_or_removed() {
             IndexLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let mut out = Vec::new();
@@ -346,7 +345,7 @@ fn invalid_index_positions_are_not_clipped_sorted_or_removed() {
 }
 #[test]
 fn far_seek_never_invents_clean_eof() {
-    let b = include_bytes!("fixtures/recovery-v2/offset-4294967295.mov");
+    let b = include_bytes!("fixtures/direct-recovery/offset-4294967295.mov");
     let p = Budget::new(1 << 20).unwrap();
     let (r, h, m) = parts(b, &p);
     let t = build(r, &p).unwrap();
@@ -358,8 +357,8 @@ fn far_seek_never_invents_clean_eof() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     loop {
@@ -372,8 +371,72 @@ fn far_seek_never_invents_clean_eof() {
     }
     assert_eq!(
         c.take_occurrence().unwrap().read,
-        DirectRead::UnreviewedSeekRefusal
+        DirectRead::ObservedSeekFailure
     );
+}
+/// The read of the first packet of `bytes`, whose first chunk starts past the end of the
+/// file, when the demuxer's input stands at `read_position`.
+fn first_read(bytes: &[u8], read_position: u64) -> DirectRead {
+    let p = Budget::new(1 << 20).unwrap();
+    let (r, h, m) = parts(bytes, &p);
+    let t = build(r, &p).unwrap();
+    let mut c = t
+        .direct_packet_cursor(
+            &p,
+            &h,
+            &m,
+            PacketLimits::default(),
+            DirectContext {
+                physical_length: bytes.len() as u64,
+                read_position,
+            },
+        )
+        .unwrap();
+    while c
+        .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
+        .unwrap()
+        != CursorStatus::Ready
+    {}
+    c.take_occurrence().unwrap().read
+}
+#[test]
+fn a_packet_past_the_end_is_read_forward_within_the_buffer_of_the_read_position() {
+    // The fixtures are 747 bytes long and their media data starts at 675; the name gives
+    // the first chunk's offset. From the media start the forward read reaches 675 + 32768.
+    let at = |name: &str| {
+        std::fs::read(format!(
+            "{}/tests/fixtures/direct-recovery/edge-{name}.mov",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap()
+    };
+    for (name, from_media_start, from_file_end) in [
+        (
+            "33443",
+            DirectRead::ObservedForwardEof,
+            DirectRead::ObservedForwardEof,
+        ),
+        (
+            "33444",
+            DirectRead::ObservedSeekFailure,
+            DirectRead::ObservedForwardEof,
+        ),
+        (
+            "33515",
+            DirectRead::ObservedSeekFailure,
+            DirectRead::ObservedForwardEof,
+        ),
+        (
+            "33516",
+            DirectRead::ObservedSeekFailure,
+            DirectRead::ObservedSeekFailure,
+        ),
+    ] {
+        let bytes = at(name);
+        assert_eq!(bytes.len(), 747);
+        assert_eq!(first_read(&bytes, 675), from_media_start, "{name}");
+        assert_eq!(first_read(&bytes, 747), from_file_end, "{name}");
+    }
 }
 #[test]
 fn zero_work_yields_cancel_is_sticky_even_ready() {
@@ -388,8 +451,8 @@ fn zero_work_yields_cancel_is_sticky_even_ready() {
             PacketLimits::default(),
             DirectContext {
                 physical_length: 747,
+                read_position: 675,
             },
-            DirectRecoveryProfile,
         )
         .unwrap();
     let cancel = AtomicBool::new(false);
@@ -419,6 +482,7 @@ fn source_limits_and_index_limits_are_not_waived() {
     let t = build(r, &p).unwrap();
     let ctx = DirectContext {
         physical_length: 747,
+        read_position: 675,
     };
     assert!(matches!(
         t.direct_packet_cursor(
@@ -429,8 +493,7 @@ fn source_limits_and_index_limits_are_not_waived() {
                 max_source_samples: 5,
                 ..PacketLimits::default()
             },
-            ctx,
-            DirectRecoveryProfile
+            ctx
         ),
         Err(Error::Limit { .. })
     ));
@@ -444,7 +507,6 @@ fn source_limits_and_index_limits_are_not_waived() {
                 ..IndexLimits::default()
             },
             ctx,
-            DirectRecoveryProfile,
         )
         .unwrap();
     loop {
@@ -486,8 +548,8 @@ fn direct_iteration_does_not_allocate_and_raw_backing_survives_close() {
                 PacketLimits::default(),
                 DirectContext {
                     physical_length: 747,
+                    read_position: 675,
                 },
-                DirectRecoveryProfile,
             )
             .unwrap();
         loop {
@@ -519,14 +581,14 @@ fn direct_description_cannot_enter_the_run_cursor_surface() {
     assert!(matches!(
         t.packet_cursor(&p, &h, &m, PacketLimits::default()),
         Err(Error::Unsupported(
-            "initial-description recovery requires explicit v2 cursor"
+            "initial-description recovery requires the direct packet cursor"
         ))
     ));
     assert_eq!(p.used(), before);
     assert!(matches!(
         t.index_cursor(&p, &h, &m, IndexLimits::default()),
         Err(Error::Unsupported(
-            "initial-description recovery requires explicit v2 cursor"
+            "initial-description recovery requires the direct packet cursor"
         ))
     ));
     assert_eq!(p.used(), before);

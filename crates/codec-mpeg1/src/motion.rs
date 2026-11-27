@@ -10,12 +10,13 @@
 //! samples) adds coarse candidates, followed by a full-sample diamond and a
 //! half-sample refinement, all on SAD plus a rate term.
 
-use triergon_pixel::Geometry;
+use crate::planes::samples;
+use triergon_pixel::MacroblockGeometry;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Mv {
-    pub x: i32,
-    pub y: i32,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
 }
 
 impl Mv {
@@ -39,7 +40,7 @@ pub(crate) struct Bounds {
 
 impl Bounds {
     /// `range` caps |component| (half-samples) to what the f_code can code.
-    pub(crate) fn new(g: &Geometry, mb_x: usize, mb_y: usize, range: i32) -> Bounds {
+    pub(crate) fn new(g: &MacroblockGeometry, mb_x: usize, mb_y: usize, range: i32) -> Bounds {
         let (w, h) = (
             (g.macroblock_width() * 16) as i32,
             (g.macroblock_height() * 16) as i32,
@@ -83,7 +84,7 @@ pub(crate) fn decimate4(plane: &[u8], stride: usize, rows: usize, out: &mut [u8]
 
 #[inline]
 fn byte_pairs(bytes: &[u8]) -> u32 {
-    let word = u32::from_ne_bytes(bytes.try_into().expect("four luma samples"));
+    let word = u32::from_ne_bytes(*samples::<4>(bytes, 0));
     const LOW_BYTES: u32 = 0x00ff_00ff;
     (word & LOW_BYTES) + ((word >> 8) & LOW_BYTES)
 }
@@ -103,12 +104,6 @@ fn accumulate(acc: &mut [u16; 16], a: &[u8; 16], b: &[u8; 16]) {
     }
 }
 
-/// The 16 samples of `plane` at `at`.
-#[inline(always)]
-fn row16(plane: &[u8], at: usize) -> &[u8; 16] {
-    plane[at..][..16].try_into().expect("16 samples")
-}
-
 /// SAD of two 16×16 blocks.
 ///
 /// The SADs are kept out of line: inlined into the search, the sums of their
@@ -120,8 +115,8 @@ pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride:
     for row in 0..16 {
         accumulate(
             &mut acc,
-            row16(cur, row * cur_stride),
-            row16(reference, row * ref_stride),
+            samples::<16>(cur, row * cur_stride),
+            samples::<16>(reference, row * ref_stride),
         );
     }
     lane_sum(&acc)
@@ -131,7 +126,7 @@ pub(crate) fn sad16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride:
 /// the 16 columns, with at most 16,320 in the 16-bit total.
 #[inline(always)]
 fn sad4([a0, a1, a2, a3]: &[[u8; 16]; 4], reference: &[u8], stride: usize) -> u32 {
-    let [b0, b1, b2, b3] = std::array::from_fn(|r| row16(reference, r * stride));
+    let [b0, b1, b2, b3] = std::array::from_fn(|r| samples::<16>(reference, r * stride));
     let total = (0..16)
         .map(|i| {
             u16::from(a0[i].abs_diff(b0[i]))
@@ -196,21 +191,21 @@ fn sad16_half(
 /// operand a plain vector. Averages round half up (MPEG-1).
 #[inline(always)]
 fn half_row<const HX: bool, const HY: bool>(plane: &[u8], at: usize, stride: usize) -> [u8; 16] {
-    let p0 = row16(plane, at);
+    let p0 = samples::<16>(plane, at);
     match (HX, HY) {
         (false, false) => *p0,
         (true, false) => {
-            let p1 = row16(plane, at + 1);
+            let p1 = samples::<16>(plane, at + 1);
             std::array::from_fn(|i| ((u16::from(p0[i]) + u16::from(p1[i]) + 1) >> 1) as u8)
         }
         (false, true) => {
-            let q0 = row16(plane, at + stride);
+            let q0 = samples::<16>(plane, at + stride);
             std::array::from_fn(|i| ((u16::from(p0[i]) + u16::from(q0[i]) + 1) >> 1) as u8)
         }
         (true, true) => {
-            let p1 = row16(plane, at + 1);
-            let q0 = row16(plane, at + stride);
-            let q1 = row16(plane, at + stride + 1);
+            let p1 = samples::<16>(plane, at + 1);
+            let q0 = samples::<16>(plane, at + stride);
+            let q1 = samples::<16>(plane, at + stride + 1);
             std::array::from_fn(|i| {
                 let s = u16::from(p0[i]) + u16::from(p1[i]) + u16::from(q0[i]) + u16::from(q1[i]);
                 ((s + 2) >> 2) as u8
@@ -224,12 +219,8 @@ fn half_row<const HX: bool, const HY: bool>(plane: &[u8], at: usize, stride: usi
 pub(crate) fn sse16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride: usize) -> u32 {
     let mut acc = [0u32; 16];
     for row in 0..16 {
-        let a: &[u8; 16] = cur[row * cur_stride..row * cur_stride + 16]
-            .try_into()
-            .unwrap();
-        let b: &[u8; 16] = reference[row * ref_stride..row * ref_stride + 16]
-            .try_into()
-            .unwrap();
+        let a = samples::<16>(cur, row * cur_stride);
+        let b = samples::<16>(reference, row * ref_stride);
         for i in 0..16 {
             let d = a[i].abs_diff(b[i]) as u32;
             acc[i] += d * d;
@@ -241,7 +232,6 @@ pub(crate) fn sse16(cur: &[u8], cur_stride: usize, reference: &[u8], ref_stride:
 /// Predict a `N`×`N` block at half-sample vector `(vx, vy)` relative to
 /// sample position `(x, y)` of `plane`. Averages round half up (MPEG-1).
 #[inline]
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn predict<const N: usize>(
     plane: &[u8],
     stride: usize,
@@ -340,27 +330,32 @@ pub(crate) fn component_bits(delta: i32, f_code: u32) -> u32 {
         return 1;
     }
     let code = (((delta.abs() - 1) >> r_size) + 1).min(16) as usize;
-    super::tables::MOTION_CODE[code].1 + 1 + r_size
+    crate::tables::MOTION_CODE[code].1 + 1 + r_size
 }
 
 /// Coarse-level inputs: decimated current and reference luma.
 pub(crate) struct Coarse<'a> {
-    pub cur: &'a [u8],
-    pub reference: &'a [u8],
-    pub width: usize,
+    pub(crate) cur: &'a [u8],
+    pub(crate) reference: &'a [u8],
+    pub(crate) width: usize,
 }
 
 /// Searches one 16×16 luma block of `cur` against `reference`.
 pub(crate) struct Search<'a> {
-    pub cur: &'a [u8],
-    pub reference: &'a [u8],
-    pub stride: usize,
-    pub x: usize,
-    pub y: usize,
-    pub bounds: Bounds,
-    pub pred: Mv,
-    pub lambda: u32,
-    pub f_code: u32,
+    pub(crate) cur: &'a [u8],
+    pub(crate) reference: &'a [u8],
+    /// Stride of both planes.
+    pub(crate) stride: usize,
+    /// Top-left sample of the block.
+    pub(crate) x: usize,
+    pub(crate) y: usize,
+    pub(crate) bounds: Bounds,
+    /// The vector predictor a candidate's bits are counted from.
+    pub(crate) pred: Mv,
+    /// Weight of one vector bit against one unit of SAD.
+    pub(crate) lambda: u32,
+    /// forward_f_code the vector bits are counted with.
+    pub(crate) f_code: u32,
 }
 
 /// A predictor this good (mean absolute error ≤ 1) ends the search.
@@ -426,7 +421,7 @@ impl Search<'_> {
         }
         // Every remaining candidate compares against these same source rows.
         let start = self.y * self.stride + self.x;
-        let cur = std::array::from_fn(|row| *row16(self.cur, start + row * self.stride));
+        let cur = std::array::from_fn(|row| *samples::<16>(self.cur, start + row * self.stride));
         // Evaluates a full-sample candidate and returns its cost (exact when
         // it beats the best, otherwise only a lower bound; u32::MAX when not
         // evaluated).
@@ -692,11 +687,11 @@ mod tests {
         let stride = 32;
         let plane: Vec<u8> = (0..17 * stride).map(|i| (i * 73 + i / 9) as u8).collect();
         let reference = &plane[3..];
-        let cur = std::array::from_fn(|r| *row16(&plane, r * stride + 11));
+        let cur = std::array::from_fn(|r| *samples::<16>(&plane, r * stride + 11));
         let mut prefixes = [0u32; 4];
         let mut total = 0;
         for (r, row) in cur.iter().enumerate() {
-            for (a, b) in row.iter().zip(row16(reference, r * stride)) {
+            for (a, b) in row.iter().zip(samples::<16>(reference, r * stride)) {
                 total += u32::from(a.abs_diff(*b));
             }
             if r % 4 == 3 {
@@ -714,7 +709,7 @@ mod tests {
 
     #[test]
     fn bounds_keep_blocks_inside() {
-        let g = Geometry::new(64, 48).unwrap();
+        let g = MacroblockGeometry::new(64, 48).unwrap();
         let b = Bounds::new(&g, 0, 0, 256);
         assert!(b.contains(Mv { x: 0, y: 0 }));
         assert!(!b.contains(Mv { x: -1, y: 0 }));
@@ -739,7 +734,7 @@ mod tests {
 
     #[test]
     fn search_finds_a_translation() {
-        let g = Geometry::new(128, 96).unwrap();
+        let g = MacroblockGeometry::new(128, 96).unwrap();
         let stride = g.luma_stride();
         let texture = |x: usize, y: usize| {
             let (x, y) = (x as f64, y as f64);

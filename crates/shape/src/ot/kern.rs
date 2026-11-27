@@ -1,11 +1,20 @@
 //! The legacy `kern` table, applied the way HarfBuzz applies it when GPOS has no
 //! kerning: format 0 pair subtables over adjacent non-mark glyphs in visual
 //! order, each kerning value split between the two glyphs.
+//!
+//! `triergon-font`'s `kern` reader gives FreeType's pair values instead: it
+//! reads at most 32 subtables, skips minimum ones and those of other formats,
+//! ignores the cross-stream bit, honours the override bit, searches unordered
+//! pairs linearly and reads Apple's version 1 table as empty. This one applies
+//! every horizontal subtable, refuses other formats, cross-stream subtables
+//! and Apple's table, and bisects the pairs whatever their order.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::apply::{Apply, Next, Values};
-use super::data::{Data, bsearch};
+use super::data::Data;
 use super::layout::LookupFlags;
 use triergon_core::{Error, Result};
+use triergon_font::read::bsearch;
 
 /// The OpenType (Microsoft) `kern` table.
 #[derive(Clone, Copy, Debug, Default)]
@@ -135,7 +144,7 @@ pub(crate) fn kern_machine(
         let kern = value(infos[idx].glyph, infos[j].glyph);
         if kern != 0 {
             let kern = if scale {
-                ctx.font.em_scale_x(kern)
+                ctx.font.em.scale_x(kern)
             } else {
                 kern
             };

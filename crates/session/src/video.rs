@@ -1,22 +1,30 @@
-//! Video lane: Annex-B access units in, one clock-gated 1920x1080 RGBA picture out.
+//! Video lane: Annex-B access units in, one clock-gated RGBA picture out, letterboxed into
+//! the lane's canvas (1920x1080 unless chosen otherwise).
 //!
 //! Each picture keeps the timestamp its access unit carried through the
 //! decoder's reordering. The lane holds at most one converted picture ahead of
 //! the clock and publishes it once the clock reaches its PTS.
 use crate::SessionState;
-use crate::queue::{FeedError, QueueLimits, UnitQueue};
+use crate::lane::{OnRefusal, Phase, Refusals};
+use crate::queue::{FeedError, QueueLimits, UnitQueue, packet_pts};
 use std::sync::Arc;
-use triergon_codec::VideoDecoder;
-use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_codec::{DynVideoDecoder, Error};
+use triergon_core::container::PacketInfo;
+use triergon_pixel::letterbox::{Canvas, Scaler};
 
 /// The current picture for the compositor. `sequence` increases for every
 /// publication of this session object, across generations, so a texture cache
 /// never mistakes a new stream's first picture for an old one.
 #[derive(Clone, Debug)]
 pub struct Published {
+    /// Increases with every picture this session publishes.
     pub sequence: u64,
+    /// The session's [`generation`](VideoSession::generation) when it was published.
     pub generation: u64,
+    /// The PTS of the picture's access unit, in nanoseconds on the caller's clock.
     pub pts: Option<i64>,
+    /// The letterboxed picture: the session's [`Canvas`] of RGBA, rows top to bottom, no
+    /// padding.
     pub rgba: Arc<Vec<u8>>,
 }
 
@@ -26,8 +34,10 @@ struct Ahead {
     rgba: Vec<u8>,
 }
 
+/// The video lane of a playback session: a bounded queue of Annex-B access units, a
+/// decoder, and the letterboxed picture the caller's clock has reached.
 pub struct VideoSession {
-    decoder: Option<Box<dyn VideoDecoder>>,
+    decoder: Option<Box<DynVideoDecoder>>,
     queue: UnitQueue,
     scaler: Scaler,
     ahead: Option<Ahead>,
@@ -35,43 +45,61 @@ pub struct VideoSession {
     latest: Option<Published>,
     generation: u64,
     sequence: u64,
-    ended: bool,
-    drained: bool,
-    failure: Option<String>,
+    phase: Phase,
+    refusals: Refusals,
+}
+
+impl core::fmt::Debug for VideoSession {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("VideoSession")
+            .field("state", &self.state())
+            .field("generation", &self.generation)
+            .field("sequence", &self.sequence)
+            .field("refusals", &self.refusals)
+            .finish_non_exhaustive()
+    }
 }
 
 impl VideoSession {
+    /// An idle lane whose queue holds at most `limits`, publishing pictures on the
+    /// default 1920x1080 canvas. A refused access unit fails it ([`OnRefusal::Fail`]).
     pub fn new(limits: QueueLimits) -> Self {
+        Self::with_canvas(limits, Canvas::default())
+    }
+    /// [`new`](Self::new) with pictures letterboxed into `canvas`.
+    pub fn with_canvas(limits: QueueLimits, canvas: Canvas) -> Self {
         Self {
             decoder: None,
             queue: UnitQueue::new(limits),
-            scaler: Scaler::default(),
+            scaler: Scaler::new(canvas),
             ahead: None,
             spare: None,
             latest: None,
             generation: 0,
             sequence: 0,
-            ended: false,
-            drained: false,
-            failure: None,
+            phase: Phase::Open,
+            refusals: Refusals::default(),
         }
     }
-    /// A new stream: old input, decoder state and picture go.
-    pub fn load(&mut self, decoder: Box<dyn VideoDecoder>) {
-        self.reset(true);
-        self.decoder = Some(decoder);
+    /// This lane, doing what `policy` says when its decoder refuses an access unit.
+    #[must_use]
+    pub fn on_refusal(mut self, policy: OnRefusal) -> Self {
+        self.refusals.policy = policy;
+        self
     }
-    /// Seek/flush: the fed timeline restarts; the last picture stays on screen.
+    /// A new stream: old input, decoder state and picture go and `decoder` takes over;
+    /// `None` unloads the lane ([`SessionState::Idle`]).
+    pub fn load(&mut self, decoder: Option<Box<DynVideoDecoder>>) {
+        self.reset(true);
+        self.decoder = decoder;
+    }
+    /// Seek: queued input is discarded and the decoder drops its state but its parameter
+    /// sets; the lane keeps its decoder, and the last picture stays on screen.
     pub fn flush(&mut self) {
         self.reset(false);
         if let Some(decoder) = self.decoder.as_mut() {
             decoder.reset();
         }
-    }
-    /// Unload/destroy: no stream and no picture.
-    pub fn stop(&mut self) {
-        self.reset(true);
-        self.decoder = None;
     }
     fn reset(&mut self, clear_picture: bool) {
         self.generation += 1;
@@ -79,30 +107,38 @@ impl VideoSession {
         if let Some(ahead) = self.ahead.take() {
             self.spare = Some(ahead.rgba);
         }
-        self.ended = false;
-        self.drained = false;
-        self.failure = None;
+        self.phase = Phase::Open;
+        self.refusals.clear();
         if clear_picture {
             self.latest = None;
         }
     }
+    /// The canvas its pictures are letterboxed into.
+    pub fn canvas(&self) -> Canvas {
+        self.scaler.canvas()
+    }
+    /// Increases with every [`load`](Self::load) and [`flush`](Self::flush).
     pub fn generation(&self) -> u64 {
         self.generation
     }
+    /// Queue one Annex-B access unit with its PTS in nanoseconds on the caller's clock
+    /// (`None` when unknown), the clock [`step`](Self::step) is given. Refused as
+    /// [`AudioSession::feed`](crate::AudioSession::feed) refuses.
     pub fn feed(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
-        if self.decoder.is_none() || self.failure.is_some() {
-            return Err(FeedError::Idle);
-        }
-        if self.ended {
-            return Err(FeedError::Invalid);
-        }
+        self.phase.admit(self.decoder.is_some())?;
         self.queue.push(au, pts)
+    }
+    /// Queue an Annex B packet, rounding its PTS down to nanoseconds and preserving
+    /// an absent PTS. A PTS outside `i64` nanoseconds is [`FeedError::Invalid`].
+    /// Other refusals follow [`Self::feed`].
+    pub fn feed_packet(&mut self, packet: &impl PacketInfo) -> Result<(), FeedError> {
+        self.feed(packet.payload(), packet_pts(packet)?)
     }
     /// No more input for this generation: the decoder drains and the lane
     /// reports `Ended` once every picture has been published.
     pub fn end_of_stream(&mut self) {
-        if self.decoder.is_some() && !self.ended {
-            self.ended = true;
+        if self.decoder.is_some() && self.phase == Phase::Open {
+            self.phase = Phase::Ending;
         }
     }
     /// Bounded work: decode until one picture waits ahead of the clock or the
@@ -110,15 +146,14 @@ impl VideoSession {
     /// Returns true when a new picture was published.
     pub fn step(&mut self, clock_ns: Option<i64>) -> bool {
         self.fill_ahead();
-        let due = self.ahead.as_ref().is_some_and(|ahead| {
+        let due = |ahead: &mut Ahead| {
             ahead
                 .pts
                 .is_none_or(|pts| clock_ns.is_none_or(|clock| clock >= pts))
-        });
-        if !due {
+        };
+        let Some(ahead) = self.ahead.take_if(due) else {
             return false;
-        }
-        let ahead = self.ahead.take().expect("due picture");
+        };
         let previous = self.latest.take();
         self.sequence += 1;
         self.latest = Some(Published {
@@ -137,10 +172,10 @@ impl VideoSession {
         let Some(decoder) = self.decoder.as_mut() else {
             return;
         };
-        while self.ahead.is_none() && self.failure.is_none() {
+        while self.ahead.is_none() && !matches!(self.phase, Phase::Failed(_)) {
             if let Some(view) = decoder.receive() {
                 let mut rgba = self.spare.take().unwrap_or_default();
-                rgba.resize(CANVAS_BYTES, 0);
+                rgba.resize(self.scaler.canvas().bytes(), 0);
                 self.scaler.letterbox(&view, &mut rgba);
                 self.ahead = Some(Ahead {
                     pts: view.pts,
@@ -150,29 +185,38 @@ impl VideoSession {
             }
             match self.queue.pop() {
                 Some(unit) => {
-                    if let Err(error) = decoder.send(&unit.data, unit.pts) {
-                        self.failure = Some(error.0);
+                    if let Err(error) = decoder.send(&unit.data, unit.pts)
+                        && self.refusals.refuse(error) == OnRefusal::Fail
+                    {
+                        self.phase = Phase::Failed(error);
                         self.queue.clear();
                     }
                 }
-                None if self.ended && !self.drained => {
+                None if self.phase == Phase::Ending => {
                     decoder.flush();
-                    self.drained = true;
+                    self.phase = Phase::Drained;
                 }
                 None => return,
             }
         }
     }
+    /// The picture on screen: the last one published, until the next
+    /// [`load`](Self::load).
     pub fn latest(&self) -> Option<&Published> {
         self.latest.as_ref()
     }
+    /// Why the lane is or is not producing output.
     pub fn state(&self) -> SessionState {
-        match (&self.decoder, &self.failure) {
-            (None, _) => SessionState::Idle,
-            (_, Some(message)) => SessionState::Failed(message.clone()),
-            _ if self.ahead.is_some() || !self.queue.is_empty() => SessionState::Running,
-            _ if self.drained => SessionState::Ended,
-            _ => SessionState::Starved,
-        }
+        let pending = self.ahead.is_some() || !self.queue.is_empty();
+        self.phase.state(self.decoder.is_some(), pending)
+    }
+    /// Access units the decoder refused since the last [`load`](Self::load) or
+    /// [`flush`](Self::flush).
+    pub fn refusals(&self) -> u64 {
+        self.refusals.count
+    }
+    /// The decoder's latest refusal since then.
+    pub fn last_refusal(&self) -> Option<Error> {
+        self.refusals.last
     }
 }

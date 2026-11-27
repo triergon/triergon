@@ -118,7 +118,8 @@ from numpad numbering, and SSA's `AlphaLevel` and back colour are converted as
 libass converts them. Values keep their meaning in their types: `Bold`, `Italic`
 and `BorderStyle` keep the integer libass keeps (glyph runs split where it
 changes), underline and strike-out are booleans, `Alignment` is its horizontal
-and vertical part, and `WrapStyle` and `Justify` are the values libass names.
+and vertical part, and `WrapStyle` and `Justify` are the values libass names. `Encoding::charset`
+returns no charset for `-1`, which determines bidi direction by paragraph.
 
 **Events.** `Dialogue:` lines with the event format (or the dialect's standard
 one), up to `Text`, which takes the rest of the line; `Comment:` lines are
@@ -141,7 +142,7 @@ in a whole script, a codec private or more data. Fonts are kept with
 header fields by name, then style fields in the named style (ignoring case) or in
 all styles.
 
-**Override tags.** `Tags` lexes a `{...}` block as `ass_parse_tags` does,
+**Override tags.** `Tags` lexes a `{...}` block as libass does,
 including VSFilter's argument rules, and converts numbers with libass's own
 decimal conversion. `Tag` covers `\b \i \u \s \bord \xbord \ybord \shad \xshad
 \yshad \be \blur \fn \fs \fsp \fscx \fscy \fsc \frx \fry \frz \fr \fax \fay \an \a
@@ -150,8 +151,8 @@ decimal conversion. `Tag` covers `\b \i \u \s \bord \xbord \ybord \shad \xshad
 `\N \n \h \{ \}` and tabs are text escapes.
 
 **Evaluation.** `Context` walks an event's text at a time in milliseconds,
-applying blocks and yielding glyphs with a copy of the state, as `parse_events`
-does: the first `\pos`/`\move`, `\org`, `\fad`/`\fade` and `\an`/`\a` win; `\t`
+applying blocks and yielding glyphs with a copy of the state, as libass's
+renderer does: the first `\pos`/`\move`, `\org`, `\fad`/`\fade` and `\an`/`\a` win; `\t`
 animates with `((t - t1) / (t2 - t1))^accel`; colours animate per channel; `\r`
 resets to the event's or a named style; drawing mode turns the text up to the
 next `{` into one drawing glyph. The `Banner` and `Scroll up/down` effects are
@@ -160,7 +161,7 @@ syllables from laid-out positions.
 
 **Drawings.** `Drawing::parse` reads `m n l b s p c` into a
 `triergon_raster::Outline` of lines and cubic splines in 26.6 fixed point (y
-down), as `ass_drawing_parse` does. A coordinate beyond ±(2^28 − 1) in 26.6 makes
+down), as libass reads drawings. A coordinate beyond ±(2^28 − 1) in 26.6 makes
 the drawing invalid (`None`). The `\p` level scales by `drawing_scale`.
 
 ## How it renders
@@ -172,12 +173,12 @@ selective style overrides), in the frame and storage size and margins of its
 
 - **Fonts.** The `Fonts` a player gives (attached font files, a default family
   and a default font file) and the script's embedded fonts are matched by family,
-  full or PostScript name, weight and slant with `triergon_font::select`, as
+  full or PostScript name, weight and slant with `triergon_font::compat::libass::select`, as
   libass matches fonts without a system font provider. Fallback for a character
   no face maps tries the requested family, the default family and the default
   font file, so it depends on what was drawn before, as in libass. A face
   selected for a character its text charmap does not map is tried through each
-  of its charmaps in turn, as `ass_font_get_index` does; that retry is
+  of its charmaps in turn, as libass tries it; that retry is
   `Error::Unsupported` for a face with charmaps `triergon-font` does not read,
   as is a lookup through a charmap whose codes libass converts.
 - **Shaping.** Scripts per character, runs of one face, script and style,
@@ -190,16 +191,16 @@ selective style overrides), in the frame and storage size and margins of its
   `\move` or a scroll; and the rotation origin. Glyphs of `@` fonts from U+02F1
   on are drawn turned by 90°, as libass draws them.
 - **Bitmaps.** Each glyph's fill and border or opaque box through
-  `triergon_raster::Raster::render`, each run composited with its blur, `\be` and
-  shadow by `Raster::compose`, then each run's shadow, border and fill as images,
-  clipped by the clip rectangle (with `\kf`'s split), multiplied by a vector
-  clip, and the box of `BorderStyle` 4.
+  `triergon_raster::compat::libass::Run::render_with`, each run composited with
+  its blur, `\be` and shadow by `Composite::new`, then each run's shadow, border
+  and fill as images, clipped by the clip rectangle (with `\kf`'s split),
+  multiplied by a vector clip, and the box of `BorderStyle` 4.
 - **The frame.** Events are taken in layer and read order; within a layer,
   events placed by their margins move clear of each other and keep their place
   on later frames (the record lives with the event in the `Script`, and a
   refused frame changes none); fully transparent images are dropped.
-- **Change detection.** `Frame::change` is what libass's `ass_detect_change`
-  reports: `Change::Content` when the image count differs or an image's size,
+- **Change detection.** `Frame::change` is the change value
+  `ass_render_frame` reports: `Change::Content` when the image count differs or an image's size,
   stride, colour or bitmap does, `Change::Positions` when only places do, else
   `Change::None`. A frame of a script without events reports new content.
 
@@ -208,11 +209,11 @@ aspect, font scale, line spacing and position) follow libass's formulas.
 
 **Caches.** `Settings::cache` holds the cache limits (`CacheLimits`): by default
 libass's (10,000 outlines, 128 MiB of glyph bitmaps, 64 MiB of composites), and
-`CacheLimits::new(glyphs, megabytes)` gives what `ass_set_cache_limits` sets.
-Outlines, glyph bitmaps and composited runs are kept between frames and cut as
-libass cuts its caches (`ass_cache_cut`): least recently used first, never an
-entry the previous frame's images still hold, so eviction never changes a change
-value. Requested fonts and the faces they gathered are kept up to
+`compat::libass::cache_limits(glyphs, megabytes)` gives what
+`ass_set_cache_limits` sets. Outlines, glyph bitmaps and composited runs are
+kept between frames and cut as libass cuts its caches: least recently used
+first, never an entry the previous frame's images still hold, so eviction never
+changes a change value. Requested fonts and the faces they gathered are kept up to
 `CacheLimits::fonts` font descriptions (10,000 by default); libass keeps them
 all, so a caller that wants libass's behaviour sets it to `usize::MAX`. Shaping
 plans are kept up to 256. All of it is charged to the renderer's budget.
@@ -237,9 +238,9 @@ convention asks:
   coordinate therefore discards the drawing. A coordinate landing exactly on
   `INT_MIN`, which libass built with GCC accepts through `abs(INT_MIN)`
   overflow, is rejected.
-- Collision handling sorts the placed boxes as libass does on glibc (`qsort`
-  with `cmp_rect_y0`, a stable merge sort), including the order its overflowing
-  comparison gives for tops 2³¹ or more apart; another C library may order such
+- Collision handling sorts the placed boxes as libass does on glibc (`qsort`,
+  a stable merge sort), including the order its overflowing comparison of the
+  tops gives for tops 2³¹ or more apart; another C library may order such
   boxes, or equal tops, differently.
 - A `BorderStyle` 4 event whose doubled horizontal border overflows `int` loses
   its box, as in libass built with GCC; event box values outside the signed
@@ -267,10 +268,11 @@ wants libass's unbounded behaviour raises the setting. Shaping and bidi also run
 under the limits of their crates. Malformed input is read as libass reads it,
 skipping what it skips, and never panics.
 
-## Cargo features
+## Features
 
-- `work-probe`: a development aid that adds `Renderer::work_spent`, the work the
-  last frame spent. Not needed in production.
+| Feature | Default | Effect |
+|---|---|---|
+| `work-probe` | off | `Renderer::work_spent`, the work the last frame spent |
 
 ## Not supported
 
@@ -280,12 +282,14 @@ nothing), track features (`ass_track_set_feature`), `ass_step_sub`,
 `ass_configure_prune` (a player calls `prune_events`), system font providers,
 reading files and charset conversion.
 
-## Verification
+## Conformance
 
-`cargo test -p triergon-ass` runs unit tests, a mutation test and rendering tests
-with a font built in memory. The comparison with libass 0.17.5 runs through
-[`ass-worker`](../ass-worker/README.md) and the `harness/features/ass-*`
-features; [docs/status.md](../../docs/status.md) has the results.
+The comparison with libass 0.17.5 runs through [`ass-worker`](../ass-worker/README.md)
+and the `harness/features/ass-*` features (`cargo xtask ass compare`). The
+target-specific [parsing](../../harness/features/ass-parse-host/contract.json) and
+[rendering](../../harness/features/ass-render-host/contract.json) comparisons check the
+drawing-coordinate bounds, extreme event boxes and collision placement against libass
+built for 32-bit ARM. Results are in [docs/status.md](../../docs/status.md).
 
 ## Licence
 

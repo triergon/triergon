@@ -1,33 +1,34 @@
-mod common;
-use common::{child, children, roots, table};
+use crate::common;
+use common::{atom, child, children, roots, table};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Time, TimeBase,
     WorkBudget,
 };
 use triergon_isobmff::{
-    BuildStatus, ConfigurationLimits, EditList, Limits, MovieHeader, SampleTable, TrackHeader,
-    check_dts_core_description,
+    BuildStatus, CursorStatus, Limits,
     compat::mov::{
         edits::{
             EditCursor, EditLimits, EncodedEditContext, EncodedEditJob, EncodedEditLimits,
-            EncodedEditPlan, EncodedEditProfile,
+            EncodedEditPlan,
         },
         encoded::{
-            EncodedConfigProfile, EncodedConfigSequence, EncodedContextProfile, EncodedEntryKind,
-            EncodedMetadataProfile, EncodedRecoveryProfile, EncodedSelection, EncodedStream,
-            EncodedStreamJob, EncodedStreamProfile,
+            EncodedConfigSequence, EncodedEntryKind, EncodedSelection, EncodedStream,
+            EncodedStreamJob,
         },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+        packets::{DemuxTrack, PacketCursor, PacketLimits},
         seek::{GlobalSeekJob, IndexCursor, IndexLimits, SeekLimits},
     },
+    config::{ConfigurationLimits, check_dts_core_description},
+    movie::{EditList, MovieHeader, TrackHeader},
+    table::SampleTable,
 };
-const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit-v2/original.mp4");
-const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio0.mp4");
-const AUDIO1024: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio1024.mp4");
-const AUDIO2048: &[u8] = include_bytes!("fixtures/encoded-edit-v2/audio2048.mp4");
-const VIDEO0: &[u8] = include_bytes!("fixtures/encoded-edit-v2/video0.mp4");
-const VIDEO2673: &[u8] = include_bytes!("fixtures/encoded-edit-v2/video2673.mp4");
+const ORIGINAL: &[u8] = include_bytes!("fixtures/encoded-edit/original.mp4");
+const AUDIO0: &[u8] = include_bytes!("fixtures/encoded-edit/audio0.mp4");
+const AUDIO1024: &[u8] = include_bytes!("fixtures/encoded-edit/audio1024.mp4");
+const AUDIO2048: &[u8] = include_bytes!("fixtures/encoded-edit/audio2048.mp4");
+const VIDEO0: &[u8] = include_bytes!("fixtures/encoded-edit/video0.mp4");
+const VIDEO2673: &[u8] = include_bytes!("fixtures/encoded-edit/video2673.mp4");
 const LEADING_AC3: &[u8] = include_bytes!("fixtures/range-encoded-edits/leading-ac3.mp4");
 const LEADING_EAC3: &[u8] = include_bytes!("fixtures/range-encoded-edits/leading-eac3.mp4");
 struct Source {
@@ -113,7 +114,6 @@ impl Source {
             i,
             Some(*b"isom"),
             ConfigurationLimits::default(),
-            EncodedStreamProfile,
         )
         .unwrap();
         for _ in 0..100000 {
@@ -144,7 +144,6 @@ impl Source {
             EncodedEditLimits {
                 max_samples: maximum,
             },
-            EncodedEditProfile,
         )
     }
     fn plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
@@ -191,7 +190,6 @@ fn rows(
         &p.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut out = Vec::new();
@@ -337,7 +335,6 @@ fn range_playback_keeps_the_leading_video_gap_and_uses_the_edited_seek_clock() {
         &source.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -424,7 +421,7 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
     let cancel = AtomicBool::new(false);
     assert!(matches!(
         seek(-513).poll(&mut WorkBudget::new(4096), &cancel),
-        Err(Error::Unsupported("native seek no observed key fallback"))
+        Err(Error::Unsupported("seek fallback is not a key packet"))
     ));
     let mut at_sync = seek(-512);
     assert_eq!(
@@ -442,7 +439,6 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
         &source.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -463,7 +459,7 @@ fn range_playback_keeps_non_sync_video_but_seeks_to_sync() {
         .unwrap();
     assert!(matches!(
         before_sync.poll(&mut work, &cancel),
-        Err(Error::Unsupported("native seek no observed key fallback"))
+        Err(Error::Unsupported("seek fallback is not a key packet"))
     ));
     let mut at_sync = cursor
         .prepare_checked_range_seek(tracks[0].track_id, -512, SeekLimits::default())
@@ -644,9 +640,7 @@ fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
         let source = Source::new(raw, b"soun");
         assert!(matches!(
             source.plan(1),
-            Err(Error::Unsupported(
-                "encoded edited audio codec frame clock not established"
-            ))
+            Err(Error::Unsupported("encoded codec requires range playback"))
         ));
         let plan = range_plan(&source, *b"isom").unwrap();
         let packets = rows(&source, plan);
@@ -664,13 +658,6 @@ fn range_playback_keeps_dolby_packets_and_reports_the_leading_sample_skip() {
 
 fn fixture_payload(raw: &[u8], kind: &[u8; 4]) -> usize {
     raw.windows(4).position(|bytes| bytes == kind).unwrap() + 4
-}
-
-fn atom(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
-    let mut raw = ((body.len() + 8) as u32).to_be_bytes().to_vec();
-    raw.extend_from_slice(kind);
-    raw.extend_from_slice(body);
-    raw
 }
 
 fn ddts(construction: u8, frequency: u32, frame_code: u8) -> Vec<u8> {
@@ -812,7 +799,7 @@ fn range_playback_uses_the_opus_edit_and_keeps_variable_packet_durations() {
     );
     let plan = range_plan(&source, *b"isom").unwrap();
     assert_eq!(plan.anchor_ticks(), 720);
-    assert_eq!(plan.selected_end_ticks(), 5040);
+    assert_eq!(plan.end_ticks(), 5040);
     let packets = rows(&source, plan);
     assert_eq!(packets.len(), OPUS_DURATIONS.len());
     for (i, ((packet, skip), (duration, pts))) in packets
@@ -900,7 +887,7 @@ fn opus_global_seek_aligns_audio_without_the_range_checkpoints() {
         .unwrap()
         .source_result()
         .unwrap()
-        .source_scope(triergon_isobmff::RecoveryKind::Roll);
+        .source_scope(triergon_isobmff::sample_groups::RecoveryKind::Roll);
     assert!(recovery.track_descriptions.is_some());
     assert!(recovery.mappings.is_some());
     let tracks = [video.track(), audio.track()];
@@ -942,7 +929,6 @@ fn opus_decoder_recovery_agrees_with_and_without_range_checkpoints() {
         &video.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -1226,7 +1212,6 @@ fn encoded_views_refuse_caller_supplied_dts_range_configurations() {
         &input,
         Some(*b"isom"),
         limits,
-        EncodedStreamProfile,
     )
     .unwrap();
     let cancel = AtomicBool::new(false);
@@ -1248,29 +1233,11 @@ fn encoded_views_refuse_caller_supplied_dts_range_configurations() {
     let limits = EncodedEditLimits::default();
     #[allow(clippy::large_stack_arrays)] // A handful of jobs in a test.
     for admission in [
-        EncodedEditJob::new(context(), &input, limits, EncodedEditProfile),
-        EncodedEditJob::new_with_configs(context(), &configs, &input, limits, EncodedConfigProfile),
-        EncodedEditJob::new_with_dependency_table(
-            context(),
-            &configs,
-            &input,
-            limits,
-            EncodedMetadataProfile,
-        ),
-        EncodedEditJob::new_with_recovery_groups(
-            context(),
-            &configs,
-            &input,
-            limits,
-            EncodedRecoveryProfile,
-        ),
-        EncodedEditJob::new_with_recovery_contexts(
-            context(),
-            &configs,
-            &input,
-            limits,
-            EncodedContextProfile,
-        ),
+        EncodedEditJob::new(context(), &input, limits),
+        EncodedEditJob::new_with_configs(context(), &configs, &input, limits),
+        EncodedEditJob::new_with_dependency_table(context(), &configs, &input, limits),
+        EncodedEditJob::new_with_recovery_groups(context(), &configs, &input, limits),
+        EncodedEditJob::new_with_recovery_contexts(context(), &configs, &input, limits),
     ] {
         assert!(matches!(
             admission,
@@ -1278,7 +1245,7 @@ fn encoded_views_refuse_caller_supplied_dts_range_configurations() {
         ));
     }
     assert!(matches!(
-        EncodedConfigSequence::new(&source.table, &configs, &input, EncodedConfigProfile),
+        EncodedConfigSequence::new(&source.table, &configs, &input),
         Err(Error::Unsupported("encoded codec requires range playback"))
     ));
 }
@@ -1297,7 +1264,7 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
     let source = Source::new(&raw, b"soun");
     let plan = range_plan(&source, *b"isom").unwrap();
     assert_eq!(plan.anchor_ticks(), -204);
-    assert_eq!(plan.selected_end_ticks(), 8736);
+    assert_eq!(plan.end_ticks(), 8736);
     let packets = rows(&source, plan.clone());
     assert_eq!(packets.len(), 6);
     for (i, (packet, skip)) in packets.iter().enumerate() {
@@ -1327,7 +1294,6 @@ fn range_dts_edit_and_seek_use_media_ticks_and_sample_entry_trim_units() {
         &source.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     cursor.enable_range_seek_checkpoints();
@@ -1444,7 +1410,7 @@ fn range_playback_requires_an_exact_dolby_edit_end() {
             let source = Source::new(&raw, b"soun");
             let plan = range_plan(&source, *b"isom");
             if duration == 17_920 {
-                assert_eq!(plan.unwrap().selected_end_ticks(), 9216);
+                assert_eq!(plan.unwrap().end_ticks(), 9216);
             } else {
                 assert!(plan.is_err(), "range playback admitted duration {duration}");
             }
@@ -1513,7 +1479,6 @@ fn encoded_cursor_rejects_plan_with_wrong_movie_timebase() {
         },
         &input,
         EncodedEditLimits::default(),
-        EncodedEditProfile,
     )
     .unwrap();
     let plans = [Some(complete(&mut job, &mut input, 1).unwrap())];
@@ -1523,7 +1488,6 @@ fn encoded_cursor_rejects_plan_with_wrong_movie_timebase() {
         &p.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .map(|_| ());
     assert_eq!(
@@ -1569,7 +1533,7 @@ fn plan_work1_and_bulk_are_identical_and_keep_literal_elst() {
     let a = p.plan(1).unwrap();
     let b = p.plan(4096).unwrap();
     assert_eq!(a.anchor_ticks(), b.anchor_ticks());
-    assert_eq!(a.selected_end_ticks(), b.selected_end_ticks());
+    assert_eq!(a.end_ticks(), b.end_ticks());
     assert_eq!(
         a.source_edit().bytes().as_ref(),
         p.edits.raw().bytes().as_ref()
@@ -1710,8 +1674,7 @@ fn source_association_cannot_rebind_equal_bytes_from_different_backing() {
             &[other.track()],
             &other.media,
             PacketLimits::default(),
-            &plans,
-            EncodedEditProfile
+            &plans
         ),
         Err(Error::Invalid(_))
     ));
@@ -1762,7 +1725,6 @@ fn new_index_uses_same_real_source_positions_and_decode_ticks() {
         &p.media,
         IndexLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut count = 0;
@@ -1802,8 +1764,7 @@ fn charged_cursor_pressure_preserves_plan_for_bounded_retry() {
             &[p.track()],
             &p.media,
             PacketLimits::default(),
-            &plans,
-            EncodedEditProfile
+            &plans
         ),
         Err(Error::Backpressure { .. })
     ));
@@ -1814,7 +1775,6 @@ fn charged_cursor_pressure_preserves_plan_for_bounded_retry() {
         &p.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     for _ in 0..100000 {
@@ -1888,7 +1848,7 @@ fn without_sdtp_keeps_existing_aac_roll_observation() {
     let p = Source::new(ORIGINAL, b"soun");
     let mut source = p.table.cursor();
     match source.poll(&mut WorkBudget::new(1)).unwrap() {
-        triergon_isobmff::SampleStep::Sample(s) => assert_eq!(s.dependency, None),
+        triergon_isobmff::Next::Item(s) => assert_eq!(s.dependency, None),
         _ => panic!("original source first sample absent"),
     }
     let expected = rows(&p, p.plan(1).unwrap());
@@ -1905,7 +1865,6 @@ fn without_sdtp_keeps_existing_aac_roll_observation() {
         &configs,
         &input,
         EncodedEditLimits::default(),
-        EncodedMetadataProfile,
     )
     .unwrap();
     let actual = rows(&p, complete(&mut job, &mut input, 1).unwrap());

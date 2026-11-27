@@ -3,12 +3,13 @@
 use triergon::ogg::page::{BEGIN_OF_STREAM, END_OF_STREAM, write_page};
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_blocking};
 use triergon_codec::{AudioFrame, Speaker};
-use triergon_session::{AudioSession, Discard, PcmBlock, QueueLimits, TrackDecoder};
+use triergon_session::{AudioSession, Discard, Error, PcmBlock, QueueLimits, TrackDecoder};
 
-/// Ogg Opus: five 20 ms CELT packets, a 312-sample pre-skip, and a final granule (which
+/// Ogg Opus: five 20 ms CELT packets, the supplied pre-skip, and a final granule (which
 /// counts the pre-skip) 100 samples before the end of the last packet.
-fn opus_file() -> Vec<u8> {
-    let head = b"OpusHead\x01\x02\x38\x01\x80\xbb\x00\x00\x00\x00\x00";
+fn opus_file(pre_skip: u16) -> Vec<u8> {
+    let mut head = *b"OpusHead\x01\x02\x00\x00\x80\xbb\x00\x00\x00\x00\x00";
+    head[10..12].copy_from_slice(&pre_skip.to_le_bytes());
     let tags = b"OpusTags\x04\x00\x00\x00test\x00\x00\x00\x00";
     let mut file = Vec::new();
     write_page(
@@ -17,7 +18,7 @@ fn opus_file() -> Vec<u8> {
         9,
         0,
         &[head.len() as u8],
-        head,
+        &head,
         &mut file,
     );
     write_page(0, 0, 9, 1, &[tags.len() as u8], tags, &mut file);
@@ -36,8 +37,23 @@ fn opus_file() -> Vec<u8> {
 
 #[test]
 fn an_audio_session_applies_pre_skip_and_end_trim() {
+    let (block, expected) = opus_session(312, false);
+    assert_eq!(block.pts, None);
+    assert_eq!(block.samples.len(), expected);
+}
+
+#[test]
+fn opus_block_starts_at_the_first_sample_after_pre_skip() {
+    for pre_skip in [312, 1272, 2232] {
+        let (block, expected) = opus_session(pre_skip, true);
+        assert_eq!(block.pts, Some(0), "pre-skip {pre_skip}");
+        assert_eq!(block.samples.len(), expected);
+    }
+}
+
+fn opus_session(pre_skip: u16, clocked: bool) -> (PcmBlock, usize) {
     let pool = Budget::new(16 << 20).unwrap();
-    let mut source = open_blocking(std::io::Cursor::new(opus_file()), &pool).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(opus_file(pre_skip)), &pool).unwrap();
     let mut session = AudioSession::new(QueueLimits::AUDIO);
     let mut loaded = false;
     while let Some(packet) = source.next_packet().unwrap() {
@@ -46,33 +62,36 @@ fn an_audio_session_applies_pre_skip_and_end_trim() {
             session.load(Some(TrackDecoder::new(track).unwrap().into_decoder()));
             loaded = true;
         }
-        let payload = packet.payload().to_vec();
-        session
-            .feed_discarding(&payload, None, Discard::of(&packet))
-            .unwrap();
+        if clocked {
+            session.feed_packet(&packet).unwrap();
+        } else {
+            session
+                .feed_discarding(packet.payload(), None, Discard::of(&packet))
+                .unwrap();
+        }
     }
     session.end_of_stream();
     let mut block = PcmBlock::default();
     session.pull(None, 0, &mut block);
     assert_eq!(block.sample_rate, 48_000);
-    assert_eq!(block.samples.len(), 2 * (5 * 960 - 312 - 100));
+    (block, 2 * (5 * 960 - usize::from(pre_skip) - 100))
 }
 
 #[test]
 fn a_track_decoder_charges_its_configuration_to_the_callers_pool() {
     let pool = Budget::new(16 << 20).unwrap();
-    let mut source = open_blocking(std::io::Cursor::new(opus_file()), &pool).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(opus_file(312)), &pool).unwrap();
     source.next_packet().unwrap();
     let track = source.reader().track(0).unwrap();
     let tiny = Budget::new(Budget::control_storage_bytes() + 8).unwrap();
     let refused = TrackDecoder::new_in(track, &tiny).unwrap_err();
-    assert!(refused.0.starts_with("Limit"), "{}", refused.0);
+    assert!(matches!(refused, Error::Limit { .. }), "{refused:?}");
     let decoder = TrackDecoder::new_in(track, &Budget::new(1 << 20).unwrap()).unwrap();
     assert_eq!(decoder.codec(), triergon_session::AudioCodec::Opus);
 }
 
 #[test]
-fn a_quicktime_aac_track_preserves_eight_speakers() {
+fn a_quicktime_aac_track_decodes_raw_packets_and_preserves_eight_speakers() {
     use Speaker::{
         BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency, SideLeft, SideRight,
     };
@@ -86,7 +105,7 @@ fn a_quicktime_aac_track_preserves_eight_speakers() {
         .find(|track| track.kind() == MediaKind::Audio)
         .unwrap();
     let id = track.id();
-    let mut decoder = TrackDecoder::aac_access_units_in(track.configuration(), &budget).unwrap();
+    let mut decoder = TrackDecoder::new(track).unwrap();
     let mut frame = AudioFrame::default();
     let mut count = 0;
     while let Some(current) = packet {
@@ -130,6 +149,35 @@ fn a_quicktime_aac_track_preserves_eight_speakers() {
     assert_eq!(count, 174);
 }
 
+#[test]
+fn a_matroska_aac_track_decodes_raw_packets_with_its_codec_private() {
+    let fixture = include_bytes!("../../matroska/tests/shared_bounded/hevc-aac.mkv");
+    let budget = Budget::new(32 << 20).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(fixture), &budget).unwrap();
+    let mut packet = source.next_packet().unwrap();
+    let reader = source.reader();
+    let track = (0..reader.track_count())
+        .filter_map(|index| reader.track(index))
+        .find(|track| track.kind() == MediaKind::Audio)
+        .unwrap();
+    assert_eq!(track.codec_tag(), b"A_AAC");
+    assert!(!track.configuration().is_empty());
+    let id = track.id();
+    let mut decoder = TrackDecoder::new_in(track, &budget).unwrap();
+    let mut frame = AudioFrame::default();
+    let mut samples = 0;
+    while let Some(current) = packet {
+        if current.track() == id {
+            decoder.decode(&current, &mut frame).unwrap();
+            assert_eq!(frame.sample_rate, 48_000);
+            assert_eq!(frame.layout.speakers(), &[Speaker::FrontCenter]);
+            samples += frame.samples_per_channel;
+        }
+        packet = source.next_packet().unwrap();
+    }
+    assert_eq!(samples, 192_496);
+}
+
 fn tone_power(samples: &[f32], frequency: f64) -> f64 {
     let phase_step = std::f64::consts::TAU * frequency / 44_100.0;
     let (sin, cos) = samples
@@ -140,4 +188,34 @@ fn tone_power(samples: &[f32], frequency: f64) -> f64 {
             (sin + f64::from(sample) * s, cos + f64::from(sample) * c)
         });
     sin * sin + cos * cos
+}
+
+#[test]
+fn reset_replays_aac_without_the_previous_packets_overlap() {
+    let fixture = include_bytes!("../../playback/tests/fixtures/mp4/avc-aac-quicktime-7-1.mov");
+    let budget = Budget::new(32 << 20).unwrap();
+    let mut source = open_blocking(std::io::Cursor::new(fixture), &budget).unwrap();
+    let first = source.next_packet().unwrap().unwrap();
+    let reader = source.reader();
+    let track = (0..reader.track_count())
+        .filter_map(|index| reader.track(index))
+        .find(|track| track.kind() == MediaKind::Audio)
+        .unwrap();
+    let id = track.id();
+    let mut reset = TrackDecoder::aac_access_units_in(track.configuration(), &budget).unwrap();
+    let mut fresh = TrackDecoder::aac_access_units_in(track.configuration(), &budget).unwrap();
+    let mut packets = std::iter::once(first)
+        .chain(std::iter::from_fn(|| source.next_packet().unwrap()))
+        .filter(|packet| packet.track() == id)
+        .skip(20);
+    let packet = packets.next().unwrap();
+    let mut frame = AudioFrame::default();
+    reset.decode(&packet, &mut frame).unwrap();
+    reset.decode(&packets.next().unwrap(), &mut frame).unwrap();
+    reset.reset();
+    reset.decode(&packet, &mut frame).unwrap();
+    let mut expected = AudioFrame::default();
+    fresh.decode(&packet, &mut expected).unwrap();
+    assert_eq!(frame.samples_per_channel, expected.samples_per_channel);
+    assert_eq!(frame.planes, expected.planes);
 }

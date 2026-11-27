@@ -3,10 +3,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::{checks, corpus, harness, json, prepare, process, python, sha256};
+use crate::{harness, json, prepare, process, python, sha256};
 use json::Value;
 
 use super::correctness::{Rules, channel_stats};
+use crate::files::read;
 
 const OPERATION: &str = "audio-aac-access-units";
 const COMPAT_OPERATION: &str = "audio-aac-access-units-compat";
@@ -34,14 +35,6 @@ fn number(object: &Value, key: &str) -> Result<u32, String> {
         .ok_or_else(|| format!("invalid {key}"))
 }
 
-fn read(path: &Path) -> Result<Vec<u8>, String> {
-    fs::read(path).map_err(|error| format!("{}: {error}", path.display()))
-}
-
-fn file_sha(path: &Path) -> Result<String, String> {
-    sha256::file_hex(path).map_err(|error| format!("{}: {error}", path.display()))
-}
-
 struct Comparison {
     candidate: PathBuf,
     reference: PathBuf,
@@ -53,11 +46,11 @@ struct Comparison {
 impl Comparison {
     fn load(root: &Path, paths: Option<(&Path, &Path)>) -> Result<Self, String> {
         let contract_path = root.join(FEATURE).join("contract.json");
-        let contract = checks::read_json(&contract_path)?;
+        let contract = json::read(&contract_path)?;
         if string(&contract, "operation")? != OPERATION {
             return Err("invalid AAC worker operation".into());
         }
-        let identity = checks::read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         let candidate_name = string(&contract, "candidate")?;
         let candidate_record = identity
             .get("additional_candidates")
@@ -82,9 +75,9 @@ impl Comparison {
             ),
         };
         let ffprobe = root.join(".research/reference-decode").join(FFPROBE);
-        let candidate_sha = file_sha(&candidate)?;
-        let reference_sha = file_sha(&reference)?;
-        let probe_sha = file_sha(&ffprobe)?;
+        let candidate_sha = crate::files::sha256(&candidate)?;
+        let reference_sha = crate::files::sha256(&reference)?;
+        let probe_sha = crate::files::sha256(&ffprobe)?;
         if candidate_sha != string(candidate_record, "sha256")?
             || reference_sha != string(&reference_record, "sha256")?
             || probe_sha
@@ -101,9 +94,12 @@ impl Comparison {
             ("ffprobe_sha256", Value::str(probe_sha)),
             (
                 "numeric_rules_sha256",
-                Value::str(file_sha(&root.join(NUMERIC_RULES))?),
+                Value::str(crate::files::sha256(&root.join(NUMERIC_RULES))?),
             ),
-            ("contract_sha256", Value::str(file_sha(&contract_path)?)),
+            (
+                "contract_sha256",
+                Value::str(crate::files::sha256(&contract_path)?),
+            ),
         ]);
         Ok(Self {
             candidate,
@@ -152,7 +148,7 @@ pub(super) fn measurement_parity(
     }) {
         return Ok(None);
     }
-    if *manifest != checks::read_json(&root.join(FEATURE).join("corpus.json"))? {
+    if *manifest != json::read(&root.join(FEATURE).join("corpus.json"))? {
         return Err("AAC measurement requires the complete pinned workload set".into());
     }
     let comparison = Comparison::load(root, Some((candidates.of(OPERATION), reference)))?;
@@ -161,7 +157,7 @@ pub(super) fn measurement_parity(
     let parity = json::parse(std::str::from_utf8(&bytes).map_err(|error| error.to_string())?)
         .map_err(|error| format!("{}: {error}", parity_path.display()))?;
     if parity.get("comparison") != Some(&comparison.binding)
-        || string(&parity, "workloads_sha256")? != file_sha(workload_path)?
+        || string(&parity, "workloads_sha256")? != crate::files::sha256(workload_path)?
     {
         return Err("AAC parity inputs, tools or rules changed".into());
     }
@@ -320,9 +316,9 @@ fn vectors(manifest: &Value) -> Result<&[Value], String> {
 }
 
 pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
-    let quicktime = checks::read_json(&root.join("harness/codecs/aac/mov-manifest.json"))?;
+    let quicktime = json::read(&root.join("harness/codecs/aac/mov-manifest.json"))?;
     let feature = root.join(FEATURE);
-    let authored = checks::read_json(&feature.join("sources.json"))?;
+    let authored = json::read(&feature.join("sources.json"))?;
     let sources = vectors(&quicktime)?
         .iter()
         .map(|source| (source, OPERATION))
@@ -429,7 +425,7 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         };
         let (candidate_row, candidate_pcm) = raw(&comparison.candidate, "candidate")?;
         let (reference_row, reference_pcm) = raw(&comparison.reference, "reference")?;
-        if file_sha(&input_path)? != input_sha {
+        if crate::files::sha256(&input_path)? != input_sha {
             return Err(format!("{id}: AAC input changed during parity"));
         }
         let (layout, surround_pair_labels) = compare_speakers(
@@ -468,22 +464,25 @@ pub fn run(root: &Path, out: &Path, record: bool) -> Result<(), String> {
         return Err("AAC comparison tools or rules changed during parity".into());
     }
     let pinned = root.join(FEATURE).join("corpus.json");
-    if !record && checks::read_json(&pinned)? != workloads {
+    if !record && json::read(&pinned)? != workloads {
         return Err("AAC access-unit workload differs from its pins".into());
     }
     let workload_path = out.join("workloads.json");
-    corpus::write_json(&workload_path, &workloads)?;
+    json::write(&workload_path, &workloads)?;
     let parity = Value::object([
         ("comparison", comparison.binding),
-        ("workloads_sha256", Value::str(file_sha(&workload_path)?)),
+        (
+            "workloads_sha256",
+            Value::str(crate::files::sha256(&workload_path)?),
+        ),
         ("cases", Value::Array(results)),
     ]);
-    corpus::write_json(&out.join(PARITY_FILE), &parity)?;
+    json::write(&out.join(PARITY_FILE), &parity)?;
     if !accepted {
         return Err("AAC speaker order or PCM differs from the reference".into());
     }
     if record {
-        corpus::write_json(&pinned, &workloads)?;
+        json::write(&pinned, &workloads)?;
     }
     Ok(())
 }

@@ -1,7 +1,7 @@
 //! Typed decoder errors.
 
 use std::fmt;
-use triergon_codec::StorageError;
+use triergon_codec::Error;
 
 /// A named feature the decoder deliberately does not implement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -24,32 +24,71 @@ pub enum Feature {
     SampleRateIndex(u8),
 }
 
+impl fmt::Display for Feature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::SsrGainControl => f.write_str("SsrGainControl"),
+            Self::ObjectType(code) => write!(f, "ObjectType({code})"),
+            Self::FrameLength960 => f.write_str("FrameLength960"),
+            Self::RawSbr => f.write_str("RawSbr"),
+            Self::CouplingTarget => f.write_str("CouplingTarget"),
+            Self::TooManyChannels => f.write_str("TooManyChannels"),
+            Self::RawProgramLayout => f.write_str("RawProgramLayout"),
+            Self::SampleRateIndex(index) => write!(f, "SampleRateIndex({index})"),
+        }
+    }
+}
+
+/// Why the decoder refused an access unit or a configuration.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     /// The input uses a feature outside the implemented set (named).
     Unsupported(Feature),
     /// Malformed bitstream; the string names the failing syntax element.
-    InvalidData(&'static str),
+    Invalid(&'static str),
     /// A resource limit would be exceeded (channels, elements, ...).
-    ResourceLimit(&'static str),
+    Policy(&'static str),
     /// The access unit is shorter than its header requires.
     Truncated,
     /// Storage the access unit needs does not fit the decoder's budget.
-    Budget(StorageError),
+    Budget(Error),
 }
 
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
+impl From<Error> for DecodeError {
+    fn from(error: Error) -> Self {
         DecodeError::Budget(error)
+    }
+}
+
+impl From<DecodeError> for Error {
+    /// The workspace error of the same class. An unsupported feature keeps its name and
+    /// loses the number it carries; a refused storage charge is the budget's own error.
+    fn from(error: DecodeError) -> Self {
+        match error {
+            DecodeError::Unsupported(feature) => Self::Unsupported(match feature {
+                Feature::SsrGainControl => "SSR gain control",
+                Feature::ObjectType(_) => "audio object type",
+                Feature::FrameLength960 => "960-sample frames",
+                Feature::RawSbr => "SBR in a raw AAC-LC access unit",
+                Feature::CouplingTarget => "coupling channel target",
+                Feature::TooManyChannels => "channel count",
+                Feature::RawProgramLayout => "raw program speaker layout",
+                Feature::SampleRateIndex(_) => "sampling frequency index",
+            }),
+            DecodeError::Invalid(detail) => Self::Invalid(detail),
+            DecodeError::Policy(limit) => Self::Policy(limit),
+            DecodeError::Truncated => Self::Truncated,
+            DecodeError::Budget(error) => error,
+        }
     }
 }
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DecodeError::Unsupported(x) => write!(f, "unsupported feature: {x:?}"),
-            DecodeError::InvalidData(s) => write!(f, "invalid data: {s}"),
-            DecodeError::ResourceLimit(s) => write!(f, "resource limit: {s}"),
+            DecodeError::Unsupported(x) => write!(f, "unsupported feature: {x}"),
+            DecodeError::Invalid(s) => write!(f, "invalid data: {s}"),
+            DecodeError::Policy(s) => write!(f, "resource limit: {s}"),
             DecodeError::Truncated => write!(f, "truncated access unit"),
             DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
         }

@@ -1,0 +1,14 @@
+storage 32
+reserve a 20
+reserve b 20
+reserve c 33
+reserve b 12
+resize a 21
+resize a 8
+reserve c 12
+release a
+resize b 20
+release b
+release c
+reserve d 32
+release d

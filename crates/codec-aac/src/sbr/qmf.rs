@@ -2,7 +2,7 @@
 //!
 //! Definitions (ISO/IEC 14496-3 4.6.18.4.1 / 4.6.18.4.2; the ISO text is not available here,
 //! the equations are the implementer's recollection, confirmed exactly against the FFmpeg
-//! 9.0.2 binary with `examples/sbr_mute.rs` and `harness/codecs/aac/tools/qmffit.py`):
+//! 9.0.2 binary with muted SBR payloads and `harness/codecs/aac/tools/qmffit.py`):
 //!
 //! - analysis: x = 320 input samples, newest first; u\[n\] = sum_{j<5} x\[n + 64j\]
 //!   c\[2(n + 64j)\]; X(k) = sum_{n<64} 2 u\[n\] exp(i pi (k + 1/2)(2n - 1/2) / 64), k < 32;
@@ -20,10 +20,11 @@
 //! of `Analysis::run` and `Synthesis::run`; the unit tests check both against the direct
 //! definitions.
 
+use super::kernels;
 use super::tables::QMF_WINDOW;
 use crate::fft::{Cpx, Dct4};
-use std::sync::OnceLock;
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use std::sync::LazyLock;
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// Prototype window c[n], n < 640, of the analysis (c[2n]) and synthesis (c[n]) banks:
 /// ETSI TS 101 980 V1.1.1 Annex I Table I.1 read in reverse order, c[n] = c_DRM[639 - n]
@@ -50,8 +51,7 @@ pub(crate) struct Tables {
 }
 
 fn tables() -> &'static Tables {
-    static T: OnceLock<Tables> = OnceLock::new();
-    T.get_or_init(|| {
+    static T: LazyLock<Tables> = LazyLock::new(|| {
         let rotation = |k: usize| {
             let phi = 3.0 * std::f64::consts::PI * (2 * k + 1) as f64 / 256.0;
             let sign = if k.is_multiple_of(2) { 1.0 } else { -1.0 };
@@ -69,7 +69,8 @@ fn tables() -> &'static Tables {
                 }
             }),
         }
-    })
+    });
+    &T
 }
 
 #[derive(Debug)]
@@ -89,8 +90,21 @@ pub(crate) struct Synthesis {
     t: &'static Tables,
     a: [f32; 64],
     b: [f32; 64],
-    c: [f32; 64],
-    d: [f32; 64],
+    /// The two DCT-IVs' outputs, split as `Dct4::run_split` returns them.
+    c: [[f32; 32]; 2],
+    d: [[f32; 32]; 2],
+}
+
+/// The `N` values at the start of `s`; panics as indexing does when `s` is shorter.
+#[inline(always)]
+fn head<const N: usize>(s: &[f32]) -> &[f32; N] {
+    &s.as_chunks::<N>().0[0]
+}
+
+/// The `N` values at the start of `s`; panics as indexing does when `s` is shorter.
+#[inline(always)]
+fn head_mut<const N: usize>(s: &mut [f32]) -> &mut [f32; N] {
+    &mut s.as_chunks_mut::<N>().0[0]
 }
 
 /// The modulations of the banks: DCT-IVs with work space, which the decoder keeps one pair
@@ -114,7 +128,7 @@ impl Modulation {
 
 impl Analysis {
     /// An analysis bank, or with `used` false an empty one that never runs.
-    pub(crate) fn new(budget: &Budget, used: bool) -> Result<Analysis, StorageError> {
+    pub(crate) fn new(budget: &Budget, used: bool) -> Result<Analysis, Error> {
         Ok(Analysis {
             x: BudgetVec::try_filled(budget, 0.0, if used { 640 } else { 0 })?,
             pos: 320,
@@ -135,44 +149,21 @@ impl Analysis {
     /// and keeps the sine's. So X(k) = exp(-i phi_k) (C(k) + i S(k)), where C is the DCT-IV
     /// of d[n] = u[n] - u[63 - n] and S the DST-IV of u[n] + u[63 - n], n < 32, both scaled
     /// by 2.
-    pub(crate) fn run(&mut self, m: &mut Modulation, input: &[f32], scale: f32, out: &mut [Cpx]) {
+    pub(crate) fn run(
+        &mut self,
+        m: &mut Modulation,
+        input: &[f32; 32],
+        scale: f32,
+        out: &mut [Cpx; 32],
+    ) {
         if self.pos < 32 {
             self.x.copy_within(self.pos..self.pos + 288, 640 - 288);
             self.pos = 640 - 288;
         }
         self.pos -= 32;
-        let p = self.pos;
-        #[cfg(feature = "simd")]
-        let (d, r) = {
-            let u = super::simd::analysis_window(
-                &mut self.x[p..p + 320],
-                input,
-                scale,
-                &self.t.analysis_win,
-            );
-            super::simd::analysis_fold(&u)
-        };
-        #[cfg(not(feature = "simd"))]
-        let (d, r) = {
-            for n in 0..32 {
-                self.x[p + 31 - n] = input[n] * scale;
-            }
-            // each sum in a register over its five taps x[64j + n] w[64j + n], in tap order,
-            // four sums a block
-            let x = &self.x[p..p + 320];
-            let w = &self.t.analysis_win;
-            let x: [&[[f32; 4]]; 5] = std::array::from_fn(|j| x[64 * j..][..64].as_chunks().0);
-            let w: [&[[f32; 4]]; 5] = std::array::from_fn(|j| w[64 * j..][..64].as_chunks().0);
-            let mut u = [[0f32; 4]; 16];
-            for (b, u) in u.iter_mut().enumerate() {
-                *u = std::array::from_fn(|i| (0..5).fold(0.0, |u, j| u + x[j][b][i] * w[j][b][i]));
-            }
-            let u = u.as_flattened();
-            // the DST-IV as a DCT-IV of the reversed input, u[31 - n] + u[32 + n]
-            let d: [f32; 32] = std::array::from_fn(|n| u[n] - u[63 - n]);
-            let r: [f32; 32] = std::array::from_fn(|n| u[31 - n] + u[32 + n]);
-            (d, r)
-        };
+        let x = head_mut::<320>(&mut self.x[self.pos..]);
+        let u = kernels::analysis_window(x, input, scale, &self.t.analysis_win);
+        let (d, r) = kernels::analysis_fold(&u);
         let (mut c, mut s) = ([0f32; 32], [0f32; 32]);
         let (ce, co) = c.split_at_mut(16);
         m.analysis.run_split(&d, ce, co);
@@ -182,7 +173,6 @@ impl Analysis {
         let rotate = |c: f32, s: f32, [cos, sin, scos, ssin]: [f32; 4]| {
             Cpx::new(c * cos + s * ssin, s * scos - c * sin)
         };
-        let out: &mut [Cpx; 32] = (&mut out[..32]).try_into().expect("32 bands");
         let t = &self.t.rotation;
         for j in 0..16 {
             out[2 * j] = rotate(c[j], s[j], t[j]);
@@ -192,23 +182,26 @@ impl Analysis {
 }
 
 impl Synthesis {
-    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<Synthesis, Error> {
         Ok(Synthesis {
             v: BudgetVec::try_filled(budget, 0.0, 2560)?,
             pos: 1280,
             t: tables(),
             a: [0.0; 64],
             b: [0.0; 64],
-            c: [0.0; 64],
-            d: [0.0; 64],
+            c: [[0.0; 32]; 2],
+            d: [[0.0; 32]; 2],
         })
     }
 
     pub(crate) fn reset(&mut self) {
         self.v.fill(0.0);
         self.pos = 1280;
-        for scratch in [&mut self.a, &mut self.b, &mut self.c, &mut self.d] {
+        for scratch in [&mut self.a, &mut self.b] {
             *scratch = [0.0; 64];
+        }
+        for scratch in [&mut self.c, &mut self.d] {
+            *scratch = [[0.0; 32]; 2];
         }
     }
 
@@ -219,69 +212,36 @@ impl Synthesis {
     /// v[64 + m] = C[m] + S[m] and v[63 - m] = C[m] - S[m], where C is the DCT-IV of
     /// (-1)^k Im X(k) and S the DST-IV of (-1)^k Re X(k), both scaled by 1/64 (the DST-IV is
     /// a DCT-IV of the reversed input with alternating output signs).
-    pub(crate) fn run(&mut self, m: &mut Modulation, x: &[Cpx], scale: f32, out: &mut [f32]) {
+    pub(crate) fn run(
+        &mut self,
+        m: &mut Modulation,
+        x: &[Cpx; 64],
+        scale: f32,
+        out: &mut [f32; 64],
+    ) {
         if self.pos < 128 {
             self.v.copy_within(self.pos..self.pos + 1152, 2560 - 1152);
             self.pos = 2560 - 1152;
         }
         self.pos -= 128;
         let p = self.pos;
-        let x = &x[..64];
-        #[cfg(feature = "simd")]
-        super::simd::synthesis_inputs(x, &mut self.a, &mut self.b);
-        #[cfg(not(feature = "simd"))]
-        for k in 0..64 {
-            let sgn = if k & 1 == 0 { 1.0 } else { -1.0 };
-            self.a[k] = sgn * x[k].im;
-            // reversed, with (-1)^(63 - j) = -(-1)^j
-            self.b[k] = -sgn * x[63 - k].re;
-        }
+        kernels::synthesis_inputs(x, &mut self.a, &mut self.b);
         // C and S split as `Dct4::run_split` returns them: c[2k] = ce[k], c[63 - 2k] = co[k]
-        let (ce, co) = self.c.split_at_mut(32);
+        let [ce, co] = &mut self.c;
         m.synthesis.run_split(&self.a, ce, co);
-        let (se, so) = self.d.split_at_mut(32);
+        let [se, so] = &mut self.d;
         m.synthesis.run_split(&self.b, se, so);
-        let v: &mut [f32; 128] = (&mut self.v[p..p + 128]).try_into().expect("128");
         // v[64 + m] = C[m] + (-1)^m S[m] and v[63 - m] = C[m] - (-1)^m S[m], for the even
         // m = 2k and the odd m = 63 - 2k
-        #[cfg(feature = "simd")]
-        super::simd::synthesis_butterflies(ce, co, se, so, v);
-        #[cfg(not(feature = "simd"))]
-        for (k, (((&ce, &co), &se), &so)) in ce.iter().zip(&*co).zip(&*se).zip(&*so).enumerate() {
-            v[64 + 2 * k] = ce + se;
-            v[63 - 2 * k] = ce - se;
-            v[127 - 2 * k] = co - so;
-            v[2 * k] = co + so;
-        }
+        kernels::synthesis_butterflies(ce, co, se, so, head_mut::<128>(&mut self.v[p..]));
         // Each output's sum in a register over its ten taps, in tap order, four outputs a
-        // block: tap 2i reads v[256i + n] and w[128i + n], tap 2i + 1 v[256i + 192 + n] and
-        // w[128i + 64 + n].
-        #[cfg(feature = "simd")]
-        super::simd::synthesis_window(&self.v[p..p + 1280], &self.t.synthesis_win, scale, out);
-        #[cfg(not(feature = "simd"))]
-        {
-            let v = &self.v[p..p + 1280];
-            let w = &self.t.synthesis_win;
-            let v: [&[[f32; 4]]; 10] =
-                std::array::from_fn(|t| v[256 * (t / 2) + 192 * (t % 2)..][..64].as_chunks().0);
-            let w: [&[[f32; 4]]; 10] =
-                std::array::from_fn(|t| w[128 * (t / 2) + 64 * (t % 2)..][..64].as_chunks().0);
-            for (b, out) in out[..64].as_chunks_mut::<4>().0.iter_mut().enumerate() {
-                for (j, out) in out.iter_mut().enumerate() {
-                    let acc = (0..5).fold(0.0, |acc, i| {
-                        acc + (v[2 * i][b][j] * w[2 * i][b][j]
-                            + v[2 * i + 1][b][j] * w[2 * i + 1][b][j])
-                    });
-                    *out = acc * scale;
-                }
-            }
-        }
+        // block.
+        let v = head::<1280>(&self.v[p..]);
+        kernels::synthesis_window(v, &self.t.synthesis_win, scale, out);
     }
 }
 
 #[cfg(test)]
-// direct reference definitions, written index-style to mirror the formulas
-#[allow(clippy::needless_range_loop)]
 mod tests {
     use super::*;
 
@@ -312,9 +272,9 @@ mod tests {
         let mut x = [Cpx::default(); 64];
         let mut out = vec![0f32; 0];
         for slot in 0..200 {
-            let inp: Vec<f32> = (0..32)
-                .map(|n| (2.0 * std::f64::consts::PI * f * (32 * slot + n) as f64).sin() as f32)
-                .collect();
+            let inp: [f32; 32] = std::array::from_fn(|n| {
+                (2.0 * std::f64::consts::PI * f * (32 * slot + n) as f64).sin() as f32
+            });
             let mut w = [Cpx::default(); 32];
             a.run(&mut m, &inp, 1.0, &mut w);
             x[..32].copy_from_slice(&w);
@@ -341,9 +301,9 @@ mod tests {
             (s as i32) as f32 / 2147483648.0
         };
         let mut hist = vec![0f64; 320];
-        let mut out = vec![Cpx::default(); 32];
+        let mut out = [Cpx::default(); 32];
         for _slot in 0..12 {
-            let inp: Vec<f32> = (0..32).map(|_| rnd()).collect();
+            let inp: [f32; 32] = std::array::from_fn(|_| rnd());
             a.run(&mut m, &inp, 1.0, &mut out);
             hist.copy_within(0..288, 32);
             for n in 0..32 {
@@ -388,9 +348,9 @@ mod tests {
             (s as i32) as f32 / 2147483648.0
         };
         let mut v = vec![0f64; 1280];
-        let mut out = vec![0f32; 64];
+        let mut out = [0f32; 64];
         for _slot in 0..14 {
-            let x: Vec<Cpx> = (0..64).map(|_| Cpx::new(rnd(), rnd())).collect();
+            let x: [Cpx; 64] = std::array::from_fn(|_| Cpx::new(rnd(), rnd()));
             sy.run(&mut m, &x, 1.0, &mut out);
             v.copy_within(0..1152, 128);
             for n in 0..128 {

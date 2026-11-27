@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,54 +9,33 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
+
+use core::marker::PhantomData;
 
 mod division;
-pub mod layout;
+mod error;
+mod layout;
 pub mod mdct;
 mod window;
 
+/// Selectable channel-layout compatibility rules.
+pub mod compat {
+    pub use crate::layout::ffmpeg;
+}
+
 pub use division::{Divisor, divide, divide_u32};
-pub use layout::{ChannelLayout, Speaker};
-pub use triergon_core::{Budget, BudgetVec, Charged, Error as StorageError, Reservation};
-pub use triergon_pixel::{Colour, PictureView, Plane};
+pub use error::DecodeError;
+pub use layout::{ChannelLayout, Speaker, flac_order, native_order, vorbis_order};
+pub use triergon_core::{Budget, BudgetVec, Charged, Error, Reservation};
+pub use triergon_pixel::{Colour, PictureView, Plane, SampleAspectRatio};
 pub use window::{kbd_window, vorbis_window};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum VideoCodec {
-    H264,
-    Hevc,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AudioCodec {
-    Ac3,
-    Eac3,
-    Aac,
-    Dts,
-    Flac,
-    Opus,
-    Vorbis,
-    /// MPEG-1/2 audio Layer I, II or III.
-    MpegAudio,
-}
-
-/// Why a decoder refused an access unit: the codec error's `Debug` text.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DecodeFailure(pub String);
-
-impl DecodeFailure {
-    /// The failure for a codec crate's error.
-    pub fn from_error(error: impl core::fmt::Debug) -> Self {
-        DecodeFailure(format!("{error:?}"))
-    }
-}
 
 /// The sample format a decoder produces natively, before its samples become the
 /// frame's `f32` planes. Mixing follows it: FFmpeg's resampler mixes 16-bit input in
 /// fixed point.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SampleFormat {
+    /// 32-bit float; the planes hold the decoder's samples as they are.
     #[default]
     Float,
     /// Signed 16-bit; each sample is exactly `x / 2^15`.
@@ -68,8 +48,11 @@ pub enum SampleFormat {
 /// Decoded audio of one access unit: planar `f32` at full scale 1.0.
 #[derive(Clone, Debug, Default)]
 pub struct AudioFrame {
+    /// Samples per second per channel.
     pub sample_rate: u32,
+    /// The speaker of each plane.
     pub layout: ChannelLayout,
+    /// Samples in each plane; 0 when the access unit produced none.
     pub samples_per_channel: usize,
     /// What the planes are images of.
     pub sample_format: SampleFormat,
@@ -97,31 +80,17 @@ impl AudioFrame {
         channels: usize,
         len: usize,
         charge: &mut Reservation,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         self.planes.truncate(channels);
-        let planes = |count: usize| {
-            count
-                .checked_mul(size_of::<Vec<f32>>())
-                .ok_or(StorageError::Overflow)
-        };
-        let samples = |count: usize| {
-            count
-                .checked_mul(size_of::<f32>())
-                .ok_or(StorageError::Overflow)
-        };
-        let mut bytes = planes(self.planes.capacity().max(channels))?;
-        for i in 0..channels {
-            let capacity = self.planes.get(i).map_or(0, Vec::capacity).max(len);
-            bytes = bytes
-                .checked_add(samples(capacity)?)
-                .ok_or(StorageError::Overflow)?;
-        }
+        let capacities =
+            (0..channels).map(|i| self.planes.get(i).map_or(0, Vec::capacity).max(len));
+        let bytes = plane_storage_bytes(self.planes.capacity().max(channels), capacities)?;
         charge.resize_to(bytes)?;
         let mut grew = false;
         if channels > self.planes.len() {
             self.planes
                 .try_reserve_exact(channels - self.planes.len())
-                .map_err(|_| StorageError::Allocation)?;
+                .map_err(|_| Error::Allocation)?;
             self.planes.resize_with(channels, Vec::new);
             grew = true;
         }
@@ -129,22 +98,33 @@ impl AudioFrame {
             if len > plane.capacity() {
                 plane
                     .try_reserve_exact(len - plane.len())
-                    .map_err(|_| StorageError::Allocation)?;
+                    .map_err(|_| Error::Allocation)?;
                 grew = true;
             }
             plane.resize(len, 0.0);
         }
         if grew {
-            let mut bytes = planes(self.planes.capacity())?;
-            for plane in &self.planes {
-                bytes = bytes
-                    .checked_add(samples(plane.capacity())?)
-                    .ok_or(StorageError::Overflow)?;
-            }
+            let capacities = self.planes.iter().map(Vec::capacity);
+            let bytes = plane_storage_bytes(self.planes.capacity(), capacities)?;
             charge.resize_to(bytes)?;
         }
         Ok(())
     }
+}
+
+fn plane_storage_bytes(
+    planes: usize,
+    mut capacities: impl Iterator<Item = usize>,
+) -> Result<usize, Error> {
+    let headers = planes
+        .checked_mul(size_of::<Vec<f32>>())
+        .ok_or(Error::Overflow)?;
+    capacities.try_fold(headers, |bytes, samples| {
+        let plane = samples
+            .checked_mul(size_of::<f32>())
+            .ok_or(Error::Overflow)?;
+        bytes.checked_add(plane).ok_or(Error::Overflow)
+    })
 }
 
 /// Stereo downmix parameters a stream carries (AC-3/E-AC-3 centre/surround/LFE mix
@@ -152,9 +132,13 @@ impl AudioFrame {
 /// -3 dB centre and surrounds with LFE omitted, used when a stream carries none.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DownmixLevels {
+    /// Linear gain of the centre channel into each side.
     pub center: f32,
+    /// Linear gain of the surround channels.
     pub surround: f32,
+    /// Linear gain of the LFE channel, before its -3 dB into each side; 0 omits it.
     pub lfe: f32,
+    /// How the surround channels are matrixed into the stereo pair.
     pub encoding: SurroundEncoding,
 }
 
@@ -169,17 +153,32 @@ impl Default for DownmixLevels {
     }
 }
 
+/// How a stereo downmix carries the surround channels.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SurroundEncoding {
+    /// Each surround channel to its own side.
     None,
+    /// Dolby Surround: the surrounds summed out of phase into both sides.
     Dolby,
+    /// Dolby Pro Logic II: the surrounds out of phase into both sides, weighted to
+    /// their own side.
     ProLogicII,
 }
 
 /// An Annex-B video decoder with caller timestamps carried through reordering.
 pub trait VideoDecoder: Send {
-    /// One Annex-B access unit with its caller timestamp.
-    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeFailure>;
+    /// Why the decoder refuses an access unit: [`DecodeError`], or its crate's own enum
+    /// with the same classes and more detail. Every decoder of this workspace converts it
+    /// to [`Error`], keeping its class and its detail text.
+    type Error;
+
+    /// Decodes one Annex B access unit with its caller timestamp.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first NAL unit error without consuming later units in the access
+    /// unit. The decoder remains usable.
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), Self::Error>;
     /// The next picture in output order, if ready. The view borrows the decoder until
     /// the next call; it returns `None` once no picture is ready.
     fn receive(&mut self) -> Option<PictureView<'_>>;
@@ -187,17 +186,38 @@ pub trait VideoDecoder: Send {
     fn flush(&mut self);
     /// Discontinuity: drop all decoder state except parameter sets.
     fn reset(&mut self);
+
+    /// This decoder boxed, its errors converted to `E`: the form for a caller that
+    /// chooses the codec at run time. With [`Error`] for `E` it is a
+    /// [`DynVideoDecoder`]. Every call forwards to this decoder unchanged; only a
+    /// refusal changes type, through `Into`.
+    fn boxed<E: 'static>(self) -> Box<dyn VideoDecoder<Error = E>>
+    where
+        Self: Sized + 'static,
+        Self::Error: Into<E>,
+    {
+        Box::new(Converting {
+            decoder: self,
+            error: PhantomData,
+        })
+    }
 }
 
 /// An audio decoder taking one access unit at a time.
 pub trait AudioDecoder: Send {
+    /// Why the decoder refuses an access unit: [`DecodeError`], or its crate's own enum
+    /// with the same classes and more detail. Every decoder of this workspace converts it
+    /// to [`Error`], keeping its class and its detail text.
+    type Error;
+
     /// Replace `out` with the output of `au` (`samples_per_channel == 0` when it
-    /// produced none). Returns the stream's downmix metadata, if it carries any.
+    /// produced none). Returns the stream's downmix metadata, if it carries any. A
+    /// refused access unit leaves the decoder usable.
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure>;
+    ) -> Result<Option<DownmixLevels>, Self::Error>;
     /// Samples at the start of the stream that carry no signal and are discarded unless
     /// the container says otherwise (the Opus pre-skip); 0 for most decoders.
     fn delay(&self) -> usize {
@@ -205,10 +225,83 @@ pub trait AudioDecoder: Send {
     }
     /// End of stream: replace `out` with any samples the decoder still holds back
     /// (`samples_per_channel == 0` when there are none, as for most decoders).
-    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), DecodeFailure> {
+    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), Self::Error> {
         out.clear();
         Ok(())
     }
     /// Discontinuity: drop all signal history.
     fn reset(&mut self);
+
+    /// This decoder boxed, its errors converted to `E`: the form for a caller that
+    /// chooses the codec at run time. With [`Error`] for `E` it is a
+    /// [`DynAudioDecoder`]. Every call forwards to this decoder unchanged, the provided
+    /// [`delay`](Self::delay) and [`flush`](Self::flush) included; only a refusal changes
+    /// type, through `Into`.
+    fn boxed<E: 'static>(self) -> Box<dyn AudioDecoder<Error = E>>
+    where
+        Self: Sized + 'static,
+        Self::Error: Into<E>,
+    {
+        Box::new(Converting {
+            decoder: self,
+            error: PhantomData,
+        })
+    }
+}
+
+/// A video decoder of a codec chosen at run time. It refuses with the workspace
+/// [`Error`]; [`VideoDecoder::boxed`] makes one from a codec crate's decoder.
+pub type DynVideoDecoder = dyn VideoDecoder<Error = Error>;
+
+/// An audio decoder of a codec chosen at run time. It refuses with the workspace
+/// [`Error`]; [`AudioDecoder::boxed`] makes one from a codec crate's decoder.
+pub type DynAudioDecoder = dyn AudioDecoder<Error = Error>;
+
+/// The decoder behind [`VideoDecoder::boxed`] and [`AudioDecoder::boxed`]: every method
+/// forwards, and a refusal converts to `E` on the way out.
+// A workspace-error trait with direct decoder dispatch added 0.065419% instructions on E-AC-3.
+struct Converting<D, E> {
+    decoder: D,
+    // `fn() -> E`: the wrapper holds no `E`, so it is `Send` whenever the decoder is.
+    error: PhantomData<fn() -> E>,
+}
+
+impl<D: VideoDecoder, E> VideoDecoder for Converting<D, E>
+where
+    D::Error: Into<E>,
+{
+    type Error = E;
+
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), E> {
+        self.decoder.send(au, pts).map_err(Into::into)
+    }
+    fn receive(&mut self) -> Option<PictureView<'_>> {
+        self.decoder.receive()
+    }
+    fn flush(&mut self) {
+        self.decoder.flush();
+    }
+    fn reset(&mut self) {
+        self.decoder.reset();
+    }
+}
+
+impl<D: AudioDecoder, E> AudioDecoder for Converting<D, E>
+where
+    D::Error: Into<E>,
+{
+    type Error = E;
+
+    fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<Option<DownmixLevels>, E> {
+        self.decoder.decode(au, out).map_err(Into::into)
+    }
+    fn delay(&self) -> usize {
+        self.decoder.delay()
+    }
+    fn flush(&mut self, out: &mut AudioFrame) -> Result<(), E> {
+        self.decoder.flush(out).map_err(Into::into)
+    }
+    fn reset(&mut self) {
+        self.decoder.reset();
+    }
 }

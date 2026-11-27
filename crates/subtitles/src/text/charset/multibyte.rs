@@ -1,39 +1,72 @@
-//! Explicit, strict, version-pinned mapping profiles. No charset detection.
+//! Strict multibyte charset profiles, each bound to one mapping table, and a
+//! decoder that reads them a byte at a time. No charset is detected.
 //!
-//! Mapping DATA and licences are described in `MULTIBYTE-CONTRACT.md`.
-//! These profiles intentionally distinguish historical Unicode, Windows and
-//! restricted EUC repertoires. They do not claim universal label equivalence.
-use std::{ops::Range, sync::atomic::AtomicBool};
+//! The mapping data and licences are described in `MULTIBYTE-CONTRACT.md`.
+//! A profile follows the current definition of its charset: the Encoding
+//! Standard's decoder of its label, or for a `cp` label the Windows code page
+//! as Windows converts it. The receiver repertoires are selected through
+//! [`crate::compat::charset::Profile`].
+use std::{num::NonZeroU8, ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Error, Result, WorkBudget};
 
-use super::super::unicode::cancelled;
+use crate::cancelled;
+use crate::compat::charset::Profile;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MultibyteCharset {
-    /// Microsoft CP936 table 2.01, including its single-byte euro mapping.
-    GbkCp936,
-    /// Unicode historical Big5 table 2.0, with its seven NO MAPPING entries refused.
-    Big5Unicode,
-    /// Unicode historical Shift-JIS table 2.0, including yen and overline.
-    ShiftJisUnicode,
-    /// CP949 table 2.01 restricted to A1..FE byte pairs, plus ASCII.
-    EucKr,
-    Windows932,
-    Windows949,
-    Windows950,
-    /// Opt-in freely distributable GNU Big5 charmap version 0.92, glibc 2.39 snapshot.
-    ReceiverBig5Glibc239,
-    /// Historical EUC-KR repertoire plus explicit single-byte C1 controls.
-    ReceiverEucKrC1,
-    /// Original CP932 repertoire plus Microsoft-documented 1880 user-defined scalars.
-    ReceiverWindows932Pua,
-    /// Explicit receiver v2: C1 repertoire plus the independently observed GNU A2E8/U327E mapping.
-    ReceiverEucKrGlibc239,
+/// A multibyte charset's lead and trail bytes and Unicode mapping table.
+/// Standalone ASCII bytes decode as themselves except where documented.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct MultibyteCharset(Kind);
+
+const _: () = assert!(size_of::<MultibyteCharset>() == 1);
+const _: () = assert!(size_of::<Option<MultibyteCharset>>() == 1);
+
+impl std::fmt::Debug for MultibyteCharset {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
 }
 
 impl MultibyteCharset {
-    /// Opt-in resolver. The original `Charset::from_label` stays unchanged.
-    /// Matching is ASCII case-insensitive, with no trimming or guessed aliases.
+    /// GBK in the Encoding Standard's fatal mode: its index gb18030 for the
+    /// two-byte codes, the single byte 0x80 as U+20AC, and the four-byte codes
+    /// of GB18030 by its index of ranges.
+    pub const GBK: Self = Self(Kind::Gbk);
+    /// Big5 in the Encoding Standard's fatal mode: its index, with the Hong Kong
+    /// supplement and its plane 2 characters. The codes 88 62, 88 64, 88 A3
+    /// and 88 A5 are each two characters, a letter and a combining mark.
+    pub const BIG5: Self = Self(Kind::Big5);
+    /// Shift_JIS in the Encoding Standard's fatal mode: its index jis0208, the
+    /// user-defined codes F040–F9FC as U+E000–U+E757, and the single bytes 0x80
+    /// as U+0080 and A1–DF as the halfwidth katakana. That is
+    /// [`Windows932`](Self::WINDOWS_932) with 0x80.
+    pub const SHIFT_JIS: Self = Self(Kind::ShiftJis);
+    /// EUC-KR in the Encoding Standard's fatal mode: its index euc-kr, which
+    /// holds KS X 1001 and the UHC extension pairs, the pairs of
+    /// [`Windows949`](Self::WINDOWS_949); no single byte beyond ASCII. Any byte
+    /// from 0x41 to 0xFE may follow a lead byte, so a pair in the gaps
+    /// 0x5B–0x60 and 0x7B–0x80 is unmapped rather than a refused trail.
+    pub const EUC_KR: Self = Self(Kind::EucKr);
+    /// Microsoft CP932 table 2.01 plus the 1,880 user-defined codes
+    /// F040–F9FC as U+E000–U+E757, as Windows converts them.
+    pub const WINDOWS_932: Self = Self(Kind::Windows932);
+    /// Microsoft CP949 table 2.01, including the UHC extension pairs.
+    pub const WINDOWS_949: Self = Self(Kind::Windows949);
+    /// Code page 950 as Windows converts it: Microsoft CP950 table 2.01, the
+    /// 6,217 user-defined codes FA40–FEFE, 8E40–A0FE, 8140–8DFE and C6A1–C8FE
+    /// as U+E000–U+F848 in that order, and the single bytes 0x80 and 0xFF as
+    /// U+0080 and U+F8F8.
+    pub const WINDOWS_950: Self = Self(Kind::Windows950);
+
+    pub(crate) const fn decodes_outside_table(self) -> bool {
+        self.0.decodes_outside_table()
+    }
+
+    /// The profile of `label`, matched ASCII case-insensitively with no
+    /// trimming: gbk, cp936, windows-936, big5, big-5, shift_jis, shift-jis,
+    /// sjis, euc-kr, euc_kr, cp932, windows-932, cp949, windows-949, cp950
+    /// or windows-950. `Error::Limit` for a label over 256 bytes,
+    /// `Error::Unsupported` for any other.
     pub fn from_label(label: &[u8]) -> Result<Self> {
         if label.len() > 256 {
             return Err(Error::Limit {
@@ -42,22 +75,22 @@ impl MultibyteCharset {
             });
         }
         for (name, profile) in [
-            ("gbk", Self::GbkCp936),
-            ("cp936", Self::GbkCp936),
-            ("windows-936", Self::GbkCp936),
-            ("big5", Self::Big5Unicode),
-            ("big-5", Self::Big5Unicode),
-            ("shift_jis", Self::ShiftJisUnicode),
-            ("shift-jis", Self::ShiftJisUnicode),
-            ("sjis", Self::ShiftJisUnicode),
-            ("euc-kr", Self::EucKr),
-            ("euc_kr", Self::EucKr),
-            ("cp932", Self::Windows932),
-            ("windows-932", Self::Windows932),
-            ("cp949", Self::Windows949),
-            ("windows-949", Self::Windows949),
-            ("cp950", Self::Windows950),
-            ("windows-950", Self::Windows950),
+            ("gbk", Self::GBK),
+            ("cp936", Self::GBK),
+            ("windows-936", Self::GBK),
+            ("big5", Self::BIG5),
+            ("big-5", Self::BIG5),
+            ("shift_jis", Self::SHIFT_JIS),
+            ("shift-jis", Self::SHIFT_JIS),
+            ("sjis", Self::SHIFT_JIS),
+            ("euc-kr", Self::EUC_KR),
+            ("euc_kr", Self::EUC_KR),
+            ("cp932", Self::WINDOWS_932),
+            ("windows-932", Self::WINDOWS_932),
+            ("cp949", Self::WINDOWS_949),
+            ("windows-949", Self::WINDOWS_949),
+            ("cp950", Self::WINDOWS_950),
+            ("windows-950", Self::WINDOWS_950),
         ] {
             if label.eq_ignore_ascii_case(name.as_bytes()) {
                 return Ok(profile);
@@ -65,44 +98,143 @@ impl MultibyteCharset {
         }
         Err(Error::Unsupported("explicit multibyte charset label"))
     }
+}
 
-    // Sorted fixed-width DATA records: two-byte wire code, two-byte scalar.
-    // At most 16 binary-search comparisons for a mapping; no allocation.
-    fn lookup(self, code: u16) -> Option<char> {
-        let data: &[u8] = match self {
-            Self::GbkCp936 => include_bytes!("mapping-data/gbk.bin"),
-            Self::Big5Unicode => include_bytes!("mapping-data/big5.bin"),
-            Self::ShiftJisUnicode => include_bytes!("mapping-data/shift_jis.bin"),
-            Self::EucKr | Self::ReceiverEucKrC1 | Self::ReceiverEucKrGlibc239 => {
-                if let Ok(byte) = u8::try_from(code) {
-                    // ASCII in every profile, plus the receiver profiles' C1 controls.
-                    let last = if self == Self::EucKr { 0x7f } else { 0x9f };
-                    return (byte <= last).then(|| char::from(byte));
-                }
-                if self == Self::ReceiverEucKrGlibc239 && code == 0xa2e8 {
-                    return Some('\u{327e}');
-                }
-                include_bytes!("mapping-data/euc_kr.bin")
-            }
-            Self::Windows932 => include_bytes!("mapping-data/windows932.bin"),
-            Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
+impl Profile {
+    /// The selected repertoire for explicit multibyte conversion.
+    #[must_use]
+    pub const fn multibyte(self) -> MultibyteCharset {
+        MultibyteCharset(match self {
+            Self::Gbk => Kind::ReceiverGbk,
+            Self::Big5 => Kind::ReceiverBig5,
+            Self::ShiftJis => Kind::ReceiverShiftJis,
+            Self::EucKr => Kind::ReceiverEucKrC1,
+        })
+    }
+}
+
+// GBK receiver as tag 0 saves one instruction per packet, and strict GBK
+// and Big5 form one range for table fallback.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Kind {
+    ReceiverGbk,
+    Gbk,
+    Big5,
+    ReceiverBig5,
+    Windows950,
+    ShiftJis,
+    Windows932,
+    ReceiverShiftJis,
+    EucKr,
+    Windows949,
+    ReceiverEucKrC1,
+}
+
+impl Kind {
+    /// Every profile, in declaration order.
+    const ALL: [Self; 11] = [
+        Self::ReceiverGbk,
+        Self::Gbk,
+        Self::Big5,
+        Self::ReceiverBig5,
+        Self::Windows950,
+        Self::ShiftJis,
+        Self::Windows932,
+        Self::ReceiverShiftJis,
+        Self::EucKr,
+        Self::Windows949,
+        Self::ReceiverEucKrC1,
+    ];
+
+    /// The profile's mapping table: sorted fixed-width records of a two-byte
+    /// wire code and a two-byte scalar.
+    const fn table(self) -> &'static [u8] {
+        match self {
+            Self::Gbk => include_bytes!("mapping-data/gbk.bin"),
+            Self::Big5 => include_bytes!("mapping-data/big5.bin"),
+            Self::ShiftJis | Self::Windows932 => include_bytes!("mapping-data/windows932.bin"),
+            Self::EucKr | Self::Windows949 => include_bytes!("mapping-data/windows949.bin"),
             Self::Windows950 => include_bytes!("mapping-data/windows950.bin"),
-            Self::ReceiverBig5Glibc239 => include_bytes!("mapping-data/receiver_big5_glibc239.bin"),
-            Self::ReceiverWindows932Pua => include_bytes!("mapping-data/receiver_cp932_pua.bin"),
+            Self::ReceiverBig5 => include_bytes!("mapping-data/receiver_big5.bin"),
+            Self::ReceiverEucKrC1 => include_bytes!("mapping-data/receiver_euc_kr.bin"),
+            Self::ReceiverGbk => include_bytes!("mapping-data/receiver_gbk.bin"),
+            Self::ReceiverShiftJis => include_bytes!("mapping-data/receiver_shift_jis.bin"),
+        }
+    }
+
+    /// The last byte the profile decodes as itself although its table does
+    /// not hold it: ASCII's, Shift_JIS's 0x80, or the receiver EUC-KR's C1
+    /// control 0x9F.
+    const fn as_itself(self) -> u8 {
+        match self {
+            Self::ShiftJis => 0x80,
+            Self::ReceiverEucKrC1 => 0x9f,
+            _ => 0x7f,
+        }
+    }
+
+    /// The inclusive ranges of the bytes that may lead a pair. Big5's are
+    /// those of its standard part; the decoder takes the supplement's, 0x81 to
+    /// 0xA0 and 0xFA to 0xFE, with what else lies outside its table.
+    const fn lead_ranges(self) -> &'static [(u8, u8)] {
+        match self {
+            Self::ShiftJis | Self::Windows932 => &[(0x81, 0x9f), (0xe0, 0xfc)],
+            Self::ReceiverShiftJis => &[(0x81, 0x9f), (0xe0, 0xef)],
+            Self::Big5 | Self::ReceiverBig5 => &[(0xa1, 0xf9)],
+            Self::Gbk | Self::ReceiverGbk | Self::EucKr | Self::Windows949 | Self::Windows950 => {
+                &[(0x81, 0xfe)]
+            }
+            Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
+        }
+    }
+
+    /// The inclusive ranges of the bytes that may follow a lead byte.
+    const fn trail_ranges(self) -> &'static [(u8, u8)] {
+        match self {
+            Self::ShiftJis | Self::Windows932 | Self::ReceiverShiftJis => {
+                &[(0x40, 0x7e), (0x80, 0xfc)]
+            }
+            Self::Big5 | Self::Windows950 | Self::ReceiverBig5 => &[(0x40, 0x7e), (0xa1, 0xfe)],
+            Self::Gbk | Self::ReceiverGbk => &[(0x40, 0x7e), (0x80, 0xfe)],
+            Self::EucKr => &[(0x41, 0xfe)],
+            Self::Windows949 => &[(0x41, 0x5a), (0x61, 0x7a), (0x81, 0xfe)],
+            Self::ReceiverEucKrC1 => &[(0xa1, 0xfe)],
+        }
+    }
+
+    // The decoder asks for no ASCII byte. A byte beyond it is searched for
+    // among the profile's records of such bytes and a pair among its pairs: at
+    // most 16 binary-search comparisons; no allocation.
+    //
+    // Out of line, as are `lead` and `trail`: inlined, any of them makes the
+    // decoder's step dearer for every character, ASCII included.
+    #[inline(never)]
+    fn lookup(self, code: u16) -> Option<char> {
+        let Span {
+            as_itself,
+            bytes,
+            pairs,
+            end,
+        } = SPANS[self as usize];
+        let (mut low, mut high) = if let Ok(byte) = u8::try_from(code) {
+            if byte <= as_itself {
+                return Some(char::from(byte));
+            }
+            (bytes, pairs)
+        } else {
+            (pairs, end)
         };
-        let mut low = 0;
-        let mut high = data.len() / 4;
         while low < high {
             let mid = low + (high - low) / 2;
             let at = mid * 4;
-            let key = u16::from_be_bytes([data[at], data[at + 1]]);
+            let key = u16::from_be_bytes([TABLES[at], TABLES[at + 1]]);
             match key.cmp(&code) {
                 std::cmp::Ordering::Less => low = mid + 1,
                 std::cmp::Ordering::Greater => high = mid,
                 std::cmp::Ordering::Equal => {
                     return char::from_u32(u32::from(u16::from_be_bytes([
-                        data[at + 2],
-                        data[at + 3],
+                        TABLES[at + 2],
+                        TABLES[at + 3],
                     ])));
                 }
             }
@@ -110,63 +242,243 @@ impl MultibyteCharset {
         None
     }
 
+    /// Whether `byte` may lead a pair.
+    #[inline(never)]
     fn lead(self, byte: u8) -> bool {
-        match self {
-            Self::ShiftJisUnicode => matches!(byte, 0x81..=0x9f | 0xe0..=0xef),
-            Self::Windows932 | Self::ReceiverWindows932Pua => {
-                matches!(byte, 0x81..=0x9f | 0xe0..=0xfc)
-            }
-            Self::Big5Unicode | Self::ReceiverBig5Glibc239 => matches!(byte, 0xa1..=0xf9),
-            Self::EucKr | Self::ReceiverEucKrC1 | Self::ReceiverEucKrGlibc239 => {
-                matches!(byte, 0xa1..=0xfe)
-            }
-            Self::GbkCp936 | Self::Windows949 | Self::Windows950 => matches!(byte, 0x81..=0xfe),
-        }
+        CLASSES[self as usize][usize::from(byte)] & LEAD != 0
     }
 
+    /// Whether `byte` may follow a lead byte.
+    #[inline(never)]
     fn trail(self, byte: u8) -> bool {
-        match self {
-            Self::ShiftJisUnicode | Self::Windows932 | Self::ReceiverWindows932Pua => {
-                matches!(byte, 0x40..=0x7e | 0x80..=0xfc)
-            }
-            Self::GbkCp936 => matches!(byte, 0x40..=0x7e | 0x80..=0xfe),
-            Self::Big5Unicode | Self::Windows950 | Self::ReceiverBig5Glibc239 => {
-                matches!(byte, 0x40..=0x7e | 0xa1..=0xfe)
-            }
-            Self::EucKr | Self::ReceiverEucKrC1 | Self::ReceiverEucKrGlibc239 => {
-                matches!(byte, 0xa1..=0xfe)
-            }
-            Self::Windows949 => matches!(byte, 0x41..=0x5a | 0x61..=0x7a | 0x81..=0xfe),
-        }
+        CLASSES[self as usize][usize::from(byte)] & TRAIL != 0
+    }
+
+    /// The character of a [`Big5`](Self::Big5) code in plane 2.
+    fn big5_plane2(code: u16) -> Option<char> {
+        let (records, _) = include_bytes!("mapping-data/big5_plane2.bin").as_chunks::<4>();
+        let at = records
+            .binary_search_by_key(&code, |&[lead, trail, ..]| {
+                u16::from_be_bytes([lead, trail])
+            })
+            .ok()?;
+        let [_, _, high, low] = records[at];
+        char::from_u32(0x2_0000 | u32::from(u16::from_be_bytes([high, low])))
+    }
+
+    /// Whether the profile decodes some input its table and lead bytes
+    /// refuse, which [`MultibyteDecoder::outside_table`] takes.
+    const fn decodes_outside_table(self) -> bool {
+        matches!(self, Self::Big5 | Self::Gbk)
     }
 }
 
+/// The code point of a four-byte GB18030 pointer, by the Encoding Standard's
+/// index of ranges: pointer 7457 is U+E7C7, the pointers from 189000 to 1237575
+/// are U+10000 onwards, and those between 39420 and 188999 or beyond are none.
+fn gb18030_ranges(pointer: u32) -> Option<char> {
+    if pointer == 7457 {
+        return Some('\u{e7c7}');
+    }
+    if (39_420..189_000).contains(&pointer) || pointer > 1_237_575 {
+        return None;
+    }
+    if pointer >= 189_000 {
+        return char::from_u32(0x1_0000 + pointer - 189_000);
+    }
+    let (ranges, _) = include_bytes!("mapping-data/gb18030_ranges.bin").as_chunks::<4>();
+    let at = ranges
+        .partition_point(|&[high, low, ..]| u32::from(u16::from_be_bytes([high, low])) <= pointer);
+    let [high, low, code_high, code_low] = ranges[at.checked_sub(1)?];
+    let offset = u32::from(u16::from_be_bytes([high, low]));
+    char::from_u32(u32::from(u16::from_be_bytes([code_high, code_low])) + pointer - offset)
+}
+
+const PROFILES: usize = Kind::ALL.len();
+
+/// Every profile's table, each table once, one after another. A profile's
+/// records are found by an index into it, which needs neither a jump on the
+/// profile nor a relocation of the binary, as a slice per profile would.
+static TABLES: [u8; LAYOUT.len] = {
+    let mut tables = [0; LAYOUT.len];
+    let mut index = 0;
+    while index < PROFILES {
+        let table = Kind::ALL[index].table();
+        let (_, rest) = tables.split_at_mut(LAYOUT.starts[index]);
+        rest.split_at_mut(table.len()).0.copy_from_slice(table);
+        index += 1;
+    }
+    tables
+};
+
+/// Each profile's [`Span`], in [`Kind::ALL`]'s order.
+static SPANS: [Span; PROFILES] = LAYOUT.spans;
+
+/// Where a profile's records lie in [`TABLES`], counted in records: those of
+/// ASCII bytes, those of bytes beyond ASCII and those of pairs follow each
+/// other.
+#[derive(Clone, Copy)]
+struct Span {
+    /// [`Kind::as_itself`].
+    as_itself: u8,
+    /// The first record of a byte beyond ASCII.
+    bytes: usize,
+    /// The first record of a pair.
+    pairs: usize,
+    /// The end of the profile's records.
+    end: usize,
+}
+
+/// Where each profile's table starts in [`TABLES`], and the length of it.
+struct Layout {
+    spans: [Span; PROFILES],
+    /// The byte at which each profile's table starts.
+    starts: [usize; PROFILES],
+    len: usize,
+}
+
+const LAYOUT: Layout = {
+    let mut layout = Layout {
+        spans: [Span {
+            as_itself: 0,
+            bytes: 0,
+            pairs: 0,
+            end: 0,
+        }; PROFILES],
+        starts: [0; PROFILES],
+        len: 0,
+    };
+    let mut index = 0;
+    while index < PROFILES {
+        let profile = Kind::ALL[index];
+        assert!(profile as usize == index, "Kind::ALL out of order");
+        let table = profile.table();
+        let mut earlier = 0;
+        while earlier < index && !same_bytes(Kind::ALL[earlier].table(), table) {
+            earlier += 1;
+        }
+        let start = if earlier < index {
+            layout.starts[earlier]
+        } else {
+            layout.len += table.len();
+            layout.len - table.len()
+        };
+        let (first, records) = (start / 4, table.len() / 4);
+        let mut bytes = 0;
+        while bytes < records && table[bytes * 4] == 0 && table[bytes * 4 + 1] < 0x80 {
+            bytes += 1;
+        }
+        let mut pairs = bytes;
+        while pairs < records && table[pairs * 4] == 0 {
+            pairs += 1;
+        }
+        layout.starts[index] = start;
+        layout.spans[index] = Span {
+            as_itself: profile.as_itself(),
+            bytes: first + bytes,
+            pairs: first + pairs,
+            end: first + records,
+        };
+        index += 1;
+    }
+    layout
+};
+
+const fn same_bytes(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut at = 0;
+    while at < a.len() {
+        if a[at] != b[at] {
+            return false;
+        }
+        at += 1;
+    }
+    true
+}
+
+/// Each profile's classes of every byte, [`LEAD`] and [`TRAIL`], in
+/// [`Kind::ALL`]'s order: a test of a byte is a load, whichever
+/// the profile.
+static CLASSES: [[u8; 256]; PROFILES] = {
+    let mut classes = [[0; 256]; PROFILES];
+    let mut index = 0;
+    while index < PROFILES {
+        let profile = Kind::ALL[index];
+        mark(&mut classes[index], profile.lead_ranges(), LEAD);
+        mark(&mut classes[index], profile.trail_ranges(), TRAIL);
+        index += 1;
+    }
+    classes
+};
+
+/// The class of a byte that may lead a pair.
+const LEAD: u8 = 1;
+/// The class of a byte that may follow a lead byte.
+const TRAIL: u8 = 2;
+
+const fn mark(classes: &mut [u8; 256], ranges: &[(u8, u8)], class: u8) {
+    let mut range = 0;
+    while range < ranges.len() {
+        let (first, last) = ranges[range];
+        let mut byte = first as usize;
+        while byte <= last as usize {
+            classes[byte] |= class;
+            byte += 1;
+        }
+        range += 1;
+    }
+}
+
+/// Lead bytes that stand for a combining mark still to give, the second
+/// character of a [`MultibyteCharset::BIG5`] code that is two: a macron and a
+/// caron. Neither is a Big5 lead byte.
+const MACRON_DUE: u8 = 0x80;
+const CARON_DUE: u8 = 0xff;
+
+/// Lead bytes that stand for a four-byte [`MultibyteCharset::GBK`] code whose
+/// third or fourth byte is due. Neither is a GBK lead byte.
+const THIRD_DUE: u8 = 0x80;
+const FOURTH_DUE: u8 = 0xff;
+
+/// A decoded character and the bytes it was decoded from.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DecodedScalar {
+    /// The Unicode scalar the bytes map to.
     pub value: char,
-    /// Exact byte range in the caller's stream, without joining or rewriting bytes.
+    /// Its byte range in the caller's stream, counted from the decoder's
+    /// origin.
     pub range: Range<usize>,
 }
 
+/// What [`MultibyteDecoder::push`] did with a byte.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DecodeStep {
-    /// The supplied byte was consumed as a lead. This is not physical EOF.
+    /// The byte was taken as a lead byte; push its trail byte. This is not
+    /// the end of input.
     NeedInput,
+    /// The byte completed a character.
     Scalar(DecodedScalar),
-    /// No byte was consumed and no state changed.
+    /// The work budget ran out: no byte was consumed and no state changed.
     Yield,
 }
 
-/// Allocation-free state machine, retaining at most one lead byte.
-/// Each consumed byte costs one work unit, including a bounded table lookup.
-/// A caller may supply bytes from any physical chunk partition without joining
-/// chunks. It retains source owners, labels, epochs and transport outcomes.
-/// Only explicit `finish` asserts final source EOF; starvation is not truncation.
+/// Decodes a multibyte profile a byte at a time, holding at most one lead
+/// byte and allocating nothing. Each byte costs one work unit, its table
+/// lookup included, and chunk boundaries do not change the result. Only
+/// [`finish`](Self::finish) ends the input: a pending lead byte is not
+/// truncation before it. Errors other than cancellation are sticky.
 #[derive(Debug)]
 pub struct MultibyteDecoder {
-    profile: MultibyteCharset,
+    profile: Kind,
     position: usize,
-    lead: Option<u8>,
+    // A typed lead and four-byte pointer state costs 2–17 more instructions per input byte.
+    /// The lead byte whose trail byte is due, or [`MACRON_DUE`] or
+    /// [`CARON_DUE`]; no lead byte is zero.
+    lead: Option<NonZeroU8>,
+    /// The part of a four-byte GB18030 pointer its bytes so far give.
+    four_byte: u32,
     finished: bool,
     failed: Option<Error>,
 }
@@ -177,26 +489,54 @@ const _: () = assert!(size_of::<DecodedScalar>() <= 32);
 const _: () = assert!(size_of::<DecodeStep>() <= 48);
 
 impl MultibyteDecoder {
+    /// A decoder of `profile` whose byte positions start at 0.
     pub fn new(profile: MultibyteCharset) -> Self {
         Self::at_offset(profile, 0)
     }
 
-    /// Use an explicit caller-provided physical origin; no source ID is inferred.
+    /// A decoder of `profile` whose byte positions start at `offset`.
     pub fn at_offset(profile: MultibyteCharset, offset: usize) -> Self {
         Self {
-            profile,
+            profile: profile.0,
             position: offset,
             lead: None,
+            four_byte: 0,
             finished: false,
             failed: None,
         }
     }
 
+    /// The position of the next byte to push.
     pub fn position(&self) -> usize {
         self.position
     }
 
+    /// Decodes `byte`, the byte at [`position`](Self::position). The trail
+    /// byte of a [`MultibyteCharset::BIG5`] code that is two characters gives
+    /// the letter and stays the next byte to push; pushed again it gives the
+    /// combining mark. The first three bytes of a four-byte
+    /// [`MultibyteCharset::GBK`] code need input. `Error::Invalid` for input after
+    /// [`finish`](Self::finish), a trail byte the profile refuses, or a byte
+    /// or pair its table does not map; `Error::Overflow` when the position
+    /// does not fit `usize`.
     pub fn push(
+        &mut self,
+        byte: u8,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<DecodeStep> {
+        let step = self.push_table(byte, work, cancel);
+        match step {
+            Err(error) => self.outside_table(byte).ok_or(error),
+            step => step,
+        }
+    }
+
+    /// [`push`](Self::push) for what the profile's table and lead bytes hold;
+    /// what else [`MultibyteCharset::BIG5`] and [`MultibyteCharset::GBK`]
+    /// decode is refused here and taken by
+    /// [`outside_table`](Self::outside_table).
+    pub(crate) fn push_table(
         &mut self,
         byte: u8,
         work: &mut WorkBudget,
@@ -225,7 +565,7 @@ impl MultibyteDecoder {
             if !self.profile.trail(byte) {
                 return Err(Error::Invalid("invalid multibyte trail"));
             }
-            let code = u16::from_be_bytes([lead, byte]);
+            let code = u16::from_be_bytes([lead.get(), byte]);
             let value = self
                 .profile
                 .lookup(code)
@@ -241,8 +581,8 @@ impl MultibyteDecoder {
         // Historical Shift-JIS maps 0x5C to yen and 0x7E to overline.
         let single = if byte.is_ascii() {
             Some(match (self.profile, byte) {
-                (MultibyteCharset::ShiftJisUnicode, b'\\') => '\u{00a5}',
-                (MultibyteCharset::ShiftJisUnicode, b'~') => '\u{203e}',
+                (Kind::ReceiverShiftJis, b'\\') => '\u{00a5}',
+                (Kind::ReceiverShiftJis, b'~') => '\u{203e}',
                 _ => char::from(byte),
             })
         } else {
@@ -257,15 +597,97 @@ impl MultibyteDecoder {
             }));
         }
         if self.profile.lead(byte) {
-            self.lead = Some(byte);
+            self.lead = NonZeroU8::new(byte);
             self.position = next;
             return Ok(DecodeStep::NeedInput);
         }
         Err(Error::Invalid("unmapped multibyte byte"))
     }
 
-    /// Constant-size explicit EOF control. A partial lead is a sticky Truncated
-    /// error; cancellation is resumable. Repeated successful finish is idempotent.
+    /// The step for `byte`, which [`push_table`](Self::push_table) has just
+    /// refused, where the profile decodes it all the same:
+    /// [`MultibyteCharset::BIG5`] a lead byte of the supplement, a plane 2
+    /// character or one of the codes that are two characters,
+    /// [`MultibyteCharset::GBK`] a byte of a four-byte code. `None` leaves the
+    /// refusal standing.
+    #[cold]
+    pub(crate) fn outside_table(&mut self, byte: u8) -> Option<DecodeStep> {
+        if !self.profile.decodes_outside_table() || self.finished {
+            return None;
+        }
+        self.failed?;
+        let next = self.position.checked_add(1)?;
+        if self.profile == Kind::Gbk {
+            return self.four_byte(byte, next);
+        }
+        let Some(lead) = self.lead else {
+            if !matches!(byte, 0x81..=0xa0 | 0xfa..=0xfe) {
+                return None;
+            }
+            self.failed = None;
+            self.lead = NonZeroU8::new(byte);
+            self.position = next;
+            return Some(DecodeStep::NeedInput);
+        };
+        if !self.profile.trail(byte) {
+            return None;
+        }
+        let start = self.position.checked_sub(1)?;
+        let (value, range, lead) = match [lead.get(), byte] {
+            // The mark of a letter already given: the trail byte's second turn.
+            [MACRON_DUE, _] => ('\u{304}', self.position..next, None),
+            [CARON_DUE, _] => ('\u{30c}', self.position..next, None),
+            // The letter, with the trail byte left for its mark.
+            [0x88, 0x62] => ('\u{ca}', start..self.position, Some(MACRON_DUE)),
+            [0x88, 0x64] => ('\u{ca}', start..self.position, Some(CARON_DUE)),
+            [0x88, 0xa3] => ('\u{ea}', start..self.position, Some(MACRON_DUE)),
+            [0x88, 0xa5] => ('\u{ea}', start..self.position, Some(CARON_DUE)),
+            code => (
+                Kind::big5_plane2(u16::from_be_bytes(code))?,
+                start..next,
+                None,
+            ),
+        };
+        self.failed = None;
+        self.lead = lead.and_then(NonZeroU8::new);
+        self.position = range.end;
+        Some(DecodeStep::Scalar(DecodedScalar { value, range }))
+    }
+
+    /// A byte of a four-byte GB18030 code after its lead byte: a second byte
+    /// 0x30 to 0x39, a third 0x81 to 0xFE, a fourth 0x30 to 0x39. The pointer
+    /// is ((first − 0x81) × 10 + second − 0x30) × 1260 + (third − 0x81) × 10 +
+    /// fourth − 0x30.
+    fn four_byte(&mut self, byte: u8, next: usize) -> Option<DecodeStep> {
+        let (pointer, lead) = match (self.lead?.get(), byte) {
+            (FOURTH_DUE, 0x30..=0x39) => {
+                let pointer = self.four_byte * 10 + u32::from(byte - 0x30);
+                let value = gb18030_ranges(pointer)?;
+                let start = self.position.checked_sub(3)?;
+                self.failed = None;
+                self.lead = None;
+                self.position = next;
+                return Some(DecodeStep::Scalar(DecodedScalar {
+                    value,
+                    range: start..next,
+                }));
+            }
+            (THIRD_DUE, 0x81..=0xfe) => (self.four_byte * 126 + u32::from(byte - 0x81), FOURTH_DUE),
+            (first @ 0x81..=0xfe, 0x30..=0x39) => (
+                u32::from(first - 0x81) * 10 + u32::from(byte - 0x30),
+                THIRD_DUE,
+            ),
+            _ => return None,
+        };
+        self.four_byte = pointer;
+        self.failed = None;
+        self.lead = NonZeroU8::new(lead);
+        self.position = next;
+        Some(DecodeStep::NeedInput)
+    }
+
+    /// Ends the input. A pending lead byte is a sticky `Error::Truncated`;
+    /// cancellation is resumable, and finishing again succeeds.
     pub fn finish(&mut self, cancel: &AtomicBool) -> Result<()> {
         cancelled(cancel)?;
         if let Some(error) = self.failed {

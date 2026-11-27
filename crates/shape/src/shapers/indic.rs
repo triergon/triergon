@@ -3,6 +3,7 @@
 //! around the base consonant, reph and pre-base forms, as HarfBuzz's Indic
 //! shaper does it for both the old (`deva`) and new (`dev2`) OpenType script
 //! specifications.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::Pause;
 use super::syllabic::{self, ANY, DottedCircle, Machine, for_each_syllable, syllable_type};
@@ -668,8 +669,9 @@ fn sort_syllable(
     end: usize,
 ) -> Result<usize> {
     let infos = buffer.infos_mut();
-    // The syllable field remembers each glyph's place while sorting; syllables
-    // are at most 64 glyphs, so places fit and 255 is free.
+    // Permutation cycles are read only for syllables of at most 127 glyphs.
+    const VISITED: u8 = u8::MAX;
+    // The syllable field remembers each glyph's place while sorting.
     let syllable = infos[start].syllable;
     for (place, info) in infos[start..end].iter_mut().enumerate() {
         info.syllable = place as u8;
@@ -708,7 +710,7 @@ fn sort_syllable(
     } else {
         // Merge each cycle of the sort permutation that ends after the base.
         for i in base..end {
-            if buffer.infos()[i].syllable == u8::MAX {
+            if buffer.infos()[i].syllable == VISITED {
                 continue;
             }
             let (mut min, mut max) = (i, i);
@@ -718,7 +720,7 @@ fn sort_syllable(
                 max = max.max(j);
                 let infos = buffer.infos_mut();
                 let next = start + usize::from(infos[j].syllable);
-                infos[j].syllable = u8::MAX;
+                infos[j].syllable = VISITED;
                 j = next;
             }
             buffer.merge_clusters(base.max(min), max + 1)?;

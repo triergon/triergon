@@ -1,5 +1,6 @@
 //! Group complete E-AC-3 syncframes in a single private audio stream.
-use crate::Pes;
+use crate::pes::Pes;
+use crate::psi::{descriptor_tag, stream_type};
 use crate::reader::model::{DependentSyncframe, Shared};
 use crate::reader::{Ac3AccessUnit, ReaderLimits, Track};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -7,9 +8,10 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, InputRequest, InputWindow, Result, SourceCapabilities,
     SourceId, SourceLocation, Step, WorkBudget,
 };
-use triergon_framing::{
+use triergon_framing::BuildStep;
+use triergon_framing::ac3::{
     Ac3Frame, Ac3FrameDetails, Ac3FrameFacts, Ac3FrameLimits, Ac3FrameReader, Ac3StreamSelection,
-    BuildStep, Eac3BsiLimits, Eac3BsiParser,
+    Eac3BsiLimits, Eac3BsiParser,
 };
 
 // A/52 Annex E §2.3.1 permits eight sequential dependent substreams
@@ -17,6 +19,16 @@ use triergon_framing::{
 const MAX_DEPENDENTS: usize = 8;
 // The 11-bit frame size gives the number of 16-bit words minus one.
 const MAX_SYNCFRAME_BYTES: usize = 2 * (1 << 11);
+
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the resumable parser stays inline without a separate allocation"
+)]
+enum ConverterSync {
+    Unchecked,
+    Reading(Eac3BsiParser),
+    Confirmed,
+}
 
 pub(super) struct Reader {
     framer: Ac3FrameReader,
@@ -26,8 +38,7 @@ pub(super) struct Reader {
     maximum_incomplete_bytes: usize,
     group: Option<Group>,
     pending: Option<Ac3Frame>,
-    bsi: Option<Eac3BsiParser>,
-    converter_sync_checked: bool,
+    converter_sync: ConverterSync,
     sealed: bool,
     end: Option<SourceLocation>,
 }
@@ -44,8 +55,8 @@ impl Reader {
         // separately. This lane admits only the primary independent service.
         for descriptor in track.stream().descriptors() {
             let descriptor = descriptor?;
-            if track.stream().stream_type == 0x06
-                && descriptor.tag == 0x7a
+            if track.stream().stream_type == stream_type::PES_PRIVATE_DATA
+                && descriptor.tag == descriptor_tag::DVB_EAC3
                 && descriptor
                     .dvb_eac3()?
                     .substreams
@@ -58,7 +69,7 @@ impl Reader {
             }
         }
         let syncframe_bytes = limits.maximum_audio_frame_bytes.min(MAX_SYNCFRAME_BYTES);
-        let direct_carriage = track.stream().stream_type == 0x87;
+        let direct_carriage = track.stream().stream_type == stream_type::ATSC_EAC3;
         let maximum_syncframes = (1 + MAX_DEPENDENTS) * if direct_carriage { 6 } else { 1 };
         let maximum_group_bytes = syncframe_bytes
             .checked_mul(maximum_syncframes)
@@ -92,8 +103,7 @@ impl Reader {
             maximum_incomplete_bytes,
             group: None,
             pending: None,
-            bsi: None,
-            converter_sync_checked: false,
+            converter_sync: ConverterSync::Unchecked,
             sealed: false,
             end: None,
         })
@@ -164,6 +174,12 @@ impl Reader {
         self.framer.finish(request.source, request.token)
     }
 
+    // Cold refusals here and in `Group::append` measured +0.226% on ATSC E-AC-3 (this step,
+    // inlined into `Framer::step`, grows by 182 instructions).
+    #[expect(
+        clippy::expect_used,
+        reason = "error returns +0.12 to +0.14%, cold refusals +0.226%"
+    )]
     pub(super) fn step(
         &mut self,
         work: &mut WorkBudget,
@@ -177,14 +193,11 @@ impl Reader {
                 return Ok(Step::Yield);
             }
             if self.sealed {
-                if self.direct_carriage {
-                    self.group
-                        .as_ref()
-                        .expect("sealed E-AC-3 group")
-                        .validate_complete()?;
-                }
                 let lookahead = self.pending.as_ref().map(Ac3Frame::bytes);
                 let group = self.group.as_mut().expect("sealed E-AC-3 group");
+                if self.direct_carriage {
+                    group.validate_complete()?;
+                }
                 let Some(unit) = group.materialize(&self.pool, lookahead, work, cancel)? else {
                     return Ok(Step::Yield);
                 };
@@ -206,7 +219,11 @@ impl Reader {
                         continue;
                     }
                     Ok(Step::Backpressure(never)) => match never {},
-                    Err(error @ Error::Backpressure { requested, .. }) => {
+                    Err(
+                        error @ Error::Backpressure(triergon_core::Backpressure {
+                            requested, ..
+                        }),
+                    ) => {
                         if let Some(group) = &self.group {
                             require(&self.pool, group.storage()?, requested)?;
                         }
@@ -217,16 +234,15 @@ impl Reader {
                 // A completed frame remains staged if its framer used the grant.
                 continue;
             }
-            if let Some(parser) = &mut self.bsi {
+            if let ConverterSync::Reading(parser) = &mut self.converter_sync {
                 match parser.step(work, cancel)? {
-                    BuildStep::Complete => unreachable!("E-AC-3 BSI consumed once"),
+                    BuildStep::Complete => return Err(Error::Truncated),
                     BuildStep::Yield => return Ok(Step::Yield),
                     BuildStep::Ready(bsi) => {
                         if bsi.facts().converter_sync != Some(true) {
                             return Err(Error::Invalid("ATSC E-AC-3 first converter sync"));
                         }
-                        self.bsi = None;
-                        self.converter_sync_checked = true;
+                        self.converter_sync = ConverterSync::Confirmed;
                     }
                 }
                 continue;
@@ -270,23 +286,21 @@ impl Reader {
                         // independent frame. Inspect its BSI cooperatively.
                         if self.direct_carriage
                             && facts.header.blocks < 6
-                            && !self.converter_sync_checked
+                            && matches!(self.converter_sync, ConverterSync::Unchecked)
                         {
-                            if self.bsi.is_none() {
-                                self.bsi = Some(Eac3BsiParser::new(
-                                    &self.pool,
-                                    frame.clone(),
-                                    Eac3BsiLimits {
-                                        maximum_frame_bytes: MAX_SYNCFRAME_BYTES,
-                                        maximum_bsi_bits: MAX_SYNCFRAME_BYTES * 8,
-                                    },
-                                )?);
-                            }
+                            self.converter_sync = ConverterSync::Reading(Eac3BsiParser::new(
+                                &self.pool,
+                                frame.clone(),
+                                Eac3BsiLimits {
+                                    maximum_frame_bytes: MAX_SYNCFRAME_BYTES,
+                                    maximum_bsi_bits: MAX_SYNCFRAME_BYTES * 8,
+                                },
+                            )?);
                             continue;
                         }
                         let frame = self.pending.take().expect("E-AC-3 primary");
                         self.group = Some(Group::new(frame));
-                        self.converter_sync_checked = false;
+                        self.converter_sync = ConverterSync::Unchecked;
                     }
                 }
                 Ac3FrameDetails::Eac3 {
@@ -379,6 +393,11 @@ impl Group {
             })
     }
 
+    // Cloning the dependent into a reserved slot measured +0.161%, a cold refusal +0.226%.
+    #[expect(
+        clippy::expect_used,
+        reason = "error returns +0.12 to +0.14%, cold refusals +0.226%"
+    )]
     fn append(
         &mut self,
         pool: &Budget,
@@ -419,7 +438,7 @@ impl Group {
         pending: &mut Option<Ac3Frame>,
         maximum_bytes: usize,
     ) -> Result<()> {
-        let facts = pending.as_ref().expect("E-AC-3 primary").facts();
+        let facts = pending.as_ref().ok_or(Error::Truncated)?.facts();
         let blocks = self.blocks + facts.header.blocks;
         if blocks > 6 || facts.header.sample_rate_hz != self.first.header.sample_rate_hz {
             return Err(Error::Invalid("ATSC E-AC-3 independent block sequence"));
@@ -444,7 +463,7 @@ impl Group {
         pending: &mut Option<Ac3Frame>,
         maximum_bytes: usize,
     ) -> Result<()> {
-        let frame = pending.as_ref().expect("staged E-AC-3 syncframe");
+        let frame = pending.as_ref().ok_or(Error::Truncated)?;
         let facts = frame.facts();
         let count = self.dependents.as_ref().map_or(0, BudgetVec::len);
         let length = self
@@ -479,22 +498,21 @@ impl Group {
                 .ok_or(Error::Overflow)?,
         )?;
         // Reserve before moving the staged syncframe so a failed append can retry.
-        let make = |_| DependentSyncframe {
-            facts,
-            pending_bytes: Some(
-                pending
-                    .take()
-                    .expect("staged E-AC-3 dependent")
-                    .into_bytes(),
-            ),
-        };
-        if let Some(dependents) = &mut self.dependents {
-            dependents.try_extend_with(1, make)?;
+        let dependents = if let Some(dependents) = &mut self.dependents {
+            dependents.try_reserve_exact(1)?;
+            dependents
         } else {
             let mut dependents = BudgetVec::new(pool);
-            dependents.try_extend_with(1, make)?;
-            self.dependents = Some(dependents);
-        }
+            dependents.try_reserve_exact(1)?;
+            self.dependents.insert(dependents)
+        };
+        let frame = pending.take().ok_or(Error::Truncated)?;
+        dependents
+            .try_push(DependentSyncframe {
+                facts,
+                pending_bytes: Some(frame.into_bytes()),
+            })
+            .map_err(|refused| refused.error)?;
         self.length = length;
         Ok(())
     }
@@ -507,11 +525,15 @@ impl Group {
         cancel: &AtomicBool,
     ) -> Result<Option<Ac3AccessUnit>> {
         if self.dependents.is_none() {
-            return Ok(work.try_charge(1).then(|| Ac3AccessUnit {
-                first: self.first,
-                bytes: self.primary.take().expect("E-AC-3 primary"),
-                dependents: None,
-            }));
+            return Ok(if work.try_charge(1) {
+                self.primary.take().map(|bytes| Ac3AccessUnit {
+                    first: self.first,
+                    bytes,
+                    dependents: None,
+                })
+            } else {
+                None
+            });
         }
         let lookahead = lookahead.map_or(0, Bytes::retained_storage_bytes);
         if self.joined.is_none() {
@@ -529,7 +551,9 @@ impl Group {
             joined.try_reserve_exact(self.length)?;
             self.joined = Some(joined);
         }
-        let dependents = self.dependents.as_mut().expect("E-AC-3 dependent table");
+        let Some((dependents, joined)) = self.dependents.as_mut().zip(self.joined.as_mut()) else {
+            return Err(Error::Truncated);
+        };
         while self.frame_index <= dependents.len() {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -539,16 +563,15 @@ impl Group {
             } else {
                 &mut dependents.as_mut_slice()[self.frame_index - 1].pending_bytes
             };
-            let bytes = source.as_ref().expect("pending E-AC-3 syncframe bytes");
+            let Some(bytes) = source.as_ref() else {
+                return Err(Error::Truncated);
+            };
             let count = work.take((bytes.len() - self.copied).min(4096) as u64) as usize;
             if count == 0 {
                 return Ok(None);
             }
             let end = self.copied + count;
-            self.joined
-                .as_mut()
-                .expect("E-AC-3 group buffer")
-                .try_extend_from_slice(&bytes[self.copied..end])?;
+            joined.try_extend_from_slice(&bytes[self.copied..end])?;
             self.copied = end;
             if end == bytes.len() {
                 *source = None;
@@ -574,9 +597,14 @@ impl Group {
             overhead,
         )?;
         let charge = pool.reserve(metadata)?;
-        match self.joined.take().expect("joined E-AC-3 group").freeze() {
+        let Some(joined) = self.joined.take() else {
+            return Err(Error::Truncated);
+        };
+        match joined.freeze() {
             Ok(bytes) => {
-                let frames = self.dependents.take().expect("E-AC-3 dependent table");
+                let Some(frames) = self.dependents.take() else {
+                    return Err(Error::Truncated);
+                };
                 Ok(Some(Ac3AccessUnit {
                     first: self.first,
                     bytes,
@@ -584,7 +612,7 @@ impl Group {
                 }))
             }
             Err(error) => {
-                self.joined = Some(error.buffer);
+                self.joined = Some(error.value);
                 Err(error.error)
             }
         }
@@ -610,7 +638,7 @@ fn require(pool: &Budget, retained: usize, additional: usize) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use triergon_framing::probe_ac3_header;
+    use triergon_framing::ac3;
 
     const FRAME_BYTES: usize = 32;
     const GROUP_BYTES: usize = 2 * FRAME_BYTES;
@@ -630,7 +658,7 @@ mod tests {
             source: SourceId(0),
             generation: 1,
             offset: 0,
-            header: probe_ac3_header(&frame).unwrap(),
+            header: ac3::probe_header(&frame).unwrap(),
         };
         let primary = Bytes::copy_from_slice(pool, &frame).unwrap();
         let frame = syncframe(true);
@@ -640,7 +668,7 @@ mod tests {
             .try_push(DependentSyncframe {
                 facts: Ac3FrameFacts {
                     offset: FRAME_BYTES as u64,
-                    header: probe_ac3_header(&frame).unwrap(),
+                    header: ac3::probe_header(&frame).unwrap(),
                     ..first
                 },
                 pending_bytes: Some(Bytes::copy_from_slice(pool, &frame).unwrap()),
@@ -705,10 +733,10 @@ mod tests {
             group
                 .append(&pool, &mut pending, 0, GROUP_BYTES)
                 .unwrap_err(),
-            Error::Backpressure {
+            Error::Backpressure(triergon_core::Backpressure {
                 requested: size_of::<DependentSyncframe>(),
                 available: 0,
-            }
+            })
         );
         assert_eq!(pending.as_ref().unwrap().facts(), facts);
         assert_eq!(pool.available(), 0);
@@ -761,10 +789,10 @@ mod tests {
                 group
                     .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
                     .unwrap_err(),
-                Error::Backpressure {
+                Error::Backpressure(triergon_core::Backpressure {
                     requested: GROUP_BYTES,
                     available: GROUP_BYTES - 1
-                }
+                })
             );
             assert!(group.joined.is_none());
         }
@@ -815,10 +843,10 @@ mod tests {
             group
                 .materialize(&pool, Some(&staged), &mut WorkBudget::new(1), &cancel)
                 .unwrap_err(),
-            Error::Backpressure {
+            Error::Backpressure(triergon_core::Backpressure {
                 requested: Bytes::owner_overhead_bytes(),
                 available: 0
-            }
+            })
         );
         drop(pressure);
         let joined = group

@@ -7,8 +7,8 @@
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::ReceiverDecoder;
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Status};
+use triergon_subtitles::pgs::Clock;
 
 /// `(x, y, width, height, stride, pixels)` of one rectangle.
 type Rectangle = (u16, u16, u16, u16, u16, Vec<u8>);
@@ -22,36 +22,36 @@ fn hex(text: &str) -> Vec<u8> {
 
 /// Each packet's presented rectangles, or `None` for a refused packet, at
 /// every work quantum.
-fn presented(packets: &[&str], limits: DisplayLimits) -> Vec<Option<Vec<Rectangle>>> {
+fn presented(packets: &[&str], limits: Limits) -> Vec<Option<Vec<Rectangle>>> {
     let mut runs = [1, 7, 4096].map(|quantum| {
         let budget = Budget::new(64 << 20).unwrap();
         let cancel = AtomicBool::new(false);
-        let mut decoder = ReceiverDecoder::new(&budget, limits, DisplayConfig::default()).unwrap();
+        let mut decoder = Decoder::new(&budget, Options::default(), limits).unwrap();
         let mut out = Vec::new();
         for (index, packet) in packets.iter().enumerate() {
-            let clock = PacketClock {
+            let clock = Clock {
                 pts: Some(90_000 * (index as i64 + 1)),
                 dts: None,
                 timebase: TimeBase::new(1, 90_000).unwrap(),
             };
-            let mut raw = Some(Bytes::copy_from_slice(&budget, &hex(packet)).unwrap());
-            decoder.push(&mut raw, clock, &cancel).unwrap();
+            let raw = Bytes::copy_from_slice(&budget, &hex(packet)).unwrap();
+            decoder.push(raw, &clock, &cancel).unwrap();
             let packet = loop {
                 match decoder
                     .poll(&mut WorkBudget::new(quantum), &cancel)
                     .unwrap()
                 {
-                    RecoveryStatus::OutputReady => break decoder.take_output(&cancel).unwrap(),
-                    RecoveryStatus::Yield => {}
+                    Status::Ready => break decoder.take_output(&cancel).unwrap(),
+                    Status::Yield => {}
                     status => panic!("packet {index}: {status:?}"),
                 }
             };
             if packet.refusal().is_some() {
-                assert!(packet.receiver_output().is_none());
+                assert!(packet.subtitle().is_none());
                 out.push(None);
                 continue;
             }
-            let event = packet.receiver_output().unwrap();
+            let event = packet.subtitle().unwrap();
             assert_eq!(event.pts_microseconds, Some(1_000_000 * (index as i64 + 1)));
             out.push(Some(
                 event
@@ -79,7 +79,7 @@ fn a_declared_length_past_the_rle_limit_is_a_claim_not_an_allocation() {
         "16001300100004100003000000010001000000030000800000",
         "1500070001004002000016001300100004100004000000010001000000030000800000",
     ];
-    let limits = DisplayLimits::default();
+    let limits = Limits::default();
     assert!(limits.max_encoded < 0xff_ffff);
     assert_eq!(
         presented(&packets, limits),
@@ -102,7 +102,7 @@ fn an_object_past_the_pixel_limit_ends_nothing_until_it_is_displayed() {
         "1600131000100010000100000001000100000003000015000f000100c0000008100010000101000015000f000100c00000080002000102020000800000",
         "16001310001000100002000000010001000000030000800000",
     ];
-    let limits = DisplayLimits::default();
+    let limits = Limits::default();
     assert!(limits.max_object_pixels < 4096 * 4096);
     assert_eq!(
         presented(&packets, limits),
@@ -124,7 +124,7 @@ fn an_object_length_refusal_drops_the_objects_data_and_keeps_its_new_size() {
         "16001300100004100002000000010001000000030000800000",
     ];
     assert_eq!(
-        presented(&packets, DisplayLimits::default()),
+        presented(&packets, Limits::default()),
         [
             Some(vec![(3, 0, 2, 1, 2, vec![1, 1])]),
             None,

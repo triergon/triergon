@@ -1,4 +1,5 @@
 //! Offsetting quadratic splines.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::Result;
 
@@ -32,6 +33,10 @@ impl Quadratic {
 
     /// The offset of the control point when it is within the error bounds;
     /// `c` and `s` are the dot and cross products of the end normals.
+    #[allow(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "a NaN error fails the tolerance check"
+    )]
     fn fit(&self, tolerances: &Tolerances, c: f64, s: f64) -> Option<DVector> {
         let [n0, n1] = self.normals;
         // Radial error.

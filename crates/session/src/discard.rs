@@ -1,7 +1,19 @@
 //! The decoded samples a container marks for discarding.
-use triergon_codec::AudioFrame;
+use triergon_codec::{AudioFrame, DownmixLevels, DynAudioDecoder, Error};
 use triergon_core::container::{PacketInfo, Trim};
 use triergon_core::{Rounding, TimeBase};
+
+#[inline(always)]
+pub(crate) fn decode_discarding(
+    decoder: &mut DynAudioDecoder,
+    payload: &[u8],
+    frame: &mut AudioFrame,
+    delay: &mut usize,
+    discard: impl FnOnce() -> Discard,
+) -> Result<(Option<DownmixLevels>, usize), Error> {
+    let levels = decoder.decode(payload, frame)?;
+    Ok((levels, discard().apply(frame, delay)))
+}
 
 /// What a container says about discarding one packet's decoded output: its
 /// [`Trim`] and any samples before time zero (Matroska CodecDelay, Opus pre-skip in
@@ -24,13 +36,14 @@ impl Discard {
     }
 
     /// Drop the marked samples from `frame`, and at least `delay` samples from its start.
+    /// Returns the number of samples dropped from the start, per channel.
     /// What does not fit in this frame stays in `delay` for the next one: a start delay
     /// or start trim may span packets (a LAME skip of 1105 samples over 576-sample
     /// frames, a long Opus pre-skip).
-    pub fn apply(self, frame: &mut AudioFrame, delay: &mut usize) {
+    pub fn apply(self, frame: &mut AudioFrame, delay: &mut usize) -> usize {
         let len = frame.samples_per_channel;
         if len == 0 {
-            return;
+            return 0;
         }
         let samples = |ticks: i64| {
             self.time_base
@@ -51,7 +64,7 @@ impl Discard {
         *delay = pending - start;
         let end = self.trim.end.map_or(0, samples).min(len - start);
         if start == 0 && end == 0 {
-            return;
+            return 0;
         }
         let kept = len - start - end;
         for plane in &mut frame.planes {
@@ -59,6 +72,7 @@ impl Discard {
             plane.truncate(kept);
         }
         frame.samples_per_channel = kept;
+        start
     }
 }
 
@@ -80,7 +94,7 @@ mod tests {
     fn frame(len: usize) -> AudioFrame {
         AudioFrame {
             sample_rate: 48_000,
-            layout: ChannelLayout::default_for(1).unwrap_or_default(),
+            layout: ChannelLayout::MONO,
             samples_per_channel: len,
             sample_format: triergon_codec::SampleFormat::Float,
             planes: vec![(0..len).map(|i| i as f32).collect()],

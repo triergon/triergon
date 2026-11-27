@@ -1,76 +1,81 @@
-//! Resumable per-input operation; repeated loops perform actual parsing.
+//! The resumable reading of one input, phase by phase, from its envelope to
+//! its cue.
 use super::{
-    Cue, Encoding, Format, Input, Limits,
+    Cue, Encoding, Format, Input, Limits, Modifier,
     emit::{Emitter, Fields, Plan, TextSpan, Times},
     sample,
-    unicode::{Cursor, Poll, Probe, cancelled},
+    unicode::{Cursor, Poll, Probe},
 };
+use crate::cancelled;
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
+/// What follows the text once it is validated.
 #[derive(Clone, Copy, Debug)]
-enum Phase {
-    Init,
-    Length,
-    Probe,
-    Validate,
+enum Next {
+    /// tx3g: the modifier boxes after the text.
     Boxes,
+    /// WebVTT in Matroska: the cue's block addition 1.
     Addition,
-    Emit,
-    Done,
+    /// The cue.
+    Cue,
 }
 
 #[derive(Debug)]
 #[expect(
     clippy::large_enum_variant,
-    reason = "Exclusive step outcomes transfer the owned event inline without a second allocation; guarded at 688 bytes."
+    reason = "The phase is stepped in place inside its session; the cue's plan stays inline rather than in an allocation the pool does not charge."
 )]
-pub(crate) enum Action {
-    Yield,
-    Cue(Cue),
-    Complete,
+enum Phase {
+    /// Nothing read yet.
+    Init,
+    /// tx3g: the text length.
+    Length(sample::Length),
+    /// The encoding selector at the start of the text.
+    Probe(Probe, Next),
+    /// The text, checked and its UTF-8 length counted.
+    Validate(Cursor, Next),
+    /// tx3g: the modifier boxes.
+    Boxes(sample::Boxes),
+    /// The WebVTT settings, identifier and comments.
+    Addition(sample::Addition),
+    /// The cue, built from what was read.
+    Emit(Emitter),
+    /// The cue was returned.
+    Done,
 }
-
-const _: () = assert!(size_of::<Action>() <= 688);
 
 #[derive(Debug)]
 pub(crate) struct Session {
     phase: Phase,
+    iso_tx3g: bool,
     text_range: Range<usize>,
     decode_range: Range<usize>,
     encoding: Encoding,
     decoded_len: usize,
-    probe: Option<Probe>,
-    validator: Option<Cursor>,
-    tx3g: Option<sample::Tx3g>,
-    addition: Option<sample::Addition>,
-    fields: Fields,
-    emitter: Option<Emitter>,
 }
 
 impl Session {
-    pub(super) fn new(input: &Input, pool: &Budget, iso_tx3g: bool) -> Self {
+    pub(super) fn new(input: &Input, iso_tx3g: bool) -> Self {
         Self {
             phase: Phase::Init,
+            iso_tx3g,
             text_range: 0..input.payload.len(),
             decode_range: 0..input.payload.len(),
             encoding: Encoding::Opaque,
             decoded_len: 0,
-            probe: None,
-            validator: None,
-            tx3g: (input.format == Format::Tx3g).then(|| sample::Tx3g::new(pool, iso_tx3g)),
-            addition: None,
-            fields: Fields::default(),
-            emitter: None,
         }
     }
 
-    fn sample_plan(&mut self, input: &Input, pool: &Budget) -> Result<()> {
-        let modifiers = if let Some(tx3g) = self.tx3g.as_mut() {
-            tx3g.take_modifiers(pool)
-        } else {
-            BudgetVec::new(pool)
-        };
+    /// The phase that builds the cue from the text read, the WebVTT `fields`
+    /// and the tx3g `modifiers`.
+    fn emit(
+        &self,
+        input: &Input,
+        pool: &Budget,
+        fields: Fields,
+        modifiers: BudgetVec<Modifier>,
+    ) -> Result<Phase> {
         let plan = Plan {
             span: TextSpan {
                 raw: 0..input.payload.len(),
@@ -79,31 +84,11 @@ impl Session {
                 encoding: self.encoding,
                 decoded_len: self.decoded_len,
             },
-            fields: std::mem::take(&mut self.fields),
+            fields,
             times: Times::sample(input)?,
             modifiers,
         };
-        self.emitter = Some(Emitter::new(plan, pool));
-        self.phase = Phase::Emit;
-        Ok(())
-    }
-
-    fn after_validation(&mut self, input: &Input, pool: &Budget) -> Result<()> {
-        match input.format {
-            Format::Tx3g => self.phase = Phase::Boxes,
-            Format::MatroskaWebVtt => {
-                if let Some(addition) = input.addition.as_ref().filter(|addition| addition.id == 1)
-                {
-                    self.addition = Some(sample::Addition::new(addition.bytes.len()));
-                    self.phase = Phase::Addition;
-                } else {
-                    self.sample_plan(input, pool)?;
-                }
-            }
-            Format::Utf8Packet => self.sample_plan(input, pool)?,
-            Format::OpaqueAss => return Err(Error::Invalid("opaque text validation phase")),
-        }
-        Ok(())
+        Ok(Phase::Emit(Emitter::new(plan, pool)))
     }
 
     pub(super) fn step(
@@ -113,128 +98,94 @@ impl Session {
         limits: Limits,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<Action> {
+    ) -> Result<Option<Cue>> {
+        let payload = input.payload.as_ref();
         loop {
             cancelled(cancel)?;
-            match self.phase {
+            match &mut self.phase {
                 Phase::Init => {
                     if !work.try_charge(1) {
-                        return Ok(Action::Yield);
+                        return Ok(None);
                     }
-                    match input.format {
+                    self.phase = match input.format {
                         Format::OpaqueAss => {
                             self.encoding = Encoding::Opaque;
-                            self.sample_plan(input, pool)?;
+                            self.emit(input, pool, Fields::default(), BudgetVec::new(pool))?
                         }
-                        Format::Tx3g => self.phase = Phase::Length,
+                        Format::Tx3g => Phase::Length(sample::Length::default()),
                         Format::Utf8Packet | Format::MatroskaWebVtt => {
                             if input.encoding != Encoding::Utf8 {
                                 return Err(Error::Invalid("text format requires UTF-8"));
                             }
-                            self.probe = Some(Probe::new(self.text_range.clone(), Encoding::Utf8));
-                            self.phase = Phase::Probe;
+                            let next = match &input.addition {
+                                Some(addition)
+                                    if input.format == Format::MatroskaWebVtt
+                                        && addition.id == 1 =>
+                                {
+                                    Next::Addition
+                                }
+                                _ => Next::Cue,
+                            };
+                            Phase::Probe(Probe::new(self.text_range.clone(), Encoding::Utf8), next)
                         }
-                    }
+                    };
                 }
-                Phase::Length => {
-                    match self
-                        .tx3g
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing tx3g envelope"))?
-                        .text(input.payload.as_ref(), work, cancel)?
-                    {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::End => return Err(Error::Invalid("tx3g envelope ended")),
-                        Poll::Ready(range) => {
-                            self.text_range = range.clone();
-                            self.probe = Some(Probe::new(range, Encoding::Tx3gInBand));
-                            self.phase = Phase::Probe;
-                        }
-                    }
+                Phase::Length(length) => {
+                    let Some(range) = length.poll(payload, work, cancel)? else {
+                        return Ok(None);
+                    };
+                    self.text_range = range.clone();
+                    self.phase = Phase::Probe(Probe::new(range, Encoding::Tx3gInBand), Next::Boxes);
                 }
-                Phase::Probe => {
-                    match self
-                        .probe
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing encoding probe"))?
-                        .poll(input.payload.as_ref(), work, cancel)?
-                    {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::End => return Err(Error::Invalid("encoding probe ended")),
-                        Poll::Ready((encoding, range)) => {
-                            self.encoding = encoding;
-                            self.decode_range = range.clone();
-                            self.validator = Some(Cursor::new(range, encoding));
-                            self.probe = None;
-                            self.phase = Phase::Validate;
-                        }
-                    }
+                Phase::Probe(probe, next) => {
+                    let Some((encoding, range)) = probe.poll(payload, work, cancel)? else {
+                        return Ok(None);
+                    };
+                    self.encoding = encoding;
+                    self.decode_range = range.clone();
+                    self.phase = Phase::Validate(Cursor::new(range, encoding), *next);
                 }
-                Phase::Validate => {
-                    let validator = self
-                        .validator
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing Unicode validator"))?;
-                    match validator.poll(input.payload.as_ref(), work, cancel)? {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::Ready(_) => {}
-                        Poll::End => {
-                            self.decoded_len = validator.decoded_len();
-                            self.validator = None;
-                            self.after_validation(input, pool)?;
-                        }
+                Phase::Validate(validator, next) => match validator.poll(payload, work, cancel)? {
+                    Poll::Yield => return Ok(None),
+                    Poll::Ready(_) => {}
+                    Poll::End => {
+                        self.decoded_len = validator.decoded_len();
+                        self.phase = match (*next, &input.addition) {
+                            (Next::Boxes, _) => Phase::Boxes(sample::Boxes::new(
+                                pool,
+                                self.iso_tx3g,
+                                self.text_range.end,
+                            )),
+                            (Next::Addition, Some(addition)) => {
+                                Phase::Addition(sample::Addition::new(&addition.bytes))
+                            }
+                            (Next::Addition | Next::Cue, _) => {
+                                self.emit(input, pool, Fields::default(), BudgetVec::new(pool))?
+                            }
+                        };
                     }
-                }
-                Phase::Boxes => {
-                    match self
-                        .tx3g
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing tx3g modifiers"))?
-                        .boxes(input.payload.as_ref(), limits, work, cancel)?
-                    {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::End => return Err(Error::Invalid("tx3g modifier parser ended")),
-                        Poll::Ready(()) => self.sample_plan(input, pool)?,
+                },
+                Phase::Boxes(boxes) => {
+                    if !boxes.poll(payload, limits, work, cancel)? {
+                        return Ok(None);
                     }
+                    let modifiers = boxes.take_modifiers(pool);
+                    self.phase = self.emit(input, pool, Fields::default(), modifiers)?;
                 }
-                Phase::Addition => {
-                    let bytes = &input
-                        .addition
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing WebVTT addition"))?
-                        .bytes;
-                    match self
-                        .addition
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing addition parser"))?
-                        .poll(bytes.as_ref(), work, cancel)?
-                    {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::End => return Err(Error::Invalid("WebVTT addition parser ended")),
-                        Poll::Ready(fields) => {
-                            self.fields = fields;
-                            self.addition = None;
-                            self.sample_plan(input, pool)?;
-                        }
-                    }
+                Phase::Addition(addition) => {
+                    let Some(fields) = addition.poll(work, cancel)? else {
+                        return Ok(None);
+                    };
+                    self.phase = self.emit(input, pool, fields, BudgetVec::new(pool))?;
                 }
-                Phase::Emit => {
-                    match self
-                        .emitter
-                        .as_mut()
-                        .ok_or(Error::Invalid("missing cue emitter"))?
-                        .poll(input, limits, work, cancel)?
-                    {
-                        Poll::Yield => return Ok(Action::Yield),
-                        Poll::End => return Err(Error::Invalid("cue emitter ended")),
-                        Poll::Ready(cue) => {
-                            self.emitter = None;
-                            self.phase = Phase::Done;
-                            return Ok(Action::Cue(cue));
-                        }
-                    }
+                Phase::Emit(emitter) => {
+                    let Some(cue) = emitter.poll(input, pool, limits, work, cancel)? else {
+                        return Ok(None);
+                    };
+                    self.phase = Phase::Done;
+                    return Ok(Some(cue));
                 }
-                Phase::Done => return Ok(Action::Complete),
+                Phase::Done => return Ok(None),
             }
         }
     }

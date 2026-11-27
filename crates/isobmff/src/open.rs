@@ -1,14 +1,17 @@
 //! Bounded composition of the box, table and fragment readers into one movie.
 //!
-//! [`MovieOpen`] walks the root boxes, retains `ftyp`, `moov` and `moof`, walks the
-//! movie, builds each track's sample table and indexes every fragment. It performs
-//! no I/O: the caller answers its [`OpenStep::NeedInput`] through the shared
-//! [`InputCursor`]. A source without random access can stop at the first media
-//! after a front movie, which [`Movie::read_scope`] records.
+//! [`MovieOpen`] retains `ftyp`, `moov` and `moof` and indexes their tracks and
+//! fragments. The caller supplies each [`OpenStep::NeedInput`] through the
+//! [`InputCursor`]. [`Movie::read_scope`] records whether the open stopped at the
+//! first media box after a front movie or scanned the whole source.
 use crate::{
-    BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxStep, BoxView, BuildStatus, EditList,
-    FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits, MovieHeader,
-    SampleTable, SampleTableBuilder, TerminalMdat, TimingRunPolicy, TrackHeader, Trex, fields,
+    Limits, Next,
+    boxes::{BoxChildren, BoxEvent, BoxHeader, BoxReader, BoxView},
+    fields,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    movie::{EditList, MovieHeader, TrackHeader},
+    payload::TerminalMdat,
+    table::{SampleTable, SampleTableBuilder, TimingRunPolicy},
 };
 use std::{
     ops::Range,
@@ -21,16 +24,13 @@ use triergon_core::{
 fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
     v.try_push(x).map_err(|e| e.error)
 }
-/// A root box reader for the opener and for later root walks of the same source.
-/// Public for `triergon-playback` only.
-#[doc(hidden)]
-pub fn box_reader(
-    input: &InputCursor,
-    metadata_bytes: usize,
-    native_recovery: bool,
-) -> Result<BoxReader> {
-    if native_recovery {
-        BoxReader::new_recovery(input, metadata_bytes, crate::RunRecoveryProfile)
+/// A [`BoxReader`] at the cursor's position that reads root boxes of at most
+/// `metadata_bytes` into memory, as [`MovieOpen`] reads them: for the roots a caller
+/// reads itself after an open that stopped at the first media box. With `recovery` a
+/// terminal `mdat` may declare more bytes than the known source length holds.
+pub fn box_reader(input: &InputCursor, metadata_bytes: usize, recovery: bool) -> Result<BoxReader> {
+    if recovery {
+        BoxReader::new_recovery(input, metadata_bytes)
     } else {
         BoxReader::new(input, metadata_bytes)
     }
@@ -62,13 +62,22 @@ fn validate_quicktime_data_handler(raw: &BoxView) -> Result<()> {
     }
     Ok(())
 }
+/// Limits for one [`MovieOpen`], in addition to the input cursor's memory budget.
 #[derive(Clone, Copy, Debug)]
 pub struct OpenLimits {
+    /// Largest root box read into memory (`ftyp`, `moov`, `moof`), in bytes; default
+    /// 16 MiB.
     pub metadata_bytes: usize,
+    /// Most root boxes in the source; default 4096.
     pub roots: usize,
+    /// Most tracks, and most `trex` boxes; 1 to 64, default 64.
     pub tracks: usize,
+    /// Deepest nesting of container boxes walked in `moov`, which counts as 1; 1 to 32,
+    /// default 12.
     pub depth: usize,
+    /// Most `moof` boxes; default 4096.
     pub fragments: usize,
+    /// Count limits for every box, table and description walk.
     pub format: Limits,
 }
 impl Default for OpenLimits {
@@ -102,8 +111,7 @@ struct Frame {
 }
 #[derive(Debug)]
 struct Walk {
-    frames: BudgetVec<Option<Frame>>,
-    depth: usize,
+    frames: BudgetVec<Frame>,
     quicktime: bool,
     recover_legacy_data_handler: bool,
     parts: BudgetVec<Parts>,
@@ -122,18 +130,17 @@ impl Walk {
     ) -> Result<Self> {
         let mut frames = BudgetVec::new(b);
         frames.try_reserve_exact(l.depth)?;
-        for _ in 0..l.depth {
-            push(&mut frames, None)?;
-        }
-        frames.as_mut_slice()[0] = Some(Frame {
-            children: root.children(0, l.format)?,
-            track: None,
-            kind: root.header().kind,
-            data_info_seen: false,
-        });
+        push(
+            &mut frames,
+            Frame {
+                children: root.children(0, l.format)?,
+                track: None,
+                kind: root.header().kind,
+                data_info_seen: false,
+            },
+        )?;
         Ok(Self {
             frames,
-            depth: 1,
             quicktime: major_brand == Some(*b"qt  "),
             recover_legacy_data_handler,
             parts: BudgetVec::new(b),
@@ -147,9 +154,6 @@ impl Walk {
         if c.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        if self.depth == 0 {
-            return Ok(true);
-        }
         if let Some((raw, track)) = self.pending.as_ref() {
             if !w.try_charge(1) {
                 return Ok(false);
@@ -160,24 +164,17 @@ impl Walk {
             self.pending = None;
             return Ok(false);
         }
-        let at = self.depth - 1;
-        let track = self.frames.as_slice()[at]
-            .as_ref()
-            .ok_or(Error::Invalid("frame missing"))?
-            .track;
-        match self.frames.as_mut_slice()[at]
-            .as_mut()
-            .ok_or(Error::Invalid("frame missing"))?
-            .children
-            .poll(w)?
-        {
-            BoxStep::Yield => Ok(false),
-            BoxStep::End => {
-                self.frames.as_mut_slice()[at] = None;
-                self.depth -= 1;
-                Ok(self.depth == 0)
+        let Some(frame) = self.frames.as_mut_slice().last_mut() else {
+            return Ok(true);
+        };
+        let track = frame.track;
+        match frame.children.poll(w)? {
+            Next::Yield => Ok(false),
+            Next::End => {
+                self.frames.pop();
+                Ok(self.frames.is_empty())
             }
-            BoxStep::Box(raw) => {
+            Next::Item(raw) => {
                 self.seen = self.seen.checked_add(1).ok_or(Error::Overflow)?;
                 if self.seen > l.format.max_boxes {
                     return Err(Error::Limit {
@@ -205,13 +202,12 @@ impl Walk {
             self.descend(raw, Some(index), l)?;
             push(&mut self.parts, Parts::default())?;
         } else if [*b"mdia", *b"minf", *b"dinf", *b"edts", *b"mvex"].contains(&kind) {
-            let parent = self.depth - 1;
             self.descend(raw, track, l)?;
             if self.quicktime
                 && kind == *b"dinf"
-                && let Some(frame) = &mut self.frames.as_mut_slice()[parent]
+                && let [.., parent, _] = self.frames.as_mut_slice()
             {
-                frame.data_info_seen = true;
+                parent.data_info_seen = true;
             }
         } else if kind == *b"mvhd" {
             if self.movie.is_some() {
@@ -226,11 +222,7 @@ impl Walk {
                 });
             }
             push(&mut self.trex, Trex::parse(&raw)?)?;
-        } else if let Some(t) = track {
-            let frames = &self.frames.as_slice()[..self.depth];
-            let parent = frames[self.depth - 1]
-                .as_ref()
-                .ok_or(Error::Invalid("frame missing"))?;
+        } else if let (Some(t), frames @ [.., parent]) = (track, self.frames.as_slice()) {
             let p = &mut self.parts.as_mut_slice()[t];
             match &kind {
                 b"tkhd" => unique(&mut p.tkhd, raw)?,
@@ -242,7 +234,7 @@ impl Walk {
                     if !(self.quicktime || legacy)
                         || !matches!(
                             frames,
-                            [_, Some(trak), Some(mdia), Some(minf)]
+                            [_, trak, mdia, minf]
                                 if [trak.kind, mdia.kind, minf.kind] == [*b"trak", *b"mdia", *b"minf"]
                         )
                     {
@@ -279,27 +271,33 @@ impl Walk {
         Ok(())
     }
     fn descend(&mut self, raw: BoxView, track: Option<usize>, l: OpenLimits) -> Result<()> {
-        if self.depth >= l.depth {
+        if self.frames.len() == l.depth {
             return Err(Error::Limit {
-                requested: self.depth + 1,
+                requested: self.frames.len() + 1,
                 maximum: l.depth,
             });
         }
-        self.frames.as_mut_slice()[self.depth] = Some(Frame {
-            children: raw.children(0, l.format)?,
-            track,
-            kind: raw.header().kind,
-            data_info_seen: false,
-        });
-        self.depth += 1;
-        Ok(())
+        push(
+            &mut self.frames,
+            Frame {
+                children: raw.children(0, l.format)?,
+                track,
+                kind: raw.header().kind,
+                data_info_seen: false,
+            },
+        )
     }
 }
+/// How much of the source an open read; see [`Movie::read_scope`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MetadataReadScope {
+    /// Every root box, to the end of the source.
     CompleteEntity,
+    /// The movie came first and the open stopped at this first `mdat` header; later root
+    /// boxes, fragments included, were not read.
     FrontMetadataBeforeMdat(BoxHeader),
 }
+/// One opened track: its headers, checked sample table, edit list and fragment indexes.
 #[derive(Debug)]
 pub struct MovieTrack {
     pub(crate) header: TrackHeader,
@@ -310,21 +308,18 @@ pub struct MovieTrack {
     pub(crate) next_ordinal: u64,
 }
 
-// Bound the payload retained for indexed backward reads on a pipe.
-/// Public for `triergon-playback` only.
-#[doc(hidden)]
+/// Most payload bytes of `mdat` boxes that precede `moov` an open keeps
+/// ([`Movie::media_cache`]) when its source cannot go back to them.
 pub const RETAINED_MEDIA_BYTES: usize = 32 * 1024;
 
-/// Public for `triergon-playback` only.
-#[doc(hidden)]
+/// The payload of one `mdat` kept in memory, because its source cannot be read again.
 #[derive(Clone, Debug)]
 pub struct CachedMedia {
     pub(crate) start: u64,
     pub(crate) bytes: Bytes,
 }
 
-/// Public for `triergon-playback` only.
-#[doc(hidden)]
+/// A [`CachedMedia`] being read from the input cursor.
 #[derive(Debug)]
 pub struct PendingMedia {
     start: u64,
@@ -333,15 +328,19 @@ pub struct PendingMedia {
 }
 
 impl CachedMedia {
+    /// Absolute offset of the first retained byte.
     pub fn start(&self) -> u64 {
         self.start
     }
+    /// The original contiguous media bytes, charged to the input budget.
     pub fn bytes(&self) -> &Bytes {
         &self.bytes
     }
 }
 
 impl PendingMedia {
+    /// Reserves `length` bytes in `pool` for media starting at absolute offset `start`.
+    /// Returns a budget or allocation error if the reservation fails.
     pub fn new(start: u64, length: usize, pool: &Budget) -> Result<Self> {
         let mut buffer = BudgetVec::new(pool);
         buffer.try_reserve_exact(length)?;
@@ -352,6 +351,9 @@ impl PendingMedia {
         })
     }
 
+    /// Reads exactly the reserved byte count from the caller-positioned cursor.
+    /// Propagates input requests, cancellation and premature end. A ready result
+    /// owns the pooled bytes.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -377,17 +379,20 @@ impl PendingMedia {
                 bytes,
             })),
             Err(failure) => {
-                self.buffer = failure.buffer;
+                self.buffer = failure.value;
                 Err(failure.error)
             }
         }
     }
 }
 
+/// An opened movie: its header, its tracks with their indexes, the `mdat` extents and
+/// the retained root boxes, as far into the source as [`Self::read_scope`] says the
+/// open read.
 #[derive(Debug)]
 pub struct Movie {
     pub(crate) read_scope: MetadataReadScope,
-    pub(crate) native_recovery: bool,
+    pub(crate) recovery: bool,
     pub(crate) source: triergon_core::SourceId,
     pub(crate) generation: u64,
     pub(crate) source_length: Option<u64>,
@@ -400,82 +405,112 @@ pub struct Movie {
     pub(crate) raw_roots: BudgetVec<BoxView>,
     pub(crate) major_brand: Option<[u8; 4]>,
     pub(crate) pool: Budget,
+    /// The streams and plans of FFmpeg's encoded edits, once a
+    /// [`DemuxEditsJob`](crate::compat::mov::edits::DemuxEditsJob) has read them.
+    pub(crate) demux_edits: std::sync::OnceLock<Box<crate::compat::mov::demux_edits::DemuxEdits>>,
 }
 impl Movie {
+    /// The major brand from the first `ftyp` read.
     pub fn major_brand(&self) -> Option<[u8; 4]> {
         self.major_brand
     }
+    /// Whether the open indexed the whole source or stopped at the first media header.
     pub fn read_scope(&self) -> MetadataReadScope {
         self.read_scope
     }
+    /// The terminal size-zero `mdat` of a metadata-first open, if one was encountered.
     pub fn terminal_mdat(&self) -> Option<TerminalMdat> {
         self.terminal_mdat
     }
+    /// The tracks, in `moov` order.
     pub fn tracks(&self) -> &[MovieTrack] {
         self.tracks.as_slice()
     }
+    /// The root boxes read into memory (`ftyp`, `moov`, `moof`), in file order.
     pub fn raw_roots(&self) -> &[BoxView] {
         self.raw_roots.as_slice()
     }
+    /// Clock and duration from `mvhd`.
     pub fn header(&self) -> &MovieHeader {
         &self.movie
     }
+    /// The source the movie was read from.
     pub fn source(&self) -> triergon_core::SourceId {
         self.source
     }
+    /// Source generation captured by [`MovieOpen::finish`], for matching later reads.
     pub fn generation(&self) -> u64 {
         self.generation
     }
+    /// The source length in bytes, if the source stated one.
     pub fn source_length(&self) -> Option<u64> {
         self.source_length
     }
     /// Whether the recovery opener produced this movie.
-    pub fn native_recovery(&self) -> bool {
-        self.native_recovery
+    pub fn recovery(&self) -> bool {
+        self.recovery
     }
     /// Payload extents of the `mdat` boxes, in source order.
     pub fn media(&self) -> &[Range<u64>] {
         self.media.as_slice()
     }
+    /// The fragment defaults of the `trex` boxes in `mvex`.
     pub fn trex(&self) -> &[Trex] {
         self.trex.as_slice()
     }
-    /// Public for `triergon-playback` only.
-    #[doc(hidden)]
+    /// The `mdat` payloads kept in memory, in file order: those that preceded `moov` on
+    /// a source without random access, within [`RETAINED_MEDIA_BYTES`] in all.
     pub fn media_cache(&self) -> &[CachedMedia] {
         self.media_cache.as_slice()
     }
-    /// Public for `triergon-playback` only.
-    #[doc(hidden)]
+    /// The budget the movie's boxes, indexes and kept media are charged to.
     pub fn pool(&self) -> &Budget {
         &self.pool
     }
 }
 impl MovieTrack {
+    /// The track's edit list, if it has an `elst`.
     pub fn edits(&self) -> Option<&EditList> {
         self.edits.as_ref()
     }
+    /// The track's `tkhd`, `mdhd` and `hdlr` facts.
     pub fn header(&self) -> &TrackHeader {
         &self.header
     }
+    /// Checked `stbl`, including the track's sample descriptions.
     pub fn table(&self) -> &SampleTable {
         &self.table
     }
+    /// The track's fragment indexes, in file order.
     pub fn fragments(&self) -> &[FragmentIndex] {
         self.fragments.as_slice()
     }
+    /// The track's `dref` box as read; every sample entry refers to a self-contained
+    /// entry in it.
     pub fn raw_dref(&self) -> &BoxView {
         &self.raw_dref
     }
-    /// The container ordinal the next fragment sample would take.
+    /// 1-based ordinal after the last regular or fragment sample.
     pub fn next_ordinal(&self) -> u64 {
         self.next_ordinal
+    }
+    /// Decode time just after the last regular or fragment sample, in media ticks: where
+    /// a following fragment without `tfdt` starts (ISO/IEC 14496-12 §8.8.12.1). The last
+    /// fragment's end, `None` when its times are unknown, or else the `stts` total, zero
+    /// for an empty table. `Error::Overflow` when that total does not fit.
+    pub fn decode_end(&self) -> Result<Option<i128>> {
+        match self.fragments().last() {
+            Some(fragment) => Ok(fragment.decode_end()),
+            None => self.table.decode_end().map(Some),
+        }
     }
 }
 /// What one [`MovieOpen::advance`] did.
 #[derive(Debug)]
 pub enum OpenStep {
+    /// Call `advance` again, with a new work budget if this one is spent.
     Yield,
+    /// Answer this request through the input cursor, then call `advance` again.
     NeedInput(InputRequest),
     /// A root box was passed or retained.
     Root(BoxHeader),
@@ -483,78 +518,394 @@ pub enum OpenStep {
     Ready,
 }
 
+#[derive(Debug)]
+struct TrackBuild {
+    builder: SampleTableBuilder,
+    refs: Option<BoxChildren>,
+    pending_reference: Option<bool>,
+    description_at: usize,
+}
+
+struct TrackIndexing<'a> {
+    part: &'a mut Parts,
+    tracks: &'a mut BudgetVec<MovieTrack>,
+    at: &'a mut usize,
+    build: &'a mut Option<TrackBuild>,
+    references: &'a mut BudgetVec<bool>,
+    pool: &'a Budget,
+    limits: Limits,
+    timing_policy: TimingRunPolicy,
+    recovery: bool,
+}
+
+impl TrackIndexing<'_> {
+    // A separate track-building frame increases open instructions by about 10%.
+    #[inline(always)]
+    fn poll(self, w: &mut WorkBudget) -> Result<OpenStep> {
+        let p = self.part;
+        if self.build.is_none() {
+            if !w.try_charge(1) {
+                return Ok(OpenStep::Yield);
+            }
+            let raw = required(p.stbl.clone(), "missing sample table")?;
+            let mut builder = SampleTableBuilder::with_timing_policy(
+                raw,
+                self.pool.clone(),
+                self.limits,
+                self.timing_policy,
+            )?;
+            if self.recovery {
+                builder.allow_legacy_dependency_flags();
+            }
+            let dref = p
+                .dref
+                .as_ref()
+                .ok_or(Error::Invalid("missing source data references"))?;
+            if fields::u32_at(dref.payload(), 0)? != 0 {
+                return Err(Error::Unsupported("data reference flags"));
+            }
+            *self.build = Some(TrackBuild {
+                builder,
+                refs: Some(dref.children(8, self.limits)?),
+                pending_reference: None,
+                description_at: 0,
+            });
+            p.stbl = None;
+        }
+        let Some(build) = self.build.as_mut() else {
+            return Ok(OpenStep::Yield);
+        };
+        if let Some(value) = build.pending_reference {
+            if !w.try_charge(1) {
+                return Ok(OpenStep::Yield);
+            }
+            push(self.references, value)?;
+            build.pending_reference = None;
+            return Ok(OpenStep::Yield);
+        }
+        if let Some(refs) = build.refs.as_mut() {
+            match refs.poll(w)? {
+                Next::Yield => return Ok(OpenStep::Yield),
+                Next::Item(raw) => {
+                    if self.references.len() >= self.limits.max_descriptions as usize {
+                        return Err(Error::Limit {
+                            requested: self.references.len() + 1,
+                            maximum: self.limits.max_descriptions as usize,
+                        });
+                    }
+                    build.pending_reference =
+                        Some(raw.header().kind == *b"url " && raw.payload() == [0, 0, 0, 1]);
+                    return Ok(OpenStep::Yield);
+                }
+                Next::End => {
+                    let dref = refs.parent();
+                    if fields::u32_at(dref.payload(), 4)? as usize != self.references.len() {
+                        return Err(Error::Invalid("data reference count"));
+                    }
+                    build.refs = None;
+                }
+            }
+        }
+        build.builder.poll(w)?;
+        let Some(table) = build.builder.built() else {
+            return Ok(OpenStep::Yield);
+        };
+        if let Some(desc) = table.descriptions().get(build.description_at) {
+            if !w.try_charge(1) {
+                return Ok(OpenStep::Yield);
+            }
+            let at = usize::from(desc.data_reference_index)
+                .checked_sub(1)
+                .ok_or(Error::Invalid("zero reference"))?;
+            match self.references.as_slice().get(at) {
+                Some(true) => {}
+                Some(false) => {
+                    return Err(Error::Unsupported("external source data reference"));
+                }
+                None => return Err(Error::Invalid("dangling source data reference")),
+            }
+            build.description_at += 1;
+            return Ok(OpenStep::Yield);
+        }
+        if !w.try_charge(1) {
+            return Ok(OpenStep::Yield);
+        }
+        let tkhd = p.tkhd.as_ref().ok_or(Error::Invalid("missing tkhd"))?;
+        let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
+        let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
+        let header = if self.recovery {
+            crate::compat::mov::field_recovery::RecoveryTrackHeader::parse(tkhd, mdhd, hdlr)?
+                .into_source()
+        } else {
+            TrackHeader::parse(tkhd, mdhd, hdlr)?
+        };
+        if self
+            .tracks
+            .as_slice()
+            .iter()
+            .any(|t| t.header.track_id == header.track_id)
+        {
+            return Err(Error::Invalid("duplicate source track ID"));
+        }
+        let edits = p
+            .elst
+            .clone()
+            .map(|b| EditList::parse(b, self.limits))
+            .transpose()?;
+        self.tracks.try_reserve_exact(1)?;
+        let next_ordinal = table.sample_count().checked_add(1).ok_or(Error::Overflow)?;
+        if let Some(build) = self.build.take() {
+            push(
+                self.tracks,
+                MovieTrack {
+                    header,
+                    next_ordinal,
+                    table: build.builder.finish()?,
+                    edits,
+                    fragments: BudgetVec::new(self.pool),
+                    // Moving the reference into the child walk costs 0.15% on a playback open.
+                    raw_dref: required(p.dref.take(), "missing dref")?,
+                },
+            )?;
+        }
+        p.elst = None;
+        self.references.clear();
+        *self.at += 1;
+        Ok(OpenStep::Yield)
+    }
+}
+
+/// An opened track as a fragment's admission sees it: the opener holds one bare, the
+/// neutral reader inside its reading state.
+pub(crate) trait FragmentTrack {
+    fn opened(&self) -> &MovieTrack;
+    fn opened_mut(&mut self) -> &mut MovieTrack;
+}
+impl FragmentTrack for MovieTrack {
+    fn opened(&self) -> &MovieTrack {
+        self
+    }
+    fn opened_mut(&mut self) -> &mut MovieTrack {
+        self
+    }
+}
+
+/// The fragment defaults of the track `id` among a movie's `trex` boxes.
+pub(crate) fn fragment_defaults(trex: &[Trex], id: u32) -> Result<Trex> {
+    trex.iter()
+        .find(|defaults| defaults.track_id == id)
+        .copied()
+        .ok_or(Error::Invalid("fragment missing trex"))
+}
+
+/// Admits the `traf` boxes of one `moof` to their tracks, in file order: each becomes
+/// the next [`FragmentIndex`] of its track and moves the track's next ordinal past its
+/// samples.
+#[derive(Debug)]
+pub(crate) struct MoofWalk {
+    children: BoxChildren,
+    previous_traf: Option<u64>,
+    traf: TrafStage,
+}
+impl MoofWalk {
+    pub(crate) fn new(moof: &BoxView, limits: Limits) -> Result<Self> {
+        Ok(Self {
+            children: moof.children(0, limits)?,
+            previous_traf: None,
+            traf: TrafStage::Next,
+        })
+    }
+    /// One bounded step; `true` once the `moof` holds no further box. `defaults` gives a
+    /// track's `trex` by its `track_ID`. With `recovery` a zero-size sample is refused, as
+    /// the recovery opener does.
+    #[inline(always)]
+    pub(crate) fn poll<T: FragmentTrack>(
+        &mut self,
+        tracks: &mut [T],
+        defaults: impl FnOnce(u32) -> Result<Trex>,
+        pool: &Budget,
+        limits: Limits,
+        recovery: bool,
+        w: &mut WorkBudget,
+    ) -> Result<bool> {
+        match &mut self.traf {
+            TrafStage::Next => match self.children.poll(w)? {
+                Next::Yield => {}
+                Next::Item(raw) if raw.header().kind == *b"traf" => {
+                    self.traf = TrafStage::Scan {
+                        children: raw.children(0, limits)?,
+                        raw,
+                    };
+                }
+                Next::Item(_) => {}
+                Next::End => return Ok(true),
+            },
+            TrafStage::Scan { raw, children } => match children.poll(w)? {
+                Next::Yield => {}
+                Next::Item(header) if header.header().kind == *b"tfhd" => {
+                    let id = fields::u32_at(header.payload(), 4)?;
+                    let track = tracks
+                        .iter()
+                        .position(|t| t.opened().header.track_id == id)
+                        .ok_or(Error::Invalid("fragment unknown source track"))?;
+                    let t = tracks[track].opened();
+                    let defaults = defaults(id)?;
+                    let first = t.next_ordinal;
+                    let context = FragmentContext {
+                        moof_start: self.children.parent().header().start,
+                        implicit_base: self
+                            .previous_traf
+                            .map_or(ImplicitBase::FirstTraf, ImplicitBase::PreviousTraf),
+                        decode_origin: None,
+                        first_ordinal: first,
+                        description_count: u32::try_from(t.table.descriptions().len())
+                            .map_err(|_| Error::Overflow)?,
+                    };
+                    let build = if recovery {
+                        FragmentBuilder::new_header_open
+                    } else {
+                        FragmentBuilder::new_with_inherited_decode_end
+                    };
+                    let inherited = t.decode_end()?;
+                    self.traf = TrafStage::Build {
+                        track,
+                        builder: build(
+                            raw.clone(),
+                            defaults,
+                            context,
+                            pool.clone(),
+                            limits,
+                            inherited,
+                        )?,
+                    };
+                }
+                Next::Item(_) => {}
+                Next::End => return Err(Error::Invalid("traf missing tfhd")),
+            },
+            TrafStage::Build { track, builder } => {
+                if !builder.is_ready() {
+                    builder.poll(w)?;
+                    return Ok(false);
+                }
+                if !w.try_charge(1) {
+                    return Ok(false);
+                }
+                let (count, end) = builder.opening_extent()?;
+                let track = tracks[*track].opened_mut();
+                let next = track
+                    .next_ordinal
+                    .checked_add(count)
+                    .ok_or(Error::Overflow)?;
+                track.fragments.try_reserve_exact(1)?;
+                if let TrafStage::Build { builder, .. } =
+                    std::mem::replace(&mut self.traf, TrafStage::Next)
+                {
+                    push(&mut track.fragments, builder.finish()?)?;
+                }
+                track.next_ordinal = next;
+                self.previous_traf = Some(end);
+            }
+        }
+        Ok(false)
+    }
+}
+
+#[derive(Debug)]
+#[repr(u8)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "Keep the builder inline without a per-fragment allocation"
+)]
+enum TrafStage {
+    Next,
+    Scan {
+        raw: BoxView,
+        children: BoxChildren,
+    },
+    Build {
+        track: usize,
+        builder: FragmentBuilder,
+    },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum OpenMode {
+    Complete,
+    Progressive,
+    Recovery,
+}
+
 /// The resumable opener over a caller-driven [`InputCursor`]: it walks the root
 /// boxes, the movie and every fragment, and validates each track.
 #[derive(Debug)]
+#[repr(C)]
 pub struct MovieOpen {
     reader: BoxReader,
-    native_recovery: bool,
-    timing_policy: TimingRunPolicy,
-    prefer_front: bool,
-    limits: OpenLimits,
-    pool: Budget,
+    pending_header: Option<BoxHeader>,
+    read_scope: MetadataReadScope,
+    track_build: Option<TrackBuild>,
+    fragment_walk: Option<MoofWalk>,
+    // The walk of moov after the root boxes are read.
+    walk: Option<Walk>,
+    terminal_mdat: Option<TerminalMdat>,
+    pending_metadata: Option<BoxView>,
+    moov: Option<BoxView>,
     roots: BudgetVec<BoxView>,
     media: BudgetVec<Range<u64>>,
     media_cache: BudgetVec<CachedMedia>,
-    pending_media: Option<PendingMedia>,
-    remaining_cache_bytes: usize,
-    terminal_mdat: Option<TerminalMdat>,
-    pending_header: Option<BoxHeader>,
-    pending_metadata: Option<BoxView>,
     moofs: BudgetVec<BoxView>,
-    moov: Option<BoxView>,
-    brand: Option<[u8; 4]>,
-    scan_done: bool,
-    read_scope: MetadataReadScope,
-    top_count: usize,
-    walk: Option<Walk>,
     tracks: BudgetVec<MovieTrack>,
-    track_at: usize,
-    builder: Option<SampleTableBuilder>,
-    refs: Option<BoxChildren>,
     references: BudgetVec<bool>,
-    pending_reference: Option<bool>,
-    description_at: usize,
-    built_table: Option<SampleTable>,
+    pending_media: Option<PendingMedia>,
+    pool: Budget,
+    limits: OpenLimits,
+    remaining_cache_bytes: usize,
+    top_count: usize,
+    track_at: usize,
     fragment_moof: usize,
-    fragment_children: Option<BoxChildren>,
-    fragment_raw: Option<BoxView>,
-    fragment_scan: Option<BoxChildren>,
-    fragment_track: Option<usize>,
-    fragment_job: Option<FragmentBuilder>,
-    pending_fragment: Option<FragmentIndex>,
-    previous_traf: Option<u64>,
+    mode: OpenMode,
+    timing_policy: TimingRunPolicy,
+    // Leave the following fields at the same offsets.
+    reserved: [u8; 1],
+    brand: Option<[u8; 4]>,
     ready: bool,
 }
 impl MovieOpen {
+    /// An opener reading every root box from the cursor's position; `Error::Invalid` for
+    /// limits outside the ranges [`OpenLimits`] states.
     pub fn new(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
-        Self::new_inner(input, limits, false, false)
+        Self::new_inner(input, limits, OpenMode::Complete)
     }
 
-    /// Choose how the opener validates surplus sample timing.
-    /// Inspect each track's sample table for the declared surplus counts.
+    /// Sets the surplus timing policy for tables whose build has yet to start.
     pub fn set_timing_policy(&mut self, policy: TimingRunPolicy) {
         self.timing_policy = policy;
     }
 
-    /// Stop at the first media header after a front movie, even when the
-    /// transport offers ranges. The caller parses later fragments.
+    /// Opens a metadata-first movie through the first media header, even on a
+    /// seekable source. The caller reads later fragments. Limits are as in [`Self::new`].
     pub fn new_progressive(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
-        Self::new_inner(input, limits, false, true)
+        Self::new_inner(input, limits, OpenMode::Progressive)
     }
 
-    /// Preserve terminal media declarations and admit the supported legacy
-    /// QuickTime metadata in the recovery view.
+    /// The open a source's capabilities call for: [`new`](Self::new) with random
+    /// access, [`new_progressive`](Self::new_progressive) without.
+    pub(crate) fn for_source(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
+        if input.capabilities().random_access {
+            Self::new(input, limits)
+        } else {
+            Self::new_progressive(input, limits)
+        }
+    }
+
+    /// Opens with terminal media declarations preserved and legacy QuickTime
+    /// data handlers and dependency flags admitted. Limits are as in [`Self::new`].
     pub fn new_recovery(input: &InputCursor, limits: OpenLimits) -> Result<Self> {
-        Self::new_inner(input, limits, true, false)
+        Self::new_inner(input, limits, OpenMode::Recovery)
     }
 
-    fn new_inner(
-        input: &InputCursor,
-        limits: OpenLimits,
-        native_recovery: bool,
-        prefer_front: bool,
-    ) -> Result<Self> {
+    fn new_inner(input: &InputCursor, limits: OpenLimits, mode: OpenMode) -> Result<Self> {
         if limits.tracks == 0
             || limits.tracks > 64
             || limits.depth == 0
@@ -564,12 +915,12 @@ impl MovieOpen {
             return Err(Error::Invalid("MP4 adapter open limits"));
         }
         let pool = input.budget().clone();
-        let reader = box_reader(input, limits.metadata_bytes, native_recovery)?;
+        let reader = box_reader(input, limits.metadata_bytes, mode == OpenMode::Recovery)?;
         Ok(Self {
             reader,
-            native_recovery,
-            timing_policy: TimingRunPolicy::Strict,
-            prefer_front,
+            mode,
+            timing_policy: TimingRunPolicy::default(),
+            reserved: [0],
             limits,
             pool: pool.clone(),
             roots: BudgetVec::new(&pool),
@@ -583,26 +934,15 @@ impl MovieOpen {
             moofs: BudgetVec::new(&pool),
             moov: None,
             brand: None,
-            scan_done: false,
             read_scope: MetadataReadScope::CompleteEntity,
             top_count: 0,
             walk: None,
             tracks: BudgetVec::new(&pool),
             track_at: 0,
-            builder: None,
-            refs: None,
+            track_build: None,
             references: BudgetVec::new(&pool),
-            pending_reference: None,
-            description_at: 0,
-            built_table: None,
             fragment_moof: 0,
-            fragment_children: None,
-            fragment_raw: None,
-            fragment_scan: None,
-            fragment_track: None,
-            fragment_job: None,
-            pending_fragment: None,
-            previous_traf: None,
+            fragment_walk: None,
             ready: false,
         })
     }
@@ -610,7 +950,7 @@ impl MovieOpen {
     pub fn is_ready(&self) -> bool {
         self.ready
     }
-    /// One bounded step. Cancellation is checked where input is read.
+    /// One bounded step. Cancellation is checked during input reads and the `moov` walk.
     pub fn advance(
         &mut self,
         input: &mut InputCursor,
@@ -623,11 +963,55 @@ impl MovieOpen {
         if w.remaining() == 0 {
             return Ok(OpenStep::Yield);
         }
-        if self.pending_header.is_some() {
-            return self.announced_header(input, w);
+        if let Some(header) = self.pending_header {
+            return self.announced_header(header, input, w);
         }
-        if self.pending_metadata.is_some() {
-            return self.metadata(w);
+        if let Some(raw) = self.pending_metadata.as_ref() {
+            if !w.try_charge(1) {
+                return Ok(OpenStep::Yield);
+            }
+            if self.roots.len() >= self.limits.roots {
+                return Err(Error::Limit {
+                    requested: self.roots.len() + 1,
+                    maximum: self.limits.roots,
+                });
+            }
+            let brand = match &raw.header().kind {
+                b"moov" if self.moov.is_some() => {
+                    return Err(Error::Invalid("duplicate structural movie box"));
+                }
+                b"moof" => {
+                    if self.moofs.len() >= self.limits.fragments {
+                        return Err(Error::Limit {
+                            requested: self.moofs.len() + 1,
+                            maximum: self.limits.fragments,
+                        });
+                    }
+                    self.moofs.try_reserve_exact(1)?;
+                    None
+                }
+                b"ftyp" => Some(
+                    raw.payload()
+                        .get(..4)
+                        .ok_or(Error::Truncated)?
+                        .try_into()
+                        .map_err(|_| Error::Truncated)?,
+                ),
+                _ => None,
+            };
+            self.roots.try_reserve_exact(1)?;
+            // Both destination capacities are present before changing source facts.
+            match &raw.header().kind {
+                b"moov" => self.moov = Some(raw.clone()),
+                b"moof" => push(&mut self.moofs, raw.clone())?,
+                b"ftyp" => self.brand = self.brand.or(brand),
+                _ => {}
+            }
+            // Taking the pending box before reserving adds up to 0.141% seek instructions.
+            push(&mut self.roots, raw.clone())?;
+            let header = *raw.header();
+            self.pending_metadata = None;
+            return Ok(OpenStep::Root(header));
         }
         if let Some(pending) = self.pending_media.as_mut() {
             return match pending.poll(input, w, c)? {
@@ -636,8 +1020,11 @@ impl MovieOpen {
                     push(&mut self.media_cache, cached)?;
                     self.pending_media = None;
                     // The cursor is at the next top-level header after the retained MDAT.
-                    self.reader =
-                        box_reader(input, self.limits.metadata_bytes, self.native_recovery)?;
+                    self.reader = box_reader(
+                        input,
+                        self.limits.metadata_bytes,
+                        self.mode == OpenMode::Recovery,
+                    )?;
                     Ok(OpenStep::Yield)
                 }
                 Step::NeedInput(r) => Ok(OpenStep::NeedInput(r)),
@@ -645,7 +1032,7 @@ impl MovieOpen {
                 Step::End(_) => Err(Error::Truncated),
             };
         }
-        if !self.scan_done {
+        let Some(walk) = self.walk.as_mut() else {
             return match self.reader.poll(input, w, c)? {
                 Step::NeedInput(r) => Ok(OpenStep::NeedInput(r)),
                 Step::Yield => Ok(OpenStep::Yield),
@@ -657,10 +1044,9 @@ impl MovieOpen {
                         &self.pool,
                         self.limits,
                         self.brand,
-                        self.native_recovery,
+                        self.mode == OpenMode::Recovery,
                     )?;
                     self.walk = Some(walk);
-                    self.scan_done = true;
                     Ok(OpenStep::Yield)
                 }
                 Step::Ready(BoxEvent::Header(h)) => {
@@ -680,29 +1066,24 @@ impl MovieOpen {
                 }
                 Step::Ready(BoxEvent::Skipped(header)) => Ok(OpenStep::Root(header)),
             };
-        }
-        if self
-            .walk
-            .as_ref()
-            .ok_or(Error::Invalid("walk missing"))?
-            .depth
-            != 0
-        {
-            self.walk
-                .as_mut()
-                .ok_or(Error::Invalid("walk missing"))?
-                .poll(w, c, self.limits)?;
+        };
+        if !walk.frames.is_empty() {
+            walk.poll(w, c, self.limits)?;
             return Ok(OpenStep::Yield);
         }
-        if self.track_at
-            < self
-                .walk
-                .as_ref()
-                .ok_or(Error::Invalid("walk missing"))?
-                .parts
-                .len()
-        {
-            return self.track(w);
+        if let Some(part) = walk.parts.as_mut_slice().get_mut(self.track_at) {
+            return TrackIndexing {
+                part,
+                tracks: &mut self.tracks,
+                at: &mut self.track_at,
+                build: &mut self.track_build,
+                references: &mut self.references,
+                pool: &self.pool,
+                limits: self.limits.format,
+                timing_policy: self.timing_policy,
+                recovery: self.mode == OpenMode::Recovery,
+            }
+            .poll(w);
         }
         if self.fragment_moof < self.moofs.len() {
             return self.fragment(w);
@@ -710,210 +1091,15 @@ impl MovieOpen {
         self.ready = true;
         Ok(OpenStep::Ready)
     }
-    // A frame of its own adds about 10% to the instructions of an open.
-    #[inline(always)]
-    fn track(&mut self, w: &mut WorkBudget) -> Result<OpenStep> {
-        let p = &mut self
-            .walk
-            .as_mut()
-            .ok_or(Error::Invalid("walk missing"))?
-            .parts
-            .as_mut_slice()[self.track_at];
-        if self.builder.is_none() && self.built_table.is_none() {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            let raw = required(p.stbl.clone(), "missing sample table")?;
-            let mut builder = SampleTableBuilder::with_timing_policy(
-                raw,
-                self.pool.clone(),
-                self.limits.format,
-                self.timing_policy,
-            )?;
-            if self.native_recovery {
-                builder.allow_legacy_dependency_flags();
-            }
-            let dref = p
-                .dref
-                .as_ref()
-                .ok_or(Error::Invalid("missing source data references"))?;
-            if fields::u32_at(dref.payload(), 0)? != 0 {
-                return Err(Error::Unsupported("data reference flags"));
-            }
-            self.refs = Some(dref.children(8, self.limits.format)?);
-            self.builder = Some(builder);
-            p.stbl = None;
-        }
-        if let Some(value) = self.pending_reference {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            push(&mut self.references, value)?;
-            self.pending_reference = None;
-            return Ok(OpenStep::Yield);
-        }
-        if let Some(refs) = self.refs.as_mut() {
-            match refs.poll(w)? {
-                BoxStep::Yield => return Ok(OpenStep::Yield),
-                BoxStep::Box(raw) => {
-                    if self.references.len() >= self.limits.format.max_descriptions as usize {
-                        return Err(Error::Limit {
-                            requested: self.references.len() + 1,
-                            maximum: self.limits.format.max_descriptions as usize,
-                        });
-                    }
-                    self.pending_reference =
-                        Some(raw.header().kind == *b"url " && raw.payload() == [0, 0, 0, 1]);
-                    return Ok(OpenStep::Yield);
-                }
-                BoxStep::End => {
-                    let dref = p.dref.as_ref().ok_or(Error::Invalid("missing dref"))?;
-                    if fields::u32_at(dref.payload(), 4)? as usize != self.references.len() {
-                        return Err(Error::Invalid("data reference count"));
-                    }
-                    self.refs = None;
-                }
-            }
-        }
-        if let Some(builder) = self.builder.as_mut() {
-            if builder.poll(w)? == BuildStatus::Yield {
-                return Ok(OpenStep::Yield);
-            }
-            self.built_table = Some(
-                self.builder
-                    .take()
-                    .ok_or(Error::Invalid("table builder missing"))?
-                    .finish()?,
-            );
-        }
-        let table = self
-            .built_table
-            .as_ref()
-            .ok_or(Error::Invalid("table missing"))?;
-        if let Some(desc) = table.descriptions().get(self.description_at) {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            let at = usize::from(desc.data_reference_index)
-                .checked_sub(1)
-                .ok_or(Error::Invalid("zero reference"))?;
-            match self.references.as_slice().get(at) {
-                Some(true) => {}
-                Some(false) => {
-                    return Err(Error::Unsupported("external source data reference"));
-                }
-                None => return Err(Error::Invalid("dangling source data reference")),
-            }
-            self.description_at += 1;
-            return Ok(OpenStep::Yield);
-        }
-        if !w.try_charge(1) {
-            return Ok(OpenStep::Yield);
-        }
-        let tkhd = p.tkhd.as_ref().ok_or(Error::Invalid("missing tkhd"))?;
-        let mdhd = p.mdhd.as_ref().ok_or(Error::Invalid("missing mdhd"))?;
-        let hdlr = p.hdlr.as_ref().ok_or(Error::Invalid("missing hdlr"))?;
-        let header = if self.native_recovery {
-            crate::RecoveryTrackHeader::parse(tkhd, mdhd, hdlr, crate::RunRecoveryProfile)?
-                .into_source()
-        } else {
-            TrackHeader::parse(tkhd, mdhd, hdlr)?
-        };
-        if self
-            .tracks
-            .as_slice()
-            .iter()
-            .any(|t| t.header.track_id == header.track_id)
-        {
-            return Err(Error::Invalid("duplicate source track ID"));
-        }
-        let edits = p
-            .elst
-            .clone()
-            .map(|b| EditList::parse(b, self.limits.format))
-            .transpose()?;
-        self.tracks.try_reserve_exact(1)?;
-        push(
-            &mut self.tracks,
-            MovieTrack {
-                header,
-                next_ordinal: table.sample_count().checked_add(1).ok_or(Error::Overflow)?,
-                table: self
-                    .built_table
-                    .take()
-                    .ok_or(Error::Invalid("table missing"))?,
-                edits,
-                fragments: BudgetVec::new(&self.pool),
-                raw_dref: required(p.dref.take(), "missing dref")?,
-            },
-        )?;
-        p.elst = None;
-        self.description_at = 0;
-        self.references.clear();
-        self.track_at += 1;
-        Ok(OpenStep::Yield)
-    }
-    fn metadata(&mut self, w: &mut WorkBudget) -> Result<OpenStep> {
-        if !w.try_charge(1) {
-            return Ok(OpenStep::Yield);
-        }
-        let raw = self
-            .pending_metadata
-            .as_ref()
-            .ok_or(Error::Invalid("metadata missing"))?;
-        if self.roots.len() >= self.limits.roots {
-            return Err(Error::Limit {
-                requested: self.roots.len() + 1,
-                maximum: self.limits.roots,
-            });
-        }
-        let brand = match &raw.header().kind {
-            b"moov" if self.moov.is_some() => {
-                return Err(Error::Invalid("duplicate structural movie box"));
-            }
-            b"moof" => {
-                if self.moofs.len() >= self.limits.fragments {
-                    return Err(Error::Limit {
-                        requested: self.moofs.len() + 1,
-                        maximum: self.limits.fragments,
-                    });
-                }
-                self.moofs.try_reserve_exact(1)?;
-                None
-            }
-            b"ftyp" => Some(
-                raw.payload()
-                    .get(..4)
-                    .ok_or(Error::Truncated)?
-                    .try_into()
-                    .map_err(|_| Error::Truncated)?,
-            ),
-            _ => None,
-        };
-        self.roots.try_reserve_exact(1)?;
-        // Both destination capacities are present before changing source facts.
-        match &raw.header().kind {
-            b"moov" => self.moov = Some(raw.clone()),
-            b"moof" => push(&mut self.moofs, raw.clone())?,
-            b"ftyp" => self.brand = brand,
-            _ => {}
-        }
-        push(&mut self.roots, raw.clone())?;
-        let header = *raw.header();
-        self.pending_metadata = None;
-        Ok(OpenStep::Root(header))
-    }
     fn announced_header(
         &mut self,
+        h: BoxHeader,
         input: &mut InputCursor,
         w: &mut WorkBudget,
     ) -> Result<OpenStep> {
         if !w.try_charge(1) {
             return Ok(OpenStep::Yield);
         }
-        let h = self
-            .pending_header
-            .ok_or(Error::Invalid("pending MP4 header missing"))?;
         if h.kind == *b"mdat" {
             if self.media.len() >= self.limits.roots {
                 return Err(Error::Limit {
@@ -921,12 +1107,13 @@ impl MovieOpen {
                     maximum: self.limits.roots,
                 });
             }
-            if self.prefer_front && self.moov.is_none() {
+            if self.mode == OpenMode::Progressive && self.moov.is_none() {
                 return Err(Error::Unsupported("progressive MP4 needs front metadata"));
             }
-            let front =
-                (self.prefer_front || !input.capabilities().random_access) && self.moov.is_some();
-            let file_end = if self.native_recovery
+            let front = ((self.mode == OpenMode::Progressive)
+                || !input.capabilities().random_access)
+                && self.moov.is_some();
+            let file_end = if self.mode == OpenMode::Recovery
                 && input.capabilities().random_access
                 && self.moov.is_some()
             {
@@ -953,7 +1140,7 @@ impl MovieOpen {
                     &self.pool,
                     self.limits,
                     self.brand,
-                    self.native_recovery,
+                    self.mode == OpenMode::Recovery,
                 )?)
             } else {
                 None
@@ -975,7 +1162,6 @@ impl MovieOpen {
             if front {
                 self.terminal_mdat = terminal;
                 self.walk = walk;
-                self.scan_done = true;
                 self.read_scope = MetadataReadScope::FrontMetadataBeforeMdat(h);
             } else if pending_media.is_some() {
                 self.pending_media = pending_media;
@@ -983,7 +1169,11 @@ impl MovieOpen {
                 // The checked declaration extends past the physical entity.
                 // Still obtain a matching End before completing the open.
                 input.request_range(end)?;
-                self.reader = box_reader(input, self.limits.metadata_bytes, self.native_recovery)?;
+                self.reader = box_reader(
+                    input,
+                    self.limits.metadata_bytes,
+                    self.mode == OpenMode::Recovery,
+                )?;
             } else {
                 self.reader.skip(input)?;
             }
@@ -996,123 +1186,34 @@ impl MovieOpen {
         Ok(OpenStep::Yield)
     }
     fn fragment(&mut self, w: &mut WorkBudget) -> Result<OpenStep> {
-        let moof = &self.moofs.as_slice()[self.fragment_moof];
-        if let Some(index) = self.pending_fragment.as_ref() {
-            if !w.try_charge(1) {
-                return Ok(OpenStep::Yield);
-            }
-            let end = index.implicit_data_end()?;
-            let at = self
-                .fragment_track
-                .ok_or(Error::Invalid("fragment track missing"))?;
-            let track = &mut self.tracks.as_mut_slice()[at];
-            let next = track
-                .next_ordinal
-                .checked_add(index.sample_count())
-                .ok_or(Error::Overflow)?;
-            track.fragments.try_reserve_exact(1)?;
-            if let Some(index) = self.pending_fragment.take() {
-                push(&mut track.fragments, index)?;
-            }
-            track.next_ordinal = next;
-            self.previous_traf = Some(end);
-            self.fragment_track = None;
-            self.fragment_raw = None;
-            return Ok(OpenStep::Yield);
-        }
-        if let Some(job) = self.fragment_job.as_mut() {
-            if job.poll(w)? == BuildStatus::Yield {
-                return Ok(OpenStep::Yield);
-            }
-            let index = self
-                .fragment_job
-                .take()
-                .ok_or(Error::Invalid("fragment job missing"))?
-                .finish()?;
-            self.pending_fragment = Some(index);
-            return Ok(OpenStep::Yield);
-        }
-        if let Some(scan) = self.fragment_scan.as_mut() {
-            match scan.poll(w)? {
-                BoxStep::Yield => return Ok(OpenStep::Yield),
-                BoxStep::Box(raw) if raw.header().kind == *b"tfhd" => {
-                    let id = fields::u32_at(raw.payload(), 4)?;
-                    let at = self
-                        .tracks
-                        .as_slice()
-                        .iter()
-                        .position(|t| t.header.track_id == id)
-                        .ok_or(Error::Invalid("fragment unknown source track"))?;
-                    let t = &self.tracks.as_slice()[at];
-                    let defaults = *self
-                        .walk
-                        .as_ref()
-                        .ok_or(Error::Invalid("walk missing"))?
-                        .trex
-                        .as_slice()
-                        .iter()
-                        .find(|r| r.track_id == id)
-                        .ok_or(Error::Invalid("fragment missing trex"))?;
-                    let first = t.next_ordinal;
-                    let context = FragmentContext {
-                        moof_start: moof.header().start,
-                        implicit_base: self
-                            .previous_traf
-                            .map_or(ImplicitBase::FirstTraf, ImplicitBase::PreviousTraf),
-                        decode_origin: None,
-                        first_ordinal: first,
-                        description_count: u32::try_from(t.table.descriptions().len())
-                            .map_err(|_| Error::Overflow)?,
-                    };
-                    let raw = self
-                        .fragment_raw
-                        .as_ref()
-                        .ok_or(Error::Invalid("traf missing"))?
-                        .clone();
-                    let build = if self.native_recovery {
-                        FragmentBuilder::new_header_open
-                    } else {
-                        FragmentBuilder::new
-                    };
-                    self.fragment_job = Some(build(
-                        raw,
-                        defaults,
-                        context,
-                        self.pool.clone(),
-                        self.limits.format,
-                    )?);
-                    self.fragment_track = Some(at);
-                    self.fragment_scan = None;
-                    return Ok(OpenStep::Yield);
-                }
-                BoxStep::Box(_) => return Ok(OpenStep::Yield),
-                BoxStep::End => return Err(Error::Invalid("traf missing tfhd")),
-            }
-        }
-        if self.fragment_children.is_none() {
-            self.fragment_children = Some(moof.children(0, self.limits.format)?);
-            self.previous_traf = None;
-        }
-        match self
-            .fragment_children
-            .as_mut()
-            .ok_or(Error::Invalid("fragment children missing"))?
-            .poll(w)?
-        {
-            BoxStep::Yield => {}
-            BoxStep::Box(raw) if raw.header().kind == *b"traf" => {
-                self.fragment_scan = Some(raw.children(0, self.limits.format)?);
-                self.fragment_raw = Some(raw);
-            }
-            BoxStep::Box(_) => {}
-            BoxStep::End => {
-                self.fragment_children = None;
-                self.fragment_moof += 1;
-            }
+        let walk = match &mut self.fragment_walk {
+            Some(walk) => walk,
+            None => self.fragment_walk.insert(MoofWalk::new(
+                &self.moofs.as_slice()[self.fragment_moof],
+                self.limits.format,
+            )?),
+        };
+        // Passing the defaults slice into the fragment step adds 0.213% playback instructions.
+        let movie = &self.walk;
+        let defaults = |id| {
+            let movie = movie.as_ref().ok_or(Error::Invalid("walk missing"))?;
+            fragment_defaults(movie.trex.as_slice(), id)
+        };
+        if walk.poll(
+            self.tracks.as_mut_slice(),
+            defaults,
+            &self.pool,
+            self.limits.format,
+            self.mode == OpenMode::Recovery,
+            w,
+        )? {
+            self.fragment_walk = None;
+            self.fragment_moof += 1;
         }
         Ok(OpenStep::Yield)
     }
-    /// The opened movie. Later calls fail: its parts have moved out.
+    /// Takes the opened movie from the opener. Returns `Error::Invalid` before
+    /// [`OpenStep::Ready`] or after the movie has been taken.
     pub fn finish(&mut self, input: &InputCursor) -> Result<Movie> {
         if !self.ready {
             return Err(Error::Invalid("movie not ready"));
@@ -1120,7 +1221,7 @@ impl MovieOpen {
         let walk = self.walk.take().ok_or(Error::Invalid("walk missing"))?;
         Ok(Movie {
             read_scope: self.read_scope,
-            native_recovery: self.native_recovery,
+            recovery: self.mode == OpenMode::Recovery,
             source: input.source(),
             generation: input.generation(),
             source_length: input.capabilities().length,
@@ -1133,6 +1234,7 @@ impl MovieOpen {
             raw_roots: std::mem::replace(&mut self.roots, BudgetVec::new(&self.pool)),
             major_brand: self.brand,
             pool: self.pool.clone(),
+            demux_edits: std::sync::OnceLock::new(),
         })
     }
 }

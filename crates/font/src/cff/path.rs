@@ -1,34 +1,33 @@
-//! The glyph path of FreeType's CFF engine (`cf2_glyphpath` in
-//! `psaux/pshints.c`) without stem darkening: charstring coordinates in 16.16
-//! character space go to a 16.16 device space, x by the horizontal scale and
-//! y through the hint map in force, and on to FreeType's outline builder,
-//! which keeps them as 26.6 (`x >> 10`).
+//! The glyph path of the CFF hinter, without stem darkening: charstring
+//! coordinates in 16.16 character space go to a 16.16 device space, x by the
+//! horizontal scale and y through the hint map in force, and on to the
+//! outline builder, which keeps them as 26.6 (`x >> 10`).
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 //!
 //! Each line or curve waits until the next one is drawn, and is then mapped
 //! with the hint map of the mask in force by then: a new mask takes effect
 //! from the element before the one that follows it. A subpath's last element
 //! ends on its start as the hint map of its first point maps it. Without
-//! darkening no element is offset, so consecutive elements always meet and
-//! FreeType's intersections never come into play.
+//! darkening no element is offset, so consecutive elements always meet.
 //!
 //! Unhinted, both scales are 1/64 and the hint maps empty, so the points are
-//! what `FT_LOAD_NO_SCALE` yields: font units truncated toward negative
-//! infinity. Lines of zero length are dropped in character space, unless a new
-//! hint mask takes effect at them, and again in device space; contours start at
-//! their first segment; closing a contour drops a final on-curve point equal to
-//! its first and a contour left with one point. A path can also be run into no
-//! contours at all, for the interpreter's observers alone.
+//! font units truncated toward negative infinity. Lines of zero length are
+//! dropped in character space, unless a new hint mask takes effect at them,
+//! and again in device space; contours start at their first segment; closing
+//! a contour drops a final on-curve point equal to its first and a contour
+//! left with one point. A path can also be run into no contours at all, for
+//! the interpreter's observers alone.
 
 use super::hint::{Blues, HintMap, Hints, mul};
 use crate::outline::{Outline, Point, PointKind};
 use crate::read::Reader;
 use triergon_core::{Result, WorkBudget};
 
-/// A 16.16 charstring number (`CF2_Fixed`); sums wrap at 32 bits.
+/// A 16.16 charstring number; sums wrap at 32 bits.
 pub(super) type Fixed = i32;
 
-/// How a glyph's path reaches device space (cf2's `innerTransform`): 16.16
-/// scales, and the blue zones of its Private DICT when hinting.
+/// How a glyph's path reaches device space: 16.16 scales, and the blue zones
+/// of its Private DICT when hinting.
 #[derive(Debug)]
 pub(super) struct Scaling {
     pub(super) x: Fixed,
@@ -37,7 +36,7 @@ pub(super) struct Scaling {
 }
 
 impl Scaling {
-    /// Font units: FreeType's unity scale of 1/64 (`0x400`), unhinted.
+    /// Font units: a scale of 1/64 (`0x400`), unhinted.
     pub(super) const UNHINTED: Self = Self {
         x: 0x400,
         y: 0x400,
@@ -116,8 +115,8 @@ impl<'s> Path<'s> {
         self.hints.build_current(work)
     }
 
-    /// `cf2_glyphpath_hintPoint`: a point in device space, scaled uniformly
-    /// without a hint map.
+    /// A point in device space: y through `map`, or scaled uniformly without
+    /// one.
     fn device_point(&self, map: Option<&HintMap>, p: (Fixed, Fixed)) -> (Fixed, Fixed) {
         let y = map.map_or_else(
             || mul(p.1, self.scaling.y),
@@ -126,7 +125,7 @@ impl<'s> Path<'s> {
         (mul(self.scaling.x, p.0), y)
     }
 
-    /// `cf2_glyphpath_moveTo`.
+    /// Moves to `to`, closing the open subpath; a new hint mask takes effect.
     pub(super) fn move_to(
         &mut self,
         b: &mut impl Contours,
@@ -144,7 +143,7 @@ impl<'s> Path<'s> {
         Ok(())
     }
 
-    /// `cf2_glyphpath_lineTo`.
+    /// A line to `to`, dropped at zero length unless a new mask takes effect.
     pub(super) fn line_to(
         &mut self,
         b: &mut impl Contours,
@@ -165,7 +164,7 @@ impl<'s> Path<'s> {
         Ok(())
     }
 
-    /// `cf2_glyphpath_curveTo`.
+    /// A curve through the control points `c1` and `c2` to `to`.
     pub(super) fn curve_to(
         &mut self,
         b: &mut impl Contours,
@@ -182,8 +181,7 @@ impl<'s> Path<'s> {
         Ok(())
     }
 
-    /// `cf2_glyphpath_closeOpenPath`: closes the open subpath with a line back
-    /// to its start.
+    /// Closes the open subpath with a line back to its start.
     pub(super) fn close(&mut self, b: &mut impl Contours, work: &mut WorkBudget) -> Result<()> {
         if self.open {
             self.closing = true;
@@ -207,8 +205,8 @@ impl<'s> Path<'s> {
         work: &mut WorkBudget,
     ) -> Result<()> {
         if self.move_pending {
-            // `cf2_glyphpath_pushMove`; a charstring that draws before its
-            // first move moves to the origin first.
+            // A charstring that draws before its first move moves to the
+            // origin first.
             if !self.hints.current_is_valid() {
                 self.move_to(b, self.start, work)?;
             }
@@ -223,11 +221,11 @@ impl<'s> Path<'s> {
         Ok(())
     }
 
-    /// `cf2_glyphpath_pushPrevElem`: maps `element` with the current hint map
-    /// and hands it to the builder, with a line on to `next`, the start of the
-    /// next element, should they not meet in device space. Closing, a line's
-    /// end and `next` map with the hint map of the subpath's first point.
-    /// Lines of zero length in device space are dropped.
+    /// Maps `element` with the current hint map and hands it to the builder,
+    /// with a line on to `next`, the start of the next element, should they
+    /// not meet in device space. Closing, a line's end and `next` map with the
+    /// hint map of the subpath's first point. Lines of zero length in device
+    /// space are dropped.
     fn push(
         &mut self,
         b: &mut impl Contours,
@@ -289,7 +287,7 @@ impl Contours for () {
     }
 }
 
-/// FreeType's outline builder over an [`Outline`].
+/// Builds the contours of an [`Outline`], each begun by its first segment.
 #[derive(Debug)]
 pub(super) struct Builder<'o> {
     outline: &'o mut Outline,
@@ -341,7 +339,8 @@ impl Contours for Builder<'_> {
         self.push(points[2], PointKind::On)
     }
 
-    /// Closes the last contour, as `ps_builder_close_contour` does; closing it
+    /// Closes the last contour: a final on-curve point equal to its first
+    /// goes, and so does a contour left with one point or none. Closing it
     /// again (two moves in a row) applies the same rules once more.
     fn close(&mut self) -> Result<()> {
         let o = &mut *self.outline;

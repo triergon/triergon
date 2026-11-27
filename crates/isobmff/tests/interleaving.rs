@@ -1,13 +1,17 @@
-mod common;
+use crate::common;
 use common::{child, fixtures::CASES};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, Error, InputCursor, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxView, BuildStatus, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase,
-    InterleaveStatus, Limits, PhysicalInterleaveLimits, PhysicalSampleCursor, SampleReader,
-    SampleStep, SampleTable, SourceTrack, TrackHeader, TrackSampleCursor, Trex,
+    BuildStatus, CursorStatus, Limits, Next,
+    boxes::BoxView,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack, TrackSampleCursor},
+    movie::TrackHeader,
+    payload::SampleReader,
+    table::SampleTable,
 };
 
 fn regular_tables(budget: &Budget, name: &str) -> Vec<(u32, SampleTable)> {
@@ -55,7 +59,37 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
     movie[635..639].copy_from_slice(&1256u32.to_be_bytes());
     movie.extend_from_slice(&original[1184..1196]);
 
-    for quantum in [1, 4096] {
+    // Track by track, or merged with each track in decode order: track 1's third
+    // sample, moved behind everything else, holds back the track's later samples.
+    let track_order = [
+        (1, 1, 1151, Some(0)),
+        (1, 2, 1163, Some(1000)),
+        (1, 3, 1256, Some(2000)),
+        (1, 4, 1203, Some(3000)),
+        (1, 5, 1215, Some(4000)),
+        (1, 6, 1227, Some(5000)),
+        (2, 1, 1175, Some(0)),
+        (2, 2, 1182, Some(1000)),
+        (2, 3, 1196, Some(2000)),
+        (2, 4, 1239, Some(3000)),
+        (2, 5, 1244, Some(4000)),
+        (2, 6, 1250, Some(5000)),
+    ];
+    let decode_order = [
+        (1, 1, 1151, Some(0)),
+        (1, 2, 1163, Some(1000)),
+        (2, 1, 1175, Some(0)),
+        (2, 2, 1182, Some(1000)),
+        (2, 3, 1196, Some(2000)),
+        (2, 4, 1239, Some(3000)),
+        (2, 5, 1244, Some(4000)),
+        (2, 6, 1250, Some(5000)),
+        (1, 3, 1256, Some(2000)),
+        (1, 4, 1203, Some(3000)),
+        (1, 5, 1215, Some(4000)),
+        (1, 6, 1227, Some(5000)),
+    ];
+    for (quantum, merged) in [(1, false), (4096, false), (1, true), (4096, true)] {
         let budget = Budget::new(1024 * 1024).unwrap();
         let tables = regular_tables_from_bytes(&budget, &movie);
         let tracks: Vec<_> = tables
@@ -77,11 +111,15 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
             ))
         );
         assert_eq!(cursor.validated_samples(), 12);
-        assert!(cursor.resume_in_track_order());
+        assert!(if merged {
+            cursor.resume_in_decode_order()
+        } else {
+            cursor.resume_in_track_order()
+        });
         let mut samples = Vec::new();
         loop {
             match poll_until_physical_decision(&mut cursor, quantum).unwrap() {
-                InterleaveStatus::Ready => {
+                CursorStatus::Ready => {
                     let item = cursor.take_sample().unwrap();
                     samples.push((
                         item.track_id,
@@ -90,27 +128,11 @@ fn regular_movie_with_backward_chunk_preserves_decode_order_or_refuses_physical_
                         item.sample.dts_ticks,
                     ));
                 }
-                InterleaveStatus::End => break,
-                InterleaveStatus::Yield => unreachable!(),
+                CursorStatus::End => break,
+                CursorStatus::Yield => unreachable!(),
             }
         }
-        assert_eq!(
-            samples,
-            [
-                (1, 1, 1151, Some(0)),
-                (1, 2, 1163, Some(1000)),
-                (1, 3, 1256, Some(2000)),
-                (1, 4, 1203, Some(3000)),
-                (1, 5, 1215, Some(4000)),
-                (1, 6, 1227, Some(5000)),
-                (2, 1, 1175, Some(0)),
-                (2, 2, 1182, Some(1000)),
-                (2, 3, 1196, Some(2000)),
-                (2, 4, 1239, Some(3000)),
-                (2, 5, 1244, Some(4000)),
-                (2, 6, 1250, Some(5000)),
-            ]
-        );
+        assert_eq!(samples, if merged { decode_order } else { track_order });
         assert_eq!(&movie[1256..1268], &original[1184..1196]);
     }
 }
@@ -193,13 +215,13 @@ fn physical_regular_interleaving_matches_independent_source_ranges_in_both_sched
         let mut actual = Vec::new();
         for _ in 0..50_000 {
             match cursor.poll(&mut WorkBudget::new(quantum), &cancel).unwrap() {
-                InterleaveStatus::Yield => {}
-                InterleaveStatus::End => break,
-                InterleaveStatus::Ready => {
+                CursorStatus::Yield => {}
+                CursorStatus::End => break,
+                CursorStatus::Ready => {
                     // A waiting output cannot consume the next source sample.
                     assert_eq!(
                         cursor.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
-                        InterleaveStatus::Ready
+                        CursorStatus::Ready
                     );
                     let next = cursor.take_sample().unwrap();
                     let source = expected[actual.len()];
@@ -260,12 +282,12 @@ fn default_demux_order_remains_distinct_from_source_physical_order() {
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
-            InterleaveStatus::Yield => {}
-            InterleaveStatus::Ready => {
+            CursorStatus::Yield => {}
+            CursorStatus::Ready => {
                 let next = cursor.take_sample().unwrap();
                 physical.push((next.track_id, next.sample.ordinal));
             }
-            InterleaveStatus::End => break,
+            CursorStatus::End => break,
         }
     }
     assert_eq!(physical.len(), demux.len());
@@ -299,15 +321,15 @@ fn sparse_legacy_tracks_merge_without_narrowing_or_inventing_missing_clocks() {
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
-            InterleaveStatus::Ready => {
+            CursorStatus::Ready => {
                 let next = cursor.take_sample().unwrap();
                 assert_eq!(next.sample.dts_ticks, None);
                 assert_eq!(next.sample.cts_ticks, None);
                 assert_eq!(next.sample.range.end - next.sample.range.start, 4);
                 actual.push((next.track_id, next.sample.range.start));
             }
-            InterleaveStatus::Yield => {}
-            InterleaveStatus::End => break,
+            CursorStatus::Yield => {}
+            CursorStatus::End => break,
         }
     }
     assert_eq!(
@@ -335,9 +357,9 @@ fn regular_samples_then_legacy_fragments_keep_source_identity_and_unknown_fragme
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
-            InterleaveStatus::Ready => samples.push(cursor.take_sample().unwrap()),
-            InterleaveStatus::Yield => {}
-            InterleaveStatus::End => break,
+            CursorStatus::Ready => samples.push(cursor.take_sample().unwrap()),
+            CursorStatus::Yield => {}
+            CursorStatus::End => break,
         }
     }
     assert_eq!(samples.len(), 8);
@@ -367,7 +389,7 @@ fn backward_track_offsets_fail_before_any_physical_output_and_remain_source_acce
     let mut failure = None;
     for _ in 0..1000 {
         match cursor.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
-            Ok(InterleaveStatus::Yield) => {}
+            Ok(CursorStatus::Yield) => {}
             result => {
                 failure = Some(result.unwrap_err());
                 break;
@@ -385,9 +407,9 @@ fn backward_track_offsets_fail_before_any_physical_output_and_remain_source_acce
     let mut addresses = Vec::new();
     for _ in 0..100 {
         match original.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(sample) => addresses.push(sample.range.start),
-            SampleStep::Yield => {}
-            SampleStep::End => break,
+            Next::Item(sample) => addresses.push(sample.range.start),
+            Next::Yield => {}
+            Next::End => break,
         }
     }
     assert_eq!(addresses, [(1u64 << 32) + 200, (1u64 << 32) + 100]);
@@ -412,13 +434,13 @@ fn equal_addresses_and_zero_sizes_preserve_declared_track_order() {
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
         {
-            InterleaveStatus::Ready => {
+            CursorStatus::Ready => {
                 let next = cursor.take_sample().unwrap();
                 assert!(next.sample.range.is_empty());
                 ids.push(next.track_id);
             }
-            InterleaveStatus::Yield => {}
-            InterleaveStatus::End => break,
+            CursorStatus::Yield => {}
+            CursorStatus::End => break,
         }
     }
     assert_eq!(ids, [9, 1]);
@@ -461,7 +483,7 @@ fn track_and_sample_limits_reject_without_output_or_leaking_charges() {
     let mut failure = None;
     for _ in 0..1000 {
         match cursor.poll(&mut WorkBudget::new(1), &AtomicBool::new(false)) {
-            Ok(InterleaveStatus::Yield) => {}
+            Ok(CursorStatus::Yield) => {}
             other => {
                 failure = Some(other.unwrap_err());
                 break;
@@ -491,12 +513,12 @@ fn zero_work_and_cancellation_do_not_advance_or_release_waiting_output() {
     let cancel = AtomicBool::new(false);
     assert_eq!(
         cursor.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
-        InterleaveStatus::Yield
+        CursorStatus::Yield
     );
     assert_eq!(cursor.validated_samples(), 0);
     let mut ready = false;
     for _ in 0..1000 {
-        if cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() == InterleaveStatus::Ready {
+        if cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() == CursorStatus::Ready {
             ready = true;
             break;
         }
@@ -545,9 +567,9 @@ fn interleaved_source_samples_drive_real_core_range_reads_under_tiny_windows() {
     let mut count = 0;
     for _ in 0..50_000 {
         match cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap() {
-            InterleaveStatus::Yield => {}
-            InterleaveStatus::End => break,
-            InterleaveStatus::Ready => {
+            CursorStatus::Yield => {}
+            CursorStatus::End => break,
+            CursorStatus::Ready => {
                 let item = cursor.take_sample().unwrap();
                 let source = case
                     .samples
@@ -605,7 +627,7 @@ fn empty_track_set_finishes_without_allocating_sample_storage() {
         cursor
             .poll(&mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        InterleaveStatus::End
+        CursorStatus::End
     );
     assert_eq!(budget.used(), baseline);
     assert!(matches!(cursor.take_sample(), Err(Error::Invalid(_))));
@@ -614,12 +636,12 @@ fn empty_track_set_finishes_without_allocating_sample_storage() {
 fn poll_until_physical_decision(
     cursor: &mut PhysicalSampleCursor<'_>,
     quantum: u64,
-) -> Result<InterleaveStatus, Error> {
+) -> Result<CursorStatus, Error> {
     for _ in 0..20_000 {
         let mut work = WorkBudget::new(quantum);
         let result = cursor.poll(&mut work, &AtomicBool::new(false));
         assert!(work.spent() <= quantum);
-        if result != Ok(InterleaveStatus::Yield) {
+        if result != Ok(CursorStatus::Yield) {
             return result;
         }
     }
@@ -745,7 +767,7 @@ fn checked_media_sparse_ranges_reject_holes_and_cross_extent_samples() {
     for offset in [100, 200] {
         assert_eq!(
             poll_until_physical_decision(&mut cursor, 1).unwrap(),
-            InterleaveStatus::Ready
+            CursorStatus::Ready
         );
         let item = cursor.take_sample().unwrap();
         assert_eq!(item.sample.range, base + offset..base + offset + 4);
@@ -753,7 +775,7 @@ fn checked_media_sparse_ranges_reject_holes_and_cross_extent_samples() {
     }
     assert_eq!(
         poll_until_physical_decision(&mut cursor, 1).unwrap(),
-        InterleaveStatus::End
+        CursorStatus::End
     );
 }
 
@@ -805,12 +827,12 @@ fn checked_media_work_yields_cancellation_and_borrowed_storage_are_bounded() {
     let cancel = AtomicBool::new(false);
     assert_eq!(
         cursor.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
-        InterleaveStatus::Yield
+        CursorStatus::Yield
     );
     for _ in 0..64 {
         assert_eq!(
             cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap(),
-            InterleaveStatus::Yield
+            CursorStatus::Yield
         );
         assert_eq!(cursor.validated_samples(), 0);
         assert_eq!(budget.used(), storage);
@@ -819,7 +841,7 @@ fn checked_media_work_yields_cancellation_and_borrowed_storage_are_bounded() {
     for _ in 0..100 {
         assert_eq!(
             cursor.poll(&mut WorkBudget::new(1), &cancel).unwrap(),
-            InterleaveStatus::Yield
+            CursorStatus::Yield
         );
         if cursor.validated_samples() == 1 {
             break;
@@ -844,14 +866,14 @@ fn checked_media_work_yields_cancellation_and_borrowed_storage_are_bounded() {
     let fixed = budget.used();
     assert_eq!(
         poll_until_physical_decision(&mut retry, 1).unwrap(),
-        InterleaveStatus::Ready
+        CursorStatus::Ready
     );
     assert_eq!(budget.used(), fixed);
     assert_eq!(
         retry
             .poll(&mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        InterleaveStatus::Ready
+        CursorStatus::Ready
     );
     assert_eq!(
         retry.take_sample().unwrap().sample.range,
@@ -859,7 +881,7 @@ fn checked_media_work_yields_cancellation_and_borrowed_storage_are_bounded() {
     );
     assert_eq!(
         poll_until_physical_decision(&mut retry, 1).unwrap(),
-        InterleaveStatus::End
+        CursorStatus::End
     );
     assert_eq!(budget.used(), fixed);
     drop(retry);
@@ -881,7 +903,7 @@ fn checked_media_empty_sources_and_zero_byte_endpoints_are_explicit() {
         empty
             .poll(&mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap(),
-        InterleaveStatus::End
+        CursorStatus::End
     );
     let fragments = [fragment(&budget, 1, &[104], 0)];
     let tracks = [SourceTrack::new(1, None, &fragments).unwrap()];
@@ -907,7 +929,7 @@ fn checked_media_empty_sources_and_zero_byte_endpoints_are_explicit() {
         .unwrap();
         assert_eq!(
             poll_until_physical_decision(&mut cursor, 1).unwrap(),
-            InterleaveStatus::Ready
+            CursorStatus::Ready
         );
         assert_eq!(
             cursor.take_sample().unwrap().sample.range,
@@ -915,7 +937,7 @@ fn checked_media_empty_sources_and_zero_byte_endpoints_are_explicit() {
         );
         assert_eq!(
             poll_until_physical_decision(&mut cursor, 1).unwrap(),
-            InterleaveStatus::End
+            CursorStatus::End
         );
     }
 }

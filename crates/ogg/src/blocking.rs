@@ -9,6 +9,7 @@ use triergon_core::{Budget, Error, Result, SourceCapabilities, SourceId};
 
 /// Bytes the reader requests per window.
 const WINDOW: usize = 64 * 1024;
+const SOURCE: SourceId = SourceId(1);
 
 /// Drives a [`Reader`] from a [`Read`] source, seeking it when it is also [`Seek`].
 #[derive(Debug)]
@@ -20,52 +21,98 @@ pub struct BlockingReader<R> {
 
 impl<R: Read + Seek> BlockingReader<R> {
     /// Open a seekable source: seeking bisects and track ends are scanned.
+    pub fn open_seekable(source: R, limits: Limits) -> Result<Self> {
+        let pool = Budget::new(limits.live_storage_bytes)?;
+        Self::open_seekable_in(source, limits, &pool)
+    }
+
+    /// [`BlockingReader::open_seekable`] charging a caller's pool.
+    pub fn open_seekable_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        Self::open_seekable_with(source, limits, pool, false)
+    }
+
+    pub(crate) fn open_seekable_with(
+        mut source: R,
+        limits: Limits,
+        pool: &Budget,
+        reference_clock: bool,
+    ) -> Result<Self> {
+        let capabilities = seekable_capabilities(&mut source)?;
+        let reader = Self::make_reader(pool, capabilities, limits, reference_clock)?;
+        Self::start(Blocking::seekable(reader, source, pool), pool, limits)
+    }
+}
+
+impl<R: Read> BlockingReader<R> {
+    /// Open a sequential source; it cannot seek.
     pub fn open(source: R, limits: Limits) -> Result<Self> {
         let pool = Budget::new(limits.live_storage_bytes)?;
         Self::open_in(source, limits, &pool)
     }
 
     /// [`BlockingReader::open`] charging a caller's pool.
-    pub fn open_in(mut source: R, limits: Limits, pool: &Budget) -> Result<Self> {
-        let capabilities = seekable_capabilities(&mut source)?;
-        let reader = Reader::new(pool, SourceId(1), capabilities, limits, WINDOW)?;
-        Self::start(Blocking::seekable(reader, source, pool), pool)
+    pub fn open_in(source: R, limits: Limits, pool: &Budget) -> Result<Self> {
+        Self::open_with(source, limits, pool, false)
     }
-}
 
-impl<R: Read> BlockingReader<R> {
-    /// Open a sequential source; it cannot seek.
-    pub fn open_stream(source: R, limits: Limits) -> Result<Self> {
-        let pool = Budget::new(limits.live_storage_bytes)?;
+    pub(crate) fn open_with(
+        source: R,
+        limits: Limits,
+        pool: &Budget,
+        reference_clock: bool,
+    ) -> Result<Self> {
         let capabilities = SourceCapabilities {
             length: None,
             random_access: false,
         };
-        let reader = Reader::new(&pool, SourceId(1), capabilities, limits, WINDOW)?;
-        Self::start(Blocking::sequential(reader, source, &pool), &pool)
+        let reader = Self::make_reader(pool, capabilities, limits, reference_clock)?;
+        Self::start(Blocking::sequential(reader, source, pool), pool, limits)
     }
 
-    /// Read until the first packet, so the first link's tracks are known.
-    fn start(driver: Blocking<Reader, R>, pool: &Budget) -> Result<Self> {
+    fn make_reader(
+        pool: &Budget,
+        capabilities: SourceCapabilities,
+        limits: Limits,
+        reference_clock: bool,
+    ) -> Result<Reader> {
+        if reference_clock {
+            crate::compat::clock::reader(pool, SOURCE, capabilities, limits, WINDOW)
+        } else {
+            Reader::new(pool, SOURCE, capabilities, limits, WINDOW)
+        }
+    }
+
+    /// Read through the first packet after the first link's headers, or through the
+    /// packet that takes the queue above `limits.opening_bytes`.
+    fn start(driver: Blocking<Reader, R>, pool: &Budget, limits: Limits) -> Result<Self> {
         let mut blocking = BlockingReader {
             driver,
             queued: Queue::new(pool),
         };
+        let mut queued_bytes = 0usize;
         loop {
             blocking.queued.reserve(1)?;
             let Some(event) = blocking.driver.next_event()? else {
                 break;
             };
-            let packet = matches!(event, Event::Packet(_));
+            let packet = match &event {
+                Event::Packet(packet) => Some(packet.payload.len()),
+                _ => None,
+            };
             blocking.queued.push(event)?;
-            if packet {
-                break;
+            if let Some(len) = packet {
+                queued_bytes = queued_bytes.saturating_add(len);
+                if blocking.reader().headers_read() || queued_bytes > limits.opening_bytes {
+                    break;
+                }
             }
         }
         Ok(blocking)
     }
 
-    /// Tracks seen so far; every track of the first link once open returns.
+    /// Tracks seen so far; every track of the first link, configured unless its headers
+    /// are broken or still missing after `Limits::opening_bytes` of other packets, once
+    /// open returns.
     pub fn tracks(&self) -> &[Track] {
         self.reader().tracks()
     }
@@ -103,7 +150,7 @@ impl<R: Read> BlockingReader<R> {
             return Err(Error::Unsupported("seeking a sequential source"));
         }
         self.queued.retain(|event| matches!(event, Event::Other(_)));
-        self.driver.seek(request)?;
+        self.driver.begin_seek(request)?;
         loop {
             self.queued.reserve(1)?;
             match self.driver.next_event_or_cancel(cancel)? {

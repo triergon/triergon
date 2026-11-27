@@ -5,34 +5,36 @@
 //! coordinates (equations 8-228 / 8-229 / 8-237 / 8-238), so no per-sample clamping happens on
 //! the common path.
 
+use crate::picture::{Structure, array, array_mut};
+
 /// A view of one reference plane: a frame, or one field of a frame (stride doubled).
 #[derive(Clone, Copy)]
 pub(crate) struct PlaneRef<'a> {
-    pub data: &'a [u8],
-    pub base: usize,
-    pub stride: usize,
-    pub w: i32,
-    pub h: i32,
+    pub(crate) data: &'a [u8],
+    pub(crate) base: usize,
+    pub(crate) stride: usize,
+    pub(crate) w: i32,
+    pub(crate) h: i32,
 }
 
 impl<'a> PlaneRef<'a> {
-    pub(crate) fn new(data: &'a [u8], width: usize, height: usize, parity: u8) -> Self {
+    pub(crate) fn new(data: &'a [u8], width: usize, height: usize, parity: Structure) -> Self {
         match parity {
-            0 => PlaneRef {
+            Structure::Frame => PlaneRef {
                 data,
                 base: 0,
                 stride: width,
                 w: width as i32,
                 h: height as i32,
             },
-            1 => PlaneRef {
+            Structure::Top => PlaneRef {
                 data,
                 base: 0,
                 stride: width * 2,
                 w: width as i32,
                 h: (height / 2) as i32,
             },
-            _ => PlaneRef {
+            Structure::Bottom => PlaneRef {
                 data,
                 base: width,
                 stride: width * 2,
@@ -69,7 +71,6 @@ fn fetch(r: &PlaneRef<'_>, x0: i32, y0: i32, ww: usize, wh: usize, out: &mut [u8
 
 /// Luma prediction of a w x h block at integer position (xi, yi) with fraction (fx, fy),
 /// written to `dst` with stride `ds` (8.4.2.2.1).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn luma_mc(
     r: &PlaneRef<'_>,
     xi: i32,
@@ -91,7 +92,10 @@ pub(crate) fn luma_mc(
 /// Clip1((v + 16) >> 5) of a 6-tap intermediate; every first-stage intermediate (b1 / h1) lies
 /// in -2550 ..= 10710, so 16-bit lanes suffice.
 #[inline(always)]
-#[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+#[expect(
+    clippy::manual_clamp,
+    reason = "the clamp assertion blocks vectorisation"
+)]
 fn clip_h(v: i16) -> u8 {
     ((v + 16) >> 5).max(0).min(255) as u8
 }
@@ -101,7 +105,7 @@ fn clip_h(v: i16) -> u8 {
 #[inline(always)]
 fn h6<const W: usize>(src: &[u8], o: usize) -> [i16; W] {
     let win = &src[o..o + W + 5];
-    let t = |k: usize| -> &[u8; W] { win[k..k + W].try_into().unwrap() };
+    let t = |k: usize| -> &[u8; W] { array(win, k) };
     let (s0, s1, s2, s3, s4, s5) = (t(0), t(1), t(2), t(3), t(4), t(5));
     let mut out = [0i16; W];
     for x in 0..W {
@@ -115,7 +119,7 @@ fn h6<const W: usize>(src: &[u8], o: usize) -> [i16; W] {
 
 #[inline(always)]
 fn row16(src: &[u8], o: usize) -> &[u8; 16] {
-    src[o..o + 16].try_into().unwrap()
+    array(src, o)
 }
 
 /// Vertical 6-tap intermediates h1 for one output row from 6 source rows.
@@ -163,13 +167,12 @@ fn copy_block<const W: usize>(
     ds: usize,
 ) {
     for y in 0..h {
-        let s: &[u8; W] = src[so + y * st..so + y * st + W].try_into().unwrap();
-        let d: &mut [u8; W] = (&mut dst[y * ds..y * ds + W]).try_into().unwrap();
+        let s: &[u8; W] = array(src, so + y * st);
+        let d: &mut [u8; W] = array_mut(dst, y * ds);
         *d = *s;
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn luma_mc_w<const W: usize>(
     r: &PlaneRef<'_>,
@@ -201,8 +204,6 @@ fn luma_mc_w<const W: usize>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn luma_kernel<const W: usize>(
     src: &[u8],
     base: usize,
@@ -265,7 +266,7 @@ fn luma_kernel<const W: usize>(
                 let d = &mut dst[y * ds..y * ds + W];
                 match (fx, fy) {
                     (2, 2) => d.copy_from_slice(&j),
-                    (2, 1) | (2, 3) => {
+                    (2, 1 | 3) => {
                         let br = &b1[y + 2 + (fy == 3) as usize];
                         for x in 0..W {
                             d[x] = ((j[x] as u16 + clip_h(br[x]) as u16 + 1) >> 1) as u8;
@@ -297,7 +298,6 @@ fn luma_kernel<const W: usize>(
 }
 
 /// Chroma prediction (8.4.2.2.2) of a w x h block at integer (xi, yi), eighth fraction (fx, fy).
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn chroma_mc(
     r: &PlaneRef<'_>,
     xi: i32,
@@ -316,7 +316,6 @@ pub(crate) fn chroma_mc(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn chroma_mc_w<const W: usize>(
     r: &PlaneRef<'_>,
@@ -356,7 +355,6 @@ fn chroma_mc_w<const W: usize>(
 /// (`next`), packed at stride W.
 const GATHER: usize = 72;
 
-#[allow(clippy::too_many_arguments)]
 fn chroma_kernel<const W: usize>(
     src: &[u8],
     base: usize,
@@ -424,7 +422,6 @@ struct Average;
 
 impl Combine for Average {
     #[inline(always)]
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays keeps the loop vectorisable
     fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]) {
         for x in 0..N {
             d[x] = ((a[x] as u16 + b[x] as u16 + 1) >> 1) as u8;
@@ -444,8 +441,7 @@ struct Weighted<T> {
 
 impl<T: WLane> Combine for Weighted<T> {
     #[inline(always)]
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays keeps the loop vectorisable
-    #[allow(clippy::manual_clamp)] // Ord::clamp asserts min <= max at run time, which blocks vectorisation
+    // The clamp assertion blocks vectorisation.
     fn apply<const N: usize>(self, d: &mut [u8; N], a: &[u8; N], b: &[u8; N]) {
         for x in 0..N {
             let r = (T::from(a[x]) * self.w0 + T::from(b[x]) * self.w1 + self.round) >> self.sh;
@@ -455,7 +451,6 @@ impl<T: WLane> Combine for Weighted<T> {
 }
 
 /// Combine h rows of W samples of `a` and `b` (strides `sa`, `sb`) into `d` (stride `ds`).
-#[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn combine_rows<const W: usize, C: Combine>(
     c: C,
@@ -468,9 +463,9 @@ fn combine_rows<const W: usize, C: Combine>(
     h: usize,
 ) {
     for y in 0..h {
-        let rd: &mut [u8; W] = (&mut d[y * ds..y * ds + W]).try_into().unwrap();
-        let ra: &[u8; W] = a[y * sa..y * sa + W].try_into().unwrap();
-        let rb: &[u8; W] = b[y * sb..y * sb + W].try_into().unwrap();
+        let rd: &mut [u8; W] = array_mut(d, y * ds);
+        let ra: &[u8; W] = array(a, y * sa);
+        let rb: &[u8; W] = array(b, y * sb);
         c.apply(rd, ra, rb);
     }
 }
@@ -511,7 +506,6 @@ macro_rules! with_combine {
 
 /// Weighted sample prediction (8-272 / 8-273) of a w x h block: predictions `a` and `b`
 /// (strides `sa`, `sb`) combined into `d` (stride `ds`).
-#[allow(clippy::too_many_arguments)]
 #[inline]
 pub(crate) fn weight_bi(
     d: &mut [u8],
@@ -539,7 +533,6 @@ pub(crate) fn weight_bi(
 /// predictions are rows of stride `st` in `a` and `b`, each with room for a whole number of
 /// 16-sample chunks: the 16-sample loop runs over the rows end to end, the result replaces `a`
 /// and the block's `w` samples of each row are copied into `d` (stride `ds`).
-#[allow(clippy::too_many_arguments)]
 #[inline]
 pub(crate) fn weight_bi_narrow(
     d: &mut [u8],
@@ -557,9 +550,9 @@ pub(crate) fn weight_bi_narrow(
     let n = (st * h).next_multiple_of(16);
     with_combine!(log_wd, w0, w1, o, |c| {
         for (ra, rb) in a[..n].chunks_exact_mut(16).zip(b[..n].chunks_exact(16)) {
-            let ra: &mut [u8; 16] = ra.try_into().unwrap();
+            let ra: &mut [u8; 16] = array_mut(ra, 0);
             let x = *ra;
-            c.apply::<16>(ra, &x, rb.try_into().unwrap());
+            c.apply::<16>(ra, &x, array(rb, 0));
         }
     });
     store_narrow(w, a, st, h, d, ds);
@@ -592,7 +585,7 @@ fn weight_uni_w<const W: usize>(a: &mut [u8], sa: usize, h: usize, log_wd: u32, 
     // ((v*w + 2^(logWD-1)) >> logWD) + o, with o folded into the rounding term (8-270 / 8-271).
     let round = (if log_wd >= 1 { 1 << (log_wd - 1) } else { 0 }) + (o << log_wd);
     for y in 0..h {
-        let ra: &mut [u8; W] = (&mut a[y * sa..y * sa + W]).try_into().unwrap();
+        let ra: &mut [u8; W] = array_mut(a, y * sa);
         for v in ra.iter_mut() {
             *v = ((*v as i32 * wt + round) >> log_wd).clamp(0, 255) as u8;
         }
@@ -693,7 +686,7 @@ mod tests {
             seed
         };
         let data: Vec<u8> = (0..32 * 32).map(|_| rnd() as u8).collect();
-        let r = PlaneRef::new(&data, 32, 32, 0);
+        let r = PlaneRef::new(&data, 32, 32, Structure::Frame);
         for (w, h) in [(8, 8), (8, 4), (4, 8), (4, 4), (4, 2), (2, 4), (2, 2)] {
             for fx in 0..8u32 {
                 for fy in 0..8u32 {
@@ -722,7 +715,7 @@ mod tests {
     #[test]
     fn flat_plane_interpolates_flat() {
         let data = vec![77u8; 32 * 32];
-        let r = PlaneRef::new(&data, 32, 32, 0);
+        let r = PlaneRef::new(&data, 32, 32, Structure::Frame);
         for fx in 0..4 {
             for fy in 0..4 {
                 let mut d = [0u8; 256];

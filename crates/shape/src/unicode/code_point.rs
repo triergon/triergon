@@ -1,5 +1,6 @@
 //! HarfBuzz's Unicode functions over any `u32`, as a buffer holds code points:
 //! values that are not scalar values get HarfBuzz's defaults.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::{GeneralCategory, tables};
 use crate::Script;

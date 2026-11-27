@@ -6,9 +6,9 @@
 //! analysis filtered when TNS is active, and added to the bands flagged in ltp_long_used.
 
 use crate::filterbank::Filterbank;
-use crate::ics::{ChannelData, CoreCfg, EIGHT_SHORT, TNS_ANALYSIS};
+use crate::ics::{ChannelData, CoreCfg, TnsKind, WindowSequence, WindowShape};
 use crate::tables::{LTP_COEF, MAX_LTP_LONG_SFB};
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 #[derive(Debug)]
 pub(crate) struct LtpState {
@@ -18,7 +18,7 @@ pub(crate) struct LtpState {
 }
 
 impl LtpState {
-    pub(crate) fn new(budget: &Budget) -> Result<LtpState, StorageError> {
+    pub(crate) fn new(budget: &Budget) -> Result<LtpState, Error> {
         Ok(LtpState {
             hist: BudgetVec::try_filled(budget, 0.0, 3072)?,
             time: BudgetVec::try_filled(budget, 0.0, 2048)?,
@@ -37,12 +37,12 @@ pub(crate) fn apply(
     l: &mut LtpState,
     fb: &mut Filterbank,
     cd: &mut ChannelData,
-    prev_shape: u8,
+    prev_shape: WindowShape,
     cfg: &CoreCfg,
 ) {
     let info = cd.info;
     let ltp = info.ltp[0];
-    if info.window_sequence == EIGHT_SHORT || !ltp.present {
+    if info.window_sequence == WindowSequence::EightShort || !ltp.present {
         return;
     }
     let coef = LTP_COEF[ltp.coef as usize];
@@ -63,7 +63,7 @@ pub(crate) fn apply(
         &mut l.spec,
     );
     if cd.tns.present {
-        crate::ics::tns_filter(&cd.tns, &info, cfg, &mut l.spec, TNS_ANALYSIS);
+        crate::ics::tns_filter(&cd.tns, &info, cfg, &mut l.spec, TnsKind::AllZero);
     }
     for sfb in 0..info.max_sfb.min(MAX_LTP_LONG_SFB) {
         if ltp.long_used[sfb] {

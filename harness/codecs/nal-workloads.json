@@ -1,0 +1,106 @@
+{
+ "schema": "triergon.codecs.workloads.v1",
+ "root": "worktree root (paths relative)",
+ "memory_timeout_seconds": {
+  "aarch64-unknown-linux-gnu": 221,
+  "thumbv7neon-unknown-linux-gnueabihf": 208
+ },
+ "note": "The candidate codec-views-worker feeds each Annex B NAL to the decoder. The reference ffmpeg-decode-worker uses its ordinary parser and access-unit decode. Both produce the existing codec workload's letterboxed RGBA output.",
+ "candidate": "codec-views-worker",
+ "reference": "ffmpeg-decode-worker",
+ "open_workloads": [],
+ "open_unmeasured": [
+  {
+   "bound": "runtime",
+   "cases": [
+    "h264-high-1080p",
+    "h264-main-1920x800",
+    "h264-high-720p",
+    "hevc-main-1080p",
+    "hevc-main10-1080p",
+    "hevc-main10-2160p"
+   ],
+   "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+  },
+  {
+   "bound": "heap",
+   "cases": [
+    "h264-high-1080p",
+    "h264-main-1920x800",
+    "h264-high-720p",
+    "hevc-main-1080p",
+    "hevc-main10-1080p",
+    "hevc-main10-2160p"
+   ],
+   "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+  },
+  {
+   "bound": "total_rss",
+   "cases": [
+    "h264-high-1080p",
+    "h264-main-1920x800",
+    "h264-high-720p",
+    "hevc-main-1080p",
+    "hevc-main10-1080p",
+    "hevc-main10-2160p"
+   ],
+   "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+  }
+ ],
+ "workloads": [
+  {
+   "id": "h264-high-1080p",
+   "path": ".research/codec-inputs/h264-high-1080p.h264",
+   "sha256": "4d7abd5fa936096028cab705dc513f5c30c829020c783164ec666a6ed6a0ac64",
+   "bytes": 2937517,
+   "operation": "video-h264",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "h264-main-1920x800",
+   "path": ".research/codec-inputs/h264-main-1920x800.h264",
+   "sha256": "3cb5324d42b8d35219208da7620c3dc71d8c08fdf93660e67d5cbcd2a4443f89",
+   "bytes": 2102873,
+   "operation": "video-h264",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "h264-high-720p",
+   "path": ".research/codec-inputs/h264-high-720p.h264",
+   "sha256": "f3b75499bd3a7d300d70110f5c640beb59788f7cc61143810a576a93317fd701",
+   "bytes": 1469100,
+   "operation": "video-h264",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "hevc-main-1080p",
+   "path": ".research/codec-inputs/hevc-main-1080p.hevc",
+   "sha256": "d72d53118fcf832485201682dcb80c7bbaeabd392b5fe493ba5e4b1cb25f1421",
+   "bytes": 2525973,
+   "operation": "video-hevc",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "hevc-main10-1080p",
+   "path": ".research/codec-inputs/hevc-main10-1080p.hevc",
+   "sha256": "d00f2cabfd5a079d94d594c0f98c24d4fa474cf63d1ceef645949611ad23fcd9",
+   "bytes": 2301304,
+   "operation": "video-hevc",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "hevc-main10-2160p",
+   "path": ".research/codec-inputs/hevc-main10-2160p.hevc",
+   "sha256": "5fcd4a7ad7c95c5bb17e7cf6302b02b97fb547433460e4bff716ef565781f681",
+   "bytes": 1884534,
+   "operation": "video-hevc",
+   "iterations": 1,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  }
+ ]
+}

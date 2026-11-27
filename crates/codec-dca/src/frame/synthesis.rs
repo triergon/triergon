@@ -2,12 +2,11 @@
 //! post-processing (X96 recombination, XCh down-mix removal, sum/difference), QMF
 //! synthesis and LFE interpolation.
 
-use super::CoreFrame;
-use crate::MAX_SLOTS;
+use super::{CoreFrame, FrameDecoder, MAX_SLOTS, X96Bank};
 use crate::qmf::{Qmf, QmfState};
 use crate::subframe::{HIST, SubBuf};
-use crate::{AudioFrame, ChannelLayout, DecodeError, FrameDecoder, Speaker, X96Bank};
-use triergon_codec::StorageError;
+use crate::{AudioFrame, ChannelLayout, DecodeError, Speaker};
+use triergon_codec::Error;
 
 impl FrameDecoder {
     /// Allocates the 64-band filter bank on first use and sizes the synthesis scratch,
@@ -19,7 +18,7 @@ impl FrameDecoder {
         f: &CoreFrame<'_>,
         nslots: usize,
         have_x96: bool,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         let blocks = f.h.blocks;
         if have_x96 && self.x96.is_none() {
             self.x96 = Some(X96Bank::new(&self.budget)?);
@@ -29,7 +28,7 @@ impl FrameDecoder {
             self.tbuf.try_resize(blocks * bands, 0.0)?;
         }
         let n48 = blocks * 32;
-        if have_x96 && f.h.lff > 0 && self.lfe48.len() < n48 {
+        if have_x96 && f.h.lfe_mode > 0 && self.lfe48.len() < n48 {
             self.lfe48.try_resize(n48, 0.0)?;
         }
 
@@ -69,7 +68,7 @@ impl FrameDecoder {
             let xbuf = self
                 .x96buf
                 .as_mut()
-                .ok_or(DecodeError::InvalidData("X96 buffer"))?;
+                .ok_or(DecodeError::Invalid("X96 buffer"))?;
             for ch in 0..set.nch {
                 for b in 0..32 {
                     let core_row = self.sub.row(ch, b);
@@ -80,7 +79,7 @@ impl FrameDecoder {
                 }
             }
         }
-        if xch && let Some((l, r)) = surround_pair(h.amode) {
+        if xch && let Some((l, r)) = surround_pair(h.audio_mode) {
             // XCh carries Cs; the core surrounds hold Ls + 0.7071 Cs and
             // Rs + 0.7071 Cs (clause 6.4.1). Remove the embedded down-mix.
             for b in 0..32 {
@@ -105,12 +104,16 @@ impl FrameDecoder {
             Some(xb) if have_x96 => (xb, 64),
             _ => (&mut self.sub, 32),
         };
-        let fpair = if h.sumf || h.amode == 3 {
-            front_pair(h.amode)
+        let fpair = if h.front_sum_difference || h.audio_mode == 3 {
+            front_pair(h.audio_mode)
         } else {
             None
         };
-        let spair = if h.sums { surround_pair(h.amode) } else { None };
+        let spair = if h.surround_sum_difference {
+            surround_pair(h.audio_mode)
+        } else {
+            None
+        };
         for (l, r) in [fpair, spair].into_iter().flatten() {
             for b in 0..sbands {
                 let (ll, rr) = src.row_pair_mut(l, r, b);
@@ -141,11 +144,15 @@ impl FrameDecoder {
         let blocks = h.blocks;
         let mut x96 = if have_x96 {
             let bank = self.x96.as_deref_mut();
-            Some(bank.ok_or(DecodeError::InvalidData("X96 filter bank"))?)
+            Some(bank.ok_or(DecodeError::Invalid("X96 filter bank"))?)
         } else {
             None
         };
-        let qmf = if h.filts { &self.qmf_pr } else { &self.qmf_np };
+        let qmf = if h.perfect_reconstruction {
+            &self.qmf_pr
+        } else {
+            &self.qmf_np
+        };
         for ch in 0..nslots {
             let (srcbuf, sb): (&SubBuf, usize) = match self.x96buf.as_ref() {
                 Some(xb) if have_x96 && ch < f.set.nch => (xb, 64),
@@ -153,7 +160,7 @@ impl FrameDecoder {
             };
             let tb = &mut self.tbuf[..blocks * bands];
             if sb < bands {
-                tb.iter_mut().for_each(|v| *v = 0.0);
+                tb.fill(0.0);
             }
             for b in 0..sb {
                 let row = &srcbuf.row(ch, b)[HIST..HIST + blocks];
@@ -182,7 +189,7 @@ impl FrameDecoder {
         let h = &f.h;
         let blocks = h.blocks;
         let nsamples = blocks * if have_x96 { 64 } else { 32 };
-        let factor = if h.lff == 1 { 128 } else { 64 };
+        let factor = if h.lfe_mode == 1 { 128 } else { 64 };
         let n48 = blocks * 32;
         let ndec = n48 / factor;
         let plane = &mut out.planes[lp];
@@ -214,22 +221,21 @@ impl FrameDecoder {
         f: &CoreFrame<'_>,
         xch: bool,
         have_x96: bool,
-    ) -> Result<([usize; MAX_SLOTS], Option<usize>), StorageError> {
+    ) -> Result<([usize; MAX_SLOTS], Option<usize>), DecodeError> {
         let (h, set) = (&f.h, &f.set);
         let nsamples = h.blocks * if have_x96 { 64 } else { 32 };
-        let mut order: [(Speaker, usize); MAX_SLOTS + 1] = [(Speaker::FrontLeft, 0); MAX_SLOTS + 1];
+        let mut order = [(Speaker::FrontLeft, None); MAX_SLOTS + 1];
         let mut n = 0;
         for (ch, &sp) in f.speakers.iter().enumerate() {
-            order[n] = (sp, ch);
+            order[n] = (sp, Some(ch as u8));
             n += 1;
         }
         if xch {
-            order[n] = (Speaker::BackCenter, set.nch);
+            order[n] = (Speaker::BackCenter, Some(set.nch as u8));
             n += 1;
         }
-        const LFE_SRC: usize = usize::MAX;
-        if h.lff > 0 {
-            order[n] = (Speaker::LowFrequency, LFE_SRC);
+        if h.lfe_mode > 0 {
+            order[n] = (Speaker::LowFrequency, None);
             n += 1;
         }
         let order = &mut order[..n];
@@ -243,12 +249,13 @@ impl FrameDecoder {
             h.sample_rate
         };
         out.samples_per_channel = nsamples;
-        out.layout = ChannelLayout::new(order.iter().map(|e| e.0)).expect("at most 9 planes");
+        out.layout = ChannelLayout::new(order.iter().map(|e| e.0))
+            .ok_or(DecodeError::Invalid("more than 16 output planes"))?;
         for (i, &(_, src)) in order.iter().enumerate() {
-            if src == LFE_SRC {
-                lfe_plane = Some(i);
+            if let Some(channel) = src {
+                plane_of[usize::from(channel)] = i;
             } else {
-                plane_of[src] = i;
+                lfe_plane = Some(i);
             }
         }
         Ok((plane_of, lfe_plane))
@@ -275,16 +282,16 @@ fn run_bank<const TAPS: usize, const LEN: usize>(
 }
 
 /// Coded slot indices of the front and surround L/R pairs for sum/difference decoding.
-fn front_pair(amode: u8) -> Option<(usize, usize)> {
-    match amode {
+fn front_pair(audio_mode: u8) -> Option<(usize, usize)> {
+    match audio_mode {
         2..=4 | 6 | 8 => Some((0, 1)),
         5 | 7 | 9 => Some((1, 2)),
         _ => None,
     }
 }
 
-fn surround_pair(amode: u8) -> Option<(usize, usize)> {
-    match amode {
+fn surround_pair(audio_mode: u8) -> Option<(usize, usize)> {
+    match audio_mode {
         8 => Some((2, 3)),
         9 => Some((3, 4)),
         _ => None,

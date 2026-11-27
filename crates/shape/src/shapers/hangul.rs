@@ -4,6 +4,7 @@
 //!
 //! Hangul fonts are not designed to mix precomposed syllables and jamo, so
 //! normalisation does not compose for this script.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::{Buffer, Info, ShaperProps};
 use crate::metrics::Scaled;

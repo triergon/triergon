@@ -5,6 +5,7 @@
 //!
 //! The rules are those of <https://linux.thai.net/~thep/th-otf/shaping.html>, as
 //! HarfBuzz implements them.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::buffer::{Buffer, CharFlag};
 use crate::metrics::Scaled;

@@ -22,6 +22,14 @@ capture-worker bench    <in.rgba> <iterations> <w> <h> <flip> <frames> <bitrate>
 `flip` reads them bottom-up. Sessions use `SessionConfig::with_rate_rule` at
 `bitrate` bit/s (`convert` uses 2.5 Mbit/s).
 
+`recon`, `pipeline`, `memory` and `bench` accept the following trailing
+options as flag/value pairs. The worker reads them before opening the session.
+
+- `--gop` in pictures, `--max-rate` in bit/s and `--vbv-bits` in bits.
+- `--transport-stream-id`, `--original-network-id`, `--program-number`,
+  `--pmt-pid`, `--video-pid` and `--stream-type` as decimal integers.
+- `--provider-name` and `--service-name` as printable ASCII strings.
+
 ## Outputs
 
 | Mode | Output |

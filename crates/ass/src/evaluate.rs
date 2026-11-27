@@ -1,10 +1,9 @@
-//! Evaluating an event at one time: libass's render context, the state its
-//! override tags change, and the walk over the event text that gives each
-//! glyph a copy of it (`init_render_context`, `ass_parse_tags` and the text
-//! loop of `parse_events`).
+//! Evaluating an event at one time: the state its override tags change, and
+//! the walk over the event text that gives each glyph a copy of it.
 //!
 //! Values are in script units: sizes, borders, shadows and positions in
 //! script pixels, before the renderer's screen scaling.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Error, Result, WorkBudget};
 
@@ -78,10 +77,10 @@ pub struct GlyphState<'s> {
     /// `\fay`.
     pub shear_y: f64,
     /// `\fe`: the font charset.
-    pub encoding: i32,
+    pub encoding: crate::Encoding,
 }
 
-/// The font a glyph asks for, as libass's `ass_update_font` describes it.
+/// The font a glyph asks for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FontDesc<'s> {
     /// The family name, without the `@` of vertical text.
@@ -109,7 +108,7 @@ impl<'s> GlyphState<'s> {
         }
     }
 
-    /// libass's `ass_reset_render_context`: everything `\r` resets.
+    /// Everything `\r` resets, from `style`.
     fn reset(style: &'s Style) -> Self {
         Self {
             family: style.font_name(),
@@ -170,8 +169,8 @@ pub struct EventState<'s> {
     /// Whether the event takes part in collision handling: not after `\pos`,
     /// `\move`, `\org`, `\t` or a scrolling effect.
     pub detect_collisions: bool,
-    /// libass's `explicit`: a scrolling effect, or a `\pos`, `\move`,
-    /// `\clip`, `\iclip`, `\org` or `\p...` anywhere in the text.
+    /// Placed explicitly: a scrolling effect, or a `\pos`, `\move`, `\clip`,
+    /// `\iclip`, `\org` or `\p...` anywhere in the text.
     pub explicit: bool,
     /// The alpha of `\fad`/`\fade` now, 0 to 255 (when positive it is
     /// applied over each glyph's alphas).
@@ -193,8 +192,7 @@ pub enum Symbol<'s> {
         text: &'s [u8],
         /// The `\p` level in force.
         scale: i32,
-        /// The `\pbo` in force, truncated to an integer as libass stores it
-        /// per glyph.
+        /// The `\pbo` in force, truncated to an integer.
         baseline: i32,
     },
 }
@@ -411,9 +409,9 @@ impl<'s> Context<'s> {
         }
     }
 
-    /// The first `}` at or after `from`, as libass's `strchr` finds it. A
-    /// `}` found earlier, or the absence of one, still answers for any later
-    /// `from` up to it, so the scan and its charge stay linear in the text.
+    /// The first `}` at or after `from`, as `strchr` finds it. A `}` found
+    /// earlier, or the absence of one, still answers for any later `from` up
+    /// to it, so the scan and its charge stay linear in the text.
     fn closing_brace(&mut self, from: usize) -> Result<Option<usize>> {
         match self.close {
             Brace::None => return Ok(None),
@@ -428,7 +426,7 @@ impl<'s> Context<'s> {
         Ok(close)
     }
 
-    /// libass's `ass_parse_tags` over `tags` with animation power `pwr`.
+    /// Applies `tags` with animation power `pwr`.
     /// Inside a `\t` (`nested`), a further `\t` sets the power for the tags
     /// after it; its own tags then always run to the end of the block, so
     /// they continue in place rather than recursing, and the recursion is at
@@ -568,7 +566,7 @@ impl<'s> Context<'s> {
             Tag::Italic(v) => g.italic = v.unwrap_or(style.italic),
             Tag::Underline(v) => g.underline = v.unwrap_or(style.underline),
             Tag::StrikeOut(v) => g.strike_out = v.unwrap_or(style.strike_out),
-            Tag::Encoding(v) => g.encoding = v.unwrap_or(style.encoding),
+            Tag::Encoding(v) => g.encoding = v.map_or(style.encoding, crate::Encoding::from_raw),
             Tag::Reset(name) => {
                 let named = name
                     .and_then(|name| self.script.styles().iter().rev().find(|s| s.name() == name));
@@ -652,19 +650,17 @@ impl<'s> Context<'s> {
     }
 }
 
-/// libass's `calc_anim_int32`: `(1 - pwr) * old + new * pwr` truncated by
-/// `dtoi32`.
+/// `(1 - pwr) * old + new * pwr` truncated by `dtoi32`.
 fn anim(new: u32, old: u32, pwr: f64) -> i32 {
     dtoi32((1.0 - pwr) * f64::from(old) + f64::from(new) * pwr)
 }
 
-/// libass's `change_alpha`: the low byte of the animated value.
+/// `colour` with the low byte of its animated alpha.
 fn change_alpha(colour: Rgba, new: u32, pwr: f64) -> Rgba {
     colour.with_alpha(anim(new, colour.a().into(), pwr) as u8)
 }
 
-/// libass's `change_color`: each of red, green and blue animated in its own
-/// byte position, alpha kept.
+/// Each of red, green and blue animated in its own byte position, alpha kept.
 fn change_colour(colour: Rgba, new: Rgba, pwr: f64) -> Rgba {
     let (old, new) = (colour.0.swap_bytes(), new.0.swap_bytes());
     let mixed = [0xff_0000_u32, 0xff00, 0xff]
@@ -695,11 +691,19 @@ fn move_position(m: Move, t: i32, duration: i32) -> (f64, f64) {
     )
 }
 
-/// libass's `interpolate_alpha` for `\fad`/`\fade` at `now` milliseconds into
-/// an event of `duration`.
+/// The alpha of `\fad`/`\fade` at `now` milliseconds into an event of
+/// `duration`.
 fn fade_alpha(fade: Fade, now: i64, duration: i32) -> i32 {
     let (a1, a2, a3, t1, t2, t3, t4) = match fade {
-        Fade::InOut { fade_in, fade_out } => (255, 0, 255, -1, fade_in, fade_out, -1),
+        Fade::InOut { fade_in, fade_out } => (
+            255,
+            0,
+            255,
+            0,
+            fade_in,
+            duration.wrapping_sub(fade_out),
+            duration,
+        ),
         Fade::Full {
             a1,
             a2,
@@ -708,14 +712,14 @@ fn fade_alpha(fade: Fade, now: i64, duration: i32) -> i32 {
             t2,
             t3,
             t4,
-        } => (a1, a2, a3, t1, t2, t3, t4),
-    };
-    // Both outer times -1: the inner ones are durations from the event's
-    // start and back from its end.
-    let (t1, t3, t4) = if t1 == -1 && t4 == -1 {
-        (0, duration.wrapping_sub(t3), duration)
-    } else {
-        (t1, t3, t4)
+        } => {
+            // Explicit -1 at both ends also makes the inner times durations.
+            if t1 == -1 && t4 == -1 {
+                (a1, a2, a3, 0, t2, duration.wrapping_sub(t3), duration)
+            } else {
+                (a1, a2, a3, t1, t2, t3, t4)
+            }
+        }
     };
     let fraction = |from: i32, to: i32| {
         f64::from((now as u32).wrapping_sub(from as u32) as i32)
@@ -735,9 +739,9 @@ fn fade_alpha(fade: Fade, now: i64, duration: i32) -> i32 {
     }
 }
 
-/// libass's `ass_event_has_hard_overrides`: whether a block holds `\pos`,
-/// `\move`, `\clip`, `\iclip`, `\org` or any tag starting with `p`, which
-/// exempts an event from selective style overrides.
+/// Whether a block holds `\pos`, `\move`, `\clip`, `\iclip`, `\org` or any
+/// tag starting with `p`, which exempts an event from selective style
+/// overrides.
 fn has_hard_overrides(text: &[u8]) -> bool {
     const HARD: [&[u8]; 7] = [b"pos", b"move", b"clip", b"iclip", b"org", b"pbo", b"p"];
     let mut at = 0;
@@ -794,6 +798,18 @@ mod tests {
             t4: -1,
         };
         assert_eq!(fade_alpha(full, 50, 1000), 127);
+
+        let relative = Fade::Full {
+            a1: 180,
+            a2: 80,
+            a3: 160,
+            t1: -1,
+            t2: 100,
+            t3: 100,
+            t4: -1,
+        };
+        assert_eq!(fade_alpha(relative, 50, 1000), 130);
+        assert_eq!(fade_alpha(relative, 950, 1000), 120);
     }
 
     #[test]

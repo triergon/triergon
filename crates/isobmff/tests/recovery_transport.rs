@@ -1,6 +1,5 @@
-#[path = "common/transport_cases.rs"]
-mod cases;
-mod common;
+use crate::common;
+use crate::common::transport_cases as cases;
 use common::{child, roots};
 use std::{
     ops::Range,
@@ -8,13 +7,13 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxHeader, BoxView, BuildStatus, Limits,
+    BuildStatus, CursorStatus, Limits,
+    boxes::{BoxHeader, BoxView},
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, DescriptionRecoveryTable, RecoveryTrackHeader,
-            RunRecoveryProfile,
+            DescriptionRecoveryTable, RecoveryTrackHeader,
         },
         seek::IndexLimits,
     },
@@ -55,17 +54,11 @@ impl Source {
             &child(&trak, b"tkhd").unwrap(),
             &child(&mdia, b"mdhd").unwrap(),
             &child(&mdia, b"hdlr").unwrap(),
-            RunRecoveryProfile,
         )
         .unwrap();
         let raw = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-        let mut build = DescriptionRecoveryBuilder::new(
-            raw,
-            pool.clone(),
-            Limits::default(),
-            DescriptionRecoveryProfile,
-        )
-        .unwrap();
+        let mut build =
+            DescriptionRecoveryBuilder::new(raw, pool.clone(), Limits::default()).unwrap();
         while build
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
@@ -177,7 +170,6 @@ fn cursor_model_keeps_uncertain_alignment_and_source_ranges_explicit() {
             &source.media,
             PacketLimits::default(),
             &model,
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     while cursor
@@ -236,7 +228,6 @@ fn index_keeps_every_raw_entry_after_the_first_modeled_packet_eof() {
             &source.media,
             IndexLimits::default(),
             &model,
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     let mut positions = Vec::new();
@@ -271,8 +262,7 @@ fn model_cannot_cross_source_table_or_pool_bindings() {
                 &other_pool_source.track,
                 &other_pool_source.media,
                 PacketLimits::default(),
-                &model,
-                DescriptionRecoveryProfile
+                &model
             ),
         Err(Error::ForeignPool)
     ));
@@ -281,13 +271,8 @@ fn model_cannot_cross_source_table_or_pool_bindings() {
     let moov = top.iter().find(|b| b.header().kind == *b"moov").unwrap();
     let mdia = child(&child(moov, b"trak").unwrap(), b"mdia").unwrap();
     let raw = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-    let mut builder = DescriptionRecoveryBuilder::new(
-        raw,
-        source.pool.clone(),
-        Limits::default(),
-        DescriptionRecoveryProfile,
-    )
-    .unwrap();
+    let mut builder =
+        DescriptionRecoveryBuilder::new(raw, source.pool.clone(), Limits::default()).unwrap();
     while builder
         .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
@@ -300,8 +285,7 @@ fn model_cannot_cross_source_table_or_pool_bindings() {
             &source.track,
             &source.media,
             PacketLimits::default(),
-            &model,
-            DescriptionRecoveryProfile
+            &model
         ),
         Err(Error::Unsupported(_))
     ));
@@ -390,7 +374,6 @@ fn modeled_pending_packet_and_index_cancellation_clears_ready_outputs() {
             &source.media,
             PacketLimits::default(),
             &model,
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     while packet.poll(&mut WorkBudget::new(1), &cancel).unwrap() != CursorStatus::Ready {}
@@ -413,7 +396,6 @@ fn modeled_pending_packet_and_index_cancellation_clears_ready_outputs() {
             &source.media,
             limits,
             &model,
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     let error = loop {

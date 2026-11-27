@@ -7,6 +7,10 @@ samples; it returns source-preserving views, decoder-ready Annex-B/ADTS/temporal
 output and typed refusals. It depends on `triergon-core` and `triergon-bitstream`, does
 no I/O and does not decode audio or video.
 
+`access::AccessUnits` frames a container track's packets using its `TrackInfo`
+and their `PacketInfo`. It emits AVC and HEVC as Annex B and wraps raw AAC in
+ADTS when the configuration is known. Other packets retain their original payload.
+
 ## Usage
 
 Every record job, packet job and incremental reader takes a core `Budget` pool, a
@@ -14,17 +18,18 @@ Every record job, packet job and incremental reader takes a core `Budget` pool, 
 `BuildStep::{Yield, Ready, Complete}`; incremental readers return core `Step::{NeedInput,
 Yield, Ready, End}` and are fed with `provide` and closed with `finish` or `fail`.
 
-AVC and HEVC record parsers, including their compatibility wrappers, also offer
-`step_into` with an empty output slot and `ConfigProgress`. This publishes the
-configuration directly into caller storage. Occupied slots are rejected without
-advancing the parser; `step` retains the same progress and error behaviour.
+The AVC and HEVC record parsers, their compatibility wrappers and the packet job also
+offer `step_into`, which publishes the output into an empty caller-provided slot and
+returns `SlotProgress`. An occupied slot is refused without advancing the job; `step`
+has the same progress and errors.
 
 ```rust
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, SourceId, WorkBudget};
-use triergon_framing::{
+use triergon_framing::BuildStep;
+use triergon_framing::avc::{
     AvcAnnexBConfig, AvcAnnexBJob, AvcAnnexBLimits, AvcConfigLimits, AvcConfigParser,
-    AvcConfigSource, BuildStep,
+    AvcConfigSource,
 };
 
 let pool = Budget::new(1 << 20)?;
@@ -74,49 +79,50 @@ assert_eq!(decoder_input, [
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `reference-trace` | off | `reference_trace::dts`, FFmpeg's DTS parser model, and the accessors that report the return codes FFmpeg's packet receivers give |
+
 ## Supported
 
-| Area | Entry points | What it does |
+The format modules expose source fields and bounded framing operations for consumers
+that parse configurations or assemble decoder input. Comparison projections require
+`reference-trace`.
+
+| Module | Entry points | Output |
 |---|---|---|
-| NAL streams | `NalReader`, `Framing::{AnnexB, LengthPrefixed}`, `LengthSize` | Incremental AVC/HEVC NAL extraction from any chunking; 1–4 byte big-endian lengths or Annex-B start codes; fixed NAL header facts |
-| NAL units in memory | `AnnexBUnits`, `start_code`, `split_length_prefixed`; `NalHeader::parse`; `avc`, `hevc` | An access unit's or stream's NAL units without their start codes or length prefixes; validated fixed headers; H.264 and H.265 type values and the HEVC type classes (slice, access-unit start, IRAP, IDR, BLA, RASL, RADL) |
-| Parameter-set walks | `skip_avc_scaling_matrix`, `skip_vui_to_timing`, `skip_hevc_profile_tier_level` | Pass over an SPS's H.264 scaling matrix, VUI fields before the timing, or H.265 profile-tier-level, over any `BitSource`, so each caller keeps its own emulation-prevention strictness and errors |
-| H.264 headers | `read_avc_sps`, `read_avc_pps`, `read_avc_slice_header`, `avc_slice_pps_id`; `AvcSps`, `AvcVui`, `AvcPocSyntax`, `AvcPps`, `AvcSliceHeader`, `AvcSliceDepth`, `AvcReading` | The SPS, PPS and slice header fields that picture order and output need (order count syntax, `frame_num` and `gaps_in_frame_num_value_allowed_flag`, fields, VUI timing and bitstream restriction, `no_output_of_prior_pics_flag`, `memory_management_control_operation` 5); `00 00 00` to `00 00 02` inside an RBSP refused or read as data |
-| Picture output | `picture_output::{DecodedPictures, Entry, View, NewPicture, Leave, Marking, Parity, PictureId, HevcLimits, HevcPicture, AvcPicture, StoreError, Refused, LateOutput}`, `picture_output::order::{AvcOrder, HevcOrder, AfterMmco5, AfterGap}`, `picture_output::levels::{max_dpb_mbs, max_dpb_frames}` | The decoded picture buffer of H.264 Annex C.4 (gap frames C.4.2, C.4.4, C.4.5, field pairs, bumping C.4.5.3) and H.265 Annex C.5.2 (C.5.2.2–C.5.2.4), generic over the stored picture, driven by marking, removal, storage and flush events, each stored picture readable by position and markable by field, and plain storage and bumping for a caller with its own output conditions; the output of the H.264 and HEVC decoders and of caption extraction; picture order counts of H.264 8.2.1 (types 0, 1, 2, `memory_management_control_operation` 5, `frame_num` gaps) and H.265 8.3.1; MaxDpbMbs and MaxDpbFrames of Table A-1; FFmpeg's observed departures as separate steps and options |
-| Raw Annex-B access units | `RawAnnexBReader`, `RawAccessUnit` | Groups an elementary AVC/HEVC stream into access units (H.264 §7.4.1.2.3–4, H.265 §7.4.2.4.4; an HEVC end of sequence or bitstream starts the next one, as in FFmpeg's parser); reports IDR/IRAP; keeps original start codes and padding |
-| avcC | `AvcConfigParser` | Full record: fixed fields, SPS/PPS/SPS-ext arrays, high-profile extension, trailing bytes |
-| hvcC | `HvcConfigParser`, `inspect_hvc_config_prefix` | Version 1: 23-byte fixed prefix, all NAL arrays in order (unknown/duplicate/empty arrays kept) |
-| Sample to Annex-B | `AvcAnnexBJob`, `HevcAnnexBJob` | Four-byte start codes; prepends record SPS/PPS (VPS/SPS/PPS) before IDR/IRAP; zero-copy segments |
-| Record to Annex-B | `HvcAnnexBWriter`, `HvcDecoderConfigWriter`, `AnnexBWriter` | All hvcC NALs in order, or the decoder subset (types 32–34, 39, 40); single NAL with `00 00 00 01` |
-| FFmpeg-compatible BSF | `NalPacketSession`, `NalPacketConfigWriter`, `compat::nal` | Stateful `h264_mp4toannexb`/`hevc_mp4toannexb` packet behaviour, including in-band parameter-set tracking and AVC `NEW_EXTRADATA` |
-| Other config inputs | `AnnexBConfigParser`, `DeclaredConfigParser`, `Configuration::declared_record` | Annex-B extradata framing; caller-declared array/NAL layouts; opaque record retention |
-| AV1 | `Av1ObuReader`, `Av1ConfigParser`, `Av1TemporalUnitJob` | Low-overhead or single-OBU framing with exact LEB128; av1C v1 fields and config OBUs; container sample to decoder temporal unit |
-| VP9 | `Vp9ConfigParser` | vpcC v1 fields (profile, level, bit depth, chroma, range, CICP) |
-| AAC | `AacAscParser`, `AacAscScopeParser`, `aac_decoder_configuration_view` | AudioSpecificConfig for AAC-LC (2), SBR (5), PS (29): frequency, fixed channel configurations 1–7, 11, 12 and 14, GASpecificConfig, PCE, `0x2b7`/`0x548` sync extensions |
-| ADTS | `inspect_aac_adts_header`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | 56-bit header facts; single-block AAC-LC frames; ADTS wrapping of raw access units (`AacAdtsParameters::from_asc`); aligned ADTS streams |
-| AC-3 / E-AC-3 | `probe_ac3_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Header facts (bsid 0–8, 11–16), aligned syncframe reader, dac3/dec3 records, complete E-AC-3 BSI |
-| DTS core | `probe_dts_core_header`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Normal core header (all fields, optional HCRC), FSIZE+1 frame acquisition |
-| DTS declared extents | `probe_dts_frame_extent`, `probe_dts_extension_substream_extent` | Bounded core and extension size fields at an established canonical sync, including the short and long extension prefixes |
-| DTS packings | `Dts14BitUnpacker`, `DtsPackedPayloadJob`, `Dts14SyncReader`, `Dts14CarrierReader`, `DtsNormalSourceReader` | 16-bit LE and 14-bit BE/LE word packings; experimental 14-bit stream acquisition |
-| MPEG audio | `MpegAudioHeader`, `mpeg_info_frame`, `mpeg_audio_crc_ok` | ISO/IEC 11172-3 and 13818-3 frame headers, including MPEG-2.5 rates; Xing, Info (with LAME tag) and VBRI information frames; frame CRC check |
-| FLAC | `flac_stream_info`, `flac_metadata_blocks`, `flac_configuration_from_dfla`, `flac_configuration_from_ogg`, `FlacFrameHeader` | STREAMINFO and metadata blocks; the `fLaC` configuration rebuilt from a `dfLa` payload or the first Ogg FLAC packet; frame headers with their CRC-8 |
-| Opus | `OpusHead`, `opus_packet_samples` | Identification header, also from a `dOps` payload; packet duration from the TOC |
-| Vorbis | `VorbisIdentification`, `VorbisModes`, `vorbis_packet_blocksize`, `xiph_split`, `xiph_join` | Identification header, setup-header modes and each audio packet's block size without decoding; Xiph lacing |
-| Audio configuration | `canonical_flac_configuration`, `canonical_opus_configuration`, `canonical_vorbis_configuration` | One canonical decoder configuration per codec, whichever container carried it |
-| DTS parser comparison | `reference_trace::dts::ParserOperation` (`reference-trace` feature) | Raw 14-bit source frames alongside the packets, clock and byte positions of FFmpeg's `dca` parser |
+| `nal` | `NalReader`, `AnnexBUnits`, `RawAnnexBReader`, `AnnexBConfigParser`, `DeclaredConfigParser` | AVC/HEVC NAL units, raw access units and declared configurations with original bytes and offsets |
+| `avc` | `AvcConfigParser`, `AvcAnnexBJob`, `read_sps`, `read_pps`, `read_slice_header` | avcC records, Annex B samples and validated SPS, PPS and slice syntax |
+| `hevc` | `HvcConfigParser`, `HevcAnnexBJob`, `HvcAnnexBWriter`, `HvcDecoderConfigWriter`, `read_sps_prefix` | hvcC records, Annex B samples and parameter-set prefixes |
+| `compat::nal` | `NalPacketSession`, `NalPacketConfigWriter`, `AvcRecordParser`, `HevcRecordParser` | Annex B packets and configuration as FFmpeg's `mp4toannexb` filters frame them, with in-band parameter sets |
+| `picture_output` | `DecodedPictures`, `order::{AvcOrder, HevcOrder}`, `levels::{max_dpb_mbs, max_dpb_frames}` | Picture order, marking and bounded output for H.264 and H.265 |
+| `av1` | `Av1ObuReader`, `Av1ConfigParser`, `Av1TemporalUnitJob` | Low-overhead or externally sized OBUs, av1C and temporal units |
+| `vp9` | `Vp9ConfigParser` | vpcC profile, level, bit depth, range and CICP |
+| `aac` | `AacAscParser`, `AacAscScopeParser`, `AacAdtsParser`, `AacAdtsWriter`, `AacAdtsStreamReader`, `AacAdtsCarrierReader` | AudioSpecificConfig and bounded single-block ADTS framing |
+| `ac3` | `probe_header`, `Ac3FrameReader`, `Ac3ConfigParser`, `Eac3BsiParser` | Aligned AC-3 and E-AC-3 frames, dac3/dec3 records and E-AC-3 BSI |
+| `dts` | `probe_core_header`, `probe_frame_extent`, `probe_extension_substream_extent`, `DtsCoreFrameReader`, `DtsHeaderInspector` | Core headers, complete core acquisition and declared core and extension extents |
+| `dts` packed | `DtsPackedPayloadJob`, `Dts14CarrierReader`, `DtsNormalSourceReader` | Canonical header and payload from packed DTS words |
+| `flac` | `stream_info`, `metadata_blocks`, `FlacFrameHeader`, `canonical_configuration` | STREAMINFO, metadata, frame headers and canonical FLAC configuration |
+| `opus` | `OpusHead`, `packet_samples`, `canonical_configuration` | Identification, TOC duration and canonical Opus configuration |
+| `vorbis` | `VorbisHeaders`, `VorbisIdentification`, `VorbisModes`, `canonical_configuration` | Xiph-laced headers, modes and canonical Vorbis configuration |
+| `mpeg_audio` | `MpegAudioHeader`, `info_frame` | Layers I–III frame headers with MPEG-2.5 rates, Xing, Info and VBRI |
+| `reference_trace::dts` | `ParserOperation` | Source frame and demuxer parser packet, clock and position comparisons |
 
 ## Behaviour and limits
 
-**Reference compatibility.** The crate-root types follow the specifications.
+**Reference compatibility.** The format modules follow the specifications.
 `compat::nal` reproduces FFmpeg's `mp4toannexb` packet receiver where a consumer needs
-its result, and names the FFmpeg revision it reproduces. Comparison-only projections
-need the non-default `reference-trace` feature.
+its result, and names the FFmpeg revision it reproduces.
 
 **Input model.** Incremental readers own a core `InputCursor` and accept same-pool
 windows of any size with the exact token, source and offset. An empty window is
 starvation; a known length is not EOF. Truncation, transport failure and cancellation
-are sticky errors, never a synthetic end. A new source or reset needs a new reader.
-Record parsers take a complete pool-owned record (box payload, no size/type header);
+are sticky errors, never a synthetic end. The ADTS stream and carrier readers and the
+DTS normal, 14-bit sync and 14-bit carrier readers restart on the same source at an
+offset with `reset`, under a new token generation; every other reader needs a new
+reader for a new source or position. Record parsers take a complete pool-owned record (box payload, no size/type header);
 sample jobs take one complete container sample.
 
 **Source preservation.** Outputs keep exact source bytes, offsets, source ID and
@@ -128,12 +134,13 @@ keeps the whole backing allocation charged.
 **Resources.** All arithmetic is checked. Every operation has caller limits (bytes,
 NAL/OBU/frame counts, input window) and charges work per byte or field. Allocation
 pressure returns retryable `Backpressure` at the exact checkpoint; no partial output is
-published. A `NalPacketSession` frames packets, records and outputs of at most
-4 GiB − 1 bytes (`NalPacketLimits::MAXIMUM_SPAN`).
+published. A `compat::nal::NalPacketSession` frames packets, records and outputs of at
+most 4 GiB − 1 bytes (`NalPacketLimits::MAXIMUM_SPAN`).
 
 **Codec-specific limits.**
 
-- NAL: payload bytes are opaque; no RBSP, SPS/PPS body or decoder-consistency check.
+- NAL: Annex B start-code offsets, padding and widths use `AnnexBPrefix`, also
+  carried by `NalFraming::AnnexB`. Payload bytes are opaque; no RBSP, SPS/PPS body or decoder-consistency check.
   The leading `zero_byte` rule is not enforced. `AnnexBWriter` never edits emulation
   prevention.
 - avcC/hvcC parsers refuse `lengthSizeMinusOne = 2` (three-byte lengths) and unknown
@@ -164,7 +171,8 @@ Implemented from these specifications:
 | HEVC NAL / Annex B / AU | ITU-T H.265 (07/2024) §7.3.1.2, §7.4.2 Table 7-1, §7.4.2.4.4, Annex B |
 | Picture output | ITU-T H.264 (08/2024) §8.2.1, §8.2.5.3–4, §A.3.1 Table A-1, Annex C.4.4–C.4.5; ITU-T H.265 (07/2024) §8.1.3, §8.3.1–8.3.2, Annex C.5.2 |
 | avcC | ISO/IEC 14496-15:2010 with the 2006 FRExt amendment |
-| hvcC, AAC ASC/ADTS | ISO/IEC 14496-15 and 14496-3 record layouts, from licensed interoperability references |
+| hvcC | ISO/IEC 14496-15 §8.3.3.1 (`HEVCDecoderConfigurationRecord`) |
+| AAC ASC / ADTS | ISO/IEC 14496-3 §1.6.2.1 (`AudioSpecificConfig`), §1.A.2.2 (ADTS) |
 | AV1 | AV1 Bitstream v1.0.0 Errata 1 §§4.10.5, 5.2–5.3, 6.2; AV1-ISOBMFF v1.3.0 §§2.3.3–2.4 |
 | VP9 | VP Codec ISO Media File Format Binding v1.0 |
 | AC-3 / E-AC-3 | ATSC A/52:2018 §§5.3–5.4, Table 5.18, Annex E Tables E1.2, E1.5, E1.6 and §E2.3; ETSI TS 102 366 V1.4.1 Annex F.4/F.6 (dac3/dec3) |
@@ -178,6 +186,6 @@ and key flags FFmpeg's raw H.264/HEVC demuxers produce for the paired streams;
 `hevc-eos.hevc` is `hevc-aud0.hevc` with an end of sequence before its second VPS and an
 end of bitstream at the end.
 
-Verification: the [packet-framing
-harness](../../harness/features/packet-framing/README.md); results in
-[docs/status.md](../../docs/status.md).
+The [packet-framing comparison](../../harness/features/packet-framing/README.md) and
+the codec configuration and parser view features compare these outputs with FFmpeg;
+results are in [docs/status.md](../../docs/status.md).

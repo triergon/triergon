@@ -34,6 +34,7 @@ assert_eq!(h, 2_956_290); // 3, 3, 97, 98, 99 folded in order
 | `digest` | Ordered work digest `h <- 31*h + v (mod 2^64)` over every field and payload byte, never sampled. Timed operations use it to prove both sides did equal work. `fold_bytes` regroups the per-byte recurrence for speed and equals it exactly; golden-vector tests pin the values `harness/reference.c` produces |
 | `interleaved` | `InterleavedDigest`, the output fingerprint of the decode workers: eight lanes over 64-byte blocks folded into the ordered digest, then the byte count. It detects unequal output; it is not a cryptographic hash |
 | `md5` | RFC 1321 MD5, for comparing decoded output with recorded `ffmpeg -f md5` and framemd5 digests. Not a security primitive |
+| `test_report` | Reports unavailable vector checks on uncaptured stderr for the test gate |
 
 The harness and its comparison rules are described in
 [docs/quality.md](../../docs/quality.md).

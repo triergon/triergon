@@ -1,17 +1,16 @@
-//! Facade format selection for a supplied prefix or a blocking source.
-use std::io::{ErrorKind, Read};
+//! Format selection from the first bytes of a source.
 use triergon_core::signature::{
-    self,
+    self, Container, Selection,
     TransportSync::{M2ts192, Ts188},
+    TransportTie,
 };
-use triergon_core::{Budget, Error, Reservation, Result};
 
-/// What the first bytes of a source look like.
+/// A source format the facade opens, as [`probe`] recognises it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Probe {
+pub enum SourceFormat {
     /// An EBML header (Matroska or WebM).
     Matroska,
-    /// An ISO BMFF box sequence (`ftyp`, `styp`, `moov`, `moof`, ...).
+    /// An ISO BMFF box sequence (`ftyp`, `styp`, `moov`, `moof`, `wide`, ...).
     Isobmff,
     /// 188-byte MPEG transport packets.
     Ts,
@@ -28,237 +27,95 @@ pub enum Probe {
     Adts,
     /// Two consecutive AC-3 or E-AC-3 syncframes.
     Ac3,
-    /// Not recognised from these bytes.
-    Unknown,
 }
 
-/// Classify a source from its first bytes. A short prefix may give `Unknown`: an
-/// elementary stream (MPEG audio, ADTS, AC-3) is recognised only once the prefix holds
-/// the start of its second frame, and an ID3v2 tag must fit in it whole.
-pub fn probe(bytes: &[u8]) -> Probe {
-    match container(bytes) {
-        Selection::Format(kind) => kind,
-        Selection::Need(_) | Selection::Elementary => elementary(bytes),
-    }
-}
-
-enum Selection {
-    Format(Probe),
+/// What a source prefix says about its format.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Probed {
+    /// The source starts this format.
+    Format(SourceFormat),
+    /// Undecided until at least this many prefix bytes are available. For elementary
+    /// streams this can be the 64 KiB probe limit. Call [`probe_whole`] at EOF.
     Need(usize),
-    Elementary,
+    /// No format the facade opens starts with these bytes, whatever follows them.
+    Unrecognised,
 }
 
-// Opening-box policy belongs to the facade. In particular, an arbitrary first
-// word (even a FLAC marker) can be the size of a recognised opening box.
-const BOXES: [&[u8; 4]; 8] = [
-    b"ftyp", b"styp", b"moov", b"moof", b"mdat", b"free", b"skip", b"sidx",
-];
+/// Classify a source from a prefix that more bytes may follow. A container is decided as
+/// soon as its signature is (Matroska from four bytes, Ogg from five, ISO BMFF from
+/// eight, MPEG transport from three sync bytes); an elementary stream (MPEG audio, ADTS,
+/// AC-3) once the prefix holds the start of its second frame and any ID3v2 tag whole,
+/// and the facade's openers look for one in the first 64 KiB, so a shorter prefix that
+/// holds none yet is [`Probed::Need`] of 64 KiB.
+pub fn probe(prefix: &[u8]) -> Probed {
+    match signature::select(prefix, &POLICY) {
+        Selection::Container(kind) => Probed::Format(container(kind)),
+        Selection::Need(end) => Probed::Need(end),
+        Selection::Unrecognised | Selection::Ambiguous => match elementary(prefix) {
+            Some(format) => Probed::Format(format),
+            None if ELEMENTARY && prefix.len() < LIMIT => Probed::Need(LIMIT),
+            None => Probed::Unrecognised,
+        },
+    }
+}
 
-fn container(bytes: &[u8]) -> Selection {
-    if signature::ebml(bytes) {
-        return Selection::Format(Probe::Matroska);
+/// Classify a whole source, which no more bytes follow: [`probe`]'s answer where that
+/// decides, else the format the bytes it has select. A source that ends before a third
+/// transport sync byte is MPEG transport when its first two sync bytes are in place (one
+/// packet and all or part of a second); a container signature cut short is not one.
+/// `None` when no format the facade opens starts the source.
+pub fn probe_whole(source: &[u8]) -> Option<SourceFormat> {
+    match signature::select_whole(source, &POLICY) {
+        Selection::Container(kind) => Some(container(kind)),
+        Selection::Need(_) | Selection::Unrecognised | Selection::Ambiguous => elementary(source),
     }
-    if signature::opening_box(bytes).is_some_and(|kind| BOXES.contains(&kind)) {
-        return Selection::Format(Probe::Isobmff);
+}
+
+/// What the readers select where the signatures leave a choice: every box a source
+/// they read may open with, a fragment or an index included; Ogg; and TS188 for a
+/// prefix that fits both transport spacings. `triergon-playback` selects for a
+/// player instead (`triergon_playback::probe::SELECTION`): no `moof`, `sidx` or `skip`,
+/// no Ogg, and no packet size for such a prefix.
+pub(crate) const POLICY: signature::Policy = signature::Policy {
+    opening_boxes: &[
+        *b"ftyp", *b"styp", *b"moov", *b"moof", *b"mdat", *b"free", *b"skip", *b"sidx", *b"wide",
+    ],
+    ogg: true,
+    short_audio_prefix: true,
+    transport_tie: TransportTie::Ts188,
+};
+
+/// Whether the elementary stream readers are built in.
+pub(crate) const ELEMENTARY: bool = cfg!(feature = "elementary");
+
+pub(crate) fn container(container: Container) -> SourceFormat {
+    match container {
+        Container::Matroska => SourceFormat::Matroska,
+        Container::Isobmff => SourceFormat::Isobmff,
+        Container::Ogg => SourceFormat::Ogg,
+        Container::Transport(Ts188) => SourceFormat::Ts,
+        Container::Transport(M2ts192) => SourceFormat::M2ts,
     }
-    if signature::ogg(bytes) {
-        return Selection::Format(Probe::Ogg);
-    }
-    if bytes.len() < 4 {
-        return Selection::Need(4);
-    }
-    if bytes.len() == 4 && (bytes == b"OggS" || bytes == b"fLaC") {
-        return Selection::Need(5);
-    }
-    if bytes.len() < 8 && BOXES.iter().any(|kind| kind.starts_with(&bytes[4..])) {
-        return Selection::Need(8);
-    }
-    // TS188 wins even when both three-sync patterns are present.
-    for (sync, kind) in [(Ts188, Probe::Ts), (M2ts192, Probe::M2ts)] {
-        match sync.observed(bytes) {
-            Some(true) => return Selection::Format(kind),
-            Some(false) => {}
-            None => return Selection::Need(sync.prefix_len()),
-        }
-    }
-    Selection::Elementary
 }
 
 /// The elementary stream `bytes` starts, when that reader is built in.
-fn elementary(bytes: &[u8]) -> Probe {
+pub(crate) fn elementary(bytes: &[u8]) -> Option<SourceFormat> {
     #[cfg(feature = "elementary")]
     {
         use triergon_elementary::Kind;
-        match triergon_elementary::probe(bytes) {
-            Some(Kind::Flac) => Probe::Flac,
-            Some(Kind::MpegAudio) => Probe::MpegAudio,
-            Some(Kind::Adts) => Probe::Adts,
-            Some(Kind::Ac3) => Probe::Ac3,
-            None => Probe::Unknown,
-        }
+        triergon_elementary::probe(bytes).map(|kind| match kind {
+            Kind::Flac => SourceFormat::Flac,
+            Kind::MpegAudio => SourceFormat::MpegAudio,
+            Kind::Adts => SourceFormat::Adts,
+            Kind::Ac3 => SourceFormat::Ac3,
+        })
     }
     #[cfg(not(feature = "elementary"))]
     {
         let _ = bytes;
-        Probe::Unknown
+        None
     }
 }
 
-const LIMIT: usize = 64 * 1024;
-
-/// A replay allocation and the reservation covering its capacity.
-#[derive(Debug)]
-pub(super) struct Prefix {
-    pub(super) bytes: Vec<u8>,
-    charge: Reservation,
-}
-
-impl Prefix {
-    // Allocate once, after the signature or the first block tells us how much
-    // space to use. A pipe can already hold the reservation for this allocation.
-    fn allocate(&mut self, capacity: usize) -> Result<()> {
-        self.charge.resize_to(capacity)?;
-        self.bytes
-            .try_reserve_exact(capacity)
-            .map_err(|_| Error::Allocation)?;
-        self.charge.resize_to(self.bytes.capacity())
-    }
-}
-
-/// Probe fixed signatures on the stack. Only pipes need to retain these bytes.
-pub(super) struct ProbeBuffer {
-    header: [u8; M2ts192.prefix_len()],
-    used: usize,
-    prefix: Prefix,
-    maximum: usize,
-}
-
-impl ProbeBuffer {
-    pub(super) fn new(pool: &Budget) -> Self {
-        let bound = if cfg!(feature = "elementary") {
-            LIMIT
-        } else {
-            M2ts192.prefix_len()
-        };
-        Self {
-            header: [0; M2ts192.prefix_len()],
-            used: 0,
-            prefix: Prefix {
-                bytes: Vec::new(),
-                charge: Reservation::empty(pool),
-            },
-            maximum: bound.min(pool.limit() - Budget::control_storage_bytes()),
-        }
-    }
-
-    /// A pipe cannot put bytes back if its allocation is refused midway.
-    /// Claim its possible replay capacity before the first irreversible read.
-    pub(super) fn identify_pipe(&mut self, source: &mut impl Read) -> Result<Probe> {
-        self.prefix.charge.resize_to(self.maximum)?;
-        let kind = self.identify(source, None)?;
-        if self.prefix.bytes.is_empty() {
-            // Return unused headroom before the selected reader is constructed.
-            self.prefix.charge.resize_to(self.used.min(self.maximum))?;
-        }
-        Ok(kind)
-    }
-
-    pub(super) fn identify(
-        &mut self,
-        source: &mut impl Read,
-        length: Option<u64>,
-    ) -> Result<Probe> {
-        loop {
-            let bytes = &self.header[..self.used];
-            match container(bytes) {
-                Selection::Format(kind) => return Ok(kind),
-                Selection::Need(end) => {
-                    let count = read(source, &mut self.header[self.used..end])?;
-                    if count == 0 {
-                        return Ok(elementary(&self.header[..self.used]));
-                    }
-                    self.used += count;
-                }
-                Selection::Elementary => {
-                    if !cfg!(feature = "elementary") || bytes.starts_with(b"fLaC") {
-                        return Ok(elementary(bytes));
-                    }
-                    return self.read_elementary(source, length);
-                }
-            }
-        }
-    }
-
-    pub(super) fn into_replay(mut self) -> Result<Prefix> {
-        if self.prefix.bytes.is_empty() {
-            self.prefix.allocate(self.used)?;
-            self.prefix
-                .bytes
-                .extend_from_slice(&self.header[..self.used]);
-        }
-        Ok(self.prefix)
-    }
-
-    /// Search the full bounded prefix once. Buffer the first block on the stack
-    /// so a short input needs only its actual length. A longer input takes one
-    /// allocation and never has to charge both an old and a replacement window.
-    fn read_elementary(&mut self, source: &mut impl Read, length: Option<u64>) -> Result<Probe> {
-        let hint = length.unwrap_or(0).min(self.maximum as u64) as usize;
-        let mut block = [0; 4096];
-        block[..self.used].copy_from_slice(&self.header[..self.used]);
-        let mut used = self.used;
-        while self.prefix.bytes.len() < LIMIT {
-            // A file can grow past its hint. Keep the original block boundaries
-            // when checking the pool limit on the remaining bytes.
-            let want = block.len() - self.prefix.bytes.len() % block.len();
-            used += fill(source, &mut block[used..want])?;
-            let end = self.prefix.bytes.len() + used;
-            if end > self.maximum {
-                return Err(Error::Limit {
-                    requested: end,
-                    maximum: self.maximum,
-                });
-            }
-            if self.prefix.bytes.is_empty() {
-                self.prefix
-                    .allocate(if used < want { used } else { self.maximum })?;
-            }
-            self.prefix.bytes.extend_from_slice(&block[..used]);
-            if used < want {
-                break;
-            }
-            if end < hint {
-                // Read a seekable file directly into the reserved prefix.
-                self.prefix.bytes.resize(hint, 0);
-                let actual = end + fill(source, &mut self.prefix.bytes[end..])?;
-                self.prefix.bytes.truncate(actual);
-                if actual < hint {
-                    break;
-                }
-            }
-            used = 0;
-        }
-        Ok(elementary(&self.prefix.bytes))
-    }
-}
-
-fn fill(source: &mut impl Read, buffer: &mut [u8]) -> Result<usize> {
-    let mut used = 0;
-    while used < buffer.len() {
-        let count = read(source, &mut buffer[used..])?;
-        if count == 0 {
-            break;
-        }
-        used += count;
-    }
-    Ok(used)
-}
-
-fn read(source: &mut impl Read, out: &mut [u8]) -> Result<usize> {
-    loop {
-        match source.read(out) {
-            Err(error) if error.kind() == ErrorKind::Interrupted => continue,
-            result => return result.map_err(|error| Error::Io(error.kind())),
-        }
-    }
-}
+/// The most bytes the openers read before they decide.
+pub(crate) const LIMIT: usize = 64 * 1024;

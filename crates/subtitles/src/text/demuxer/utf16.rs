@@ -25,6 +25,9 @@ pub(super) struct Decoder {
     /// The next character is looked at: it follows a CR or LF that it may
     /// complete into a line end.
     peeked: bool,
+    /// The offset after each LF in the output and in the document.
+    #[cfg(feature = "reference-trace")]
+    line_ends: BudgetVec<(usize, usize)>,
 }
 
 impl Decoder {
@@ -47,11 +50,16 @@ impl Decoder {
             output: BudgetVec::new(pool),
             maximum: limits.document_bytes,
             peeked: false,
+            #[cfg(feature = "reference-trace")]
+            line_ends: BudgetVec::new(pool),
         })
     }
 
     /// Converts until `work` runs out (`None`) or the document is converted.
     /// Each code unit costs one unit.
+    // Out of line: called once per poll, its loop keeps its own registers
+    // whatever else the caller inlines (measured).
+    #[inline(never)]
     pub(super) fn advance(
         &mut self,
         source: &[u8],
@@ -109,7 +117,20 @@ impl Decoder {
                 maximum: self.maximum,
             });
         }
+        #[cfg(feature = "reference-trace")]
+        if scalar == '\n' {
+            self.line_ends
+                .try_push((length, self.at))
+                .map_err(|error| error.error)?;
+        }
         self.output.try_reserve(encoded.len())?;
         self.output.try_extend_from_slice(encoded)
+    }
+
+    /// [`Reader::line_ends`](super::Reader::line_ends), once converted.
+    #[cfg(feature = "reference-trace")]
+    pub(super) fn take_line_ends(&mut self) -> BudgetVec<(usize, usize)> {
+        let empty = BudgetVec::new(self.line_ends.budget());
+        std::mem::replace(&mut self.line_ends, empty)
     }
 }

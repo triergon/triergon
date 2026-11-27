@@ -10,6 +10,7 @@
 use super::screen::{COLUMNS, Cell, Font, ROWS, Row, Screen, Style};
 use crate::cc::line21::{Character, Charset, Color};
 use crate::cc::text::Text;
+use crate::decimal::decimal;
 use triergon_core::Result;
 
 /// The ASS text of `screen`, replacing `out`.
@@ -68,38 +69,22 @@ fn leading_blanks(cells: &Row) -> usize {
 
 fn position(out: &mut Text, column: usize, row: usize) -> Result<()> {
     out.put(b"{\\an7}{\\pos(")?;
-    decimal(out, COLUMN_X[column])?;
+    decimal(COLUMN_X[column], |digits| out.put(digits))?;
     out.put(b",")?;
-    decimal(out, ROW_Y[row])?;
+    decimal(ROW_Y[row], |digits| out.put(digits))?;
     out.put(b")}")
 }
 
 /// The receiver's `\pos` coordinates of each column and row: about
 /// `384 * (0.1 + 0.8 * column / 32)` and `288 * (0.1 + 0.8 * row / 15)`,
 /// truncated (row 9 sits at 166). Recovered from reference output.
-const COLUMN_X: [usize; COLUMNS + 1] = [
+const COLUMN_X: [u32; COLUMNS + 1] = [
     38, 48, 57, 67, 76, 86, 96, 105, 115, 124, 134, 144, 153, 163, 172, 182, 192, 201, 211, 220,
     230, 240, 249, 259, 268, 278, 288, 297, 307, 316, 326, 336, 345,
 ];
-const ROW_Y: [usize; ROWS] = [
+const ROW_Y: [u32; ROWS] = [
     28, 44, 59, 74, 90, 105, 120, 136, 151, 166, 182, 197, 213, 228, 243,
 ];
-
-fn decimal(out: &mut Text, value: usize) -> Result<()> {
-    let digits = [
-        b'0' + (value / 100 % 10) as u8,
-        b'0' + (value / 10 % 10) as u8,
-        b'0' + (value % 10) as u8,
-    ];
-    let skip = if value >= 100 {
-        0
-    } else if value >= 10 {
-        1
-    } else {
-        2
-    };
-    out.put(&digits[skip..])
-}
 
 fn tags(out: &mut Text, from: Style, to: Style) -> Result<()> {
     if from.font != to.font {

@@ -10,19 +10,24 @@ use crate::syntax::{Gap, Length, Plan, Prelude, Probe, SeekContext, Syntax, Trac
 use triergon_bitstream::crc::crc16_a52;
 use triergon_core::container::{CodecId, SeekMethod};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result};
-use triergon_framing::{
-    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacBlocking, FlacFrameHeader, FlacStreamInfo,
-};
+use triergon_framing::flac::{self, FlacBlocking, FlacFrameHeader, FlacStreamInfo};
 
 /// The kind of a metadata block (RFC 9639 section 8.1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum FlacBlockKind {
+    /// STREAMINFO (type 0).
     StreamInfo,
+    /// PADDING (type 1).
     Padding,
+    /// APPLICATION (type 2).
     Application,
+    /// SEEKTABLE (type 3).
     SeekTable,
+    /// VORBIS_COMMENT (type 4).
     VorbisComment,
+    /// CUESHEET (type 5).
     CueSheet,
+    /// PICTURE (type 6).
     Picture,
     /// Types 7 to 126.
     Reserved(u8),
@@ -46,6 +51,7 @@ impl FlacBlockKind {
 /// One metadata block.
 #[derive(Clone, Debug)]
 pub struct FlacMetadata {
+    /// The block type.
     pub kind: FlacBlockKind,
     /// Body length in bytes.
     pub len: u32,
@@ -88,6 +94,7 @@ pub struct Flac {
 }
 
 impl Flac {
+    /// The STREAMINFO block, once read; `None` for a stream without the `fLaC` marker.
     pub fn stream_info(&self) -> Option<&FlacStreamInfo> {
         self.stream_info.as_ref()
     }
@@ -133,19 +140,25 @@ impl Flac {
         self.expect = if last { Expect::Frames } else { Expect::Block };
     }
 
-    /// Samples per fixed-blocking frame number: the first frame's block size when
-    /// STREAMINFO declares a fixed block size (or is absent), the frame's own when it
-    /// declares a range (as FFmpeg reads streams that vary their block size under the
-    /// fixed flag). The first frame, not STREAMINFO, decides the size, as for FFmpeg when
-    /// STREAMINFO states it wrongly.
-    fn fixed_block_size(&self, header: &FlacFrameHeader) -> u64 {
-        match (self.stream_info, self.first) {
-            (Some(info), _) if info.min_block_size != info.max_block_size => {
-                u64::from(header.block_size)
-            }
-            (_, Some(first)) => u64::from(first.block_size),
-            (_, None) => u64::from(header.block_size),
-        }
+    /// Whether a frame's coded number counts samples rather than frames (RFC 9639
+    /// section 9.1.5): when the frame sets the blocking strategy bit, and in a stream
+    /// written before that bit existed, whose STREAMINFO declares a range of block sizes
+    /// while its frames leave the bit clear (Appendix B.1).
+    fn numbers_samples(&self, header: &FlacFrameHeader) -> bool {
+        header.blocking == FlacBlocking::Variable
+            || self
+                .stream_info
+                .is_some_and(|info| info.min_block_size != info.max_block_size)
+    }
+
+    /// Samples per frame number in a stream numbered in frames: the first frame's block
+    /// size, which every frame but the last shares. The first frame, not STREAMINFO,
+    /// decides it, as for FFmpeg when STREAMINFO states it wrongly.
+    fn frame_samples(&self, header: &FlacFrameHeader) -> u64 {
+        u64::from(
+            self.first
+                .map_or(header.block_size, |first| first.block_size),
+        )
     }
 }
 
@@ -190,9 +203,10 @@ impl Syntax for Flac {
     }
 
     fn numbers_on(&self, header: &FlacFrameHeader, next: &FlacFrameHeader) -> bool {
-        let expected = match header.blocking {
-            FlacBlocking::Fixed => header.number + 1,
-            FlacBlocking::Variable => header.number + u64::from(header.block_size),
+        let expected = if self.numbers_samples(header) {
+            header.number + u64::from(header.block_size)
+        } else {
+            header.number + 1
         };
         next.number == expected
     }
@@ -207,9 +221,10 @@ impl Syntax for Flac {
     }
 
     fn first_sample(&self, header: &FlacFrameHeader) -> Option<u64> {
-        match header.blocking {
-            FlacBlocking::Variable => Some(header.number),
-            FlacBlocking::Fixed => header.number.checked_mul(self.fixed_block_size(header)),
+        if self.numbers_samples(header) {
+            Some(header.number)
+        } else {
+            header.number.checked_mul(self.frame_samples(header))
         }
     }
 
@@ -309,12 +324,12 @@ impl Syntax for Flac {
                     .and_then(|block| block.body.as_ref());
                 let last = if comment.is_some() { 0 } else { 0x80 };
                 configuration.try_extend_from_slice(b"fLaC")?;
-                configuration.try_extend_from_slice(&[last | FLAC_STREAMINFO, 0, 0, 34])?;
+                configuration.try_extend_from_slice(&[last | flac::STREAMINFO, 0, 0, 34])?;
                 configuration.try_extend_from_slice(&body[..FlacStreamInfo::BYTES])?;
                 if let Some(comment) = comment {
                     let len = u32::try_from(comment.len()).map_err(|_| Error::Overflow)?;
                     let [_, a, b, c] = len.to_be_bytes();
-                    configuration.try_extend_from_slice(&[0x80 | FLAC_VORBIS_COMMENT, a, b, c])?;
+                    configuration.try_extend_from_slice(&[0x80 | flac::VORBIS_COMMENT, a, b, c])?;
                     configuration.try_extend_from_slice(comment)?;
                 }
                 (

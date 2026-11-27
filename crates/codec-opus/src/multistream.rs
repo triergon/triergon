@@ -2,9 +2,8 @@
 //! channel takes, the output layout, and the header's output gain.
 
 use crate::DecodeError;
-use triergon_codec::layout::{native_order, vorbis_order};
-use triergon_codec::{BudgetVec, ChannelLayout};
-use triergon_framing::OpusHead;
+use triergon_codec::{BudgetVec, ChannelLayout, native_order, vorbis_order};
+use triergon_framing::opus::OpusHead;
 
 /// No stream feeds this channel: it is silent.
 const SILENT: u8 = 255;
@@ -19,13 +18,6 @@ pub(crate) struct Mapping {
     layout: ChannelLayout,
     /// Linear output gain, `None` at 0 dB.
     gain: Option<f32>,
-}
-
-/// Channels in coded order without speaker positions (FFmpeg's unspecified order),
-/// `channels <= ChannelLayout::CAPACITY`.
-fn unordered(channels: usize) -> (ChannelLayout, [u8; ChannelLayout::CAPACITY]) {
-    let layout = ChannelLayout::unspecified(channels).unwrap_or_default();
-    (layout, core::array::from_fn(|i| i as u8))
 }
 
 impl Mapping {
@@ -43,7 +35,11 @@ impl Mapping {
                 .ok_or(DecodeError::Invalid(
                     "Vorbis channel mapping beyond 8 channels",
                 ))?,
-            255 => unordered(channels),
+            255 => (
+                ChannelLayout::unspecified(channels)
+                    .ok_or(DecodeError::Unsupported("more than 93 output channels"))?,
+                core::array::from_fn(|i| i as u8),
+            ),
             _ => return Err(DecodeError::Unsupported("Opus channel mapping family")),
         };
         let mut source = [SILENT; ChannelLayout::CAPACITY];

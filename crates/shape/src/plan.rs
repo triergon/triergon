@@ -1,6 +1,7 @@
 //! The shape plan: which features apply, the mask bits they get, the lookups of
 //! each stage in order, and which positioning methods run — HarfBuzz's map
 //! builder and shape planner.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::Language;
 use crate::face::Face;
@@ -10,6 +11,7 @@ use crate::shapers::{Pause, Shaper};
 use crate::tag::{Direction, Script, Tag};
 use crate::work;
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use triergon_font::read::bsearch;
 
 /// A feature the caller sets for the whole item, such as `kern=0`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -262,6 +264,17 @@ impl LookupMap {
     };
 }
 
+/// How a plan kerns besides GPOS.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Kerning {
+    /// Only GPOS kerns, if anything does.
+    None,
+    /// The legacy `kern` table.
+    Table,
+    /// The font functions' pair kerning, where they give it.
+    FontFunctions,
+}
+
 /// The lookups up to `last_lookup`, then an optional pause.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct StageMap {
@@ -283,8 +296,7 @@ pub struct Plan {
     pub(crate) chosen_script: [Option<Tag>; 2],
     pub(crate) fallback_glyph_classes: bool,
     pub(crate) apply_gpos: bool,
-    pub(crate) apply_kern: bool,
-    pub(crate) apply_fallback_kern: bool,
+    pub(crate) kerning: Kerning,
     pub(crate) zero_marks: bool,
     pub(crate) has_gpos_mark: bool,
     pub(crate) adjust_mark_positioning_when_zeroing: bool,
@@ -390,8 +402,7 @@ impl Plan {
     fn feature(&self, tag: &[u8; 4]) -> Option<&FeatureMap> {
         let tag = Tag::new(tag);
         let features = self.features.as_slice();
-        crate::ot::data::bsearch(features.len(), |i| features[i].tag.cmp(&tag))
-            .map(|i| &features[i])
+        bsearch(features.len(), |i| features[i].tag.cmp(&tag)).map(|i| &features[i])
     }
 
     /// Whether feature `tag` has a mask but no lookups in the font.
@@ -434,17 +445,19 @@ impl Plan {
             .is_some_and(|tag| Some(tag) != self.chosen_script[1]);
         self.fallback_glyph_classes = !face.gdef.has_glyph_classes();
         let fallback_position = self.shaper.fallback_position();
-        let has_gpos = !disable_gpos && face.gpos.has_data();
-        self.apply_gpos = has_gpos;
-        if !has_gpos_kern || !self.apply_gpos {
-            self.apply_kern = face.kern.has_data() && fallback_position;
-        }
-        self.apply_fallback_kern = fallback_position && !(self.apply_gpos || self.apply_kern);
+        self.apply_gpos = !disable_gpos && face.gpos.has_data();
+        let kern_table = (!has_gpos_kern || !self.apply_gpos) && face.kern.has_data();
+        self.kerning = match (fallback_position, kern_table, self.apply_gpos) {
+            (true, true, _) => Kerning::Table,
+            (true, false, false) => Kerning::FontFunctions,
+            _ => Kerning::None,
+        };
+        let applies_kern = self.kerning == Kerning::Table;
         self.zero_marks = self.shaper.zero_width_marks().is_some()
-            && (!self.apply_kern || !face.kern.has_state_machine());
+            && (!applies_kern || !face.kern.has_state_machine());
         self.has_gpos_mark = self.one_mask(b"mark") != 0;
         self.adjust_mark_positioning_when_zeroing =
-            !self.apply_gpos && (!self.apply_kern || !face.kern.has_cross_stream());
+            !self.apply_gpos && (!applies_kern || !face.kern.has_cross_stream());
         self.fallback_mark_positioning =
             self.adjust_mark_positioning_when_zeroing && fallback_position;
     }
@@ -460,7 +473,7 @@ struct Features {
 }
 
 impl Builder<'_> {
-    /// Compiles the plan as `hb_ot_map_builder_t::compile` does: merges
+    /// Compiles the plan as HarfBuzz's map builder does: merges
     /// duplicate features, allocates their mask bits and collects each stage's
     /// lookups.
     fn compile(
@@ -497,8 +510,7 @@ impl Builder<'_> {
             chosen_script: self.chosen_script,
             fallback_glyph_classes: false,
             apply_gpos: false,
-            apply_kern: false,
-            apply_fallback_kern: false,
+            kerning: Kerning::None,
             zero_marks: false,
             has_gpos_mark: false,
             adjust_mark_positioning_when_zeroing: false,

@@ -6,6 +6,7 @@
 //! (the exact, dither-stripped comparison lives in harness/codecs/ac3/).
 
 use std::path::PathBuf;
+use triergon_harness_protocol::test_report::skipped;
 
 use triergon_codec_ac3::{AudioFrame, Decoder, access_unit_len};
 
@@ -91,15 +92,15 @@ const VECTORS: &[Expect] = &[
 fn fate_vectors_frame_counts_layouts_and_coarse_values() {
     let root = suite();
     if !root.exists() {
-        eprintln!(
-            "note: {} absent, skipping FATE vector checks",
+        skipped(format_args!(
+            "the AC-3 vector checks: {} absent",
             root.display()
-        );
+        ));
         return;
     }
     for v in VECTORS {
         let Ok(data) = std::fs::read(root.join(v.path)) else {
-            eprintln!("note: {} absent, skipped", v.path);
+            skipped(format_args!("the AC-3 vector {}: absent", v.path));
             continue;
         };
         let mut dec = Decoder::new();
@@ -116,7 +117,7 @@ fn fate_vectors_frame_counts_layouts_and_coarse_values() {
             frame.clear();
             if let Ok(info) = dec.decode(&data[pos..end], &mut frame) {
                 frames += 1;
-                layout = triergon_codec_ac3::layout_name(&info.layout);
+                layout = info.layout.name();
                 for i in 0..frame.samples_per_channel {
                     for p in &frame.planes {
                         interleaved.push(p[i]);
@@ -158,7 +159,10 @@ fn fate_vectors_frame_counts_layouts_and_coarse_values() {
 fn corrupted_vectors_never_panic() {
     let root = suite();
     if !root.exists() {
-        eprintln!("note: {} absent, skipping corruption test", root.display());
+        skipped(format_args!(
+            "the AC-3 corruption test: {} absent",
+            root.display()
+        ));
         return;
     }
     let mut seed = 0x1234_5678u32;

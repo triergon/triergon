@@ -1,4 +1,5 @@
 //! Fonts embedded in `[Fonts]` with SSA's uuencode variant.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{BudgetVec, Bytes, Result};
 
@@ -39,9 +40,9 @@ fn decode(encoded: &[u8], out: &mut BudgetVec<u8>) -> Result<bool> {
 }
 
 impl Script {
-    /// libass's `process_fonts_line`: a `fontname:` line starts a font and
-    /// ends the previous one; other lines append to the current font, or are
-    /// ignored before any.
+    /// A `[Fonts]` line: a `fontname:` line starts a font and ends the
+    /// previous one; other lines append to the current font, or are ignored
+    /// before any.
     pub(super) fn fonts_line(&mut self, line: &[u8]) -> Result<()> {
         if let Some(name) = line.strip_prefix(b"fontname:") {
             if self.pending_font.is_some() {

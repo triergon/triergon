@@ -1,29 +1,30 @@
 //! Original public-API regression: one allocation can describe two physical origins.
-mod common;
+use crate::common;
 use common::{child, children, roots, table};
 use std::sync::atomic::AtomicBool;
 use triergon_core::TimeBase;
 use triergon_core::{Budget, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
-use triergon_isobmff::{
-    BoxView, ConfigurationLimits, EditList, Limits, SampleStep, SampleTable, TrackHeader,
-    compat::mov::{
-        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditProfile},
-        encoded::{
-            EncodedConfigProfile, EncodedInitial, EncodedMetadataProfile, EncodedSelection,
-            EncodedStreamJob,
-        },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
-    },
-};
 #[cfg(feature = "reference-trace")]
 use triergon_isobmff::{
     BuildStatus,
     compat::mov::packets::StreamView,
     reference_trace::mov::sample_entry::{PrivateCatalogueProfile, PrivateConfigurationJob},
 };
+use triergon_isobmff::{
+    CursorStatus, Limits, Next,
+    boxes::BoxView,
+    compat::mov::{
+        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits},
+        encoded::{EncodedInitial, EncodedSelection, EncodedStreamJob},
+        packets::{DemuxTrack, PacketCursor, PacketLimits},
+    },
+    config::ConfigurationLimits,
+    movie::{EditList, TrackHeader},
+    table::SampleTable,
+};
 #[cfg(feature = "reference-trace")]
-const RAW: &[u8] = include_bytes!("fixtures/private-catalogue-v8/dOps-only-size-11.mov");
-const AVC: &[u8] = include_bytes!("fixtures/encoded-dependency-v4/dep-unreferenced.mp4");
+const RAW: &[u8] = include_bytes!("fixtures/private-catalogue/dOps-only-size-11.mov");
+const AVC: &[u8] = include_bytes!("fixtures/encoded-dependency/dep-unreferenced.mp4");
 struct Source {
     pool: Budget,
     header: TrackHeader,
@@ -112,7 +113,6 @@ impl Source {
                 description: 1,
                 limits: ConfigurationLimits::default(),
             },
-            EncodedMetadataProfile,
         )
         .unwrap();
         for _ in 0..10000 {
@@ -155,9 +155,9 @@ fn first(table: &SampleTable) -> triergon_isobmff::Sample {
     let mut c = table.cursor();
     loop {
         match c.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(v) => return v,
-            SampleStep::Yield => {}
-            SampleStep::End => panic!("no sample"),
+            Next::Item(v) => return v,
+            Next::Yield => {}
+            Next::End => panic!("no sample"),
         }
     }
 }
@@ -202,13 +202,7 @@ fn same_bytes_relocated_encoded_description_is_rejected() {
         config.source_description().raw().header().start,
         s.table.descriptions()[0].raw().header().start
     );
-    let result = EncodedInitial::new(
-        &s.table,
-        &[config],
-        &first(&s.table),
-        &input,
-        EncodedConfigProfile,
-    );
+    let result = EncodedInitial::new(&s.table, &[config], &first(&s.table), &input);
     assert!(
         matches!(
             result,
@@ -233,7 +227,6 @@ fn direct_edit_constructor_rejects_relocated_configuration() {
         },
         &input,
         EncodedEditLimits::default(),
-        EncodedEditProfile,
     );
     assert!(
         matches!(
@@ -261,7 +254,6 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
         &configs,
         &input,
         EncodedEditLimits::default(),
-        EncodedMetadataProfile,
     )
     .unwrap();
     while job
@@ -284,7 +276,6 @@ fn packet_cursor_rejects_plan_at_relocated_metadata_origin() {
         &s.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     );
     assert!(
         matches!(
@@ -318,14 +309,5 @@ fn encoded_same_allocation_same_physical_start_stays_valid() {
     let reconstructed = s.shifted(0);
     let mut input = s.input();
     let config = s.encoded(&reconstructed, &mut input);
-    assert!(
-        EncodedInitial::new(
-            &s.table,
-            &[config],
-            &first(&s.table),
-            &input,
-            EncodedConfigProfile
-        )
-        .is_ok()
-    );
+    assert!(EncodedInitial::new(&s.table, &[config], &first(&s.table), &input).is_ok());
 }

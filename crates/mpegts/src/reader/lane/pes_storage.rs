@@ -1,8 +1,9 @@
 //! Shared lower bound for materializing a validated PES-backed unit.
 use super::{Piece, table_storage};
+use crate::pes::{Pes, PesSpan};
 use crate::reader::PayloadSource;
 use crate::reader::model::{PacketData, Shared};
-use crate::{Pes, PesSpan, TraceEvent};
+use crate::stream::TraceEvent;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, BudgetVec, Bytes, Error, Result, WorkBudget};
 

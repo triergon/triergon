@@ -17,6 +17,9 @@ mod timestamp;
 mod utf16;
 mod webvtt;
 
+#[cfg(feature = "reference-trace")]
+pub(crate) use timestamp::subrip as subrip_timing;
+
 use blocks::{Block, Blocks};
 use lines::{Line, Lines};
 use std::ops::Range;
@@ -47,11 +50,13 @@ pub enum TimestampFieldWidth {
 /// Resource bounds of one document.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Document bytes, and for a UTF-16 SubRip document its UTF-8 conversion.
+    /// Document bytes, and for a UTF-16 SubRip document its UTF-8
+    /// conversion; 16 MiB by default.
     pub document_bytes: usize,
-    /// Cues read from the document.
+    /// Cues read from the document; 65536 by default.
     pub cues: usize,
-    /// Bytes of SubRip cue text, which the reader assembles from its lines.
+    /// Bytes of SubRip cue text, which the reader assembles from its lines;
+    /// 16 MiB by default.
     pub text_bytes: usize,
 }
 
@@ -74,10 +79,15 @@ pub struct Cue {
     pub duration_ms: i64,
     /// The packet bytes: the cue text, unvalidated.
     pub text: Bytes,
-    /// The WebVTT cue identifier.
+    /// The WebVTT cue identifier, the line before the timing line; `None`
+    /// when the cue starts with its timing line, and for SubRip.
     pub identifier: Option<Bytes>,
-    /// The WebVTT cue settings.
+    /// The WebVTT cue settings; `None` when empty and for SubRip.
     pub settings: Option<Bytes>,
+    /// Where the cue was read in the parsed text: the start of its SubRip
+    /// timing line, or the end of its WebVTT block.
+    #[cfg(feature = "reference-trace")]
+    pub(crate) offset: usize,
 }
 
 /// What a [`Reader::poll`] produced.
@@ -86,9 +96,9 @@ pub enum Status {
     /// The work budget ran out; poll again.
     Yield,
     /// The next cue.
-    Cue(Cue),
+    Ready(Cue),
     /// Every cue has been published.
-    Finished,
+    End,
 }
 
 /// A cue found in the document, with its byte ranges in the reader's text.
@@ -101,6 +111,9 @@ struct Entry {
     text: Range<usize>,
     identifier: Option<Range<usize>>,
     settings: Option<Range<usize>>,
+    /// [`Cue::offset`].
+    #[cfg(feature = "reference-trace")]
+    offset: usize,
 }
 
 impl Entry {
@@ -167,10 +180,16 @@ pub struct Reader {
     entries: Entries,
     /// The bytes cue ranges point into: SubRip text, or the source for WebVTT.
     text: Option<Bytes>,
+    /// A converted document's line ends ([`Reader::line_ends`]).
+    #[cfg(feature = "reference-trace")]
+    line_ends: Option<BudgetVec<(usize, usize)>>,
 }
 
 impl Reader {
-    /// Read `document` with the 32-bit timestamp field policy on every target.
+    /// A reader of `document` that reads out-of-range time fields as FFmpeg
+    /// on 32-bit ARMv7 does ([`TimestampFieldWidth::Bits32`]), on every
+    /// target. `Error::Limit` when the document is longer than
+    /// `limits.document_bytes`.
     pub fn new(pool: &Budget, document: Bytes, syntax: Syntax, limits: Limits) -> Result<Self> {
         Self::with_timestamp_field_width(
             pool,
@@ -181,7 +200,7 @@ impl Reader {
         )
     }
 
-    /// Read `document` with the selected timestamp field width.
+    /// [`new`](Self::new), reading time fields at `timestamp_width`.
     pub fn with_timestamp_field_width(
         pool: &Budget,
         document: Bytes,
@@ -211,7 +230,23 @@ impl Reader {
                 maximum: limits.cues,
             },
             text: None,
+            #[cfg(feature = "reference-trace")]
+            line_ends: None,
         })
+    }
+
+    /// The text the cues were read from: the document, or its UTF-8
+    /// conversion.
+    #[cfg(feature = "reference-trace")]
+    pub(crate) fn source(&self) -> &Bytes {
+        &self.source
+    }
+
+    /// For a document converted from UTF-16, the offset after each LF in the
+    /// conversion and in the document, in order.
+    #[cfg(feature = "reference-trace")]
+    pub(crate) fn line_ends(&self) -> Option<&[(usize, usize)]> {
+        self.line_ends.as_ref().map(BudgetVec::as_slice)
     }
 
     fn parse_phase(pool: &Budget, source: &Bytes, syntax: Syntax, limits: Limits) -> Phase {
@@ -237,6 +272,10 @@ impl Reader {
                     let Some(converted) = decoder.advance(self.source.as_ref(), work)? else {
                         return Ok(Status::Yield);
                     };
+                    #[cfg(feature = "reference-trace")]
+                    {
+                        self.line_ends = Some(decoder.take_line_ends());
+                    }
                     self.source = converted;
                     self.phase =
                         Self::parse_phase(&self.pool, &self.source, self.syntax, self.limits);
@@ -324,10 +363,12 @@ impl Reader {
                         text: slice(&entry.text)?,
                         identifier: entry.identifier.as_ref().map(slice).transpose()?,
                         settings: entry.settings.as_ref().map(slice).transpose()?,
+                        #[cfg(feature = "reference-trace")]
+                        offset: entry.offset,
                     };
-                    return Ok(Status::Cue(cue));
+                    return Ok(Status::Ready(cue));
                 }
-                Phase::Finished => return Ok(Status::Finished),
+                Phase::Finished => return Ok(Status::End),
             }
         }
     }

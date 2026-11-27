@@ -1,26 +1,63 @@
 //! individual_channel_stream() parsing, inverse quantisation and the spectral tools
 //! (PNS, M/S, intensity, TNS) of ISO/IEC 14496-3 subpart 4.
 
-use crate::error::{DecodeError, Result};
+use crate::error::{DecodeError, Feature, Result};
 use crate::huffman::{FAST_BITS, SpectralBook, books, fast_field};
 use crate::tables::*;
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 use triergon_bitstream::CachedBitReader;
 
-pub(crate) const LONG_START: u8 = 1;
-pub(crate) const EIGHT_SHORT: u8 = 2;
-pub(crate) const LONG_STOP: u8 = 3;
+/// The window_sequence of ics_info(): the windows and transform lengths of a frame. The
+/// discriminants are the field's values.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum WindowSequence {
+    #[default]
+    OnlyLong = 0,
+    LongStart = 1,
+    EightShort = 2,
+    LongStop = 3,
+}
+
+impl WindowSequence {
+    /// The sequence the 2-bit field value `bits` codes.
+    fn from_bits(bits: u32) -> WindowSequence {
+        match bits & 3 {
+            0 => WindowSequence::OnlyLong,
+            1 => WindowSequence::LongStart,
+            2 => WindowSequence::EightShort,
+            _ => WindowSequence::LongStop,
+        }
+    }
+}
 
 pub(crate) const ZERO_HCB: u8 = 0;
 pub(crate) const ESC_HCB: u8 = 11;
+pub(crate) const RESERVED_HCB: u8 = 12;
 pub(crate) const NOISE_HCB: u8 = 13;
 pub(crate) const INTENSITY_HCB2: u8 = 14;
 pub(crate) const INTENSITY_HCB: u8 = 15;
 
-/// Audio object types handled by the core.
-pub(crate) const AOT_MAIN: u8 = 1;
-pub(crate) const AOT_LC: u8 = 2;
-pub(crate) const AOT_LTP: u8 = 4;
+/// Core audio object types (ISO/IEC 14496-3 Table 1.17).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum ObjectType {
+    Main = 1,
+    Lc = 2,
+    Ltp = 4,
+}
+
+impl ObjectType {
+    pub(crate) fn from_code(code: u8) -> Result<Self> {
+        match code {
+            1 => Ok(Self::Main),
+            2 => Ok(Self::Lc),
+            3 => Err(DecodeError::Unsupported(Feature::SsrGainControl)),
+            4 => Ok(Self::Ltp),
+            _ => Err(DecodeError::Unsupported(Feature::ObjectType(code))),
+        }
+    }
+}
 
 pub(crate) const MAX_SFB: usize = 64;
 
@@ -43,28 +80,38 @@ impl Default for Ltp {
     }
 }
 
+/// Window family of `ics_info()` (ISO/IEC 14496-3 4.6.11.3.2).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum WindowShape {
+    #[default]
+    Sine = 0,
+    KaiserBessel = 1,
+}
+
 #[derive(Debug, Clone, Copy)]
+#[repr(C)]
 pub(crate) struct IcsInfo {
-    pub window_sequence: u8,
-    pub window_shape: u8,
+    pub ltp: [Ltp; 2],
+    pub swb: &'static [u16],
     pub max_sfb: usize,
     pub num_windows: usize,
     pub num_window_groups: usize,
     pub window_group_len: [u8; 8],
+    pub num_swb: usize,
     pub predictor_data_present: bool,
+    pub prediction_used: [bool; 41],
+    pub window_sequence: WindowSequence,
+    pub window_shape: WindowShape,
     /// 0 = no reset, else predictor_reset_group_number.
     pub predictor_reset_group: u8,
-    pub prediction_used: [bool; 41],
-    pub ltp: [Ltp; 2],
-    pub swb: &'static [u16],
-    pub num_swb: usize,
 }
 
 impl Default for IcsInfo {
     fn default() -> Self {
         IcsInfo {
-            window_sequence: 0,
-            window_shape: 0,
+            window_sequence: WindowSequence::OnlyLong,
+            window_shape: WindowShape::Sine,
             max_sfb: 0,
             num_windows: 1,
             num_window_groups: 1,
@@ -80,10 +127,18 @@ impl Default for IcsInfo {
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+#[repr(u8)]
+enum Direction {
+    #[default]
+    Upward = 0,
+    Downward = 1,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct TnsFilter {
     pub length: u8,
     pub order: u8,
-    pub direction: bool,
+    direction: Direction,
     pub lpc: [f32; 21],
 }
 
@@ -97,8 +152,7 @@ pub(crate) struct Tns {
 /// One decoded channel of a syntactic element for the current frame.
 #[derive(Debug)]
 pub(crate) struct ChannelData {
-    /// bitmask of codebooks used in this frame (debug statistics)
-    pub cb_mask: u32,
+    /// Whether the decoded channel uses pulse data.
     pub pulse_used: bool,
     pub info: IcsInfo,
     pub global_gain: u8,
@@ -115,7 +169,6 @@ pub(crate) struct ChannelData {
 impl ChannelData {
     pub(crate) fn new() -> ChannelData {
         ChannelData {
-            cb_mask: 0,
             pulse_used: false,
             info: IcsInfo::default(),
             global_gain: 0,
@@ -130,23 +183,24 @@ impl ChannelData {
 
 /// Shared decode context for the core.
 pub(crate) struct CoreCfg {
-    pub aot: u8,
+    pub aot: ObjectType,
     pub sf_index: usize,
 }
 
 fn pow43_table() -> &'static [f32] {
-    static T: OnceLock<Vec<f32>> = OnceLock::new();
-    T.get_or_init(|| {
+    static T: LazyLock<Vec<f32>> = LazyLock::new(|| {
         (0..8192)
             .map(|i| (i as f64).powf(4.0 / 3.0) as f32)
             .collect()
-    })
+    });
+    &T
 }
 
 /// 2^((i - 300) / 4) for i in 0..600: covers scalefactors, noise energies and IS positions.
 fn pow2_quarter_table() -> &'static [f32; 600] {
-    static T: OnceLock<[f32; 600]> = OnceLock::new();
-    T.get_or_init(|| std::array::from_fn(|i| 2f64.powf((i as f64 - 300.0) / 4.0) as f32))
+    static T: LazyLock<[f32; 600]> =
+        LazyLock::new(|| std::array::from_fn(|i| 2f64.powf((i as f64 - 300.0) / 4.0) as f32));
+    &T
 }
 
 /// 2^(i / 4), clamped to the table.
@@ -167,16 +221,20 @@ pub(crate) fn parse_ics_info(
     info: &mut IcsInfo,
 ) -> Result<()> {
     if br.bit() {
-        // ics_reserved_bit: FFmpeg reports and continues; we treat as invalid like the spec.
-        return Err(DecodeError::InvalidData("ics_reserved_bit"));
+        // ics_reserved_bit shall be 0: a set bit is refused (FFmpeg reports it and continues)
+        return Err(DecodeError::Invalid("ics_reserved_bit"));
     }
-    info.window_sequence = br.read(2) as u8;
-    info.window_shape = br.read(1) as u8;
+    info.window_sequence = WindowSequence::from_bits(br.read(2));
+    info.window_shape = if br.bit() {
+        WindowShape::KaiserBessel
+    } else {
+        WindowShape::Sine
+    };
     info.predictor_data_present = false;
     info.predictor_reset_group = 0;
     info.ltp[0].present = false;
     info.ltp[1].present = false;
-    if info.window_sequence == EIGHT_SHORT {
+    if info.window_sequence == WindowSequence::EightShort {
         info.max_sfb = br.read(4) as usize;
         let grouping = br.read(7);
         info.num_windows = 8;
@@ -200,19 +258,21 @@ pub(crate) fn parse_ics_info(
         info.predictor_data_present = br.bit();
         if info.predictor_data_present {
             match cfg.aot {
-                AOT_MAIN => {
+                ObjectType::Main => {
                     if br.bit() {
                         info.predictor_reset_group = br.read(5) as u8;
                         if info.predictor_reset_group == 0 || info.predictor_reset_group > 30 {
-                            return Err(DecodeError::InvalidData("predictor_reset_group_number"));
+                            return Err(DecodeError::Invalid("predictor_reset_group_number"));
                         }
                     }
                     let n = info.max_sfb.min(PRED_SFB_MAX[cfg.sf_index] as usize);
                     let (used, rest) = info.prediction_used.split_at_mut(n);
-                    used.iter_mut().for_each(|u| *u = br.bit());
+                    for u in used {
+                        *u = br.bit();
+                    }
                     rest.fill(false);
                 }
-                AOT_LTP => {
+                ObjectType::Ltp => {
                     info.ltp[0].present = br.bit();
                     if info.ltp[0].present {
                         parse_ltp(br, info.max_sfb, &mut info.ltp[0]);
@@ -224,13 +284,13 @@ pub(crate) fn parse_ics_info(
                         }
                     }
                 }
-                _ => return Err(DecodeError::InvalidData("predictor_data_present in LC")),
+                ObjectType::Lc => return Err(DecodeError::Invalid("predictor_data_present in LC")),
             }
         }
     }
     info.num_swb = info.swb.len() - 1;
     if info.max_sfb > info.num_swb {
-        return Err(DecodeError::InvalidData("max_sfb"));
+        return Err(DecodeError::Invalid("max_sfb"));
     }
     Ok(())
 }
@@ -240,7 +300,9 @@ fn parse_ltp(br: &mut CachedBitReader<'_>, max_sfb: usize, ltp: &mut Ltp) {
     ltp.coef = br.read(3) as u8;
     let n = max_sfb.min(MAX_LTP_LONG_SFB);
     let (used, rest) = ltp.long_used.split_at_mut(n);
-    used.iter_mut().for_each(|u| *u = br.bit());
+    for u in used {
+        *u = br.bit();
+    }
     rest.fill(false);
 }
 
@@ -266,19 +328,19 @@ pub(crate) fn parse_ics(
     ch.tns.present = false;
     if !scale_flag {
         if br.bit() {
-            if ch.info.window_sequence == EIGHT_SHORT {
-                return Err(DecodeError::InvalidData("pulse data in short window"));
+            if ch.info.window_sequence == WindowSequence::EightShort {
+                return Err(DecodeError::Invalid("pulse data in short window"));
             }
             npulse = br.read(2) as usize + 1;
             let start = br.read(6) as usize;
             if start >= ch.info.num_swb {
-                return Err(DecodeError::InvalidData("pulse_start_sfb"));
+                return Err(DecodeError::Invalid("pulse_start_sfb"));
             }
             let mut k = ch.info.swb[start] as usize;
             for p in pulse.iter_mut().take(npulse) {
                 k += br.read(5) as usize;
                 if k >= 1024 {
-                    return Err(DecodeError::InvalidData("pulse offset"));
+                    return Err(DecodeError::Invalid("pulse offset"));
                 }
                 *p = (k, br.read(4) as i32);
             }
@@ -287,28 +349,20 @@ pub(crate) fn parse_ics(
             parse_tns(br, cfg, ch)?;
         }
         if br.bit() {
-            return Err(DecodeError::Unsupported(
-                crate::error::Feature::SsrGainControl,
-            ));
+            return Err(DecodeError::Unsupported(Feature::SsrGainControl));
         }
     }
     ch.pulse_used = npulse > 0;
-    ch.cb_mask = 0;
-    for g in 0..ch.info.num_window_groups {
-        for sfb in 0..ch.info.max_sfb {
-            ch.cb_mask |= 1 << ch.band_type[g * MAX_SFB + sfb];
-        }
-    }
     decode_spectrum(br, ch, &pulse[..npulse], random)?;
     if br.overrun() {
-        return Err(DecodeError::InvalidData("channel stream overrun"));
+        return Err(DecodeError::Invalid("channel stream overrun"));
     }
     Ok(())
 }
 
 fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Result<()> {
     let info = &ch.info;
-    let (bits, esc) = if info.window_sequence == EIGHT_SHORT {
+    let (bits, esc) = if info.window_sequence == WindowSequence::EightShort {
         (3, 7)
     } else {
         (5, 31)
@@ -317,8 +371,8 @@ fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
         let mut k = 0usize;
         while k < info.max_sfb {
             let cb = br.read(4) as u8;
-            if cb == 12 {
-                return Err(DecodeError::InvalidData("reserved codebook 12"));
+            if cb == RESERVED_HCB {
+                return Err(DecodeError::Invalid("reserved codebook 12"));
             }
             let mut len = 0usize;
             loop {
@@ -328,18 +382,18 @@ fn parse_section_data(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                     break;
                 }
                 if br.overrun() {
-                    return Err(DecodeError::InvalidData("section data overrun"));
+                    return Err(DecodeError::Invalid("section data overrun"));
                 }
             }
             if k + len > info.max_sfb {
-                return Err(DecodeError::InvalidData("section length"));
+                return Err(DecodeError::Invalid("section length"));
             }
             for sfb in k..k + len {
                 ch.band_type[g * MAX_SFB + sfb] = cb;
             }
             k += len;
             if br.overrun() {
-                return Err(DecodeError::InvalidData("section data overrun"));
+                return Err(DecodeError::Invalid("section data overrun"));
             }
         }
         for sfb in info.max_sfb..MAX_SFB {
@@ -364,7 +418,7 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                 INTENSITY_HCB | INTENSITY_HCB2 => {
                     let d = vlc
                         .decode(br)
-                        .ok_or(DecodeError::InvalidData("scalefactor code"))?
+                        .ok_or(DecodeError::Invalid("scalefactor code"))?
                         as i32
                         - 60;
                     is_pos += d;
@@ -377,7 +431,7 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                     } else {
                         let d = vlc
                             .decode(br)
-                            .ok_or(DecodeError::InvalidData("scalefactor code"))?
+                            .ok_or(DecodeError::Invalid("scalefactor code"))?
                             as i32
                             - 60;
                         noise += d;
@@ -387,12 +441,12 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
                 _ => {
                     let d = vlc
                         .decode(br)
-                        .ok_or(DecodeError::InvalidData("scalefactor code"))?
+                        .ok_or(DecodeError::Invalid("scalefactor code"))?
                         as i32
                         - 60;
                     sf += d;
                     if !(0..=255).contains(&sf) {
-                        return Err(DecodeError::InvalidData("scalefactor out of range"));
+                        return Err(DecodeError::Invalid("scalefactor out of range"));
                     }
                     ch.sf[i] = sf;
                 }
@@ -404,11 +458,11 @@ fn parse_scalefactors(br: &mut CachedBitReader<'_>, ch: &mut ChannelData) -> Res
 
 fn parse_tns(br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) -> Result<()> {
     let info = &ch.info;
-    let short = info.window_sequence == EIGHT_SHORT;
+    let short = info.window_sequence == WindowSequence::EightShort;
     let (nf_bits, len_bits, ord_bits, max_order) = if short {
         (1, 4, 3, 7u8)
     } else {
-        (2, 6, 5, if cfg.aot == AOT_MAIN { 20 } else { 12 })
+        (2, 6, 5, if cfg.aot == ObjectType::Main { 20 } else { 12 })
     };
     ch.tns.present = true;
     for w in 0..info.num_windows {
@@ -422,10 +476,14 @@ fn parse_tns(br: &mut CachedBitReader<'_>, cfg: &CoreCfg, ch: &mut ChannelData) 
             flt.length = br.read(len_bits) as u8;
             flt.order = br.read(ord_bits) as u8;
             if flt.order > max_order {
-                return Err(DecodeError::InvalidData("TNS order"));
+                return Err(DecodeError::Invalid("TNS order"));
             }
             if flt.order > 0 {
-                flt.direction = br.bit();
+                flt.direction = if br.bit() {
+                    Direction::Downward
+                } else {
+                    Direction::Upward
+                };
                 let compress = br.read(1);
                 let coef_bits = coef_res + 3 - compress;
                 let mut tmp = [0f32; 20];
@@ -497,11 +555,11 @@ fn read_signs_i32(br: &mut CachedBitReader<'_>, v: &mut [i32]) {
 
 /// sign(v) |v|^(4/3) for v in -16..=16 (index v + 16).
 fn pow43_signed() -> &'static [f32; 33] {
-    static T: OnceLock<[f32; 33]> = OnceLock::new();
-    T.get_or_init(|| {
+    static T: LazyLock<[f32; 33]> = LazyLock::new(|| {
         let p = pow43_table();
         std::array::from_fn(|i| if i < 16 { -p[16 - i] } else { p[i - 16] })
-    })
+    });
+    &T
 }
 
 /// One band of an N-tuple codebook without escapes, decoded and inverse quantised.
@@ -525,7 +583,7 @@ fn band<const N: usize, const UNSIGNED: bool>(
         let sym = book
             .vlc
             .decode(br)
-            .ok_or(DecodeError::InvalidData("spectral code"))? as usize;
+            .ok_or(DecodeError::Invalid("spectral code"))? as usize;
         let mut v = [0f32; N];
         v.copy_from_slice(&book.fvalues[sym][..N]);
         if UNSIGNED {
@@ -548,7 +606,7 @@ fn escape(br: &mut CachedBitReader<'_>, v: i32) -> Result<i32> {
     while br.bit() {
         nbits += 1;
         if nbits > 12 {
-            return Err(DecodeError::InvalidData("escape sequence"));
+            return Err(DecodeError::Invalid("escape sequence"));
         }
     }
     let e = (1i32 << nbits) + br.read(nbits) as i32;
@@ -584,7 +642,7 @@ fn band_esc(
             let sym = book
                 .vlc
                 .decode(br)
-                .ok_or(DecodeError::InvalidData("spectral code"))? as usize;
+                .ok_or(DecodeError::Invalid("spectral code"))? as usize;
             let vals = book.values[sym];
             let mut q = [vals[0] as i32, vals[1] as i32];
             read_signs_i32(br, &mut q);
@@ -611,7 +669,7 @@ fn band_int(
         let sym = book
             .vlc
             .decode(br)
-            .ok_or(DecodeError::InvalidData("spectral code"))? as usize;
+            .ok_or(DecodeError::Invalid("spectral code"))? as usize;
         let vals = book.values[sym];
         for i in 0..n {
             o[i] = vals[i] as i32;
@@ -718,10 +776,10 @@ fn decode_bands(
                         }
                     }
                 }
-                _ => return Err(DecodeError::InvalidData("band type")),
+                _ => return Err(DecodeError::Invalid("band type")),
             }
             if br.overrun() {
-                return Err(DecodeError::InvalidData("spectral data overrun"));
+                return Err(DecodeError::Invalid("spectral data overrun"));
             }
         }
         for w in win..win + glen {
@@ -782,7 +840,7 @@ pub(crate) fn apply_ms(l: &mut ChannelData, r: &mut ChannelData, mask: &[bool]) 
 }
 
 /// Intensity stereo (ISO/IEC 14496-3 4.6.8.2.3).
-pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, ms_present: u8, mask: &[bool]) {
+pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, mask: &[bool]) {
     let info = &r.info;
     let mut win = 0;
     for g in 0..info.num_window_groups {
@@ -794,7 +852,7 @@ pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, ms_present: 
                 continue;
             }
             let mut c = if bt == INTENSITY_HCB { 1.0f32 } else { -1.0 };
-            if ms_present != 0 && mask[i] {
+            if mask[i] {
                 c = -c;
             }
             let scale = c * pow2_quarter(-r.sf[i]);
@@ -810,15 +868,19 @@ pub(crate) fn apply_intensity(l: &ChannelData, r: &mut ChannelData, ms_present: 
     }
 }
 
-pub(crate) const TNS_SYNTHESIS: bool = true;
-pub(crate) const TNS_ANALYSIS: bool = false;
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum TnsKind {
+    AllZero = 0,
+    AllPole = 1,
+}
 
 /// TNS synthesis filtering (ISO/IEC 14496-3 4.6.9.3) of the channel spectrum.
 pub(crate) fn apply_tns(ch: &mut ChannelData, cfg: &CoreCfg) {
     if !ch.tns.present {
         return;
     }
-    tns_filter(&ch.tns, &ch.info, cfg, &mut ch.coef, TNS_SYNTHESIS);
+    tns_filter(&ch.tns, &ch.info, cfg, &mut ch.coef, TnsKind::AllPole);
 }
 
 /// All-pole (synthesis) or all-zero (analysis, used by LTP) TNS filtering of `coef`.
@@ -828,9 +890,9 @@ pub(crate) fn tns_filter(
     info: &IcsInfo,
     cfg: &CoreCfg,
     coef: &mut [f32],
-    synthesis: bool,
+    kind: TnsKind,
 ) {
-    let short = info.window_sequence == EIGHT_SHORT;
+    let short = info.window_sequence == WindowSequence::EightShort;
     let max_bands = if short {
         TNS_MAX_BANDS_SHORT[cfg.sf_index]
     } else {
@@ -856,14 +918,13 @@ pub(crate) fn tns_filter(
             let size = end - start;
             let lpc = &flt.lpc;
             for i in 0..size {
-                let k = if flt.direction {
-                    end - 1 - i
-                } else {
-                    start + i
+                let k = match flt.direction {
+                    Direction::Upward => start + i,
+                    Direction::Downward => end - 1 - i,
                 };
                 let x = spec[k];
                 let mut y = x;
-                if synthesis {
+                if kind == TnsKind::AllPole {
                     for j in 0..order {
                         y = (-state[j]).mul_add(lpc[j + 1], y);
                     }

@@ -37,6 +37,10 @@ read leaves the reader at the start of that code. A decoder validating a whole
 partition can use [`RiceReader::rice_in_partition`] and call [`RiceReader::past_end`]
 once before accepting any of its values.
 
+[`LsbReader`] reads LSB-first bits, as Vorbis I packs them, and also yields zeros past
+the end ([`LsbReader::overrun`]). [`LsbWindow`] lends its next 32 bits to a run of short
+reads, such as consecutive codewords, which then cost a shift and a mask each.
+
 ## Checked reads
 
 [`BitCursor`] reads MSB-first bits of a slice and fails at its end. Headers and parameter
@@ -74,18 +78,24 @@ binarizations and context tables. A context is one state byte; `decision_unfille
 `refill` let a hot loop decode two bins per refill on a local copy of the engine.
 `Engine::new` and `restart` refuse an initial offset of 510 or 511 (`InvalidOffset`),
 which the specifications forbid. Every decoding process then keeps the offset below the
-range, so `bypass_bits(n)` returns at most `n` bits on any input. The `HEADROOM`
-parameter chooses a register layout; both decode every stream the same.
+range, so `bypass_bits(n)` returns at most `n` bits on any input. Choose `FullRegister` or
+`WithHeadroom` for the register layout. Both decode every stream the same.
+
+The [CABAC engine comparison](../../harness/features/cabac-engine/contract.json) checks
+both layouts against serial arithmetic decoding, including context updates, bypass
+reads through 32 bins, offset refusals and cursor values. A capped unary read
+leaves every bin after the cap for the next read, as in H.264 §9.3.2.2 and
+H.265 §9.3.3.2 with a Rice parameter of zero.
 
 ```rust
-use triergon_bitstream::cabac::{Engine, InvalidOffset, init_state};
+use triergon_bitstream::cabac::{Engine, InvalidOffset, WithHeadroom, init_state};
 
 let mut state = init_state(0, 64, 26);
-let mut engine = Engine::<true>::new(&[0; 16], 0)?;
+let mut engine = Engine::<WithHeadroom>::new(&[0; 16], 0)?;
 assert_eq!(engine.decision(&mut state), 1); // the most probable symbol of this context
 assert_eq!(engine.bypass(), 0);
 assert_eq!(engine.terminate(), 0);
-assert_eq!(Engine::<true>::new(&[0xff, 0x80], 0).err(), Some(InvalidOffset));
+assert_eq!(Engine::<WithHeadroom>::new(&[0xff, 0x80], 0).err(), Some(InvalidOffset));
 # Ok::<(), InvalidOffset>(())
 ```
 
@@ -112,3 +122,15 @@ assert_eq!(section.remainder(), 0x0376_e6e7);
 // EBML CRC-32 elements.
 assert_eq!(Crc32Ieee::of(b"123456789"), 0xcbf4_3926);
 ```
+
+## Conformance
+
+The [CRC comparison](../../harness/features/crc-values/contract.json) checks the MPEG-2, Ogg,
+EBML, FLAC, AC-3 and MPEG audio registers against FFmpeg's. It covers whole inputs,
+incremental updates across seeded splits and lengths from zero through 64 bytes.
+
+The [bit reader comparison](../../harness/features/bit-readers/contract.json) checks
+field values, refusals, positions and overruns against independent MSB, LSB and Rice
+models. The [RBSP comparison](../../harness/features/rbsp-unescape/contract.json)
+checks strict and lenient output, prevention errors and run boundaries against
+the H.264 payload rules.

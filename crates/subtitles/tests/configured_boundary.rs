@@ -1,10 +1,9 @@
 //! Configured-boundary tests.
 #![forbid(unsafe_code)]
 
-use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time};
+use triergon_core::{Budget, Bytes, Error, SourceId, SourceLocation, Time, TimeBase};
 use triergon_subtitles::dvb::{
-    ClockOrigin, ClockValue, PacketEnvelope, PacketIdentity, PacketTiming, SourceClock,
-    SourceConfiguration,
+    ClockOrigin, ClockValue, PacketEnvelope, PacketIdentity, PacketTiming, SourceConfiguration,
 };
 
 const GENERATION: u64 = 7;
@@ -63,7 +62,7 @@ fn source_private_descriptor_and_clock_are_explicit_and_preserved() {
             [(&private[..], 1, 1000), (&descriptor[..], 1, 90000)]
         {
             let original = Bytes::copy_from_slice(&budget, bytes).unwrap();
-            let clock = SourceClock::new(numerator, denominator).unwrap();
+            let clock = TimeBase::new(numerator, denominator).unwrap();
             let configuration = if bytes.len() == 5 {
                 SourceConfiguration::from_matroska_private(&budget, &original, clock).unwrap()
             } else {
@@ -81,8 +80,7 @@ fn source_private_descriptor_and_clock_are_explicit_and_preserved() {
             assert_eq!(configuration.service().ancillary_page, 2);
             assert_eq!(configuration.service().subtitling_type, fixture.subtype);
             assert_eq!(configuration.service_private_view(), private);
-            assert_eq!(configuration.clock().raw_numerator(), numerator);
-            assert_eq!(configuration.clock().raw_denominator(), denominator);
+            assert_eq!(configuration.clock(), clock);
             assert_eq!(configuration.envelope(), PacketEnvelope::Segments);
             let payload = Bytes::copy_from_slice(&budget, fixture.bytes).unwrap();
             let packet = configuration
@@ -109,16 +107,16 @@ fn source_private_descriptor_and_clock_are_explicit_and_preserved() {
 }
 
 #[test]
-fn declared_clock_ratio_and_inferred_dts_do_not_replace_source_facts() {
+fn an_unreduced_clock_times_exactly_and_inferred_dts_do_not_replace_source_facts() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let original = Bytes::copy_from_slice(&budget, &PRIVATE).unwrap();
-    let clock = SourceClock::new(2, 2000).unwrap();
-    let configuration =
-        SourceConfiguration::from_matroska_private(&budget, &original, clock).unwrap();
-    assert_eq!(clock.raw_numerator(), 2);
-    assert_eq!(clock.raw_denominator(), 2000);
-    assert_eq!(clock.time_base().numerator(), 1);
-    assert_eq!(clock.time_base().denominator(), 1000);
+    let configuration = SourceConfiguration::from_matroska_private(
+        &budget,
+        &original,
+        TimeBase::new(2, 2000).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(configuration.clock(), TimeBase::new(1, 1000).unwrap());
     let raw = Bytes::copy_from_slice(&budget, COMPLETE).unwrap();
     let used = budget.used();
     let input = configuration
@@ -150,18 +148,17 @@ fn declared_clock_ratio_and_inferred_dts_do_not_replace_source_facts() {
     assert_eq!(input.pts, Some(Time::new(1, 1).unwrap()));
     let facts = input.source.as_ref().unwrap();
     assert_eq!(facts.timing().dts.unwrap().origin, ClockOrigin::Inferred);
-    assert_eq!(facts.configuration().clock().raw_denominator(), 2000);
     assert_eq!(facts.container_position(), identity(0).container_position);
 }
 
 #[test]
-fn unknown_and_known_native_sentinel_integer_are_separate_source_values() {
+fn unknown_and_known_sentinel_integer_are_separate_source_values() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let original = Bytes::copy_from_slice(&budget, &PRIVATE).unwrap();
     let configuration = SourceConfiguration::from_matroska_private(
         &budget,
         &original,
-        SourceClock::new(1, 1000).unwrap(),
+        TimeBase::new(1, 1000).unwrap(),
     )
     .unwrap();
     let raw = Bytes::copy_from_slice(&budget, COMPLETE).unwrap();
@@ -195,7 +192,7 @@ fn malformed_or_foreign_configuration_rejects_without_taking_ownership() {
     let budget = Budget::new(4 * 1024 * 1024).unwrap();
     let foreign = Budget::new(1024).unwrap();
     let raw = Bytes::copy_from_slice(&foreign, &PRIVATE).unwrap();
-    let clock = SourceClock::new(1, 1000).unwrap();
+    let clock = TimeBase::new(1, 1000).unwrap();
     assert_eq!(
         SourceConfiguration::from_matroska_private(&budget, &raw, clock).unwrap_err(),
         Error::ForeignPool
@@ -223,8 +220,6 @@ fn malformed_or_foreign_configuration_rejects_without_taking_ownership() {
         .unwrap_err(),
         Error::Invalid("DVB descriptor service index")
     );
-    assert!(SourceClock::new(0, 1).is_err());
-    assert!(SourceClock::new(1, 0).is_err());
 }
 
 #[test]
@@ -238,7 +233,7 @@ fn descriptor_service_selection_keeps_all_original_entries_and_language_bytes() 
         &budget,
         &raw,
         1,
-        SourceClock::new(1, 90000).unwrap(),
+        TimeBase::new(1, 90000).unwrap(),
         PacketEnvelope::Segments,
     )
     .unwrap();

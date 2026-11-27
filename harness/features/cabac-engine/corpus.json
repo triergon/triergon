@@ -1,0 +1,294 @@
+{
+  "schema": 1,
+  "directory": "harness/features/cabac-engine/inputs",
+  "cases": [
+    {
+      "id": "mixed-plain",
+      "profile": "plain",
+      "file": "mixed.case",
+      "sha256": "9015fdb7689369f5de9d6e9f3fcd92b2f973165b7ae471c1bcb66ec63dc99443",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "e7680dc24ffba64fead4bf147dc76a276e09f2a84fb0a7d29452f68e36d46654"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "0d94cfa1a4ab5f9dbb764eebfeecf35bf4ae754e10b4ca68fb1152580b10179f"
+        }
+      }
+    },
+    {
+      "id": "mixed-headroom",
+      "profile": "headroom",
+      "file": "mixed.case",
+      "sha256": "9015fdb7689369f5de9d6e9f3fcd92b2f973165b7ae471c1bcb66ec63dc99443",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "177d33dd89a7f803ae6d6b0572395bf38b75d50a3df6df6a2f79320fcbaf9e37"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "be2d20552ad6da75d3d85b6bb033b6b708ef63aef4d8fbb082a0eceed2f87a8e"
+        }
+      }
+    },
+    {
+      "id": "bypass-widths-plain",
+      "profile": "plain",
+      "file": "bypass-widths.case",
+      "sha256": "a44ec7514d21f45819980e18bff9f7da1d1a3e65d8a4088b2825ce5e7b980d0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "17fc015e5ffea909f4698d3fc197cd23ae702219bf5f138947e42b60cce3c766"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "9b88243576e289ef322661763ff8149559c7d5122867c923a0002e701ba40e20"
+        }
+      }
+    },
+    {
+      "id": "bypass-widths-headroom",
+      "profile": "headroom",
+      "file": "bypass-widths.case",
+      "sha256": "a44ec7514d21f45819980e18bff9f7da1d1a3e65d8a4088b2825ce5e7b980d0e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "6c81542d99b3148ce10ad9c7cd2d835f09b474a9c3fcfe656f53b500f6c4a3c3"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "7b1b8324067e013ac83245873d8ca88241c240b0939a2c2e33e49d087b4dac86"
+        }
+      }
+    },
+    {
+      "id": "unary-stop-plain",
+      "profile": "plain",
+      "file": "unary-stop.case",
+      "sha256": "e9eb98316aef172b153c56a0c467205d0563afe8355cf0742d16e9a245c2b326",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "256d11596cb50e734fec4c33e4248f99765170ebaafbb8feb3526dd3834a238c"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "556ae55102c6ba5b2b2e4796d8d9fef255e371fba87a16a9f3dc08cff2215178"
+        }
+      }
+    },
+    {
+      "id": "unary-stop-headroom",
+      "profile": "headroom",
+      "file": "unary-stop.case",
+      "sha256": "e9eb98316aef172b153c56a0c467205d0563afe8355cf0742d16e9a245c2b326",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "d7a4f6c7bfd347f8f5454c2ae3d273b24d3b1fe0877b58bae4e84f4ee69a94a9"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "556ae55102c6ba5b2b2e4796d8d9fef255e371fba87a16a9f3dc08cff2215178"
+        }
+      }
+    },
+    {
+      "id": "unary-boundary-plain",
+      "profile": "plain",
+      "file": "unary-boundary.case",
+      "sha256": "d4354b4195adb961949d715e2851fc8199cefb58dfb53ea20f8eb79fc533846a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "6ff1532db49eb55b890a797feb94de36cc2d7aa81f90828fea54a9e63582d19b"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "036dd127bdb46fe7324252e089c45f64ed74a2edde347661829de5c9f4537ee0"
+        }
+      }
+    },
+    {
+      "id": "unary-boundary-headroom",
+      "profile": "headroom",
+      "file": "unary-boundary.case",
+      "sha256": "d4354b4195adb961949d715e2851fc8199cefb58dfb53ea20f8eb79fc533846a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "50b4890686a08b2e36ad89fc8c961f75bcb8c407473f079e1c44e7f8dbb867c5"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "036dd127bdb46fe7324252e089c45f64ed74a2edde347661829de5c9f4537ee0"
+        }
+      }
+    },
+    {
+      "id": "unary-cap-plain",
+      "profile": "plain",
+      "file": "unary-cap.case",
+      "sha256": "2e1e40c21908d04c1f639d83090d8c2d902cb896e48bd3cd22edb0517fa83641",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "97297f37ee2cbaaa5be2b5064579ffca7b75420fe21e4da264543f171ce9c73a"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "9338a1136dc4fe2db18d03abf0e4f42c01a3a794262c1436ee9de68fd3fbe1da"
+        }
+      }
+    },
+    {
+      "id": "unary-cap-headroom",
+      "profile": "headroom",
+      "file": "unary-cap.case",
+      "sha256": "2e1e40c21908d04c1f639d83090d8c2d902cb896e48bd3cd22edb0517fa83641",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "1af38d03157eb6f72b463686381c03cf132b0b64d461f6884e2591b9c3d3196d"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "9338a1136dc4fe2db18d03abf0e4f42c01a3a794262c1436ee9de68fd3fbe1da"
+        }
+      }
+    },
+    {
+      "id": "unary-early-zero-past-cap-plain",
+      "profile": "plain",
+      "file": "unary-early-zero-past-cap.case",
+      "sha256": "cab5cbffd978f8dbddb8454de41a58ef09bf53433819590806153afa94387a67",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "0d6b5c1426ee6aa49e0264257e1a012ceff021102cdc5255524fe193f5891db3"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "927f6ed866bf76f5cbb01515ae97cf95cb31720fdb80b8383f90f36dce376a37"
+        }
+      }
+    },
+    {
+      "id": "unary-early-zero-past-cap-headroom",
+      "profile": "headroom",
+      "file": "unary-early-zero-past-cap.case",
+      "sha256": "cab5cbffd978f8dbddb8454de41a58ef09bf53433819590806153afa94387a67",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "932e138bdb5df964c6d90a1f9fe7a23f26578ea668dfbf4a9d7c99cfbdd91d9e"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "927f6ed866bf76f5cbb01515ae97cf95cb31720fdb80b8383f90f36dce376a37"
+        }
+      }
+    },
+    {
+      "id": "refusals-plain",
+      "profile": "plain",
+      "file": "refusals.case",
+      "sha256": "38bc33600c001bf1bf116c58a3b42a4bf7c38aec6f259712e07eabd699b606a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "09e3b52ad1df3dc40602e5f3c2880602c8d8d05b3dd673fb4f916547397ee85c"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "09e3b52ad1df3dc40602e5f3c2880602c8d8d05b3dd673fb4f916547397ee85c"
+        }
+      }
+    },
+    {
+      "id": "refusals-headroom",
+      "profile": "headroom",
+      "file": "refusals.case",
+      "sha256": "38bc33600c001bf1bf116c58a3b42a4bf7c38aec6f259712e07eabd699b606a9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "f370156ee1cab9b143ab326e33d1cbaff8df5f963ea9554e35b32fd2387e00b8"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "09e3b52ad1df3dc40602e5f3c2880602c8d8d05b3dd673fb4f916547397ee85c"
+        }
+      }
+    },
+    {
+      "id": "empty-input-plain",
+      "profile": "plain",
+      "file": "empty-input.case",
+      "sha256": "7de47e9064d5d615b1a0bb9dd9a96e6906fd55144bd1a1cd1166dc4772d13ca2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "plain"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "277f0d32830a23a8b7a2681b7b081d0e3a774e8e9b261416181134ae4115292a"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "277f0d32830a23a8b7a2681b7b081d0e3a774e8e9b261416181134ae4115292a"
+        }
+      }
+    },
+    {
+      "id": "empty-input-headroom",
+      "profile": "headroom",
+      "file": "empty-input.case",
+      "sha256": "7de47e9064d5d615b1a0bb9dd9a96e6906fd55144bd1a1cd1166dc4772d13ca2",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "headroom"
+      ],
+      "expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "trace_sha256": "0c93c9d3b8c9caf9c77979d9fe286249c4357d316c1e5dbfc952aa90236543bd"
+        },
+        "thumbv7neon-unknown-linux-gnueabihf": {
+          "trace_sha256": "277f0d32830a23a8b7a2681b7b081d0e3a774e8e9b261416181134ae4115292a"
+        }
+      }
+    }
+  ]
+}

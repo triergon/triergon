@@ -1,5 +1,6 @@
 //! Outlines: closed contours of lines and quadratic and cubic splines with
 //! points in 26.6 fixed point, y down.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, BudgetVec, Error, Result, round_ties_even_i32};
 use triergon_font::{OutlinePoint, Point, PointKind};
@@ -13,20 +14,18 @@ const OUT_OF_RANGE: Error = Error::Invalid("outline point out of range");
 /// The order of one outline segment: how many points it owns.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SegmentKind {
-    /// A straight line (`OUTLINE_LINE_SEGMENT`): one point, its start.
+    /// A straight line: one point, its start.
     Line = 1,
-    /// A quadratic spline (`OUTLINE_QUADRATIC_SPLINE`): its start and one
-    /// control point.
+    /// A quadratic spline: its start and one control point.
     Quadratic = 2,
-    /// A cubic spline (`OUTLINE_CUBIC_SPLINE`): its start and two control
-    /// points.
+    /// A cubic spline: its start and two control points.
     Cubic = 3,
 }
 
 impl SegmentKind {
     /// The points the segment owns: its start and its control points. Its end is
     /// the next segment's start, or the contour's first point when it closes it.
-    pub const fn points(self) -> usize {
+    pub(crate) const fn points(self) -> usize {
         self as usize
     }
 }
@@ -36,8 +35,7 @@ impl SegmentKind {
 pub struct Segment {
     /// The segment's order, which fixes how many points it owns.
     pub kind: SegmentKind,
-    /// The segment ends at its contour's first point (libass's
-    /// `OUTLINE_CONTOUR_END` flag).
+    /// The segment ends at its contour's first point.
     pub closes_contour: bool,
 }
 
@@ -103,22 +101,6 @@ impl Outline {
             points: self.points.try_clone()?,
             segments: self.segments.try_clone()?,
         })
-    }
-
-    /// Gives back the storage beyond the points and segments it holds.
-    ///
-    /// # Errors
-    ///
-    /// The budget's errors; the outline is then unchanged.
-    pub fn shrink_to_fit(&mut self) -> Result<()> {
-        self.points.try_shrink_to(self.points.len())?;
-        self.segments.try_shrink_to(self.segments.len())
-    }
-
-    /// Bytes of storage currently charged.
-    pub fn retained_bytes(&self) -> usize {
-        self.points.capacity() * size_of::<Vector>()
-            + self.segments.capacity() * size_of::<Segment>()
     }
 
     /// The segments with their points. A trailing contour that is not closed, or
@@ -247,7 +229,7 @@ impl Outline {
 
     /// Appends a glyph's contours from the points and exclusive contour ends of
     /// a 26.6 font outline, y up (`triergon_font::Outline::points` and
-    /// `contour_ends`), as libass converts them (`ass_outline_convert`): y is
+    /// `contour_ends`), as libass converts them: y is
     /// negated, a contour that starts on a quadratic control point starts at its
     /// last point (or midway to it), implied on-curve points are made explicit
     /// with an arithmetic halving, and contours of one or two points are dropped.
@@ -366,7 +348,7 @@ impl Outline {
 
     /// The smaller of `min_x` and the least x of the points under the
     /// perspective transform `m`, clamped to ±[`OUTLINE_MAX`]; points whose x is
-    /// NaN are ignored. libass times `\kf` karaoke from it.
+    /// NaN are ignored. A renderer times `\kf` karaoke from it.
     pub fn min_transformed_x(&self, m: &Matrix, mut min_x: i32) -> i32 {
         let limit = f64::from(OUTLINE_MAX);
         for p in self.points() {
@@ -381,8 +363,8 @@ impl Outline {
     }
 }
 
-/// libass's conversion of font contours (`ass_outline_convert`): a state
-/// machine over each contour's point kinds.
+/// The conversion of font contours: a state machine over each contour's
+/// point kinds.
 struct Converter<'a> {
     out: &'a mut Outline,
 }
@@ -617,22 +599,6 @@ mod tests {
     }
 
     #[test]
-    fn a_fitted_outline_keeps_only_what_it_holds() {
-        let budget = Budget::new(1 << 16).unwrap();
-        let mut outline = Outline::new(&budget);
-        for x in 0..20 {
-            outline
-                .push_rect(Vector::new(x, 0), Vector::new(x + 1, 1))
-                .unwrap();
-        }
-        let points = outline.points().to_vec();
-        outline.shrink_to_fit().unwrap();
-        assert_eq!(outline.points(), points.as_slice());
-        let held = size_of_val(outline.points()) + size_of_val(outline.segments());
-        assert_eq!(outline.retained_bytes(), held);
-    }
-
-    #[test]
     fn conversion_negates_y_and_makes_implied_points_explicit() {
         let budget = Budget::new(1 << 16).unwrap();
         let quadratic = |x, y| OutlinePoint {
@@ -656,6 +622,23 @@ mod tests {
             ]
         );
         assert!(outline.segments()[2].closes_contour);
+    }
+
+    #[test]
+    fn a_quarter_turn_keeps_the_outline_in_range_or_unchanged() {
+        let budget = Budget::new(1 << 16).unwrap();
+        let mut outline = Outline::new(&budget);
+        outline
+            .push_rect(Vector::new(0, 0), Vector::new(64, 128))
+            .unwrap();
+        outline.rotate_90(Vector::new(10, 20)).unwrap();
+        assert_eq!(
+            outline.points(),
+            [(10, 20), (10, -44), (138, -44), (138, 20)].map(|(x, y)| Vector::new(x, y))
+        );
+        let turned = outline.points().to_vec();
+        assert!(outline.rotate_90(Vector::new(OUTLINE_MAX, 0)).is_err());
+        assert_eq!(outline.points(), turned.as_slice());
     }
 
     #[test]

@@ -2,50 +2,81 @@
 //!
 //! # Channel order
 //!
-//! A [`Speaker`]'s discriminant is FFmpeg's channel id (`AV_CHAN_*`), which is also
-//! the bit index of its `AV_CH_*` mask. Every decoder emits one plane per speaker in
-//! ascending discriminant order, which is the "native" order FFmpeg's own decoders
-//! use, so plane `i` corresponds to channel `i` of the reference output. The one
-//! exception is an AAC program configuration FFmpeg cannot map to a known layout:
-//! FFmpeg then keeps the PCE's element order and so does the AAC decoder.
+//! The first eighteen speaker positions use WAVEFORMATEXTENSIBLE mask bits. Higher
+//! positions extend that mask. Decoders normally return planes in ascending mask-bit
+//! order. An AAC program configuration without a recognized layout keeps its element
+//! order.
 
-/// A loudspeaker position. Discriminant = FFmpeg `AV_CHAN_*` id / `AV_CH_*` bit index.
+/// A loudspeaker position. Its discriminant is the position in the channel mask.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]
 pub enum Speaker {
+    /// Front left (`FL`).
     FrontLeft = 0,
+    /// Front right (`FR`).
     FrontRight = 1,
+    /// Front centre (`FC`).
     FrontCenter = 2,
+    /// Low-frequency effects (`LFE`).
     LowFrequency = 3,
+    /// Back left (`BL`).
     BackLeft = 4,
+    /// Back right (`BR`).
     BackRight = 5,
+    /// Front left of centre (`FLC`).
     FrontLeftOfCenter = 6,
+    /// Front right of centre (`FRC`).
     FrontRightOfCenter = 7,
+    /// Back centre (`BC`).
     BackCenter = 8,
+    /// Side left (`SL`).
     SideLeft = 9,
+    /// Side right (`SR`).
     SideRight = 10,
+    /// Top centre, above the listener (`TC`).
     TopCenter = 11,
+    /// Top front left (`TFL`).
     TopFrontLeft = 12,
+    /// Top front centre (`TFC`).
     TopFrontCenter = 13,
+    /// Top front right (`TFR`).
     TopFrontRight = 14,
+    /// Top back left (`TBL`).
     TopBackLeft = 15,
+    /// Top back centre (`TBC`).
     TopBackCenter = 16,
+    /// Top back right (`TBR`).
     TopBackRight = 17,
+    /// Wide left, between front left and side left (`WL`).
     WideLeft = 31,
+    /// Wide right, between front right and side right (`WR`).
     WideRight = 32,
+    /// Surround direct left (`SDL`).
     SurroundDirectLeft = 33,
+    /// Surround direct right (`SDR`).
     SurroundDirectRight = 34,
+    /// Second low-frequency effects (`LFE2`).
     LowFrequency2 = 35,
+    /// Top side left (`TSL`).
     TopSideLeft = 36,
+    /// Top side right (`TSR`).
     TopSideRight = 37,
+    /// Bottom front centre (`BFC`).
     BottomFrontCenter = 38,
+    /// Bottom front left (`BFL`).
     BottomFrontLeft = 39,
+    /// Bottom front right (`BFR`).
     BottomFrontRight = 40,
 }
 
 impl Speaker {
-    /// FFmpeg's short channel name (`FL`, `FR`, ...).
+    /// Short speaker label in comparison traces, such as `FL` or `FR`.
+    #[cfg(feature = "reference-trace")]
     pub fn name(self) -> &'static str {
+        self.abbreviation()
+    }
+
+    fn abbreviation(self) -> &'static str {
         use Speaker::{
             BackCenter, BackLeft, BackRight, BottomFrontCenter, BottomFrontLeft, BottomFrontRight,
             FrontCenter, FrontLeft, FrontLeftOfCenter, FrontRight, FrontRightOfCenter,
@@ -86,7 +117,7 @@ impl Speaker {
         }
     }
 
-    /// The speaker whose `AV_CH_*` mask bit is `bit`.
+    /// The speaker for WAVEFORMATEXTENSIBLE mask bit `bit`, including extended positions.
     pub fn from_bit(bit: u8) -> Option<Speaker> {
         const ALL: [Speaker; 28] = [
             Speaker::FrontLeft,
@@ -121,7 +152,7 @@ impl Speaker {
         ALL.into_iter().find(|speaker| *speaker as u8 == bit)
     }
 
-    /// FFmpeg `AV_CH_*` mask bit.
+    /// The WAVEFORMATEXTENSIBLE mask bit or its extension for this position.
     pub fn mask(self) -> u64 {
         1u64 << (self as u8)
     }
@@ -149,6 +180,21 @@ impl ChannelLayout {
         len: 0,
     };
 
+    /// One front-centre plane.
+    pub const MONO: ChannelLayout = ChannelLayout {
+        len: 1,
+        ..Self::EMPTY
+    };
+
+    /// Front-left and front-right planes, in that order.
+    pub const STEREO: ChannelLayout = {
+        let mut layout = Self::EMPTY;
+        layout.speakers[0] = Speaker::FrontLeft;
+        layout.speakers[1] = Speaker::FrontRight;
+        layout.len = 2;
+        layout
+    };
+
     /// A layout with `speakers` as its planes, in the order given. `None` beyond
     /// [`Self::CAPACITY`] planes.
     pub fn new(speakers: impl IntoIterator<Item = Speaker>) -> Option<ChannelLayout> {
@@ -160,25 +206,10 @@ impl ChannelLayout {
         Some(layout)
     }
 
-    /// `channels` planes without speaker positions, FFmpeg's unspecified order (for
-    /// example an Opus family 255 stream). Its [`mask`](Self::mask) is 0 and its
-    /// [`name`](Self::name) `N channels`; `None` beyond [`Self::CAPACITY`].
+    /// `channels` planes without a declared speaker order, as in Opus mapping family 255.
+    /// Returns `None` beyond [`Self::CAPACITY`].
     pub fn unspecified(channels: usize) -> Option<ChannelLayout> {
         ChannelLayout::new(core::iter::repeat_n(Speaker::FrontCenter, channels))
-    }
-
-    /// FFmpeg's default layout for `channels` channels: the first standard layout with
-    /// that many speakers (`stereo` for 2, `7.1` for 8). Mixing treats an unspecified
-    /// layout as this one, as FFmpeg's resampler does.
-    pub fn default_for(channels: usize) -> Option<ChannelLayout> {
-        let (mask, _) = STANDARD
-            .iter()
-            .find(|(mask, _)| mask.count_ones() as usize == channels)?;
-        ChannelLayout::new(
-            (0..64u8)
-                .filter(|bit| mask & (1 << bit) != 0)
-                .filter_map(Speaker::from_bit),
-        )
     }
 
     /// Speakers in plane order.
@@ -191,7 +222,8 @@ impl ChannelLayout {
         usize::from(self.len)
     }
 
-    /// OR of the FFmpeg masks; 0 when a position repeats (no FFmpeg mask describes it).
+    /// Channel mask in WAVEFORMATEXTENSIBLE bit order, extended for higher positions.
+    /// Returns 0 when any speaker position repeats.
     pub fn mask(&self) -> u64 {
         let mut mask = 0u64;
         for speaker in self.speakers() {
@@ -203,9 +235,9 @@ impl ChannelLayout {
         mask
     }
 
-    /// FFmpeg's name for the layout, as `ffprobe` reports `channel_layout`: a standard
-    /// layout's name (`stereo`, `5.1(side)`, ...), else the speaker names joined by `+`,
-    /// or `N channels` when a speaker repeats.
+    /// Comparison label for a standard layout, a list of speaker labels joined by
+    /// `+`, or `N channels` when the layout has no channel mask.
+    #[cfg(any(test, feature = "reference-trace"))]
     pub fn name(&self) -> String {
         let mask = self.mask();
         if mask == 0 {
@@ -214,7 +246,7 @@ impl ChannelLayout {
         if let Some((_, name)) = STANDARD.iter().find(|(m, _)| *m == mask) {
             return (*name).to_owned();
         }
-        let names: Vec<&str> = self.speakers().iter().map(|s| s.name()).collect();
+        let names: Vec<&str> = self.speakers().iter().map(|s| s.abbreviation()).collect();
         names.join("+")
     }
 
@@ -290,7 +322,7 @@ impl core::hash::Hash for ChannelLayout {
 impl core::fmt::Debug for ChannelLayout {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_list()
-            .entries(self.speakers().iter().map(|s| s.name()))
+            .entries(self.speakers().iter().map(|s| s.abbreviation()))
             .finish()
     }
 }
@@ -470,5 +502,23 @@ mod tests {
             "3 channels"
         );
         assert!(native_order(&[FrontLeft, FrontLeft]).is_none());
+    }
+}
+
+/// Default speaker assignments matching FFmpeg 9.0.2.
+pub mod ffmpeg {
+    use super::{ChannelLayout, STANDARD, Speaker};
+
+    /// The first standard layout with this channel count, for example stereo for
+    /// two channels. Returns `None` if no standard layout has that count.
+    pub fn default_layout(channels: usize) -> Option<ChannelLayout> {
+        let (mask, _) = STANDARD
+            .iter()
+            .find(|(mask, _)| mask.count_ones() as usize == channels)?;
+        ChannelLayout::new(
+            (0..64u8)
+                .filter(|bit| mask & (1 << bit) != 0)
+                .filter_map(Speaker::from_bit),
+        )
     }
 }

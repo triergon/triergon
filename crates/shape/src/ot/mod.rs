@@ -1,4 +1,5 @@
 //! OpenType layout: the GDEF, GSUB, GPOS and `kern` tables and their application.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 pub(crate) mod apply;
 mod context;

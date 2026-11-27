@@ -1,12 +1,13 @@
 //! Decode a DTS core elementary stream to interleaved f32le (plane order) on stdout or
 //! into a file. A one-line JSON summary goes to stderr.
 //!
-//! usage: decode IN.dts [OUT.f32]
+//! usage: decode IN.dts [OUT.f32 | --null] [--reference-prototype]
 //!
 //! Frames are split with this example's own sync/FSIZE parsing; DTS-HD extension
 //! substreams (sync 0x64582025) between core frames are skipped.
 use std::io::Write;
-use triergon_codec_dca::{AudioFrame, Decoder, Packing};
+use triergon_codec_dca::compat::ffmpeg::Policy;
+use triergon_codec_dca::{AudioFrame, Budget, Decoder, Limits, Packing};
 
 /// Byte length of the frame starting at `data` (which begins with a core sync word).
 fn frame_len(data: &[u8], packing: Packing) -> Option<usize> {
@@ -71,21 +72,29 @@ fn main() {
     use std::io::Read;
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
-        eprintln!("usage: decode IN.dts [OUT.f32 | --null]");
+        eprintln!("usage: decode IN.dts [OUT.f32 | --null] [--reference-prototype]");
         std::process::exit(2);
     }
     let mut input = std::fs::File::open(&args[1]).expect("open input");
-    let null = args.get(2).map(String::as_str) == Some("--null");
-    let mut sink: Box<dyn Write> = if null {
-        Box::new(std::io::sink())
-    } else if args.len() > 2 {
-        Box::new(std::io::BufWriter::new(
-            std::fs::File::create(&args[2]).expect("create output"),
-        ))
-    } else {
-        Box::new(std::io::BufWriter::new(std::io::stdout().lock()))
+    let output = args[2..]
+        .iter()
+        .map(String::as_str)
+        .find(|&arg| arg != "--reference-prototype");
+    let null = output == Some("--null");
+    let mut sink: Box<dyn Write> = match output {
+        Some("--null") => Box::new(std::io::sink()),
+        Some(path) => Box::new(std::io::BufWriter::new(
+            std::fs::File::create(path).expect("create output"),
+        )),
+        None => Box::new(std::io::BufWriter::new(std::io::stdout().lock())),
     };
-    let mut dec = Decoder::new();
+    let policy = if args[2..].iter().any(|arg| arg == "--reference-prototype") {
+        Policy::Reference
+    } else {
+        Policy::default()
+    };
+    let budget = Budget::new(Limits::default().live_storage_bytes).expect("default storage budget");
+    let mut dec = Decoder::with_policy_in(policy, &budget);
     let mut frame = AudioFrame::default();
     let mut frames = 0usize;
     let mut total = 0usize;
@@ -130,14 +139,7 @@ fn main() {
                 if first.is_none() {
                     first = Some((
                         frame.sample_rate,
-                        triergon_codec_dca::layout_name(&frame.layout).map_or_else(
-                            || {
-                                let names: Vec<&str> =
-                                    frame.layout.speakers().iter().map(|s| s.name()).collect();
-                                format!("{} channels ({})", names.len(), names.join("+"))
-                            },
-                            str::to_string,
-                        ),
+                        frame.layout.name(),
                         frame
                             .layout
                             .speakers()

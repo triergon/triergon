@@ -15,7 +15,7 @@ use crate::tags::{
 use std::sync::atomic::AtomicBool;
 
 mod seek;
-use seek::Seeking;
+use seek::{Progress, Seeking};
 use triergon_core::container::{
     ContainerReader, Event, ReaderStep, SeekMethod, SeekPolicy, SeekRequest,
 };
@@ -55,6 +55,7 @@ enum Owner {
 }
 
 /// The access unit being delimited. Offsets are from the start of the view.
+// A stage enum costs 0.672% by value and 0.578% stepped in place on multichannel FLAC.
 #[derive(Clone, Copy, Debug)]
 struct Cut<H> {
     /// Bytes before the unit's first header that belong to its packet.
@@ -115,6 +116,7 @@ enum Phase<H> {
     Frame(Cut<H>),
     Trailing,
     End,
+    Failed(Error),
 }
 
 /// What follows a delimited unit.
@@ -161,6 +163,7 @@ enum Scan {
 }
 
 /// Look for `sync` in `view` from `from`, charging one work unit per byte examined.
+// Calling this scan out of line costs 1.6% on multichannel FLAC.
 fn scan(view: &[u8], from: usize, sync: u8, work: &mut WorkBudget) -> Scan {
     let Some(rest) = view.get(from..).filter(|rest| !rest.is_empty()) else {
         return Scan::Passed(from.max(view.len()));
@@ -179,23 +182,36 @@ fn scan(view: &[u8], from: usize, sync: u8, work: &mut WorkBudget) -> Scan {
     }
 }
 
-/// The first `byte` in `hay`, eight bytes at a time: frame payloads are long and sync
-/// bytes rare.
+/// The first `byte` in `hay`, sixteen bytes at a time: frame payloads are long and sync
+/// bytes rare. Two words per round share one test, which keeps the scan short where
+/// it is inlined into the reader's step and has few registers to spare.
+// Calling the search out of line costs 2.2% on multichannel FLAC.
 #[inline]
 fn find(hay: &[u8], byte: u8) -> Option<usize> {
     const LOW: u64 = 0x0101_0101_0101_0101;
     const HIGH: u64 = 0x8080_8080_8080_8080;
     let pattern = LOW * u64::from(byte);
-    let mut words = hay.chunks_exact(8);
-    for (index, word) in words.by_ref().enumerate() {
+    // The high bit of each byte of `word` equal to `byte`. A borrow can also mark a
+    // byte above a true match, never below one, so the lowest mark is exact.
+    let marks = |word: &[u8]| {
         let word = u64::from_le_bytes(word.try_into().unwrap_or([0; 8])) ^ pattern;
-        let zero = word.wrapping_sub(LOW) & !word & HIGH;
-        if zero != 0 {
-            return Some(index * 8 + zero.trailing_zeros() as usize / 8);
+        word.wrapping_sub(LOW) & !word & HIGH
+    };
+    let mut pairs = hay.chunks_exact(16);
+    for (index, pair) in pairs.by_ref().enumerate() {
+        let (first, second) = pair.split_at(8);
+        let (first, second) = (marks(first), marks(second));
+        if first | second != 0 {
+            let bit = if first != 0 {
+                first.trailing_zeros()
+            } else {
+                64 + second.trailing_zeros()
+            };
+            return Some(index * 16 + bit as usize / 8);
         }
     }
-    let tail = hay.len() - words.remainder().len();
-    words
+    let tail = hay.len() - pairs.remainder().len();
+    pairs
         .remainder()
         .iter()
         .position(|&b| b == byte)
@@ -210,17 +226,17 @@ enum Flow<T> {
 type Next = Flow<Option<Event<Packet, ReaderEvent>>>;
 
 /// A resumable reader of one elementary audio stream. It performs no I/O: it asks
-/// for byte ranges and accepts windows of any size.
+/// for byte ranges and accepts windows of any size. Errors other than backpressure
+/// are sticky until [`ContainerReader::reset`].
 #[derive(Debug)]
 pub struct Reader<F: Format> {
     input: Input,
     format: F,
     limits: Limits,
     phase: Phase<F::Header>,
-    /// The first header of the stream; later headers must continue it.
-    reference: Option<F::Header>,
+    /// The track and the stream's first header, which later headers must continue.
+    opened: Option<(Track, F::Header)>,
     last: Option<F::Header>,
-    track: Option<Track>,
     tags: BudgetVec<Tag>,
     retained: usize,
     announce: bool,
@@ -229,19 +245,25 @@ pub struct Reader<F: Format> {
     audio_end: Option<u64>,
     seeking: Option<Seeking>,
     last_seek: Option<SeekDetail>,
+    /// A new sequence ([`Syntax::NEW_SEQUENCE`]) follows the last unit: the reader
+    /// refuses it where the stream would end.
+    new_sequence: bool,
 }
 
 impl<F: Format> Reader<F> {
+    /// A reader for one source, requesting windows of at most `window` bytes. Fails when
+    /// `window` or [`Limits::frame_bytes`] is zero.
     pub fn new(
         pool: &Budget,
         source: SourceId,
         capabilities: SourceCapabilities,
         limits: Limits,
+        window: usize,
     ) -> Result<Reader<F>> {
-        if limits.frame_bytes == 0 || limits.input_window == 0 {
+        if limits.frame_bytes == 0 {
             return Err(Error::Invalid("zero elementary stream limit"));
         }
-        let cursor = InputCursor::new(pool, source, capabilities, limits.input_window)?;
+        let cursor = InputCursor::new(pool, source, capabilities, window)?;
         let view = limits
             .frame_bytes
             .saturating_add(usize::try_from(limits.sync_scan_bytes).unwrap_or(usize::MAX))
@@ -251,9 +273,8 @@ impl<F: Format> Reader<F> {
             format: F::new(pool, &limits),
             limits,
             phase: Phase::Leading,
-            reference: None,
+            opened: None,
             last: None,
-            track: None,
             tags: BudgetVec::new(pool),
             retained: 0,
             announce: false,
@@ -262,6 +283,7 @@ impl<F: Format> Reader<F> {
             audio_end: None,
             seeking: None,
             last_seek: None,
+            new_sequence: false,
         })
     }
 
@@ -269,21 +291,16 @@ impl<F: Format> Reader<F> {
     pub fn format(&self) -> &F {
         &self.format
     }
+    /// The stream's track, once its first frame is confirmed.
     pub fn stream(&self) -> Option<&Track> {
-        self.track.as_ref()
+        self.opened.as_ref().map(|(track, _)| track)
     }
-    /// Tags found so far: ID3v2 at the start, ID3v1 and APEv2 once reached.
+    /// Tags found so far: ID3v2 at the start, ID3v1 and APEv2 once reached. Every
+    /// entry is charged to the pool, including tags retained by length alone.
     pub fn tags(&self) -> &[Tag] {
         &self.tags
     }
-    /// Offset of the first audio frame, once known.
-    pub fn audio_start(&self) -> Option<u64> {
-        self.audio_start
-    }
-    /// Offset where the trailing tags start, once reached.
-    pub fn audio_end(&self) -> Option<u64> {
-        self.audio_end
-    }
+    /// What the last completed seek did.
     pub fn last_seek(&self) -> Option<SeekDetail> {
         self.last_seek
     }
@@ -315,11 +332,14 @@ impl<F: Format> Reader<F> {
     }
 
     fn continues(&self, header: &F::Header) -> bool {
-        self.reference
-            .is_none_or(|reference| self.format.continues(&reference, header))
+        self.opened
+            .as_ref()
+            .is_none_or(|(_, reference)| self.format.continues(reference, header))
     }
 
-    pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
+    /// The next event, or why there is none yet. A full pool is an error here, which
+    /// [`ContainerReader::step`] turns into [`Step::Backpressure`].
+    fn advance(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
         loop {
             let next = match self.phase {
                 Phase::Leading => self.leading(work, cancel)?,
@@ -332,7 +352,13 @@ impl<F: Format> Reader<F> {
                 Phase::Found(header) => self.found(header, work, cancel)?,
                 Phase::Frame(cut) => self.frame(cut, work, cancel)?,
                 Phase::Trailing => self.trailing(work, cancel)?,
+                Phase::Failed(error) => return Err(error),
                 Phase::End => {
+                    if let Some(detail) = F::NEW_SEQUENCE
+                        && self.new_sequence
+                    {
+                        return Err(Error::Unsupported(detail));
+                    }
                     return Ok(Step::End(SourceLocation {
                         source: self.input.cursor().source(),
                         offset: self.input.position(),
@@ -358,16 +384,16 @@ impl<F: Format> Reader<F> {
             return Ok(Flow::Wait(wait));
         }
         self.phase = match id3v2(self.input.view()) {
-            Leading::Tag(len) => self.keep(len, Owner::Tag(TagKind::Id3v2), Then::Leading),
+            Leading::Tag(len) => self.keep(len, Owner::Tag(TagKind::Id3v2), Then::Leading)?,
             Leading::No | Leading::Short => Phase::Prelude,
         };
         Ok(Flow::Ready(None))
     }
 
     /// Retain `len` bytes if the limits allow it, or record their length and drop them.
-    fn keep(&mut self, len: u64, owner: Owner, then: Then<F::Header>) -> Phase<F::Header> {
+    fn keep(&mut self, len: u64, owner: Owner, then: Then<F::Header>) -> Result<Phase<F::Header>> {
         let room = self.limits.retained_metadata_bytes - self.retained;
-        match usize::try_from(len) {
+        Ok(match usize::try_from(len) {
             Ok(len) if len <= room && len <= self.limits.frame_bytes => {
                 self.retained += len;
                 Phase::Retain { len, owner, then }
@@ -379,16 +405,15 @@ impl<F: Format> Reader<F> {
                         offset: self.input.position(),
                         len,
                         bytes: None,
-                    });
+                    })?;
                 }
                 Phase::Discard { left: len, then }
             }
-        }
+        })
     }
 
-    fn record(&mut self, tag: Tag) {
-        // A tag list the budget cannot hold loses its tail, never the stream.
-        let _ = self.tags.try_push(tag);
+    fn record(&mut self, tag: Tag) -> Result<()> {
+        self.tags.try_push(tag).map_err(|refused| refused.error)
     }
 
     fn prelude(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Next> {
@@ -409,7 +434,7 @@ impl<F: Format> Reader<F> {
                     return Ok(Flow::Ready(None));
                 }
                 Prelude::Keep(len) => {
-                    self.phase = self.keep(len, Owner::Format, Then::Prelude);
+                    self.phase = self.keep(len, Owner::Format, Then::Prelude)?;
                     if matches!(self.phase, Phase::Discard { .. }) {
                         self.format.omit(len)?;
                     }
@@ -471,6 +496,10 @@ impl<F: Format> Reader<F> {
             Flow::Ready(false) => return Err(Error::Truncated),
             Flow::Ready(true) => {}
         }
+        if matches!(owner, Owner::Tag(_)) {
+            // Reserve the tag entry before taking its bytes so backpressure can retry.
+            self.tags.try_reserve(1)?;
+        }
         let offset = self.input.position();
         let Some(bytes) = self.input.take(len, work, cancel)? else {
             return Ok(Flow::Wait(Wait::Step(Step::Yield)));
@@ -481,7 +510,7 @@ impl<F: Format> Reader<F> {
                 offset,
                 len: len as u64,
                 bytes: Some(bytes),
-            }),
+            })?,
             Owner::Format => self.format.keep(bytes)?,
         }
         self.phase = Self::resume(then);
@@ -666,37 +695,30 @@ impl<F: Format> Reader<F> {
 
     /// The source ended without a sync.
     fn sync_exhausted(&mut self) -> Result<Next> {
-        if let Some(seeking) = self.seeking {
-            if let Plan::Bisect { low, method, .. } = seeking.plan
-                && !seeking.forward
-            {
+        if let Some(mut seeking) = self.seeking {
+            let plan = match seeking.progress {
                 // No frame starts after the probe: the target lies before it.
-                self.set_plan(Plan::Bisect {
+                Progress::Bisect { low, .. } => Plan::Bisect {
                     low,
                     high: seeking.probe,
-                    method,
-                });
-                return self
-                    .jump()
-                    .map(|request| Flow::Wait(Wait::Step(Step::NeedInput(request))));
-            }
-            if let Plan::Estimate { .. } = seeking.plan
-                && !seeking.forward
-            {
+                    method: seeking.method,
+                },
                 // The estimate fell past the last frame: count from the start instead.
-                if let Some(seeking) = self.seeking.as_mut() {
-                    seeking.plan = Plan::Scan;
+                Progress::Estimate => {
                     seeking.method = SeekMethod::Restart;
                     seeking.basis = SeekBasis::Exact;
+                    Plan::Scan
                 }
-                return self
-                    .jump()
-                    .map(|request| Flow::Wait(Wait::Step(Step::NeedInput(request))));
-            }
-            self.seeking = None;
-            return Ok(Flow::Wait(Wait::End));
+                Progress::Forward | Progress::VerifyEstimate { .. } => {
+                    self.seeking = None;
+                    return Ok(Flow::Wait(Wait::End));
+                }
+            };
+            return self
+                .jump(seeking, plan)
+                .map(|request| Flow::Wait(Wait::Step(Step::NeedInput(request))));
         }
-        if self.track.is_none() {
+        if self.opened.is_none() {
             return Err(Error::Invalid("no frame in the source"));
         }
         Ok(Flow::Wait(Wait::End))
@@ -709,14 +731,13 @@ impl<F: Format> Reader<F> {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Next> {
-        if self.seeking.is_some() {
-            return self.seek_found(header);
+        if let Some(seeking) = self.seeking {
+            return self.seek_found(seeking, header);
         }
-        if self.track.is_none() {
+        if self.opened.is_none() {
             let facts = self.format.adopt(&header, self.input.cursor().budget())?;
             let time_base = TimeBase::new(1, u64::from(facts.sample_rate))?;
-            self.track = Some(Track { facts, time_base });
-            self.reference = Some(header);
+            self.opened = Some((Track { facts, time_base }, header));
             self.announce = true;
         }
         if !self.announce {
@@ -746,7 +767,7 @@ impl<F: Format> Reader<F> {
         }
         self.audio_start = Some(start);
         self.announce = false;
-        if let (Some(track), Some(duration)) = (self.track.as_mut(), self.format.duration()) {
+        if let (Some((track, _)), Some(duration)) = (self.opened.as_mut(), self.format.duration()) {
             track.facts.duration = Some(duration);
         }
         Ok(Flow::Ready(Some(Event::Other(ReaderEvent::Opened))))
@@ -884,6 +905,23 @@ impl<F: Format> Reader<F> {
                     after: After::Frame { lead: 0 },
                 })));
             }
+            if F::NEW_SEQUENCE.is_some()
+                && let Probe::Header(next) = self.format.probe(&self.input.view()[end..])
+            {
+                match self.confirmed_sequence(end, &next, work, cancel)? {
+                    Flow::Wait(wait) => return Ok(Flow::Wait(wait)),
+                    Flow::Ready(true) => {
+                        self.new_sequence = true;
+                        return Ok(Flow::Ready(Some(Unit {
+                            len: end,
+                            header: unit,
+                            complete: true,
+                            after: After::End,
+                        })));
+                    }
+                    Flow::Ready(false) => {}
+                }
+            }
             let found = match self.resync(cut, end, work, cancel)? {
                 Flow::Wait(wait) => return Ok(Flow::Wait(wait)),
                 Flow::Ready(found) => found,
@@ -909,6 +947,35 @@ impl<F: Format> Reader<F> {
                 after,
             })));
         }
+    }
+
+    /// Whether `next`, the header after the frame ending at `end`, which does not
+    /// continue the stream, starts a new sequence ([`Syntax::NEW_SEQUENCE`]): the frame
+    /// after it continues it, or the source ends with it. Otherwise it is a false sync
+    /// to search past.
+    #[cold]
+    fn confirmed_sequence(
+        &mut self,
+        end: usize,
+        next: &F::Header,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Flow<bool>> {
+        let Length::Known(len) = self.format.length(next) else {
+            return Ok(Flow::Ready(false));
+        };
+        let after = end + len;
+        let at_end = match self.need(after + F::PROBE, work, cancel)? {
+            Flow::Wait(wait) => return Ok(Flow::Wait(wait)),
+            Flow::Ready(_) => self.input.ended(),
+        };
+        let view = self.input.view();
+        Ok(Flow::Ready(
+            match view.get(after..).map(|rest| self.format.probe(rest)) {
+                Some(Probe::Header(following)) => self.format.continues(next, &following),
+                _ => at_end && after == view.len(),
+            },
+        ))
     }
 
     /// Search for the end of a frame whose header gives no length: the next header of
@@ -1071,8 +1138,11 @@ impl<F: Format> Reader<F> {
             .map_err(|_| Error::Overflow)?;
         let duration = self.format.samples(&header);
         let (extra, then) = unit.after.then();
-        if let Some(seeking) = self.seeking
-            && seeking.forward
+        if let Some(seeking) = self.seeking.as_mut()
+            && matches!(
+                seeking.progress,
+                Progress::Forward | Progress::VerifyEstimate { .. }
+            )
         {
             let preroll = match seeking.policy {
                 SeekPolicy::PreviousRandomAccess => 0,
@@ -1083,17 +1153,16 @@ impl<F: Format> Reader<F> {
             if reach <= target && !matches!(unit.after, After::End) {
                 // Before the target: read past the unit without delivering it.
                 self.next_pts = pts + i64::from(duration);
-                if let Some(seeking) = self.seeking.as_mut() {
-                    seeking.scanned += unit.len as u64;
-                }
+                seeking.scanned += unit.len as u64;
                 self.phase = Phase::Discard {
                     left: unit.len as u64 + extra,
                     then,
                 };
                 return Ok(Flow::Ready(None));
             }
+            let seeking = *seeking;
             self.phase = Phase::Frame(cut);
-            return Ok(Flow::Ready(Some(Event::Seek(self.land(pts)?))));
+            return Ok(Flow::Ready(Some(Event::Seek(self.land(seeking, pts)?))));
         }
         let offset = self.input.position();
         let Some(data) = self.input.take(unit.len, work, cancel)? else {
@@ -1101,8 +1170,7 @@ impl<F: Format> Reader<F> {
             return Ok(Flow::Wait(Wait::Step(Step::Yield)));
         };
         let time_base = self
-            .track
-            .as_ref()
+            .stream()
             .map(Track::time_base)
             .ok_or(Error::Invalid("packet before the stream is open"))?;
         let packet = Packet {
@@ -1147,31 +1215,15 @@ impl<F: Format> Reader<F> {
                 }
             }
         };
-        self.phase = self.keep(len, Owner::Tag(kind), Then::End);
+        self.phase = self.keep(len, Owner::Tag(kind), Then::End)?;
         Ok(Flow::Ready(None))
-    }
-
-    /// Restart from the start of the source, forgetting the stream.
-    pub fn reset(&mut self) -> Result<InputRequest> {
-        self.phase = Phase::Leading;
-        self.reference = None;
-        self.last = None;
-        self.track = None;
-        self.tags.clear();
-        self.retained = 0;
-        self.announce = false;
-        self.next_pts = 0;
-        self.audio_start = None;
-        self.audio_end = None;
-        self.seeking = None;
-        self.format.reset();
-        self.input.reset(0)
     }
 }
 
 impl<F: Format> ContainerReader for Reader<F> {
     type Packet = Packet;
     type Track = Track;
+    /// The track is known.
     type Other = ReaderEvent;
 
     fn provide(&mut self, window: &InputWindow) -> Result<()> {
@@ -1183,23 +1235,69 @@ impl<F: Format> ContainerReader for Reader<F> {
     fn fail(&mut self, source: SourceId, token: InputToken, failure: SourceFailure) -> Result<()> {
         self.input.cursor_mut().fail(source, token, failure)
     }
+    /// Keeps nothing: the stream is found again from the source start.
     fn reset(&mut self) -> Result<InputRequest> {
-        Reader::reset(self)
+        self.phase = Phase::Leading;
+        self.new_sequence = false;
+        self.opened = None;
+        self.last = None;
+        self.tags.clear();
+        self.retained = 0;
+        self.announce = false;
+        self.next_pts = 0;
+        self.audio_start = None;
+        self.audio_end = None;
+        self.seeking = None;
+        self.last_seek = None;
+        self.format.reset();
+        self.input.reset(0)
     }
     #[inline]
     fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<ReaderStep<Self>> {
-        Reader::step(self, work, cancel)
+        self.advance(work, cancel).or_else(|error| {
+            error
+                .into_step()
+                .inspect_err(|&error| self.phase = Phase::Failed(error))
+        })
     }
+    /// Seek the stream's track; a [`Event::Seek`] receipt arrives before the first packet
+    /// at the landing point.
     fn request_seek(&mut self, request: SeekRequest) -> Result<InputRequest> {
-        Reader::request_seek(self, request)
+        if let Phase::Failed(error) = self.phase {
+            return Err(error);
+        }
+        self.start_seek(request)
     }
     fn track_count(&self) -> usize {
-        usize::from(self.track.is_some())
+        usize::from(self.opened.is_some())
     }
     fn track(&self, index: usize) -> Option<&Track> {
-        self.track.as_ref().filter(|_| index == 0)
+        self.stream().filter(|_| index == 0)
     }
     fn capabilities(&self) -> SourceCapabilities {
         self.input.capabilities()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::find;
+
+    #[test]
+    fn find_agrees_with_a_byte_search_at_every_offset_and_length() {
+        // Bytes just below and above the sync byte probe the borrow between lanes.
+        for byte in [0x00u8, 0x0b, 0x7f, 0x80, 0xfe, 0xff] {
+            let mut hay: Vec<u8> = (0..70u8).map(|i| byte.wrapping_add(i % 3 + 1)).collect();
+            hay[20] = byte.wrapping_sub(1);
+            for at in 0..hay.len() {
+                let mut with = hay.clone();
+                with[at] = byte;
+                for len in 0..=with.len() {
+                    let expected = with[..len].iter().position(|&b| b == byte);
+                    assert_eq!(find(&with[..len], byte), expected, "{byte} at {at}, {len}");
+                }
+            }
+            assert_eq!(find(&hay, byte), hay.iter().position(|&b| b == byte));
+        }
     }
 }

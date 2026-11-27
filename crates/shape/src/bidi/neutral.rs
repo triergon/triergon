@@ -29,8 +29,8 @@
 
 use super::charge;
 use super::class::{BidiClass, Bracket, Level, fill};
-use super::explicit::{MAX_ISOLATE_DEPTH, NONE};
-use super::sequence::Paragraph;
+use super::explicit::{MAX_ISOLATE_DEPTH, Partner};
+use super::sequence::{NONE, Paragraph};
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 
 /// The opening brackets a depth keeps unpaired at most.
@@ -49,8 +49,7 @@ const SHARED_SLOTS: usize = SHARED_ROW * (SHARED_DEPTHS - 1) + MAX_OPEN_BRACKETS
 struct Depth {
     /// How many opening brackets it holds.
     open: u8,
-    /// The level of the last character seen at this depth, `u8::MAX` where a
-    /// shallower character came after it.
+    /// The last level at this depth until a shallower character follows.
     level: u8,
     /// Where its stack starts in [`Storage::slots`], [`NONE`] until it is used.
     start: u32,
@@ -60,12 +59,22 @@ struct Depth {
 }
 
 impl Depth {
+    const NO_LEVEL: u8 = u8::MAX;
+
     const UNUSED: Self = Self {
         open: 0,
-        level: u8::MAX,
+        level: Self::NO_LEVEL,
         start: NONE,
         paragraph: 0,
     };
+
+    fn forget_level(&mut self) {
+        self.level = Self::NO_LEVEL;
+    }
+
+    fn has_level(&self) -> bool {
+        self.level != Self::NO_LEVEL
+    }
 }
 
 /// Storage for pairing brackets, kept between paragraphs.
@@ -142,7 +151,10 @@ impl Storage {
 /// BD16 and N0 over a paragraph whose weak types are resolved: `levels` are
 /// the explicit levels, `sequence_of` the isolating run sequence of each
 /// character and `absorbed` the characters W1 joined to a run before marks.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the paragraph and run data live in separate slices"
+)]
 pub(super) fn resolve_brackets(
     storage: &mut Storage,
     types: &mut [BidiClass],
@@ -193,7 +205,10 @@ pub(super) fn resolve_brackets(
 /// BD16 as FriBidi pairs brackets: the pairs, in order of their opening
 /// brackets, into `storage.pairs`. Only brackets of class ON that W1 did not
 /// join to another run pair.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "pairing reads paragraph and run data separately"
+)]
 fn pair(
     storage: &mut Storage,
     types: &[BidiClass],
@@ -220,14 +235,17 @@ fn pair(
         if last != Some((depth, levels[at].0)) {
             last = Some((depth, levels[at].0));
             for deeper in depth + 1..deepest.max(depth + 1) {
-                storage.depth(deeper).level = u8::MAX;
+                storage.depth(deeper).forget_level();
             }
             deepest = depth + 1;
             let state = storage.depth(depth);
             if state.level != levels[at].0 {
                 let closes_isolate = paragraph.classes[at] == BidiClass::Pdi
-                    && paragraph.partner.get(at).is_some_and(|&p| p != NONE);
-                if state.level != u8::MAX && !closes_isolate {
+                    && paragraph
+                        .partner
+                        .get(at)
+                        .is_some_and(|&p| p != Partner::NONE);
+                if state.has_level() && !closes_isolate {
                     state.open = 0;
                 }
                 state.level = levels[at].0;

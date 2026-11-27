@@ -29,10 +29,22 @@ pub fn read(root: &Path, path: &Path) -> Result<(Value, String), String> {
     Ok((value.clone(), sha256::hex(canonical(&value).as_bytes())))
 }
 
+/// Whether the required comparison prepares and checks configured AAC workloads.
+pub(crate) fn configured_aac_runner(contract: &Value) -> bool {
+    contract.get("runner").and_then(Value::as_str) == Some("cargo xtask codecs aac-access-units")
+}
+
 /// Check the declared membership and pin coverage before a required report.
 pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), String> {
+    let configured_aac = configured_aac_runner(contract);
+    if configured_aac
+        && manifest.get("schema").and_then(Value::as_str) != Some("triergon.codecs.workloads.v1")
+    {
+        return Err("configured AAC corpus is not a codec workload list".into());
+    }
+    let cases_key = if configured_aac { "workloads" } else { "cases" };
     let cases = manifest
-        .get("cases")
+        .get(cases_key)
         .and_then(Value::as_array)
         .filter(|cases| !cases.is_empty())
         .ok_or("required manifest has no cases")?;
@@ -51,6 +63,24 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
     if work_fields.is_some() && per_target && targets.is_empty() {
         return Err("per-target pins need required targets".into());
     }
+    // A refusal, or a case not comparable with the reference, pins the candidate's
+    // fold and nothing of the reference.
+    let mut candidate_only = BTreeSet::new();
+    let scopes: Vec<&str> = targets.iter().filter_map(Value::as_str).collect();
+    for target in if scopes.is_empty() {
+        &[""][..]
+    } else {
+        &scopes
+    } {
+        let listed = super::registry::read_unchecked(contract, target)?;
+        candidate_only.extend(
+            listed
+                .ids()
+                .iter()
+                .filter(|id| listed.get(id).is_some_and(|case| case.candidate_only))
+                .cloned(),
+        );
+    }
     for case in cases {
         let id = case
             .get("id")
@@ -60,8 +90,63 @@ pub fn validate_required(contract: &Value, manifest: &Value) -> Result<(), Strin
         if !ids.insert(id) {
             return Err(format!("duplicate case ID {id}"));
         }
+        if candidate_only.contains(id) {
+            if case.get("expected").is_some()
+                || case.get(crate::generators::EXPECTED_BY_TARGET).is_some()
+            {
+                return Err(format!(
+                    "{id}: a refusal, or a case not comparable with the reference, pins no \
+                     reference fold"
+                ));
+            }
+            if let Some(profile) = case.get("profile").and_then(Value::as_str) {
+                profiles.insert(profile.to_owned());
+            }
+            continue;
+        }
+        if configured_aac {
+            for key in ["sha256", "source_sha256"] {
+                super::validation::hash(case, key).map_err(|error| format!("{id}: {error}"))?;
+            }
+            if !matches!(
+                case.get("operation").and_then(Value::as_str),
+                Some("audio-aac-access-units" | "audio-aac-access-units-compat")
+            ) || case.get("iterations") != contract.get("iterations")
+            {
+                return Err(format!(
+                    "{id}: invalid configured AAC operation or iteration count"
+                ));
+            }
+        }
         if let Some(profile) = case.get("profile").and_then(Value::as_str) {
             profiles.insert(profile.to_owned());
+        }
+        if contract.get("oracle").is_some() {
+            if per_target {
+                if case.get("expected").is_some() {
+                    return Err(format!("{id}: expected must use per-target oracle pins"));
+                }
+                let unpinned = crate::generators::unpinned(contract, id);
+                for target in targets {
+                    let target = target.as_str().ok_or("invalid required target")?;
+                    if super::report::expected_for(case, target).is_none()
+                        && unpinned
+                            .iter()
+                            .any(|&(name, why)| name == target && !why.is_empty())
+                    {
+                        continue;
+                    }
+                    super::oracle_compare::pin(case, target)?;
+                }
+            } else {
+                if case.get(crate::generators::EXPECTED_BY_TARGET).is_some() {
+                    return Err(format!(
+                        "{id}: per-target oracle pins require pinned_per_target"
+                    ));
+                }
+                super::oracle_compare::pin(case, "")?;
+            }
+            continue;
         }
         let Some(fields) = &work_fields else {
             continue;
@@ -117,7 +202,7 @@ pub fn sources(root: &Path, path: &Path) -> Vec<PathBuf> {
         .and_then(Path::file_name)
         .and_then(|n| n.to_str())
         .unwrap_or_default();
-    let contract = crate::checks::read_json(&path.with_file_name("contract.json")).ok();
+    let contract = json::read(&path.with_file_name("contract.json")).ok();
     match contract.as_ref().and_then(crate::generators::for_contract) {
         Some(generator) => generator
             .inputs(root, id)
@@ -137,7 +222,7 @@ pub(crate) fn generated(root: &Path, path: &Path) -> Option<Result<Value, String
         return None;
     }
     let id = path.parent().and_then(Path::file_name)?.to_str()?;
-    let document = match crate::checks::read_json(&path.with_file_name("contract.json")) {
+    let document = match json::read(&path.with_file_name("contract.json")) {
         Ok(document) => document,
         Err(error) => return Some(Err(error)),
     };
@@ -168,6 +253,24 @@ mod tests {
         assert_eq!(
             validate_required(&contract, &without_pin).unwrap_err(),
             "two: missing expected fold"
+        );
+        // A refusal the contract lists pins the candidate alone, and no reference fold.
+        let refusing = json::parse(
+            r#"{"worker_operation":"test-","required_profiles":["first","second"],
+                "open_refusals":[{"reason":"r","clause":"c","class":"unsupported","detail":"d",
+                                  "cases":["two"]}]}"#,
+        )
+        .unwrap();
+        validate_required(&refusing, &without_pin).unwrap();
+        let pinned = json::parse(
+            r#"{"cases":[{"id":"one","profile":"first","expected":{"packets":1,"bytes":1,"digest":1}},
+                          {"id":"two","profile":"second","expected":{"packets":1,"bytes":1,"digest":1}}]}"#,
+        )
+        .unwrap();
+        assert!(
+            validate_required(&refusing, &pinned)
+                .unwrap_err()
+                .contains("pins no reference fold")
         );
     }
 
@@ -210,6 +313,28 @@ mod tests {
             validate_required(&allowed, &shadowed).unwrap_err(),
             "one: expected must use per-target folds"
         );
+    }
+
+    #[test]
+    fn target_specific_oracle_pins_are_required_for_each_target() {
+        let contract = json::parse(
+            r#"{"oracle":"cabac-engine","worker_operation":"cabac-",
+                "pinned_per_target":true,"required_targets":["first","second"]}"#,
+        )
+        .unwrap();
+        let hash = "a".repeat(64);
+        let case =
+            |pins: &str| json::parse(&format!(r#"{{"cases":[{{"id":"one",{pins}}}]}}"#)).unwrap();
+        let first = format!(r#""first":{{"trace_sha256":"{hash}"}}"#);
+        let second = format!(r#""second":{{"trace_sha256":"{hash}"}}"#);
+        let incomplete = case(&format!(r#""expected_by_target":{{{first}}}"#));
+        assert!(
+            validate_required(&contract, &incomplete)
+                .unwrap_err()
+                .contains("missing oracle trace pin for second")
+        );
+        let complete = case(&format!(r#""expected_by_target":{{{first},{second}}}"#));
+        validate_required(&contract, &complete).unwrap();
     }
 
     #[test]

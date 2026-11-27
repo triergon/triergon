@@ -1,8 +1,7 @@
 //! Bind a supplied session worker to the library checkout and the target Cargo built.
-use super::sha;
 use crate::harness::{build, gate_build};
-use crate::json::Value;
-use crate::{checks, corpus, json, prepare, sha256};
+use crate::json::{self, Value};
+use crate::{process, sha256};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -22,7 +21,10 @@ const WORKER: build::Candidate = build::Candidate {
 fn overlay(root: &Path) -> Result<Value, String> {
     let mut files = Vec::new();
     for name in OVERLAY {
-        files.push((name.to_owned(), Value::str(sha(&root.join(name))?)));
+        files.push((
+            name.to_owned(),
+            Value::str(crate::files::sha256(&root.join(name))?),
+        ));
     }
     Ok(Value::Object(files))
 }
@@ -85,14 +87,14 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     for name in OVERLAY {
         git.arg(format!(":(exclude){name}"));
     }
-    if !prepare::output(&mut git)?.is_empty() {
+    if !process::output(&mut git)?.is_empty() {
         return Err("worker checkout has changes outside the workload overlay".into());
     }
     let files = overlay(tree)?;
     if files != overlay(root)? {
         return Err("worker checkout has the wrong workload overlay".into());
     }
-    let revision = prepare::output(
+    let revision = process::output(
         Command::new("git")
             .current_dir(tree)
             .args(["rev-parse", "HEAD"]),
@@ -111,7 +113,7 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     let dir = std::path::absolute(dir).map_err(|e| e.to_string())?;
     let cache = build_dir(&dir, revision.trim(), &files);
     let argv = cargo_command(&dir)?;
-    prepare::run(
+    process::run(
         Command::new(&argv[0])
             .args(&argv[1..])
             .current_dir(tree)
@@ -123,19 +125,19 @@ pub(super) fn stage(root: &Path, tree: &Path, dest: &Path) -> Result<(), String>
     let identity = Value::object([
         ("revision", Value::str(revision.trim())),
         ("target", Value::str(target)),
-        ("sha256", Value::str(sha(dest)?)),
+        ("sha256", Value::str(crate::files::sha256(dest)?)),
         ("build_dir", Value::str(cache.display().to_string())),
         ("artifact", Value::str(binary.display().to_string())),
         ("overlay", files),
         ("build", build),
         ("argv", Value::strings(argv)),
     ]);
-    corpus::write_json(&identity_path(dest), &identity)
+    json::write(&identity_path(dest), &identity)
 }
 
 pub(super) fn verify(root: &Path, worker: &Path) -> Result<Value, String> {
-    let identity = checks::read_json(&identity_path(worker))?;
-    if identity.get("sha256").and_then(Value::as_str) != Some(&sha(worker)?)
+    let identity = json::read(&identity_path(worker))?;
+    if identity.get("sha256").and_then(Value::as_str) != Some(&crate::files::sha256(worker)?)
         || identity.get("target").and_then(Value::as_str) != Some(gate_build::worker_target()?)
         || identity.get("overlay") != Some(&overlay(root)?)
     {

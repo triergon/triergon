@@ -14,14 +14,13 @@ use super::acceptance::acceptance_iter;
 use super::comparison::reference_summary;
 use super::gate_build;
 use super::parity::{self, Comparison, Run};
-use super::policy::Runtime;
+use super::policy::{Memory, Runtime};
 use super::provenance::source_identity_error;
+use super::registry::Listed;
 use super::reuse;
 use super::timing::{Operation, Pairs, Work, benchmark};
 use super::validation::{self, selected_operation};
 use super::worker;
-use crate::checks::read_json;
-use crate::corpus::write_json;
 use crate::json::{self, Value};
 use crate::sha256;
 
@@ -85,10 +84,6 @@ impl Options {
             })
             .unwrap_or(200)
     }
-}
-
-fn digest(path: &Path) -> Result<String, String> {
-    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 fn measure_pinned(
@@ -237,7 +232,7 @@ fn auxiliary_input_failure(
         if !path.is_file() {
             return Ok(Some(missing));
         }
-        if digest(&path)?
+        if crate::files::sha256(&path)?
             != s(input, "sha256").ok_or_else(|| format!("{kind} without input hash"))?
         {
             return Ok(Some(changed));
@@ -289,12 +284,14 @@ const QUALIFIED_TARGETS: [&str; 4] = [
 /// reports `aarch64` or `armv8l` from `uname -m`, so the machine name cannot tell
 /// it apart from a 64-bit one. Any other target, such as ARMv6 or A32, is reported
 /// as unqualified.
+/// Set `TRIERGON_TEST_UNQUALIFIED_TARGET=1` to exercise unqualified parity on this host.
 pub fn gate_target() -> Result<String, String> {
-    gate_build::worker_target().map(qualified)
+    let force_unqualified = std::env::var("TRIERGON_TEST_UNQUALIFIED_TARGET").as_deref() == Ok("1");
+    gate_build::worker_target().map(|target| qualified(target, force_unqualified))
 }
 
-fn qualified(target: &str) -> String {
-    if QUALIFIED_TARGETS.contains(&target) {
+fn qualified(target: &str, force_unqualified: bool) -> String {
+    if !force_unqualified && QUALIFIED_TARGETS.contains(&target) {
         target.to_owned()
     } else {
         format!("unqualified-{target}")
@@ -333,7 +330,7 @@ pub fn fate_coverage(
         .and_then(Value::as_array)
         .unwrap_or_default();
     let reference = root.join(".research/reference");
-    let build = read_json(&reference.join("build.json")).ok();
+    let build = json::read(&reference.join("build.json")).ok();
     let enabled: Vec<String> = fs::read_to_string(reference.join("fate-list.txt"))
         .map(|t| t.split_whitespace().map(str::to_owned).collect())
         .unwrap_or_default();
@@ -344,7 +341,7 @@ pub fn fate_coverage(
         for path in paths {
             let name = path.file_name().unwrap_or_default().to_string_lossy();
             if name.starts_with("fate-") && name.ends_with(".json") {
-                let receipt = read_json(&path)?;
+                let receipt = json::read(&path)?;
                 if let Some(case) = s(&receipt, "case") {
                     receipts.retain(|(k, _)| k != case);
                     receipts.push((case.to_owned(), receipt));
@@ -393,7 +390,7 @@ pub fn fate_coverage(
                 let asset = if path.is_file() {
                     Value::object([
                         ("status", Value::str("present-external-rights-unreviewed")),
-                        ("sha256", Value::str(digest(&path)?)),
+                        ("sha256", Value::str(crate::files::sha256(&path)?)),
                     ])
                 } else {
                     Value::object([("status", Value::str("missing"))])
@@ -419,10 +416,10 @@ pub fn fate_coverage(
 /// which list `samples` with their `sha256`.
 const REVIEWED_INPUTS: [&str; 2] = ["harness/fonts/corpus.json", "harness/fate/samples.json"];
 
-fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
+pub(super) fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
     REVIEWED_INPUTS
         .iter()
-        .map(|path| read_json(&root.join(path)).map_err(|e| format!("{path}: {e}")))
+        .map(|path| json::read(&root.join(path)))
         .collect()
 }
 
@@ -430,7 +427,7 @@ fn reviewed_inputs(root: &Path) -> Result<Vec<Value>, String> {
 /// `reviewed-licence` file whose hash a reviewed input manifest records under the
 /// licence the case names, or a `fetched-not-redistributed` sample whose hash a
 /// manifest of fetched samples records. Any other rights value is unreviewed.
-fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
+pub(super) fn rights_reviewed(reviewed: &[Value], case: &Value) -> bool {
     fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
         value.get(key).and_then(Value::as_array).unwrap_or_default()
     }
@@ -495,12 +492,33 @@ pub fn case_arguments(case: &Value) -> Vec<std::ffi::OsString> {
         .collect()
 }
 
-/// Rebase DVD palette options onto the same corpus used to check companion pins.
-pub(super) fn resolved_case_arguments(
+/// Resolve pinned companion and entity paths for workers that preload them.
+pub(crate) fn resolved_case_arguments(
     corpus: &Path,
     case: &Value,
     mut arguments: Vec<std::ffi::OsString>,
 ) -> Result<Vec<std::ffi::OsString>, String> {
+    if case.get("resolve_entity_paths") == Some(&Value::Bool(true)) {
+        if let Some(problem) = entity_input_failure(corpus, case, None)? {
+            return Err(problem.into());
+        }
+        let entities = case
+            .get("entities")
+            .and_then(Value::as_array)
+            .ok_or("missing ordered entities")?;
+        let mut following = entities.iter().skip(1);
+        let namespace = arguments
+            .get(2)
+            .is_some_and(|arg| arg == "--dvb" || arg == "--atsc");
+        for argument in arguments.iter_mut().skip(2 + usize::from(namespace)) {
+            if argument != "--discontinuity" {
+                let entity = following.next().ok_or("missing entity pin")?;
+                *argument = corpus
+                    .join(validation::text(entity, "file")?)
+                    .into_os_string();
+            }
+        }
+    }
     const OPTION: &str = "opt:ifo_palette=";
     for argument in &mut arguments {
         let Some(declared) = argument.to_str().and_then(|text| text.strip_prefix(OPTION)) else {
@@ -547,9 +565,10 @@ pub fn recorded_corpus(root: &Path, manifest: &Value) -> Option<PathBuf> {
 pub struct PrefixFeature {
     pub id: String,
     pub prefix: String,
+    pub reference_prefix: Option<String>,
     pub candidate: String,
     /// The comparison reference's name in the build identity.
-    pub reference: String,
+    pub reference: Option<String>,
     pub contract: PathBuf,
     pub manifest: PathBuf,
     pub cases: Vec<Value>,
@@ -562,15 +581,28 @@ pub struct PrefixFeature {
     pub per_target: bool,
 }
 
+fn reference_prefix(contract: &Value) -> Result<Option<&str>, String> {
+    if contract.get("reference_worker_operation").is_none() {
+        return Ok(None);
+    }
+    validation::text(contract, "worker_operation")?;
+    validation::text(contract, "reference")?;
+    let prefix = validation::text(contract, "reference_worker_operation")?;
+    if !prefix.ends_with('-') {
+        return Err("reference worker operation must be a prefix ending in '-'".into());
+    }
+    Ok(Some(prefix))
+}
+
 impl PrefixFeature {
-    /// Loads a prefix feature; `corpus` overrides the manifest's `directory`.
+    /// Loads a prefix feature with an optional override for its corpus directory.
     pub fn load(
         root: &Path,
         contract: &Path,
         manifest: &Path,
         corpus: Option<&Path>,
     ) -> Result<Self, String> {
-        let document = read_json(contract)?;
+        let document = json::read(contract)?;
         let text = |key: &str| {
             s(&document, key)
                 .map(str::to_owned)
@@ -578,19 +610,31 @@ impl PrefixFeature {
         };
         let id = text("id")?;
         let (listing, _) = super::manifest::read(root, manifest)?;
-        let corpus = match corpus {
-            Some(corpus) => corpus.to_path_buf(),
-            None => recorded_corpus(root, &listing).ok_or_else(|| {
+        let has_oracle = document.get("oracle").is_some();
+        let corpus = corpus
+            .map(Path::to_path_buf)
+            .or_else(|| {
+                if has_oracle {
+                    super::oracle_compare::corpus_directory(root, &document, &listing)
+                } else {
+                    recorded_corpus(root, &listing)
+                }
+            })
+            .ok_or_else(|| {
                 format!(
                     "{}: no corpus directory; pass --corpus or record `directory`",
                     manifest.display()
                 )
-            })?,
-        };
+            })?;
         Ok(Self {
             prefix: text("worker_operation")?,
+            reference_prefix: reference_prefix(&document)?.map(str::to_owned),
             candidate: text("candidate")?,
-            reference: text("reference")?,
+            reference: if has_oracle {
+                None
+            } else {
+                Some(text("reference")?)
+            },
             cases: listing
                 .get("cases")
                 .and_then(Value::as_array)
@@ -638,7 +682,7 @@ impl PrefixFeature {
 
     /// The built candidate and reference, checked against the build identity.
     pub fn workers(&self, root: &Path) -> Result<(PathBuf, PathBuf), String> {
-        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         let candidate = validation::candidate_worker(root, &identity, &self.candidate)?;
         Ok((candidate, self.reference_worker(root, &identity)?))
     }
@@ -648,13 +692,14 @@ impl PrefixFeature {
         root: &Path,
         identity: &Value,
     ) -> Result<PathBuf, String> {
-        let record = super::comparison::reference_named(identity, &self.reference)?;
+        let name = self
+            .reference
+            .as_deref()
+            .ok_or("oracle feature has no reference worker")?;
+        let record = super::comparison::reference_named(identity, name)?;
         let reference = root.join(validation::text(&record, "path")?);
-        if super::linux::file_sha(&reference)? != validation::hash(&record, "sha256")? {
-            return Err(format!(
-                "{} changed since build identity; rebuild",
-                self.reference
-            ));
+        if crate::files::sha256(&reference)? != validation::hash(&record, "sha256")? {
+            return Err(format!("{name} changed since build identity; rebuild"));
         }
         Ok(reference)
     }
@@ -672,9 +717,9 @@ impl PrefixFeature {
         Ok(self.corpus.join(file))
     }
 
-    pub(super) fn verified_input(&self, case: &Value) -> Result<PathBuf, String> {
+    pub(crate) fn verified_input(&self, case: &Value) -> Result<PathBuf, String> {
         let path = self.input(case)?;
-        if digest(&path)? != validation::hash(case, "sha256")? {
+        if crate::files::sha256(&path)? != validation::hash(case, "sha256")? {
             return Err(format!("input changed: {}", path.display()));
         }
         if let Some(status) = additional_input_failure(&self.corpus, case, Some(&self.prefix))? {
@@ -712,7 +757,7 @@ fn input_failure(
     sha: &str,
     prefix: Option<&str>,
 ) -> Result<Option<&'static str>, String> {
-    if digest(input)? != sha {
+    if crate::files::sha256(input)? != sha {
         return Ok(Some("input-hash-mismatch"));
     }
     let failure = additional_input_failure(corpus, case, prefix)?;
@@ -724,7 +769,7 @@ fn input_failure(
 
 /// Why a case cannot be measured from `corpus`, before anything runs: a missing
 /// or changed input, ordered entity or companion.
-pub(super) fn input_problem(
+pub(crate) fn input_problem(
     corpus: &Path,
     case: &Value,
     prefix: Option<&str>,
@@ -760,9 +805,9 @@ pub(crate) fn case_files(corpus: &Path, case: &Value) -> Result<Vec<PathBuf>, St
     Ok(files)
 }
 
-fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
+pub(crate) fn save_checkpoint(path: &Path, value: &Value) -> Result<(), String> {
     let temporary = path.with_extension("tmp");
-    write_json(&temporary, value)?;
+    json::write(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| format!("{}: {e}", path.display()))
 }
 
@@ -926,12 +971,20 @@ fn reserve_case_outputs(output: &Path, cases: &[Value]) -> Result<(), String> {
 /// Run the report; returns 0 for matching parity, 1 for a failed case and 2
 /// when required acceptance was withheld.
 pub fn run(root: &Path, options: &Options) -> Result<i32, String> {
+    run_with_inputs(root, options, None)
+}
+
+pub(crate) fn run_with_inputs(
+    root: &Path,
+    options: &Options,
+    optional: Option<&crate::test_skips::ParityInputs>,
+) -> Result<i32, String> {
     create_output(&options.output)?;
     match gate_key(root, options, &[])? {
         Some(key) => reuse::step(root, &options.output, &key, options.full, || {
             collect(root, options, None)
         }),
-        None => collect(root, options, None),
+        None => collect_with_inputs(root, options, None, optional),
     }
 }
 
@@ -950,8 +1003,8 @@ pub(crate) fn gate_key(
         (false, true) => "report --memory",
         (true, true) => "report --benchmark --memory",
     };
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
-    let contract = read_json(&options.contract)?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
+    let contract = json::read(&options.contract)?;
     let (manifest, _) = super::manifest::read(root, &options.manifest)?;
     let (media, native) = validation::current_workers(root, &identity)?;
     let candidate = match s(&contract, "candidate").unwrap_or("media-worker") {
@@ -1006,7 +1059,6 @@ pub(crate) fn gate_key(
     let shared = [
         "harness/fate/index.json",
         "harness/fate/map.json",
-        "harness/module-gates.json",
         "harness/comparison-rules.json",
     ]
     .map(|path| root.join(path));
@@ -1028,12 +1080,21 @@ pub(crate) fn collect(
     options: &Options,
     controls: Option<&Value>,
 ) -> Result<i32, String> {
+    collect_with_inputs(root, options, controls, None)
+}
+
+fn collect_with_inputs(
+    root: &Path,
+    options: &Options,
+    controls: Option<&Value>,
+    optional: Option<&crate::test_skips::ParityInputs>,
+) -> Result<i32, String> {
     if options.baseline_worker.is_some()
         && (options.require_acceptance || options.require_slice_acceptance)
     {
         return Err("a baseline comparison is not an acceptance run".into());
     }
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let pinned = gate_build::pinned_release(root)?;
     println!("{}", gate_build::describe(&identity, &pinned));
     let refusals = gate_build::identity_refusals(root, &identity, &pinned);
@@ -1041,7 +1102,7 @@ pub(crate) fn collect(
         return Err(format!("not the gate build: {}", refusals.join("; ")));
     }
     let (candidate, native) = validation::current_workers(root, &identity)?;
-    let contract = read_json(&options.contract)?;
+    let contract = json::read(&options.contract)?;
     let work_fields = super::comparison::work_fields(&contract)?;
     let timeout = worker::contract_timeout(&contract)?;
     let parity_timeout = worker::contract_parity_timeout(&contract)?;
@@ -1056,19 +1117,22 @@ pub(crate) fn collect(
     // Workers that take one input per operation and print one fold: the contract
     // names the mode prefix, and each case may add arguments after the input.
     let worker_operation = s(&contract, "worker_operation").map(str::to_owned);
+    let reference_prefix = reference_prefix(&contract)?;
     let iterations = options.iterations(&contract);
     if (options.require_acceptance || options.require_slice_acceptance)
         && !validation::iterations_valid(&contract, &Value::int(iterations))
     {
         return Err("qualification iterations do not match the contract".into());
     }
-    let contract_sha = digest(&options.contract)?;
+    let contract_sha = crate::files::sha256(&options.contract)?;
     let (manifest, manifest_sha) = super::manifest::read(root, &options.manifest)?;
-    let open = open_cases(&contract, &manifest, &gate_target()?)?;
+    let target = gate_target()?;
+    let listed = open(&contract, &manifest, &target)?;
+    let unmeasured = super::bounds::Unmeasured::read(&contract, &manifest, &target)?;
     let contract_id = s(&contract, "id").map(str::to_owned);
     let mut additional = Vec::new();
     for path in &options.additional_reports {
-        let receipt = read_json(path)?;
+        let receipt = json::read(path)?;
         let fresh = receipt
             .get("identity")
             .is_some_and(|i| super::diff::equal(i, &identity))
@@ -1083,11 +1147,10 @@ pub(crate) fn collect(
         let samples = options.output.join("measurements");
         fs::create_dir(&samples).map_err(|e| format!("{}: {e}", samples.display()))?;
     }
-    let target = gate_target()?;
     let coverage = fate_coverage(
         root,
-        &read_json(&root.join("harness/fate/index.json"))?,
-        &read_json(&root.join("harness/fate/map.json"))?,
+        &json::read(&root.join("harness/fate/index.json"))?,
+        &json::read(&root.join("harness/fate/map.json"))?,
         options.fate_cache.as_deref(),
     )?;
     let mut base = vec![
@@ -1152,7 +1215,8 @@ pub(crate) fn collect(
     let (timing_pairs, memory_pairs) = match options.baseline_worker {
         None => (
             Pairs::gate(options.pairs, Runtime::load(root)?.ceiling).early_stop(options.early_stop),
-            Pairs::gate(planned_memory, super::memory::CEILING).early_stop(options.early_stop),
+            Pairs::gate(planned_memory, Memory::load(root)?.ceiling())
+                .early_stop(options.early_stop),
         ),
         Some(_) => (Pairs::fixed(options.pairs), Pairs::fixed(planned_memory)),
     };
@@ -1181,7 +1245,10 @@ pub(crate) fn collect(
             ));
         }
         let measured = root.join(s(&selected.measured, "path").unwrap_or_default());
-        if (options.benchmark || options.memory) && options.baseline_worker.is_none() {
+        if ((options.benchmark && !unmeasured.skips(&id, "timing"))
+            || (options.memory && !unmeasured.skips(&id, "memory")))
+            && options.baseline_worker.is_none()
+        {
             super::comparison::measurable(&selected.measured)?;
         }
         let file = s(case, "file").unwrap_or_default();
@@ -1193,9 +1260,15 @@ pub(crate) fn collect(
             return Err("input escapes corpus".into());
         }
         let sha = s(case, "sha256").unwrap_or_default();
-        let parity = if !path.is_file() {
+        let skipped = optional
+            .map(|inputs| inputs.skipped(root, &corpus, case))
+            .transpose()?
+            .flatten();
+        let parity = if let Some(skipped) = skipped {
+            skipped
+        } else if !path.is_file() {
             Value::object([("status", Value::str("missing-sample"))])
-        } else if digest(&path)? != sha {
+        } else if crate::files::sha256(&path)? != sha {
             Value::object([("status", Value::str("input-hash-mismatch"))])
         } else if !rights_reviewed(&reviewed, case) {
             Value::object([("status", Value::str("rights-unreviewed"))])
@@ -1224,6 +1297,7 @@ pub(crate) fn collect(
                 path.clone(),
                 Operation {
                     prefix: prefix.clone(),
+                    reference_prefix: reference_prefix.map(str::to_owned),
                     arguments: arguments.clone(),
                     candidate_options: vec![],
                     work: Work {
@@ -1235,15 +1309,34 @@ pub(crate) fn collect(
             ));
             let per_target = crate::generators::pinned_per_target(&contract);
             let expected = expected_for(case, &target);
+            let listing = listed.get(&id).map(|listing| parity::Listing {
+                case: listing,
+                candidate: candidate_expected_for(case, &target),
+            });
+            // A case that compares nothing of the reference has no reference pin,
+            // and is never timed or measured.
+            let candidate_only = listing
+                .as_ref()
+                .is_some_and(|listing| listing.case.candidate_only);
+            if candidate_only {
+                timed = None;
+                if expected.is_some() {
+                    return Err(format!(
+                        "{id}: a refusal, or a case not comparable with the reference, \
+                         pins no reference fold"
+                    ));
+                }
+            }
             let ran = parity::feed_parity(
                 &run,
-                prefix,
+                (prefix, reference_prefix.unwrap_or(prefix)),
                 &arguments,
                 expected.unwrap_or(&Value::Null),
                 &work_fields,
                 per_target,
+                listing,
             )?;
-            if expected.is_some() {
+            if expected.is_some() || candidate_only {
                 ran
             } else {
                 unpinned(ran, &contract, &id, &target)
@@ -1290,6 +1383,7 @@ pub(crate) fn collect(
                 path.clone(),
                 Operation {
                     prefix: prefix.into(),
+                    reference_prefix: None,
                     arguments,
                     candidate_options: vec![],
                     work: Work {
@@ -1299,7 +1393,7 @@ pub(crate) fn collect(
                     timeout,
                 },
             ));
-            if catalogue {
+            let parity = if catalogue {
                 parity::catalogue_parity(&run, true, comparison.as_ref(), content)?
             } else if colour {
                 parity::colour_parity(&run, true, comparison.as_ref(), content)?
@@ -1307,9 +1401,19 @@ pub(crate) fn collect(
                 parity::parity(&run, true, comparison.as_ref(), content, "")?
             } else {
                 parity::seek_parity(&run, true, comparison.as_ref(), content)?
+            };
+            match listed.get(&id) {
+                Some(listing) => unpinned_listed(parity, listing),
+                None => parity,
             }
         };
         match s(&parity, "reason") {
+            Some(reason) if s(&parity, "status") == Some("skipped") => {
+                eprintln!(
+                    "skipped: {} {id}: {reason}",
+                    contract_id.as_deref().unwrap_or_default()
+                );
+            }
             Some(reason) => println!(
                 "{id} {}: {reason}",
                 s(&parity, "status").unwrap_or_default()
@@ -1318,10 +1422,17 @@ pub(crate) fn collect(
         }
         let passed = s(&parity, "status") == Some("pass");
         row.push(("parity", parity));
+        let causes = unmeasured.annotation(&id);
+        if unmeasured.causes(&id).next().is_some() {
+            for (bound, cause) in unmeasured.causes(&id) {
+                println!("{id}: {bound} not measured: {cause}");
+            }
+            row.push(("not_measured", causes));
+        }
         if let (true, Some((measured, input, operation))) = (passed, timed) {
             let reference = options.baseline_worker.clone().unwrap_or(measured);
             let prefix = worker_operation.as_deref();
-            if options.benchmark {
+            if options.benchmark && !unmeasured.skips(&id, "timing") {
                 let timing = measure_pinned(
                     || input_failure(&corpus, case, &input, sha, prefix),
                     || {
@@ -1341,7 +1452,12 @@ pub(crate) fn collect(
                     store_measurement(&options.output, rows.len(), "timing", &timing)?,
                 ));
             }
-            if options.memory {
+            if options.memory && !unmeasured.skips(&id, "memory") {
+                use super::bounds::Bound;
+                let memory_selection = super::memory::Selection::from_deferred(
+                    unmeasured.has(&id, Bound::Heap),
+                    unmeasured.has(&id, Bound::TotalRss),
+                );
                 let index = rows.len();
                 let pinned_refusal =
                     expected_for(case, &target).is_some_and(parity::pins_zero_output_refusal);
@@ -1358,7 +1474,7 @@ pub(crate) fn collect(
                     let memory = measure_pinned(
                         || input_failure(&corpus, case, &input, sha, prefix),
                         || {
-                            super::memory::collect(
+                            super::memory::collect_selected(
                                 slot,
                                 root,
                                 super::memory::WorkerPaths {
@@ -1370,6 +1486,7 @@ pub(crate) fn collect(
                                 memory_pairs,
                                 options.seed,
                                 &operation,
+                                memory_selection,
                                 pinned_refusal,
                             )
                         },
@@ -1380,7 +1497,11 @@ pub(crate) fn collect(
             }
         }
         rows.push(object(row));
-        save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
+        // Workspace parity also runs corpora with thousands of cases. Their
+        // progress is logged per case, so rewrite the accumulated JSON in batches.
+        if optional.is_none() || rows.len().is_multiple_of(64) || rows.len() == cases.len() {
+            save_checkpoint(&options.output.join("partial.json"), &partial(&base, &rows))?;
+        }
     }
     // Every case is timed before any memory runs; memory then fills the CPUs.
     let (indices, jobs): (Vec<usize>, Vec<_>) = memory_jobs.into_iter().unzip();
@@ -1495,7 +1616,7 @@ pub(crate) fn collect(
     if (options.require_slice_acceptance && !slice) || (options.require_acceptance && !accepted) {
         return Ok(2);
     }
-    let parity_matches = ratchet(&label, &rows, &open);
+    let parity_matches = ratchet_with_skips(&label, &rows, &listed, optional.is_some());
     Ok(i32::from(
         !parity_matches || !controls_valid || !identity_valid,
     ))
@@ -1517,79 +1638,178 @@ fn publish_measurements(
     write_observed_case_report(output, &header, rows.iter().map(load_case))
 }
 
-/// A contract's `open_cases` on `target`: case ids that fail today, each tied to
-/// one of its `pending_module_requirements`. An entry with `targets` is open on
-/// those of the contract's `required_targets` only, and must pass elsewhere.
-/// Every id must be a case of the manifest.
-pub(super) fn open_cases(
+/// The candidate's pinned fold of a listed case on `target`: its
+/// `candidate_expected_by_target` entry, or `candidate_expected`.
+pub fn candidate_expected_for<'a>(case: &'a Value, target: &str) -> Option<&'a Value> {
+    case.get("candidate_expected_by_target")
+        .and_then(|pins| pins.get(target))
+        .or_else(|| case.get("candidate_expected"))
+}
+
+/// The ids a contract lists on `target`, in the order its lists name them: every
+/// case whose candidate fold the recorder pins.
+pub(crate) fn open_cases(
     contract: &Value,
     manifest: &Value,
     target: &str,
 ) -> Result<Vec<String>, String> {
-    let list = |value: &Value, key: &str| -> Vec<Value> {
-        value
-            .get(key)
-            .and_then(Value::as_array)
-            .unwrap_or_default()
-            .to_vec()
-    };
-    let pending = list(contract, "pending_module_requirements");
-    let cases = list(manifest, "cases");
-    let mut open = Vec::new();
-    for entry in list(contract, "open_cases") {
-        let (Some(id), Some(requirement)) = (s(&entry, "id"), entry.get("requirement")) else {
-            return Err("an open case needs an id and a requirement".into());
-        };
-        if !pending.contains(requirement) {
-            return Err(format!("open case {id}: its requirement is not pending"));
-        }
-        if !cases.iter().any(|case| s(case, "id") == Some(id)) {
-            return Err(format!("open case {id}: not a case of the manifest"));
-        }
-        if let Some(scope) = entry.get("targets") {
-            let required = list(contract, "required_targets");
-            let scope = scope.as_array().unwrap_or_default();
-            if scope.is_empty() || scope.iter().any(|t| !required.contains(t)) {
-                return Err(format!(
-                    "open case {id}: its targets must be some of the required targets"
-                ));
-            }
-            if !scope.iter().any(|t| t.as_str() == Some(target)) {
-                continue;
-            }
-        }
-        open.push(id.to_owned());
-    }
-    Ok(open)
+    open(contract, manifest, target).map(|listed| listed.ids().to_vec())
 }
 
-/// Prints how many cases pass and which listed open cases still fail. Holds when
-/// every other case passes and every open case still fails: a listed case that
-/// starts to pass must leave the list, so the list only shrinks.
-pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
-    let passed = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("pass");
-    let listed = |row: &Value| open.iter().any(|id| s(row, "id") == Some(id));
+/// The cases `contract` lists as differing from the reference on `target`, among
+/// the cases of `manifest`, and how each is judged ([`super::registry::read`]).
+pub(crate) fn open(contract: &Value, manifest: &Value, target: &str) -> Result<Listed, String> {
+    super::registry::read(contract, manifest, target)
+}
+
+/// The parity status of a listed case whose two complete runs each gave its pinned
+/// fold (the reference's `expected` and the candidate's `candidate_expected`), or,
+/// for a case not comparable with the reference, whose candidate did.
+pub(crate) const LISTED: &str = "listed";
+/// The parity status of a listed case with no candidate pin: it fails, unless the
+/// contract's `open_unpinned` registers why the pin cannot be recorded yet.
+pub(crate) const LISTED_UNPINNED: &str = "listed-unpinned";
+/// The parity status of a listed case whose candidate or reference fold differs
+/// from its pin, or whose candidate no longer names the entry's detail.
+pub(crate) const LISTED_CHANGED: &str = "listed-changed";
+/// The parity status of a listed case one of whose workers exited with an error,
+/// timed out or did not finish: no listed difference holds for it.
+pub(crate) const LISTED_RUN_FAILED: &str = "listed-run-failed";
+
+/// Worker run statuses that end a run without a result.
+const RUN_FAILURES: [&str; 5] = [
+    "worker-error",
+    "worker-failure",
+    "timeout",
+    "invalid-worker-output",
+    "error",
+];
+
+/// The parity of a listed case for a comparison that pins only the reference's
+/// output: [`LISTED_RUN_FAILED`] after a failed run, else [`LISTED_UNPINNED`]; a
+/// passing case keeps its status. The row names the lists that name the case.
+pub(crate) fn unpinned_listed(mut parity: Value, case: &super::registry::Case) -> Value {
+    let status = match s(&parity, "status") {
+        Some("pass") => None,
+        Some(status) if RUN_FAILURES.contains(&status) => Some(LISTED_RUN_FAILED),
+        _ => Some(LISTED_UNPINNED),
+    };
+    if let Value::Object(members) = &mut parity {
+        if let Some(status) = status {
+            members.retain(|(key, _)| key != "status");
+            members.insert(0, ("status".into(), Value::str(status)));
+        }
+        members.push(("listed".into(), Value::strings(case.lists())));
+    }
+    parity
+}
+
+/// Prints how many cases pass and which listed cases differ as listed. Holds when
+/// every other case passes and every listed case holds: a refusal by its proof, any
+/// other as [`LISTED`], or as [`LISTED_UNPINNED`] where `open_unpinned` registers
+/// the missing pin. A listed case that starts to pass must leave its lists, so the
+/// lists only shrink.
+pub(crate) fn ratchet(label: &str, rows: &[Value], listed: &Listed) -> bool {
+    ratchet_with_skips(label, rows, listed, false)
+}
+
+pub(super) fn ratchet_with_skips(
+    label: &str,
+    rows: &[Value],
+    listed: &Listed,
+    allow_skips: bool,
+) -> bool {
+    use super::registry::Form;
+    fn status(row: &Value) -> Option<&str> {
+        row.get("parity").and_then(|p| s(p, "status"))
+    }
+    let passed = |row: &Value| status(row) == Some("pass");
+    let case = |row: &Value| s(row, "id").and_then(|id| listed.get(id));
     let ids = |keep: &dyn Fn(&Value) -> bool| -> Vec<&str> {
         rows.iter()
             .filter(|row| keep(row))
             .filter_map(|row| s(row, "id"))
             .collect()
     };
-    let unpinned = |row: &Value| row.get("parity").and_then(|p| s(p, "status")) == Some("unpinned");
-    let failing = ids(&|row| !passed(row) && !listed(row) && !unpinned(row));
+    let unpinned = |row: &Value| status(row) == Some("unpinned");
+    let skipped = |row: &Value| status(row) == Some("skipped");
+    let missing = |row: &Value| {
+        matches!(
+            status(row),
+            Some("missing-sample" | "missing-entity" | "missing-companion")
+        )
+    };
+    // A refusal whose proof holds: it passes, and counts as a declared refusal.
+    let refused = |row: &Value| {
+        passed(row)
+            && case(row).is_some_and(super::registry::Case::refusal)
+            && row.get("parity").and_then(|proof| s(proof, "comparison"))
+                == Some(super::fold_refusal::COMPARISON)
+    };
+    // A listed case that differs exactly as the registry pins it.
+    let holds = |row: &Value| match (case(row), status(row)) {
+        (Some(case), Some(LISTED)) => !case.refusal(),
+        (Some(case), Some(LISTED_UNPINNED)) => case.unpinned,
+        _ => false,
+    };
+    let closed = |row: &Value| passed(row) && case(row).is_some() && !refused(row);
+    let excused = |row: &Value| unpinned(row) || skipped(row) || missing(row);
+    let failing = ids(&|row| {
+        missing(row)
+            || (skipped(row) && !allow_skips)
+            || match case(row) {
+                Some(_) => !holds(row) && !refused(row) && !closed(row) && !excused(row),
+                None => !passed(row) && !excused(row),
+            }
+    });
     let reported = ids(&unpinned);
-    let still_open = ids(&|row| !passed(row) && listed(row));
-    let closed = ids(&|row| passed(row) && listed(row));
-    println!(
-        "{label}: {} of {} cases pass",
-        rows.iter().filter(|row| passed(row)).count(),
-        rows.len()
-    );
-    if !still_open.is_empty() {
+    let one_sided = ids(&|row| holds(row) && status(row) == Some(LISTED_UNPINNED));
+    let still_listed = ids(&holds);
+    let closed = ids(&closed);
+    let refused = ids(&refused);
+    let passing = rows.iter().filter(|row| passed(row)).count() - refused.len();
+    println!("{label}: {passing} of {} cases pass", rows.len());
+    let skipped = ids(&skipped);
+    if !skipped.is_empty() {
         println!(
-            "{label}: {} open failures, as listed: {}",
-            still_open.len(),
-            still_open.join(", ")
+            "{label}: {} checks did not run for absent inputs; the gate runs them",
+            skipped.len()
+        );
+    }
+    if !refused.is_empty() {
+        println!(
+            "{label}: {} registered refusals: {}",
+            refused.len(),
+            refused.join(", ")
+        );
+    }
+    if !still_listed.is_empty() {
+        let counts: Vec<String> = Form::ALL
+            .into_iter()
+            .filter_map(|form| {
+                let count = still_listed
+                    .iter()
+                    .filter(|id| {
+                        listed
+                            .get(id)
+                            .is_some_and(|case| case.forms.contains(&form))
+                    })
+                    .count();
+                (count > 0).then(|| format!("{} {count}", form.word()))
+            })
+            .collect();
+        println!(
+            "{label}: {} cases differ as listed ({}): {}",
+            still_listed.len(),
+            counts.join(", "),
+            still_listed.join(", ")
+        );
+    }
+    if !one_sided.is_empty() {
+        println!(
+            "{label}: {} listed cases without a candidate pin, as open_unpinned registers: {}",
+            one_sided.len(),
+            one_sided.join(", ")
         );
     }
     if !reported.is_empty() {
@@ -1604,7 +1824,7 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
     }
     if !closed.is_empty() {
         println!(
-            "{label}: listed open cases now pass; remove them from open_cases: {}",
+            "{label}: listed cases now pass; remove them from their lists: {}",
             closed.join(", ")
         );
     }
@@ -1612,685 +1832,7 @@ pub(super) fn ratchet(label: &str, rows: &[Value], open: &[String]) -> bool {
 }
 
 #[cfg(test)]
-mod prefix_tests {
-    use super::{
-        PrefixFeature, entity_input_failure, measure_pinned, open_cases, ratchet, read_json,
-        recorded_corpus, reviewed_inputs, rights_reviewed, s,
-    };
-    use crate::json::{Value, parse};
-    use std::collections::BTreeMap;
-    use std::path::Path;
-
-    #[test]
-    fn ordered_input_hashes_are_checked_before_running_the_workers() {
-        let root = crate::walk::scratch("ordered-input-hashes");
-        std::fs::create_dir_all(&root).unwrap();
-        let input = b"known entity bytes";
-        let hash = crate::sha256::hex(input);
-        let row = format!(
-            r#"{{"file":"first.ts","sha256":"{hash}","arguments":["188","1","next.ts"],
-                 "entities":[{{"file":"first.ts","sha256":"{hash}"}},
-                             {{"file":"next.ts","sha256":"{hash}"}}]}}"#
-        );
-        let case = parse(&row).unwrap();
-        let unpinned = parse(r#"{"arguments":["188","1","next.ts"]}"#).unwrap();
-        assert_eq!(
-            entity_input_failure(&root, &unpinned, Some("ts-")).unwrap_err(),
-            "worker entity argument has no input pin"
-        );
-        let mismatched =
-            parse(&row.replace(r#"["188","1","next.ts"]"#, r#"["188","1","different.ts"]"#))
-                .unwrap();
-        assert_eq!(
-            entity_input_failure(&root, &mismatched, Some("ts-")).unwrap_err(),
-            "ordered entity does not match its worker argument"
-        );
-        assert_eq!(
-            entity_input_failure(&root, &case, Some("ts-")).unwrap(),
-            Some("missing-entity")
-        );
-        std::fs::write(root.join("next.ts"), b"other entity bytes").unwrap();
-        assert_eq!(
-            entity_input_failure(&root, &case, Some("ts-")).unwrap(),
-            Some("entity-hash-mismatch")
-        );
-        std::fs::write(root.join("next.ts"), input).unwrap();
-        assert_eq!(
-            entity_input_failure(&root, &case, Some("ts-")).unwrap(),
-            None
-        );
-        for namespace in ["--dvb", "--atsc"] {
-            let with_namespace = parse(&row.replace(
-                r#"["188","1","next.ts"]"#,
-                &format!(r#"["188","1","{namespace}","next.ts"]"#),
-            ))
-            .unwrap();
-            assert_eq!(
-                entity_input_failure(&root, &with_namespace, Some("ts-")).unwrap(),
-                None
-            );
-        }
-        let measured = measure_pinned(
-            || entity_input_failure(&root, &case, Some("ts-")),
-            || {
-                std::fs::write(root.join("next.ts"), b"changed while measuring").unwrap();
-                Ok(Value::object([("status", Value::str("measured"))]))
-            },
-        )
-        .unwrap();
-        assert_eq!(s(&measured, "status"), Some("entity-hash-mismatch"));
-        assert_eq!(
-            measured
-                .get("invalidated_measurement")
-                .and_then(|v| s(v, "status")),
-            Some("measured")
-        );
-        let measured = std::cell::Cell::new(false);
-        let result = measure_pinned(
-            || {
-                if measured.get() {
-                    Err("input unreadable".into())
-                } else {
-                    Ok(None)
-                }
-            },
-            || {
-                measured.set(true);
-                Ok(Value::object([("status", Value::str("measured"))]))
-            },
-        )
-        .unwrap();
-        assert_eq!(s(&result, "status"), Some("input-check-failed"));
-        assert!(result.get("invalidated_measurement").is_some());
-        std::fs::remove_file(root.join("next.ts")).unwrap();
-        std::fs::remove_dir(root).unwrap();
-    }
-
-    #[test]
-    fn dts_identity_is_a_single_entity_access_unit_option() {
-        let root = Path::new(".");
-        let selected = parse(r#"{"arguments":["188","1","--dvb","--dts-core=256"]}"#).unwrap();
-        assert_eq!(
-            entity_input_failure(root, &selected, Some("ts-au-")).unwrap(),
-            None
-        );
-        assert!(entity_input_failure(root, &selected, Some("ts-")).is_err());
-        for options in [r#""next.ts","--dts-core=256""#, r#""--dts-core=8191""#] {
-            let case = parse(&format!(r#"{{"arguments":["188","1",{options}]}}"#)).unwrap();
-            assert!(entity_input_failure(root, &case, Some("ts-au-")).is_err());
-        }
-    }
-
-    #[test]
-    fn pcr_compatibility_leaves_companion_input_pins_required() {
-        let root = Path::new(".");
-        let selected =
-            parse(r#"{"arguments":["188","1","--dts-core=256","--ignore-pcr-reserved-bits"]}"#)
-                .unwrap();
-        assert_eq!(
-            entity_input_failure(root, &selected, Some("ts-au-")).unwrap(),
-            None
-        );
-        assert!(entity_input_failure(root, &selected, Some("ts-")).is_err());
-        let unpinned =
-            parse(r#"{"arguments":["188","1","next.ts","--ignore-pcr-reserved-bits"]}"#).unwrap();
-        assert!(entity_input_failure(root, &unpinned, Some("ts-au-")).is_err());
-        let probe =
-            parse(r#"{"arguments":["188","1","--probe-dts-core","--ignore-pcr-reserved-bits"]}"#)
-                .unwrap();
-        assert_eq!(
-            entity_input_failure(root, &probe, Some("ts-au-")).unwrap(),
-            None
-        );
-        assert!(entity_input_failure(root, &probe, Some("ts-")).is_err());
-        let unpinned_probe = parse(r#"{"arguments":["188","1","next.ts","--probe-dts-core","--ignore-pcr-reserved-bits"]}"#).unwrap();
-        assert!(entity_input_failure(root, &unpinned_probe, Some("ts-au-")).is_err());
-    }
-
-    #[test]
-    fn unreadable_input_before_memory_keeps_the_completed_timing_row() {
-        let timing = measure_pinned(
-            || Ok(None),
-            || Ok(Value::object([("status", Value::str("measured"))])),
-        )
-        .unwrap();
-        let memory = measure_pinned(
-            || Err("input unreadable".into()),
-            || panic!("memory must not run without a verified input"),
-        )
-        .unwrap();
-        let row = Value::object([("timing", timing), ("memory", memory)]);
-        assert_eq!(
-            row.get("timing").and_then(|v| s(v, "status")),
-            Some("measured")
-        );
-        let memory = row.get("memory").unwrap();
-        assert_eq!(s(memory, "status"), Some("input-check-failed"));
-        assert_eq!(s(memory, "input_error"), Some("input unreadable"));
-    }
-
-    #[test]
-    fn rights_are_synthetic_or_a_recorded_reviewed_licence() {
-        let reviewed = [
-            parse(
-                r#"{"sources": [{"licence": "OFL-1.1", "files": [{"path": "a.ttf", "sha256": "aa"}]}]}"#,
-            )
-            .unwrap(),
-            parse(r#"{"samples": [{"path": "fate/a.ts", "sha256": "cc"}]}"#).unwrap(),
-        ];
-        let case = |text: &str| parse(text).unwrap();
-        assert!(rights_reviewed(
-            &reviewed,
-            &case(r#"{"rights": "authored-synthetic"}"#)
-        ));
-        let font = r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "aa"}"#;
-        assert!(rights_reviewed(&reviewed, &case(font)));
-        let fetched = r#"{"rights": "fetched-not-redistributed", "sha256": "cc"}"#;
-        assert!(rights_reviewed(&reviewed, &case(fetched)));
-        for unreviewed in [
-            r#"{"rights": "fetched-not-redistributed", "sha256": "aa"}"#,
-            r#"{"rights": "fetched-not-redistributed", "source": "fate-suite/a.ts"}"#,
-            r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "cc"}"#,
-            r#"{"rights": "reviewed-licence", "licence": "Apache-2.0", "sha256": "aa"}"#,
-            r#"{"rights": "reviewed-licence", "licence": "OFL-1.1", "sha256": "bb"}"#,
-            r#"{"rights": "reviewed-licence", "sha256": "aa"}"#,
-            r#"{"rights": "OFL-1.1", "licence": "OFL-1.1", "sha256": "aa"}"#,
-            r#"{"sha256": "aa"}"#,
-        ] {
-            assert!(
-                !rights_reviewed(&reviewed, &case(unreviewed)),
-                "{unreviewed}"
-            );
-        }
-    }
-
-    #[test]
-    fn every_subtitle_case_may_be_measured() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let reviewed = reviewed_inputs(root).unwrap();
-        for feature in ["pgs", "dvb", "dvd", "cc", "teletext"] {
-            let path = root.join(format!("harness/features/subtitle-{feature}/corpus.json"));
-            let manifest = read_json(&path).unwrap();
-            for case in manifest.get("cases").and_then(Value::as_array).unwrap() {
-                assert!(
-                    rights_reviewed(&reviewed, case),
-                    "{}",
-                    s(case, "id").unwrap()
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn registered_prefix_features_use_supplied_corpus_directories() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        for (candidate, corpora) in [
-            (
-                "playback-worker",
-                vec![
-                    ("hls-segments", root.join("harness/fixtures/hls")),
-                    ("mp4-range", root.join(".research/mp4-range-fixtures")),
-                    (
-                        "progressive-ts188",
-                        root.join("harness/features/progressive-ts188/inputs"),
-                    ),
-                ],
-            ),
-            (
-                "playback-matroska-worker",
-                vec![(
-                    "matroska-startup-seek",
-                    root.join(".research/startup-seek-fixtures"),
-                )],
-            ),
-        ] {
-            let mut corpora: BTreeMap<String, std::path::PathBuf> = corpora
-                .into_iter()
-                .map(|(id, directory)| (id.to_owned(), directory))
-                .collect();
-            let features = PrefixFeature::registered(root, candidate, &corpora).unwrap();
-            for (id, directory) in &corpora {
-                let feature = features.iter().find(|feature| feature.id == *id).unwrap();
-                assert_eq!(&feature.corpus, directory);
-                assert!(!feature.cases.is_empty());
-            }
-            corpora.insert("unused".to_owned(), root.to_path_buf());
-            assert!(
-                PrefixFeature::registered(root, candidate, &corpora)
-                    .err()
-                    .unwrap()
-                    .contains("no registered prefix feature unused")
-            );
-        }
-    }
-
-    #[test]
-    fn dvd_palette_options_use_the_selected_corpus_and_keep_absence() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let manifest = read_json(&root.join("harness/features/subtitle-dvd/corpus.json")).unwrap();
-        let cases = manifest.get("cases").and_then(Value::as_array).unwrap();
-        let case = |id| cases.iter().find(|case| s(case, "id") == Some(id)).unwrap();
-        let scratch = crate::walk::scratch("dvd-ifo");
-        let corpus = scratch.join("relocated");
-        std::fs::create_dir_all(corpus.join("dvd")).unwrap();
-        let resolve = |id| {
-            let case = case(id);
-            super::resolved_case_arguments(&corpus, case, super::case_arguments(case))
-        };
-        let palette = corpus.join("dvd/VTS_01_0.IFO");
-        std::fs::write(&palette, b"palette").unwrap();
-        let arguments = resolve("vobsub-ifo-palette-vts").unwrap();
-        assert_eq!(
-            arguments[1],
-            format!("opt:ifo_palette={}", palette.display()).as_str()
-        );
-
-        let missing = corpus.join("dvd/VTS_99_0.IFO");
-        let arguments = resolve("vobsub-ifo-palette-missing").unwrap();
-        assert_eq!(
-            arguments[1],
-            format!("opt:ifo_palette={}", missing.display()).as_str()
-        );
-        std::fs::write(&missing, b"unexpected palette").unwrap();
-        assert_eq!(
-            resolve("vobsub-ifo-palette-missing").unwrap_err(),
-            "IFO palette input has no pin: dvd/VTS_99_0.IFO"
-        );
-        std::fs::remove_dir_all(scratch).unwrap();
-    }
-
-    #[test]
-    fn the_font_features_are_registered_prefix_features() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let features = PrefixFeature::registered(root, "font-worker", &BTreeMap::new()).unwrap();
-        let found: Vec<(&str, &str, usize)> = features
-            .iter()
-            .map(|f| (f.id.as_str(), f.prefix.as_str(), f.cases.len()))
-            .collect();
-        assert_eq!(
-            found,
-            [
-                ("font-hinting-default", "font-sized-", 159),
-                ("font-hinting-modes", "font-sized-", 954),
-                ("font-hinting-none", "font-sized-", 159),
-                ("font-outlines", "font-", 53),
-            ]
-        );
-        let reviewed = reviewed_inputs(root).unwrap();
-        for feature in &features {
-            assert_eq!(feature.corpus, root.join(".research/fonts/files"));
-            assert!(
-                feature
-                    .cases
-                    .iter()
-                    .all(|case| rights_reviewed(&reviewed, case))
-            );
-        }
-        assert!(
-            features[0]
-                .input(&parse(r#"{"file": "../x.ttf"}"#).unwrap())
-                .is_err()
-        );
-        assert_eq!(recorded_corpus(root, &Value::Object(vec![])), None);
-    }
-
-    #[test]
-    fn open_cases_only_shrink() {
-        let rows = |pass: &[(&str, bool)]| -> Vec<Value> {
-            pass.iter()
-                .map(|(id, ok)| {
-                    let status = if *ok { "pass" } else { "mismatch" };
-                    parse(&format!(
-                        r#"{{"id": "{id}", "parity": {{"status": "{status}"}}}}"#
-                    ))
-                    .unwrap()
-                })
-                .collect()
-        };
-        let open = vec!["b".to_owned()];
-        assert!(ratchet("f", &rows(&[("a", true), ("b", false)]), &open));
-        assert!(
-            !ratchet("f", &rows(&[("a", false), ("b", false)]), &open),
-            "unlisted failure"
-        );
-        assert!(
-            !ratchet("f", &rows(&[("a", true), ("b", true)]), &open),
-            "listed case passes"
-        );
-        assert!(ratchet("f", &rows(&[("a", true)]), &[]));
-        let contract = |requirement: &str| {
-            parse(&format!(
-                r#"{{"pending_module_requirements": ["x"], "open_cases": [{{"id": "b", "requirement": "{requirement}"}}]}}"#
-            ))
-            .unwrap()
-        };
-        let manifest = parse(r#"{"cases": [{"id": "a"}, {"id": "b"}]}"#).unwrap();
-        assert_eq!(open_cases(&contract("x"), &manifest, "t").unwrap(), open);
-        assert!(
-            open_cases(&contract("y"), &manifest, "t").is_err(),
-            "requirement not pending"
-        );
-        let other = parse(r#"{"cases": [{"id": "a"}]}"#).unwrap();
-        assert!(
-            open_cases(&contract("x"), &other, "t").is_err(),
-            "unknown case"
-        );
-        // An open case scoped to targets is open there only.
-        let scoped = |targets: &str| {
-            parse(&format!(
-                r#"{{"required_targets": ["t", "u"], "pending_module_requirements": ["x"],
-                    "open_cases": [{{"id": "b", "requirement": "x", "targets": {targets}}}]}}"#
-            ))
-            .unwrap()
-        };
-        assert_eq!(
-            open_cases(&scoped(r#"["t"]"#), &manifest, "t").unwrap(),
-            open
-        );
-        assert!(
-            open_cases(&scoped(r#"["t"]"#), &manifest, "u")
-                .unwrap()
-                .is_empty()
-        );
-        for wrong in ["[]", r#"["v"]"#] {
-            assert!(
-                open_cases(&scoped(wrong), &manifest, "t").is_err(),
-                "{wrong}"
-            );
-        }
-    }
-}
+mod prefix_tests;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
-
-    #[test]
-    fn only_the_listed_targets_qualify() {
-        assert_eq!(
-            qualified("thumbv7neon-unknown-linux-gnueabihf"),
-            "thumbv7neon-unknown-linux-gnueabihf"
-        );
-        for other in [
-            "arm-unknown-linux-gnueabihf",
-            "armv6-unknown-linux-gnueabihf",
-            "armv7-unknown-linux-gnueabihf",
-            "aarch64-unknown-linux-musl",
-        ] {
-            assert_eq!(qualified(other), format!("unqualified-{other}"));
-        }
-        let host = gate_target().unwrap();
-        assert!(
-            QUALIFIED_TARGETS.contains(&host.as_str()) || host.starts_with("unqualified-"),
-            "{host}"
-        );
-    }
-
-    struct Output(PathBuf);
-
-    impl Output {
-        fn new() -> Self {
-            static NEXT: AtomicU64 = AtomicU64::new(0);
-            let path = std::env::temp_dir().join(format!(
-                "triergon-case-report-{}-{}",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed)
-            ));
-            fs::create_dir(&path).unwrap();
-            Self(path)
-        }
-    }
-
-    impl Drop for Output {
-        fn drop(&mut self) {
-            let _ = fs::remove_dir_all(&self.0);
-        }
-    }
-
-    #[test]
-    fn measured_checkpoint_keeps_samples_separate_and_checks_their_digest() {
-        let output = Output::new();
-        fs::create_dir(output.0.join("measurements")).unwrap();
-        let timing = json::parse_strict(
-            r#"{"ratio":{"upper_95":1.01234567890123456789},"samples":[18446744073709551615]}"#,
-        )
-        .unwrap();
-        let memory = json::parse_observations(
-            r#"{"status":"invalid-memory-work","samples":[{"reference_rss":9007199254740993,"candidate_heap":NaN}]}"#,
-        )
-        .unwrap();
-        let row = Value::object([
-            ("id", Value::str("sample")),
-            (
-                "timing",
-                store_measurement(&output.0, 0, "timing", &timing).unwrap(),
-            ),
-            (
-                "memory",
-                store_measurement(&output.0, 0, "memory", &memory).unwrap(),
-            ),
-        ]);
-        let checkpoint = Value::object([
-            ("collection_status", Value::str("partial")),
-            ("case_storage", Value::str("sha256-files")),
-            ("cases", Value::Array(vec![row.clone()])),
-        ]);
-        let path = output.0.join("partial.json");
-        save_checkpoint(&path, &checkpoint).unwrap();
-        let text = fs::read_to_string(path).unwrap();
-        assert!(!text.contains("samples"));
-        assert!(!output.0.join("report.json").exists());
-        let expanded = validation::expand_measurements(&output.0, &row).unwrap();
-        assert_eq!(
-            json::canonical(expanded.get("timing").unwrap()),
-            json::canonical(&timing)
-        );
-        let memory = json::observations(&memory);
-        assert_eq!(json::observations(expanded.get("memory").unwrap()), memory);
-        let inline = output.0.join("inline");
-        create_output(&inline).unwrap();
-        stream_report(
-            &inline,
-            &Value::Object(Vec::new()),
-            [Ok(expanded)].into_iter(),
-            false,
-        )
-        .unwrap();
-        assert!(
-            fs::read_to_string(inline.join("report.json"))
-                .unwrap()
-                .contains(&memory)
-        );
-        assert!(store_measurement(&output.0, 0, "memory", &timing).is_err());
-        fs::write(output.0.join("measurements/0000-memory.json"), b"{}\n").unwrap();
-        assert!(
-            validation::expand_measurements(&output.0, &row)
-                .unwrap_err()
-                .contains("raw measurement changed")
-        );
-    }
-
-    #[test]
-    fn case_report_preserves_raw_rows_and_number_precision() {
-        let output = Output::new();
-        let header = Value::object([
-            (
-                "z",
-                Value::object([("b", Value::int(2)), ("a", Value::int(1))]),
-            ),
-            ("cases", Value::strings(["replace this value"])),
-            ("a", Value::str("complete")),
-        ]);
-        let raw = [
-            r#"{"id":"one","timing":{"samples":[{"digest":18446744073709551615,"elapsed_ns":9007199254740993,"ratio":0.123456789012345678901234567890}]}}"#,
-            r#"{"id":"two","memory":{"samples":[{"low":-170141183460469231731687303715884105728,"bytes":170141183460469231731687303715884105727}]},"proof":{"valid":true,"source":"input"}}"#,
-        ];
-        write_case_report(
-            &output.0,
-            &header,
-            raw.iter()
-                .map(|text| json::parse_strict(text).map_err(|error| error.to_string())),
-        )
-        .unwrap();
-        let expected = Value::object([
-            ("z", header.get("z").unwrap().clone()),
-            ("a", Value::str("complete")),
-            (
-                "cases",
-                Value::Array(
-                    raw.iter()
-                        .map(|text| json::parse_strict(text).unwrap())
-                        .collect(),
-                ),
-            ),
-        ]);
-        let text = fs::read_to_string(output.0.join("report.json")).unwrap();
-        assert_eq!(text, format!("{}\n", json::canonical(&expected)));
-        for number in [
-            "18446744073709551615",
-            "9007199254740993",
-            "0.123456789012345678901234567890",
-            "-170141183460469231731687303715884105728",
-        ] {
-            assert!(text.contains(number));
-        }
-        assert!(!output.0.join("report.json.tmp").exists());
-    }
-
-    #[test]
-    fn case_report_iteration_failure_is_not_published() {
-        let output = Output::new();
-        let rows = [Ok(Value::int(1)), Err("raw case unavailable".to_owned())]
-            .into_iter()
-            .chain(std::iter::once_with(|| {
-                panic!("iteration continued after error")
-            }));
-        let error = write_case_report(&output.0, &Value::Object(Vec::new()), rows).unwrap_err();
-        assert!(error.contains("raw case unavailable"));
-        assert!(!output.0.join("report.json").exists());
-        assert!(!output.0.join("report.json.tmp").exists());
-    }
-
-    #[test]
-    fn parity_only_cannot_overwrite_a_measured_report() {
-        let parent = Output::new();
-        let output = parent.0.join("run");
-        create_output(&output).unwrap();
-        let path = output.join("partial.json");
-        fs::write(&path, "measurement checkpoint").unwrap();
-        let options = Options {
-            output,
-            ..Options::defaults(&parent.0)
-        };
-        assert!(
-            run(&parent.0, &options)
-                .unwrap_err()
-                .contains("use a new output directory")
-        );
-        assert_eq!(fs::read_to_string(path).unwrap(), "measurement checkpoint");
-    }
-
-    #[test]
-    fn case_report_keeps_existing_destination() {
-        let output = Output::new();
-        let destination = output.0.join("report.json");
-        fs::write(&destination, b"existing report\n").unwrap();
-        assert!(
-            write_case_report(
-                &output.0,
-                &Value::object([("schema", Value::int(1))]),
-                std::iter::once(Ok(Value::int(2))),
-            )
-            .is_err()
-        );
-        assert_eq!(fs::read(&destination).unwrap(), b"existing report\n");
-        assert!(!output.0.join("report.json.tmp").exists());
-    }
-
-    #[test]
-    fn complete_json_keeps_existing_destination() {
-        let output = Output::new();
-        let destination = output.0.join("report.json");
-        fs::write(&destination, b"existing grade\n").unwrap();
-        assert!(publish_json(&destination, "{}\n").is_err());
-        assert_eq!(fs::read(&destination).unwrap(), b"existing grade\n");
-        assert!(!output.0.join("report.json.tmp").exists());
-    }
-
-    #[test]
-    fn case_output_keeps_existing_nested_traces() {
-        let output = Output::new();
-        let nested = output.0.join("nested/case");
-        create_output(&nested).unwrap();
-        let trace = nested.join("progressive-fold.json");
-        fs::write(&trace, b"existing trace\n").unwrap();
-        for id in ["nested/case", "../outside"] {
-            let case = Value::object([("id", Value::str(id))]);
-            assert!(reserve_case_outputs(&output.0, &[case]).is_err());
-        }
-        assert_eq!(fs::read(&trace).unwrap(), b"existing trace\n");
-    }
-
-    #[test]
-    fn case_outputs_reserve_nested_cases_in_either_order() {
-        for child in ["nested/child", "Nested/child"] {
-            for ids in [[child, "nested"], ["nested", child]] {
-                let output = Output::new();
-                let cases = ids.map(|id| Value::object([("id", Value::str(id))]));
-                reserve_case_outputs(&output.0, &cases).unwrap();
-                assert!(output.0.join(child).is_dir());
-            }
-        }
-    }
-
-    #[test]
-    fn case_report_keeps_existing_temporary_file() {
-        let output = Output::new();
-        let temporary = output.0.join("report.json.tmp");
-        fs::write(&temporary, b"in progress\n").unwrap();
-        assert!(
-            write_case_report(
-                &output.0,
-                &Value::object([("schema", Value::int(1))]),
-                std::iter::empty(),
-            )
-            .is_err()
-        );
-        assert_eq!(fs::read(&temporary).unwrap(), b"in progress\n");
-        assert!(!output.0.join("report.json").exists());
-    }
-
-    #[test]
-    fn final_validation_failures_are_written_in_both_report_forms() {
-        let output = Output::new();
-        let mut proof = Value::object([
-            ("passed", Value::Bool(true)),
-            ("path", Value::str("controls/report.json")),
-        ]);
-        reject_controls(&mut proof, "functional control proof hash mismatch").unwrap();
-        let header = Value::object([
-            ("functional_controls", proof),
-            (
-                "summary",
-                Value::object([("source_and_workers_unchanged", Value::Bool(false))]),
-            ),
-        ]);
-        publish_measurements(&output.0, header, &[Value::int(1)], |case| Ok(case.clone())).unwrap();
-        for name in ["collection.json", "report.json"] {
-            let report = read_json(&output.0.join(name)).unwrap();
-            assert_eq!(
-                report
-                    .get("summary")
-                    .and_then(|summary| summary.get("source_and_workers_unchanged")),
-                Some(&Value::Bool(false))
-            );
-            let proof = report.get("functional_controls").unwrap();
-            assert_eq!(proof.get("passed"), Some(&Value::Bool(false)));
-            assert_eq!(
-                s(proof, "error"),
-                Some("functional control proof hash mismatch")
-            );
-        }
-    }
-}
+mod tests;

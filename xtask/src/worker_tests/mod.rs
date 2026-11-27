@@ -42,6 +42,10 @@ struct Test {
 
 const TESTS: &[Test] = &[
     Test {
+        name: "dts::packed_and_canonical_pcm",
+        run: |cx| crate::framing_views::dts::verify_decode_pins(cx.root),
+    },
+    Test {
         name: "transport::ordered_reference_entities",
         run: |cx| crate::harness::build::test_transport_entities(cx.root),
     },
@@ -94,8 +98,8 @@ const TESTS: &[Test] = &[
         run: header::header_encoding_does_not_rewrite_source_timing,
     },
     Test {
-        name: "mp4_range::opus_recovery_refuses_invalid_roll_maps",
-        run: mp4_range::opus_recovery_refuses_invalid_roll_maps,
+        name: "mp4_range::opus_recovery_checks_roll_maps",
+        run: mp4_range::opus_recovery_checks_roll_maps,
     },
     Test {
         name: "reference_encodings::combined_private_scope_is_an_explicit_unsupported_reference_case",
@@ -402,8 +406,7 @@ pub fn items<'v>(value: &'v Value, key: &str) -> Result<&'v [Value], String> {
 
 /// The `cases` of a feature corpus manifest.
 pub fn corpus_cases(root: &Path, feature: &str) -> Result<Vec<Value>, String> {
-    let manifest =
-        crate::checks::read_json(&root.join(format!("harness/features/{feature}/corpus.json")))?;
+    let manifest = json::read(&root.join(format!("harness/features/{feature}/corpus.json")))?;
     Ok(items(&manifest, "cases")?.to_vec())
 }
 

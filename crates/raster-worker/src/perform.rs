@@ -4,13 +4,14 @@
 use std::io;
 
 use triergon_core::{Budget, Error, Result as CoreResult, WorkBudget};
-use triergon_raster::{
-    Bitmap, Border, Clip, ClipFrame, Colour, Effects, FrameScale, GlyphBitmaps, GlyphRequest,
-    Limits, OUTLINE_MAX, Outline, Pen, Placement, Raster, Rect, Run, Shadow, Shape, Vector,
+use triergon_raster::compat::libass::{
+    Border, Clip, ClipFrame, Colour, Composite, Effects, FrameScale, GlyphBitmaps, GlyphRequest,
+    Placement, Run, Shadow,
 };
+use triergon_raster::{Bitmap, Limits, OUTLINE_MAX, Outline, Pen, Raster, Rect, Shape, Vector};
 
 use crate::case::{Case, Glyph, Random, RunCase, Source};
-use crate::record::{Kind, Sink};
+use crate::record::{Kind, Values};
 
 /// Status values of a record. The first three are the reference's: the source
 /// or parameters are invalid, the operation succeeded, or it failed as libass
@@ -87,7 +88,8 @@ impl<'g> Runner<'g> {
         Ok(outline)
     }
 
-    pub fn perform(&mut self, case: Option<&Case>, sink: &mut impl Sink) -> io::Result<()> {
+    // One function on purpose: one arm per case kind of `harness/reference_raster.h`, inside the timed loop; a split is a hot-path change not yet measured.
+    pub fn perform(&mut self, case: Option<&Case>, sink: &mut impl Values) -> io::Result<()> {
         self.work = WorkBudget::new(CASE_WORK);
         let Some(case) = case else {
             sink.begin(Kind::Unparsed)?;
@@ -98,22 +100,22 @@ impl<'g> Runner<'g> {
                 sink.begin(Kind::Convert)?;
                 match self.convert(source) {
                     Ok(outline) => {
-                        sink.value(OK)?;
+                        sink.int(OK)?;
                         sink.outline(&outline)?;
                     }
-                    Err(error) => sink.value(unconverted(&error))?,
+                    Err(error) => sink.int(unconverted(&error))?,
                 }
             }
             Case::Rotate(offset, source) => {
                 sink.begin(Kind::Rotate)?;
                 match self.convert(source) {
-                    Err(error) => sink.value(unconverted(&error))?,
+                    Err(error) => sink.int(unconverted(&error))?,
                     Ok(mut outline) => match outline.rotate_90(*offset) {
                         Ok(()) => {
-                            sink.value(OK)?;
+                            sink.int(OK)?;
                             sink.outline(&outline)?;
                         }
-                        Err(error) => sink.value(refused(&error))?,
+                        Err(error) => sink.int(refused(&error))?,
                     },
                 }
             }
@@ -126,17 +128,17 @@ impl<'g> Runner<'g> {
                 let outline = match self.convert(source) {
                     Ok(outline) => outline,
                     Err(error) => {
-                        sink.value(unconverted(&error))?;
+                        sink.int(unconverted(&error))?;
                         return sink.end();
                     }
                 };
                 let mut out = Outline::new(&self.budget);
                 match outline.transform_into(m, *projection, &mut out) {
                     Ok(()) => {
-                        sink.value(OK)?;
+                        sink.int(OK)?;
                         sink.outline(&out)?;
                     }
-                    Err(error) => sink.value(refused(&error))?,
+                    Err(error) => sink.int(refused(&error))?,
                 }
             }
             Case::Raster(projection, m, sources) => {
@@ -146,7 +148,7 @@ impl<'g> Runner<'g> {
                     let outline = match self.convert(source) {
                         Ok(outline) => outline,
                         Err(error) => {
-                            sink.value(unconverted(&error))?;
+                            sink.int(unconverted(&error))?;
                             return sink.end();
                         }
                     };
@@ -156,7 +158,7 @@ impl<'g> Runner<'g> {
                     match outline.transform_into(m, *projection, &mut out) {
                         Ok(()) | Err(Error::Invalid(_)) => {}
                         Err(error) => {
-                            sink.value(refused(&error))?;
+                            sink.int(refused(&error))?;
                             return sink.end();
                         }
                     }
@@ -256,15 +258,15 @@ impl<'g> Runner<'g> {
     /// refusal; libass draws every one.
     fn result(
         &mut self,
-        sink: &mut impl Sink,
+        sink: &mut impl Values,
         operation: impl FnOnce(&mut Self) -> CoreResult<Option<Bitmap>>,
     ) -> io::Result<()> {
         match operation(self) {
             Ok(bitmap) => {
-                sink.value(OK)?;
+                sink.int(OK)?;
                 sink.bitmap(bitmap.as_ref())
             }
-            Err(error) => sink.value(refused(&error)),
+            Err(error) => sink.int(refused(&error)),
         }
     }
 
@@ -277,15 +279,15 @@ impl<'g> Runner<'g> {
         width: Vector,
         tolerance: i32,
         source: &Source,
-        sink: &mut impl Sink,
+        sink: &mut impl Values,
     ) -> io::Result<()> {
         let radius = width.x.max(width.y);
         let outline = match self.convert(source) {
             Ok(outline) => outline,
-            Err(error) => return sink.value(unconverted(&error)),
+            Err(error) => return sink.int(unconverted(&error)),
         };
         if !(tolerance >= 1 && radius >= tolerance && radius <= OUTLINE_MAX) {
-            return sink.value(INVALID);
+            return sink.int(INVALID);
         }
         let pen = Pen { width, tolerance };
         let mut border = Shape::new(&self.budget);
@@ -294,19 +296,19 @@ impl<'g> Runner<'g> {
             .stroke(&outline, &pen, &mut border, &mut self.work)
         {
             Ok(()) => {
-                sink.value(OK)?;
+                sink.int(OK)?;
                 let [outer, inner] = border.outlines();
                 sink.outline(outer)?;
                 sink.outline(inner)
             }
-            Err(error) => sink.value(refused(&error)),
+            Err(error) => sink.int(refused(&error)),
         }
     }
 
-    fn clip(&self, bitmap: Random, v: &[i32; 16], sink: &mut impl Sink) -> io::Result<()> {
+    fn clip(&self, bitmap: Random, v: &[i32; 16], sink: &mut impl Values) -> io::Result<()> {
         let mut source = match self.random(bitmap) {
             Ok(source) => source,
-            Err(error) => return sink.value(refused(&error)),
+            Err(error) => return sink.int(refused(&error)),
         };
         source.position = Vector::new(v[0], v[1]);
         let rect = |at: usize| Rect::new(v[at], v[at + 1], v[at + 2], v[at + 3]);
@@ -320,14 +322,14 @@ impl<'g> Runner<'g> {
             content: rect(12),
         };
         let parts = clip.parts(&source, Vector::new(v[2], v[3]), v[4], &frame);
-        sink.value(OK)?;
-        sink.value(parts.len() as i64)?;
+        sink.int(OK)?;
+        sink.int(parts.len() as i64)?;
         for part in parts {
             let colour = match part.colour {
                 Colour::First => 1,
                 Colour::Second => 2,
             };
-            sink.values(&[
+            sink.ints(&[
                 part.position.x.into(),
                 part.position.y.into(),
                 part.source_x as i64,
@@ -344,7 +346,7 @@ impl<'g> Runner<'g> {
     /// x, then the composite's fill, border and shadow. The case's flags are
     /// the style's: an opaque box, a border, a shadow, a shadow and a border
     /// that keep the fill, and `\kf` karaoke.
-    fn run(&mut self, case: &RunCase, sink: &mut impl Sink) -> io::Result<()> {
+    fn run(&mut self, case: &RunCase, sink: &mut impl Values) -> io::Result<()> {
         let bit = |b: u32| case.flags & b != 0;
         let r = &case.reals;
         let frame = FrameScale {
@@ -376,47 +378,46 @@ impl<'g> Runner<'g> {
             be: case.be,
         };
         let mut run = Run::default();
+        let mut leftmost_x = OUTLINE_MAX;
         let mut drawn = Vec::new();
         for glyph in &case.glyphs {
             let outline = match self.convert(&glyph.source) {
                 Ok(outline) => outline,
                 Err(Error::Invalid(_)) => {
-                    sink.value(INVALID)?;
+                    sink.int(INVALID)?;
                     continue;
                 }
-                Err(error) => return sink.value(refused(&error)),
+                Err(error) => return sink.int(refused(&error)),
             };
             let shape = Shape::from_outlines(outline, Outline::new(&self.budget));
             let (gr, gi) = (&glyph.reals, &glyph.ints);
             let glyph_effects = effects([gr[11], gr[12]]);
-            let request = GlyphRequest {
-                shape: &shape,
-                placement: Placement {
-                    rotation: [gr[0], gr[1], gr[2]],
-                    shear: [gr[3], gr[4]],
-                    scale: [gr[5], gr[6]],
-                    outline_scale: [gr[7], gr[8]],
-                    outline_offset: [gr[9], gr[10]],
-                    shift: Vector::new(gi[0], gi[1]),
-                    ascender: gi[2],
-                    descender: gi[3],
-                    position: Vector::new(gi[4], gi[5]),
-                    advance: gi[6].wrapping_add(gi[7]),
-                    scale_fix: gr[13],
-                },
-                frame,
-                effects: &glyph_effects,
-                karaoke: bit(32),
+            let placement = Placement {
+                rotation: [gr[0], gr[1], gr[2]],
+                shear: [gr[3], gr[4]],
+                scale: [gr[5], gr[6]],
+                outline_scale: [gr[7], gr[8]],
+                outline_offset: [gr[9], gr[10]],
+                shift: Vector::new(gi[0], gi[1]),
+                ascender: gi[2],
+                descender: gi[3],
+                position: Vector::new(gi[4], gi[5]),
+                advance: gi[6].wrapping_add(gi[7]),
+                scale_fix: gr[13],
             };
-            let bitmaps = match self.raster.render(&request, &mut run, &mut self.work) {
+            let request = GlyphRequest::new(&shape, &placement, &frame, &glyph_effects);
+            if bit(32) {
+                leftmost_x = shape.outlines()[0].min_transformed_x(request.matrix(), leftmost_x);
+            }
+            let bitmaps = match run.render(&mut self.raster, &request, &mut self.work) {
                 Ok(bitmaps) => bitmaps,
-                Err(error) => return sink.value(refused(&error)),
+                Err(error) => return sink.int(refused(&error)),
             };
-            sink.value(OK)?;
+            sink.int(OK)?;
             let origin = bitmaps
                 .as_ref()
                 .map_or(Vector::default(), GlyphBitmaps::origin);
-            sink.values(&[origin.x.into(), origin.y.into()])?;
+            sink.ints(&[origin.x.into(), origin.y.into()])?;
             // Both bitmaps are recorded against the glyph's origin.
             for placed in [GlyphBitmaps::fill, GlyphBitmaps::border] {
                 let placed = bitmaps.as_ref().and_then(placed);
@@ -424,21 +425,23 @@ impl<'g> Runner<'g> {
             }
             drawn.extend(bitmaps);
         }
-        sink.value(run.leftmost_x().into())?;
+        sink.int(leftmost_x.into())?;
         if drawn.is_empty() {
             for _ in 0..3 {
                 sink.absent()?;
             }
             return Ok(());
         }
-        let composite =
-            match self
-                .raster
-                .compose(&effects([0.0; 2]), &frame, &drawn, &mut self.work)
-            {
-                Ok(composite) => composite,
-                Err(error) => return sink.value(refused(&error)),
-            };
+        let composite = match Composite::new(
+            &mut self.raster,
+            &effects([0.0; 2]),
+            &frame,
+            &drawn,
+            &mut self.work,
+        ) {
+            Ok(composite) => composite,
+            Err(error) => return sink.int(refused(&error)),
+        };
         for bitmap in [&composite.fill, &composite.border, &composite.shadow] {
             sink.bitmap(bitmap.as_ref())?;
         }

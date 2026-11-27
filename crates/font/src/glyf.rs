@@ -50,8 +50,8 @@ fn point(scale: Scale, x: i64, y: i64) -> Result<Point> {
     ))
 }
 
-/// Applies a component matrix as `FT_Outline_Transform` does, after FreeType
-/// widens F2Dot14 to 16.16 by multiplying with 4.
+/// Applies a component matrix, its F2Dot14 coefficients widened to 16.16 by
+/// multiplying with 4 and each product rounded.
 fn transform(points: &mut [OutlinePoint], m: Matrix) -> Result<()> {
     let [xx, yx, xy, yy] = m.map(|v| i64::from(v) * 4);
     for p in points {
@@ -64,7 +64,7 @@ fn transform(points: &mut [OutlinePoint], m: Matrix) -> Result<()> {
 
 /// A component offset at `scale`: in whole font units first, scaled when the
 /// component asks for it by the length of each matrix row (FreeType's reading
-/// of Apple's rule), each product rounded with `FT_MulFix`.
+/// of Apple's rule), each product rounded.
 fn offset(scale: Scale, x: i32, y: i32, scaled: Option<Matrix>) -> (i64, i64) {
     let (x, y) = (i64::from(x), i64::from(y));
     let (x, y) = match scaled {
@@ -270,12 +270,7 @@ impl Glyf {
         };
         let mut r = Reader::new(slice(data, self.glyf.offset + start, end - start)?);
         let contours = r.i16()?;
-        let bounds = Bounds {
-            x_min: r.i16()?,
-            y_min: r.i16()?,
-            x_max: r.i16()?,
-            y_max: r.i16()?,
-        };
+        let bounds = Bounds::read(&mut r)?;
         Ok((contours != 0).then_some((Header { contours, bounds }, r)))
     }
 

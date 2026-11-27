@@ -7,11 +7,12 @@ use triergon_core::{
     Budget, Error, InputCursor, InputWindow, Result, SourceLocation, Step, WorkBudget,
 };
 use triergon_mpegts::compat::pes::{
-    DemuxObserver, DemuxProfile, DemuxScope, MalformedInputCompletion, MalformedSourceDisposition,
+    DemuxObserver, DemuxScope, MalformedInputCompletion, MalformedSourceDisposition,
     NoPacketsConfirmation, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
 use triergon_mpegts::psi::ProgramMap;
-use triergon_mpegts::{FaultKind, PacketFormat, ParseLimits, TraceEvent, TraceFault};
+use triergon_mpegts::stream::{FaultKind, TraceEvent, TraceFault};
+use triergon_mpegts::{PacketFormat, ParseLimits};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) struct Diagnostic {
@@ -153,7 +154,6 @@ fn bind_observer(
         epochs: context.epochs,
     };
     let observer = DemuxObserver::new_registered(
-        DemuxProfile::PesPackets,
         scope,
         RegisteredCarriage::Avc,
         input.budget().clone(),
@@ -170,8 +170,9 @@ mod tests {
     use crate::ts_input::{FIRST_SOURCE, Request};
     use std::sync::atomic::AtomicBool;
     use triergon_core::{Budget, BudgetVec, Bytes, Error, SourceLocation};
+    use triergon_mpegts::PacketFormat;
     use triergon_mpegts::psi::DescriptorNamespace;
-    use triergon_mpegts::{FaultKind, PacketFormat};
+    use triergon_mpegts::stream::FaultKind;
 
     #[test]
     fn a_different_diagnostic_cannot_prove_empty_completion() {

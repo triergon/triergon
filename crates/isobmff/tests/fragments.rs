@@ -1,8 +1,9 @@
-mod common;
+use crate::common;
 use common::{child, fixtures::CASES};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, FragmentBuilder, FragmentContext, ImplicitBase, Limits, SampleStep, Trex,
+    BuildStatus, Limits, Next,
+    fragment::{FragmentBuilder, FragmentContext, ImplicitBase, Trex},
 };
 
 #[test]
@@ -48,9 +49,9 @@ fn sourced_absolute_base_fragments_match_independent_source_facts() {
             for expected in wanted {
                 let actual = loop {
                     match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                        SampleStep::Sample(value) => break value,
-                        SampleStep::Yield => {}
-                        SampleStep::End => panic!(),
+                        Next::Item(value) => break value,
+                        Next::Yield => {}
+                        Next::End => panic!(),
                     }
                 };
                 assert_eq!(actual.ordinal, expected.ordinal);
@@ -67,9 +68,9 @@ fn sourced_absolute_base_fragments_match_independent_source_facts() {
             }
             loop {
                 match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                    SampleStep::End => break,
-                    SampleStep::Yield => {}
-                    SampleStep::Sample(_) => panic!(),
+                    Next::End => break,
+                    Next::Yield => {}
+                    Next::Item(_) => panic!(),
                 }
             }
         }
@@ -110,9 +111,9 @@ fn selected_draft_signed_trun_preserves_frozen_source_and_raw_bits() {
         for wanted in case.samples.iter().filter(|s| s.ordinal >= first).take(3) {
             let source = loop {
                 match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                    SampleStep::Yield => {}
-                    SampleStep::Sample(value) => break value,
-                    SampleStep::End => panic!("missing frozen signed-trun sample"),
+                    Next::Yield => {}
+                    Next::Item(value) => break value,
+                    Next::End => panic!("missing frozen signed-trun sample"),
                 }
             };
             assert_eq!(source.ordinal, wanted.ordinal);
@@ -141,9 +142,9 @@ fn selected_draft_signed_trun_preserves_frozen_source_and_raw_bits() {
         }
         loop {
             match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                SampleStep::Yield => {}
-                SampleStep::End => break,
-                SampleStep::Sample(_) => panic!("extra signed-trun sample"),
+                Next::Yield => {}
+                Next::End => break,
+                Next::Item(_) => panic!("extra signed-trun sample"),
             }
         }
     }
@@ -162,9 +163,10 @@ fn required_moof_relative_fragment_preserves_frozen_source_ranges_and_tfdt() {
         let mut ordinal = 1;
         for moof in top.iter().filter(|b| b.header().kind == *b"moof") {
             let traf = child(moof, b"traf").unwrap();
-            let expected_time =
-                triergon_isobmff::FragmentDecodeTime::parse(child(&traf, b"tfdt").unwrap())
-                    .unwrap();
+            let expected_time = triergon_isobmff::fragment::FragmentDecodeTime::parse(
+                child(&traf, b"tfdt").unwrap(),
+            )
+            .unwrap();
             let mut builder = FragmentBuilder::new(
                 traf.clone(),
                 trex,
@@ -204,12 +206,12 @@ fn required_moof_relative_fragment_preserves_frozen_source_ranges_and_tfdt() {
                 let mut actual = None;
                 for _ in 0..10_000 {
                     match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                        SampleStep::Yield => {}
-                        SampleStep::Sample(sample) => {
+                        Next::Yield => {}
+                        Next::Item(sample) => {
                             actual = Some(sample);
                             break;
                         }
-                        SampleStep::End => panic!("missing frozen source sample"),
+                        Next::End => panic!("missing frozen source sample"),
                     }
                 }
                 let actual = actual.expect("bounded sample cursor must make progress");
@@ -233,12 +235,12 @@ fn required_moof_relative_fragment_preserves_frozen_source_ranges_and_tfdt() {
             let mut ended = false;
             for _ in 0..10_000 {
                 match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                    SampleStep::Yield => {}
-                    SampleStep::End => {
+                    Next::Yield => {}
+                    Next::End => {
                         ended = true;
                         break;
                     }
-                    SampleStep::Sample(_) => panic!("unexpected extra source sample"),
+                    Next::Item(_) => panic!("unexpected extra source sample"),
                 }
             }
             assert!(ended, "bounded sample cursor must reach its declared end");
@@ -251,7 +253,7 @@ fn original_traf(
     budget: &Budget,
     track_id: u32,
     offsets: &[Option<i32>],
-) -> triergon_isobmff::BoxView {
+) -> triergon_isobmff::boxes::BoxView {
     let mut children = Vec::new();
     children.extend_from_slice(&16u32.to_be_bytes());
     children.extend_from_slice(b"tfhd");
@@ -272,7 +274,7 @@ fn original_traf(
         .to_vec();
     raw.extend_from_slice(b"traf");
     raw.extend_from_slice(&children);
-    triergon_isobmff::BoxView::new(common::bytes(budget, &raw), 0).unwrap()
+    triergon_isobmff::boxes::BoxView::new(common::bytes(budget, &raw), 0).unwrap()
 }
 
 fn original_index(
@@ -280,7 +282,7 @@ fn original_index(
     track_id: u32,
     offsets: &[Option<i32>],
     implicit_base: ImplicitBase,
-) -> triergon_isobmff::FragmentIndex {
+) -> triergon_isobmff::fragment::FragmentIndex {
     let mut builder = FragmentBuilder::new(
         original_traf(budget, track_id, offsets),
         Trex {
@@ -313,7 +315,7 @@ fn legacy_implicit_traf_chaining_uses_source_bytes_and_leaves_missing_time_unkno
     assert_eq!(end, (1u64 << 32) + 132);
     let second = original_index(&budget, 2, &[None], ImplicitBase::PreviousTraf(end));
     assert_eq!(second.track_id(), 2);
-    let SampleStep::Sample(sample) = second.cursor().poll(&mut WorkBudget::new(1)).unwrap() else {
+    let Next::Item(sample) = second.cursor().poll(&mut WorkBudget::new(1)).unwrap() else {
         panic!()
     };
     assert_eq!(sample.range, end..end + 4);
@@ -362,7 +364,7 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
                 .filter(|b| b.header().kind == *b"trak")
             {
                 let media = child(track, b"mdia").unwrap();
-                let header = triergon_isobmff::TrackHeader::parse(
+                let header = triergon_isobmff::movie::TrackHeader::parse(
                     &child(track, b"tkhd").unwrap(),
                     &child(&media, b"mdhd").unwrap(),
                     &child(&media, b"hdlr").unwrap(),
@@ -432,12 +434,12 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
                         let mut found = None;
                         for _ in 0..10_000 {
                             match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                                SampleStep::Yield => {}
-                                SampleStep::Sample(value) => {
+                                Next::Yield => {}
+                                Next::Item(value) => {
                                     found = Some(value);
                                     break;
                                 }
-                                SampleStep::End => panic!("missing original source sample"),
+                                Next::End => panic!("missing original source sample"),
                             }
                         }
                         let sample = found.expect("bounded original fragment cursor stalled");
@@ -473,12 +475,12 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
                     let mut ended = false;
                     for _ in 0..10_000 {
                         match cursor.poll(&mut WorkBudget::new(quantum)).unwrap() {
-                            SampleStep::Yield => {}
-                            SampleStep::End => {
+                            Next::Yield => {}
+                            Next::End => {
                                 ended = true;
                                 break;
                             }
-                            SampleStep::Sample(_) => panic!("extra original source sample"),
+                            Next::Item(_) => panic!("extra original source sample"),
                         }
                     }
                     assert!(ended, "bounded original fragment cursor did not finish");
@@ -494,4 +496,33 @@ fn original_modern_fragment_profiles_preserve_facts_and_unknown_clocks() {
         exercised += 1;
     }
     assert_eq!(exercised, 13);
+}
+
+#[test]
+fn a_box_from_another_pool_is_refused_by_the_table_and_fragment_builders() {
+    let case = CASES.iter().find(|c| c.name == "f-explicit").unwrap();
+    let budget = Budget::new(1024 * 1024).unwrap();
+    let other = Budget::new(1024 * 1024).unwrap();
+    let top = common::roots(&budget, case.bytes).unwrap();
+    let movie = top.iter().find(|b| b.header().kind == *b"moov").unwrap();
+    let trex = Trex::parse(&child(&child(movie, b"mvex").unwrap(), b"trex").unwrap()).unwrap();
+    let moof = top.iter().find(|b| b.header().kind == *b"moof").unwrap();
+    let context = FragmentContext {
+        moof_start: moof.header().start,
+        implicit_base: ImplicitBase::FirstTraf,
+        decode_origin: None,
+        first_ordinal: 1,
+        description_count: 1,
+    };
+    let traf = child(moof, b"traf").unwrap();
+    assert_eq!(
+        FragmentBuilder::new(traf, trex, context, other.clone(), Limits::default()).err(),
+        Some(Error::ForeignPool)
+    );
+    let media = child(&child(movie, b"trak").unwrap(), b"mdia").unwrap();
+    let table = child(&child(&media, b"minf").unwrap(), b"stbl").unwrap();
+    assert_eq!(
+        triergon_isobmff::table::SampleTableBuilder::new(table, other, Limits::default()).err(),
+        Some(Error::ForeignPool)
+    );
 }

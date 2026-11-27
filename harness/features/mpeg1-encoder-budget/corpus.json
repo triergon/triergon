@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "aligned",
+      "profile": "aligned",
+      "file": "harness/features/mpeg1-encoder-budget/aligned.txt",
+      "sha256": "19bf9476c3d985731ccd49328a127504a13d083cc714f97b967e7bfd5c4fa4e9",
+      "rights": "authored-synthetic",
+      "expected": {
+        "trace_sha256": "121e76f9ee87df601c908e09a50181826291c7e375fc5237a99ec6682caa3b06"
+      }
+    },
+    {
+      "id": "padded",
+      "profile": "padded",
+      "file": "harness/features/mpeg1-encoder-budget/padded.txt",
+      "sha256": "d897cbcb37bbd52c893a8025269ff33121d8de1dcd900406ab9745cd8369cd40",
+      "rights": "authored-synthetic",
+      "expected": {
+        "trace_sha256": "9150bf451a9106ef899c4bfc7a8078cf2728543f49c31a8555401f0df6f7dd83"
+      }
+    }
+  ]
+}

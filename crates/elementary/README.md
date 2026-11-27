@@ -3,10 +3,14 @@
 Readers for audio elementary streams: native FLAC, MPEG audio (Layer I, II and III,
 with ID3 and APE tags and Xing/Info/VBRI frames), AAC in ADTS, and AC-3/E-AC-3. Each
 is a `triergon_core::container::ContainerReader` with one track and does no I/O;
-`BlockingReader` drives one from `std::io::Read + Seek`.
+`BlockingReader::open` drives one from a sequential `std::io::Read` and
+`open_seekable` enables seeking on `Read + Seek`. The `probe` function selects the
+format from a prefix.
+
+## Usage
 
 ```rust
-use std::io::Cursor;
+use std::sync::atomic::AtomicBool;
 use triergon_core::container::{PacketInfo, TrackInfo};
 use triergon_elementary::{BlockingReader, Limits, MpegAudio};
 
@@ -15,20 +19,29 @@ let mut frame = vec![0xff, 0xfb, 0x90, 0x64];
 frame.resize(417, 0);
 let file = [frame.clone(), frame].concat();
 
-let mut reader = BlockingReader::<MpegAudio, _>::open(Cursor::new(file), Limits::default())?;
-let first = reader.next_packet()?.expect("a frame");
+let cancel = AtomicBool::new(false);
+let mut reader = BlockingReader::<MpegAudio, _>::open(file.as_slice(), Limits::default())?;
+let first = reader.next_packet(&cancel)?.expect("a frame");
 assert_eq!((first.pts(), first.duration()), (Some(0), Some(1152)));
 let track = reader.reader().stream().expect("the track");
 assert_eq!((track.codec_tag(), track.sample_rate()), (b"mp3".as_slice(), 44100));
 # Ok::<(), triergon_core::Error>(())
 ```
 
-## Behaviour
+## Behaviour and limits
+
+The readers follow the packetization of FFmpeg 9.0.2's raw demuxers where the formats
+leave room, including how bytes between frames and incomplete tails are delivered.
+The public API exposes this single packetization policy. Frame headers, sample counts
+and retained metadata follow the format syntax.
 
 All four formats run one frame-stream engine: leading ID3v2 tags, the format's
 opening, a sync confirmed by the frames after it, then access units until a trailing
-ID3v1 or APEv2 tag or the end. Packet times are samples (`1/sample_rate`); every frame
-is a random-access point. Tags are kept as bounded opaque bytes (`Reader::tags`).
+ID3v1 or APEv2 tag or the end. Packet times are samples (`1/sample_rate`). The native
+view leaves DTS absent. Every frame is a random-access point. Tags are kept as bounded
+opaque bytes (`Reader::tags`).
+Tags above the retention limit are kept by offset and length. Every tag entry
+uses the reader's pool, and a full pool pauses the reader until it can retain the entry.
 
 | Format | Frame end | Bytes between frames | Configuration | Codec tag |
 |---|---|---|---|---|
@@ -39,14 +52,19 @@ is a random-access point. Tags are kept as bounded opaque bytes (`Reader::tags`)
 
 A frame cut short by the end of the input is delivered with `Packet::is_complete`
 false, and so are MPEG audio bytes after the last frame, as FFmpeg 9.0.2 delivers them.
+An ADTS stream that goes on with another sampling frequency or ID, a new sequence
+(ISO/IEC 13818-7 section 6.2.1), is read up to its last frame before the change and
+then refused with `Unsupported`: the reader reads one sequence.
 
 FLAC metadata blocks are kept up to the retention limit (PADDING by length only), and
 SEEKTABLE and STREAMINFO are read; a stream whose first block is not STREAMINFO is
 refused, as FFmpeg refuses it. A stream without the `fLaC` marker (joined mid-way)
 starts at the first frame header that a CRC-16-confirmed frame follows, after any bytes
 before it; its track comes from that header and its configuration is empty.
-Fixed-blocking frame numbers count the first frame's block size, or each frame's own
-when STREAMINFO declares a range of sizes, as FFmpeg counts them.
+A frame number counts frames of the first frame's block size (RFC 9639 section 9.1.5). A
+stream whose STREAMINFO declares a range of block sizes while its frames leave the
+blocking strategy bit clear was written before that bit existed, and numbers its frames
+by their first sample, as RFC 9639 Appendix B.1 describes; its frames are timed so.
 
 MPEG audio follows FFmpeg 9.0.2 where the specification leaves room: a first Layer III
 frame with a Xing, Info or VBRI description is not delivered; a LAME tag written by
@@ -58,22 +76,36 @@ Seeking reports a receipt and, through `Reader::last_seek`, whether the landing 
 exact. FLAC bisects by frame header timestamps within the SEEKTABLE interval (or the
 whole file) and reads forward to the frame holding the target. MPEG audio estimates
 from the Xing table of contents or the bit rate (`SeekBasis::Toc`, `SeekBasis::Bitrate`)
-and counts from the start when the estimate falls past the end. ADTS and AC-3 count
+and counts from the start when the jump passes the last frame. After a bit-rate jump,
+if the next confirmed frame estimates past the target, the reader counts from the
+start to land on a complete packet. It keeps the estimated seek basis if the jump
+was at that packet's start and its estimated time agrees with the count. ADTS and AC-3 count
 frames from the start (`SeekMethod::Restart`). A playback seek lands
 `Format::PREROLL` frames early (two for MPEG audio, one for ADTS and AC-3, none for
-FLAC).
-
-## Limits
+FLAC). The receipt sets `replays_from_start` when delivery starts at the first
+audio packet.
 
 `Limits` bounds the largest access unit (4 MiB: a verbatim FLAC frame of 65535 samples
 of eight 32-bit channels is about 2.2 MB), retained tags and metadata (4 MiB in all),
-sync search (1 MiB), input window (64 KiB), SEEKTABLE points (65536) and bisection
-jumps (64). Every input-dependent allocation is charged to the reader's `Budget`;
-exceeding a limit is a typed error.
+sync search (1 MiB), SEEKTABLE points (65536) and bisection jumps (64); `Reader::new`
+takes the largest input window (`BlockingReader` reads 64 KiB). Every input-dependent
+allocation is charged to the reader's `Budget`; exceeding a limit is a typed error. A
+full pool is `Step::Backpressure`, and the step resumes once output is released.
+`BlockingReader` returns it as `Error::Backpressure`. Other step errors persist until reset.
 
-## Differences from FFmpeg
+`probe` names the format a prefix starts, after any ID3v2 tag: native FLAC by its
+marker, MPEG audio, ADTS and AC-3 by two frames from the first byte (the second needs
+only its header), FLAC without its marker by a frame header the next one numbers on
+from. After other bytes, MPEG audio, ADTS and AC-3 need three frames that agree on the
+stream, and FLAC a first frame its CRC-16 confirms. The end of the prefix is never
+taken as the end of the stream: one frame, or one and a second header cut short, is
+`None`, and the readers, which confirm a first frame by the frame after it, do not
+read such a source either.
 
-Packets differ from FFmpeg 9.0.2's (`ffprobe -show_packets`) only where FFmpeg:
+## Conformance
+
+Packets are compared with FFmpeg 9.0.2's (`ffprobe -show_packets`) and differ only
+where FFmpeg:
 
 - delivers a FLAC frame's duration rescaled to the first frame's rate when the rate
   changes, no duration at 768 kHz, and the last frame of a stream with varying block
@@ -91,5 +123,14 @@ Packets differ from FFmpeg 9.0.2's (`ffprobe -show_packets`) only where FFmpeg:
   file, where this reader reports the stream as truncated.
 
 The reviewed differences are in
-[reader-differences.json](../../harness/codecs/reader-differences.json); results in
+[reader-differences.json](../../harness/codecs/reader-differences.json). The
+[media probe comparison](../../harness/features/media-probe/contract.json) checks
+`probe` over four prefix lengths, including ID3v2, marker-less FLAC and prefixes without
+a recognised elementary stream. The
+[track metadata comparison](../../harness/features/elementary-metadata/contract.json)
+checks ADTS and E-AC-3 rates and channel counts against the first physical frame, and
+the [wire comparison](../../harness/features/elementary-metadata-wire/contract.json)
+original FLAC metadata, seek points, frame headers and tag envelopes. The
+[seek comparison](../../harness/codecs/reader-seeks.json) checks each format's
+receipt, landing basis, preroll and packets after the landing. Results are in
 [docs/status.md](../../docs/status.md).

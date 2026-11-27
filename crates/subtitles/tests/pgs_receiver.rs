@@ -1,7 +1,7 @@
 //! The receiver against recorded reference output: every packet of each
 //! fixture in `pgs-receiver-fixtures/` (written by
 //! `harness/subtitles/pgs_fixtures.py` from the pinned FFmpeg build's decoded
-//! subtitles) through one `ReceiverDecoder`, at several work quanta.
+//! subtitles) through one `Decoder`, at several work quanta.
 //!
 //! The fixtures cover what the receiver tolerates: packets refused while the
 //! decoder keeps its state, segments read past their end, rejected canvases,
@@ -12,12 +12,12 @@
 use std::fmt::Write as _;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
-use triergon_subtitles::compat::pgs::ReceiverDecoder;
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Status};
+use triergon_subtitles::pgs::Clock;
 
 struct Fixture {
     forced_only: bool,
-    packets: Vec<(PacketClock, Vec<u8>)>,
+    packets: Vec<(Clock, Vec<u8>)>,
     /// The recorded `refused`, `event` and `rect` lines, in order.
     expected: String,
 }
@@ -48,7 +48,7 @@ fn parse(text: &str) -> Fixture {
         match fields[0] {
             "options" => fixture.forced_only = fields[1] == "forced_only=1",
             "packet" => fixture.packets.push((
-                PacketClock {
+                Clock {
                     pts: clock(fields[1]),
                     dts: clock(fields[2]),
                     timebase,
@@ -70,30 +70,30 @@ fn hex_of(bytes: impl IntoIterator<Item = String>) -> String {
 fn decode(fixture: &Fixture, quantum: u64) -> String {
     let budget = Budget::new(64 << 20).unwrap();
     let cancel = AtomicBool::new(false);
-    let config = DisplayConfig {
-        receiver_forced_only: fixture.forced_only,
+    let config = Options {
+        forced_only: fixture.forced_only,
     };
-    let mut decoder = ReceiverDecoder::new(&budget, DisplayLimits::default(), config).unwrap();
+    let mut decoder = Decoder::new(&budget, config, Limits::default()).unwrap();
     let mut out = String::new();
     for (index, (clock, data)) in fixture.packets.iter().enumerate() {
         if data.is_empty() {
             // An empty packet is a drain call, not a packet to decode.
             continue;
         }
-        let mut raw = Some(Bytes::copy_from_slice(&budget, data).unwrap());
-        decoder.push(&mut raw, *clock, &cancel).unwrap();
+        let raw = Bytes::copy_from_slice(&budget, data).unwrap();
+        decoder.push(raw, clock, &cancel).unwrap();
         let packet = loop {
             let mut work = WorkBudget::new(quantum);
             match decoder.poll(&mut work, &cancel).unwrap() {
-                RecoveryStatus::OutputReady => break decoder.take_output(&cancel).unwrap(),
-                RecoveryStatus::Yield => assert!(work.spent() <= quantum),
+                Status::Ready => break decoder.take_output(&cancel).unwrap(),
+                Status::Yield => assert!(work.spent() <= quantum),
                 status => panic!("packet {index}: {status:?}"),
             }
         };
         if packet.refusal().is_some() {
             writeln!(out, "refused {index}").unwrap();
         }
-        let Some(event) = packet.receiver_output() else {
+        let Some(event) = packet.subtitle() else {
             continue;
         };
         let pts = event.pts_microseconds.map_or("-".into(), |v| v.to_string());
@@ -118,7 +118,7 @@ fn decode(fixture: &Fixture, quantum: u64) -> String {
     while decoder
         .poll(&mut WorkBudget::new(quantum), &cancel)
         .unwrap()
-        != RecoveryStatus::Ended
+        != Status::End
     {}
     out
 }

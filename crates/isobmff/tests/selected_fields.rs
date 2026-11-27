@@ -1,11 +1,13 @@
 // Primary-derived metadata vectors and independent bit/Fraction proof are
 // hash-bound beside these fixtures.
-mod common;
+use crate::common;
 use std::{fs, path::Path};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits,
-    Sample, SampleStep, SampleTable, SampleTableBuilder, Trex,
+    BuildStatus, Limits, Next, Sample,
+    boxes::BoxView,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    table::{SampleTable, SampleTableBuilder},
 };
 
 #[derive(Debug)]
@@ -119,21 +121,21 @@ fn sample_row(sample: &Sample) -> Vec<String> {
     ]
 }
 fn sample(
-    mut poll: impl FnMut(&mut WorkBudget) -> Result<SampleStep, Error>,
+    mut poll: impl FnMut(&mut WorkBudget) -> Result<Next<Sample>, Error>,
     quantum: u64,
 ) -> Sample {
     for _ in 0..10_000 {
         match poll(&mut WorkBudget::new(quantum)).unwrap() {
-            SampleStep::Sample(sample) => return sample,
-            SampleStep::Yield => {}
-            SampleStep::End => panic!("missing independently expected sample"),
+            Next::Item(sample) => return sample,
+            Next::Yield => {}
+            Next::End => panic!("missing independently expected sample"),
         }
     }
     panic!("bounded source sample lookup stalled");
 }
 
 fn exercise(group: &str, expected_cases: usize) {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/selected-fields18");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/table-fields");
     let text = fs::read_to_string(root.join(format!("{group}.txt"))).unwrap();
     let mut cases = 0;
     for block in text.split("\n\n") {
@@ -222,7 +224,7 @@ fn exercise(group: &str, expected_cases: usize) {
                     }
                     assert_eq!(
                         cursor.poll(&mut WorkBudget::new(quantum)).unwrap(),
-                        SampleStep::End
+                        Next::End
                     );
                 } else {
                     let fragment = index.fragment.as_ref().unwrap();
@@ -236,7 +238,7 @@ fn exercise(group: &str, expected_cases: usize) {
                     }
                     assert_eq!(
                         cursor.poll(&mut WorkBudget::new(quantum)).unwrap(),
-                        SampleStep::End
+                        Next::End
                     );
                 }
             }

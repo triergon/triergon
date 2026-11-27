@@ -1,9 +1,10 @@
 //! The facade opens a source from its first bytes and reads it generically.
 #![cfg(feature = "matroska")]
-use std::sync::atomic::AtomicBool;
+mod common;
+
 use triergon::{
-    AnyReader, Budget, Bytes, CodecId, ContainerReader, Event, InputWindow, MediaKind, PacketInfo,
-    Probe, SourceCapabilities, SourceId, Step, TrackId, WorkBudget, probe,
+    AnyReader, Budget, CodecId, ContainerReader, MediaKind, PacketInfo, Probed, SourceCapabilities,
+    SourceFormat, SourceId, TrackId, probe, probe_whole,
 };
 
 fn element(id: u64, data: &[u8]) -> Vec<u8> {
@@ -45,65 +46,58 @@ fn matroska() -> Vec<u8> {
     .concat()
 }
 
-#[test]
-fn probe_classifies_the_three_container_families() {
-    assert_eq!(probe(&matroska()), Probe::Matroska);
-    assert_eq!(probe(b"\0\0\0\x18ftypisom"), Probe::Isobmff);
+/// Three TS188 packets: no more than their sync bytes.
+fn transport() -> Vec<u8> {
     let mut ts = vec![0u8; 188 * 3];
     for packet in ts.chunks_mut(188) {
         packet[0] = 0x47;
     }
-    assert_eq!(probe(&ts), Probe::Ts);
-    assert_eq!(probe(b"RIFF"), Probe::Unknown);
+    ts
+}
+
+#[test]
+fn probe_classifies_the_three_container_families() {
+    assert_eq!(probe(&matroska()), Probed::Format(SourceFormat::Matroska));
+    assert_eq!(
+        probe(b"\0\0\0\x18ftypisom"),
+        Probed::Format(SourceFormat::Isobmff)
+    );
+    assert_eq!(probe(&transport()), Probed::Format(SourceFormat::Ts));
+    assert_eq!(probe(b"RIFF"), Probed::Need(8));
+    assert_eq!(probe_whole(b"RIFF"), None);
 }
 
 #[test]
 fn any_reader_reads_matroska_through_the_neutral_model() {
-    let raw = matroska();
-    let pool = Budget::new(1 << 20).unwrap();
-    let capabilities = SourceCapabilities {
-        length: Some(raw.len() as u64),
-        random_access: true,
-    };
-    let mut reader = AnyReader::open(&raw[..8], &pool, SourceId(1), capabilities).unwrap();
-    let cancel = AtomicBool::new(false);
-    let mut packets = Vec::new();
-    loop {
-        match reader.step(&mut WorkBudget::new(4096), &cancel).unwrap() {
-            Step::Ready(Event::Packet(p)) => {
-                packets.push((p.track(), p.payload().to_vec(), p.pts()));
-            }
-            Step::Ready(_) | Step::Yield => {}
-            Step::NeedInput(r) => {
-                let at = r.offset as usize;
-                if at >= raw.len() {
-                    reader.finish(r.source, r.token).unwrap();
-                } else {
-                    let bytes =
-                        Bytes::copy_from_slice(&pool, &raw[at..raw.len().min(at + r.maximum)])
-                            .unwrap();
-                    reader
-                        .provide(&InputWindow::new(r.source, r.token, r.offset, bytes).unwrap())
-                        .unwrap();
-                }
-            }
-            Step::Backpressure(p) => panic!("{p:?}"),
-            Step::End(_) => break,
-        }
-    }
+    let (reader, packets) = common::read(&matroska());
+    let packets: Vec<_> = packets
+        .iter()
+        .map(|p| (p.track(), p.payload().to_vec(), p.pts()))
+        .collect();
     assert_eq!(packets, [(TrackId(2), vec![7], Some(0))]);
     assert_eq!(reader.track_count(), 1);
     let track = reader.track(0).unwrap();
     assert_eq!(track.kind(), MediaKind::Audio);
-    assert_eq!(track.codec(), CodecId::Other(b"A_AUTHORED"));
-    assert_eq!(track.codec_tag(), b"A_AUTHORED");
-    let mut ts = vec![0u8; 188 * 3];
-    for packet in ts.chunks_mut(188) {
-        packet[0] = 0x47;
-    }
-    let refused = AnyReader::open(&ts, &pool, SourceId(2), capabilities);
+    assert_eq!(
+        (track.codec(), track.codec_tag()),
+        (CodecId::Other, &b"A_AUTHORED"[..])
+    );
+}
+
+#[test]
+fn a_transport_stream_opens_only_with_the_mpegts_feature() {
+    let ts = transport();
+    let pool = Budget::new(1 << 20).unwrap();
+    let capabilities = SourceCapabilities {
+        length: Some(ts.len() as u64),
+        random_access: true,
+    };
+    let opened = AnyReader::open(&ts, &pool, SourceId(2), capabilities);
     #[cfg(not(feature = "mpegts"))]
-    assert!(matches!(refused, Err(triergon::Error::Unsupported(_))));
+    assert_eq!(
+        opened.err(),
+        Some(triergon::Error::Unsupported("reader feature not enabled"))
+    );
     #[cfg(feature = "mpegts")]
-    assert!(matches!(refused, Ok(AnyReader::MpegTs(_))));
+    assert!(matches!(opened, Ok(AnyReader::MpegTs(_))));
 }

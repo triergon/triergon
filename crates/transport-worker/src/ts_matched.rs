@@ -10,7 +10,8 @@ use triergon_core::{
     Budget, Error, InputWindow, Rounding, SourceId, Step, Time, TimeBase, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_framed, signed};
-use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SeekEntity, SourceEpochs};
+use triergon_mpegts::reader::SeekEntity;
+use triergon_mpegts::{AccessUnit, Reader, ReaderLimits, SourceEpochs};
 
 #[derive(Clone, Copy)]
 pub(crate) enum Kind {
@@ -184,6 +185,7 @@ fn execute(
     Ok(out)
 }
 
+// One function on purpose: the reads of each seek inside the timed loop; a split is a hot-path change not yet measured.
 fn drain(
     reader: &mut Reader,
     input: &Request,
@@ -289,11 +291,7 @@ fn drain(
             }
             Step::Ready(Event::Other(_)) | Step::Yield => (),
             Step::Backpressure(pressure) => {
-                return Err(Error::Backpressure {
-                    requested: pressure.requested,
-                    available: pressure.available,
-                }
-                .into());
+                return Err(Error::Backpressure(pressure).into());
             }
             Step::End(_) if out.packets > start => return Ok(()),
             Step::End(_) => return Err("transport comparison delivered no packets".into()),

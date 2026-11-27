@@ -10,13 +10,13 @@ mod residual;
 mod transform_tree;
 
 use crate::cabac::{Bins, Cabac, ctx, init_contexts};
-use crate::error::{DecodeError, Result};
 use crate::inter::{McScratch, PRED_STRIDE};
 use crate::picture::{ColMotion, Frame, Pixel, PuMotion};
 use crate::ps::{Layout, Pps, Sps};
-use crate::slice::{SLICE_I, SLICE_P, SliceHeader};
+use crate::slice::{SliceHeader, SliceType};
 use crate::state::*;
 use crate::transform;
+use crate::{DecodeError, Result};
 use triergon_codec::{Budget, BudgetVec};
 
 /// Z-order (Morton) index of 4x4 units inside a 64x64 CTB, [y4 * 16 + x4] (6.5.2 within a CTB).
@@ -40,45 +40,45 @@ const Z4: [u8; 256] = {
     t
 };
 
-pub const PART_2NX2N: u8 = 0;
-pub const PART_2NXN: u8 = 1;
-pub const PART_NX2N: u8 = 2;
-pub const PART_NXN: u8 = 3;
-pub const PART_2NXNU: u8 = 4;
-pub const PART_2NXND: u8 = 5;
-pub const PART_NLX2N: u8 = 6;
-pub const PART_NRX2N: u8 = 7;
+pub(crate) const PART_2NX2N: u8 = 0;
+pub(crate) const PART_2NXN: u8 = 1;
+pub(crate) const PART_NX2N: u8 = 2;
+pub(crate) const PART_NXN: u8 = 3;
+pub(crate) const PART_2NXNU: u8 = 4;
+pub(crate) const PART_2NXND: u8 = 5;
+pub(crate) const PART_NLX2N: u8 = 6;
+pub(crate) const PART_NRX2N: u8 = 7;
 
 #[derive(Clone, Copy)]
-pub struct RefEntry<'a, P> {
-    pub frame: Option<&'a Frame<P>>,
-    pub poc: i32,
-    pub lt: bool,
+pub(crate) struct RefEntry<'a, P> {
+    pub(crate) frame: Option<&'a Frame<P>>,
+    pub(crate) poc: i32,
+    pub(crate) lt: bool,
 }
 
-pub struct RefLists<'a, P> {
-    pub list: [[RefEntry<'a, P>; 16]; 2],
-    pub num: [usize; 2],
-    pub col: Option<&'a ColMotion>,
-    pub col_poc: i32,
-    pub no_backward_pred: bool,
+pub(crate) struct RefLists<'a, P> {
+    pub(crate) list: [[RefEntry<'a, P>; 16]; 2],
+    pub(crate) num: [usize; 2],
+    pub(crate) col: Option<&'a ColMotion>,
+    pub(crate) col_poc: i32,
+    pub(crate) no_backward_pred: bool,
 }
 
 #[derive(Debug)]
-pub struct Scratch<P> {
-    pub coeffs: Vec<i32>,
-    pub res: Vec<i32>,
-    pub pred: [Vec<i16>; 2],
-    pub mc: McScratch<P>,
-    pub tr: transform::TransformScratch,
+pub(crate) struct Scratch<P> {
+    pub(crate) coeffs: Vec<i32>,
+    pub(crate) res: Vec<i32>,
+    pub(crate) pred: [Vec<i16>; 2],
+    pub(crate) mc: McScratch<P>,
+    pub(crate) tr: transform::TransformScratch,
     /// SAO source band (deblocked samples of one CTB row plus a line above and below) and
     /// the saved last deblocked line of the previous row, per component.
-    pub band: Option<Frame<P>>,
-    pub saved: [BudgetVec<P>; 3],
+    pub(crate) band: Option<Frame<P>>,
+    pub(crate) saved: [BudgetVec<P>; 3],
 }
 
 impl<P: Pixel> Scratch<P> {
-    pub fn new(budget: &Budget) -> Self {
+    pub(crate) fn new(budget: &Budget) -> Self {
         Scratch {
             coeffs: vec![0; 32 * 32],
             res: vec![0; 32 * 32],
@@ -105,7 +105,7 @@ struct Cu {
     chroma_mode: u32,
 }
 
-pub struct SliceDecoder<'a, P: Pixel> {
+pub(crate) struct SliceDecoder<'a, P: Pixel> {
     sps: &'a Sps,
     pps: &'a Pps,
     sh: &'a SliceHeader,
@@ -150,8 +150,7 @@ pub struct SliceDecoder<'a, P: Pixel> {
 }
 
 impl<'a, P: Pixel> SliceDecoder<'a, P> {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         sps: &'a Sps,
         pps: &'a Pps,
         sh: &'a SliceHeader,
@@ -165,15 +164,15 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
         poc: i32,
     ) -> Result<Self> {
         let init_type = match sh.slice_type {
-            SLICE_I => 0,
-            SLICE_P => {
+            SliceType::I => 0,
+            SliceType::P => {
                 if sh.cabac_init {
                     2
                 } else {
                     1
                 }
             }
-            _ => {
+            SliceType::B => {
                 if sh.cabac_init {
                     1
                 } else {
@@ -192,7 +191,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             refs,
             sc,
             data,
-            cabac: Cabac::new(data, start.min(data.len()))?,
+            cabac: Cabac::new(data, start.min(data.len())).map_err(crate::cabac::invalid_offset)?,
             c: [0; ctx::NUM],
             slice_idx,
             poc,
@@ -317,7 +316,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
         init_contexts(&mut self.c, self.sh.slice_qp, self.init_type);
     }
 
-    pub fn decode(&mut self) -> Result<()> {
+    pub(crate) fn decode(&mut self) -> Result<()> {
         let sps = self.sps;
         let pps = self.pps;
         let layout = self.layout;
@@ -358,13 +357,15 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                     self.init_ctx();
                 } else if pps.entropy_coding_sync && first_in_row_of_tile {
                     let tr_avail = self.nb_ok[3];
-                    if tr_avail && self.st.ctx_wpp_valid {
-                        self.c = self.st.ctx_wpp;
-                    } else {
-                        self.init_ctx();
+                    match self.st.ctx_wpp {
+                        Some(saved) if tr_avail => self.c = saved,
+                        _ => self.init_ctx(),
                     }
-                } else if first && self.sh.dependent_slice_segment && self.st.ctx_ds_valid {
-                    self.c = self.st.ctx_ds;
+                } else if first
+                    && self.sh.dependent_slice_segment
+                    && let Some(saved) = self.st.ctx_ds
+                {
+                    self.c = saved;
                 } else {
                     self.init_ctx();
                 }
@@ -381,7 +382,6 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 self.sao_syntax(ctb_x, rs / pic_w_ctb)?;
             }
             self.coding_quadtree(x_ctb, y_ctb, self.log2_ctb, 0)?;
-            self.st.decoded_ctbs += 1;
             let ry = (rs / pic_w_ctb) as usize;
             self.st.row_done[ry] = self.st.row_done[ry].saturating_add(1);
             if self.st.row_done[ry] as u32 >= pic_w_ctb {
@@ -391,7 +391,7 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                 );
             }
             if self.cabac.overrun() {
-                return Err(DecodeError::InvalidData("slice data overrun"));
+                return Err(DecodeError::Invalid("slice data overrun"));
             }
             // WPP storage (9.3.1).
             if pps.entropy_coding_sync
@@ -400,21 +400,19 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
                         && layout.tile_id[layout.ctb_addr_rs_to_ts[rs as usize - 2] as usize]
                             != tile))
             {
-                self.st.ctx_wpp = self.c;
-                self.st.ctx_wpp_valid = true;
+                self.st.ctx_wpp = Some(self.c);
             }
             let end = self.cabac.terminate();
             self.ctb_ts += 1;
             if end == 1 {
                 if pps.dependent_slice_segments_enabled {
-                    self.st.ctx_ds = self.c;
-                    self.st.ctx_ds_valid = true;
+                    self.st.ctx_ds = Some(self.c);
                     self.st.ds_last_qp = self.last_qp_y;
                 }
                 return Ok(());
             }
             if self.ctb_ts >= num_ctb {
-                return Err(DecodeError::InvalidData("slice runs past end of picture"));
+                return Err(DecodeError::Invalid("slice runs past end of picture"));
             }
             self.ctb_rs = layout.ctb_addr_ts_to_rs[self.ctb_ts as usize];
             let ntile = layout.tile_id[self.ctb_ts as usize];
@@ -426,10 +424,12 @@ impl<'a, P: Pixel> SliceDecoder<'a, P> {
             if (pps.tiles_enabled && ntile != tile) || new_row {
                 let one = self.cabac.terminate();
                 if one != 1 {
-                    return Err(DecodeError::InvalidData("end_of_subset_one_bit"));
+                    return Err(DecodeError::Invalid("end_of_subset_one_bit"));
                 }
                 let pos = self.cabac.aligned_byte_position();
-                self.cabac.restart(pos)?;
+                self.cabac
+                    .restart(pos)
+                    .map_err(crate::cabac::invalid_offset)?;
             }
         }
     }

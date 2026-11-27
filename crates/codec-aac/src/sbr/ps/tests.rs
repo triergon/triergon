@@ -106,3 +106,101 @@ fn class_one_borders_get_an_envelope_to_the_end() {
     assert_eq!(&b[..n], &[31]);
     assert!(Ps::borders(&raw(true, 3, [9, 4, 31, 0])).is_none());
 }
+
+/// A frame of `coded_env` envelopes, all values index 0, with the header `header` and
+/// the IPD/OPD extension `ipd`.
+fn frame_with(header: Option<Header>, coded_env: usize, ipd: Option<PhaseData>) -> Raw {
+    Raw {
+        header,
+        class1: false,
+        coded_env,
+        borders: [0; 4],
+        iid: [(false, [0; MAX_PAR]); 4],
+        icc: [(false, [0; MAX_PAR]); 4],
+        ipd,
+    }
+}
+
+#[test]
+fn an_error_frame_resets_the_phases_and_concealment_disables_them() {
+    let header = Header {
+        iid: Some(5),
+        icc: Some(5),
+        ext: true,
+    };
+    // frequency-differential: the first band's index, then steps of 0
+    let mut ipd = [0u8; 17];
+    ipd[0] = 3;
+    let mut env = [[(false, [0u8; 17]); 2]; 4];
+    env[0] = [(false, ipd), (false, ipd)];
+    let without_ext = Header {
+        ext: false,
+        ..header
+    };
+    for policy in [Policy::Conceal, Policy::Reference] {
+        let mut ps = Ps::new();
+        ps.policy = policy;
+        assert!(ps.apply_raw(&frame_with(Some(header), 1, Some((true, env))), false));
+        assert_eq!(ps.phase[0][0][..17], [3; 17]);
+        ps.fault(Some(Fault::Read(1)));
+        assert!(ps.apply_raw(&frame_with(Some(without_ext), 1, None), false));
+        assert_eq!(ps.phase_on, policy == Policy::Reference);
+        assert!(ps.phase.iter().flatten().flatten().all(|&v| v == 0));
+        assert_eq!(ps.last_ipd, [[0; 17]; 2]);
+    }
+}
+
+#[test]
+fn a_time_differential_mode_change_uses_only_the_last_coded_parameters() {
+    let frame = |mode, dt, first| {
+        let header = Header {
+            iid: Some(mode),
+            ..Header::default()
+        };
+        let mut raw = frame_with(Some(header), 1, None);
+        raw.iid[0].0 = dt;
+        raw.iid[0].1[0] = first;
+        raw
+    };
+    for (policy, uncoded) in [(Policy::Conceal, 0), (Policy::Reference, 3)] {
+        let mut ps = Ps::new();
+        ps.policy = policy;
+        assert!(ps.apply_raw(&frame(1, false, 3), false));
+        assert!(ps.apply_raw(&frame(0, false, -1), false));
+        assert!(ps.apply_raw(&frame(1, true, 0), false));
+        assert_eq!(ps.frame.iid[0][..10], [-1; 10]);
+        assert_eq!(ps.frame.iid[0][10..20], [uncoded; 10]);
+    }
+}
+
+#[test]
+fn a_time_differential_envelope_reads_the_values_of_its_envelope_index() {
+    // probes o41 and o43: a 4-envelope 20-band frame, a 1-envelope 10-band frame, then a
+    // 20-band envelope coded time-differentially with steps of 0: above band 10 it reads
+    // what the first frame's envelope 0 wrote, not its last envelope
+    let header = |mode| Header {
+        iid: Some(mode),
+        icc: None,
+        ext: false,
+    };
+    let coded = |dt: bool, first: i8| {
+        let mut steps = [0i8; MAX_PAR];
+        steps[0] = first;
+        (dt, steps)
+    };
+    let mut ps = Ps::new();
+    ps.policy = Policy::Reference;
+    let mut four = frame_with(Some(header(1)), 4, None);
+    for (e, envelope) in four.iid.iter_mut().enumerate() {
+        *envelope = coded(false, e as i8);
+    }
+    assert!(ps.apply_raw(&four, false));
+    let mut ten = frame_with(Some(header(0)), 1, None);
+    ten.iid[0] = coded(false, -1);
+    assert!(ps.apply_raw(&ten, false));
+    let mut twenty = frame_with(Some(header(1)), 1, None);
+    twenty.iid[0] = coded(true, 0);
+    assert!(ps.apply_raw(&twenty, false));
+    assert_eq!(ps.frame.iid[0][..10], [-1; 10]);
+    assert_eq!(ps.frame.iid[0][10..20], [0; 10]);
+}

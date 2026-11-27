@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "sequential",
+      "profile": "sequential",
+      "file": "crates/playback/tests/fixtures/mkv-feed/three-tracks.mkv",
+      "sha256": "d0e2a1165ae19ea6af7a1827b4cddc25582f0691e62191d055935b0f5295279a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b78451ac85db2613447eece774014fc816c6da7c4f5019d11548ad44262cf713"
+      }
+    }
+  ]
+}

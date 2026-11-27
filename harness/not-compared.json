@@ -1,0 +1,94 @@
+{
+  "about": "Public features of each library crate that no gated comparison compares directly with its reference, by crate: each by a short stable name, the public items it is reached through, how near it comes to a direct comparison and what a comparison would need. `degree` is one of `step` (compared only as a step inside a larger compared operation), `recorded` (checked against reference output recorded once, which no worker re-runs), `outside-gate` (compared with the reference by an opt-in test or a command the gate does not run), `unit-tests` (unit tests only), `untested` (no tests) and `no-reference` (no reference implements it). A crate listed with no features was reviewed and has none; a crate not listed is not reviewed yet. A feature leaves its list when a gated comparison compares it directly. `cargo xtask check-design` checks the list and holds the count per crate to harness/gate-exceptions.json, so a feature left uncompared is recorded as visibly as a loosened gate.",
+  "crates": {
+    "codec-worker": [],
+    "playback-worker": [],
+    "triergon": [],
+    "triergon-ass": [],
+    "triergon-bitstream": [],
+    "triergon-bridge": [],
+    "triergon-capture": [
+      {
+        "name": "session-configuration",
+        "entry_points": ["SessionConfig::gop", "SessionConfig::max_rate", "SessionConfig::vbv_bits", "SessionConfig::bit_rate", "SessionConfig::mux"],
+        "degree": "step",
+        "needs": "ARMv7 parity for the capture configuration cases, which compare configured GOP, rates, VBV and multiplex settings, including a matching refusal for a one-bit buffer on AArch64"
+      }
+    ],
+    "triergon-codec": [],
+    "triergon-codec-aac": [],
+    "triergon-codec-ac3": [
+      {
+        "name": "decoder-options",
+        "entry_points": ["NoiseMode::Off"],
+        "degree": "no-reference",
+        "needs": "The reference has no option equivalent to disabling all dither, AHT zero-bin noise and spectral extension noise. The dither-free lane compares Off where stripping the input gives an equivalent computation. The CRC lanes compare Decoder::with_options with Reject."
+      },
+      {
+        "name": "decoder-modes",
+        "entry_points": ["Compat::Specification"],
+        "degree": "no-reference",
+        "needs": "FFmpeg 9.0.2 has no option for the A/52 mode. Its decoder refuses reduced-rate E-AC-3 and does not expose the specification mode's strict dependent-substream and end-of-frame handling or dither generator."
+      },
+      {
+        "name": "frame-info",
+        "entry_points": ["FrameFeatures"],
+        "degree": "no-reference",
+        "needs": "The reference does not publish audio block tool flags. The ac3-features oracle compares complete version-8 AC-3 syncframes. Annex E syntax, other bitstream versions and truncated audio blocks need separate oracle coverage."
+      },
+      {
+        "name": "bit-position-trace",
+        "entry_points": ["Decoder::set_trace", "Decoder::trace", "Trace"],
+        "degree": "no-reference",
+        "needs": "The reference does not publish coded bit positions or full per-block trace state. The dither-free lane compares the pinned result of rewriting the coded dither fields and grades the stripped stream."
+      }
+    ],
+    "triergon-codec-dca": [],
+    "triergon-codec-flac": [],
+    "triergon-codec-h264": [],
+    "triergon-codec-hevc": [
+      {
+        "name": "picture-properties",
+        "entry_points": ["ColourDescription::colour_description_present", "ColourDescription::video_signal_type_present"],
+        "degree": "no-reference",
+        "needs": "Picture properties compare decoded CICP, effective range, aspect ratio and visible planes. The frame reference does not expose the two coded VUI presence bits."
+      }
+    ],
+    "triergon-codec-mp3": [],
+    "triergon-codec-mpeg1": [],
+    "triergon-codec-opus": [],
+    "triergon-codec-vorbis": [],
+    "triergon-core": [],
+    "triergon-elementary": [],
+    "triergon-font": [],
+    "triergon-framing": [],
+    "triergon-harness-protocol": [],
+    "triergon-harness-runner": [],
+    "triergon-hls": [],
+    "triergon-isobmff": [],
+    "triergon-matroska": [],
+    "triergon-mpegts": [],
+    "triergon-ogg": [],
+    "triergon-pixel": [],
+    "triergon-playback": [
+      {
+        "name": "fifo-delivery-and-pump",
+        "entry_points": ["Player::advance", "Player::advance_ready", "Player::pop", "Player::may_deliver", "Player::pause", "Player::stop", "pump::Pump", "pump::Sink", "pump::CatalogueSink", "pump::Feed"],
+        "degree": "no-reference",
+        "needs": "Playback-delivery compares the delivered packet sequence and the Matroska Cluster prefix. Queue and sink lifecycle has no reference counterpart and is exercised by the library tests."
+      },
+      {
+        "name": "neutral-views",
+        "entry_points": ["DemuxTimes", "Track::key", "mp4::PreparedMp4::identify_tracks", "Engine::mp4_plan", "Engine::matroska_reader"],
+        "degree": "step",
+        "needs": "Playback-source-view checks the neutral track keys, reader and prepared-plan accessors, and DemuxTimes."
+      }
+    ],
+    "triergon-raster": [],
+    "triergon-raw-video": [],
+    "triergon-session": [],
+    "triergon-shape": [],
+    "triergon-subtitles": [],
+    "triergon-worker-entry": []
+  }
+}

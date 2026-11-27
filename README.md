@@ -3,29 +3,27 @@
 Media containers, packet framing, subtitles, fonts and decoders in safe Rust, with no
 dependencies.
 
-Triergon reads Matroska/WebM, MP4/MOV, MPEG-TS, Ogg, native FLAC and raw MPEG audio,
-ADTS and AC-3/E-AC-3 streams, frames H.264, HEVC, AV1, VP9, AAC, AC-3/E-AC-3 and
-DTS/DTS-HD packets for hardware or software decoders, decodes text and bitmap
-subtitles, closed captions and teletext, reads OpenType and TrueType fonts, shapes text,
-rasterises glyphs and subtitle bitmaps, reads ASS scripts and their override tags, and
-includes software decoders for H.264, HEVC, AAC, AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis
-and MPEG audio Layer I, II and III. It is written from the published standards and
-measured case by case against a pinned reference: FFmpeg for media, FreeType for fonts,
-HarfBuzz and FriBidi for shaping, libass for rasterising and ASS parsing.
+Triergon reads Matroska/WebM, MP4/MOV, MPEG-TS, HLS segments, Ogg, native FLAC, raw
+MPEG audio, ADTS, AC-3/E-AC-3 and raw H.264/HEVC Annex B streams; frames H.264, HEVC,
+AV1, VP9, AAC, AC-3/E-AC-3 and DTS/DTS-HD packets for hardware or software decoders;
+decodes text and bitmap subtitles, closed captions and teletext; reads OpenType and
+TrueType fonts, shapes text, rasterises glyphs and renders ASS scripts; and includes
+software decoders for H.264, HEVC, AAC, AC-3/E-AC-3, DTS, FLAC, Opus, Vorbis and MPEG
+audio Layer I, II and III, and an MPEG-1 video encoder. It is written from the published
+standards and measured case by case against a pinned reference: FFmpeg for media,
+FreeType for fonts, HarfBuzz and FriBidi for shaping, libass for rasterising and ASS.
 
 > **Status: experimental.** APIs change without notice and nothing is published to
-> crates.io yet. See [status](docs/status.md) for what is verified today.
+> crates.io. [Status](docs/status.md) shows what is verified.
 
 ## Principles
 
-- **Safe Rust, zero dependencies.** Every library crate forbids `unsafe`. The dependency graph
-  is `std` and nothing else.
-- **As good as the reference, or it does not ship.** Each module must match its pinned
-  reference (FFmpeg for media, FreeType for fonts, HarfBuzz and FriBidi for shaping,
-  libass for rasterising and subtitle rendering) on its
-  whole declared feature set, stay within the [runtime ceiling](docs/quality.md#gates) of
-  the reference's time per case and use less memory. Results are measured, paired and
-  published per case.
+- **Safe Rust, zero dependencies.** Every library crate forbids `unsafe`. The dependency
+  graph is `std` and nothing else.
+- **As good as the reference, or it does not ship.** Each module must match its
+  reference on its whole declared feature set, stay within the
+  [runtime ceiling](docs/quality.md#gates) of the reference's time per case and use
+  less memory. Results are measured, paired and published per case.
 - **Built for untrusted input.** Every input-dependent allocation is budgeted, every
   loop is bounded, and malformed data produces an error, never a panic or a hang.
 - **You own the I/O.** Parsers take byte windows and tell you which bytes they need
@@ -38,12 +36,12 @@ HarfBuzz and FriBidi for shaping, libass for rasterising and ASS parsing.
 
 | Crate | What it gives you |
 |---|---|
-| [`triergon`](crates/triergon) | Facade: core vocabulary, container model, `AnyReader` and one Cargo feature per format |
-| [`triergon-core`](crates/core) | Budgets, shared byte buffers, exact time, input windows, resumable steps, the neutral container model |
-| [`triergon-bitstream`](crates/bitstream) | Bit readers, exp-Golomb, RBSP, CABAC and CRCs shared by the format, framing and codec crates |
-| [`triergon-matroska`](crates/media) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
+| [`triergon`](crates/triergon) | Facade: the core vocabulary, `AnyReader` over every container, and one Cargo feature per group of crates |
+| [`triergon-core`](crates/core) | Budgets, shared byte buffers, exact time, input windows, resumable steps, the workspace error, the neutral container model |
+| [`triergon-bitstream`](crates/bitstream) | Bit readers, Exp-Golomb, RBSP, CABAC and CRCs shared by the format, framing and codec crates |
+| [`triergon-matroska`](crates/matroska) | Matroska and WebM reader with seeking, chapters, tags, attachments, colour and HDR |
 | [`triergon-isobmff`](crates/isobmff) | MP4, MOV and fragmented MP4: sample tables, edit lists, range-based playback |
-| [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES and access-unit assembly, timestamps, bounded seeking, HLS segments, a single-program writer |
+| [`triergon-mpegts`](crates/mpegts) | MPEG-TS and M2TS: PSI, PES and access-unit assembly, timestamps, bounded seeking, a single-program writer |
 | [`triergon-ogg`](crates/ogg) | Ogg with the FLAC, Opus and Vorbis mappings: chained and multiplexed streams, granule timing, trims, seeking |
 | [`triergon-elementary`](crates/elementary) | Native FLAC, MPEG audio (ID3, Xing/Info/VBRI, LAME gapless), ADTS and AC-3/E-AC-3 streams |
 | [`triergon-framing`](crates/framing) | Codec configuration and packet conversion for H.264, HEVC, AV1, VP9, AAC, AC-3/E-AC-3, DTS/DTS-HD |
@@ -51,15 +49,20 @@ HarfBuzz and FriBidi for shaping, libass for rasterising and ASS parsing.
 | [`triergon-font`](crates/font) | OpenType and TrueType faces and collections: cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | [`triergon-shape`](crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
 | [`triergon-raster`](crates/raster) | Glyph outlines, border stroking, the tile rasteriser, blur, composition and clipping of subtitle bitmaps |
-| [`triergon-ass`](crates/ass) | ASS and SSA scripts and Matroska packets, override tags, per-glyph state over time, karaoke and drawings |
-| [`triergon-pixel`](crates/pixel) | Decoded-picture views, BT.601 RGBA to YUV 4:2:0, letterboxing into a 1920×1080 RGBA canvas |
+| [`triergon-ass`](crates/ass) | ASS and SSA scripts and Matroska packets, override tags, per-glyph state over time, karaoke, drawings, rendering to positioned alpha images |
+| [`triergon-pixel`](crates/pixel) | Decoded-picture views, BT.601 RGBA to YUV 4:2:0, letterboxing into an RGBA canvas |
 | [`triergon-codec`](crates/codec) | Decoder traits, audio frames, channel layouts and orders, the shared inverse MDCT |
 | [`triergon-codec-h264`](crates/codec-h264), [`-hevc`](crates/codec-hevc) | Software video decoders |
 | [`triergon-codec-aac`](crates/codec-aac), [`-ac3`](crates/codec-ac3), [`-dca`](crates/codec-dca), [`-flac`](crates/codec-flac), [`-opus`](crates/codec-opus), [`-vorbis`](crates/codec-vorbis), [`-mp3`](crates/codec-mp3) | Software audio decoders |
 | [`triergon-codec-mpeg1`](crates/codec-mpeg1) | MPEG-1 video encoder with I and P pictures |
-| [`triergon-playback`](crates/playback) | Container-independent packet feeds with seeking |
+| [`triergon-playback`](crates/playback) | Matroska, MP4 and MPEG-TS packet feeds: format probing, track selection, seeking |
+| [`triergon-raw-video`](crates/raw-video) | Raw AVC and HEVC Annex B feeds with their parameter sets, and a probe over every playback format |
+| [`triergon-hls`](crates/hls) | Access units from HLS TS188 media segments and forward-only TS188 input |
+| [`triergon-bridge`](crates/bridge) | Decoder access units from playback packets, and text, bitmap, caption and teletext subtitle receivers |
 | [`triergon-session`](crates/session) | Decode sessions: queues, clocks and output over the decoders, container track decoding with trims |
 | [`triergon-capture`](crates/capture) | Capture session: RGBA frames in, MPEG-1 video in MPEG-TS out |
+
+[Architecture](docs/architecture.md) shows how they layer.
 
 ## Getting started
 
@@ -73,7 +76,7 @@ Reading a Matroska file:
 
 ```rust
 use std::{fs::File, sync::atomic::AtomicBool};
-use triergon_matroska::{Limits, typed::BlockingReader};
+use triergon_matroska::{BlockingReader, Limits};
 
 let cancel = AtomicBool::new(false);
 let mut reader = BlockingReader::open_seekable(File::open("movie.mkv")?, Limits::default())?;
@@ -85,8 +88,10 @@ while let Some(packet) = reader.next_typed_packet(&cancel)? {
 }
 ```
 
-Each crate README shows its entry points, and the `examples/` directories contain
-small programs.
+Each crate README shows its entry points; the [facade](crates/triergon) shows a whole
+playback loop.
+
+## Build settings
 
 The published results assume this release profile in the program that uses the crates:
 
@@ -98,7 +103,7 @@ codegen-units = 1
 
 Cargo's default profile runs measurably slower, most of all on 32-bit ARM.
 `panic = "abort"` is faster still; it is safe unless the program wraps calls into these
-crates in `catch_unwind`. See [measuring performance](docs/quality.md#measuring-performance).
+crates in `catch_unwind`.
 
 On GNU/Linux the published memory also assumes the program's functions are linked in
 the playback worker's trained order, as the measurement workers are: by the Rust
@@ -122,9 +127,9 @@ orders and how they are recorded.
 ## Documentation
 
 - [Architecture](docs/architecture.md): layers, input and resource model, container contract
-- [Quality](docs/quality.md): the reference gates, corpus, harness and measurement rules
+- [Quality](docs/quality.md): the reference gates, feature contracts, harness and measurement rules
 - [Status](docs/status.md): verified scope and current results per module
-- [Provenance](docs/provenance.md): licences of the modules derived from FreeType, HarfBuzz and libass
+- [Provenance](docs/provenance.md): the modules derived from FreeType, HarfBuzz and libass, and their licences
 - [Contributing](CONTRIBUTING.md)
 
 ## Licence
@@ -134,10 +139,6 @@ Test media and specification texts keep their own terms. Patent licensing for co
 is the responsibility of whoever ships them.
 
 `triergon-font`, `triergon-shape`, `triergon-ass` and `triergon-raster` contain modules
-translated from FreeType 2.15.0 (FreeType License), HarfBuzz 14.6.0 ("Old MIT") and
-libass 0.17.5 (ISC), which keep those licences too; each crate's `LICENSE` holds the
-notices, and [docs/provenance.md](docs/provenance.md) lists the modules. Software that
-includes `triergon-font` credits FreeType in its documentation:
-
-> Portions of this software are copyright © 2026 The FreeType Project
-> (<https://freetype.org>). All rights reserved.
+derived from FreeType, HarfBuzz and libass, which keep those projects' licences too;
+each crate's `LICENSE` holds the notices. Software that includes `triergon-font` credits
+FreeType in its documentation, as [provenance](docs/provenance.md) gives.

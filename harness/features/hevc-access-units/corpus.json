@@ -1,0 +1,5796 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+      "sha256": "6063fb81c57d8596af226960f17b8dea06eb0661f97d76509ce331fa99e1ba46",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 180029,
+        "digest": 13200058360731153877
+      }
+    },
+    {
+      "id": "ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ADJUST_IPRED_ANGLE_A_RExt_Mitsubishi_1.bit",
+      "sha256": "6063fb81c57d8596af226960f17b8dea06eb0661f97d76509ce331fa99e1ba46",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 180029,
+        "digest": 13200058360731153877
+      }
+    },
+    {
+      "id": "AMP_A_Samsung_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_A_Samsung_4.bit",
+      "sha256": "52d5c79c26dc5caf916b018159f8d1dfdf28945a11a71788802b80927c730e95",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 2097540,
+        "digest": 4580847345750991420
+      }
+    },
+    {
+      "id": "AMP_A_Samsung_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_A_Samsung_4.bit",
+      "sha256": "52d5c79c26dc5caf916b018159f8d1dfdf28945a11a71788802b80927c730e95",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 2097540,
+        "digest": 4580847345750991420
+      }
+    },
+    {
+      "id": "AMP_A_Samsung_6.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_A_Samsung_6.bit",
+      "sha256": "51ce631db13a8207706182544d9ec9c69aacb85ead5805dd2b3196e352100183",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 2096976,
+        "digest": 14836090932387663465
+      }
+    },
+    {
+      "id": "AMP_A_Samsung_6.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_A_Samsung_6.bit",
+      "sha256": "51ce631db13a8207706182544d9ec9c69aacb85ead5805dd2b3196e352100183",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 2096976,
+        "digest": 14836090932387663465
+      }
+    },
+    {
+      "id": "AMP_B_Samsung_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_B_Samsung_4.bit",
+      "sha256": "45f811c3bdf9179fb676b7b549662d99da1acdd09b2aacb8c0c1eb76fdc97fb3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 763633,
+        "digest": 14757484898352502297
+      }
+    },
+    {
+      "id": "AMP_B_Samsung_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_B_Samsung_4.bit",
+      "sha256": "45f811c3bdf9179fb676b7b549662d99da1acdd09b2aacb8c0c1eb76fdc97fb3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 763633,
+        "digest": 14757484898352502297
+      }
+    },
+    {
+      "id": "AMP_B_Samsung_6.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_B_Samsung_6.bit",
+      "sha256": "2746c8e9ad165bae79cb71b29ddf777c33133cafed8b7ae02457bb6f3757ba33",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 763599,
+        "digest": 3431381860723850197
+      }
+    },
+    {
+      "id": "AMP_B_Samsung_6.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_B_Samsung_6.bit",
+      "sha256": "2746c8e9ad165bae79cb71b29ddf777c33133cafed8b7ae02457bb6f3757ba33",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 763599,
+        "digest": 3431381860723850197
+      }
+    },
+    {
+      "id": "AMP_D_Hisilicon.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_D_Hisilicon.bit",
+      "sha256": "a0d7fea2136ae47739bab1fa8c760705538a20b35467f34606f4bf9da5019a63",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 715534,
+        "digest": 12956807963589796596
+      }
+    },
+    {
+      "id": "AMP_D_Hisilicon.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_D_Hisilicon.bit",
+      "sha256": "a0d7fea2136ae47739bab1fa8c760705538a20b35467f34606f4bf9da5019a63",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 715534,
+        "digest": 12956807963589796596
+      }
+    },
+    {
+      "id": "AMP_E_Hisilicon.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_E_Hisilicon.bit",
+      "sha256": "2088d96297504a1e56da30a530d321fd1380ae48aeac7357d925da7b09f850dd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 807087,
+        "digest": 7389488888014048492
+      }
+    },
+    {
+      "id": "AMP_E_Hisilicon.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_E_Hisilicon.bit",
+      "sha256": "2088d96297504a1e56da30a530d321fd1380ae48aeac7357d925da7b09f850dd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 807087,
+        "digest": 7389488888014048492
+      }
+    },
+    {
+      "id": "AMP_F_Hisilicon_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_F_Hisilicon_3.bit",
+      "sha256": "5976368a7f37557cdbc6d8313bf16419a7b533bef9b73e8afced86c23be9c208",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 557269,
+        "digest": 101153657685714631
+      }
+    },
+    {
+      "id": "AMP_F_Hisilicon_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMP_F_Hisilicon_3.bit",
+      "sha256": "5976368a7f37557cdbc6d8313bf16419a7b533bef9b73e8afced86c23be9c208",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 557269,
+        "digest": 101153657685714631
+      }
+    },
+    {
+      "id": "AMVP_A_MTK_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_A_MTK_4.bit",
+      "sha256": "dcbc3c321e66f8d4b06481ffbdb2e02214d83f60db5868823938715cfd275371",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 17811,
+        "digest": 8338044842518596249
+      }
+    },
+    {
+      "id": "AMVP_A_MTK_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_A_MTK_4.bit",
+      "sha256": "dcbc3c321e66f8d4b06481ffbdb2e02214d83f60db5868823938715cfd275371",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 17811,
+        "digest": 8338044842518596249
+      }
+    },
+    {
+      "id": "AMVP_B_MTK_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_B_MTK_4.bit",
+      "sha256": "6f863212547479c25f8f7d85b25d5ca6a1528cbc9e0ee6ff3fad799122d6c632",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 23975,
+        "digest": 15941918213043936721
+      }
+    },
+    {
+      "id": "AMVP_B_MTK_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_B_MTK_4.bit",
+      "sha256": "6f863212547479c25f8f7d85b25d5ca6a1528cbc9e0ee6ff3fad799122d6c632",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 23975,
+        "digest": 15941918213043936721
+      }
+    },
+    {
+      "id": "AMVP_C_Samsung_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_C_Samsung_4.bit",
+      "sha256": "4ce220e37329844b41628a9876df32d8d6e645b2ca78aece7fdf9aef474c874d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 748401,
+        "digest": 5855174313056675205
+      }
+    },
+    {
+      "id": "AMVP_C_Samsung_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_C_Samsung_4.bit",
+      "sha256": "4ce220e37329844b41628a9876df32d8d6e645b2ca78aece7fdf9aef474c874d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 748401,
+        "digest": 5855174313056675205
+      }
+    },
+    {
+      "id": "AMVP_C_Samsung_6.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_C_Samsung_6.bit",
+      "sha256": "256557367fc76454fcecda698c749c230c2477da1449ab416e780ea2f0452d62",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 749698,
+        "digest": 17384898006469421724
+      }
+    },
+    {
+      "id": "AMVP_C_Samsung_6.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/AMVP_C_Samsung_6.bit",
+      "sha256": "256557367fc76454fcecda698c749c230c2477da1449ab416e780ea2f0452d62",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 749698,
+        "digest": 17384898006469421724
+      }
+    },
+    {
+      "id": "BUMPING_A_ericsson_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/BUMPING_A_ericsson_1.bit",
+      "sha256": "817ba50355043ac04abd76898e0d7d713c7055fee4524f22f24ddae6500577d9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 527550,
+        "digest": 6354527650797106387
+      }
+    },
+    {
+      "id": "BUMPING_A_ericsson_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/BUMPING_A_ericsson_1.bit",
+      "sha256": "817ba50355043ac04abd76898e0d7d713c7055fee4524f22f24ddae6500577d9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 66,
+        "bytes": 527550,
+        "digest": 6354527650797106387
+      }
+    },
+    {
+      "id": "CAINIT_A_SHARP_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_A_SHARP_4.bit",
+      "sha256": "e7a4b9ab27dde802001582e8a189aaf8a72e7a95480b22c002a725fa02d25105",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 110099,
+        "digest": 162530615505734549
+      }
+    },
+    {
+      "id": "CAINIT_A_SHARP_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_A_SHARP_4.bit",
+      "sha256": "e7a4b9ab27dde802001582e8a189aaf8a72e7a95480b22c002a725fa02d25105",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 110099,
+        "digest": 162530615505734549
+      }
+    },
+    {
+      "id": "CAINIT_B_SHARP_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_B_SHARP_4.bit",
+      "sha256": "d7f9bef49ab3c32bd6c53124f9c8f5e853b6706d6f32d2551046dea7ca2f4746",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 110212,
+        "digest": 11368699454785620732
+      }
+    },
+    {
+      "id": "CAINIT_B_SHARP_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_B_SHARP_4.bit",
+      "sha256": "d7f9bef49ab3c32bd6c53124f9c8f5e853b6706d6f32d2551046dea7ca2f4746",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 110212,
+        "digest": 11368699454785620732
+      }
+    },
+    {
+      "id": "CAINIT_C_SHARP_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_C_SHARP_3.bit",
+      "sha256": "bfdf239164cef54252ead77cd76cd436b96847b1a0b7ccba547fbb601e4a34f1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 111971,
+        "digest": 6257131617972307790
+      }
+    },
+    {
+      "id": "CAINIT_C_SHARP_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_C_SHARP_3.bit",
+      "sha256": "bfdf239164cef54252ead77cd76cd436b96847b1a0b7ccba547fbb601e4a34f1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 111971,
+        "digest": 6257131617972307790
+      }
+    },
+    {
+      "id": "CAINIT_D_SHARP_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_D_SHARP_3.bit",
+      "sha256": "7bb128ed1ca68961548fe8bc749d66665651387d4cf2a45c6fdcdc713dd4f5b8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 107575,
+        "digest": 4010839127944377252
+      }
+    },
+    {
+      "id": "CAINIT_D_SHARP_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_D_SHARP_3.bit",
+      "sha256": "7bb128ed1ca68961548fe8bc749d66665651387d4cf2a45c6fdcdc713dd4f5b8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 107575,
+        "digest": 4010839127944377252
+      }
+    },
+    {
+      "id": "CAINIT_E_SHARP_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_E_SHARP_3.bit",
+      "sha256": "ef55f131f79e2f7f376131a68118ff41d89e7bdf9a02fc7e5b5aeb85563a3dfa",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 114648,
+        "digest": 18091741296052803753
+      }
+    },
+    {
+      "id": "CAINIT_E_SHARP_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_E_SHARP_3.bit",
+      "sha256": "ef55f131f79e2f7f376131a68118ff41d89e7bdf9a02fc7e5b5aeb85563a3dfa",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 114648,
+        "digest": 18091741296052803753
+      }
+    },
+    {
+      "id": "CAINIT_F_SHARP_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_F_SHARP_3.bit",
+      "sha256": "eac6cebd384d31fbcea7983b17bb76290d77f865a3932ff1f05a4412cbcf9cfc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 109770,
+        "digest": 13484326784613668895
+      }
+    },
+    {
+      "id": "CAINIT_F_SHARP_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_F_SHARP_3.bit",
+      "sha256": "eac6cebd384d31fbcea7983b17bb76290d77f865a3932ff1f05a4412cbcf9cfc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 109770,
+        "digest": 13484326784613668895
+      }
+    },
+    {
+      "id": "CAINIT_G_SHARP_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_G_SHARP_3.bit",
+      "sha256": "caf40ca73dfea0efe2a8f7010036b25176d85d6959b12b5456fdaab44fd2d61d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 126431,
+        "digest": 17080728680402585547
+      }
+    },
+    {
+      "id": "CAINIT_G_SHARP_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_G_SHARP_3.bit",
+      "sha256": "caf40ca73dfea0efe2a8f7010036b25176d85d6959b12b5456fdaab44fd2d61d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 126431,
+        "digest": 17080728680402585547
+      }
+    },
+    {
+      "id": "CAINIT_H_SHARP_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_H_SHARP_3.bit",
+      "sha256": "c658a14f3ae68bb137c37989d1789a2b09e0f313ea8739a02966207f7d64c0c9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 122377,
+        "digest": 14059791411872221520
+      }
+    },
+    {
+      "id": "CAINIT_H_SHARP_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CAINIT_H_SHARP_3.bit",
+      "sha256": "c658a14f3ae68bb137c37989d1789a2b09e0f313ea8739a02966207f7d64c0c9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 122377,
+        "digest": 14059791411872221520
+      }
+    },
+    {
+      "id": "CIP_A_Panasonic_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CIP_A_Panasonic_3.bit",
+      "sha256": "19f6a710e8b2c66f393392af24c11e5fbba10a5c9f6f28c8b26949942f384c1c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 11957,
+        "digest": 11753501061883197274
+      }
+    },
+    {
+      "id": "CIP_A_Panasonic_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CIP_A_Panasonic_3.bit",
+      "sha256": "19f6a710e8b2c66f393392af24c11e5fbba10a5c9f6f28c8b26949942f384c1c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 11957,
+        "digest": 11753501061883197274
+      }
+    },
+    {
+      "id": "CIP_C_Panasonic_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CIP_C_Panasonic_2.bit",
+      "sha256": "1a696ecc7520b23c89ac6daca7ab1f1f325a01dc01845ba352528be775456ed5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12928,
+        "digest": 508524124109816108
+      }
+    },
+    {
+      "id": "CIP_C_Panasonic_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CIP_C_Panasonic_2.bit",
+      "sha256": "1a696ecc7520b23c89ac6daca7ab1f1f325a01dc01845ba352528be775456ed5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 12928,
+        "digest": 508524124109816108
+      }
+    },
+    {
+      "id": "CONFWIN_A_Sony_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CONFWIN_A_Sony_1.bit",
+      "sha256": "688c2684539ffdca60335e7da650da0236f76c20179c844a33395cceaebb1ca3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 283483,
+        "digest": 3092389772339920945
+      }
+    },
+    {
+      "id": "CONFWIN_A_Sony_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/CONFWIN_A_Sony_1.bit",
+      "sha256": "688c2684539ffdca60335e7da650da0236f76c20179c844a33395cceaebb1ca3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 283483,
+        "digest": 3092389772339920945
+      }
+    },
+    {
+      "id": "DBLK_A_MAIN10_VIXS_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_A_MAIN10_VIXS_2.bit",
+      "sha256": "7da55ba87bf18ce1c2edf41dabcf3a3eb44f19a65d5da78ee8010a75e17d0d77",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 100467,
+        "digest": 18390299266636023404
+      }
+    },
+    {
+      "id": "DBLK_A_MAIN10_VIXS_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_A_MAIN10_VIXS_2.bit",
+      "sha256": "7da55ba87bf18ce1c2edf41dabcf3a3eb44f19a65d5da78ee8010a75e17d0d77",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 100467,
+        "digest": 18390299266636023404
+      }
+    },
+    {
+      "id": "DBLK_A_MAIN10_VIXS_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_A_MAIN10_VIXS_3.bit",
+      "sha256": "96c4f1a6b824cc51433d87ebc11bffcc6c2fe3de3ed18339316803e8bbc9be17",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 100468,
+        "digest": 16263979381436470328
+      }
+    },
+    {
+      "id": "DBLK_A_MAIN10_VIXS_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_A_MAIN10_VIXS_3.bit",
+      "sha256": "96c4f1a6b824cc51433d87ebc11bffcc6c2fe3de3ed18339316803e8bbc9be17",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 100468,
+        "digest": 16263979381436470328
+      }
+    },
+    {
+      "id": "DBLK_A_SONY_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_A_SONY_3.bit",
+      "sha256": "d61a13e04a1678816c0f16cf7a47f5bb918de95ecf1b6fab305e2390c3dd7de9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 279115,
+        "digest": 5172178457865839840
+      }
+    },
+    {
+      "id": "DBLK_A_SONY_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_A_SONY_3.bit",
+      "sha256": "d61a13e04a1678816c0f16cf7a47f5bb918de95ecf1b6fab305e2390c3dd7de9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 279115,
+        "digest": 5172178457865839840
+      }
+    },
+    {
+      "id": "DBLK_B_SONY_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_B_SONY_3.bit",
+      "sha256": "1800b72fdf655d1ad399ff4d35fb2789c2b89640c95045e3c1502c74efa232b0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 75869,
+        "digest": 9947904514010748892
+      }
+    },
+    {
+      "id": "DBLK_B_SONY_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_B_SONY_3.bit",
+      "sha256": "1800b72fdf655d1ad399ff4d35fb2789c2b89640c95045e3c1502c74efa232b0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 75869,
+        "digest": 9947904514010748892
+      }
+    },
+    {
+      "id": "DBLK_C_SONY_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_C_SONY_3.bit",
+      "sha256": "039835a155f8e72c5f3876ec63d0667e06928959d2767dd1764f1148d2d8c2e2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 851236,
+        "digest": 18063554311650958735
+      }
+    },
+    {
+      "id": "DBLK_C_SONY_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_C_SONY_3.bit",
+      "sha256": "039835a155f8e72c5f3876ec63d0667e06928959d2767dd1764f1148d2d8c2e2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 851236,
+        "digest": 18063554311650958735
+      }
+    },
+    {
+      "id": "DBLK_D_VIXS_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_D_VIXS_1.bit",
+      "sha256": "b1b3b1fbff7ece03229180be508a5534ff3a352f74e5ca416c14f48f46ca4389",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 17407,
+        "digest": 17146237788774257154
+      }
+    },
+    {
+      "id": "DBLK_D_VIXS_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_D_VIXS_1.bit",
+      "sha256": "b1b3b1fbff7ece03229180be508a5534ff3a352f74e5ca416c14f48f46ca4389",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 17407,
+        "digest": 17146237788774257154
+      }
+    },
+    {
+      "id": "DBLK_D_VIXS_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_D_VIXS_2.bit",
+      "sha256": "7ac7196d25d339ba2be54b50d184463d47b8ba546cbb8c0a2a8882043bda1056",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 17403,
+        "digest": 10563818602094891223
+      }
+    },
+    {
+      "id": "DBLK_D_VIXS_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_D_VIXS_2.bit",
+      "sha256": "7ac7196d25d339ba2be54b50d184463d47b8ba546cbb8c0a2a8882043bda1056",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 17403,
+        "digest": 10563818602094891223
+      }
+    },
+    {
+      "id": "DBLK_E_VIXS_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_E_VIXS_1.bit",
+      "sha256": "cd67b201dd80c56d58a024749549a8944b773f0240268ac7c7007f8e9aa9dd0d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 20845,
+        "digest": 10090752861352970246
+      }
+    },
+    {
+      "id": "DBLK_E_VIXS_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_E_VIXS_1.bit",
+      "sha256": "cd67b201dd80c56d58a024749549a8944b773f0240268ac7c7007f8e9aa9dd0d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 20845,
+        "digest": 10090752861352970246
+      }
+    },
+    {
+      "id": "DBLK_E_VIXS_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_E_VIXS_2.bit",
+      "sha256": "1e48dc12c9107f28463772b5ea1de31201181b0c4b66b11f66f4aa13ac26ce74",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26468,
+        "digest": 4921590897972601224
+      }
+    },
+    {
+      "id": "DBLK_E_VIXS_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_E_VIXS_2.bit",
+      "sha256": "1e48dc12c9107f28463772b5ea1de31201181b0c4b66b11f66f4aa13ac26ce74",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26468,
+        "digest": 4921590897972601224
+      }
+    },
+    {
+      "id": "DBLK_F_VIXS_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_F_VIXS_1.bit",
+      "sha256": "e2fd34a7cbcda21c669f09a94d2be3439be0471044cc97eaf78eb66a965e801b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26468,
+        "digest": 14090421819908523031
+      }
+    },
+    {
+      "id": "DBLK_F_VIXS_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_F_VIXS_1.bit",
+      "sha256": "e2fd34a7cbcda21c669f09a94d2be3439be0471044cc97eaf78eb66a965e801b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26468,
+        "digest": 14090421819908523031
+      }
+    },
+    {
+      "id": "DBLK_F_VIXS_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_F_VIXS_2.bit",
+      "sha256": "726c5fe34048cb3e19f69d28f9bec067bc632b13637e452fb0a536a1e32d93dd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26469,
+        "digest": 4657693079710538112
+      }
+    },
+    {
+      "id": "DBLK_F_VIXS_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_F_VIXS_2.bit",
+      "sha256": "726c5fe34048cb3e19f69d28f9bec067bc632b13637e452fb0a536a1e32d93dd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26469,
+        "digest": 4657693079710538112
+      }
+    },
+    {
+      "id": "DBLK_G_VIXS_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_G_VIXS_1.bit",
+      "sha256": "b8fb975fbd4b719cc420d8026f9fbf61a76f9d23be4eb744d05df109102256a0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26345,
+        "digest": 5038980193711518455
+      }
+    },
+    {
+      "id": "DBLK_G_VIXS_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_G_VIXS_1.bit",
+      "sha256": "b8fb975fbd4b719cc420d8026f9fbf61a76f9d23be4eb744d05df109102256a0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26345,
+        "digest": 5038980193711518455
+      }
+    },
+    {
+      "id": "DBLK_G_VIXS_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_G_VIXS_2.bit",
+      "sha256": "1e48dc12c9107f28463772b5ea1de31201181b0c4b66b11f66f4aa13ac26ce74",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26468,
+        "digest": 4921590897972601224
+      }
+    },
+    {
+      "id": "DBLK_G_VIXS_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DBLK_G_VIXS_2.bit",
+      "sha256": "1e48dc12c9107f28463772b5ea1de31201181b0c4b66b11f66f4aa13ac26ce74",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 26468,
+        "digest": 4921590897972601224
+      }
+    },
+    {
+      "id": "DELTAQP_A_BRCM_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DELTAQP_A_BRCM_4.bit",
+      "sha256": "1274e3e308dfe684b38a88f8b3a2845b84f57492b0b02aaecbe5dc29ca8ed532",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 97,
+        "bytes": 9487729,
+        "digest": 334786285071851359
+      }
+    },
+    {
+      "id": "DELTAQP_A_BRCM_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DELTAQP_A_BRCM_4.bit",
+      "sha256": "1274e3e308dfe684b38a88f8b3a2845b84f57492b0b02aaecbe5dc29ca8ed532",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 97,
+        "bytes": 9487729,
+        "digest": 334786285071851359
+      }
+    },
+    {
+      "id": "DELTAQP_B_SONY_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DELTAQP_B_SONY_3.bit",
+      "sha256": "07b8fa589e71be769874d95a480e6c253ce8dfc730dc05ec1ad24c444752e5ee",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 5372548,
+        "digest": 13328981824400941046
+      }
+    },
+    {
+      "id": "DELTAQP_B_SONY_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DELTAQP_B_SONY_3.bit",
+      "sha256": "07b8fa589e71be769874d95a480e6c253ce8dfc730dc05ec1ad24c444752e5ee",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 5372548,
+        "digest": 13328981824400941046
+      }
+    },
+    {
+      "id": "DELTAQP_C_SONY_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DELTAQP_C_SONY_3.bit",
+      "sha256": "4fc85c7ba2be608b3aa5ec3be4cf4e9c21c390ca48335b4c99e6fe4e429e8fe3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 1380367,
+        "digest": 317813002110280573
+      }
+    },
+    {
+      "id": "DELTAQP_C_SONY_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DELTAQP_C_SONY_3.bit",
+      "sha256": "4fc85c7ba2be608b3aa5ec3be4cf4e9c21c390ca48335b4c99e6fe4e429e8fe3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 30,
+        "bytes": 1380367,
+        "digest": 317813002110280573
+      }
+    },
+    {
+      "id": "DSLICE_A_HHI_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DSLICE_A_HHI_5.bit",
+      "sha256": "8398fb23c814a197bba497ad2c6103f81ca8003434fa40ec347d4d0a07c9468a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 373328,
+        "digest": 7190035057377353757
+      }
+    },
+    {
+      "id": "DSLICE_A_HHI_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DSLICE_A_HHI_5.bit",
+      "sha256": "8398fb23c814a197bba497ad2c6103f81ca8003434fa40ec347d4d0a07c9468a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 373328,
+        "digest": 7190035057377353757
+      }
+    },
+    {
+      "id": "DSLICE_B_HHI_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DSLICE_B_HHI_5.bit",
+      "sha256": "db582f1181f3b8ed3beeb32246a1a99123700dbdc3d3be4e1797032fcd46c486",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 379617,
+        "digest": 13000687272922678790
+      }
+    },
+    {
+      "id": "DSLICE_B_HHI_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DSLICE_B_HHI_5.bit",
+      "sha256": "db582f1181f3b8ed3beeb32246a1a99123700dbdc3d3be4e1797032fcd46c486",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 379617,
+        "digest": 13000687272922678790
+      }
+    },
+    {
+      "id": "DSLICE_C_HHI_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DSLICE_C_HHI_5.bit",
+      "sha256": "f162007f604aa0e48229c4153f940fd5f24db955ad158d11e2bd46c89c49ca76",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 373275,
+        "digest": 3893497667629713278
+      }
+    },
+    {
+      "id": "DSLICE_C_HHI_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/DSLICE_C_HHI_5.bit",
+      "sha256": "f162007f604aa0e48229c4153f940fd5f24db955ad158d11e2bd46c89c49ca76",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 373275,
+        "digest": 3893497667629713278
+      }
+    },
+    {
+      "id": "ENTP_A_LG_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_A_LG_2.bit",
+      "sha256": "776f1c785b90dd50a9c1eb4000691ccd86b8f22017894cef011e448391eee7cb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 140782,
+        "digest": 11288790227629330015
+      }
+    },
+    {
+      "id": "ENTP_A_LG_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_A_LG_2.bit",
+      "sha256": "776f1c785b90dd50a9c1eb4000691ccd86b8f22017894cef011e448391eee7cb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 140782,
+        "digest": 11288790227629330015
+      }
+    },
+    {
+      "id": "ENTP_A_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_A_Qualcomm_1.bit",
+      "sha256": "1dc1dfb16f676f59cebde3a4732209ce5ce0d0f49ef697970987c0c3e0e087b1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 2623324,
+        "digest": 3001257977227683999
+      }
+    },
+    {
+      "id": "ENTP_A_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_A_Qualcomm_1.bit",
+      "sha256": "1dc1dfb16f676f59cebde3a4732209ce5ce0d0f49ef697970987c0c3e0e087b1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 2623324,
+        "digest": 3001257977227683999
+      }
+    },
+    {
+      "id": "ENTP_B_LG_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_B_LG_2.bit",
+      "sha256": "e437bf31ee60bea1e114817b24283e51351f407a7dafca79d8a00abe80517001",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 141176,
+        "digest": 11720458166190289649
+      }
+    },
+    {
+      "id": "ENTP_B_LG_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_B_LG_2.bit",
+      "sha256": "e437bf31ee60bea1e114817b24283e51351f407a7dafca79d8a00abe80517001",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 141176,
+        "digest": 11720458166190289649
+      }
+    },
+    {
+      "id": "ENTP_B_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_B_Qualcomm_1.bit",
+      "sha256": "8f7320cc17416a1a4b53d01b94b031edd01c804affad3474b58d910a23af3bd4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 311296,
+        "digest": 1894199838256226645
+      }
+    },
+    {
+      "id": "ENTP_B_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_B_Qualcomm_1.bit",
+      "sha256": "8f7320cc17416a1a4b53d01b94b031edd01c804affad3474b58d910a23af3bd4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 311296,
+        "digest": 1894199838256226645
+      }
+    },
+    {
+      "id": "ENTP_C_LG_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_C_LG_3.bit",
+      "sha256": "701be23df18ed14f9c03b4f23f2c2974fe75d7e83e0401d8f88a5bd2d8d07dc8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 5371407,
+        "digest": 1353560202735315945
+      }
+    },
+    {
+      "id": "ENTP_C_LG_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_C_LG_3.bit",
+      "sha256": "701be23df18ed14f9c03b4f23f2c2974fe75d7e83e0401d8f88a5bd2d8d07dc8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 5371407,
+        "digest": 1353560202735315945
+      }
+    },
+    {
+      "id": "ENTP_C_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_C_Qualcomm_1.bit",
+      "sha256": "993cd68f0e749cd1d9ce7cc3a368b4df26dccf07ded91048100217b9a0c56d28",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 218579,
+        "digest": 16229888178135836159
+      }
+    },
+    {
+      "id": "ENTP_C_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ENTP_C_Qualcomm_1.bit",
+      "sha256": "993cd68f0e749cd1d9ce7cc3a368b4df26dccf07ded91048100217b9a0c56d28",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 218579,
+        "digest": 16229888178135836159
+      }
+    },
+    {
+      "id": "EXT_A_ericsson_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/EXT_A_ericsson_3.bit",
+      "sha256": "63f4532b481122f883d355d2d5d9a54b850a1dac3363385e0d2bfb63fedfc3dc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 27620,
+        "digest": 17342337962670657780
+      }
+    },
+    {
+      "id": "EXT_A_ericsson_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/EXT_A_ericsson_3.bit",
+      "sha256": "63f4532b481122f883d355d2d5d9a54b850a1dac3363385e0d2bfb63fedfc3dc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 27620,
+        "digest": 17342337962670657780
+      }
+    },
+    {
+      "id": "EXT_A_ericsson_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/EXT_A_ericsson_4.bit",
+      "sha256": "1322c36a7c283f258fed90fc15f6f8dfe40bd621b090716dde9cce5c06f71e05",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 27554,
+        "digest": 17227541600415789510
+      }
+    },
+    {
+      "id": "EXT_A_ericsson_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/EXT_A_ericsson_4.bit",
+      "sha256": "1322c36a7c283f258fed90fc15f6f8dfe40bd621b090716dde9cce5c06f71e05",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 27554,
+        "digest": 17227541600415789510
+      }
+    },
+    {
+      "id": "FILLER_A_Sony_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/FILLER_A_Sony_1.bit",
+      "sha256": "63669795a10c50c898ef19bd75568cd8a6ae0a16797898f629692d4c6315fa31",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 285041,
+        "digest": 2499604537682667313
+      }
+    },
+    {
+      "id": "FILLER_A_Sony_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/FILLER_A_Sony_1.bit",
+      "sha256": "63669795a10c50c898ef19bd75568cd8a6ae0a16797898f629692d4c6315fa31",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 285041,
+        "digest": 2499604537682667313
+      }
+    },
+    {
+      "id": "HRD_A_Fujitsu_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/HRD_A_Fujitsu_2.bit",
+      "sha256": "76a22e1d92a15ad5b0e9ef6d9c337094ee36ff973a7366c976c38aeb8082a21d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 149511,
+        "digest": 3378984554492891875
+      }
+    },
+    {
+      "id": "HRD_A_Fujitsu_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/HRD_A_Fujitsu_2.bit",
+      "sha256": "76a22e1d92a15ad5b0e9ef6d9c337094ee36ff973a7366c976c38aeb8082a21d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 149511,
+        "digest": 3378984554492891875
+      }
+    },
+    {
+      "id": "HRD_A_Fujitsu_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/HRD_A_Fujitsu_3.bit",
+      "sha256": "61af83565147e9dc23842847111e748d32d95830d88cd3855a66143ea08d6915",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 149080,
+        "digest": 14583321255859405391
+      }
+    },
+    {
+      "id": "HRD_A_Fujitsu_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/HRD_A_Fujitsu_3.bit",
+      "sha256": "61af83565147e9dc23842847111e748d32d95830d88cd3855a66143ea08d6915",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 149080,
+        "digest": 14583321255859405391
+      }
+    },
+    {
+      "id": "INITQP_A_Sony_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/INITQP_A_Sony_1.bit",
+      "sha256": "24bdf9511d93696aff09568f8698edae81fff52a6b551fc7d79965f8b4e10cab",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 289114,
+        "digest": 6780085019163445141
+      }
+    },
+    {
+      "id": "INITQP_A_Sony_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/INITQP_A_Sony_1.bit",
+      "sha256": "24bdf9511d93696aff09568f8698edae81fff52a6b551fc7d79965f8b4e10cab",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 289114,
+        "digest": 6780085019163445141
+      }
+    },
+    {
+      "id": "INITQP_B_Sony_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/INITQP_B_Sony_1.bit",
+      "sha256": "47a3eeabb3896b0af8f60c7a32475d69047409d609a740ef8b65c50c36c01401",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 90,
+        "bytes": 406866,
+        "digest": 12520646322697049748
+      }
+    },
+    {
+      "id": "INITQP_B_Sony_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/INITQP_B_Sony_1.bit",
+      "sha256": "47a3eeabb3896b0af8f60c7a32475d69047409d609a740ef8b65c50c36c01401",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 90,
+        "bytes": 406866,
+        "digest": 12520646322697049748
+      }
+    },
+    {
+      "id": "IPCM_A_RExt_NEC.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPCM_A_RExt_NEC.bit",
+      "sha256": "0e707edd0d6c46427bddff2ded8dafe2420ffe1bc57a81501097d068ae293562",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4255,
+        "digest": 13223966356006881601
+      }
+    },
+    {
+      "id": "IPCM_A_RExt_NEC.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPCM_A_RExt_NEC.bit",
+      "sha256": "0e707edd0d6c46427bddff2ded8dafe2420ffe1bc57a81501097d068ae293562",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4255,
+        "digest": 13223966356006881601
+      }
+    },
+    {
+      "id": "IPCM_B_RExt_NEC.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPCM_B_RExt_NEC.bit",
+      "sha256": "39f97b25079ce5f12340cce43c9dbd5821c5e23f44da58dd6f1942e135bc93b5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4973,
+        "digest": 4598703512131789739
+      }
+    },
+    {
+      "id": "IPCM_B_RExt_NEC.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPCM_B_RExt_NEC.bit",
+      "sha256": "39f97b25079ce5f12340cce43c9dbd5821c5e23f44da58dd6f1942e135bc93b5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 4973,
+        "digest": 4598703512131789739
+      }
+    },
+    {
+      "id": "IPRED_A_docomo_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_A_docomo_2.bit",
+      "sha256": "db440d8ce43ba3706a42b7c42095464dace247dbc4651d37c9787e5eb4aa3875",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 335377,
+        "digest": 16198887932026539405
+      }
+    },
+    {
+      "id": "IPRED_A_docomo_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_A_docomo_2.bit",
+      "sha256": "db440d8ce43ba3706a42b7c42095464dace247dbc4651d37c9787e5eb4aa3875",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 335377,
+        "digest": 16198887932026539405
+      }
+    },
+    {
+      "id": "IPRED_B_Nokia_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_B_Nokia_3.bit",
+      "sha256": "456608ae5c14fea0496d770ae9614cd3d7c6ae98c14b22d64bbd96b37f49d7a0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29168,
+        "digest": 16532705761564836570
+      }
+    },
+    {
+      "id": "IPRED_B_Nokia_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_B_Nokia_3.bit",
+      "sha256": "456608ae5c14fea0496d770ae9614cd3d7c6ae98c14b22d64bbd96b37f49d7a0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 29168,
+        "digest": 16532705761564836570
+      }
+    },
+    {
+      "id": "IPRED_C_Mitsubishi_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_C_Mitsubishi_2.bit",
+      "sha256": "c4bf9e2b266c62b3faedba7eb2c78ab7935f07acab250cfb4d82f5cc106a19ec",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 163252,
+        "digest": 4274633797802281950
+      }
+    },
+    {
+      "id": "IPRED_C_Mitsubishi_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_C_Mitsubishi_2.bit",
+      "sha256": "c4bf9e2b266c62b3faedba7eb2c78ab7935f07acab250cfb4d82f5cc106a19ec",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 163252,
+        "digest": 4274633797802281950
+      }
+    },
+    {
+      "id": "IPRED_C_Mitsubishi_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_C_Mitsubishi_3.bit",
+      "sha256": "dbad5ee9c095c0336deb4ab7c7785153da20f10ef941cac0fd27c04cb9c9ec95",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 257348,
+        "digest": 14072542169782938774
+      }
+    },
+    {
+      "id": "IPRED_C_Mitsubishi_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/IPRED_C_Mitsubishi_3.bit",
+      "sha256": "dbad5ee9c095c0336deb4ab7c7785153da20f10ef941cac0fd27c04cb9c9ec95",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 4,
+        "bytes": 257348,
+        "digest": 14072542169782938774
+      }
+    },
+    {
+      "id": "LS_A_Orange_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LS_A_Orange_2.bit",
+      "sha256": "14251238f005a4576437429a327b34d216b346aaac2a7a05c132a3430174b11b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 593001,
+        "digest": 17127080846054918558
+      }
+    },
+    {
+      "id": "LS_A_Orange_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LS_A_Orange_2.bit",
+      "sha256": "14251238f005a4576437429a327b34d216b346aaac2a7a05c132a3430174b11b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 593001,
+        "digest": 17127080846054918558
+      }
+    },
+    {
+      "id": "LS_B_ORANGE_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LS_B_ORANGE_3.bit",
+      "sha256": "0d9a71541f971d7694dda1c829377cf1a30c6c55f8e2c39fecb6b24ff9e82519",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 3699418,
+        "digest": 13270144409965198682
+      }
+    },
+    {
+      "id": "LS_B_ORANGE_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LS_B_ORANGE_3.bit",
+      "sha256": "0d9a71541f971d7694dda1c829377cf1a30c6c55f8e2c39fecb6b24ff9e82519",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 3699418,
+        "digest": 13270144409965198682
+      }
+    },
+    {
+      "id": "LS_B_ORANGE_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LS_B_ORANGE_4.bit",
+      "sha256": "0d9a71541f971d7694dda1c829377cf1a30c6c55f8e2c39fecb6b24ff9e82519",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 3699418,
+        "digest": 13270144409965198682
+      }
+    },
+    {
+      "id": "LS_B_ORANGE_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LS_B_ORANGE_4.bit",
+      "sha256": "0d9a71541f971d7694dda1c829377cf1a30c6c55f8e2c39fecb6b24ff9e82519",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 3699418,
+        "digest": 13270144409965198682
+      }
+    },
+    {
+      "id": "LTRPSPS_A_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LTRPSPS_A_Qualcomm_1.bit",
+      "sha256": "8f8e50fa408b7e96e76e6936b380fc34c208271efb8c283b15a42cb1f8c78ae7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 500,
+        "bytes": 490554,
+        "digest": 6276951066972399104
+      }
+    },
+    {
+      "id": "LTRPSPS_A_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/LTRPSPS_A_Qualcomm_1.bit",
+      "sha256": "8f8e50fa408b7e96e76e6936b380fc34c208271efb8c283b15a42cb1f8c78ae7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 500,
+        "bytes": 490554,
+        "digest": 6276951066972399104
+      }
+    },
+    {
+      "id": "MAXBINS_A_TI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MAXBINS_A_TI_4.bit",
+      "sha256": "501c050b158e4effe69256d23b42c9c9842f938a7eb59ee2291db9eb811ee9c0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 442541,
+        "digest": 16290605460495697395
+      }
+    },
+    {
+      "id": "MAXBINS_A_TI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MAXBINS_A_TI_4.bit",
+      "sha256": "501c050b158e4effe69256d23b42c9c9842f938a7eb59ee2291db9eb811ee9c0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 442541,
+        "digest": 16290605460495697395
+      }
+    },
+    {
+      "id": "MAXBINS_B_TI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MAXBINS_B_TI_4.bit",
+      "sha256": "75205b9b52539d96e3f7770d14adf1a25da3000f2c58f7cefe1772b2b829b798",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 232973,
+        "digest": 9041385569997994306
+      }
+    },
+    {
+      "id": "MAXBINS_B_TI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MAXBINS_B_TI_4.bit",
+      "sha256": "75205b9b52539d96e3f7770d14adf1a25da3000f2c58f7cefe1772b2b829b798",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 232973,
+        "digest": 9041385569997994306
+      }
+    },
+    {
+      "id": "MAXBINS_C_TI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MAXBINS_C_TI_4.bit",
+      "sha256": "6ae91c024db189a59abe82f7495ad79a7f276bca0bb0049c64e06fba6a98e056",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 232661,
+        "digest": 12866013432532599131
+      }
+    },
+    {
+      "id": "MAXBINS_C_TI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MAXBINS_C_TI_4.bit",
+      "sha256": "6ae91c024db189a59abe82f7495ad79a7f276bca0bb0049c64e06fba6a98e056",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 232661,
+        "digest": 12866013432532599131
+      }
+    },
+    {
+      "id": "MERGE_A_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_A_TI_3.bit",
+      "sha256": "0a84103e548cf8944851cc33c7826ea5213245fd94517fd1071895740abce749",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16374,
+        "digest": 1525227340376295906
+      }
+    },
+    {
+      "id": "MERGE_A_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_A_TI_3.bit",
+      "sha256": "0a84103e548cf8944851cc33c7826ea5213245fd94517fd1071895740abce749",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16374,
+        "digest": 1525227340376295906
+      }
+    },
+    {
+      "id": "MERGE_B_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_B_TI_3.bit",
+      "sha256": "a61399c23cff77098300cf96392cbcedd70c82c474458f8acf67a515df08cf19",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16082,
+        "digest": 5778724825701530789
+      }
+    },
+    {
+      "id": "MERGE_B_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_B_TI_3.bit",
+      "sha256": "a61399c23cff77098300cf96392cbcedd70c82c474458f8acf67a515df08cf19",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16082,
+        "digest": 5778724825701530789
+      }
+    },
+    {
+      "id": "MERGE_C_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_C_TI_3.bit",
+      "sha256": "42096904b2145ed70a556aba2921f5e97284c8330f9b2aee50a7a1eae589cb51",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 15995,
+        "digest": 3160669281428692251
+      }
+    },
+    {
+      "id": "MERGE_C_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_C_TI_3.bit",
+      "sha256": "42096904b2145ed70a556aba2921f5e97284c8330f9b2aee50a7a1eae589cb51",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 15995,
+        "digest": 3160669281428692251
+      }
+    },
+    {
+      "id": "MERGE_D_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_D_TI_3.bit",
+      "sha256": "60a43e5ca40baa0e77617b9b392a2b6c75950ca0a9f8314ac42b01aea1f9880d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16006,
+        "digest": 5202960875891997698
+      }
+    },
+    {
+      "id": "MERGE_D_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_D_TI_3.bit",
+      "sha256": "60a43e5ca40baa0e77617b9b392a2b6c75950ca0a9f8314ac42b01aea1f9880d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16006,
+        "digest": 5202960875891997698
+      }
+    },
+    {
+      "id": "MERGE_E_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_E_TI_3.bit",
+      "sha256": "e5f1f706176e91b72d13686b8864fe1c8e8be764faa417e3cabbf0df1cf78af0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 15971,
+        "digest": 6745168618001394277
+      }
+    },
+    {
+      "id": "MERGE_E_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_E_TI_3.bit",
+      "sha256": "e5f1f706176e91b72d13686b8864fe1c8e8be764faa417e3cabbf0df1cf78af0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 15971,
+        "digest": 6745168618001394277
+      }
+    },
+    {
+      "id": "MERGE_F_MTK_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_F_MTK_4.bit",
+      "sha256": "bdf3cdaf93284dfdabb4217bfa0e11ca2a54cd618e4d3b94ec131a1c73eabd36",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 24558,
+        "digest": 7783851799596495019
+      }
+    },
+    {
+      "id": "MERGE_F_MTK_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_F_MTK_4.bit",
+      "sha256": "bdf3cdaf93284dfdabb4217bfa0e11ca2a54cd618e4d3b94ec131a1c73eabd36",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 41,
+        "bytes": 24558,
+        "digest": 7783851799596495019
+      }
+    },
+    {
+      "id": "MERGE_G_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_G_HHI_4.bit",
+      "sha256": "a7b157215595b68ddbb70d952fb786923826c26ecc448bbfe36f4df47f9abc5c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66094,
+        "digest": 8406240595432272026
+      }
+    },
+    {
+      "id": "MERGE_G_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MERGE_G_HHI_4.bit",
+      "sha256": "a7b157215595b68ddbb70d952fb786923826c26ecc448bbfe36f4df47f9abc5c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66094,
+        "digest": 8406240595432272026
+      }
+    },
+    {
+      "id": "MVCLIP_A_qualcomm_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVCLIP_A_qualcomm_3.bit",
+      "sha256": "9b287e76e0aa6943239debb517250e26489e72ad1bf504b5b2dd77d2a57dcba5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 100306,
+        "digest": 4522586843321841455
+      }
+    },
+    {
+      "id": "MVCLIP_A_qualcomm_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVCLIP_A_qualcomm_3.bit",
+      "sha256": "9b287e76e0aa6943239debb517250e26489e72ad1bf504b5b2dd77d2a57dcba5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 100306,
+        "digest": 4522586843321841455
+      }
+    },
+    {
+      "id": "MVDL1ZERO_A_docomo_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVDL1ZERO_A_docomo_3.bit",
+      "sha256": "872a2ee8016796ffec9cf9d76fc91ce3a062ffb26a3d8468eac202367c2230ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 500,
+        "bytes": 1970408,
+        "digest": 1478966115963332381
+      }
+    },
+    {
+      "id": "MVDL1ZERO_A_docomo_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVDL1ZERO_A_docomo_3.bit",
+      "sha256": "872a2ee8016796ffec9cf9d76fc91ce3a062ffb26a3d8468eac202367c2230ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 500,
+        "bytes": 1970408,
+        "digest": 1478966115963332381
+      }
+    },
+    {
+      "id": "MVEDGE_A_qualcomm_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVEDGE_A_qualcomm_3.bit",
+      "sha256": "aa19456c21b304b23e7dc568e8546982d66547bba15225a5d13b65ea27befa10",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 51715,
+        "digest": 1017497047737237103
+      }
+    },
+    {
+      "id": "MVEDGE_A_qualcomm_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVEDGE_A_qualcomm_3.bit",
+      "sha256": "aa19456c21b304b23e7dc568e8546982d66547bba15225a5d13b65ea27befa10",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 51715,
+        "digest": 1017497047737237103
+      }
+    },
+    {
+      "id": "MVHEVCS_A.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_A.bit",
+      "sha256": "f9358ead8ba3f7433713f4429d20ba7c75878a2a19090730026bb0926a2e9fa2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 214382,
+        "digest": 3780897891551219783
+      }
+    },
+    {
+      "id": "MVHEVCS_A.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_A.bit",
+      "sha256": "f9358ead8ba3f7433713f4429d20ba7c75878a2a19090730026bb0926a2e9fa2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 214382,
+        "digest": 3780897891551219783
+      }
+    },
+    {
+      "id": "MVHEVCS_B.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_B.bit",
+      "sha256": "bd34a09a13754b290c435f34744c53d41dec004b5796e03520b19f2c5d088696",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 64,
+        "bytes": 616300,
+        "digest": 10930144921448655622
+      }
+    },
+    {
+      "id": "MVHEVCS_B.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_B.bit",
+      "sha256": "bd34a09a13754b290c435f34744c53d41dec004b5796e03520b19f2c5d088696",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 64,
+        "bytes": 616300,
+        "digest": 10930144921448655622
+      }
+    },
+    {
+      "id": "MVHEVCS_E.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_E.bit",
+      "sha256": "b83890b9691a496d37dae27dea81fd0ede1905e2a757d46646ce257e105de630",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 240393,
+        "digest": 10222054458634133961
+      }
+    },
+    {
+      "id": "MVHEVCS_E.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_E.bit",
+      "sha256": "b83890b9691a496d37dae27dea81fd0ede1905e2a757d46646ce257e105de630",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 240393,
+        "digest": 10222054458634133961
+      }
+    },
+    {
+      "id": "MVHEVCS_F.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_F.bit",
+      "sha256": "6a09a8b5f2829d2d24fe13ce5ab5720154d3c8f2318cbf64bfd70ccae01b944a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 268751,
+        "digest": 7709520580300721227
+      }
+    },
+    {
+      "id": "MVHEVCS_F.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/MVHEVCS_F.bit",
+      "sha256": "6a09a8b5f2829d2d24fe13ce5ab5720154d3c8f2318cbf64bfd70ccae01b944a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 268751,
+        "digest": 7709520580300721227
+      }
+    },
+    {
+      "id": "Main_422_10_A_RExt_Sony_1.bin-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin",
+      "sha256": "91f796b1ef99c5391a4e1a2f3c5d64471290b642e272965201e7c7bb1bdac3be",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4072670,
+        "digest": 11365996807006936914
+      }
+    },
+    {
+      "id": "Main_422_10_A_RExt_Sony_1.bin-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/Main_422_10_A_RExt_Sony_1.bin",
+      "sha256": "91f796b1ef99c5391a4e1a2f3c5d64471290b642e272965201e7c7bb1bdac3be",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 4072670,
+        "digest": 11365996807006936914
+      }
+    },
+    {
+      "id": "Main_422_10_B_RExt_Sony_1.bin-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin",
+      "sha256": "57f4ad77560ad1698218b181f09fa42059a45408e285283ab49ef74dad2f796c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 4217002,
+        "digest": 5983939254533875389
+      }
+    },
+    {
+      "id": "Main_422_10_B_RExt_Sony_1.bin-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/Main_422_10_B_RExt_Sony_1.bin",
+      "sha256": "57f4ad77560ad1698218b181f09fa42059a45408e285283ab49ef74dad2f796c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 4217002,
+        "digest": 5983939254533875389
+      }
+    },
+    {
+      "id": "NUT_A_ericsson_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NUT_A_ericsson_4.bit",
+      "sha256": "d87dcae6353a680ff1c816395b578afae3ed9f1a88b56b07a24e62333e0621b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 302142,
+        "digest": 7301318958287684989
+      }
+    },
+    {
+      "id": "NUT_A_ericsson_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NUT_A_ericsson_4.bit",
+      "sha256": "d87dcae6353a680ff1c816395b578afae3ed9f1a88b56b07a24e62333e0621b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 302142,
+        "digest": 7301318958287684989
+      }
+    },
+    {
+      "id": "NUT_A_ericsson_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NUT_A_ericsson_5.bit",
+      "sha256": "d87dcae6353a680ff1c816395b578afae3ed9f1a88b56b07a24e62333e0621b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 302142,
+        "digest": 7301318958287684989
+      }
+    },
+    {
+      "id": "NUT_A_ericsson_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NUT_A_ericsson_5.bit",
+      "sha256": "d87dcae6353a680ff1c816395b578afae3ed9f1a88b56b07a24e62333e0621b7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 36,
+        "bytes": 302142,
+        "digest": 7301318958287684989
+      }
+    },
+    {
+      "id": "NoOutPrior_A_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NoOutPrior_A_Qualcomm_1.bit",
+      "sha256": "cd01eedf3929a1ca4d917e933dfa5011ce7a5cc6ea46b23cb78a6e638fa50d2e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 139771,
+        "digest": 14948906381498158742
+      }
+    },
+    {
+      "id": "NoOutPrior_A_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NoOutPrior_A_Qualcomm_1.bit",
+      "sha256": "cd01eedf3929a1ca4d917e933dfa5011ce7a5cc6ea46b23cb78a6e638fa50d2e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 139771,
+        "digest": 14948906381498158742
+      }
+    },
+    {
+      "id": "NoOutPrior_B_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NoOutPrior_B_Qualcomm_1.bit",
+      "sha256": "d06212be8b66be424237dd084a9d1401dec2ac2bf1d08543629d870c8bf01994",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 142064,
+        "digest": 14451112520130737404
+      }
+    },
+    {
+      "id": "NoOutPrior_B_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/NoOutPrior_B_Qualcomm_1.bit",
+      "sha256": "d06212be8b66be424237dd084a9d1401dec2ac2bf1d08543629d870c8bf01994",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 142064,
+        "digest": 14451112520130737404
+      }
+    },
+    {
+      "id": "OPFLAG_A_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/OPFLAG_A_Qualcomm_1.bit",
+      "sha256": "1fb75cf1426c0682f324fe0dcb029561cbc50aa813b9d91aa434d061610a123a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 500,
+        "bytes": 504908,
+        "digest": 1521962541232997937
+      }
+    },
+    {
+      "id": "OPFLAG_A_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/OPFLAG_A_Qualcomm_1.bit",
+      "sha256": "1fb75cf1426c0682f324fe0dcb029561cbc50aa813b9d91aa434d061610a123a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 500,
+        "bytes": 504908,
+        "digest": 1521962541232997937
+      }
+    },
+    {
+      "id": "OPFLAG_B_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/OPFLAG_B_Qualcomm_1.bit",
+      "sha256": "24cc9e1b1848673d45ecfd161a186bef7151a5e3b254ead5bcfa0ce93478cef7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 2055485,
+        "digest": 12875518656137697907
+      }
+    },
+    {
+      "id": "OPFLAG_B_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/OPFLAG_B_Qualcomm_1.bit",
+      "sha256": "24cc9e1b1848673d45ecfd161a186bef7151a5e3b254ead5bcfa0ce93478cef7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 2055485,
+        "digest": 12875518656137697907
+      }
+    },
+    {
+      "id": "OPFLAG_C_Qualcomm_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/OPFLAG_C_Qualcomm_1.bit",
+      "sha256": "17016c7abdec5fdda16fb92a6b6521adf4d9485070a00d662b44665c1e247824",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 278706,
+        "digest": 18410535347126417734
+      }
+    },
+    {
+      "id": "OPFLAG_C_Qualcomm_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/OPFLAG_C_Qualcomm_1.bit",
+      "sha256": "17016c7abdec5fdda16fb92a6b6521adf4d9485070a00d662b44665c1e247824",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 278706,
+        "digest": 18410535347126417734
+      }
+    },
+    {
+      "id": "PERSIST_RPARAM_A_RExt_Sony_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit",
+      "sha256": "e5e83ec018379e9bf83cad62a8f18ea7502261c8a554ab93cad16849154eca36",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 707261,
+        "digest": 16697907469154503207
+      }
+    },
+    {
+      "id": "PERSIST_RPARAM_A_RExt_Sony_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_1.bit",
+      "sha256": "e5e83ec018379e9bf83cad62a8f18ea7502261c8a554ab93cad16849154eca36",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 707261,
+        "digest": 16697907469154503207
+      }
+    },
+    {
+      "id": "PERSIST_RPARAM_A_RExt_Sony_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit",
+      "sha256": "5e1a69d29278e3e4cbd7695c7d3c229ac63c1e5e2b7af3b1c8f8062586ea1468",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 707261,
+        "digest": 368330980582788967
+      }
+    },
+    {
+      "id": "PERSIST_RPARAM_A_RExt_Sony_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PERSIST_RPARAM_A_RExt_Sony_3.bit",
+      "sha256": "5e1a69d29278e3e4cbd7695c7d3c229ac63c1e5e2b7af3b1c8f8062586ea1468",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 707261,
+        "digest": 368330980582788967
+      }
+    },
+    {
+      "id": "PICSIZE_A_Bossen_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_A_Bossen_1.bit",
+      "sha256": "3e490a54e23594294fe9e12b1c01880546ab2efcc7979d87d330a8428f1a1480",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 419329,
+        "digest": 9613470217555704994
+      }
+    },
+    {
+      "id": "PICSIZE_A_Bossen_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_A_Bossen_1.bit",
+      "sha256": "3e490a54e23594294fe9e12b1c01880546ab2efcc7979d87d330a8428f1a1480",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 419329,
+        "digest": 9613470217555704994
+      }
+    },
+    {
+      "id": "PICSIZE_B_Bossen_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_B_Bossen_1.bit",
+      "sha256": "f16bbcfb92d601cc0735641c9fd248591bcded97721a3d351d89bcfb6a48c2ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 337246,
+        "digest": 1158805658834056117
+      }
+    },
+    {
+      "id": "PICSIZE_B_Bossen_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_B_Bossen_1.bit",
+      "sha256": "f16bbcfb92d601cc0735641c9fd248591bcded97721a3d351d89bcfb6a48c2ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 337246,
+        "digest": 1158805658834056117
+      }
+    },
+    {
+      "id": "PICSIZE_C_Bossen_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_C_Bossen_1.bit",
+      "sha256": "c16e7aab1f86ce96cbeb21577f3e6f66e50eb618a1cf9203abb00fef2d71e9ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 160080,
+        "digest": 4204740657345990008
+      }
+    },
+    {
+      "id": "PICSIZE_C_Bossen_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_C_Bossen_1.bit",
+      "sha256": "c16e7aab1f86ce96cbeb21577f3e6f66e50eb618a1cf9203abb00fef2d71e9ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 160080,
+        "digest": 4204740657345990008
+      }
+    },
+    {
+      "id": "PICSIZE_D_Bossen_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_D_Bossen_1.bit",
+      "sha256": "bfdb504691a7228cb8b0acec17c56150464eb30fc3e3df6b5bf81e4d8e1898ca",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 76288,
+        "digest": 6701395301682686758
+      }
+    },
+    {
+      "id": "PICSIZE_D_Bossen_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PICSIZE_D_Bossen_1.bit",
+      "sha256": "bfdb504691a7228cb8b0acec17c56150464eb30fc3e3df6b5bf81e4d8e1898ca",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 10,
+        "bytes": 76288,
+        "digest": 6701395301682686758
+      }
+    },
+    {
+      "id": "PMERGE_A_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_A_TI_3.bit",
+      "sha256": "e5f1f706176e91b72d13686b8864fe1c8e8be764faa417e3cabbf0df1cf78af0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 15971,
+        "digest": 6745168618001394277
+      }
+    },
+    {
+      "id": "PMERGE_A_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_A_TI_3.bit",
+      "sha256": "e5f1f706176e91b72d13686b8864fe1c8e8be764faa417e3cabbf0df1cf78af0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 15971,
+        "digest": 6745168618001394277
+      }
+    },
+    {
+      "id": "PMERGE_B_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_B_TI_3.bit",
+      "sha256": "c4830df0041aceaada75eb7233be96a4a8d3e1fb0ee72c4f9a7f40cf5d55514b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16016,
+        "digest": 17649363813720246177
+      }
+    },
+    {
+      "id": "PMERGE_B_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_B_TI_3.bit",
+      "sha256": "c4830df0041aceaada75eb7233be96a4a8d3e1fb0ee72c4f9a7f40cf5d55514b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16016,
+        "digest": 17649363813720246177
+      }
+    },
+    {
+      "id": "PMERGE_C_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_C_TI_3.bit",
+      "sha256": "ec68d2adca61ba94603fceafabcd865f17072ef67f04ec1cd97ab00ffb247944",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16056,
+        "digest": 14514866294262671407
+      }
+    },
+    {
+      "id": "PMERGE_C_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_C_TI_3.bit",
+      "sha256": "ec68d2adca61ba94603fceafabcd865f17072ef67f04ec1cd97ab00ffb247944",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16056,
+        "digest": 14514866294262671407
+      }
+    },
+    {
+      "id": "PMERGE_D_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_D_TI_3.bit",
+      "sha256": "afb2952a6a4e2f446340d4053a6f5268028e3b61be52f5cee779c36275c4877a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16169,
+        "digest": 2862668642467653382
+      }
+    },
+    {
+      "id": "PMERGE_D_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_D_TI_3.bit",
+      "sha256": "afb2952a6a4e2f446340d4053a6f5268028e3b61be52f5cee779c36275c4877a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16169,
+        "digest": 2862668642467653382
+      }
+    },
+    {
+      "id": "PMERGE_E_TI_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_E_TI_3.bit",
+      "sha256": "fc3d15683748f42229c64ce58804a9174686b79749e24f580337c2cb77e46feb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16369,
+        "digest": 18241266783694105738
+      }
+    },
+    {
+      "id": "PMERGE_E_TI_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PMERGE_E_TI_3.bit",
+      "sha256": "fc3d15683748f42229c64ce58804a9174686b79749e24f580337c2cb77e46feb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 16369,
+        "digest": 18241266783694105738
+      }
+    },
+    {
+      "id": "POC_A_Bossen_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/POC_A_Bossen_3.bit",
+      "sha256": "0830773b2c3f6ef85ec973f09a08dfd0f1e7a36e05936d4b1fc0b6c014a3a639",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 85374,
+        "digest": 18007678449950141172
+      }
+    },
+    {
+      "id": "POC_A_Bossen_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/POC_A_Bossen_3.bit",
+      "sha256": "0830773b2c3f6ef85ec973f09a08dfd0f1e7a36e05936d4b1fc0b6c014a3a639",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 85374,
+        "digest": 18007678449950141172
+      }
+    },
+    {
+      "id": "PPS_A_qualcomm_7.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PPS_A_qualcomm_7.bit",
+      "sha256": "2382b56a09bc9bff001cc4b1e90826219c17324de944acce5dde490032322128",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 407074,
+        "digest": 14189224925152413680
+      }
+    },
+    {
+      "id": "PPS_A_qualcomm_7.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PPS_A_qualcomm_7.bit",
+      "sha256": "2382b56a09bc9bff001cc4b1e90826219c17324de944acce5dde490032322128",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 81,
+        "bytes": 407074,
+        "digest": 14189224925152413680
+      }
+    },
+    {
+      "id": "PS_A_VIDYO_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PS_A_VIDYO_3.bit",
+      "sha256": "6ab5194e7d9931e8618661f19f474ebb9f332705debdc7a85da900e22d8f2e13",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 17058,
+        "digest": 16484281571793636551
+      }
+    },
+    {
+      "id": "PS_A_VIDYO_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PS_A_VIDYO_3.bit",
+      "sha256": "6ab5194e7d9931e8618661f19f474ebb9f332705debdc7a85da900e22d8f2e13",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 17058,
+        "digest": 16484281571793636551
+      }
+    },
+    {
+      "id": "PS_B_VIDYO_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PS_B_VIDYO_3.bit",
+      "sha256": "3f16134cdcaea5a2cc33a4b539693c3af1bf0e78b7c5ca051a7fb1d8ddc41ce3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 17052,
+        "digest": 3394665390941682349
+      }
+    },
+    {
+      "id": "PS_B_VIDYO_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/PS_B_VIDYO_3.bit",
+      "sha256": "3f16134cdcaea5a2cc33a4b539693c3af1bf0e78b7c5ca051a7fb1d8ddc41ce3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 25,
+        "bytes": 17052,
+        "digest": 3394665390941682349
+      }
+    },
+    {
+      "id": "QMATRIX_A_RExt_Sony_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit",
+      "sha256": "74847e07f3298923da0e9b68b1f861930d227bd5ad83a834a8280cf042a7e78f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 236915,
+        "digest": 16019930947301263765
+      }
+    },
+    {
+      "id": "QMATRIX_A_RExt_Sony_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/QMATRIX_A_RExt_Sony_1.bit",
+      "sha256": "74847e07f3298923da0e9b68b1f861930d227bd5ad83a834a8280cf042a7e78f",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 20,
+        "bytes": 236915,
+        "digest": 16019930947301263765
+      }
+    },
+    {
+      "id": "RAP_A_docomo_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RAP_A_docomo_4.bit",
+      "sha256": "1d6c938a2d42391a81b52b1e4db8c83803bc3c0fe75f2aece191daade539faeb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 93,
+        "bytes": 110162,
+        "digest": 3540110653142094444
+      }
+    },
+    {
+      "id": "RAP_A_docomo_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RAP_A_docomo_4.bit",
+      "sha256": "1d6c938a2d42391a81b52b1e4db8c83803bc3c0fe75f2aece191daade539faeb",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 93,
+        "bytes": 110162,
+        "digest": 3540110653142094444
+      }
+    },
+    {
+      "id": "RAP_B_Bossen_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RAP_B_Bossen_1.bit",
+      "sha256": "f8718a7b9a58a40845601879a167566fea4a842e4919be63569836974518224a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 90,
+        "bytes": 120616,
+        "digest": 846025085673331087
+      }
+    },
+    {
+      "id": "RAP_B_Bossen_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RAP_B_Bossen_1.bit",
+      "sha256": "f8718a7b9a58a40845601879a167566fea4a842e4919be63569836974518224a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 90,
+        "bytes": 120616,
+        "digest": 846025085673331087
+      }
+    },
+    {
+      "id": "RPLM_A_qualcomm_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPLM_A_qualcomm_4.bit",
+      "sha256": "b2994be2579c6835a16d14e8404470caa97d72d45312500703c59f3189075caa",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 206075,
+        "digest": 12139092512390422419
+      }
+    },
+    {
+      "id": "RPLM_A_qualcomm_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPLM_A_qualcomm_4.bit",
+      "sha256": "b2994be2579c6835a16d14e8404470caa97d72d45312500703c59f3189075caa",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 206075,
+        "digest": 12139092512390422419
+      }
+    },
+    {
+      "id": "RPLM_B_qualcomm_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPLM_B_qualcomm_4.bit",
+      "sha256": "18d7bc82140f7f117acb48eb62c63d6dcda453bee0eda0975172b1c6012c4be2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 223289,
+        "digest": 17060844549324799520
+      }
+    },
+    {
+      "id": "RPLM_B_qualcomm_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPLM_B_qualcomm_4.bit",
+      "sha256": "18d7bc82140f7f117acb48eb62c63d6dcda453bee0eda0975172b1c6012c4be2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 223289,
+        "digest": 17060844549324799520
+      }
+    },
+    {
+      "id": "RPS_A_docomo_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_A_docomo_4.bit",
+      "sha256": "e7a90335952dc5718d931adb461d90049eb558b4d08c90ff1706612f8bca4439",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 44,
+        "bytes": 64948,
+        "digest": 15806396501963568655
+      }
+    },
+    {
+      "id": "RPS_A_docomo_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_A_docomo_4.bit",
+      "sha256": "e7a90335952dc5718d931adb461d90049eb558b4d08c90ff1706612f8bca4439",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 44,
+        "bytes": 64948,
+        "digest": 15806396501963568655
+      }
+    },
+    {
+      "id": "RPS_B_qualcomm_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_B_qualcomm_5.bit",
+      "sha256": "a5e2097201740c15824b75540b6d0d5050763681bedf7209cde80d93a3b88996",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 222629,
+        "digest": 15789244197221744548
+      }
+    },
+    {
+      "id": "RPS_B_qualcomm_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_B_qualcomm_5.bit",
+      "sha256": "a5e2097201740c15824b75540b6d0d5050763681bedf7209cde80d93a3b88996",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 222629,
+        "digest": 15789244197221744548
+      }
+    },
+    {
+      "id": "RPS_C_ericsson_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_C_ericsson_4.bit",
+      "sha256": "87c9897397ebfa8b8e08400cd6b7fdebdaed171c2e453b3c596c91285c073f5a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 40,
+        "bytes": 353900,
+        "digest": 1890268305967185485
+      }
+    },
+    {
+      "id": "RPS_C_ericsson_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_C_ericsson_4.bit",
+      "sha256": "87c9897397ebfa8b8e08400cd6b7fdebdaed171c2e453b3c596c91285c073f5a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 40,
+        "bytes": 353900,
+        "digest": 1890268305967185485
+      }
+    },
+    {
+      "id": "RPS_C_ericsson_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_C_ericsson_5.bit",
+      "sha256": "b0aa060407b3ad9a558a1212645a1bf137187f2dce8bf47f312efa1bd19ded6e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 40,
+        "bytes": 354259,
+        "digest": 16333972235893162138
+      }
+    },
+    {
+      "id": "RPS_C_ericsson_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_C_ericsson_5.bit",
+      "sha256": "b0aa060407b3ad9a558a1212645a1bf137187f2dce8bf47f312efa1bd19ded6e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 40,
+        "bytes": 354259,
+        "digest": 16333972235893162138
+      }
+    },
+    {
+      "id": "RPS_D_ericsson_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_D_ericsson_5.bit",
+      "sha256": "e818e14f50bf73364b405ca3b07c407fdf191bcb2293552d3af8fc3bfcd1aca0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 68,
+        "bytes": 561107,
+        "digest": 15044388513839812135
+      }
+    },
+    {
+      "id": "RPS_D_ericsson_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_D_ericsson_5.bit",
+      "sha256": "e818e14f50bf73364b405ca3b07c407fdf191bcb2293552d3af8fc3bfcd1aca0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 68,
+        "bytes": 561107,
+        "digest": 15044388513839812135
+      }
+    },
+    {
+      "id": "RPS_D_ericsson_6.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_D_ericsson_6.bit",
+      "sha256": "e818e14f50bf73364b405ca3b07c407fdf191bcb2293552d3af8fc3bfcd1aca0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 68,
+        "bytes": 561107,
+        "digest": 15044388513839812135
+      }
+    },
+    {
+      "id": "RPS_D_ericsson_6.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_D_ericsson_6.bit",
+      "sha256": "e818e14f50bf73364b405ca3b07c407fdf191bcb2293552d3af8fc3bfcd1aca0",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 68,
+        "bytes": 561107,
+        "digest": 15044388513839812135
+      }
+    },
+    {
+      "id": "RPS_E_qualcomm_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_E_qualcomm_5.bit",
+      "sha256": "b82c5c8c251943cc41b59e7f63f72890641fdcdbcec8e916223e4ee28a16c7ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 438168,
+        "digest": 11218877265666219595
+      }
+    },
+    {
+      "id": "RPS_E_qualcomm_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_E_qualcomm_5.bit",
+      "sha256": "b82c5c8c251943cc41b59e7f63f72890641fdcdbcec8e916223e4ee28a16c7ad",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 300,
+        "bytes": 438168,
+        "digest": 11218877265666219595
+      }
+    },
+    {
+      "id": "RPS_F_docomo_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_F_docomo_1.bit",
+      "sha256": "57588b676e3d1c2b82b761671c66383fac2b5c9c3eb98644c70a8e5fed486ed6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 79966,
+        "digest": 2808079547616891071
+      }
+    },
+    {
+      "id": "RPS_F_docomo_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RPS_F_docomo_1.bit",
+      "sha256": "57588b676e3d1c2b82b761671c66383fac2b5c9c3eb98644c70a8e5fed486ed6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 50,
+        "bytes": 79966,
+        "digest": 2808079547616891071
+      }
+    },
+    {
+      "id": "RQT_A_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_A_HHI_4.bit",
+      "sha256": "c07a976943200d97ba9eb0a16a858d2c77fb3fe37410c6c6f956e5960b2f4621",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66244,
+        "digest": 8943606393068623394
+      }
+    },
+    {
+      "id": "RQT_A_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_A_HHI_4.bit",
+      "sha256": "c07a976943200d97ba9eb0a16a858d2c77fb3fe37410c6c6f956e5960b2f4621",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66244,
+        "digest": 8943606393068623394
+      }
+    },
+    {
+      "id": "RQT_B_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_B_HHI_4.bit",
+      "sha256": "49a8037bbbed4efa8de285c522d215c3c5a117dd58d17822db0ffb9808161e29",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66149,
+        "digest": 1331870663523048894
+      }
+    },
+    {
+      "id": "RQT_B_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_B_HHI_4.bit",
+      "sha256": "49a8037bbbed4efa8de285c522d215c3c5a117dd58d17822db0ffb9808161e29",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66149,
+        "digest": 1331870663523048894
+      }
+    },
+    {
+      "id": "RQT_C_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_C_HHI_4.bit",
+      "sha256": "a7b157215595b68ddbb70d952fb786923826c26ecc448bbfe36f4df47f9abc5c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66094,
+        "digest": 8406240595432272026
+      }
+    },
+    {
+      "id": "RQT_C_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_C_HHI_4.bit",
+      "sha256": "a7b157215595b68ddbb70d952fb786923826c26ecc448bbfe36f4df47f9abc5c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66094,
+        "digest": 8406240595432272026
+      }
+    },
+    {
+      "id": "RQT_D_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_D_HHI_4.bit",
+      "sha256": "6b37468d7e4acf7d1fb97bf0062e0124785d3bda1284e1f698a1e8eb6441d76b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66078,
+        "digest": 15538308740066542035
+      }
+    },
+    {
+      "id": "RQT_D_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_D_HHI_4.bit",
+      "sha256": "6b37468d7e4acf7d1fb97bf0062e0124785d3bda1284e1f698a1e8eb6441d76b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66078,
+        "digest": 15538308740066542035
+      }
+    },
+    {
+      "id": "RQT_E_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_E_HHI_4.bit",
+      "sha256": "d792e442c19d9ffc45f43a8842c7a6ad57d0a51d62364c43ef97810689c2eea8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 84820,
+        "digest": 17819344713463365718
+      }
+    },
+    {
+      "id": "RQT_E_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_E_HHI_4.bit",
+      "sha256": "d792e442c19d9ffc45f43a8842c7a6ad57d0a51d62364c43ef97810689c2eea8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 84820,
+        "digest": 17819344713463365718
+      }
+    },
+    {
+      "id": "RQT_F_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_F_HHI_4.bit",
+      "sha256": "f784a12b06a78deafc2ab5fb51af6cbaa105e1b72ebf88e2fb28536f771fac9a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66027,
+        "digest": 12213220148156641438
+      }
+    },
+    {
+      "id": "RQT_F_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_F_HHI_4.bit",
+      "sha256": "f784a12b06a78deafc2ab5fb51af6cbaa105e1b72ebf88e2fb28536f771fac9a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66027,
+        "digest": 12213220148156641438
+      }
+    },
+    {
+      "id": "RQT_G_HHI_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_G_HHI_4.bit",
+      "sha256": "3ce2c5f477fc2762d2153a373dbc4e5a6387c98035f34dfd32008cc7667286d3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66314,
+        "digest": 5558984743442193416
+      }
+    },
+    {
+      "id": "RQT_G_HHI_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/RQT_G_HHI_4.bit",
+      "sha256": "3ce2c5f477fc2762d2153a373dbc4e5a6387c98035f34dfd32008cc7667286d3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 66314,
+        "digest": 5558984743442193416
+      }
+    },
+    {
+      "id": "SAO_A_MediaTek_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_A_MediaTek_4.bit",
+      "sha256": "88f693ac4aec4dea03cb4bc0cb9d8c98a4023a015905369bb62688064fb58944",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 52606,
+        "digest": 16345002452045853946
+      }
+    },
+    {
+      "id": "SAO_A_MediaTek_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_A_MediaTek_4.bit",
+      "sha256": "88f693ac4aec4dea03cb4bc0cb9d8c98a4023a015905369bb62688064fb58944",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 52606,
+        "digest": 16345002452045853946
+      }
+    },
+    {
+      "id": "SAO_A_RExt_MediaTek_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_A_RExt_MediaTek_1.bit",
+      "sha256": "6b0d45b5ca4d4919eaec5a98daf0eb4cebcc6d8b0a12b30b748386cc9358df13",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1466031,
+        "digest": 2319161921999431416
+      }
+    },
+    {
+      "id": "SAO_A_RExt_MediaTek_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_A_RExt_MediaTek_1.bit",
+      "sha256": "6b0d45b5ca4d4919eaec5a98daf0eb4cebcc6d8b0a12b30b748386cc9358df13",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 1466031,
+        "digest": 2319161921999431416
+      }
+    },
+    {
+      "id": "SAO_B_MediaTek_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_B_MediaTek_5.bit",
+      "sha256": "77fb629a562234f2fea44886dafb597565d85433d9d9c4f22c208f5552950009",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 163006,
+        "digest": 18043904123255436525
+      }
+    },
+    {
+      "id": "SAO_B_MediaTek_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_B_MediaTek_5.bit",
+      "sha256": "77fb629a562234f2fea44886dafb597565d85433d9d9c4f22c208f5552950009",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 163006,
+        "digest": 18043904123255436525
+      }
+    },
+    {
+      "id": "SAO_C_Samsung_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_C_Samsung_4.bit",
+      "sha256": "dd33ab118cc5bedb09ad94b980c1508663333871e860c81a55d7f97fbc4334c5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 53402,
+        "digest": 983192911570380993
+      }
+    },
+    {
+      "id": "SAO_C_Samsung_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_C_Samsung_4.bit",
+      "sha256": "dd33ab118cc5bedb09ad94b980c1508663333871e860c81a55d7f97fbc4334c5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 53402,
+        "digest": 983192911570380993
+      }
+    },
+    {
+      "id": "SAO_C_Samsung_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_C_Samsung_5.bit",
+      "sha256": "45c4b761e6f1d833b4e206ffadea66e8f5a3f5f1984ed0c29519eb9c0d666b4d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 449008,
+        "digest": 12007429970520762740
+      }
+    },
+    {
+      "id": "SAO_C_Samsung_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_C_Samsung_5.bit",
+      "sha256": "45c4b761e6f1d833b4e206ffadea66e8f5a3f5f1984ed0c29519eb9c0d666b4d",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 449008,
+        "digest": 12007429970520762740
+      }
+    },
+    {
+      "id": "SAO_D_Samsung_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_D_Samsung_4.bit",
+      "sha256": "60ca9e0cccd8e745e20637ff333232d6c7b092c859f6ea6e8745e54c4a44c26a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 65827,
+        "digest": 3043133419453855321
+      }
+    },
+    {
+      "id": "SAO_D_Samsung_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_D_Samsung_4.bit",
+      "sha256": "60ca9e0cccd8e745e20637ff333232d6c7b092c859f6ea6e8745e54c4a44c26a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 65827,
+        "digest": 3043133419453855321
+      }
+    },
+    {
+      "id": "SAO_D_Samsung_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_D_Samsung_5.bit",
+      "sha256": "84e1a6307db2a05144c73a5dbc338fc286c0a4f1c45ed04fc0182f8119d80c6c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 462536,
+        "digest": 5586398009150661028
+      }
+    },
+    {
+      "id": "SAO_D_Samsung_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_D_Samsung_5.bit",
+      "sha256": "84e1a6307db2a05144c73a5dbc338fc286c0a4f1c45ed04fc0182f8119d80c6c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 462536,
+        "digest": 5586398009150661028
+      }
+    },
+    {
+      "id": "SAO_E_Canon_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_E_Canon_4.bit",
+      "sha256": "a3a3cbf0fbf4a1335070a085d0b01aa8064889e9c74ac7081631349fbc2c5915",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 102584,
+        "digest": 7634434303908220594
+      }
+    },
+    {
+      "id": "SAO_E_Canon_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_E_Canon_4.bit",
+      "sha256": "a3a3cbf0fbf4a1335070a085d0b01aa8064889e9c74ac7081631349fbc2c5915",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 102584,
+        "digest": 7634434303908220594
+      }
+    },
+    {
+      "id": "SAO_F_Canon_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_F_Canon_3.bit",
+      "sha256": "6e663fdf83681e8989f6b5e25a4d62e0a93f1024f0c4dd785e896c6db81caeed",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 37408,
+        "digest": 8718262931623606750
+      }
+    },
+    {
+      "id": "SAO_F_Canon_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_F_Canon_3.bit",
+      "sha256": "6e663fdf83681e8989f6b5e25a4d62e0a93f1024f0c4dd785e896c6db81caeed",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 37408,
+        "digest": 8718262931623606750
+      }
+    },
+    {
+      "id": "SAO_G_Canon_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_G_Canon_3.bit",
+      "sha256": "74224b18c1864efadaf9c06427905e9cd6e847e324a100d2373e4c780726b305",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 20038,
+        "digest": 15148280467317039636
+      }
+    },
+    {
+      "id": "SAO_G_Canon_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SAO_G_Canon_3.bit",
+      "sha256": "74224b18c1864efadaf9c06427905e9cd6e847e324a100d2373e4c780726b305",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 16,
+        "bytes": 20038,
+        "digest": 15148280467317039636
+      }
+    },
+    {
+      "id": "SDH_A_Orange_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SDH_A_Orange_3.bit",
+      "sha256": "f7ba1c81185fe400d3486d1975e98d7e613fcd38f51bc52572d207135c1dcb58",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1387921,
+        "digest": 298588497312063498
+      }
+    },
+    {
+      "id": "SDH_A_Orange_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SDH_A_Orange_3.bit",
+      "sha256": "f7ba1c81185fe400d3486d1975e98d7e613fcd38f51bc52572d207135c1dcb58",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 2,
+        "bytes": 1387921,
+        "digest": 298588497312063498
+      }
+    },
+    {
+      "id": "SLICES_A_Rovi_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLICES_A_Rovi_3.bit",
+      "sha256": "7440908beaa68768ee66b7af5823a28ce0716d90aa1b49de630d2c5aa555d955",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 65943,
+        "digest": 17337404929379697017
+      }
+    },
+    {
+      "id": "SLICES_A_Rovi_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLICES_A_Rovi_3.bit",
+      "sha256": "7440908beaa68768ee66b7af5823a28ce0716d90aa1b49de630d2c5aa555d955",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 9,
+        "bytes": 65943,
+        "digest": 17337404929379697017
+      }
+    },
+    {
+      "id": "SLIST_A_Sony_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_A_Sony_4.bit",
+      "sha256": "5bb955a9296a7fd6132137c49c1b329b817118a9f73f0222444ec2ba75519438",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 372917,
+        "digest": 5773622002583311561
+      }
+    },
+    {
+      "id": "SLIST_A_Sony_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_A_Sony_4.bit",
+      "sha256": "5bb955a9296a7fd6132137c49c1b329b817118a9f73f0222444ec2ba75519438",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 372917,
+        "digest": 5773622002583311561
+      }
+    },
+    {
+      "id": "SLIST_B_Sony_8.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_B_Sony_8.bit",
+      "sha256": "94ac8ba55b5a528618720aab5f1a2a192a044a760c007d2f33dc1f89bc0e9833",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 344203,
+        "digest": 893683649578766636
+      }
+    },
+    {
+      "id": "SLIST_B_Sony_8.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_B_Sony_8.bit",
+      "sha256": "94ac8ba55b5a528618720aab5f1a2a192a044a760c007d2f33dc1f89bc0e9833",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 344203,
+        "digest": 893683649578766636
+      }
+    },
+    {
+      "id": "SLIST_C_Sony_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_C_Sony_3.bit",
+      "sha256": "be7af3ff7974e90999e2155731cc033257382237263e2a3aab96094dd04bf27b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 367546,
+        "digest": 3907559265529595252
+      }
+    },
+    {
+      "id": "SLIST_C_Sony_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_C_Sony_3.bit",
+      "sha256": "be7af3ff7974e90999e2155731cc033257382237263e2a3aab96094dd04bf27b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 367546,
+        "digest": 3907559265529595252
+      }
+    },
+    {
+      "id": "SLIST_D_Sony_9.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_D_Sony_9.bit",
+      "sha256": "f3d8468f5cd0ca4e4a2e78c372500f4859f95395e9f1c9c85b357e3dddd135e8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 354557,
+        "digest": 12470122098323995382
+      }
+    },
+    {
+      "id": "SLIST_D_Sony_9.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLIST_D_Sony_9.bit",
+      "sha256": "f3d8468f5cd0ca4e4a2e78c372500f4859f95395e9f1c9c85b357e3dddd135e8",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 65,
+        "bytes": 354557,
+        "digest": 12470122098323995382
+      }
+    },
+    {
+      "id": "SLPPLP_A_VIDYO_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLPPLP_A_VIDYO_1.bit",
+      "sha256": "405323c9b6b95028d9eb050a8593c9f9e0a6057ef211210cbe4bc200341274e9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22822,
+        "digest": 13699679874923620164
+      }
+    },
+    {
+      "id": "SLPPLP_A_VIDYO_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLPPLP_A_VIDYO_1.bit",
+      "sha256": "405323c9b6b95028d9eb050a8593c9f9e0a6057ef211210cbe4bc200341274e9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22822,
+        "digest": 13699679874923620164
+      }
+    },
+    {
+      "id": "SLPPLP_A_VIDYO_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLPPLP_A_VIDYO_2.bit",
+      "sha256": "48f9cecfe1f86654fca3eb327c0914eec475bcf0fb8f6f726632976e5b34e2a6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22822,
+        "digest": 12214262391760975684
+      }
+    },
+    {
+      "id": "SLPPLP_A_VIDYO_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/SLPPLP_A_VIDYO_2.bit",
+      "sha256": "48f9cecfe1f86654fca3eb327c0914eec475bcf0fb8f6f726632976e5b34e2a6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22822,
+        "digest": 12214262391760975684
+      }
+    },
+    {
+      "id": "STRUCT_A_Samsung_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/STRUCT_A_Samsung_5.bit",
+      "sha256": "ce7c195b1f2810e2b40f95b4e2b23e9bae4e8576e20dae5ae7900dfbdaf1f5f5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 146580,
+        "digest": 16128668670880986104
+      }
+    },
+    {
+      "id": "STRUCT_A_Samsung_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/STRUCT_A_Samsung_5.bit",
+      "sha256": "ce7c195b1f2810e2b40f95b4e2b23e9bae4e8576e20dae5ae7900dfbdaf1f5f5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 146580,
+        "digest": 16128668670880986104
+      }
+    },
+    {
+      "id": "STRUCT_B_Samsung_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/STRUCT_B_Samsung_4.bit",
+      "sha256": "a72a878e64425b2e1f07ed04ed4ff90d4061525797c713567d07c8487a8669fd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 325535,
+        "digest": 672739169147301825
+      }
+    },
+    {
+      "id": "STRUCT_B_Samsung_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/STRUCT_B_Samsung_4.bit",
+      "sha256": "a72a878e64425b2e1f07ed04ed4ff90d4061525797c713567d07c8487a8669fd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 325535,
+        "digest": 672739169147301825
+      }
+    },
+    {
+      "id": "STRUCT_B_Samsung_6.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/STRUCT_B_Samsung_6.bit",
+      "sha256": "0451b520b45172327cd3431308b2dac873b65f23a2eb6baa64f48dc24e6e2984",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 325643,
+        "digest": 14504941806203410096
+      }
+    },
+    {
+      "id": "STRUCT_B_Samsung_6.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/STRUCT_B_Samsung_6.bit",
+      "sha256": "0451b520b45172327cd3431308b2dac873b65f23a2eb6baa64f48dc24e6e2984",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 60,
+        "bytes": 325643,
+        "digest": 14504941806203410096
+      }
+    },
+    {
+      "id": "TILES_A_Cisco_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TILES_A_Cisco_2.bit",
+      "sha256": "eff78a401ecccc21d995345988f1be60ee76604cf10fa39d421c3e00668a94d6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 484767,
+        "digest": 3190084763519476982
+      }
+    },
+    {
+      "id": "TILES_A_Cisco_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TILES_A_Cisco_2.bit",
+      "sha256": "eff78a401ecccc21d995345988f1be60ee76604cf10fa39d421c3e00668a94d6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 484767,
+        "digest": 3190084763519476982
+      }
+    },
+    {
+      "id": "TILES_B_Cisco_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TILES_B_Cisco_1.bit",
+      "sha256": "d2f65167917e42030db804c60ca7775452445a61930ccee3fa2ad2cd3830a57a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 533127,
+        "digest": 1139862314616949576
+      }
+    },
+    {
+      "id": "TILES_B_Cisco_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TILES_B_Cisco_1.bit",
+      "sha256": "d2f65167917e42030db804c60ca7775452445a61930ccee3fa2ad2cd3830a57a",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 100,
+        "bytes": 533127,
+        "digest": 1139862314616949576
+      }
+    },
+    {
+      "id": "TMVP_A_MS_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TMVP_A_MS_2.bit",
+      "sha256": "8bf3ae49dc68f6c6672515a7219708257f678a6e3ab7ab87d3bfcb842f9dc381",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 16401,
+        "digest": 16540663331491105374
+      }
+    },
+    {
+      "id": "TMVP_A_MS_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TMVP_A_MS_2.bit",
+      "sha256": "8bf3ae49dc68f6c6672515a7219708257f678a6e3ab7ab87d3bfcb842f9dc381",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 16401,
+        "digest": 16540663331491105374
+      }
+    },
+    {
+      "id": "TMVP_A_MS_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TMVP_A_MS_3.bit",
+      "sha256": "33556aa42355ba43575a6e6f1b579420a9217f576fc0ae07ee57fa2750a38d52",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 17238,
+        "digest": 3182936133816021835
+      }
+    },
+    {
+      "id": "TMVP_A_MS_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TMVP_A_MS_3.bit",
+      "sha256": "33556aa42355ba43575a6e6f1b579420a9217f576fc0ae07ee57fa2750a38d52",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 17238,
+        "digest": 3182936133816021835
+      }
+    },
+    {
+      "id": "TSCL_A_VIDYO_5.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSCL_A_VIDYO_5.bit",
+      "sha256": "cab7d7ea801a5ee7d1ff495c98cf5e4eafa2c4fb32cc1473443f69f2457cfd16",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 73,
+        "bytes": 46546,
+        "digest": 8872137869037626282
+      }
+    },
+    {
+      "id": "TSCL_A_VIDYO_5.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSCL_A_VIDYO_5.bit",
+      "sha256": "cab7d7ea801a5ee7d1ff495c98cf5e4eafa2c4fb32cc1473443f69f2457cfd16",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 73,
+        "bytes": 46546,
+        "digest": 8872137869037626282
+      }
+    },
+    {
+      "id": "TSCL_B_VIDYO_4.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSCL_B_VIDYO_4.bit",
+      "sha256": "cdeff7b17f020f79f8c0d9264748f5f9104657e5900fb126858fda93be90f610",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 73,
+        "bytes": 53530,
+        "digest": 14667460090371926366
+      }
+    },
+    {
+      "id": "TSCL_B_VIDYO_4.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSCL_B_VIDYO_4.bit",
+      "sha256": "cdeff7b17f020f79f8c0d9264748f5f9104657e5900fb126858fda93be90f610",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 73,
+        "bytes": 53530,
+        "digest": 14667460090371926366
+      }
+    },
+    {
+      "id": "TSKIP_A_MS_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSKIP_A_MS_2.bit",
+      "sha256": "fccdbfdec2078b36be8631283b1fe39b7b0f8757b9036ef6225c73c944c719a6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 204388,
+        "digest": 212855079361954940
+      }
+    },
+    {
+      "id": "TSKIP_A_MS_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSKIP_A_MS_2.bit",
+      "sha256": "fccdbfdec2078b36be8631283b1fe39b7b0f8757b9036ef6225c73c944c719a6",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 204388,
+        "digest": 212855079361954940
+      }
+    },
+    {
+      "id": "TSKIP_A_MS_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSKIP_A_MS_3.bit",
+      "sha256": "8407a07198b8db84e2fb2aef5c06d2d73f32bd0e4ddf08c5a9455481dcd73141",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 86128,
+        "digest": 5030999070392934637
+      }
+    },
+    {
+      "id": "TSKIP_A_MS_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSKIP_A_MS_3.bit",
+      "sha256": "8407a07198b8db84e2fb2aef5c06d2d73f32bd0e4ddf08c5a9455481dcd73141",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 17,
+        "bytes": 86128,
+        "digest": 5030999070392934637
+      }
+    },
+    {
+      "id": "TSUNEQBD_A_MAIN10_Technicolor_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+      "sha256": "a0b12cc3b180a410614931c94a693852c34aa89587a934aa5af9dbaa10cd7dfc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 209282,
+        "digest": 12303510539495641176
+      }
+    },
+    {
+      "id": "TSUNEQBD_A_MAIN10_Technicolor_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TSUNEQBD_A_MAIN10_Technicolor_2.bit",
+      "sha256": "a0b12cc3b180a410614931c94a693852c34aa89587a934aa5af9dbaa10cd7dfc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 8,
+        "bytes": 209282,
+        "digest": 12303510539495641176
+      }
+    },
+    {
+      "id": "TUSIZE_A_Samsung_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TUSIZE_A_Samsung_1.bit",
+      "sha256": "23c9959a0dd09d9a0b9c64b980794ca18214d7a3cb0fd091ca87f98dda75acf4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1238476,
+        "digest": 11420803817901724274
+      }
+    },
+    {
+      "id": "TUSIZE_A_Samsung_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/TUSIZE_A_Samsung_1.bit",
+      "sha256": "23c9959a0dd09d9a0b9c64b980794ca18214d7a3cb0fd091ca87f98dda75acf4",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 1238476,
+        "digest": 11420803817901724274
+      }
+    },
+    {
+      "id": "VPSID_A_VIDYO_1.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/VPSID_A_VIDYO_1.bit",
+      "sha256": "d5b26ee12d87b03082038e7a3b0de0ac661f13257aef434c8c0c4a0af459c75e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22786,
+        "digest": 17118775370779148642
+      }
+    },
+    {
+      "id": "VPSID_A_VIDYO_1.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/VPSID_A_VIDYO_1.bit",
+      "sha256": "d5b26ee12d87b03082038e7a3b0de0ac661f13257aef434c8c0c4a0af459c75e",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22786,
+        "digest": 17118775370779148642
+      }
+    },
+    {
+      "id": "VPSID_A_VIDYO_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/VPSID_A_VIDYO_2.bit",
+      "sha256": "d86bb746dadb63bdf561615a1de7860b2336c7616462507453e0fcec3ddf27f3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22787,
+        "digest": 1501966923129639589
+      }
+    },
+    {
+      "id": "VPSID_A_VIDYO_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/VPSID_A_VIDYO_2.bit",
+      "sha256": "d86bb746dadb63bdf561615a1de7860b2336c7616462507453e0fcec3ddf27f3",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 33,
+        "bytes": 22787,
+        "digest": 1501966923129639589
+      }
+    },
+    {
+      "id": "WPP_A_ericsson_MAIN10_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_A_ericsson_MAIN10_2.bit",
+      "sha256": "3b0d7323bf81d64d3c1443c9cebb8df6a42e0719ed422e64125e03971999b956",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 67071,
+        "digest": 7297301052424236867
+      }
+    },
+    {
+      "id": "WPP_A_ericsson_MAIN10_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_A_ericsson_MAIN10_2.bit",
+      "sha256": "3b0d7323bf81d64d3c1443c9cebb8df6a42e0719ed422e64125e03971999b956",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 67071,
+        "digest": 7297301052424236867
+      }
+    },
+    {
+      "id": "WPP_A_ericsson_MAIN_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_A_ericsson_MAIN_2.bit",
+      "sha256": "54d896d9fbdfa0aae15629001105c6ee132c8459e152abb06efc62cead4324ae",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 67554,
+        "digest": 12794353675736220837
+      }
+    },
+    {
+      "id": "WPP_A_ericsson_MAIN_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_A_ericsson_MAIN_2.bit",
+      "sha256": "54d896d9fbdfa0aae15629001105c6ee132c8459e152abb06efc62cead4324ae",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 67554,
+        "digest": 12794353675736220837
+      }
+    },
+    {
+      "id": "WPP_B_ericsson_MAIN10_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_B_ericsson_MAIN10_2.bit",
+      "sha256": "64de8e2d12825ad760012421f6c334c71d62bf7a6d5c35af96eb76548f911fbc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 68408,
+        "digest": 958896801076907470
+      }
+    },
+    {
+      "id": "WPP_B_ericsson_MAIN10_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_B_ericsson_MAIN10_2.bit",
+      "sha256": "64de8e2d12825ad760012421f6c334c71d62bf7a6d5c35af96eb76548f911fbc",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 68408,
+        "digest": 958896801076907470
+      }
+    },
+    {
+      "id": "WPP_B_ericsson_MAIN_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_B_ericsson_MAIN_2.bit",
+      "sha256": "f1d18f737a9380f6ce58b6aeae158af458c5b557e06dd24977b7a5c6e095b9b2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 68895,
+        "digest": 3528227260877279671
+      }
+    },
+    {
+      "id": "WPP_B_ericsson_MAIN_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_B_ericsson_MAIN_2.bit",
+      "sha256": "f1d18f737a9380f6ce58b6aeae158af458c5b557e06dd24977b7a5c6e095b9b2",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 68895,
+        "digest": 3528227260877279671
+      }
+    },
+    {
+      "id": "WPP_C_ericsson_MAIN10_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_C_ericsson_MAIN10_2.bit",
+      "sha256": "707d0aa04dbb25f57be710c3fa2216d93c0a4f4d0cc950b2564f2aab6686d047",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 71447,
+        "digest": 10832201183198007666
+      }
+    },
+    {
+      "id": "WPP_C_ericsson_MAIN10_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_C_ericsson_MAIN10_2.bit",
+      "sha256": "707d0aa04dbb25f57be710c3fa2216d93c0a4f4d0cc950b2564f2aab6686d047",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 71447,
+        "digest": 10832201183198007666
+      }
+    },
+    {
+      "id": "WPP_C_ericsson_MAIN_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_C_ericsson_MAIN_2.bit",
+      "sha256": "21cf0a7c5f6fba5a76c7132a2714313d120d1443a0130400fb55ab1e454d5bda",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 71856,
+        "digest": 11483404396328382573
+      }
+    },
+    {
+      "id": "WPP_C_ericsson_MAIN_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_C_ericsson_MAIN_2.bit",
+      "sha256": "21cf0a7c5f6fba5a76c7132a2714313d120d1443a0130400fb55ab1e454d5bda",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 71856,
+        "digest": 11483404396328382573
+      }
+    },
+    {
+      "id": "WPP_D_ericsson_MAIN10_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_D_ericsson_MAIN10_2.bit",
+      "sha256": "eb411ab3baedf154ad85db24f11e4537177f04e995df4d609ef6f4ae9641aaa9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 22299,
+        "digest": 9433813088599320791
+      }
+    },
+    {
+      "id": "WPP_D_ericsson_MAIN10_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_D_ericsson_MAIN10_2.bit",
+      "sha256": "eb411ab3baedf154ad85db24f11e4537177f04e995df4d609ef6f4ae9641aaa9",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 22299,
+        "digest": 9433813088599320791
+      }
+    },
+    {
+      "id": "WPP_D_ericsson_MAIN_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_D_ericsson_MAIN_2.bit",
+      "sha256": "30eec63f2324aa982fb91bd4c1c551c833c253ba711ee131aa9cc4d322398caf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 22474,
+        "digest": 6175269573771508406
+      }
+    },
+    {
+      "id": "WPP_D_ericsson_MAIN_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_D_ericsson_MAIN_2.bit",
+      "sha256": "30eec63f2324aa982fb91bd4c1c551c833c253ba711ee131aa9cc4d322398caf",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 22474,
+        "digest": 6175269573771508406
+      }
+    },
+    {
+      "id": "WPP_E_ericsson_MAIN10_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_E_ericsson_MAIN10_2.bit",
+      "sha256": "f22251fff614135de5a5b2ada01f793ea4c511fad773acda0e8fd411dfe84e76",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 29618,
+        "digest": 7030028375211216753
+      }
+    },
+    {
+      "id": "WPP_E_ericsson_MAIN10_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_E_ericsson_MAIN10_2.bit",
+      "sha256": "f22251fff614135de5a5b2ada01f793ea4c511fad773acda0e8fd411dfe84e76",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 29618,
+        "digest": 7030028375211216753
+      }
+    },
+    {
+      "id": "WPP_E_ericsson_MAIN_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_E_ericsson_MAIN_2.bit",
+      "sha256": "c8fe49762a13e1cc2b033308bb22aeb35da0c96f94ca8ef7d87d95bdadaeaa2c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 29642,
+        "digest": 13876019100777553211
+      }
+    },
+    {
+      "id": "WPP_E_ericsson_MAIN_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_E_ericsson_MAIN_2.bit",
+      "sha256": "c8fe49762a13e1cc2b033308bb22aeb35da0c96f94ca8ef7d87d95bdadaeaa2c",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 29642,
+        "digest": 13876019100777553211
+      }
+    },
+    {
+      "id": "WPP_F_ericsson_MAIN10_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_F_ericsson_MAIN10_2.bit",
+      "sha256": "f772dc0d6ec106478ced3ac598e459d9273e260fb56734e055364653f46e79f1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 31389,
+        "digest": 8627256301841118149
+      }
+    },
+    {
+      "id": "WPP_F_ericsson_MAIN10_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_F_ericsson_MAIN10_2.bit",
+      "sha256": "f772dc0d6ec106478ced3ac598e459d9273e260fb56734e055364653f46e79f1",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 31389,
+        "digest": 8627256301841118149
+      }
+    },
+    {
+      "id": "WPP_F_ericsson_MAIN_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_F_ericsson_MAIN_2.bit",
+      "sha256": "e8566e0e48509592dfaf7d314b7e292f51cede045559e3c32b447a9822a8b949",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 31461,
+        "digest": 4019782919703703341
+      }
+    },
+    {
+      "id": "WPP_F_ericsson_MAIN_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_F_ericsson_MAIN_2.bit",
+      "sha256": "e8566e0e48509592dfaf7d314b7e292f51cede045559e3c32b447a9822a8b949",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 48,
+        "bytes": 31461,
+        "digest": 4019782919703703341
+      }
+    },
+    {
+      "id": "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+      "sha256": "2b7110f868bfb62da8282a0a6300408d7abad70a5a940a6a0ba1fbc69536f870",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 49108,
+        "digest": 8257427171136291312
+      }
+    },
+    {
+      "id": "WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WPP_HIGH_TP_444_8BIT_RExt_Apple_2.bit",
+      "sha256": "2b7110f868bfb62da8282a0a6300408d7abad70a5a940a6a0ba1fbc69536f870",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 3,
+        "bytes": 49108,
+        "digest": 8257427171136291312
+      }
+    },
+    {
+      "id": "WP_A_MAIN10_Toshiba_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_A_MAIN10_Toshiba_3.bit",
+      "sha256": "3be359e9c70f56e478bb0c0710dcea112252541570f81856cc9f3dba3d988263",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36225,
+        "digest": 14991186652353741563
+      }
+    },
+    {
+      "id": "WP_A_MAIN10_Toshiba_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_A_MAIN10_Toshiba_3.bit",
+      "sha256": "3be359e9c70f56e478bb0c0710dcea112252541570f81856cc9f3dba3d988263",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36225,
+        "digest": 14991186652353741563
+      }
+    },
+    {
+      "id": "WP_A_Toshiba_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_A_Toshiba_3.bit",
+      "sha256": "d052c54c39078ee6d546a431094b53df633e0c17777e2bed693e7999b0ba29c5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36389,
+        "digest": 16098509959535952265
+      }
+    },
+    {
+      "id": "WP_A_Toshiba_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_A_Toshiba_3.bit",
+      "sha256": "d052c54c39078ee6d546a431094b53df633e0c17777e2bed693e7999b0ba29c5",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36389,
+        "digest": 16098509959535952265
+      }
+    },
+    {
+      "id": "WP_B_Toshiba_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_B_Toshiba_3.bit",
+      "sha256": "c638c1c1052639ac52bf6c1ffe5b5bee55484ccfb56c13bcdc2a085fdb066799",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36403,
+        "digest": 10860198147973427939
+      }
+    },
+    {
+      "id": "WP_B_Toshiba_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_B_Toshiba_3.bit",
+      "sha256": "c638c1c1052639ac52bf6c1ffe5b5bee55484ccfb56c13bcdc2a085fdb066799",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36403,
+        "digest": 10860198147973427939
+      }
+    },
+    {
+      "id": "WP_MAIN10_B_Toshiba_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_MAIN10_B_Toshiba_3.bit",
+      "sha256": "0b307c3ae71258ec5f322cb85cda15ca766b93ed9a01fd3d0411ac8d113165fd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36263,
+        "digest": 862609165258639125
+      }
+    },
+    {
+      "id": "WP_MAIN10_B_Toshiba_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/WP_MAIN10_B_Toshiba_3.bit",
+      "sha256": "0b307c3ae71258ec5f322cb85cda15ca766b93ed9a01fd3d0411ac8d113165fd",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 256,
+        "bytes": 36263,
+        "digest": 862609165258639125
+      }
+    },
+    {
+      "id": "cip_B_NEC_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/cip_B_NEC_2.bit",
+      "sha256": "786e5bd6ac5418f1e4950fc9c5251826128b15d94eda29679b72a4f79d8a77f7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 13228,
+        "digest": 8074679024610315991
+      }
+    },
+    {
+      "id": "cip_B_NEC_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/cip_B_NEC_2.bit",
+      "sha256": "786e5bd6ac5418f1e4950fc9c5251826128b15d94eda29679b72a4f79d8a77f7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 13228,
+        "digest": 8074679024610315991
+      }
+    },
+    {
+      "id": "cip_B_NEC_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/cip_B_NEC_3.bit",
+      "sha256": "786e5bd6ac5418f1e4950fc9c5251826128b15d94eda29679b72a4f79d8a77f7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 13228,
+        "digest": 8074679024610315991
+      }
+    },
+    {
+      "id": "cip_B_NEC_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/cip_B_NEC_3.bit",
+      "sha256": "786e5bd6ac5418f1e4950fc9c5251826128b15d94eda29679b72a4f79d8a77f7",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 5,
+        "bytes": 13228,
+        "digest": 8074679024610315991
+      }
+    },
+    {
+      "id": "ipcm_A_NEC_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_A_NEC_2.bit",
+      "sha256": "f345fa066789908f6d2995a9d4fc7cee48a466c705857c75378e1d650feae30b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5153,
+        "digest": 17534265762660322524
+      }
+    },
+    {
+      "id": "ipcm_A_NEC_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_A_NEC_2.bit",
+      "sha256": "f345fa066789908f6d2995a9d4fc7cee48a466c705857c75378e1d650feae30b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5153,
+        "digest": 17534265762660322524
+      }
+    },
+    {
+      "id": "ipcm_A_NEC_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_A_NEC_3.bit",
+      "sha256": "f345fa066789908f6d2995a9d4fc7cee48a466c705857c75378e1d650feae30b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5153,
+        "digest": 17534265762660322524
+      }
+    },
+    {
+      "id": "ipcm_A_NEC_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_A_NEC_3.bit",
+      "sha256": "f345fa066789908f6d2995a9d4fc7cee48a466c705857c75378e1d650feae30b",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5153,
+        "digest": 17534265762660322524
+      }
+    },
+    {
+      "id": "ipcm_B_NEC_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_B_NEC_2.bit",
+      "sha256": "cf1a824624d1cc26aca3d12656e30716b039e5edb48e41c3dd1c74538157f428",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5643,
+        "digest": 17719169019042818417
+      }
+    },
+    {
+      "id": "ipcm_B_NEC_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_B_NEC_2.bit",
+      "sha256": "cf1a824624d1cc26aca3d12656e30716b039e5edb48e41c3dd1c74538157f428",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5643,
+        "digest": 17719169019042818417
+      }
+    },
+    {
+      "id": "ipcm_B_NEC_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_B_NEC_3.bit",
+      "sha256": "cf1a824624d1cc26aca3d12656e30716b039e5edb48e41c3dd1c74538157f428",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5643,
+        "digest": 17719169019042818417
+      }
+    },
+    {
+      "id": "ipcm_B_NEC_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_B_NEC_3.bit",
+      "sha256": "cf1a824624d1cc26aca3d12656e30716b039e5edb48e41c3dd1c74538157f428",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5643,
+        "digest": 17719169019042818417
+      }
+    },
+    {
+      "id": "ipcm_C_NEC_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_C_NEC_2.bit",
+      "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5856,
+        "digest": 7216205211993912033
+      }
+    },
+    {
+      "id": "ipcm_C_NEC_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_C_NEC_2.bit",
+      "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5856,
+        "digest": 7216205211993912033
+      }
+    },
+    {
+      "id": "ipcm_C_NEC_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_C_NEC_3.bit",
+      "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5856,
+        "digest": 7216205211993912033
+      }
+    },
+    {
+      "id": "ipcm_C_NEC_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_C_NEC_3.bit",
+      "sha256": "a9800f093e66e7cb3147323e6ce6adc47620dfa4bbb89f15afb7f82b1e426977",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5856,
+        "digest": 7216205211993912033
+      }
+    },
+    {
+      "id": "ipcm_D_NEC_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_D_NEC_2.bit",
+      "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5797,
+        "digest": 9715209708288434359
+      }
+    },
+    {
+      "id": "ipcm_D_NEC_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_D_NEC_2.bit",
+      "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5797,
+        "digest": 9715209708288434359
+      }
+    },
+    {
+      "id": "ipcm_D_NEC_3.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_D_NEC_3.bit",
+      "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5797,
+        "digest": 9715209708288434359
+      }
+    },
+    {
+      "id": "ipcm_D_NEC_3.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_D_NEC_3.bit",
+      "sha256": "acb72389ebab10574a4821fd0a3329a307f3cf384a9ef67e6d0e761e807d8689",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5797,
+        "digest": 9715209708288434359
+      }
+    },
+    {
+      "id": "ipcm_E_NEC_2.bit-whole",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_E_NEC_2.bit",
+      "sha256": "1c0652e89cffbfd45625371cbaca3b2293b09593672c9d81b63b83c6a5b55416",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5461,
+        "digest": 7929974672739855856
+      }
+    },
+    {
+      "id": "ipcm_E_NEC_2.bit-4096",
+      "profile": "hevc",
+      "file": ".research/fate-samples/hevc-conformance/ipcm_E_NEC_2.bit",
+      "sha256": "1c0652e89cffbfd45625371cbaca3b2293b09593672c9d81b63b83c6a5b55416",
+      "rights": "fetched-not-redistributed",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 1,
+        "bytes": 5461,
+        "digest": 7929974672739855856
+      }
+    },
+    {
+      "id": "hevc-main-1080p-whole",
+      "profile": "hevc",
+      "file": ".research/codec-inputs/hevc-main-1080p.hevc",
+      "sha256": "d72d53118fcf832485201682dcb80c7bbaeabd392b5fe493ba5e4b1cb25f1421",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 2525973,
+        "digest": 3981692874061396005
+      }
+    },
+    {
+      "id": "hevc-main-1080p-4096",
+      "profile": "hevc",
+      "file": ".research/codec-inputs/hevc-main-1080p.hevc",
+      "sha256": "d72d53118fcf832485201682dcb80c7bbaeabd392b5fe493ba5e4b1cb25f1421",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 2525973,
+        "digest": 3981692874061396005
+      }
+    },
+    {
+      "id": "hevc-main10-1080p-whole",
+      "profile": "hevc",
+      "file": ".research/codec-inputs/hevc-main10-1080p.hevc",
+      "sha256": "d00f2cabfd5a079d94d594c0f98c24d4fa474cf63d1ceef645949611ad23fcd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 2301304,
+        "digest": 14234719083325104995
+      }
+    },
+    {
+      "id": "hevc-main10-1080p-4096",
+      "profile": "hevc",
+      "file": ".research/codec-inputs/hevc-main10-1080p.hevc",
+      "sha256": "d00f2cabfd5a079d94d594c0f98c24d4fa474cf63d1ceef645949611ad23fcd9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 96,
+        "bytes": 2301304,
+        "digest": 14234719083325104995
+      }
+    },
+    {
+      "id": "hevc-main10-2160p-whole",
+      "profile": "hevc",
+      "file": ".research/codec-inputs/hevc-main10-2160p.hevc",
+      "sha256": "5fcd4a7ad7c95c5bb17e7cf6302b02b97fb547433460e4bff716ef565781f681",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 1884534,
+        "digest": 6455333622764362953
+      }
+    },
+    {
+      "id": "hevc-main10-2160p-4096",
+      "profile": "hevc",
+      "file": ".research/codec-inputs/hevc-main10-2160p.hevc",
+      "sha256": "5fcd4a7ad7c95c5bb17e7cf6302b02b97fb547433460e4bff716ef565781f681",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 24,
+        "bytes": 1884534,
+        "digest": 6455333622764362953
+      }
+    },
+    {
+      "id": "hevc-every-aud-whole",
+      "profile": "hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud1.hevc",
+      "sha256": "f6ce36d642462840df7347d66305ee05b9716a1417d292d7d58390b5a47f2a56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15854,
+        "digest": 9402366507616063765
+      }
+    },
+    {
+      "id": "hevc-every-aud-4096",
+      "profile": "hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud1.hevc",
+      "sha256": "f6ce36d642462840df7347d66305ee05b9716a1417d292d7d58390b5a47f2a56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15854,
+        "digest": 9402366507616063765
+      }
+    },
+    {
+      "id": "hevc-end-of-sequence-whole",
+      "profile": "hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-eos.hevc",
+      "sha256": "efa769f8ba786e2a2d85a1fa697742898cc51822e73b81139d0e52164bdef765",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "whole"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15791,
+        "digest": 14738042180882523908
+      }
+    },
+    {
+      "id": "hevc-end-of-sequence-4096",
+      "profile": "hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-eos.hevc",
+      "sha256": "efa769f8ba786e2a2d85a1fa697742898cc51822e73b81139d0e52164bdef765",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "4096"
+      ],
+      "expected": {
+        "packets": 12,
+        "bytes": 15791,
+        "digest": 14738042180882523908
+      }
+    }
+  ]
+}

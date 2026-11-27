@@ -1,12 +1,13 @@
-mod common;
-#[path = "support/recovery.rs"]
-mod wire;
+use crate::common::recovery as wire;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus, RecoveryDefinitionOrigin as Definition, RecoveryDescription, RecoveryDescriptions,
-    RecoveryKind as Kind, RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin as Mapping,
-    RecoveryMappings, RecoveryScope, RecoverySelection, RecoverySyntax as Syntax,
+    BuildStatus,
+    sample_groups::{
+        RecoveryDefinitionOrigin as Definition, RecoveryDescription, RecoveryDescriptions,
+        RecoveryKind as Kind, RecoveryLimits, RecoveryLookup, RecoveryMappingOrigin as Mapping,
+        RecoveryMappings, RecoveryScope, RecoverySelection, RecoverySyntax as Syntax,
+    },
 };
 
 fn entry(
@@ -325,21 +326,31 @@ fn explicit_zero_empty_and_absent_maps_remain_distinct_without_default_guessing(
         RecoveryLimits::default(),
     )
     .unwrap();
-    assert!(matches!(
-        resolve(
-            scope(Kind::Roll, Some(&track), None, Some(&empty), None, 1, 1),
-            1,
-            RecoveryLimits::default(),
-            1
-        ),
-        Err(Error::Unsupported("partial recovery map coverage"))
-    ));
+    let empty_map = resolve(
+        scope(Kind::Roll, Some(&track), None, Some(&empty), None, 1, 1),
+        1,
+        RecoveryLimits::default(),
+        1,
+    )
+    .unwrap();
+    assert_eq!(empty_map.raw_mapping_index, None);
+    assert_eq!(empty_map.mapping_origin, Mapping::Absent);
     let defaulted = RecoveryDescriptions::parse(
         wire::descriptions(&pool, Kind::Roll, 2, 2, 1, &[-2], 0),
         Syntax::Mpeg2026Draft,
         RecoveryLimits::default(),
     )
     .unwrap();
+    let defaulted_tail = resolve(
+        scope(Kind::Roll, Some(&defaulted), None, Some(&zero), None, 1, 2),
+        2,
+        RecoveryLimits::default(),
+        1,
+    )
+    .unwrap();
+    assert_eq!(defaulted_tail.raw_mapping_index, None);
+    assert_eq!(defaulted_tail.mapping_origin, Mapping::TrackDefault);
+    assert_eq!(defaulted_tail.description.unwrap().distance, -2);
     assert!(matches!(
         resolve(
             scope(Kind::Roll, Some(&defaulted), None, Some(&zero), None, 1, 1),
@@ -367,7 +378,7 @@ fn unknown_recovery_syntax_lengths_parameters_and_dangling_indexes_are_not_repai
     assert!(matches!(
         RecoveryDescriptions::parse(modern, Syntax::Versions0And1, RecoveryLimits::default()),
         Err(Error::Unsupported(
-            "recovery version2 requires explicit draft profile"
+            "sgpd version 2 needs the 2026 draft syntax"
         ))
     ));
     let mut unknown = valid.payload().to_vec();

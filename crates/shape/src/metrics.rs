@@ -1,16 +1,12 @@
 //! Glyph lookup and metrics: the font functions shaping asks for, and HarfBuzz's
 //! scaling arithmetic.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use crate::cff;
 use crate::cmap::{Cmap, Subtable};
-use crate::rotations::{Decide, FaceRotations};
-use std::cell::{Cell, RefCell};
-use std::hash::Hash;
+use std::cell::Cell;
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_font::{
-    CharEncoding, Charmap, ControlBox, Font, GlyphId, GlyphMetrics, Load, Outline, OutlineFormat,
-    Platform, SizedFont, TextLookup, Variant, VariationSequences,
-};
+use triergon_font::{ControlBox, Font, GlyphId, OutlineFormat, Variant, VariationSequences};
 
 /// The scale positions are produced in, as HarfBuzz's `hb_font_set_scale` and
 /// `hb_font_set_ppem` set it. The default is one unit per font unit and no ppem,
@@ -57,7 +53,8 @@ pub struct Extents {
 /// functions and the [`Scale`] they answer in, which positions are produced in.
 ///
 /// [`OtMetrics`] answers from the font's own tables, as HarfBuzz's built-in
-/// functions do; [`SizedMetrics`] as libass's FreeType callbacks do at a size.
+/// functions do; [`SizedMetrics`](crate::compat::libass::SizedMetrics) as
+/// libass's FreeType callbacks do at a size.
 /// The functions that load a glyph return a `Result`: an error ends the shaping
 /// call with it, while a glyph the font cannot load is an ordinary answer (zero
 /// or `None`), as it is to HarfBuzz.
@@ -117,7 +114,7 @@ pub trait Metrics {
 
 /// A glyph the font cannot load (`Invalid`) answers `otherwise`, as it does to
 /// HarfBuzz; other errors stop shaping.
-fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
+pub(crate) fn unless_unloadable<T>(result: Result<T>, otherwise: T) -> Result<T> {
     match result {
         Err(Error::Invalid(_)) => Ok(otherwise),
         result => result,
@@ -137,9 +134,7 @@ pub struct OtMetrics<'a> {
     /// format 14.
     variations: Option<VariationSequences<'a>>,
     scale: Scale,
-    x_mult: i64,
-    x_multf: f32,
-    y_multf: f32,
+    em: EmScale,
     /// A CFF or CFF2 face's charstring tables, read once.
     cff: Option<cff::Face<'a>>,
 }
@@ -149,7 +144,6 @@ impl<'a> OtMetrics<'a> {
     /// by the font's [`Limits`](triergon_font::Limits).
     pub fn new(font: &'a Font, scale: Scale) -> Self {
         let cmap = font.table(*b"cmap").and_then(Cmap::new);
-        let upem = i64::from(font.units_per_em());
         Self {
             font,
             subtable: cmap.and_then(|c| c.best(font.table(*b"OS/2").unwrap_or_default())),
@@ -157,9 +151,7 @@ impl<'a> OtMetrics<'a> {
                 .and_then(Cmap::variation_sequences)
                 .map(VariationSequences::format14),
             scale,
-            x_mult: i64::from(scale.x) * 0x10000 / upem,
-            x_multf: scale.x as f32 / f32::from(font.units_per_em()),
-            y_multf: scale.y as f32 / f32::from(font.units_per_em()),
+            em: EmScale::new(scale, font.units_per_em()),
             cff: cff::Face::new(font),
         }
     }
@@ -220,7 +212,7 @@ impl Metrics for OtMetrics<'_> {
 
     fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
         let advance = unless_unloadable(self.font.advance(glyph), 0)?;
-        Ok(((i64::from(advance) * self.x_mult + 32768) >> 16) as i32)
+        Ok(self.em.scale_x(i32::from(advance)))
     }
 
     fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
@@ -239,10 +231,8 @@ impl Metrics for OtMetrics<'_> {
             }));
         }
         // Scaled as HarfBuzz scales extents: outwards to whole units.
-        let x1 = x as f32 * self.x_multf;
-        let y1 = y as f32 * self.y_multf;
-        let x2 = x1 + w as f32 * self.x_multf;
-        let y2 = y1 + h as f32 * self.y_multf;
+        let (x1, y1) = (self.em.fscale_x(x), self.em.fscale_y(y));
+        let (x2, y2) = (x1 + self.em.fscale_x(w), y1 + self.em.fscale_y(h));
         let (x_bearing, y_bearing) = (x1.floor() as i32, y1.floor() as i32);
         let size = |end: f32, start: i32| (end.ceil() as i32).saturating_sub(start);
         Ok(Some(Extents {
@@ -251,224 +241,6 @@ impl Metrics for OtMetrics<'_> {
             width: size(x2, x_bearing),
             height: size(y2, y_bearing),
         }))
-    }
-}
-
-/// The font functions libass 0.17.5 installs on the HarfBuzz font of a face at a
-/// size (`init_font_funcs` and `get_hb_font` in `ass_shaper.c`): the face's
-/// character map looked up as libass looks codes up
-/// ([`Font::text_lookup`]), FreeType's variation sequences
-/// ([`Font::variation_sequences`]), default-load
-/// advances ([`SizedFont::default_advance`]) and `FT_KERNING_DEFAULT` kerning
-/// ([`SizedFont::kerning`]), in 26.6 pixels at the size's
-/// [`SizedFont::harfbuzz_scale`] and pixels per em, so that hinting device
-/// tables apply.
-///
-/// For a face of an `@` font ([`Self::rotating`]), the advance of a glyph
-/// libass's metrics cache keeps rotated ([`GlyphRotations`](crate::GlyphRotations)) is the default
-/// load's vertical advance ([`SizedFont::default_vertical_advance`]).
-///
-/// libass reads glyph extents and contour points from FreeType's default load
-/// ([`SizedFont::load`] with [`Load::Default`]): the extents are its grid-fitted
-/// bearings and size, the contour points its outline's. A glyph without points
-/// has empty extents in every face; for other glyphs, the default load's
-/// `Unsupported` (instructed TrueType faces, which need FreeType's TrueType
-/// interpreter, and the glyphs FreeType's auto-hinter gives a CJK or Indic
-/// style) is the functions', as is an advance `default_advance` cannot give.
-pub struct SizedMetrics<'a> {
-    sized: SizedFont<'a>,
-    lookup: Option<TextLookup<'a>>,
-    /// A Unicode charmap, which FreeType needs for variation sequences.
-    unicode: bool,
-    /// FreeType's variation sequences (`FT_Face_GetCharVariantIndex`).
-    variations: Option<VariationSequences<'a>>,
-    scale: Scale,
-    rotations: Option<&'a dyn Decide>,
-    /// The caller's budget for the default loads of extents and contour
-    /// points.
-    work: RefCell<&'a mut WorkBudget>,
-    /// The outline those loads fill.
-    scratch: RefCell<Outline>,
-}
-
-impl std::fmt::Debug for SizedMetrics<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("SizedMetrics")
-            .field("sized", &self.sized)
-            .field("lookup", &self.lookup)
-            .field("unicode", &self.unicode)
-            .field("scale", &self.scale)
-            .field("rotating", &self.rotations.is_some())
-            .finish_non_exhaustive()
-    }
-}
-
-impl<'a> SizedMetrics<'a> {
-    /// libass's font functions over `sized`, through the charmap libass
-    /// selects when it opens the face ([`Font::text_charmap`]), with `work`
-    /// bounding what they load.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::with_charmap`].
-    pub fn new(sized: SizedFont<'a>, work: &'a mut WorkBudget) -> Result<Self> {
-        Self::with_charmap(sized, sized.font().text_charmap(), work)
-    }
-
-    /// libass's font functions over `sized`, through `charmap`, the one the
-    /// face has selected: libass leaves a face on another charmap when only
-    /// that one maps a character (`ass_font_get_index`).
-    ///
-    /// # Errors
-    ///
-    /// `Unsupported` when libass would convert codes for the charmap, which
-    /// this crate does not ([`Font::text_lookup`]).
-    pub fn with_charmap(
-        sized: SizedFont<'a>,
-        charmap: Option<Charmap<'a>>,
-        work: &'a mut WorkBudget,
-    ) -> Result<Self> {
-        let lookup = charmap
-            .map(|charmap| sized.font().text_lookup(charmap))
-            .transpose()?;
-        let unicode = charmap.is_some_and(|c| {
-            c.platform() == Platform::Unicode
-                || matches!(
-                    c.encoding(),
-                    CharEncoding::Unicode | CharEncoding::UnicodeFull
-                )
-        });
-        let (x, y) = sized.harfbuzz_scale();
-        let size = sized.metrics();
-        Ok(Self {
-            sized,
-            lookup,
-            unicode,
-            variations: sized.font().variation_sequences(),
-            scale: Scale {
-                x,
-                y,
-                x_ppem: u32::from(size.x_ppem),
-                y_ppem: u32::from(size.y_ppem),
-            },
-            rotations: None,
-            work: RefCell::new(work),
-            scratch: RefCell::new(Outline::new(sized.font().data().budget())),
-        })
-    }
-
-    /// The font functions of a face of an `@` font, whose glyph metrics
-    /// cache keeps `rotations`: every glyph a lookup loads is recorded there,
-    /// and a glyph it keeps rotated advances by its vertical advance.
-    #[must_use]
-    pub fn rotating<K: Copy + Eq + Hash>(self, rotations: &'a FaceRotations<'a, K>) -> Self {
-        Self {
-            rotations: Some(rotations),
-            ..self
-        }
-    }
-
-    /// Records a glyph a lookup loads in the metrics cache: through the
-    /// character `c`, or `None` for an advance or extents. Whether its cached
-    /// metrics are rotated.
-    fn loaded(&self, glyph: GlyphId, c: Option<char>) -> bool {
-        self.rotations.is_some_and(|r| r.decide(glyph, c))
-    }
-
-    /// Records a glyph a character lookup returned in the metrics cache.
-    fn looked_up(&self, glyph: Option<GlyphId>, c: char) -> Option<GlyphId> {
-        if let Some(glyph) = glyph {
-            self.loaded(glyph, Some(c));
-        }
-        glyph
-    }
-
-    /// FreeType's default load of `glyph` into the scratch outline; `None`
-    /// for a glyph that does not load, which libass answers with nothing.
-    fn default_load(&self, glyph: GlyphId) -> Result<Option<GlyphMetrics>> {
-        let loaded = self.sized.load(
-            glyph,
-            Load::Default,
-            &mut self.scratch.borrow_mut(),
-            &mut self.work.borrow_mut(),
-        );
-        unless_unloadable(loaded.map(Some), None)
-    }
-}
-
-impl Metrics for SizedMetrics<'_> {
-    fn scale(&self) -> Scale {
-        self.scale
-    }
-
-    fn nominal_glyph(&self, c: char) -> Option<GlyphId> {
-        self.looked_up(self.lookup?.glyph(u32::from(c)), c)
-    }
-
-    fn variation_glyph(&self, c: char, selector: char) -> Option<GlyphId> {
-        let lookup = self.lookup.filter(|_| self.unicode)?;
-        let code = lookup.code(u32::from(c))?;
-        let glyph = match self.variations?.variant(code, u32::from(selector)) {
-            Variant::Default => lookup.charmap().glyph(code),
-            Variant::Glyph(glyph) => Some(glyph),
-            Variant::None => None,
-        };
-        self.looked_up(glyph, c)
-    }
-
-    fn h_advance(&self, glyph: GlyphId) -> Result<i32> {
-        let advance = if self.loaded(glyph, None) {
-            self.sized.default_vertical_advance(glyph)
-        } else {
-            self.sized.default_advance(glyph)
-        };
-        unless_unloadable(advance, 0)
-    }
-
-    fn extents(&self, glyph: GlyphId) -> Result<Option<Extents>> {
-        // Rotated or not, the cached extents are the default load's.
-        self.loaded(glyph, None);
-        match self.default_load(glyph) {
-            Ok(loaded) => Ok(loaded.map(|m| Extents {
-                x_bearing: m.bearing_x,
-                y_bearing: m.bearing_y,
-                width: m.width,
-                height: m.height.wrapping_neg(),
-            })),
-            // A glyph without points has an empty box however FreeType loads
-            // it, so its extents need no hinting this crate lacks.
-            Err(Error::Unsupported(what)) => {
-                let font = self.sized.font();
-                match font.control_box(glyph, &mut self.work.borrow_mut()) {
-                    Ok(ControlBox::Empty) => Ok(Some(Extents::default())),
-                    _ => Err(Error::Unsupported(what)),
-                }
-            }
-            Err(error) => Err(error),
-        }
-    }
-
-    fn contour_point(&self, glyph: GlyphId, point: u16) -> Result<Option<(i32, i32)>> {
-        if self.default_load(glyph)?.is_none() {
-            return Ok(None);
-        }
-        let outline = self.scratch.borrow();
-        let point = outline.points().get(usize::from(point));
-        Ok(point.map(|p| (p.point.x, p.point.y)))
-    }
-
-    fn has_h_kerning(&self) -> bool {
-        true
-    }
-
-    fn h_kerning(&self, left: GlyphId, right: GlyphId) -> Result<i32> {
-        Ok(self.sized.kerning(left, right))
-    }
-
-    fn finish(&self) -> Result<()> {
-        self.rotations
-            .and_then(Decide::take_refusal)
-            .map_or(Ok(()), Err)
     }
 }
 
@@ -481,25 +253,17 @@ impl Metrics for SizedMetrics<'_> {
 pub(crate) struct Scaled<'a> {
     pub(crate) metrics: &'a dyn Metrics,
     pub(crate) scale: Scale,
-    x_mult: i64,
-    y_mult: i64,
-    x_multf: f32,
-    y_multf: f32,
+    pub(crate) em: EmScale,
     error: Cell<Option<Error>>,
 }
 
 impl<'a> Scaled<'a> {
     pub(crate) fn new(metrics: &'a dyn Metrics, units_per_em: u16) -> Self {
         let scale = metrics.scale();
-        let upem = f32::from(units_per_em);
-        let upem_int = i64::from(units_per_em);
         Self {
             metrics,
             scale,
-            x_mult: i64::from(scale.x) * 0x10000 / upem_int,
-            y_mult: i64::from(scale.y) * 0x10000 / upem_int,
-            x_multf: scale.x as f32 / upem,
-            y_multf: scale.y as f32 / upem,
+            em: EmScale::new(scale, units_per_em),
             error: Cell::new(None),
         }
     }
@@ -560,22 +324,46 @@ impl<'a> Scaled<'a> {
             _ => 0,
         }
     }
+}
 
-    /// A font-unit distance in scaled units, rounded as HarfBuzz's `em_mult`.
-    pub(crate) fn em_scale_x(&self, v: i32) -> i32 {
+/// HarfBuzz's arithmetic from font units to a [`Scale`]: the scale per unit in
+/// 16.16 for rounded distances and as `f32` for unrounded coordinates.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EmScale {
+    x_mult: i64,
+    y_mult: i64,
+    x_multf: f32,
+    y_multf: f32,
+}
+
+impl EmScale {
+    fn new(scale: Scale, units_per_em: u16) -> Self {
+        let upem = i64::from(units_per_em);
+        Self {
+            x_mult: i64::from(scale.x) * 0x10000 / upem,
+            y_mult: i64::from(scale.y) * 0x10000 / upem,
+            x_multf: scale.x as f32 / f32::from(units_per_em),
+            y_multf: scale.y as f32 / f32::from(units_per_em),
+        }
+    }
+
+    /// A horizontal font-unit distance in scaled units, rounded half up.
+    pub(crate) fn scale_x(self, v: i32) -> i32 {
         ((i64::from(v) * self.x_mult + 32768) >> 16) as i32
     }
 
-    pub(crate) fn em_scale_y(&self, v: i32) -> i32 {
+    /// A vertical font-unit distance in scaled units, rounded half up.
+    pub(crate) fn scale_y(self, v: i32) -> i32 {
         ((i64::from(v) * self.y_mult + 32768) >> 16) as i32
     }
 
-    /// A font-unit coordinate in scaled units, unrounded, as `em_fscale`.
-    pub(crate) fn em_fscale_x(&self, v: i32) -> f32 {
+    /// A horizontal font-unit coordinate in scaled units, unrounded.
+    pub(crate) fn fscale_x(self, v: i32) -> f32 {
         v as f32 * self.x_multf
     }
 
-    pub(crate) fn em_fscale_y(&self, v: i32) -> f32 {
+    /// A vertical font-unit coordinate in scaled units, unrounded.
+    pub(crate) fn fscale_y(self, v: i32) -> f32 {
         v as f32 * self.y_multf
     }
 }

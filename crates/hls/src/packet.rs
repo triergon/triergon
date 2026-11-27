@@ -1,0 +1,94 @@
+//! The AVC access units and AAC frames of the readers through [`PacketInfo`], with
+//! the track they were read from.
+//!
+//! An HEVC picture of a media segment is several slices of the reader's input and has
+//! no single payload slice, so it has no packet view; its `contiguous_feed` copies it.
+use crate::{aac::HlsAacFrame, avc::AvcTsAccessUnit, pes::PES_CLOCK_HZ};
+use triergon_core::container::{PacketInfo, RandomAccess, TrackId};
+use triergon_core::{Error, Result, Rounding, Time, TimeBase};
+
+/// One AVC access unit or AAC frame with its track and times, borrowed from the unit.
+/// AVC uses 90 kHz ticks. AAC uses the lowest tick rate that represents both
+/// 90 kHz PES times and the frame's exact sample duration.
+#[derive(Clone, Copy, Debug)]
+pub struct UnitPacket<'a> {
+    track: TrackId,
+    payload: &'a [u8],
+    time_base: TimeBase,
+    pts: Option<i64>,
+    dts: Option<i64>,
+    duration: Option<i64>,
+    random_access: RandomAccess,
+}
+
+impl<'a> UnitPacket<'a> {
+    /// An AVC access unit of PID `pid`: its Annex B bytes as the stream carries them,
+    /// and its PES times. An IDR unit is a random-access point; for another the stream
+    /// does not say.
+    pub(crate) fn video(pid: u16, unit: &'a AvcTsAccessUnit) -> Result<Self> {
+        Ok(Self {
+            track: TrackId(u64::from(pid)),
+            payload: unit.source_bytes().as_ref(),
+            time_base: TimeBase::HZ_90000,
+            pts: unit.clock.and_then(|clock| clock.pts90),
+            dts: unit.clock.and_then(|clock| clock.dts90),
+            duration: None,
+            random_access: if unit.idr {
+                RandomAccess::Sync
+            } else {
+                RandomAccess::Unknown
+            },
+        })
+    }
+
+    /// An ADTS frame of PID `pid` presented at `pts`, decoded at `dts`.
+    pub(crate) fn audio(
+        pid: u16,
+        frame: &'a HlsAacFrame,
+        pts: Time,
+        dts: Option<Time>,
+    ) -> Result<Self> {
+        let samples = u64::try_from(frame.duration.denominator()).map_err(|_| Error::Overflow)?;
+        // The least common multiple of the two rates: reducing `samples / 90,000` leaves
+        // 90,000 divided by their greatest common divisor as the denominator.
+        let lcm = TimeBase::new(samples, u64::from(PES_CLOCK_HZ))?
+            .denominator()
+            .checked_mul(samples)
+            .ok_or(Error::Overflow)?;
+        let time_base = TimeBase::new(1, lcm)?;
+        let ticks = |time: Time| time.to_i64_ticks(time_base, Rounding::Floor);
+        Ok(Self {
+            track: TrackId(u64::from(pid)),
+            payload: frame.bytes.as_ref(),
+            time_base,
+            pts: Some(ticks(pts)?),
+            dts: dts.map(ticks).transpose()?,
+            duration: Some(ticks(frame.duration)?),
+            random_access: RandomAccess::Unknown,
+        })
+    }
+}
+
+impl PacketInfo for UnitPacket<'_> {
+    fn track(&self) -> TrackId {
+        self.track
+    }
+    fn payload(&self) -> &[u8] {
+        self.payload
+    }
+    fn time_base(&self) -> TimeBase {
+        self.time_base
+    }
+    fn pts(&self) -> Option<i64> {
+        self.pts
+    }
+    fn dts(&self) -> Option<i64> {
+        self.dts
+    }
+    fn duration(&self) -> Option<i64> {
+        self.duration
+    }
+    fn random_access(&self) -> RandomAccess {
+        self.random_access
+    }
+}

@@ -19,7 +19,7 @@ One operation parses every face of the file from memory and reads, per face:
 | OPERATION | MODE HEIGHT | Read |
 |---|---|---|
 | `font` | none | the metrics and style flags, the family, style and PostScript names in FreeType's ASCII forms, the `OS/2` weight, every name record, every supported cmap subtable with all of its mappings, the text charmap, the kerning of every pair the `kern` subtables list (sorted, unique, nonzero values only), and for every glyph its `hmtx` advance, its loaded advance and its unscaled outline in font units (`FT_LOAD_NO_SCALE`) |
-| `font-sized` | `outlines`, 26.6 pixels | the face at that size as libass loads it: the size metrics, ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands and the kerning of every listed pair; for every glyph its unhinted outline and advance, then that outline emboldened, slanted and both, each outline with its orientation (`Outline::orientation`, FreeType's `FT_Outline_Get_Orientation`: TrueType, PostScript or none) |
+| `font-sized` | `outlines`, 26.6 pixels | the face at that size as libass loads it: the size metrics, ascent and descent, HarfBuzz scale, emboldening strength, PostScript flag, underline and strikeout bands and the kerning of every listed pair; for every glyph its unhinted outline and advance, then that outline emboldened, slanted and both, each outline with its orientation (`Outline::orientation`: TrueType, PostScript or none) |
 | `font-sized` | `advances`, 26.6 pixels | every glyph's default-load (hinted) advance at that size |
 | `font-sized` | `vertical`, 26.6 pixels | every glyph's `linearVertAdvance` and `metrics.vertAdvance` of the unhinted load, then `metrics.vertAdvance` of the default load |
 | `font-sized` | `default`, 26.6 pixels | every glyph's default load (`FT_LOAD_DEFAULT`): `metrics.horiAdvance`, `vertAdvance`, `horiBearingX`, `horiBearingY`, `width` and `height`, then its hinted outline |
@@ -41,3 +41,21 @@ allocation-window markers. The dump mode prints the same values as lines, identi
 the reference's dump. The features are
 `harness/features/font-outlines/`, `font-hinting-none/`, `font-hinting-default/`
 and `font-hinting-modes/`.
+
+## Store comparisons
+
+`font-worker store-trace FILE ORACLE_ENTRY_BYTES` runs a cache access script and
+prints the build or lookup outcome, the keys evicted in order, and the retained
+entry count and charged payload bytes after each access. The script starts with
+`budget SLOTS BYTES`, then lists `get KEY SIZE`, `hold KEY` or `release KEY`.
+The budget fits `SLOTS` entry estimates plus the specified extra bytes. Holding a
+key looks it up and retains one caller handle until release.
+
+`store-overhead` prints the native zero-payload entry charge. Total used bytes
+include the pool's own charge, the charge for each retained entry and the charged
+payload bytes. The independent oracle takes the manifest's recorded estimate.
+Run the [font-store contract](../../harness/features/font-store/contract.json)
+with `cargo xtask oracle-compare --contract harness/features/font-store/contract.json`.
+`cargo xtask fonts store fixtures` regenerates the seeded scripts, and
+`cargo xtask fonts store manifest --record` records their trace hashes and those
+of the authored scripts from the oracle. Rebuild the worker identity after recording.

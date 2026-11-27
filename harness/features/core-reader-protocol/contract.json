@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "core-reader-protocol",
+  "gate": "required",
+  "operation": "core-reader-protocol",
+  "candidate": "codec-views-worker",
+  "worker_operation": "core-reader-protocol-",
+  "oracle": "core-reader-protocol",
+  "contract": [
+    "Compare the InputCursor API's range and byte-delivery rules. Check request source, token and limit, empty starvation, wrong-source and out-of-range refusal, shared and inline windows, budgets and atomic backpressure, cancellation, EOF and truncation, range reuse and resets, source continuation, and sticky input failures.",
+    "Compare Feed across single-byte, small inline and both owned window paths. Compare bytes and physical offsets, successful retry after interrupted reads, seek only when the request is noncontiguous, and the sticky cursor failure after an I/O error.",
+    "Compare sequential and seekable Blocking over a real ADTS ContainerReader. Check the original frames, source position, clocks and an actual seek/replay under ISO/IEC 14496-3 §1.A.2.2. An occupied pool preserves pending input until retry. I/O errors and cancellation persist until restart."
+  ],
+  "required_profiles": ["cursor", "feed", "blocking"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["cursor", "feed", "blocking"], "cause": "The input protocol oracle only compares parity."},
+    {"bound": "heap", "cases": ["cursor", "feed", "blocking"], "cause": "The input protocol oracle only compares parity."},
+    {"bound": "total_rss", "cases": ["cursor", "feed", "blocking"], "cause": "The input protocol oracle only compares parity."}
+  ]
+}

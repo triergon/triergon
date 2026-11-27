@@ -1,7 +1,7 @@
-//! Letterbox one decoded 4:2:0 picture into the 1920x1080 RGBA
-//! canvas, reproducing the reference chain `scale=1920:1080:
-//! force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,
-//! format=rgba` bit for bit.
+//! Letterbox one decoded 4:2:0 picture into an RGBA [`Canvas`], reproducing the
+//! reference chain `scale=W:H:force_original_aspect_ratio=decrease,pad=W:H:
+//! (ow-iw)/2:(oh-ih)/2,format=rgba` bit for bit. The default canvas is 1920x1080, the
+//! one the reference comparisons cover; other sizes follow the same rules.
 //!
 //! Every rule below was recovered by black-box observation of the reference
 //! build (crafted impulses, ramps and constant fields through its public filter
@@ -29,37 +29,91 @@
 //! profile. The tap and complete picture comparisons are separate checks.
 use crate::view::{Colour, PictureView, Plane};
 
-pub const CANVAS_WIDTH: usize = 1920;
-pub const CANVAS_HEIGHT: usize = 1080;
-pub const CANVAS_BYTES: usize = CANVAS_WIDTH * CANVAS_HEIGHT * 4;
 const BLACK: [u8; 4] = [0, 0, 0, 255];
 
-/// Fitted picture size and its offset inside the canvas.
+/// The size of the RGBA image a [`Scaler`] writes: rows top to bottom, four bytes per
+/// pixel, no padding. The default is 1920x1080.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Fit {
-    pub width: usize,
-    pub height: usize,
-    pub x: usize,
-    pub y: usize,
+pub struct Canvas {
+    width: usize,
+    height: usize,
 }
 
-pub fn fit(width: usize, height: usize) -> Fit {
-    let (ow, oh) = (CANVAS_WIDTH as u64, CANVAS_HEIGHT as u64);
-    let (iw, ih) = (width.max(1) as u64, height.max(1) as u64);
-    let rescale = |a: u64, b: u64, c: u64| (a * b + c / 2) / c;
-    let w = rescale(oh, iw, ih).clamp(1, ow) as usize;
-    let h = rescale(ow, ih, iw).clamp(1, oh) as usize;
-    Fit {
-        width: w,
-        height: h,
-        x: (CANVAS_WIDTH - w) / 2,
-        y: (CANVAS_HEIGHT - h) / 2,
+impl Canvas {
+    /// The most pixels a side of a canvas has: 65535, so fitting a picture cannot overflow.
+    pub const MAX_SIDE: usize = u16::MAX as usize;
+
+    /// A `width` x `height` canvas; `None` when either is zero or above
+    /// [`MAX_SIDE`](Self::MAX_SIDE), or the image's bytes do not fit `usize`.
+    pub const fn new(width: usize, height: usize) -> Option<Canvas> {
+        if width == 0 || height == 0 || width > Self::MAX_SIDE || height > Self::MAX_SIDE {
+            return None;
+        }
+        match width.checked_mul(height) {
+            Some(pixels) if pixels.checked_mul(4).is_some() => Some(Canvas { width, height }),
+            _ => None,
+        }
     }
+
+    /// Width in pixels.
+    pub const fn width(self) -> usize {
+        self.width
+    }
+
+    /// Height in pixels.
+    pub const fn height(self) -> usize {
+        self.height
+    }
+
+    /// Bytes of the RGBA image.
+    pub const fn bytes(self) -> usize {
+        self.width * self.height * 4
+    }
+
+    /// The placement of a `width` × `height` picture: the largest size of its aspect
+    /// ratio the canvas holds, each dimension rounded to nearest, centred with offsets
+    /// rounded down.
+    pub fn fit(self, width: usize, height: usize) -> Fit {
+        let (ow, oh) = (self.width as u64, self.height as u64);
+        let (iw, ih) = (width.max(1) as u64, height.max(1) as u64);
+        let rescale = |a: u64, b: u64, c: u64| (a * b + c / 2) / c;
+        let w = rescale(oh, iw, ih).clamp(1, ow) as usize;
+        let h = rescale(ow, ih, iw).clamp(1, oh) as usize;
+        Fit {
+            width: w,
+            height: h,
+            x: (self.width - w) / 2,
+            y: (self.height - h) / 2,
+        }
+    }
+}
+
+impl Default for Canvas {
+    /// 1920x1080.
+    fn default() -> Self {
+        Canvas {
+            width: 1920,
+            height: 1080,
+        }
+    }
+}
+
+/// Where a picture lies on the canvas, in pixels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Fit {
+    /// Width of the scaled picture.
+    pub width: usize,
+    /// Height of the scaled picture.
+    pub height: usize,
+    /// Columns of padding to its left.
+    pub x: usize,
+    /// Rows of padding above it.
+    pub y: usize,
 }
 
 /// One resampling pass: `len` taps per output sample, all inside the source
 /// (`start[i] + len <= source length`), summing to the pass's unit.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 struct Filter {
     len: usize,
     start: Vec<u32>,
@@ -88,6 +142,8 @@ fn cubic_weight(distance: i128) -> i128 {
     6 * weight
 }
 
+type TapWindow = (i64, Vec<i128>);
+
 impl Filter {
     /// The reference's taps for `src -> dst` samples summing to `one`.
     ///
@@ -110,6 +166,13 @@ impl Filter {
                 coef: vec![one as i16; src],
             };
         }
+        let (mut windows, unit) = Self::tap_windows(src, dst);
+        Self::trim_taps(&mut windows, unit);
+        Self::fold_taps(&windows, src, one)
+    }
+
+    #[inline(always)]
+    fn tap_windows(src: usize, dst: usize) -> (Vec<TapWindow>, i128) {
         let (src_i, dst_i) = (src as i64, dst as i64);
         let inc = ((src_i << 16) + dst_i / 2) / dst_i;
         let down = inc > 65536;
@@ -118,7 +181,7 @@ impl Filter {
         let headroom = (src / dst).checked_ilog2().unwrap_or(0).min(8);
         let scale = 1_i128 << headroom;
         let unit = (1_i128 << 54) / scale;
-        let mut windows: Vec<(i64, Vec<i128>)> = (0..dst_i)
+        let windows = (0..dst_i)
             .map(|x| {
                 let c2 = 2 * x * inc + inc - 65536;
                 let mut s = (c2 - half + (1 << 16)).div_euclid(1 << 17);
@@ -137,6 +200,11 @@ impl Filter {
                 (s, w)
             })
             .collect();
+        (windows, unit)
+    }
+
+    #[inline(always)]
+    fn trim_taps(windows: &mut [TapWindow], unit: i128) {
         for i in (0..windows.len()).rev() {
             let next = windows.get(i + 1).map(|w| w.0);
             let (s, w) = &mut windows[i];
@@ -153,9 +221,15 @@ impl Filter {
             }
             w.drain(..drop);
         }
+    }
+
+    #[inline(always)]
+    fn fold_taps(windows: &[TapWindow], src: usize, one: i32) -> Self {
+        let src_i = src as i64;
+        let dst = windows.len();
         let mut folded: Vec<(usize, Vec<i32>)> = Vec::with_capacity(dst);
         let mut len = 1;
-        for (s, w) in &windows {
+        for (s, w) in windows {
             let lo = (*s).max(0) as usize;
             let hi = ((*s + w.len() as i64) as usize).min(src);
             let mut f = vec![0_i128; hi - lo];
@@ -238,6 +312,10 @@ fn hscale<T: Sample>(src: &[T], f: &Filter, shift: u32, out: &mut [i16]) {
 #[inline(always)]
 fn hscale_fixed<T: Sample, const L: usize>(src: &[T], f: &Filter, shift: u32, out: &mut [i16]) {
     for ((o, &s), c) in out.iter_mut().zip(&f.start).zip(f.coef.chunks_exact(L)) {
+        #[expect(
+            clippy::expect_used,
+            reason = "the slice above has L samples; the loop keeps its measured form"
+        )]
         let taps: &[T; L] = src[s as usize..][..L]
             .try_into()
             .expect("filter inside source");
@@ -303,7 +381,7 @@ fn vfixed_into<const ADD: bool>(coef: &[i16], rows: [&[i16]; 4], acc: &mut [i32]
 }
 
 /// A plane resampled row by row through a ring of horizontally scaled rows.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Pass {
     horizontal: Filter,
     vertical: Filter,
@@ -368,13 +446,20 @@ impl Pass {
 }
 
 /// Per-geometry state of the separable path.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Plan {
     luma: Pass,
     chroma: [Pass; 2],
-    terms: Terms,
-    /// Odd fitted width: chroma at full width and the [`Wide`] output stage.
-    wide: bool,
+    output: Output,
+}
+
+/// How a [`Plan`] turns its scaled rows into RGBA.
+#[derive(Debug)]
+enum Output {
+    /// Chroma at half width, each sample's terms spread to its pixel pair.
+    Paired(Terms),
+    /// Odd fitted width: chroma at full width and the [`Wide`] stage.
+    Wide,
 }
 
 /// Scaled-path conversion constants: chroma offsets in luma steps,
@@ -472,17 +557,21 @@ impl Terms {
 impl Plan {
     fn new(width: usize, height: usize, f: Fit) -> Self {
         let (cw, ch) = (width.div_ceil(2), height.div_ceil(2));
-        let wide = f.width % 2 == 1;
-        let dst = (if wide { f.width } else { f.width / 2 }, f.height);
+        let (output, chroma_width) = if f.width % 2 == 1 {
+            (Output::Wide, f.width)
+        } else {
+            (Output::Paired(Terms::default()), f.width / 2)
+        };
+        let dst = (chroma_width, f.height);
         Self {
             luma: Pass::new((width, height), (f.width, f.height)),
             chroma: [Pass::new((cw, ch), dst), Pass::new((cw, ch), dst)],
-            terms: Terms::default(),
-            wide,
+            output,
         }
     }
 
-    fn run(&mut self, picture: &PictureView<'_>, f: Fit, rgba: &mut [u8]) {
+    /// Writes the fitted rectangle of a canvas `width` pixels wide.
+    fn run(&mut self, picture: &PictureView<'_>, f: Fit, width: usize, rgba: &mut [u8]) {
         let shift = u32::from(picture.bit_depth.clamp(8, 16)) - 1;
         let k = Conversion::new(picture.colour);
         let cw = picture.width.div_ceil(2);
@@ -490,23 +579,25 @@ impl Plan {
         for pass in &mut self.chroma {
             pass.next = 0;
         }
-        if self.wide {
-            let k = Wide::new(picture.colour);
-            for y in 0..f.height {
-                self.luma.row(&picture.planes[0], picture.width, shift, y);
-                self.chroma[0].row(&picture.planes[1], cw, shift, y);
-                self.chroma[1].row(&picture.planes[2], cw, shift, y);
-                let out = &mut rgba[((f.y + y) * CANVAS_WIDTH + f.x) * 4..][..f.width * 4];
-                k.row(
-                    &self.luma.acc,
-                    &self.chroma[0].acc,
-                    &self.chroma[1].acc,
-                    out,
-                );
+        let t = match &mut self.output {
+            Output::Paired(terms) => terms,
+            Output::Wide => {
+                let k = Wide::new(picture.colour);
+                for y in 0..f.height {
+                    self.luma.row(&picture.planes[0], picture.width, shift, y);
+                    self.chroma[0].row(&picture.planes[1], cw, shift, y);
+                    self.chroma[1].row(&picture.planes[2], cw, shift, y);
+                    let out = &mut rgba[((f.y + y) * width + f.x) * 4..][..f.width * 4];
+                    k.row(
+                        &self.luma.acc,
+                        &self.chroma[0].acc,
+                        &self.chroma[1].acc,
+                        out,
+                    );
+                }
+                return;
             }
-            return;
-        }
-        let t = &mut self.terms;
+        };
         t.resize(f.width);
         for y in 0..f.height {
             self.luma.row(&picture.planes[0], picture.width, shift, y);
@@ -521,7 +612,7 @@ impl Plan {
                     Conversion::offset(k.inc[3], u) as i16,
                 ]
             });
-            let out = &mut rgba[((f.y + y) * CANVAS_WIDTH + f.x) * 4..][..f.width * 4];
+            let out = &mut rgba[((f.y + y) * width + f.x) * 4..][..f.width * 4];
             if k.full {
                 pack::<true>(&self.luma.acc, &t.c, out);
             } else {
@@ -627,34 +718,63 @@ impl Wide {
     }
 }
 
+/// The letterbox converter of one [`Canvas`], with the filters and scratch rows it
+/// keeps from one picture to the next. The filters are rebuilt when the width, height
+/// or bit depth of the pictures changes. The default writes the default canvas.
 #[derive(Debug, Default)]
 pub struct Scaler {
-    key: Option<(usize, usize, u8)>,
-    plan: Option<Plan>,
+    canvas: Canvas,
+    /// The separable path's state, with the width, height and bit depth of
+    /// the pictures it was built for.
+    plan: Option<((usize, usize, u8), Plan)>,
     rows: [Vec<u8>; 3],
     terms: Terms,
 }
 
 impl Scaler {
-    /// Writes the complete canvas: black padding and the fitted picture.
+    /// A converter writing `canvas`.
+    pub fn new(canvas: Canvas) -> Self {
+        Scaler {
+            canvas,
+            ..Scaler::default()
+        }
+    }
+
+    /// The canvas it writes.
+    pub fn canvas(&self) -> Canvas {
+        self.canvas
+    }
+
+    /// Writes the whole canvas: opaque black padding and `picture` scaled to
+    /// its [`fit`](Canvas::fit). Panics unless `rgba` is the canvas's
+    /// [`bytes`](Canvas::bytes) long, and when a plane is shorter than the picture's
+    /// size and offsets say.
     pub fn letterbox(&mut self, picture: &PictureView<'_>, rgba: &mut [u8]) {
-        assert_eq!(rgba.len(), CANVAS_BYTES);
+        let canvas = self.canvas;
+        assert_eq!(rgba.len(), canvas.bytes());
         let picture = &reference_crop(picture);
-        let f = fit(picture.width, picture.height);
-        pad(f, rgba);
+        let f = canvas.fit(picture.width, picture.height);
+        pad(f, canvas.width, rgba);
         if picture.bit_depth <= 8 && (f.width, f.height) == (picture.width, picture.height) {
             self.direct(picture, f, rgba);
             return;
         }
         let key = (picture.width, picture.height, picture.bit_depth);
-        if self.key != Some(key) || self.plan.is_none() {
-            self.key = Some(key);
-            self.plan = Some(Plan::new(picture.width, picture.height, f));
+        if self
+            .plan
+            .as_ref()
+            .is_some_and(|(built_for, _)| *built_for != key)
+        {
+            self.plan = None;
         }
-        self.plan.as_mut().expect("plan").run(picture, f, rgba);
+        let (_, plan) = self
+            .plan
+            .get_or_insert_with(|| (key, Plan::new(picture.width, picture.height, f)));
+        plan.run(picture, f, canvas.width, rgba);
     }
 
     fn direct(&mut self, picture: &PictureView<'_>, f: Fit, rgba: &mut [u8]) {
+        let width = self.canvas.width;
         let k = Direct::new(picture.colour);
         let cw = f.width.div_ceil(2);
         let t = &mut self.terms;
@@ -669,7 +789,7 @@ impl Scaler {
                 t.spread(cb, cr, |u, v| k.terms(u, v));
             }
             let luma = row_u8(&picture.planes[0], y, f.width, ly);
-            let out = &mut rgba[((f.y + y) * CANVAS_WIDTH + f.x) * 4..][..f.width * 4];
+            let out = &mut rgba[((f.y + y) * width + f.x) * 4..][..f.width * 4];
             let [r, g, b] = &t.c;
             for ((((px, &l), &r), &g), &b) in out.chunks_exact_mut(4).zip(luma).zip(r).zip(g).zip(b)
             {
@@ -812,17 +932,17 @@ fn row_u8<'a>(plane: &'a Plane<'_>, y: usize, width: usize, scratch: &'a mut Vec
     }
 }
 
-/// Opaque black outside the fitted rectangle.
-fn pad(f: Fit, rgba: &mut [u8]) {
+/// Opaque black outside the fitted rectangle of a canvas `width` pixels wide.
+fn pad(f: Fit, width: usize, rgba: &mut [u8]) {
     let fill = |px: &mut [u8]| {
         for p in px.chunks_exact_mut(4) {
             p.copy_from_slice(&BLACK);
         }
     };
-    let row = CANVAS_WIDTH * 4;
+    let row = width * 4;
     fill(&mut rgba[..f.y * row]);
     fill(&mut rgba[(f.y + f.height) * row..]);
-    if f.width < CANVAS_WIDTH {
+    if f.width < width {
         for line in rgba[f.y * row..(f.y + f.height) * row].chunks_exact_mut(row) {
             fill(&mut line[..f.x * 4]);
             fill(&mut line[(f.x + f.width) * 4..]);
@@ -886,9 +1006,11 @@ impl Direct {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::view::SampleAspectRatio;
 
     #[test]
     fn fit_follows_the_decrease_rule_and_floor_offsets() {
+        let fit = |width, height| Canvas::default().fit(width, height);
         assert_eq!(
             fit(1920, 1080),
             Fit {
@@ -1069,7 +1191,7 @@ mod tests {
                     plane(&chroma[..], cs, top / 2 * cs + left / 2),
                 ],
                 pts: None,
-                sar: (1, 1),
+                sar: Some(SampleAspectRatio::SQUARE),
                 colour: Colour {
                     matrix: 1,
                     full_range: false,
@@ -1077,6 +1199,69 @@ mod tests {
             };
             let got = reference_crop(&view);
             assert_eq!(got.width, w + left - kept, "{coded} {bits} {left} {top}");
+        }
+    }
+
+    #[test]
+    fn a_canvas_of_another_size_holds_the_same_fitted_picture() {
+        assert_eq!(Canvas::new(0, 1080), None);
+        assert_eq!(Canvas::new(1920, 0), None);
+        assert_eq!(Canvas::new(Canvas::MAX_SIDE + 1, 1), None);
+        assert!(Canvas::new(Canvas::MAX_SIDE, 1).is_some());
+        assert_eq!(Canvas::new(1920, 1080), Some(Canvas::default()));
+        let mut state = 1_u32;
+        let mut noise = |n: usize| -> Vec<u8> {
+            (0..n)
+                .map(|_| {
+                    state = state.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+                    (state >> 16) as u8
+                })
+                .collect()
+        };
+        // A same-size picture (the direct path) and a scaled one (the separable path), each
+        // on a canvas two columns wider than its fitted size.
+        for (width, height, canvas_width) in [(1440, 1080, 1442), (720, 576, 1352)] {
+            let luma = noise(width * height);
+            let chroma = noise(width / 2 * height / 2);
+            let plane = |data, stride| Plane::U8 {
+                data,
+                stride,
+                offset: 0,
+            };
+            let view = PictureView {
+                width,
+                height,
+                bit_depth: 8,
+                planes: [
+                    plane(&luma[..], width),
+                    plane(&chroma[..], width / 2),
+                    plane(&chroma[..], width / 2),
+                ],
+                pts: None,
+                sar: Some(SampleAspectRatio::SQUARE),
+                colour: Colour {
+                    matrix: 1,
+                    full_range: false,
+                },
+            };
+            let canvas = Canvas::new(canvas_width, 1080).unwrap();
+            let (full, own) = (
+                Canvas::default().fit(width, height),
+                canvas.fit(width, height),
+            );
+            assert_eq!(
+                (own.width, own.height, own.x, own.y),
+                (full.width, 1080, 1, 0)
+            );
+            let mut reference = vec![0; Canvas::default().bytes()];
+            Scaler::default().letterbox(&view, &mut reference);
+            let mut rgba = vec![0; canvas.bytes()];
+            Scaler::new(canvas).letterbox(&view, &mut rgba);
+            for (y, line) in rgba.chunks_exact(canvas_width * 4).enumerate() {
+                let fitted = &reference[(y * 1920 + full.x) * 4..][..full.width * 4];
+                assert_eq!(&line[4..][..own.width * 4], fitted, "row {y}");
+                assert_eq!([&line[..4], &line[line.len() - 4..]], [BLACK; 2]);
+            }
         }
     }
 

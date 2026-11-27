@@ -1,9 +1,10 @@
 //! Coupling and spectral extension side information (5.4.3, Annex E 2.3.3).
 
-use super::{BlockTrace, E, Substream, Trace, bad};
+use super::{E, Substream, bad};
 use crate::error::{DecodeError, Feature};
 use crate::quant::EXP_SCALE;
 use crate::tables::{DEF_CPL_BNDSTRC, spx_band_start};
+use crate::trace::{BlockTrace, Trace};
 use triergon_bitstream::BitReader;
 
 impl Substream {

@@ -1,9 +1,9 @@
 //! Independently authored ATSC framing inputs for an exact packet-boundary probe.
 //! These opaque bodies establish framing only, not decoded-audio validity.
 use super::{Codec, R, authored_case, part};
-use crate::corpus::{Paths, write_json};
+use crate::corpus::Paths;
 use crate::json::Value;
-use crate::{checks::read_json, json};
+use crate::json::{self, read as read_json, write as write_json};
 use std::process::Command;
 use std::{fs, path::Path};
 

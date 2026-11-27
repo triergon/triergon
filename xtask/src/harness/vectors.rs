@@ -11,22 +11,17 @@ use std::time::Duration;
 use super::acceptance::acceptance;
 use super::comparison::{reference_record, reference_summary};
 use super::gate_build;
+use super::oracle_compare::{CaseOutput, TraceOracle};
 use super::parity::{self, Run};
-use super::policy::Runtime;
+use super::policy::{Memory, Runtime};
 use super::provenance::source_identity_error;
 use super::report::{
     PrefixFeature, case_arguments, expected_for, gate_target, resolved_case_arguments,
 };
 use super::timing::{Operation, Pairs, Work, benchmark};
-use crate::checks::read_json;
-use crate::corpus::write_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 type R<T> = Result<T, String>;
-
-fn sha(path: &Path) -> R<String> {
-    super::linux::file_sha(path)
-}
 
 fn s<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(Value::as_str)
@@ -42,19 +37,19 @@ fn same(a: Option<&Value>, b: Option<&Value>) -> bool {
 
 fn save(path: &Path, value: &Value) -> R<()> {
     let temporary = path.with_extension("tmp");
-    write_json(&temporary, value)?;
+    json::write(&temporary, value)?;
     fs::rename(&temporary, path).map_err(|e| e.to_string())
 }
 
 fn workers(root: &Path) -> R<(PathBuf, PathBuf, Value)> {
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let (candidate, reference) = (
         root.join(gate_build::release_dir()?).join("media-worker"),
         root.join("target/harness/ffmpeg-worker"),
     );
     let binaries = Value::object([
-        ("candidate", Value::str(sha(&candidate)?)),
-        ("reference", Value::str(sha(&reference)?)),
+        ("candidate", Value::str(crate::files::sha256(&candidate)?)),
+        ("reference", Value::str(crate::files::sha256(&reference)?)),
     ]);
     if !same(identity.get("binaries"), Some(&binaries)) {
         return Err("worker changed since build identity".into());
@@ -116,8 +111,8 @@ pub fn external_vector(root: &Path, options: &ExternalOptions) -> R<i32> {
 
 fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
     let contract_path = root.join(CONTRACT);
-    let contract = read_json(&contract_path)?;
-    let contract_sha = sha(&contract_path)?;
+    let contract = json::read(&contract_path)?;
+    let contract_sha = crate::files::sha256(&contract_path)?;
     let timeout = super::worker::contract_timeout(&contract)?;
     let spec = contract
         .get("required_additional_vectors")
@@ -138,7 +133,7 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
         return Err("external vector path escapes the sample cache".into());
     }
     let path = root.join(".research/fate-samples").join(&file);
-    if !path.is_file() || Some(sha(&path)?.as_str()) != s(&spec, "sha256") {
+    if !path.is_file() || Some(crate::files::sha256(&path)?.as_str()) != s(&spec, "sha256") {
         return Err("required original external vector missing or changed".into());
     }
     fs::create_dir_all(&options.output).map_err(|e| e.to_string())?;
@@ -171,6 +166,7 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
     ];
     let timed = Operation {
         prefix: "catalogue-".into(),
+        reference_prefix: None,
         arguments: vec![],
         candidate_options: vec![],
         work: Work {
@@ -205,10 +201,10 @@ fn qualify(root: &Path, options: &ExternalOptions) -> R<i32> {
                 reference: comparison,
                 registered: options.baseline_worker.is_none(),
             };
+            let ceiling = Memory::load(root)?.ceiling();
             let job = super::memory::Job::new(&workers, [path.clone()], |slot| {
                 let pairs = match options.baseline_worker {
-                    None => Pairs::gate(options.pairs, super::memory::CEILING)
-                        .early_stop(options.early_stop),
+                    None => Pairs::gate(options.pairs, ceiling).early_stop(options.early_stop),
                     Some(_) => Pairs::fixed(options.pairs),
                 };
                 super::memory::collect(slot, root, workers, &path, pairs, 280, &timed, false)
@@ -361,7 +357,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         return Err("Demux comparison requires both candidate and reference workers; run cargo xtask build-workers first".into());
     }
     let cache = root.join(".research/reference");
-    let build = read_json(&cache.join("build.json"))?;
+    let build = json::read(&cache.join("build.json"))?;
     let enabled = fs::read_to_string(cache.join("fate-list.txt")).map_err(|e| e.to_string())?;
     if !demux_only && !enabled.split_whitespace().any(|c| c == case) {
         return Err("Required configured FATE case disabled; rebuild the reference".into());
@@ -378,10 +374,10 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         }
         fs::write(&path, data).map_err(|e| e.to_string())?;
     }
-    let sample_sha = sha(&path)?;
+    let sample_sha = crate::files::sha256(&path)?;
     let receipt_path = cache.join(format!("fate-{label}.json"));
     if receipt_path.exists()
-        && s(&read_json(&receipt_path)?, "sample_sha256") != Some(sample_sha.as_str())
+        && s(&json::read(&receipt_path)?, "sample_sha256") != Some(sample_sha.as_str())
     {
         return Err("FATE input changed since previous run".into());
     }
@@ -428,17 +424,17 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         ),
         (
             "upstream_ffmpeg_sha256",
-            Value::str(sha(&source.join("ffmpeg"))?),
+            Value::str(crate::files::sha256(&source.join("ffmpeg"))?),
         ),
         ("reference_build", build),
     ];
     let mut demux_status = None;
     if candidate.exists() && reference.exists() {
-        let identity = read_json(&root.join("target/harness/identity.json"))?;
+        let identity = json::read(&root.join("target/harness/identity.json"))?;
         let fresh = || -> R<bool> {
             let binaries = Value::object([
-                ("candidate", Value::str(sha(&candidate)?)),
-                ("reference", Value::str(sha(&reference)?)),
+                ("candidate", Value::str(crate::files::sha256(&candidate)?)),
+                ("reference", Value::str(crate::files::sha256(&reference)?)),
             ]);
             Ok(host.source_error(root, &identity).is_none()
                 && same(identity.get("binaries"), Some(&binaries)))
@@ -468,7 +464,7 @@ pub fn fate_run(root: &Path, case: &str, demux_only: bool, host: &dyn FateHost) 
         }
         demux_status = Some(status);
     }
-    write_json(&receipt_path, &Value::object(receipt))?;
+    json::write(&receipt_path, &Value::object(receipt))?;
     println!("{reference_status} {}", receipt_path.display());
     Ok(if code != 0 {
         code as i32
@@ -496,12 +492,13 @@ pub fn trace_identities(
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let features = PrefixFeature::registered(root, &name, corpora)?;
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let native = root.join("target/harness/ffmpeg-worker");
     let scratch = std::env::temp_dir().join(format!("triergon-traces-{}", std::process::id()));
     let started = std::time::Instant::now();
     super::worker::record_calls(&candidate);
     let mut verdicts = Vec::new();
+    let mut calls = Vec::new();
     let result = if features.is_empty() {
         matroska_traces(
             root,
@@ -518,16 +515,20 @@ pub fn trace_identities(
             &features,
             &identity,
             &scratch,
+            &mut calls,
             &mut verdicts,
         )
     };
-    let calls = super::worker::stop_recording();
+    calls.extend(super::worker::stop_recording());
     let _ = fs::remove_dir_all(&scratch);
     result?;
     let elapsed = (started.elapsed().as_secs_f64() * 10.0).round() / 10.0;
     let record = Value::object([
         ("schema", Value::int(1)),
-        ("candidate_sha256", Value::str(sha(&candidate)?)),
+        (
+            "candidate_sha256",
+            Value::str(crate::files::sha256(&candidate)?),
+        ),
         ("verdicts", Value::Object(verdicts.clone())),
         ("calls", Value::Array(calls.clone())),
         ("elapsed_s", Value::float(elapsed)),
@@ -535,8 +536,7 @@ pub fn trace_identities(
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    fs::write(output, crate::json::to_python(&record, Some(1)) + "\n")
-        .map_err(|e| e.to_string())?;
+    fs::write(output, json::to_python(&record, Some(1)) + "\n").map_err(|e| e.to_string())?;
     let passed = verdicts
         .iter()
         .filter(|(_, v)| v.as_str() == Some("pass"))
@@ -547,7 +547,7 @@ pub fn trace_identities(
         calls.len()
     );
     if let Some(compare) = compare {
-        let before = read_json(compare)?;
+        let before = json::read(compare)?;
         let earlier = before
             .get("calls")
             .and_then(Value::as_array)
@@ -565,7 +565,7 @@ pub fn trace_identities(
             let shown: Vec<String> = changed
                 .iter()
                 .take(10)
-                .map(|a| crate::json::to_python(a, None))
+                .map(|a| json::to_python(a, None))
                 .collect();
             println!("NOT EQUIVALENT [{}]", shown.join(", "));
             return Ok(1);
@@ -620,10 +620,10 @@ fn matroska_traces(
         ),
     ];
     for (manifest, contract_path, corpus) in SLICES {
-        let contract = read_json(&root.join(contract_path))?;
+        let contract = json::read(&root.join(contract_path))?;
         let id = s(&contract, "id").unwrap_or_default().to_owned();
         let timeout = super::worker::contract_timeout(&contract)?;
-        for case in read_json(&root.join(manifest))?
+        for case in json::read(&root.join(manifest))?
             .get("cases")
             .and_then(Value::as_array)
             .unwrap_or_default()
@@ -632,7 +632,7 @@ fn matroska_traces(
             let reference =
                 root.join(s(&reference_record(identity, rule)?, "path").unwrap_or_default());
             let path = root.join(corpus).join(s(case, "file").unwrap_or_default());
-            if Some(sha(&path)?.as_str()) != s(case, "sha256") {
+            if Some(crate::files::sha256(&path)?.as_str()) != s(case, "sha256") {
                 return Err(format!("input changed: {}", path.display()));
             }
             let run = Run {
@@ -664,7 +664,7 @@ fn matroska_traces(
         }
     }
     let contract =
-        read_json(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
+        json::read(&root.join("harness/features/matroska-segment-metadata/contract.json"))?;
     let hdr = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)
@@ -673,7 +673,7 @@ fn matroska_traces(
         .unwrap_or(Value::Null);
     let file = s(&hdr, "file").unwrap_or_default();
     let path = root.join(".research/fate-samples").join(file);
-    if Some(sha(&path)?.as_str()) != s(&hdr, "sha256") {
+    if Some(crate::files::sha256(&path)?.as_str()) != s(&hdr, "sha256") {
         return Err("HDR vector changed".into());
     }
     let run = Run {
@@ -725,10 +725,40 @@ fn prefix_traces(
     features: &[PrefixFeature],
     identity: &Value,
     scratch: &Path,
+    calls: &mut Vec<Value>,
     verdicts: &mut Vec<(String, Value)>,
 ) -> R<()> {
     let target = gate_target()?;
     for feature in features {
+        if feature.reference.is_none() {
+            let contract = json::read(&feature.contract)?;
+            let oracle = TraceOracle::new(&contract)?;
+            // Keep calls in feature order when switching to raw oracle traces.
+            calls.extend(super::worker::stop_recording());
+            for case in &feature.cases {
+                let id = format!("{}/{}", feature.id, super::validation::text(case, "id")?);
+                let previous_calls = calls.len();
+                let status = match oracle.compare_case(
+                    root,
+                    &feature.corpus,
+                    case,
+                    candidate,
+                    CaseOutput::Calls(calls),
+                ) {
+                    Ok(result) => super::worker::status(&result).to_owned(),
+                    Err(error) if calls.len() == previous_calls => {
+                        return Err(format!("{id}: {error}"));
+                    }
+                    Err(error) => {
+                        println!("{id} error: {error}");
+                        "error".into()
+                    }
+                };
+                verdicts.push((id, Value::str(status)));
+            }
+            super::worker::record_calls(candidate);
+            continue;
+        }
         let reference = feature.reference_worker(root, identity)?;
         for case in &feature.cases {
             let id = s(case, "id").unwrap_or_default();
@@ -747,11 +777,18 @@ fn prefix_traces(
             super::worker::record_argument_aliases(&arguments, &declared);
             let result = parity::feed_parity(
                 &run,
-                &feature.prefix,
+                (
+                    &feature.prefix,
+                    feature
+                        .reference_prefix
+                        .as_deref()
+                        .unwrap_or(&feature.prefix),
+                ),
                 &arguments,
                 expected,
                 &feature.work_fields,
                 feature.per_target,
+                None,
             )?;
             verdicts.push((
                 format!("{}/{id}", feature.id),
@@ -763,273 +800,4 @@ fn prefix_traces(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::cell::RefCell;
-
-    #[test]
-    fn prefix_traces_require_the_reference_and_secondary_input_pins() {
-        let root = crate::walk::scratch("prefix-traces");
-        let corpus = root.join("relocated");
-        fs::create_dir(&corpus).unwrap();
-        fs::write(root.join("reference"), b"reference").unwrap();
-        fs::write(corpus.join("first"), b"first").unwrap();
-        let input = crate::sha256::hex(b"first");
-        let secondary = crate::sha256::hex(b"original");
-        let identity = |pin: &str| {
-            crate::json::parse(&format!(
-                r#"{{"comparison_references":{{"reference":{{"path":"reference","sha256":"{pin}"}}}}}}"#,
-            ))
-            .unwrap()
-        };
-        for (prefix, inputs, mismatch) in [
-            (
-                "ts-",
-                format!(
-                    r#""arguments":["188","1","next"],"entities":[{{"file":"first","sha256":"{input}"}},{{"file":"next","sha256":"{secondary}"}}]"#,
-                ),
-                "entity-hash-mismatch",
-            ),
-            (
-                "sub-",
-                format!(r#""companions":[{{"file":"next","sha256":"{secondary}"}}]"#),
-                "companion-hash-mismatch",
-            ),
-        ] {
-            let case = crate::json::parse(&format!(
-                r#"{{"id":"case","file":"first","sha256":"{input}",{inputs}}}"#,
-            ))
-            .unwrap();
-            let features = [PrefixFeature {
-                id: "feature".into(),
-                prefix: prefix.into(),
-                candidate: "candidate".into(),
-                reference: "reference".into(),
-                contract: root.join("contract.json"),
-                manifest: root.join("corpus.json"),
-                cases: vec![case],
-                corpus: corpus.clone(),
-                work_fields: vec![],
-                timeout: super::super::worker::DEFAULT_TIMEOUT,
-                per_target: false,
-            }];
-            let run = |identity: &Value| {
-                prefix_traces(
-                    &root,
-                    &root.join("candidate"),
-                    &features,
-                    identity,
-                    &root.join("raw"),
-                    &mut Vec::new(),
-                )
-                .unwrap_err()
-            };
-            fs::write(corpus.join("next"), b"changed").unwrap();
-            assert_eq!(
-                run(&identity(&"0".repeat(64))),
-                "reference changed since build identity; rebuild"
-            );
-            assert_eq!(
-                run(&identity(&crate::sha256::hex(b"reference"))),
-                format!("feature/case: {mismatch}")
-            );
-        }
-        assert!(!root.join("raw").exists());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    struct Fake {
-        parity: Option<&'static str>,
-        make: Option<(i64, &'static str)>,
-        stale: bool,
-        calls: RefCell<Vec<String>>,
-    }
-
-    impl FateHost for Fake {
-        fn download(&self, _: &str, _: usize) -> R<Vec<u8>> {
-            Err("no network in tests".into())
-        }
-
-        fn make(&self, _: &Path, case: &str, _: &Path) -> R<(i64, String, String)> {
-            self.calls.borrow_mut().push(format!("make {case}"));
-            let (code, out) = self.make.ok_or("make not expected")?;
-            Ok((code, out.into(), String::new()))
-        }
-
-        fn parity(&self, run: &Run<'_>, sequential: bool) -> R<Value> {
-            self.calls.borrow_mut().push(format!(
-                "parity {} {sequential}",
-                run.input.file_name().unwrap().to_string_lossy()
-            ));
-            Ok(Value::object([(
-                "status",
-                Value::str(self.parity.ok_or("parity not expected")?),
-            )]))
-        }
-
-        fn source_error(&self, _: &Path, _: &Value) -> Option<String> {
-            self.stale.then(|| "changed-source".to_owned())
-        }
-    }
-
-    fn fake(parity: Option<&'static str>, make: Option<(i64, &'static str)>) -> Fake {
-        Fake {
-            parity,
-            make,
-            stale: false,
-            calls: RefCell::new(vec![]),
-        }
-    }
-
-    fn setup(with_workers: bool) -> PathBuf {
-        let root = crate::walk::scratch("fate-run");
-        let cache = root.join(".research/reference");
-        fs::create_dir_all(cache.join("FFmpeg-frozen-fixture")).unwrap();
-        fs::write(
-            cache.join("build.json"),
-            r#"{"revision": "frozen-fixture"}"#,
-        )
-        .unwrap();
-        fs::write(
-            cache.join("fate-list.txt"),
-            "fate-matroska-xiph-lacing\nfate-matroska-opus-remux\n",
-        )
-        .unwrap();
-        fs::write(
-            cache.join("FFmpeg-frozen-fixture/ffmpeg"),
-            "unit-fixture-only-oracle",
-        )
-        .unwrap();
-        fs::create_dir_all(root.join(".research/fate-samples/mkv")).unwrap();
-        for name in ["xiph_lacing.mka", "codec_delay_opus.mkv"] {
-            fs::write(
-                root.join(".research/fate-samples/mkv").join(name),
-                "unit-fixture-only-input",
-            )
-            .unwrap();
-        }
-        if with_workers {
-            let release = root.join(gate_build::release_dir().unwrap());
-            fs::create_dir_all(&release).unwrap();
-            fs::create_dir_all(root.join("target/harness")).unwrap();
-            fs::write(release.join("media-worker"), "candidate").unwrap();
-            fs::write(root.join("target/harness/ffmpeg-worker"), "reference").unwrap();
-            let identity = format!(
-                r#"{{"binaries": {{"candidate": "{}", "reference": "{}"}}}}"#,
-                crate::sha256::hex(b"candidate"),
-                crate::sha256::hex(b"reference")
-            );
-            fs::write(root.join("target/harness/identity.json"), identity).unwrap();
-        }
-        root
-    }
-
-    fn receipt(root: &Path, label: &str) -> Value {
-        read_json(&root.join(format!(".research/reference/fate-{label}.json"))).unwrap()
-    }
-
-    #[test]
-    fn demux_only_needs_both_workers_and_runs_nothing_upstream() {
-        let root = setup(false);
-        let host = fake(None, None);
-        assert!(
-            fate_run(&root, "fate-matroska-xiph-lacing", true, &host)
-                .unwrap_err()
-                .contains("candidate and reference workers")
-        );
-        assert!(host.calls.borrow().is_empty());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn upstream_only_runs_make_and_records_no_candidate_test() {
-        let root = setup(false);
-        let host = fake(None, Some((0, "native FATE output")));
-        assert_eq!(
-            fate_run(&root, "fate-matroska-xiph-lacing", false, &host).unwrap(),
-            0
-        );
-        let r = receipt(&root, "xiph");
-        assert_eq!(r.get("upstream_case_executed"), Some(&Value::Bool(true)));
-        assert_eq!(
-            s(&r, "candidate_status"),
-            Some("not tested by upstream FATE")
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn the_demux_comparison_uses_the_original_vector_and_keeps_failures() {
-        let root = setup(true);
-        let host = fake(Some("pass"), None);
-        assert_eq!(
-            fate_run(&root, "fate-matroska-opus-remux", true, &host).unwrap(),
-            0
-        );
-        assert_eq!(*host.calls.borrow(), ["parity codec_delay_opus.mkv true"]);
-        let r = receipt(&root, "opus");
-        assert_eq!(s(&r, "reference_status"), Some("not-run-demux-only"));
-        assert!(
-            s(&r, "candidate_status")
-                .unwrap()
-                .contains("not complete upstream FATE execution")
-        );
-        assert!(
-            s(&r, "rights")
-                .unwrap()
-                .contains("redistribution unreviewed")
-        );
-        fs::remove_file(root.join(".research/reference/fate-opus.json")).unwrap();
-        assert_eq!(
-            fate_run(
-                &root,
-                "fate-matroska-opus-remux",
-                true,
-                &fake(Some("mismatch"), None)
-            )
-            .unwrap(),
-            1
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn changed_inputs_stale_workers_and_upstream_failures_fail_closed() {
-        let root = setup(true);
-        fs::write(
-            root.join(".research/reference/fate-xiph.json"),
-            r#"{"sample_sha256": "changed-input"}"#,
-        )
-        .unwrap();
-        assert!(
-            fate_run(
-                &root,
-                "fate-matroska-xiph-lacing",
-                true,
-                &fake(Some("pass"), None)
-            )
-            .unwrap_err()
-            .contains("FATE input changed")
-        );
-        fs::remove_file(root.join(".research/reference/fate-xiph.json")).unwrap();
-        let mut stale = fake(Some("pass"), None);
-        stale.stale = true;
-        assert!(
-            fate_run(&root, "fate-matroska-xiph-lacing", true, &stale)
-                .unwrap_err()
-                .contains("Stale adapter identity")
-        );
-        assert!(stale.calls.borrow().is_empty());
-        assert_eq!(
-            fate_run(
-                &root,
-                "fate-matroska-xiph-lacing",
-                false,
-                &fake(Some("pass"), Some((7, "")))
-            )
-            .unwrap(),
-            7
-        );
-        fs::remove_dir_all(root).unwrap();
-    }
-}
+mod tests;

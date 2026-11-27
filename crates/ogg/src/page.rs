@@ -1,9 +1,8 @@
-//! Ogg pages (RFC 3533 section 6) and their capture from incremental input.
+//! Ogg pages (RFC 3533 section 6): the page header, its lacing and CRC, the capture of
+//! whole pages from incremental input, and a page writer for tests and fixture tools.
 use std::sync::atomic::AtomicBool;
 use triergon_bitstream::crc::Crc32Mpeg;
-use triergon_core::{
-    BudgetVec, Bytes, Error, InputCursor, InputRequest, Result, SourceLocation, Step, WorkBudget,
-};
+use triergon_core::{BudgetVec, Bytes, Error, InputCursor, Result, Step, WorkBudget};
 
 /// The page continues a packet from the previous page.
 pub const CONTINUED: u8 = 1;
@@ -13,9 +12,9 @@ pub const BEGIN_OF_STREAM: u8 = 2;
 pub const END_OF_STREAM: u8 = 4;
 
 /// The capture pattern every page starts with.
-pub const CAPTURE: &[u8; 4] = b"OggS";
+pub(crate) const CAPTURE: &[u8; 4] = b"OggS";
 /// Bytes of a page header before its lacing values.
-pub const FIXED_HEADER: usize = 27;
+pub(crate) const FIXED_HEADER: usize = 27;
 /// The largest page: a full header and 255 segments of 255 bytes.
 pub const MAX_PAGE: usize = FIXED_HEADER + 255 + 255 * 255;
 
@@ -23,11 +22,15 @@ pub const MAX_PAGE: usize = FIXED_HEADER + 255 + 255 * 255;
 /// methods that read them take the page.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PageHeader {
+    /// The header type flags: [`CONTINUED`], [`BEGIN_OF_STREAM`], [`END_OF_STREAM`].
     pub flags: u8,
     /// Position after the last packet that ends on this page; -1 when none ends here.
     pub granule: i64,
+    /// The serial number of the page's logical stream.
     pub serial: u32,
+    /// The page's sequence number within its logical stream.
     pub sequence: u32,
+    /// The CRC the page states.
     pub crc: u32,
     segments: u8,
     body_len: u16,
@@ -89,14 +92,17 @@ impl PageHeader {
         page.get(FIXED_HEADER..self.header_len()).unwrap_or(&[])
     }
 
+    /// Whether the page's first piece continues a packet from the previous page.
     pub fn continued(&self) -> bool {
         self.flags & CONTINUED != 0
     }
 
+    /// Whether this is the first page of its logical stream.
     pub fn begin_of_stream(&self) -> bool {
         self.flags & BEGIN_OF_STREAM != 0
     }
 
+    /// Whether this is the last page of its logical stream.
     pub fn end_of_stream(&self) -> bool {
         self.flags & END_OF_STREAM != 0
     }
@@ -120,7 +126,7 @@ impl PageHeader {
 
     /// The packet pieces of the body of `page`, in order, with whether each one ends its
     /// packet (a final run of 255-byte segments continues on the next page).
-    pub fn pieces<'a>(
+    pub(crate) fn pieces<'a>(
         &self,
         page: &'a [u8],
     ) -> impl Iterator<Item = (core::ops::Range<usize>, bool)> + 'a {
@@ -149,7 +155,7 @@ impl PageHeader {
     }
 
     /// Number of packets that end on `page`.
-    pub fn completed_packets(&self, page: &[u8]) -> usize {
+    pub(crate) fn completed_packets(&self, page: &[u8]) -> usize {
         self.lacing(page)
             .iter()
             .filter(|&&value| value < 255)
@@ -159,19 +165,19 @@ impl PageHeader {
 
 /// A whole page with a checked CRC.
 #[derive(Clone, Debug)]
-pub struct Page {
-    pub header: PageHeader,
+pub(crate) struct Page {
+    pub(crate) header: PageHeader,
     /// The page bytes, header included.
-    pub bytes: Bytes,
+    pub(crate) bytes: Bytes,
     /// Source offset of the capture pattern.
-    pub offset: u64,
+    pub(crate) offset: u64,
     /// Bytes skipped to find this page since the previous one: garbage, pages with a bad
     /// CRC or an unknown version.
-    pub skipped: u64,
+    pub(crate) skipped: u64,
 }
 
 /// What the bytes at the start of a buffer hold.
-enum Examined {
+pub(crate) enum Examined {
     /// No page starts in the first `n` bytes.
     Garbage(usize),
     /// A page may start here; at least this many bytes are needed to tell.
@@ -180,7 +186,7 @@ enum Examined {
     Page(PageHeader),
 }
 
-fn examine(bytes: &[u8]) -> Examined {
+pub(crate) fn examine(bytes: &[u8]) -> Examined {
     let Some(at) = bytes.windows(4).position(|window| window == CAPTURE) else {
         // Keep a tail that may begin a capture pattern split across windows.
         let tail = (1..=3.min(bytes.len()))
@@ -215,7 +221,7 @@ fn examine(bytes: &[u8]) -> Examined {
 /// pages with a bad CRC and pages of another structure version are skipped, at most
 /// `max_skip` bytes in a row.
 #[derive(Debug)]
-pub struct PageReader {
+pub(crate) struct PageReader {
     /// A page gathered across windows, starting at `buffer_offset`.
     buffer: BudgetVec<u8>,
     buffer_offset: u64,
@@ -223,21 +229,11 @@ pub struct PageReader {
     max_skip: u64,
 }
 
-/// What [`PageReader::next`] produced.
-#[derive(Debug)]
-pub enum PageStep {
-    Page(Page),
-    NeedInput(InputRequest),
-    Yield,
-    /// The input ended; a trailing partial page is counted in `skipped`.
-    End {
-        location: SourceLocation,
-        skipped: u64,
-    },
-}
+/// The capture-pattern scanner reached its byte bound without finding a page.
+pub(crate) const CAPTURE_SCAN_LIMIT: Error = Error::Policy("Ogg capture pattern scan");
 
 impl PageReader {
-    pub fn new(input: &InputCursor, max_skip: u64) -> PageReader {
+    pub(crate) fn new(input: &InputCursor, max_skip: u64) -> PageReader {
         PageReader {
             buffer: BudgetVec::new(input.budget()),
             buffer_offset: 0,
@@ -247,13 +243,13 @@ impl PageReader {
     }
 
     /// Drop a partly gathered page, as after a jump in the input.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.buffer.clear();
         self.skipped = 0;
     }
 
     /// Offset of the next byte this reader examines.
-    pub fn position(&self, input: &InputCursor) -> u64 {
+    pub(crate) fn position(&self, input: &InputCursor) -> u64 {
         if self.buffer.is_empty() {
             input.position()
         } else {
@@ -261,21 +257,28 @@ impl PageReader {
         }
     }
 
+    /// Bytes skipped since the last page, a trailing partial page at the end of the input
+    /// included; the count starts again from zero.
+    pub(crate) fn take_skipped(&mut self) -> u64 {
+        std::mem::take(&mut self.skipped)
+    }
+
     fn skip(&mut self, bytes: usize) -> Result<()> {
         self.skipped += bytes as u64;
         if self.skipped > self.max_skip {
-            return Err(Error::Policy("Ogg capture pattern scan"));
+            return Err(CAPTURE_SCAN_LIMIT);
         }
         Ok(())
     }
 
-    /// The next whole page.
-    pub fn next(
+    /// The next whole page. At [`Step::End`], [`PageReader::take_skipped`] has the bytes
+    /// skipped since the last page.
+    pub(crate) fn next(
         &mut self,
         input: &mut InputCursor,
         work: &mut WorkBudget,
         cancel: &AtomicBool,
-    ) -> Result<PageStep> {
+    ) -> Result<Step<Page>> {
         loop {
             if !self.buffer.is_empty() {
                 match examine(&self.buffer) {
@@ -305,25 +308,25 @@ impl PageReader {
                             match buffer.freeze() {
                                 Ok(bytes) => bytes,
                                 Err(rejected) => {
-                                    self.buffer = rejected.buffer;
+                                    self.buffer = rejected.value;
                                     return Err(rejected.error);
                                 }
                             }
                         };
-                        return Ok(PageStep::Page(self.page(header, bytes, offset)));
+                        return Ok(Step::Ready(self.page(header, bytes, offset)));
                     }
                     Examined::Need(needed) => {
                         let missing = needed - self.buffer.len();
                         match input.read_append(&mut self.buffer, missing, work, cancel)? {
                             Step::Ready(_) => {}
-                            Step::NeedInput(request) => return Ok(PageStep::NeedInput(request)),
-                            Step::Yield => return Ok(PageStep::Yield),
+                            Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                            Step::Yield => return Ok(Step::Yield),
                             Step::Backpressure(never) => match never {},
                             Step::End(location) => {
                                 let partial = self.buffer.len();
                                 self.buffer.clear();
                                 self.skipped += partial as u64;
-                                return Ok(self.end(location));
+                                return Ok(Step::End(location));
                             }
                         }
                     }
@@ -333,8 +336,8 @@ impl PageReader {
             let offset = input.position();
             if input.buffered().is_empty() {
                 match input.read_discard(1, work, cancel)? {
-                    Step::NeedInput(request) => return Ok(PageStep::NeedInput(request)),
-                    Step::End(location) => return Ok(self.end(location)),
+                    Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                    Step::End(location) => return Ok(Step::End(location)),
                     _ => return Err(Error::Invalid("empty Ogg input window")),
                 }
             }
@@ -348,7 +351,7 @@ impl PageReader {
                 },
                 Examined::Page(header) if work.remaining() >= header.page_len() as u64 => {
                     return match input.read_span(header.page_len(), work, cancel)? {
-                        Step::Ready(bytes) => Ok(PageStep::Page(self.page(header, bytes, offset))),
+                        Step::Ready(bytes) => Ok(Step::Ready(self.page(header, bytes, offset))),
                         // The page is buffered and the work suffices.
                         _ => Err(Error::Invalid("buffered Ogg page")),
                     };
@@ -364,10 +367,10 @@ impl PageReader {
             };
             match step {
                 Step::Ready(_) => {}
-                Step::NeedInput(request) => return Ok(PageStep::NeedInput(request)),
-                Step::Yield => return Ok(PageStep::Yield),
+                Step::NeedInput(request) => return Ok(Step::NeedInput(request)),
+                Step::Yield => return Ok(Step::Yield),
                 Step::Backpressure(never) => match never {},
-                Step::End(location) => return Ok(self.end(location)),
+                Step::End(location) => return Ok(Step::End(location)),
             }
         }
     }
@@ -380,17 +383,10 @@ impl PageReader {
             skipped: std::mem::take(&mut self.skipped),
         }
     }
-
-    fn end(&mut self, location: SourceLocation) -> PageStep {
-        PageStep::End {
-            location,
-            skipped: std::mem::take(&mut self.skipped),
-        }
-    }
 }
 
-/// Write one page with lacing values `lacing` over `body`, computing its CRC; for tests
-/// and fixture tools.
+/// Append one version-zero page and compute its CRC. Supply at most 255 lacing values
+/// whose sum is `body.len()`, and use `-1` for an unset granule position.
 pub fn write_page(
     flags: u8,
     granule: i64,
@@ -414,14 +410,6 @@ pub fn write_page(
     let mut crc = Crc32Mpeg::from_register(0);
     crc.update(&out[start..]);
     out[start + 22..start + 26].copy_from_slice(&crc.remainder().to_le_bytes());
-}
-
-/// Lacing values for packets of the given sizes, all ending on one page.
-pub fn lacing_for(sizes: &[usize], out: &mut Vec<u8>) {
-    for &size in sizes {
-        out.extend(std::iter::repeat_n(255, size / 255));
-        out.push((size % 255) as u8);
-    }
 }
 
 #[cfg(test)]
@@ -450,11 +438,9 @@ mod tests {
 
     #[test]
     fn pieces_follow_the_lacing() {
-        let mut lacing = Vec::new();
-        lacing_for(&[0, 255, 3], &mut lacing);
-        assert_eq!(lacing, [0, 255, 0, 3]);
+        // Packets of 0, 255 and 3 bytes: a 255-byte packet ends with a zero lacing value.
         let mut page = Vec::new();
-        write_page(0, 5, 1, 0, &lacing, &[9; 258], &mut page);
+        write_page(0, 5, 1, 0, &[0, 255, 0, 3], &[9; 258], &mut page);
         let header = PageHeader::parse(&page).unwrap();
         let pieces: Vec<_> = header.pieces(&page).collect();
         assert_eq!(pieces, [(0..0, true), (0..255, true), (255..258, true)]);

@@ -2,25 +2,34 @@
 //! runtime, heap or total-RSS bound fails fails the step, unless the contract's
 //! `open_bounds` lists that bound for the case on the measured target.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::path::Path;
 
-use crate::json::Value;
+use super::policy::Policy;
+use crate::json::{self, Value};
 
 /// A bound the gate grades each case on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Bound {
     /// The runtime ratio's upper 95% bound, at most the ceiling.
     Runtime,
-    /// The peak heap ratio's upper 95% bound, below 1.
+    /// The peak heap ratio's upper 95% bound, below its ceiling.
     Heap,
-    /// The total RSS ratio's upper 95% bound, below 1.
+    /// The total RSS ratio's upper 95% bound, below its ceiling.
     TotalRss,
 }
 
 impl Bound {
-    const ALL: [Bound; 3] = [Bound::Runtime, Bound::Heap, Bound::TotalRss];
+    pub(crate) const ALL: [Bound; 3] = [Bound::Runtime, Bound::Heap, Bound::TotalRss];
+
+    fn key(self) -> &'static str {
+        match self {
+            Self::Runtime => "runtime",
+            Self::Heap => "heap",
+            Self::TotalRss => "total_rss",
+        }
+    }
 
     fn parse(name: &str) -> Option<Bound> {
         match name {
@@ -28,6 +37,15 @@ impl Bound {
             "heap" => Some(Bound::Heap),
             "total_rss" => Some(Bound::TotalRss),
             _ => None,
+        }
+    }
+
+    /// Whether a case's upper 95% bound `value` holds under `policy`.
+    pub fn holds(self, value: f64, policy: Policy) -> bool {
+        match self {
+            Bound::Runtime => value > 0.0 && value <= policy.runtime.ceiling,
+            Bound::Heap => value < policy.memory.heap,
+            Bound::TotalRss => value > 0.0 && value < policy.memory.total_rss,
         }
     }
 }
@@ -49,6 +67,13 @@ impl fmt::Display for Bound {
 pub struct CaseBounds {
     pub id: String,
     values: [Option<f64>; 3],
+}
+
+impl CaseBounds {
+    /// The case's upper 95% bound of `bound`, if its row measured it.
+    pub fn value(&self, bound: Bound) -> Option<f64> {
+        self.values[bound as usize]
+    }
 }
 
 /// The bounds a case row records, or `None` for a row the bounds do not grade: an
@@ -82,10 +107,17 @@ pub fn case_bounds(row: &Value) -> Option<CaseBounds> {
             ratio("total_rss_ratio_upper_95"),
         )
     });
-    Some(CaseBounds {
-        id,
-        values: [runtime, memory.map(|m| m.0), memory.map(|m| m.1)],
-    })
+    let mut values = [runtime, memory.map(|m| m.0), memory.map(|m| m.1)];
+    for (bound, value) in Bound::ALL.into_iter().zip(&mut values) {
+        if row
+            .get("not_measured")
+            .and_then(|bounds| bounds.get(bound.key()))
+            .is_some()
+        {
+            *value = None;
+        }
+    }
+    Some(CaseBounds { id, values })
 }
 
 /// The contract's `open_bounds` on `target`: each entry names a `bound` (`runtime`,
@@ -163,6 +195,126 @@ pub fn open_bounds(
     Ok(open)
 }
 
+/// Bounds without measurements, by case and bound on a target.
+#[derive(Default)]
+pub struct Unmeasured<'a>(BTreeMap<&'a str, BTreeMap<Bound, &'a str>>);
+
+impl<'a> Unmeasured<'a> {
+    pub fn read(contract: &'a Value, manifest: &'a Value, target: &str) -> Result<Self, String> {
+        let Some(entries) = contract.get("open_unmeasured") else {
+            return Ok(Self::default());
+        };
+        let entries = entries
+            .as_array()
+            .ok_or("open_unmeasured must be an array")?;
+        let cases: BTreeSet<_> = manifest
+            .get("cases")
+            .and_then(Value::as_array)
+            .ok_or("manifest has no cases")?
+            .iter()
+            .filter_map(|case| case.get("id").and_then(Value::as_str))
+            .collect();
+        let mut seen = BTreeSet::new();
+        let mut active = Self::default();
+        for entry in entries {
+            let text = |key| entry.get(key).and_then(Value::as_str);
+            let bound = text("bound")
+                .and_then(Bound::parse)
+                .ok_or("open_unmeasured needs a bound (runtime, heap or total_rss)")?;
+            let cause = text("cause")
+                .filter(|s| !s.trim().is_empty() && !s.contains(['\r', '\n']))
+                .ok_or("open_unmeasured cause must be one nonempty line")?;
+            let ids = entry
+                .get("cases")
+                .and_then(Value::as_array)
+                .filter(|ids| !ids.is_empty())
+                .ok_or("open_unmeasured needs a nonempty list of cases")?;
+            let targets = if let Some(targets) = entry.get("targets") {
+                targets
+                    .as_array()
+                    .filter(|targets| !targets.is_empty())
+                    .ok_or("open_unmeasured targets must be a nonempty array")?
+                    .iter()
+                    .map(|value| {
+                        value
+                            .as_str()
+                            .filter(|name| crate::gate::TARGETS.contains(name))
+                            .ok_or("open_unmeasured names an unknown target")
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+            } else {
+                crate::gate::TARGETS.to_vec()
+            };
+            for id in ids {
+                let id = id.as_str().filter(|id| cases.contains(id)).ok_or_else(|| {
+                    format!("open_unmeasured: {id:?} is not a case of the manifest")
+                })?;
+                for &on in &targets {
+                    if !seen.insert((id, bound, on)) {
+                        return Err(format!(
+                            "open_unmeasured: {id} {bound} listed twice on {on}"
+                        ));
+                    }
+                    if on == target {
+                        active.0.entry(id).or_default().insert(bound, cause);
+                    }
+                }
+            }
+        }
+        for (bound, id) in open_bounds(contract, manifest, target)? {
+            if active.has(&id, bound) {
+                return Err(format!(
+                    "{id}: {bound} listed in both open_bounds and open_unmeasured on {target}"
+                ));
+            }
+        }
+        Ok(active)
+    }
+
+    pub fn has(&self, id: &str, bound: Bound) -> bool {
+        self.0
+            .get(id)
+            .is_some_and(|bounds| bounds.contains_key(&bound))
+    }
+
+    pub fn causes(&self, id: &str) -> impl Iterator<Item = (Bound, &'a str)> + '_ {
+        self.0
+            .get(id)
+            .into_iter()
+            .flatten()
+            .map(|(&bound, &cause)| (bound, cause))
+    }
+
+    pub fn skips(&self, id: &str, collection: &str) -> bool {
+        match collection {
+            "timing" => self.has(id, Bound::Runtime),
+            "memory" => self.has(id, Bound::Heap) && self.has(id, Bound::TotalRss),
+            _ => false,
+        }
+    }
+
+    pub fn all_skip(&self, manifest: &Value, collection: &str) -> bool {
+        manifest
+            .get("cases")
+            .and_then(Value::as_array)
+            .is_some_and(|cases| {
+                !cases.is_empty()
+                    && cases.iter().all(|case| {
+                        case.get("id")
+                            .and_then(Value::as_str)
+                            .is_some_and(|id| self.skips(id, collection))
+                    })
+            })
+    }
+
+    pub fn annotation(&self, id: &str) -> Value {
+        Value::object(
+            self.causes(id)
+                .map(|(bound, cause)| (bound.key(), Value::str(cause))),
+        )
+    }
+}
+
 /// One line per failing bound of `cases`, telling those the contract lists as open from
 /// the others, and one per listed open bound that now holds, to be removed from the
 /// list. Returns the lines and whether the step fails: on a failing bound that is not
@@ -171,18 +323,14 @@ pub fn verdict(
     label: &str,
     cases: &[CaseBounds],
     open: &BTreeSet<(Bound, String)>,
-    ceiling: f64,
+    policy: Policy,
 ) -> (Vec<String>, bool) {
     let mut lines = Vec::new();
     let mut failed = false;
     for case in cases {
         for (bound, value) in Bound::ALL.into_iter().zip(case.values) {
             let Some(value) = value else { continue };
-            let holds = match bound {
-                Bound::Runtime => value > 0.0 && value <= ceiling,
-                Bound::Heap => value < 1.0,
-                Bound::TotalRss => value > 0.0 && value < 1.0,
-            };
+            let holds = bound.holds(value, policy);
             let listed = open.contains(&(bound, case.id.clone()));
             let shown = if value.is_finite() {
                 format!("{value:.4}")
@@ -216,7 +364,7 @@ pub fn verdict(
 /// command whose collections have no grade to join them: reads its `report.json`,
 /// prints the lines and returns whether the step fails.
 pub fn collection_verdict(root: &Path, options: &super::report::Options) -> Result<bool, String> {
-    let read = crate::checks::read_json;
+    let read = json::read;
     let report = read(&options.output.join("report.json"))?;
     let contract = read(&options.contract)?;
     let (manifest, _) = super::manifest::read(root, &options.manifest)?;
@@ -236,8 +384,7 @@ pub fn collection_verdict(root: &Path, options: &super::report::Options) -> Resu
         .get("id")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    let ceiling = super::policy::Runtime::load(root)?.ceiling;
-    let (lines, failed) = verdict(label, &cases, &open, ceiling);
+    let (lines, failed) = verdict(label, &cases, &open, Policy::load(root)?);
     for line in &lines {
         println!("{line}");
     }
@@ -258,6 +405,13 @@ mod tests {
         .unwrap()
     }
 
+    /// The repository's memory ceilings under a runtime ceiling of 1.2.
+    fn policy() -> Policy {
+        let mut policy = Policy::load(&crate::root()).unwrap();
+        policy.runtime.ceiling = 1.2;
+        policy
+    }
+
     fn manifest() -> Value {
         parse(r#"{"cases": [{"id": "a"}, {"id": "b"}, {"id": "c"}]}"#).unwrap()
     }
@@ -269,11 +423,11 @@ mod tests {
             .filter_map(case_bounds)
             .collect();
         let none = BTreeSet::new();
-        let (lines, failed) = verdict("pgs", &cases, &none, 1.2);
+        let (lines, failed) = verdict("pgs", &cases, &none, policy());
         assert!(failed);
         assert_eq!(lines, vec!["pgs: b: total RSS bound fails at 1.4300"]);
         let open = BTreeSet::from([(Bound::TotalRss, "b".to_owned())]);
-        let (lines, failed) = verdict("pgs", &cases, &open, 1.2);
+        let (lines, failed) = verdict("pgs", &cases, &open, policy());
         assert!(!failed);
         assert_eq!(
             lines,
@@ -284,7 +438,7 @@ mod tests {
             .iter()
             .filter_map(case_bounds)
             .collect();
-        let (lines, failed) = verdict("pgs", &slow, &open, 1.2);
+        let (lines, failed) = verdict("pgs", &slow, &open, policy());
         assert!(failed);
         assert_eq!(lines[0], "pgs: b: runtime bound fails at 1.2500");
         // A listed bound that holds is reported and does not fail the step.
@@ -292,7 +446,7 @@ mod tests {
             "pgs",
             &cases[..1],
             &BTreeSet::from([(Bound::TotalRss, "a".to_owned())]),
-            1.2,
+            policy(),
         );
         assert!(!failed);
         assert_eq!(
@@ -311,7 +465,7 @@ mod tests {
             .iter()
             .filter_map(case_bounds)
             .collect();
-        let (lines, failed) = verdict("f", &cases, &BTreeSet::new(), 1.2);
+        let (lines, failed) = verdict("f", &cases, &BTreeSet::new(), policy());
         assert!(failed);
         assert_eq!(
             lines,
@@ -392,6 +546,48 @@ mod tests {
                 open_bounds(&contract(entries), &manifest(), arm),
                 Err(error.to_owned()),
                 "{entries}"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod unmeasured_tests {
+    use super::*;
+
+    #[test]
+    fn unmeasured_bounds_keep_other_cases_and_targets_scheduled() {
+        let manifest = json::parse(r#"{"cases":[{"id":"a"},{"id":"b"}]}"#).unwrap();
+        let contract = json::parse(r#"{"open_unmeasured":[
+            {"bound":"runtime","cases":["a"],"cause":"needs a gate host"},
+            {"bound":"heap","cases":["a"],"cause":"needs a gate host"},
+            {"bound":"total_rss","cases":["a"],"cause":"needs a gate host","targets":["thumbv7neon-unknown-linux-gnueabihf"]}
+        ]}"#).unwrap();
+        let arm64 = Unmeasured::read(&contract, &manifest, "aarch64-unknown-linux-gnu").unwrap();
+        let armv7 =
+            Unmeasured::read(&contract, &manifest, "thumbv7neon-unknown-linux-gnueabihf").unwrap();
+        assert!(arm64.skips("a", "timing"));
+        assert!(!arm64.skips("a", "memory"));
+        assert!(armv7.skips("a", "memory"));
+        assert!(!armv7.all_skip(&manifest, "memory"));
+        assert!(!armv7.skips("b", "timing"));
+    }
+
+    #[test]
+    fn invalid_unmeasured_entries_cannot_excuse_a_measurement() {
+        let manifest = json::parse(r#"{"cases":[{"id":"a"}]}"#).unwrap();
+        for list in [
+            "false",
+            r#"[{"bound":"cpu","cases":["a"],"cause":"why"}]"#,
+            r#"[{"bound":"heap","cases":["b"],"cause":"why"}]"#,
+            r#"[{"bound":"heap","cases":["a"],"cause":"line\nbreak"}]"#,
+            r#"[{"bound":"heap","cases":["a","a"],"cause":"why"}]"#,
+            r#"[{"bound":"heap","cases":["a"],"cause":"why","targets":[]}]"#,
+        ] {
+            let contract = json::parse(&format!("{{\"open_unmeasured\":{list}}}")).unwrap();
+            assert!(
+                Unmeasured::read(&contract, &manifest, crate::gate::TARGETS[0]).is_err(),
+                "{list}"
             );
         }
     }

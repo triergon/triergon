@@ -1,7 +1,7 @@
 //! Layer I (ISO/IEC 11172-3 2.4.1.5 and 2.4.3.2): 12 slots of 32 subbands per frame.
 
 use triergon_bitstream::CachedBitReader;
-use triergon_framing::MpegAudioHeader;
+use triergon_framing::mpeg_audio::MpegAudioHeader;
 
 use crate::subband::{dequantize, joint_bound, scalefactor};
 use crate::synthesis::Synthesis;

@@ -8,7 +8,7 @@ use crate::stream::Limits;
 use crate::syntax::{Gap, Length, Probe, Syntax, TrackFacts};
 use triergon_core::container::CodecId;
 use triergon_core::{Budget, BudgetVec, Error, Result};
-use triergon_framing::{Ac3Family, Ac3FrameDetails, Ac3FrameHeader, probe_ac3_header};
+use triergon_framing::ac3::{self, Ac3Family, Ac3FrameDetails, Ac3FrameHeader};
 
 /// AC-3 stream facts.
 #[derive(Debug)]
@@ -38,7 +38,7 @@ fn starts_unit(header: &Ac3FrameHeader) -> bool {
 
 impl Syntax for Ac3 {
     type Header = Ac3FrameHeader;
-    /// [`probe_ac3_header`] reads at most twelve bytes.
+    /// [`ac3::probe_header`] reads at most twelve bytes.
     const PROBE: usize = 12;
     const SYNC: u8 = 0x0b;
     const GAP: Gap = Gap::AppendToPrevious;
@@ -54,7 +54,7 @@ impl Syntax for Ac3 {
         if bytes.first().is_some_and(|&b| b != 0x0b) || bytes.get(1).is_some_and(|&b| b != 0x77) {
             return Probe::Invalid;
         }
-        match probe_ac3_header(bytes) {
+        match ac3::probe_header(bytes) {
             Ok(header) => Probe::Header(header),
             Err(Error::Truncated) => Probe::Short,
             Err(_) => Probe::Invalid,

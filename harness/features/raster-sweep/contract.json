@@ -31,20 +31,30 @@
   "minimum_pairs": 30,
   "confidence": 0.95,
   "timeout_seconds": 120,
-  "pending_module_requirements": [
-    "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`"
-  ],
-  "open_cases": [
+  "open_policies": [
     {
-      "id": "outlines-71",
-      "requirement": "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`",
+      "policy": "A composite that cannot be allocated is an error, not an empty render",
+      "undecided": "ISO C section 7.22.3: an allocation may fail; the raster API returns Error::Allocation to its caller. On 32-bit ARM the multi-gigabyte composite of these cases cannot be allocated.",
+      "rule": "Returns the allocation error for each composite.",
+      "documented": "crates/raster/README.md#behaviour-and-limits",
+      "reference_rule": "The 32-bit ARM build silently draws nothing for each composite.",
+      "compat": "none: no compat item reproduces the reference's rule",
       "targets": [
         "thumbv7neon-unknown-linux-gnueabihf"
+      ],
+      "cases": [
+        "outlines-71",
+        "outlines-83"
       ]
-    },
+    }
+  ],
+  "open_unpinned": [
     {
-      "id": "outlines-83",
-      "requirement": "libass silently draws nothing when its composite allocation fails; the crate returns `Allocation`",
+      "cases": [
+        "outlines-71",
+        "outlines-83"
+      ],
+      "cause": "The candidate's fold of these composites is recorded on the 32-bit ARM host, the one target they are listed on",
       "targets": [
         "thumbv7neon-unknown-linux-gnueabihf"
       ]

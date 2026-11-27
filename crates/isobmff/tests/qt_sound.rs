@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::{child, children, roots, table};
 use std::{
     ops::Range,
@@ -9,20 +9,22 @@ use triergon_core::{
     SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    QtPcmEncodingV0, QtPcmSampleReaderV0, QtPcmSourcePacketV0, QtSoundDescriptionV0, Sample,
-    SampleStep, SampleTable, TrackHeader,
+    Next, Sample,
+    movie::TrackHeader,
+    quicktime::{PcmEncoding, PcmSampleReader, PcmSourcePacket, SoundDescriptionV0},
+    table::SampleTable,
 };
-const MONO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-u8-mono-front.mov");
-const STEREO: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-s16be-stereo-front.mov");
-const CONFIG: &[u8] = include_bytes!("fixtures/pcm-v0/pcm-description-1-2-1-unused3.mov");
+const MONO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-u8-mono-front.mov");
+const STEREO: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-s16be-stereo-front.mov");
+const CONFIG: &[u8] = include_bytes!("fixtures/qt-pcm/pcm-description-1-2-1-unused3.mov");
 const ALL: &[&[u8]] = &[
     MONO,
     STEREO,
-    include_bytes!("fixtures/pcm-v0/pcm-u8-stereo-end.mov"),
-    include_bytes!("fixtures/pcm-v0/pcm-s16be-mono-end.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-u8-stereo-end.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-s16be-mono-end.mov"),
     CONFIG,
-    include_bytes!("fixtures/pcm-v0/pcm-multi-8k-u8-and-48k-twos.mov"),
-    include_bytes!("fixtures/pcm-v0/pcm-long-chunk-2049.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-multi-8k-u8-and-48k-twos.mov"),
+    include_bytes!("fixtures/qt-pcm/pcm-long-chunk-2049.mov"),
 ];
 struct Parsed {
     pool: Budget,
@@ -79,17 +81,17 @@ impl Parsed {
     fn first(&self) -> Sample {
         let mut cursor = self.tracks[0].1.cursor();
         loop {
-            if let SampleStep::Sample(s) = cursor.poll(&mut WorkBudget::new(1)).unwrap() {
+            if let Next::Item(s) = cursor.poll(&mut WorkBudget::new(1)).unwrap() {
                 return s;
             }
         }
     }
-    fn sound(&self, index: usize) -> QtSoundDescriptionV0 {
+    fn sound(&self, index: usize) -> SoundDescriptionV0 {
         let (h, t) = &self.tracks[0];
-        QtSoundDescriptionV0::parse(h, &t.descriptions()[index]).unwrap()
+        SoundDescriptionV0::parse(h, &t.descriptions()[index]).unwrap()
     }
-    fn job(&self, input: &mut InputCursor) -> QtPcmSampleReaderV0 {
-        QtPcmSampleReaderV0::new(
+    fn job(&self, input: &mut InputCursor) -> PcmSampleReader {
+        PcmSampleReader::new(
             input,
             self.sound(0),
             self.first(),
@@ -109,12 +111,12 @@ fn feed(input: &mut InputCursor, r: InputRequest, raw: &[u8], maximum: usize) {
         .unwrap();
 }
 fn read(
-    job: &mut QtPcmSampleReaderV0,
+    job: &mut PcmSampleReader,
     input: &mut InputCursor,
     raw: &[u8],
     quantum: u64,
     maximum: usize,
-) -> Result<QtPcmSourcePacketV0, Error> {
+) -> Result<PcmSourcePacket, Error> {
     for _ in 0..10000 {
         let mut work = WorkBudget::new(quantum);
         let step = job.poll(input, &mut work, &AtomicBool::new(false))?;
@@ -136,11 +138,44 @@ fn mutate(field: usize, bytes: &[u8]) -> Vec<u8> {
     raw[at..at + bytes.len()].copy_from_slice(bytes);
     raw
 }
+/// `MONO` with the entry code `twos` in place of `raw `: 8-bit signed samples.
+fn twos_mono() -> Vec<u8> {
+    let s = Parsed::new(MONO);
+    let at = s.tracks[0].1.descriptions()[0].raw().header().start as usize + 4;
+    let mut raw = MONO.to_vec();
+    raw[at..at + 4].copy_from_slice(b"twos");
+    raw
+}
+#[test]
+fn eight_bit_twos_samples_are_signed_one_byte_frames() {
+    let raw = twos_mono();
+    let s = Parsed::new(&raw);
+    let d = s.sound(0);
+    assert_eq!((d.source().format, d.sample_bits()), (*b"twos", 8));
+    let layout = d.pcm_layout().unwrap();
+    assert_eq!(layout.encoding(), PcmEncoding::Signed8);
+    assert_eq!(layout.channels(), 1);
+    let mut input = s.input();
+    let mut job = s.job(&mut input);
+    let packet = read(&mut job, &mut input, &raw, 1, 1).unwrap();
+    assert_eq!(packet.layout(), layout);
+    assert_eq!(packet.complete_frames(), packet.packet().payload.len());
+    // The same bytes under `raw ` are unsigned samples.
+    let unsigned = Parsed::new(MONO);
+    let mut input = unsigned.input();
+    let mut job = unsigned.job(&mut input);
+    let other = read(&mut job, &mut input, MONO, 1, 1).unwrap();
+    assert_eq!(other.layout().encoding(), PcmEncoding::Unsigned8);
+    assert_eq!(
+        other.packet().payload.as_ref(),
+        packet.packet().payload.as_ref()
+    );
+}
 #[test]
 fn original_sound_fields_and_exact_fixed_rate_are_retained() {
     for (raw, channels, bits, rate, encoding) in [
-        (MONO, 1, 8, 8000_u32, QtPcmEncodingV0::Unsigned8),
-        (STEREO, 2, 16, 48000, QtPcmEncodingV0::Signed16BigEndian),
+        (MONO, 1, 8, 8000_u32, PcmEncoding::Unsigned8),
+        (STEREO, 2, 16, 48000, PcmEncoding::Signed16BigEndian),
     ] {
         let s = Parsed::new(raw);
         let d = s.sound(0);
@@ -170,16 +205,16 @@ fn every_sample_of_all_seven_movies_is_read_with_its_own_source_description() {
             let mut cursor = t.cursor();
             loop {
                 match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-                    SampleStep::Yield => (),
-                    SampleStep::End => break,
-                    SampleStep::Sample(sample) => {
-                        let d = QtSoundDescriptionV0::parse(
+                    Next::Yield => (),
+                    Next::End => break,
+                    Next::Item(sample) => {
+                        let d = SoundDescriptionV0::parse(
                             h,
                             &t.descriptions()[sample.description_index as usize - 1],
                         )
                         .unwrap();
                         let mut input = s.input();
-                        let mut job = QtPcmSampleReaderV0::new(
+                        let mut job = PcmSampleReader::new(
                             &mut input,
                             d,
                             sample.clone(),
@@ -213,14 +248,14 @@ fn source_unused_description_and_return_to_prior_entry_remain_distinct() {
     let mut prior = 0;
     loop {
         match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Yield => (),
-            SampleStep::End => break,
-            SampleStep::Sample(sample) => {
+            Next::Yield => (),
+            Next::End => break,
+            Next::Item(sample) => {
                 if sample.description_index != prior {
                     changed.push((sample.ordinal, sample.description_index));
                     prior = sample.description_index;
                 }
-                let d = QtSoundDescriptionV0::parse(
+                let d = SoundDescriptionV0::parse(
                     h,
                     &t.descriptions()[sample.description_index as usize - 1],
                 )
@@ -252,7 +287,7 @@ fn version1_and2_are_not_parsed_using_v0_offsets() {
         let raw = mutate(8, &version.to_be_bytes());
         let s = Parsed::new(&raw);
         assert!(matches!(
-            QtSoundDescriptionV0::parse(&s.tracks[0].0, &s.tracks[0].1.descriptions()[0]),
+            SoundDescriptionV0::parse(&s.tracks[0].0, &s.tracks[0].1.descriptions()[0]),
             Err(Error::Unsupported(_))
         ));
     }
@@ -268,7 +303,7 @@ fn video_raw_name_cannot_choose_an_audio_layout() {
     .unwrap();
     header.handler = *b"vide";
     assert!(matches!(
-        QtSoundDescriptionV0::parse(&header, &s.tracks[0].1.descriptions()[0]),
+        SoundDescriptionV0::parse(&header, &s.tracks[0].1.descriptions()[0]),
         Err(Error::Invalid(_))
     ));
 }
@@ -284,7 +319,7 @@ fn public_metadata_mutation_cannot_forge_raw_sound_fields() {
             _ => entry.index = 0,
         }
         assert!(matches!(
-            QtSoundDescriptionV0::parse(h, &entry),
+            SoundDescriptionV0::parse(h, &entry),
             Err(Error::Invalid(_))
         ));
     }
@@ -400,8 +435,7 @@ fn foreign_pool_or_stale_request_cannot_read_pcm() {
     )
     .unwrap();
     assert_eq!(
-        QtPcmSampleReaderV0::new(&mut input, s.sound(0), s.first(), s.media.clone(), 4096)
-            .unwrap_err(),
+        PcmSampleReader::new(&mut input, s.sound(0), s.first(), s.media.clone(), 4096).unwrap_err(),
         Error::ForeignPool
     );
     let mut input = s.input();
@@ -424,15 +458,12 @@ fn incorrect_description_or_partial_frame_refuses_before_source_mutation() {
     let token = input.token();
     let mut sample = s.first();
     sample.description_index = 2;
-    assert!(
-        QtPcmSampleReaderV0::new(&mut input, s.sound(0), sample, s.media.clone(), 4096).is_err()
-    );
+    assert!(PcmSampleReader::new(&mut input, s.sound(0), sample, s.media.clone(), 4096).is_err());
     assert_eq!(input.token(), token);
     let mut sample = s.first();
     sample.range.end -= 1;
     assert_eq!(
-        QtPcmSampleReaderV0::new(&mut input, s.sound(0), sample, s.media.clone(), 4096)
-            .unwrap_err(),
+        PcmSampleReader::new(&mut input, s.sound(0), sample, s.media.clone(), 4096).unwrap_err(),
         Error::Invalid("QT PCM incomplete source frame")
     );
     assert_eq!(input.token(), token);
@@ -443,8 +474,7 @@ fn byte_limit_and_budget_pressure_leave_original_input_token_intact() {
     let mut input = s.input();
     let token = input.token();
     assert_eq!(
-        QtPcmSampleReaderV0::new(&mut input, s.sound(0), s.first(), s.media.clone(), 3)
-            .unwrap_err(),
+        PcmSampleReader::new(&mut input, s.sound(0), s.first(), s.media.clone(), 3).unwrap_err(),
         Error::Limit {
             requested: 4,
             maximum: 3
@@ -453,14 +483,12 @@ fn byte_limit_and_budget_pressure_leave_original_input_token_intact() {
     assert_eq!(input.token(), token);
     let blocker = s.pool.reserve(s.pool.available()).unwrap();
     assert!(matches!(
-        QtPcmSampleReaderV0::new(&mut input, s.sound(0), s.first(), s.media.clone(), 4096),
+        PcmSampleReader::new(&mut input, s.sound(0), s.first(), s.media.clone(), 4096),
         Err(Error::Backpressure { .. })
     ));
     assert_eq!(input.token(), token);
     drop(blocker);
-    assert!(
-        QtPcmSampleReaderV0::new(&mut input, s.sound(0), s.first(), s.media.clone(), 4096).is_ok()
-    );
+    assert!(PcmSampleReader::new(&mut input, s.sound(0), s.first(), s.media.clone(), 4096).is_ok());
 }
 #[test]
 fn retained_source_packet_and_description_outlive_the_decoder_and_input() {
@@ -505,7 +533,7 @@ fn sequential_unknown_length_source_does_not_turn_starvation_into_eof() {
             Step::End(_) => panic!("unknown source fabricated EOF before audio"),
         }
     }
-    let mut job = QtPcmSampleReaderV0::new(
+    let mut job = PcmSampleReader::new(
         &mut input,
         s.sound(0),
         sample.clone(),

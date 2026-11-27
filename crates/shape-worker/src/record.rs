@@ -1,8 +1,8 @@
-//! The values the shaping operations produce, and the two ways of consuming them:
-//! the ordered work digest of the harness protocol and the readable line format.
+//! The records the shaping operations produce, in the order
+//! `harness/reference_shape.h` produces them.
 
-use std::io::{self, Write};
-use triergon_harness_protocol::digest::{fold, signed};
+use std::io;
+use triergon_harness_runner::records::{self, Sink};
 
 /// One group of values, in the order `harness/reference_shape.h` produces them.
 #[derive(Clone, Copy)]
@@ -136,60 +136,35 @@ impl Values {
     }
 }
 
-/// Consumes the records of one operation.
-pub trait Sink {
-    fn record(&mut self, record: Record) -> io::Result<()>;
-    /// Counts `packets` (glyphs, lines or code points) and `bytes` (code points
-    /// shaped or resolved).
-    fn count(&mut self, packets: usize, bytes: usize);
-}
+/// A record's tag and the name the dump prints; the operations count their
+/// packets and bytes themselves.
+#[derive(Clone, Copy)]
+pub struct Tag(u64, &'static str);
 
-/// The work of one or more operations.
-#[derive(Default)]
-pub struct Work {
-    pub packets: u64,
-    pub bytes: u64,
-    pub digest: u64,
-}
+impl records::Kind for Tag {
+    fn tag(self) -> u64 {
+        self.0
+    }
 
-impl Work {
-    /// Adds the work of one operation, its digest folded as one value.
-    pub fn accumulate(&mut self, operation: &Work) {
-        self.packets += operation.packets;
-        self.bytes += operation.bytes;
-        fold(&mut self.digest, operation.digest);
+    fn name(self) -> &'static str {
+        self.1
+    }
+
+    fn counted(self) -> bool {
+        false
     }
 }
 
-impl Sink for Work {
+/// Consumes the records of one operation.
+pub trait Records: Sink<Tag> {
+    /// One record: its tag, then its values.
     #[inline]
     fn record(&mut self, record: Record) -> io::Result<()> {
-        let (tag, _, values) = record.parts();
-        fold(&mut self.digest, tag);
-        for &value in values.as_slice() {
-            fold(&mut self.digest, signed(value));
-        }
-        Ok(())
-    }
-
-    fn count(&mut self, packets: usize, bytes: usize) {
-        self.packets += packets as u64;
-        self.bytes += bytes as u64;
+        let (tag, name, values) = record.parts();
+        self.begin(Tag(tag, name))?;
+        self.ints(values.as_slice())?;
+        self.end()
     }
 }
 
-/// The readable form: one line per record, `key value value ...`.
-pub struct Dump<W: Write>(pub W);
-
-impl<W: Write> Sink for Dump<W> {
-    fn record(&mut self, record: Record) -> io::Result<()> {
-        let (_, key, values) = record.parts();
-        write!(self.0, "{key}")?;
-        for value in values.as_slice() {
-            write!(self.0, " {value}")?;
-        }
-        writeln!(self.0)
-    }
-
-    fn count(&mut self, _packets: usize, _bytes: usize) {}
-}
+impl<S: Sink<Tag>> Records for S {}

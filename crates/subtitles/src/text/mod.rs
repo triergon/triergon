@@ -1,17 +1,15 @@
-//! Bounded text source ingestion with original bytes and exact cue times.
+//! Bounded reading of demuxed text samples into cues that keep every input
+//! byte and exact times.
 //!
-//! Named profiles: Tx3gCarriage1, Utf8Packet1, MatroskaWebVttCarriage1 and
-//! OpaqueAss1. Their limits and
-//! source/semantic boundaries are documented in this module's README.md.
-//! These profiles do not establish FFmpeg compatibility; the FFmpeg-compatible
-//! readers and conversions are in [`crate::compat::document`],
-//! [`crate::compat::ass`], [`crate::compat::charset`] and
-//! [`crate::compat::mov_text`].
-#![forbid(unsafe_code)]
+//! An [`Extractor`] reads each sample by its [`Format`]: [`Format::Tx3g`],
+//! [`Format::Utf8Packet`], [`Format::MatroskaWebVtt`] or
+//! [`Format::OpaqueAss`]. Their rules and default limits are documented in
+//! this module's README.md. These operations follow the specifications, not
+//! FFmpeg; the FFmpeg-compatible readers and conversions are in
+//! [`crate::compat::document`], [`crate::compat::ass`],
+//! [`crate::compat::charset`] and [`crate::compat::mov_text`].
 
 pub(crate) mod ass_decoder;
-#[cfg(feature = "reference-trace")]
-pub(crate) mod carriage;
 pub mod charset;
 pub(crate) mod decoded;
 pub(crate) mod demuxer;
@@ -25,61 +23,76 @@ mod model;
 mod sample;
 mod session;
 mod unicode;
-pub use self::model::*;
+pub use self::model::{
+    Addition, Cue, Encoding, Field, FieldOwner, Format, Input, Limits, Modifier, RawClock, Timing,
+};
 
-use self::session::{Action, Session};
+use self::session::Session;
 use std::sync::atomic::AtomicBool;
-use triergon_core::{Budget, Error, Result, WorkBudget};
-
-#[derive(Debug)]
-pub struct ProvideError {
-    pub error: Error,
-    pub input: Input,
-}
+use triergon_core::{Budget, Error, Refused, Result, WorkBudget};
 
 // Failure must return the exact input even when no output budget is available.
 // The Result envelope permits one extra 16-byte alignment unit for its tag.
-const _: () = assert!(size_of::<ProvideError>() <= 432);
-const _: () = assert!(size_of::<std::result::Result<(), ProvideError>>() <= 448);
+const _: () = assert!(size_of::<Refused<Input>>() <= 432);
+const _: () = assert!(size_of::<std::result::Result<(), Refused<Input>>>() <= 448);
 
+/// What [`Extractor::step`] produced.
 #[derive(Debug)]
 #[expect(
     clippy::large_enum_variant,
     reason = "Exclusive delivery states move charged output inline, preserving allocation-free UTF-8 publication; guarded at 672 bytes."
 )]
 pub enum Status {
+    /// No input is pending; provide the next.
     NeedInput,
+    /// The work budget ran out; step again.
     Yield,
-    Cue(Cue),
+    /// The pending input's cue; the extractor takes the next input.
+    Ready(Cue),
+    /// The pool could not hold the output; step again once memory is free.
     NeedOutput,
-    Finished,
+    /// Input is finished and none is pending.
+    End,
 }
 
 const _: () = assert!(size_of::<Status>() <= 672);
 const _: () = assert!(size_of::<Result<Status>>() <= 688);
 
-/// One complete immutable document or demuxed sample per provide operation.
-/// Transport assembly, charset selection and container discovery stay upstream.
+/// Reads one demuxed sample per [`provide`](Self::provide) into a [`Cue`]:
+/// its text range, strict character decoding, tx3g modifier boxes and WebVTT
+/// fields. Transport assembly, charset selection and container discovery
+/// stay with the caller.
 #[derive(Debug)]
 pub struct Extractor {
     pool: Budget,
     iso_tx3g: bool,
     limits: Limits,
     generation: u64,
-    pending: Option<Input>,
-    session: Option<Session>,
-    failed: Option<Error>,
+    pending: Option<Pending>,
     finished: bool,
 }
 
+/// The input being read: its session, or the error that ended it, which
+/// stays until [`Extractor::reset`].
+#[derive(Debug)]
+struct Pending {
+    input: Input,
+    session: std::result::Result<Session, Error>,
+}
+
 impl Extractor {
-    /// ISO-box tx3g profile.
+    /// [`new`](Self::new), with tx3g modifier boxes also read in their ISO
+    /// forms: size 0 (to the end of the sample), size 1 (a 64-bit size) and
+    /// `uuid` boxes.
     pub fn tx3g_iso_boxes(pool: &Budget, limits: Limits, generation: u64) -> Self {
         let mut result = Self::new(pool, limits, generation);
         result.iso_tx3g = true;
         result
     }
 
+    /// An extractor charging `pool`, bounded by `limits`, that accepts
+    /// inputs of `generation`. A tx3g modifier box of size 0 or 1 is
+    /// `Error::Unsupported`.
     pub fn new(pool: &Budget, limits: Limits, generation: u64) -> Self {
         Self {
             pool: pool.clone(),
@@ -87,24 +100,32 @@ impl Extractor {
             limits,
             generation,
             pending: None,
-            session: None,
-            failed: None,
             finished: false,
         }
     }
 
+    /// Takes the next input. It is handed back unchanged with
+    /// `Error::Invalid` after [`finish_input`](Self::finish_input) or while
+    /// an input is pending, `Error::StaleGeneration` for another generation,
+    /// `Error::ForeignPool` for bytes of another pool and `Error::Limit` for
+    /// bytes beyond their limit.
     #[expect(
         clippy::result_large_err,
-        reason = "Rejection returns the exact source owners inline without allocating on failure; ProvideError is guarded at 432 bytes."
+        reason = "A refused input goes back to the caller inline, without an allocation; its size is guarded above."
     )]
-    pub fn provide(&mut self, input: Input) -> std::result::Result<(), ProvideError> {
+    pub fn provide(&mut self, input: Input) -> std::result::Result<(), Refused<Input>> {
         match self.check_input(&input) {
             Ok(()) => {
-                self.session = Some(Session::new(&input, &self.pool, self.iso_tx3g));
-                self.pending = Some(input);
+                self.pending = Some(Pending {
+                    session: Ok(Session::new(&input, self.iso_tx3g)),
+                    input,
+                });
                 Ok(())
             }
-            Err(error) => Err(ProvideError { error, input }),
+            Err(error) => Err(Refused {
+                error,
+                value: input,
+            }),
         }
     }
 
@@ -147,61 +168,51 @@ impl Extractor {
         Ok(())
     }
 
+    /// Ends input: once no input is pending, [`step`](Self::step) returns
+    /// [`Status::End`].
     pub fn finish_input(&mut self) {
         self.finished = true;
     }
 
+    /// Drops the pending input and any sticky error, reopens input and
+    /// accepts inputs of `generation`. Cues already returned stay valid.
     pub fn reset(&mut self, generation: u64) {
-        self.session = None;
         self.pending = None;
-        self.failed = None;
         self.generation = generation;
         self.finished = false;
     }
 
+    /// Reads the pending input, spending `work`. `Error::Cancelled` is
+    /// resumable; any other error is returned by every later call until
+    /// [`reset`](Self::reset).
     pub fn step(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
-        unicode::cancelled(cancel)?;
-        if let Some(error) = self.failed {
-            return Err(error);
-        }
-        let Some(input) = self.pending.as_ref() else {
+        crate::cancelled(cancel)?;
+        let Some(pending) = self.pending.as_mut() else {
             return Ok(if self.finished {
-                Status::Finished
+                Status::End
             } else {
                 Status::NeedInput
             });
         };
+        let session = match &mut pending.session {
+            Ok(session) => session,
+            Err(error) => return Err(*error),
+        };
         if work.remaining() == 0 {
             return Ok(Status::Yield);
         }
-        let result = self
-            .session
-            .as_mut()
-            .ok_or(Error::Invalid("missing text session"))?
-            .step(input, &self.pool, self.limits, work, cancel);
-        match result {
-            Ok(Action::Yield) => Ok(Status::Yield),
-            Ok(Action::Cue(cue)) => {
-                self.session = None;
+        match session.step(&pending.input, &self.pool, self.limits, work, cancel) {
+            Ok(None) => Ok(Status::Yield),
+            Ok(Some(cue)) => {
                 self.pending = None;
-                Ok(Status::Cue(cue))
-            }
-            Ok(Action::Complete) => {
-                self.session = None;
-                self.pending = None;
-                Ok(if self.finished {
-                    Status::Finished
-                } else {
-                    Status::NeedInput
-                })
+                Ok(Status::Ready(cue))
             }
             Err(Error::Backpressure { .. }) => Ok(Status::NeedOutput),
             Err(Error::Cancelled) => Err(Error::Cancelled),
             Err(error) => {
-                // Prefix outputs retain their owners. A fatal operation error
-                // frees private construction and remains explicit until reset.
-                self.session = None;
-                self.failed = Some(error);
+                // Cues already returned keep their storage; the session's
+                // own is released, and the error stays until reset.
+                pending.session = Err(error);
                 Err(error)
             }
         }

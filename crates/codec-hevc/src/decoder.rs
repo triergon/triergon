@@ -7,29 +7,32 @@ use std::collections::VecDeque;
 use std::sync::Arc;
 
 use crate::ctu::{RefEntry, RefLists, Scratch, SliceDecoder};
-use crate::error::{DecodeError, Result};
 use crate::nal::{self, NalHeader};
+use crate::output::{OutInfo, Picture};
 use crate::picture::{AnyFrame, ColMotion, ColMv, Frame, FramePool, Pixel, SharedFrame};
 use crate::ps::{self, Layout, Pps, Shared, Sps};
-use crate::slice::{self, SLICE_B, SLICE_I, SliceHeader};
+use crate::slice::{self, SliceHeader, SliceType};
 use crate::state::{PicState, SliceInfo};
+use crate::{DecodeError, Result};
 use crate::{deblock, sao};
-use triergon_codec::{
-    Budget, BudgetVec, Charged, Colour, DecodeFailure, PictureView, VideoDecoder,
-};
+use triergon_codec::{Budget, BudgetVec, Charged, PictureView, VideoDecoder};
 use triergon_framing::picture_output::{
     DecodedPictures, HevcLimits, HevcPicture, Leave, Marking, NewPicture, Parity, View,
 };
-use triergon_framing::{AnnexBUnits, hevc};
+use triergon_framing::{hevc, nal::AnnexBUnits};
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Live storage that depends on the stream: decoded and reference pictures (also
-    /// while a caller holds them), the frame pool, collocated motion, per-picture maps,
-    /// tile and scan tables, and the RBSP of the NAL unit being parsed. The default
-    /// holds the largest DPB level 6.2 allows plus the frame pool and two held output
-    /// pictures, with about 30% to spare (see the crate README).
+    /// Bytes of live storage that depends on the stream: decoded and reference pictures
+    /// (also while a caller holds them), the frame pool, collocated motion, per-picture
+    /// block and CTB maps, parameter sets, tile and scan tables, the SAO band buffer and
+    /// the RBSP of the NAL unit being parsed.
+    ///
+    /// The default, 1.25 GiB, holds the largest picture the level 6.2 size cap accepts
+    /// (8192×4352, 107 MB in 10-bit storage) in the 6-picture DPB level 6.2 allows at
+    /// that size, plus the frame pool and two held output pictures (nine frames,
+    /// 963 MB), and about 70 MB of motion, maps and tables, with about 30% to spare.
     pub live_storage_bytes: usize,
 }
 
@@ -41,140 +44,18 @@ impl Default for Limits {
     }
 }
 
-/// Colour description from the VUI (Annex E). Values 2 mean "unspecified".
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ColourDescription {
-    pub primaries: u8,
-    pub transfer: u8,
-    pub matrix: u8,
-    pub full_range: bool,
-    pub video_signal_type_present: bool,
-    pub colour_description_present: bool,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ChromaFormat {
-    Yuv420,
-}
-
-/// Borrowed view of one row of samples.
-#[derive(Debug)]
-pub enum Row<'a> {
-    U8(&'a [u8]),
-    U16(&'a [u16]),
-}
-
-/// One (cropped) sample plane of an output picture. Shares the decoder's frame buffer.
-#[derive(Debug, Clone)]
-pub struct Plane {
-    pub width: usize,
-    pub height: usize,
-    frame: Arc<SharedFrame>,
-    index: usize,
-    x0: usize,
-    y0: usize,
-}
-
-impl Plane {
-    pub fn row(&self, y: usize) -> Row<'_> {
-        match &**self.frame {
-            AnyFrame::U8(f) => {
-                let p = &f.planes[self.index];
-                let o = (self.y0 + y) * p.stride + self.x0;
-                Row::U8(&p.data[o..o + self.width])
-            }
-            AnyFrame::U16(f) => {
-                let p = &f.planes[self.index];
-                let o = (self.y0 + y) * p.stride + self.x0;
-                Row::U16(&p.data[o..o + self.width])
-            }
-        }
-    }
-    /// Zero-copy view of the whole backing plane: (samples, stride in samples, index of the
-    /// first visible (cropped) sample). Sample (x, y) of this plane is
-    /// `slice[offset + y * stride + x]` for x < width, y < height.
-    pub fn raw(&self) -> (Row<'_>, usize, usize) {
-        match &**self.frame {
-            AnyFrame::U8(f) => {
-                let p = &f.planes[self.index];
-                (Row::U8(&p.data), p.stride, self.y0 * p.stride + self.x0)
-            }
-            AnyFrame::U16(f) => {
-                let p = &f.planes[self.index];
-                (Row::U16(&p.data), p.stride, self.y0 * p.stride + self.x0)
-            }
-        }
-    }
-
-    /// Append the plane as raw samples (u8, or little-endian u16).
-    pub fn write_raw(&self, out: &mut Vec<u8>) {
-        for y in 0..self.height {
-            match self.row(y) {
-                Row::U8(r) => out.extend_from_slice(r),
-                Row::U16(r) => {
-                    for &v in r {
-                        out.extend_from_slice(&v.to_le_bytes());
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// A decoded picture in output order.
-#[derive(Debug, Clone)]
-pub struct Picture {
-    pub width: u32,
-    pub height: u32,
-    pub bit_depth: u32,
-    pub chroma: ChromaFormat,
-    pub planes: [Plane; 3],
-    pub pts: Option<i64>,
-    pub poc: i32,
-    pub sar: (u32, u32),
-    pub colour: ColourDescription,
-}
-
 /// The session view of the decoder. A received picture is held until the next call, so
 /// its frame returns to the pool exactly when the inherent API's would.
 impl VideoDecoder for Decoder {
-    fn send(&mut self, au: &[u8], pts: Option<i64>) -> core::result::Result<(), DecodeFailure> {
+    type Error = DecodeError;
+
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<()> {
         self.ctx.held = None;
-        Decoder::send(self, au, pts).map_err(DecodeFailure::from_error)
+        Decoder::send(self, au, pts)
     }
     fn receive(&mut self) -> Option<PictureView<'_>> {
         self.ctx.held = self.ctx.out.pop_front();
-        let picture = self.ctx.held.as_ref()?;
-        fn plane(p: &Plane) -> triergon_codec::Plane<'_> {
-            match p.raw() {
-                (Row::U8(data), stride, offset) => triergon_codec::Plane::U8 {
-                    data,
-                    stride,
-                    offset,
-                },
-                (Row::U16(data), stride, offset) => triergon_codec::Plane::U16 {
-                    data,
-                    stride,
-                    offset,
-                },
-            }
-        }
-        Some(PictureView {
-            width: picture.width as usize,
-            height: picture.height as usize,
-            bit_depth: picture.bit_depth as u8,
-            planes: [
-                plane(&picture.planes[0]),
-                plane(&picture.planes[1]),
-                plane(&picture.planes[2]),
-            ],
-            pts: picture.pts,
-            sar: picture.sar,
-            colour: Colour {
-                matrix: picture.colour.matrix,
-                full_range: picture.colour.full_range,
-            },
-        })
+        Some(self.ctx.held.as_ref()?.view())
     }
     fn flush(&mut self) {
         self.ctx.held = None;
@@ -184,16 +65,6 @@ impl VideoDecoder for Decoder {
         self.ctx.held = None;
         Decoder::reset(self);
     }
-}
-
-#[derive(Debug)]
-struct OutInfo {
-    crop: [u32; 4],
-    width: u32,
-    height: u32,
-    bit_depth: u32,
-    sar: (u32, u32),
-    colour: ColourDescription,
 }
 
 /// A picture of the decoded picture buffer, which keeps its order count and marking.
@@ -224,6 +95,61 @@ struct CurPic {
     col: ColMotion,
 }
 
+/// Random-access state from the first slice header to picture admission.
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+enum SequenceEntry {
+    Running,
+    SuppressRasl,
+    AfterEos,
+    AfterEosSuppressRasl,
+    AwaitingIrap,
+    /// An IRAP was seen, but no picture has started yet.
+    FirstIrapSeen,
+}
+
+impl SequenceEntry {
+    fn is_first_picture(self) -> bool {
+        matches!(self, Self::AwaitingIrap | Self::FirstIrapSeen)
+    }
+
+    fn suppresses_rasl(self) -> bool {
+        matches!(
+            self,
+            Self::SuppressRasl | Self::AfterEosSuppressRasl | Self::FirstIrapSeen
+        )
+    }
+
+    fn observe_irap(&mut self, nal_type: u8) {
+        *self = match *self {
+            Self::AwaitingIrap | Self::FirstIrapSeen => Self::FirstIrapSeen,
+            Self::AfterEos | Self::AfterEosSuppressRasl => Self::AfterEosSuppressRasl,
+            _ if hevc::is_idr(nal_type) || hevc::is_bla(nal_type) => Self::SuppressRasl,
+            _ => Self::Running,
+        };
+    }
+
+    fn end_sequence(&mut self) {
+        *self = match *self {
+            Self::Running => Self::AfterEos,
+            Self::SuppressRasl => Self::AfterEosSuppressRasl,
+            state => state,
+        };
+    }
+
+    fn picture_started(&mut self) {
+        *self = match *self {
+            Self::FirstIrapSeen | Self::AfterEosSuppressRasl => Self::SuppressRasl,
+            Self::AfterEos => Self::Running,
+            state => state,
+        };
+    }
+}
+
+/// H.265 decoder of Annex B access units or NAL units into [`Picture`]s in output order.
+///
+/// A failed call abandons the picture it was decoding (what was decoded is still output)
+/// and leaves the decoder usable for the next access unit.
 #[derive(Debug)]
 pub struct Decoder {
     /// The RBSP of the NAL unit being decoded, kept beside the context that reads it.
@@ -233,31 +159,26 @@ pub struct Decoder {
 
 /// Everything but the RBSP buffer: parameter sets, DPB, current picture and its state.
 #[derive(Debug)]
+#[repr(C)]
 struct Context {
-    vps: Vec<Option<ps::Vps>>,
-    sps: Vec<Option<Shared<Sps>>>,
-    pps: Vec<Option<Shared<Pps>>>,
-    active_sps: Option<Shared<Sps>>,
-    layout_cache: Option<(Shared<Sps>, Shared<Pps>, Arc<Layout>)>,
-    dpb: DecodedPictures<DpbPic>,
-    out: VecDeque<Picture>,
+    /// The timestamp the next picture started takes.
+    pending_pts: Option<i64>,
     /// The picture the last [`VideoDecoder::receive`] view borrows.
     held: Option<Picture>,
     cur: Option<CurPic>,
+    sps: Vec<Option<Shared<Sps>>>,
+    pps: Vec<Option<Shared<Pps>>>,
+    dpb: DecodedPictures<DpbPic>,
+    out: VecDeque<Picture>,
     st: PicState,
     scratch8: Scratch<u8>,
     scratch16: Scratch<u16>,
     pool: Arc<FramePool>,
     /// The pool every stream-sized buffer of this decoder is charged to.
     budget: Budget,
-    // POC / IRAP state
+    layout_cache: Option<(Shared<Sps>, Shared<Pps>, Arc<Layout>)>,
     prev_tid0_poc: i32,
-    first_picture: bool,
-    after_eos: bool,
-    no_rasl_output: bool,
-    seen_irap: bool,
-    pending_pts: Option<i64>,
-    pts_used: bool,
+    entry: SequenceEntry,
 }
 
 impl Default for Decoder {
@@ -267,18 +188,25 @@ impl Default for Decoder {
 }
 
 impl Decoder {
-    /// A decoder with a pool of the default limit.
+    /// A decoder with its own pool of the default [`Limits`].
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit covers the pool itself"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
     /// A decoder with its own pool of `limits.live_storage_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// [`DecodeError::Budget`] when the limit is below the pool's own charge.
     pub fn with_limits(limits: Limits) -> Result<Self> {
         Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
     }
 
-    /// A decoder charging the caller's pool.
+    /// A decoder charging every stream-sized buffer to the caller's pool.
     pub fn new_in(budget: &Budget) -> Self {
         Decoder {
             rbsp: BudgetVec::new(budget),
@@ -286,10 +214,15 @@ impl Decoder {
         }
     }
 
-    /// Feed one Annex-B access unit with an opaque caller timestamp.
+    /// Decode one Annex B access unit; the picture it carries takes the opaque `pts`.
+    /// The picture is complete when the call returns; it is output once the decoded
+    /// picture buffer's reorder rules release it (see [`Decoder::receive`]).
+    ///
+    /// # Errors
+    ///
+    /// The first error of a NAL unit of the access unit; the later units are not decoded.
     pub fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<()> {
         self.ctx.pending_pts = pts;
-        self.ctx.pts_used = false;
         let mut result = Ok(());
         for nalu in AnnexBUnits::new(au) {
             if let Err(e) = self.decode_nal(nalu) {
@@ -308,12 +241,17 @@ impl Decoder {
         result
     }
 
-    /// Feed a single NAL unit (without start code). Pictures are completed when the next
-    /// picture starts or on `flush`.
+    /// Decode one NAL unit without start code. A picture is complete when the next one
+    /// starts, at an end of sequence or bitstream unit, or on [`Decoder::flush`]. A `pts`
+    /// given here replaces the one the next picture started takes.
+    ///
+    /// # Errors
+    ///
+    /// When the unit is invalid, unsupported, refers to a missing parameter set, or its
+    /// storage does not fit the budget.
     pub fn send_nal(&mut self, nalu: &[u8], pts: Option<i64>) -> Result<()> {
         if pts.is_some() {
             self.ctx.pending_pts = pts;
-            self.ctx.pts_used = false;
         }
         self.decode_nal(nalu)
     }
@@ -323,12 +261,13 @@ impl Decoder {
         self.ctx.out.pop_front()
     }
 
-    /// End of stream: output all remaining pictures.
+    /// End of stream: complete the current picture and output every remaining one.
     pub fn flush(&mut self) {
         self.ctx.flush();
     }
 
-    /// Discontinuity: drop the DPB and any partially decoded picture.
+    /// Discontinuity: drop the decoded picture buffer, the pictures not yet received and
+    /// any partially decoded picture. Parameter sets are kept.
     pub fn reset(&mut self) {
         self.ctx.reset();
     }
@@ -345,7 +284,7 @@ impl Decoder {
                 if self.ctx.cur.is_some() {
                     self.ctx.finish_picture()?;
                 }
-                self.ctx.after_eos = true;
+                self.ctx.entry.end_sequence();
             }
             0..=9 | 16..=21 | hevc::VPS | hevc::SPS | hevc::PPS => {
                 nal::unescape_rbsp(nalu, &mut self.rbsp)?;
@@ -360,10 +299,8 @@ impl Decoder {
 impl Context {
     fn new(budget: &Budget) -> Self {
         Context {
-            vps: (0..ps::MAX_VPS).map(|_| None).collect(),
             sps: (0..ps::MAX_SPS).map(|_| None).collect(),
             pps: (0..ps::MAX_PPS).map(|_| None).collect(),
-            active_sps: None,
             layout_cache: None,
             dpb: DecodedPictures::new(budget),
             out: VecDeque::new(),
@@ -375,12 +312,8 @@ impl Context {
             pool: Arc::default(),
             budget: budget.clone(),
             prev_tid0_poc: 0,
-            first_picture: true,
-            after_eos: false,
-            no_rasl_output: true,
-            seen_irap: false,
+            entry: SequenceEntry::AwaitingIrap,
             pending_pts: None,
-            pts_used: false,
         }
     }
 
@@ -395,18 +328,13 @@ impl Context {
         self.cur = None;
         self.dpb.discard(|_| {});
         self.out.clear();
-        self.first_picture = true;
-        self.seen_irap = false;
-        self.no_rasl_output = true;
+        self.entry = SequenceEntry::AwaitingIrap;
     }
 
     fn decode_rbsp(&mut self, rbsp: &[u8], h: NalHeader) -> Result<()> {
         match h.nal_unit_type {
-            hevc::VPS => {
-                let v = ps::parse_vps(rbsp)?;
-                let id = v.id as usize;
-                self.vps[id] = Some(v);
-            }
+            // Nothing of the VPS is used; it is still refused when cut short.
+            hevc::VPS => ps::parse_vps(rbsp)?,
             hevc::SPS => {
                 let s = ps::parse_sps(rbsp)?;
                 let id = s.id as usize;
@@ -431,13 +359,11 @@ impl Context {
         if first {
             // RASL pictures associated with an IRAP with NoRaslOutputFlag = 1 are not decoded.
             if hevc::is_irap(t) {
-                self.seen_irap = true;
-                self.no_rasl_output =
-                    hevc::is_idr(t) || hevc::is_bla(t) || self.first_picture || self.after_eos;
-            } else if !self.seen_irap {
+                self.entry.observe_irap(t);
+            } else if matches!(self.entry, SequenceEntry::AwaitingIrap) {
                 return Ok(());
             }
-            if hevc::is_rasl(t) && self.no_rasl_output {
+            if hevc::is_rasl(t) && self.entry.suppresses_rasl() {
                 return Ok(());
             }
         } else if self.cur.is_none() {
@@ -446,15 +372,16 @@ impl Context {
         }
         let pps = self.pps[pps_id as usize]
             .clone()
-            .ok_or(DecodeError::MissingParameterSet("PPS"))?;
+            .ok_or(DecodeError::Invalid("PPS"))?;
         let sps = self.sps[pps.sps_id as usize]
             .clone()
-            .ok_or(DecodeError::MissingParameterSet("SPS"))?;
-        if !first {
-            let cur = self.cur.as_ref().unwrap();
-            if !Arc::ptr_eq(&cur.pps, &pps) && cur.pps.id != pps.id {
-                return Err(DecodeError::InvalidData("PPS changed within a picture"));
-            }
+            .ok_or(DecodeError::Invalid("SPS"))?;
+        if !first
+            && let Some(cur) = &self.cur
+            && !Arc::ptr_eq(&cur.pps, &pps)
+            && cur.pps.id != pps.id
+        {
+            return Err(DecodeError::Invalid("PPS changed within a picture"));
         }
         let prev = self.cur.as_ref().and_then(|c| c.prev_sh.as_ref());
         let sh = slice::parse_slice_header(
@@ -469,68 +396,22 @@ impl Context {
             self.start_picture(&sh, h, sps.clone(), pps.clone())?;
         }
         self.st.reserve_slice()?;
-        let cur = self.cur.as_mut().unwrap();
-        // Reference picture lists (8.3.4) and SliceInfo.
+        let Some(cur) = self.cur.as_mut() else {
+            return Ok(());
+        };
         let mut info = SliceInfo {
-            slice_addr_rs: sh.slice_addr_rs,
-            deblocking_disabled: sh.deblocking_disabled,
             beta_offset_div2: sh.beta_offset_div2,
             tc_offset_div2: sh.tc_offset_div2,
             lf_across_slices: sh.loop_filter_across_slices,
-            sao_luma: sh.sao_luma,
-            sao_chroma: sh.sao_chroma,
             ref_poc: [[i32::MIN; 16]; 2],
             ref_lt: [[false; 16]; 2],
         };
-        let mut lists: [[Option<usize>; 16]; 2] = [[None; 16]; 2];
         let dpb: Vec<View<'_, DpbPic>> = self.dpb.entries().collect();
-        if sh.slice_type != SLICE_I {
-            let mut temp: Vec<(usize, bool)> = Vec::with_capacity(32);
-            let total = cur.st_before.len() + cur.st_after.len() + cur.lt_curr.len();
-            if total == 0 {
-                return Err(DecodeError::InvalidData("no reference pictures"));
-            }
-            for l in 0..(if sh.slice_type == SLICE_B { 2 } else { 1 }) {
-                temp.clear();
-                let n = (sh.num_ref_idx[l] as usize).max(total);
-                while temp.len() < n {
-                    let (a, b) = if l == 0 {
-                        (&cur.st_before, &cur.st_after)
-                    } else {
-                        (&cur.st_after, &cur.st_before)
-                    };
-                    for &i in a {
-                        if temp.len() < n {
-                            temp.push((i, false));
-                        }
-                    }
-                    for &i in b {
-                        if temp.len() < n {
-                            temp.push((i, false));
-                        }
-                    }
-                    for &i in &cur.lt_curr {
-                        if temp.len() < n {
-                            temp.push((i, true));
-                        }
-                    }
-                }
-                for r in 0..sh.num_ref_idx[l] as usize {
-                    let e = if sh.rpl_mod[l] {
-                        temp[sh.list_entry[l][r] as usize]
-                    } else {
-                        temp[r]
-                    };
-                    lists[l][r] = Some(e.0);
-                    info.ref_poc[l][r] = dpb[e.0].poc();
-                    info.ref_lt[l][r] = e.1;
-                }
-            }
-        }
+        let lists = ref_pic_lists(cur, &sh, &dpb, &mut info)?;
         // A slice counts once its state is recorded, so a refused slice leaves nothing,
         // neither an index nor a header, that later slices of the picture could reach.
         let slice_idx = u16::try_from(self.st.slices.len())
-            .map_err(|_| DecodeError::InvalidData("too many slice segments in a picture"))?;
+            .map_err(|_| DecodeError::Invalid("too many slice segments in a picture"))?;
         // Cannot fail: `reserve_slice` made room before the picture state changed.
         self.st.slices.try_push(info).map_err(|e| e.error)?;
         if !sh.dependent_slice_segment {
@@ -571,6 +452,10 @@ impl Context {
         }
     }
 
+    /// Starts the picture whose first slice segment header is `sh`: its order count,
+    /// reference marking, the output the buffer owes before it, its storage and its
+    /// references. The order count state (prevTid0Pic, first picture, end of sequence)
+    /// changes only once the picture has started.
     fn start_picture(
         &mut self,
         sh: &SliceHeader,
@@ -581,11 +466,11 @@ impl Context {
         let t = h.nal_unit_type;
         let irap = hevc::is_irap(t);
         if let Some(tool) = pps.range_ext_tool
-            && sps.profile.profile_idc >= 4
+            && sps.profile_idc >= 4
         {
             return Err(DecodeError::Unsupported(tool));
         }
-        if pps.scc_ext && sps.profile.profile_idc >= 9 {
+        if pps.scc_ext && sps.profile_idc >= 9 {
             return Err(DecodeError::Unsupported("pps_scc_extension (SCC)"));
         }
         let layout = match &self.layout_cache {
@@ -598,10 +483,73 @@ impl Context {
                 l
             }
         };
-        // POC (8.3.1)
+        let poc = self.picture_order_count(&sps, sh, irap);
+        let max_lsb = 1i32 << sps.log2_max_poc_lsb;
+        let irap_no_rasl_output = irap && self.entry.suppresses_rasl();
+        if irap_no_rasl_output {
+            self.dpb.mark_unused();
+        }
+        let rps = if hevc::is_idr(t) {
+            Rps::default()
+        } else {
+            Rps::new(sh, poc, max_lsb)
+        };
+        let found = self.mark_references(&rps, max_lsb);
+        let info = Arc::new(OutInfo::new(&sps));
+        // C.5.2.2 output and removal of pictures before decoding the current picture.
+        self.dpb.hevc_remove(
+            HevcPicture {
+                irap_no_rasl_output,
+                cra: t == hevc::CRA,
+                first: self.entry.is_first_picture(),
+                no_output_of_prior_pics: sh.no_output_of_prior_pics,
+            },
+            limits(&sps),
+            output(&mut self.out),
+        );
+        // The current picture's storage is charged once the removal above has freed what it
+        // can (into the frame pool), and before the missing references and the POC state:
+        // the buffer's room for the references generated below and the picture first.
+        self.dpb
+            .try_reserve(rps.st_before.len() + rps.st_after.len() + rps.lt_curr.len() + 1)?;
+        let frame = self.take_frame(&sps)?;
+        let (w, hgt) = (sps.width as usize, sps.height as usize);
+        let col = ColMotion::try_new(&self.budget, w, hgt)?;
+        self.st
+            .reset(w, hgt, sps.pic_size_ctb() as usize, sps.pic_h_ctb as usize)?;
+        let [st_before, st_after, lt_curr] = self.current_references(&sps, &rps, &found, &info)?;
+        // Commit the POC and IRAP state.
+        if h.temporal_id == 0
+            && !hevc::is_rasl(t)
+            && !hevc::is_radl(t)
+            && !hevc::is_sub_layer_non_ref(t)
+        {
+            self.prev_tid0_poc = poc;
+        }
+        self.entry.picture_started();
+        self.cur = Some(CurPic {
+            frame,
+            poc,
+            sps,
+            pps,
+            layout,
+            output: sh.pic_output_flag,
+            pts: self.pending_pts.take(),
+            prev_sh: None,
+            st_before,
+            st_after,
+            lt_curr,
+            info,
+            col,
+        });
+        Ok(())
+    }
+
+    /// PicOrderCntVal of a picture starting with `sh` (8.3.1).
+    fn picture_order_count(&self, sps: &Sps, sh: &SliceHeader, irap: bool) -> i32 {
         let max_lsb = 1i32 << sps.log2_max_poc_lsb;
         let lsb = sh.poc_lsb as i32;
-        let poc_msb = if irap && self.no_rasl_output {
+        let poc_msb = if irap && self.entry.suppresses_rasl() {
             0
         } else {
             let prev_lsb = self.prev_tid0_poc & (max_lsb - 1);
@@ -614,69 +562,24 @@ impl Context {
                 prev_msb
             }
         };
-        let poc = poc_msb + lsb;
-        // RPS (8.3.2)
-        if irap && self.no_rasl_output {
-            self.dpb.mark_unused();
-        }
-        let mut st_before_poc = Vec::new();
-        let mut st_after_poc = Vec::new();
-        let mut st_foll_poc = Vec::new();
-        let mut lt_curr_poc: Vec<(i32, bool)> = Vec::new();
-        let mut lt_foll_poc: Vec<(i32, bool)> = Vec::new();
-        if !hevc::is_idr(t) {
-            let rps = &sh.st_rps;
-            for i in 0..rps.num_negative as usize {
-                let (d, u) = rps.s0(i);
-                if u {
-                    st_before_poc.push(poc + d);
-                } else {
-                    st_foll_poc.push(poc + d);
-                }
-            }
-            for i in 0..rps.num_positive as usize {
-                let (d, u) = rps.s1(i);
-                if u {
-                    st_after_poc.push(poc + d);
-                } else {
-                    st_foll_poc.push(poc + d);
-                }
-            }
-            for lt in sh.long_term() {
-                let mut p = lt.poc_lsb as i32;
-                if lt.msb_present {
-                    p += poc
-                        - (lt.delta_poc_msb_cycle as i32).wrapping_mul(max_lsb)
-                        - (poc & (max_lsb - 1));
-                }
-                if lt.used_by_curr {
-                    lt_curr_poc.push((p, lt.msb_present));
-                } else {
-                    lt_foll_poc.push((p, lt.msb_present));
-                }
-            }
-        }
+        poc_msb + lsb
+    }
+
+    /// Marks the stored pictures the reference picture set names as long-term or keeps
+    /// them short-term, and every other one unused for reference (8.3.2). Returns which
+    /// entries of `rps.st_before`, `rps.st_after` and `rps.lt_curr` were found.
+    fn mark_references(&mut self, rps: &Rps, max_lsb: i32) -> [Vec<bool>; 3] {
         let mut keep = vec![false; self.dpb.len()];
-        // A long-term entry names a reference picture by its order count or its LSBs.
-        let lt_poc = |d: &View<'_, DpbPic>, p: i32, msb: bool| {
-            if msb {
-                d.poc() == p
-            } else {
-                (d.poc() & (max_lsb - 1)) == p
-            }
+        let find_lt = |dpb: &DecodedPictures<DpbPic>, &(p, msb): &(i32, bool)| {
+            position(dpb, |d| {
+                d.is_reference() && names_long_term(d, p, msb, max_lsb)
+            })
         };
-        let find_lt = |dpb: &DecodedPictures<DpbPic>, p: i32, msb: bool| {
-            position(dpb, |d| d.is_reference() && lt_poc(d, p, msb))
-        };
-        let lt_curr_idx: Vec<Option<usize>> = lt_curr_poc
-            .iter()
-            .map(|&(p, m)| find_lt(&self.dpb, p, m))
-            .collect();
-        let lt_foll_idx: Vec<Option<usize>> = lt_foll_poc
-            .iter()
-            .map(|&(p, m)| find_lt(&self.dpb, p, m))
-            .collect();
-        for &i in lt_curr_idx.iter().chain(lt_foll_idx.iter()).flatten() {
+        let lt_curr: Vec<Option<usize>> =
+            rps.lt_curr.iter().map(|e| find_lt(&self.dpb, e)).collect();
+        let lt_foll: Vec<Option<usize>> =
+            rps.lt_foll.iter().map(|e| find_lt(&self.dpb, e)).collect();
+        for &i in lt_curr.iter().chain(&lt_foll).flatten() {
             keep[i] = true;
         }
         for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
@@ -684,27 +587,21 @@ impl Context {
                 d.set_marking(None, Marking::LongTerm);
             }
         }
-        let find_st = |dpb: &DecodedPictures<DpbPic>, p: i32| {
+        let find_st = |dpb: &DecodedPictures<DpbPic>, &p: &i32| {
             position(dpb, |d| {
                 d.marking(Parity::Top) == Marking::ShortTerm && d.poc() == p
             })
         };
-        let st_before_idx: Vec<Option<usize>> = st_before_poc
+        let st_before: Vec<Option<usize>> = rps
+            .st_before
             .iter()
-            .map(|&p| find_st(&self.dpb, p))
+            .map(|p| find_st(&self.dpb, p))
             .collect();
-        let st_after_idx: Vec<Option<usize>> = st_after_poc
-            .iter()
-            .map(|&p| find_st(&self.dpb, p))
-            .collect();
-        let st_foll_idx: Vec<Option<usize>> =
-            st_foll_poc.iter().map(|&p| find_st(&self.dpb, p)).collect();
-        for &i in st_before_idx
-            .iter()
-            .chain(st_after_idx.iter())
-            .chain(st_foll_idx.iter())
-            .flatten()
-        {
+        let st_after: Vec<Option<usize>> =
+            rps.st_after.iter().map(|p| find_st(&self.dpb, p)).collect();
+        let st_foll: Vec<Option<usize>> =
+            rps.st_foll.iter().map(|p| find_st(&self.dpb, p)).collect();
+        for &i in st_before.iter().chain(&st_after).chain(&st_foll).flatten() {
             keep[i] = true;
         }
         for (keep, mut d) in keep.iter().zip(self.dpb.entries_mut()) {
@@ -712,134 +609,80 @@ impl Context {
                 d.set_marking(None, Marking::Unused);
             }
         }
-        // Picture output info.
-        let vui = &sps.vui;
-        let info = Arc::new(OutInfo {
-            crop: sps.conf_win,
-            width: sps.width,
-            height: sps.height,
-            bit_depth: sps.bit_depth_luma,
-            sar: vui.sar,
-            colour: ColourDescription {
-                primaries: vui.colour_primaries,
-                transfer: vui.transfer_characteristics,
-                matrix: vui.matrix_coeffs,
-                full_range: vui.full_range,
-                video_signal_type_present: vui.video_signal_type_present,
-                colour_description_present: vui.colour_description_present,
-            },
-        });
-        // C.5.2.2 output and removal of pictures before decoding the current picture.
-        self.dpb.hevc_remove(
-            HevcPicture {
-                irap_no_rasl_output: irap && self.no_rasl_output,
-                cra: t == hevc::CRA,
-                first: self.first_picture,
-                no_output_of_prior_pics: sh.no_output_of_prior_pics,
-            },
-            limits(&sps),
-            output(&mut self.out),
-        );
-        // The current picture's storage is charged once the removal above has freed what it
-        // can (into the frame pool), and before the missing references and the POC state:
-        // the buffer's room for the references generated below and the picture first.
-        self.dpb
-            .try_reserve(st_before_poc.len() + st_after_poc.len() + lt_curr_poc.len() + 1)?;
-        let (w, hgt) = (sps.width as usize, sps.height as usize);
-        let frame = if sps.high_bit_depth() {
-            AnyFrame::U16(match self.pool.take(w, hgt) {
-                Some(f) => f,
-                None => Frame::try_new(&self.budget, w, hgt, 0)?,
-            })
-        } else {
-            AnyFrame::U8(match self.pool.take(w, hgt) {
-                Some(f) => f,
-                None => Frame::try_new(&self.budget, w, hgt, 0)?,
-            })
-        };
+        let found = |v: Vec<Option<usize>>| v.iter().map(Option::is_some).collect();
+        [found(st_before), found(st_after), found(lt_curr)]
+    }
+
+    /// A frame for the current picture, from the pool or newly charged, with the SAO band
+    /// buffer of its sample type sized for it.
+    fn take_frame(&mut self, sps: &Sps) -> Result<AnyFrame> {
+        let (w, h) = (sps.width as usize, sps.height as usize);
         let ctb = sps.ctb_size as usize;
-        match &frame {
-            AnyFrame::U8(_) => prepare_band(&mut self.scratch8, w, ctb, &self.budget)?,
-            AnyFrame::U16(_) => prepare_band(&mut self.scratch16, w, ctb, &self.budget)?,
-        }
-        let col = ColMotion::try_new(&self.budget, w, hgt)?;
-        self.st
-            .reset(w, hgt, sps.pic_size_ctb() as usize, sps.pic_h_ctb as usize)?;
-        // The indices computed above are invalid if the DPB changed; recompute by POC.
+        Ok(if sps.high_bit_depth() {
+            let frame = match self.pool.take(w, h) {
+                Some(f) => f,
+                None => Frame::try_new(&self.budget, w, h, 0)?,
+            };
+            prepare_band(&mut self.scratch16, w, ctb, &self.budget)?;
+            AnyFrame::U16(frame)
+        } else {
+            let frame = match self.pool.take(w, h) {
+                Some(f) => f,
+                None => Frame::try_new(&self.budget, w, h, 0)?,
+            };
+            prepare_band(&mut self.scratch8, w, ctb, &self.budget)?;
+            AnyFrame::U8(frame)
+        })
+    }
+
+    /// The buffer positions of RefPicSetStCurrBefore, StCurrAfter and LtCurr. A reference
+    /// `mark_references` did not find, or that is no longer stored, is generated (8.3.3,
+    /// also for lost pictures).
+    fn current_references(
+        &mut self,
+        sps: &Sps,
+        rps: &Rps,
+        [st_before_found, st_after_found, lt_curr_found]: &[Vec<bool>; 3],
+        info: &Arc<OutInfo>,
+    ) -> Result<[Vec<usize>; 3]> {
+        let max_lsb = 1i32 << sps.log2_max_poc_lsb;
+        // Positions found before the picture was charged may have moved; look up again.
         let resolve = |dpb: &DecodedPictures<DpbPic>, p: i32| {
             position(dpb, |d| d.is_reference() && d.poc() == p)
         };
         let mut st_before = Vec::new();
         let mut st_after = Vec::new();
         let mut lt_curr = Vec::new();
-        // Generate missing references (8.3.3-style, also used for lost pictures).
-        for (k, &p) in st_before_poc.iter().enumerate() {
+        for (&p, &found) in rps.st_before.iter().zip(st_before_found) {
             let i = match resolve(&self.dpb, p) {
-                Some(i) if st_before_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, Marking::ShortTerm, info.clone())?,
+                Some(i) if found => i,
+                _ => self.generate_missing(sps, p, Marking::ShortTerm, info.clone())?,
             };
             st_before.push(i);
         }
-        for (k, &p) in st_after_poc.iter().enumerate() {
+        for (&p, &found) in rps.st_after.iter().zip(st_after_found) {
             let i = match resolve(&self.dpb, p) {
-                Some(i) if st_after_idx[k].is_some() => i,
-                _ => self.generate_missing(&sps, p, Marking::ShortTerm, info.clone())?,
+                Some(i) if found => i,
+                _ => self.generate_missing(sps, p, Marking::ShortTerm, info.clone())?,
             };
             st_after.push(i);
         }
-        for (k, &(p, msb)) in lt_curr_poc.iter().enumerate() {
-            let found = if lt_curr_idx[k].is_some() {
+        for (&(p, msb), &found) in rps.lt_curr.iter().zip(lt_curr_found) {
+            let stored = if found {
                 position(&self.dpb, |d| {
-                    d.marking(Parity::Top) == Marking::LongTerm && lt_poc(d, p, msb)
+                    d.marking(Parity::Top) == Marking::LongTerm
+                        && names_long_term(d, p, msb, max_lsb)
                 })
             } else {
                 None
             };
-            let i = match found {
+            let i = match stored {
                 Some(i) => i,
-                None => self.generate_missing(&sps, p, Marking::LongTerm, info.clone())?,
+                None => self.generate_missing(sps, p, Marking::LongTerm, info.clone())?,
             };
             lt_curr.push(i);
         }
-        // Activate the SPS and commit the POC and IRAP state.
-        let sps_changed = match &self.active_sps {
-            Some(a) => !Arc::ptr_eq(a, &sps),
-            None => true,
-        };
-        if sps_changed {
-            self.active_sps = Some(sps.clone());
-        }
-        if h.temporal_id == 0
-            && !hevc::is_rasl(t)
-            && !hevc::is_radl(t)
-            && !hevc::is_sub_layer_non_ref(t)
-        {
-            self.prev_tid0_poc = poc;
-        }
-        self.first_picture = false;
-        self.after_eos = false;
-        let pts = if self.pts_used {
-            None
-        } else {
-            self.pending_pts
-        };
-        self.pts_used = true;
-        self.cur = Some(CurPic {
-            frame,
-            poc,
-            sps,
-            pps,
-            layout,
-            output: sh.pic_output_flag,
-            pts,
-            prev_sh: None,
-            st_before,
-            st_after,
-            lt_curr,
-            info,
-            col,
-        });
-        Ok(())
+        Ok([st_before, st_after, lt_curr])
     }
 
     /// Stores a generated reference picture (8.3.3), not needed for output, and returns
@@ -962,6 +805,121 @@ impl Context {
     }
 }
 
+/// The order counts of a picture's reference picture set (8.3.2); long-term entries
+/// carry whether they name the full order count or only its LSBs.
+#[derive(Debug, Default)]
+struct Rps {
+    st_before: Vec<i32>,
+    st_after: Vec<i32>,
+    st_foll: Vec<i32>,
+    lt_curr: Vec<(i32, bool)>,
+    lt_foll: Vec<(i32, bool)>,
+}
+
+impl Rps {
+    /// The set of a non-IDR picture of order count `poc` starting with `sh`.
+    fn new(sh: &SliceHeader, poc: i32, max_lsb: i32) -> Self {
+        let mut rps = Rps::default();
+        let st = &sh.st_rps;
+        for i in 0..st.num_negative as usize {
+            let (d, used) = st.s0(i);
+            if used {
+                rps.st_before.push(poc + d);
+            } else {
+                rps.st_foll.push(poc + d);
+            }
+        }
+        for i in 0..st.num_positive as usize {
+            let (d, used) = st.s1(i);
+            if used {
+                rps.st_after.push(poc + d);
+            } else {
+                rps.st_foll.push(poc + d);
+            }
+        }
+        for lt in sh.long_term() {
+            let mut p = lt.poc_lsb as i32;
+            if lt.msb_present {
+                p += poc
+                    - (lt.delta_poc_msb_cycle as i32).wrapping_mul(max_lsb)
+                    - (poc & (max_lsb - 1));
+            }
+            if lt.used_by_curr {
+                rps.lt_curr.push((p, lt.msb_present));
+            } else {
+                rps.lt_foll.push((p, lt.msb_present));
+            }
+        }
+        rps
+    }
+}
+
+/// A long-term entry names a stored picture by its order count, or by its LSBs when the
+/// MSBs are not present.
+fn names_long_term(d: &View<'_, DpbPic>, poc: i32, msb: bool, max_lsb: i32) -> bool {
+    if msb {
+        d.poc() == poc
+    } else {
+        (d.poc() & (max_lsb - 1)) == poc
+    }
+}
+
+/// The reference picture lists of a P or B slice (8.3.4), as buffer positions, and the
+/// order counts and long-term flags of their entries in `info`.
+fn ref_pic_lists(
+    cur: &CurPic,
+    sh: &SliceHeader,
+    dpb: &[View<'_, DpbPic>],
+    info: &mut SliceInfo,
+) -> Result<[[Option<usize>; 16]; 2]> {
+    let mut lists = [[None; 16]; 2];
+    if sh.slice_type == SliceType::I {
+        return Ok(lists);
+    }
+    let total = cur.st_before.len() + cur.st_after.len() + cur.lt_curr.len();
+    if total == 0 {
+        return Err(DecodeError::Invalid("no reference pictures"));
+    }
+    let mut temp: Vec<(usize, bool)> = Vec::with_capacity(32);
+    for l in 0..(if sh.slice_type == SliceType::B { 2 } else { 1 }) {
+        temp.clear();
+        let n = (sh.num_ref_idx[l] as usize).max(total);
+        let (a, b) = if l == 0 {
+            (&cur.st_before, &cur.st_after)
+        } else {
+            (&cur.st_after, &cur.st_before)
+        };
+        while temp.len() < n {
+            for &i in a {
+                if temp.len() < n {
+                    temp.push((i, false));
+                }
+            }
+            for &i in b {
+                if temp.len() < n {
+                    temp.push((i, false));
+                }
+            }
+            for &i in &cur.lt_curr {
+                if temp.len() < n {
+                    temp.push((i, true));
+                }
+            }
+        }
+        for r in 0..sh.num_ref_idx[l] as usize {
+            let (i, lt) = if sh.rpl_mod[l] {
+                temp[sh.list_entry[l][r] as usize]
+            } else {
+                temp[r]
+            };
+            lists[l][r] = Some(i);
+            info.ref_poc[l][r] = dpb[i].poc();
+            info.ref_lt[l][r] = lt;
+        }
+    }
+    Ok(lists)
+}
+
 /// The output limits of the highest temporal sub-layer of `sps` (C.5.2.2).
 fn limits(sps: &Sps) -> HevcLimits {
     let highest = sps.max_sub_layers_minus1 as usize;
@@ -977,7 +935,12 @@ fn limits(sps: &Sps) -> HevcLimits {
 fn output(out: &mut VecDeque<Picture>) -> impl FnMut(Leave<'_, DpbPic>) + '_ {
     |leave| {
         if let Leave::Output { poc, picture } = leave {
-            out.push_back(make_picture(poc, picture));
+            out.push_back(Picture::new(
+                poc,
+                &picture.frame,
+                picture.pts,
+                &picture.info,
+            ));
         }
     }
 }
@@ -1000,7 +963,6 @@ fn position(
 /// of band r); SAO of band r needs band r+1 deblocked (its first lines are SAO
 /// neighbours, and the edge at its top modifies band r). `all` processes every remaining
 /// row (end of picture). Filtering a row soon after decoding keeps it in cache.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn filter_ready<P: Pixel>(
     f: &mut Frame<P>,
     st: &mut PicState,
@@ -1037,7 +999,6 @@ pub(crate) fn filter_ready<P: Pixel>(
 
 /// SAO of CTB row rr. The band buffer receives the deblocked rows of the band plus the
 /// saved last line of the previous band and the first line of the next one.
-#[allow(clippy::too_many_arguments)]
 fn sao_row<P: Pixel>(
     f: &mut Frame<P>,
     st: &PicState,
@@ -1050,8 +1011,10 @@ fn sao_row<P: Pixel>(
 ) {
     let ctb = sps.ctb_size as usize;
     let wc = sps.pic_w_ctb as usize;
-    // `prepare_band` sized the band and the saved lines for this picture.
-    let band = band.as_mut().unwrap();
+    // `prepare_band` sized the band and the saved lines when the picture started.
+    let Some(band) = band.as_mut() else {
+        return;
+    };
     let any_sao = st.sao[rr * wc..(rr + 1) * wc]
         .iter()
         .any(|s| s.type_idx != [0, 0, 0]);
@@ -1116,37 +1079,6 @@ fn prepare_band<P: Pixel>(
     Ok(())
 }
 
-fn make_picture(poc: i32, p: &DpbPic) -> Picture {
-    let i = &p.info;
-    let [l, r, t, b] = i.crop;
-    let w = (i.width - l - r) as usize;
-    let h = (i.height - t - b) as usize;
-    let mk = |index: usize, x0: usize, y0: usize, pw: usize, ph: usize| Plane {
-        width: pw,
-        height: ph,
-        frame: p.frame.clone(),
-        index,
-        x0,
-        y0,
-    };
-    Picture {
-        width: w as u32,
-        height: h as u32,
-        bit_depth: i.bit_depth,
-        chroma: ChromaFormat::Yuv420,
-        planes: [
-            mk(0, l as usize, t as usize, w, h),
-            mk(1, l as usize / 2, t as usize / 2, w / 2, h / 2),
-            mk(2, l as usize / 2, t as usize / 2, w / 2, h / 2),
-        ],
-        pts: p.pts,
-        poc,
-        sar: i.sar,
-        colour: i.colour,
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
 fn decode_slice_generic<P: Pixel>(
     sps: &Sps,
     pps: &Pps,
@@ -1190,8 +1122,8 @@ fn decode_slice_generic<P: Pixel>(
             }
         }
     }
-    if sh.temporal_mvp && sh.slice_type != SLICE_I {
-        let l = if sh.slice_type == SLICE_B && !sh.collocated_from_l0 {
+    if sh.temporal_mvp && sh.slice_type != SliceType::I {
+        let l = if sh.slice_type == SliceType::B && !sh.collocated_from_l0 {
             1
         } else {
             0

@@ -6,14 +6,18 @@
     unreachable_pub,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::unwrap_used
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
-// Pending: `clippy::expect_used`.
+
+#[cfg(test)]
+extern crate self as triergon_shape;
 
 pub mod bidi;
 mod buffer;
 mod cff;
 mod cmap;
+pub mod compat;
 mod face;
 mod fallback;
 mod language;
@@ -22,7 +26,6 @@ mod normalize;
 mod ot;
 mod plan;
 mod props;
-mod rotations;
 mod shape;
 mod shapers;
 mod tag;
@@ -32,9 +35,8 @@ mod work;
 pub use buffer::{Buffer, Glyph, Position};
 pub use face::Face;
 pub use language::Language;
-pub use metrics::{Extents, Metrics, OtMetrics, Scale, SizedMetrics};
+pub use metrics::{Extents, Metrics, OtMetrics, Scale};
 pub use plan::{Feature, Plan};
-pub use rotations::{FaceRotations, GlyphRotations, rotates};
 pub use shape::shape;
 pub use tag::{Direction, Script, Tag};
 pub use work::Limits;

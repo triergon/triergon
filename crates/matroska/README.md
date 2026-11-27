@@ -1,0 +1,252 @@
+# triergon-matroska
+
+A bounded Matroska and WebM demuxer: EBML parsing, tracks,
+packets with lacing and content encoding, Cues-based seeking, static colour/HDR, block
+additions and segment metadata (Info, chapters, tags, attachments). It is a format-layer
+crate on top of [triergon-core](../core/README.md) and
+[triergon-bitstream](../bitstream/README.md); its push reader implements the core
+`ContainerReader`. It does not decode codecs, schedule playback or render metadata; it
+returns source facts, and the `compat` modules reproduce FFmpeg's choices where a
+consumer needs them.
+
+The neutral track view identifies the nine deprecated AAC CodecIDs alongside
+`A_AAC`. `Track::legacy_aac_profile` exposes the profile signalled by a deprecated
+tag. The original CodecID and CodecPrivate remain available.
+`Track::has_audio_settings` reports whether an Audio element is present. See the
+[Matroska audio codec mappings](https://www.ietf.org/archive/id/draft-ietf-cellar-codec-21.html#section-3.4).
+
+## Usage
+
+Blocking `std::io` adapter:
+
+```rust
+use std::{fs::File, sync::atomic::AtomicBool};
+use triergon_matroska::{BlockingReader, Limits};
+
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/seek/cues-front.mkv");
+let cancel = AtomicBool::new(false);
+let mut reader = BlockingReader::open_seekable(File::open(path)?, Limits::default())?;
+for track in reader.tracks() { /* number, kind, codec, codec_private, colour, languages … */ }
+let video = reader.tracks().iter().position(|t| t.kind == 1).ok_or("no video track")?;
+let receipt = reader.seek_for_playback(video, 1_000_000_000, &cancel)?; // MatroskaSeekReceipt
+while let Some(p) = reader.next_typed_packet(&cancel)? {
+    // p.packet: track, pts_ns, duration_ns, keyframe, data, timing
+    // p.configuration: active track configuration; p.group: BlockGroup side data
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+Use `BlockingReader::open` for forward-only input and
+`BlockingReader::open_seekable` for random access. The corresponding `_in`
+methods accept the caller's pool. Use `BlockingSource::owned(input)` with
+`BlockingReader::open_source_in` to read and seek
+within an already charged `OwnedInputBytes`. A `BlockingSource` also selects
+the payload ownership policy. `open_in` uses the caller's `Budget`.
+`compat::block_additions::owned_source` selects the WebM compatibility policy
+for immutable input.
+`next_packet` returns the plain `Packet` and refuses packets that carry block
+additions or CodecState; use `next_typed_packet` for those. Typed configurations
+expose their allocation accounting through `Configuration::budget()`.
+
+`examples/matroska_packets.rs FILE` prints the tracks and packets of a file.
+
+## Features
+
+| Feature | Default | Effect |
+|---|---|---|
+| `reference-trace` | off | `reference_trace`: the initial trim after a seek, the decoding of one whole zlib stream (`reference_trace::zlib::decompress`) and `Colour::trace_fields`, the colour values FFmpeg reports |
+
+Push / poll reader (no I/O; the caller supplies bytes):
+
+```rust
+use std::sync::atomic::AtomicBool;
+use triergon_core::{Budget, Bytes, InputWindow, SourceCapabilities, SourceId, Step, WorkBudget};
+use triergon_matroska::{Event, Limits, Reader};
+
+# let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/seek/cues-front.mkv");
+let file = std::fs::read(path)?;                     // any transport; the reader does no I/O
+let pool = Budget::new(Limits::default().live_storage_bytes)?;
+let caps = SourceCapabilities { length: Some(file.len() as u64), random_access: true };
+let mut reader = Reader::new(&pool, SourceId(1), caps, Limits::default(), 64 * 1024)?;
+let cancel = AtomicBool::new(false);
+let mut work = WorkBudget::new(1 << 16);
+loop {
+    match reader.step(&mut work, &cancel)? {         // Step<Event, Backpressure>
+        Step::NeedInput(req) => match file.get(usize::try_from(req.offset)?..) {
+            Some(rest) if !rest.is_empty() => {
+                let bytes = Bytes::copy_from_slice(&pool, &rest[..rest.len().min(req.maximum)])?;
+                reader.provide(&InputWindow::new(req.source, req.token, req.offset, bytes)?)?;
+            }
+            _ => reader.finish(req.source, req.token)?,
+        },
+        Step::Yield => work = WorkBudget::new(1 << 16),
+        Step::Backpressure(_) => { /* release retained packets, retry */ }
+        Step::Ready(Event::Packet(p)) => { /* p.packet: track, pts_ns, keyframe, data */ }
+        Step::Ready(_) => {} // Envelope, Configuration, Document, Seek
+        Step::End(_) => break, // end of the Segment
+    }
+}
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+
+`Reader::seek_previous` / `seek_for_playback` return the first `InputRequest`;
+the seek completes with `Event::Seek(MatroskaSeekReceipt)` before any packet.
+
+`Reader` also implements `triergon_core::container::ContainerReader`, so it works in
+generic code and inside `triergon::AnyReader`:
+
+| Neutral view | Matroska source |
+|---|---|
+| `PacketInfo` | `TypedPacket`: time base nanoseconds (TimestampScale applied), `pts`/`duration` from the packet, `dts` `None`, `RandomAccess` from the Block keyframe flag, `Trim::end` from DiscardPadding |
+| `TrackInfo` | `Track`: `TrackId` = TrackNumber, `codec_tag` = CodecID, `codec` from an exact CodecID match with any other CodecID as `CodecId::Other`, `configuration` = CodecPrivate, effective language, default and forced flags, `colour` as a `ColourDescription` with `Origin::SpecificationDefault` for omitted Colour children |
+| `Event::Seek` | `MatroskaSeekReceipt::neutral()`: method `Index` or `BoundedScan`; Cue and preroll detail stay on the Matroska receipt |
+| `Event::Other` | `ReaderEvent`: Envelope, Configuration or Document |
+
+`request_seek` maps the `TrackId` to a track index (`Error::Invalid` when absent),
+floors the target to nanoseconds and calls `seek_previous` for
+`SeekPolicy::PreviousRandomAccess` or `seek_for_playback` for
+`SeekPolicy::PlaybackPreroll`.
+
+## Supported
+
+| Area | Coverage |
+|---|---|
+| EBML | RFC 8794 headers, IDs up to 4 bytes, sizes up to 8 bytes, unknown-size Segment and Cluster; DocType `matroska` or `webm` |
+| Tracks | Number, UID, type, codec ID/private/name, legacy and BCP 47 language, enabled/default/forced and accessibility flags (absence kept distinct from false), DefaultDuration, CodecDelay, SeekPreRoll, video size, audio rate/channels, raw `TrackEntry` bytes |
+| Blocks | SimpleBlock and BlockGroup; Xiph, fixed and EBML lacing (up to 256 frames); BlockDuration, ReferenceBlock, DiscardPadding |
+| Side data | BlockAdditions (raw, with mapping evidence from `BlockAdditionMapping`), CodecState with configuration events before affected packets, HDR10+ (ITU-T T.35, Application 4) via `Hdr10Plus::parse_t35` |
+| Content encoding | Header stripping and zlib, per frame (scope 1), CodecPrivate (scope 2) or both; ordered chains of up to eight stages |
+| Colour | All 13 `Colour` integers and 10 `MasteringMetadata` floats (`colour::Colour`) |
+| Segment metadata | Info (title, apps, scale, IEEE duration, DateUTC), editions and nested chapters with displays, tags with nested SimpleTags and all target UIDs, attachments |
+| Seeking | SeekHead chains, Cues (incl. CueRelativePosition, CueBlockNumber, CueCodecState), bounded fallback scan, all-track preroll |
+
+Refused with `Error::Unsupported`: encryption, bzip2/lzo compression, preset
+zlib dictionaries, ContentEncoding scope 4, `TrackTimestampScale` other than 1.0,
+multiple EBML documents or Segments, EBMLReadVersion above 1,
+DocTypeReadVersion above 4, EBMLMaxIDLength above 4, EBMLMaxSizeLength above 8,
+and seeking on a non-video track.
+
+## Behaviour and limits
+
+**Bounds.** Every reader takes `Limits`; nothing buffers a whole file. Defaults:
+
+| Field | Default | Bounds |
+|---|---:|---|
+| `live_storage_bytes` | 128 MiB | all live reader-owned storage, including packets the caller still holds |
+| `metadata_bytes` | 1 MiB | one structural metadata element; also each decoded CodecPrivate |
+| `block_bytes` | 16 MiB | one block, and all decoded frames of one lace together |
+| `tracks` | 64 | tracks per Segment |
+| `metadata_storage_bytes` | 16 MiB | all segment-metadata documents incl. validation workspace |
+| `metadata_nodes` / `metadata_depth` | 4096 / 32 | document nodes, nesting (hard ceiling 64) |
+| `attachment_bytes` | 8 MiB | attachment payload |
+| `elements` | 1,000,000 | elements visited |
+| `scan_bytes` | 64 MiB | bytes consumed in one open/seek scan phase |
+| `index_entries` | 16,384 | Cues entries |
+| `decompression_ratio` / `decompression_work` | 1024 / 128 Mi | expansion vs. input; work units per encoding |
+
+Header restoration, decoded block capacity, track parsing, track extensions
+and HDR10+ payload checks report byte excesses as `Error::Limit` with the
+requested and maximum counts. Element admission, catalogue storage, counts,
+nesting and scan work report named `Error::Policy` bounds. The pool returns
+`Error::Limit` for a storage request it can never grant. Both errors are
+permanent for the input. Output that
+fits once the caller drops retained packets is `Step::Backpressure` from `Reader::step`
+(`Error::Backpressure` from `BlockingReader`) and is retryable.
+`PayloadOwnership::OwnedExact` (default) gives each block payload storage of exactly its
+size; `SharedBounded` lets payloads alias their parent input allocation and reports that
+parent's full capacity as retained.
+
+**Opening.** Sequential input requires metadata before the first Cluster. Seekable
+input follows bounded SeekHead chains to load late Tracks, Cues, chapters, tags
+and attachments; it never scans media to build an index.
+
+**Timing.** `packet.timing.source()` gives exact rational nanoseconds with
+CodecDelay subtracted (RFC 9559 §11.2); fractional lace durations and negative PTS are
+kept. A frame's duration is its share of BlockDuration, or DefaultDuration when
+BlockDuration is absent. The Block timestamp is the first laced frame's and the later
+frames follow one another (§10.3.5), so a later frame gets a PTS only from a nonzero
+frame duration: a zero BlockDuration places none of them, DefaultDuration still does.
+`pts_ns`/`duration_ns` are that value rounded once to the nearest nanosecond.
+Matroska carries no decode time and a packet has none. `compat::clock::packet_timing` is an opt-in view in
+Segment ticks that reproduces FFmpeg's packet clock, including its omissions.
+
+**Content encoding.** Encodings apply in descending `ContentEncodingOrder`, and each
+laced frame is decoded separately. A zlib value is one complete RFC 1950 stream (stored,
+fixed and dynamic blocks); its Adler-32 is checked before any byte is returned and
+trailing bytes are refused.
+
+**Seeking.** Requests name a track index (must be video) and a presentation time in
+nanoseconds. `seek_previous` lands on the latest video keyframe at or before the
+target. `seek_for_playback` first subtracts the largest track SeekPreRoll, then
+replays the landing Cluster, including interleaved audio before the keyframe. A cue is
+checked against the real Cluster, track, timestamp and keyframe; a forged index fails
+instead of landing elsewhere, and the gap after the last cue is scanned for uncued
+keyframes. The `MatroskaSeekReceipt` reports `actual_ns`, `used_index`, `scanned_bytes`,
+`preroll_ns`, `discard_until_ns` (decode, but do not present, earlier packets) and
+`replays_from_start` (so one-time start trimming is not repeated). Recovery can fail
+with `missing timed audio duration` if a timed packet has no duration. After any failure
+or cancellation the caller must seek or `reset` before reading more packets.
+
+**Colour.** The neutral `TrackInfo::colour` view reports which values came from
+the source and which are schema defaults. `Track::colour` keeps every source
+field: bit depth, both chroma and Cb
+subsampling axes, siting, optional MaxCLL/MaxFALL and each optional mastering value as
+exact `f64`. Zero-length numbers take the schema default. Values are reported as written:
+RFC 9559 gives chromaticity the range [0, 1] and luminance a lower bound of 0, but
+neither it nor RFC 8794 (§11.1.6.6) tells a reader to refuse a value outside a range,
+so a non-finite, negative or out-of-range value is reported, not judged. A number wider
+than its type allows fails the track.
+
+**Block addition mappings.** `TrackExtensions` reports MaxBlockAdditionID and each
+BlockAdditionMapping as written. A mapping field the reader does not need to read blocks
+is not judged: a BlockAddIDValue below 2 (RFC 9559 §5.1.4.1.17.1 allows 2 and above) is
+reported and describes no BlockAddID, and BlockAddIDExtraData is the BlockAddIDType's
+private data (§5.1.4.1.17.4), however short for that type. Neither RFC 9559 nor
+RFC 8794 tells a reader to refuse a value outside its range. What blocks depend on still
+fails the input: a BlockAddID above the track's MaxBlockAdditionID and malformed EBML.
+
+**Repeated children.** A child a schema allows once is read at its first occurrence and
+passed over after it (RFC 8794 §12): in the EBML header (DocType and the read-version and
+width fields), a TrackEntry (its scalar fields, flags, languages, Video, Audio, Colour and
+ContentEncodings), a BlockAdditionMapping, MaxBlockAdditionID, a ContentEncoding's
+ContentCompression, a BlockGroup (Block, BlockDuration, DiscardPadding, CodecState,
+BlockAdditions, and a BlockMore's BlockAddID and BlockAdditional), a CuePoint and its
+CueTrackPositions, a Seek entry, and an Info, Chapters, Tags or Attachments document
+(TimestampScale and every other single-occurrence field). A passed-over child of a
+document stays in its element tree, and its value must still be well formed; the typed
+views read the first. Three rules are of another kind and still fail the input: two
+tracks with one TrackNumber or TrackUID, two additions with one BlockAddID in a
+BlockGroup, and two ContentEncodings with one ContentEncodingOrder. Two places do not
+follow the rule yet. A ContentEncoding's ContentEncodingOrder, ContentEncodingScope,
+ContentEncodingType, ContentCompAlgo and ContentCompSettings keep their last occurrence,
+because tracking their occurrences was measured to cost every open of an encoded track
+0.1% instructions. A second Cues or Attachments element fails (`duplicate Cues`,
+`duplicate Attachments`): it is refused after its bytes are read, and passing it over
+there would leave the slot the reader reserved for it in use.
+
+**Reference compatibility.** The reader follows the specifications. The `compat`
+modules reproduce FFmpeg's Matroska demuxer where a consumer needs its result, and
+each names the FFmpeg revision it reproduces: `compat::clock` gives FFmpeg's packet
+clock, `compat::seek` its block-start audio selection after a subtitle seek, and
+`compat::block_additions` configures readers to admit WebM VP9's implicit ITU-T T.35
+addition (BlockAddID 4 without a declared MaxBlockAdditionID) and projects block
+additions to the packet side data and HDR10+ events FFmpeg attaches to packets.
+
+**Segment metadata.** Each `metadata::SharedDocument` owns one source buffer; `Edition`,
+`Chapter`, `Tag`, `SimpleTag`, `SegmentInfo` and `Attachment` are borrowed views with no
+string or payload copies. Attachments stay valid after the reader is dropped. Chapter
+times are exact unsigned nanoseconds; ordered editions are reported, not executed.
+Building a document validates every node once in resumable, work-charged steps.
+
+## Conformance
+
+Authored from RFC 8794 §§4–7, 11 (EBML) and RFC 9559 §§5, 10–11, 22 (Matroska:
+§5.1.3.5 block side data, §5.1.4.1.16–17 block addition mappings,
+§5.1.4.1.28 Colour, §5.1.4.1.31 ContentEncoding, §5.1.5 Cues, §§5.1.6–8
+chapters/tags/attachments), RFC 1950/1951 (zlib/DEFLATE) and ITU-T T.35
+HDR10+ Application 4 carriage.
+
+The reader is compared with FFmpeg's Matroska demuxer by the `harness/features/matroska-*`
+features, through [media-worker](../media-worker/README.md) and, for the playback clocks
+and startup seeks, [playback-worker](../playback-worker/README.md); results are in
+[docs/status.md](../../docs/status.md).

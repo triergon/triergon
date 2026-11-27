@@ -8,18 +8,20 @@
 mod record;
 mod unicode;
 
-use record::{Dump, Record, Sink, Work};
+use record::{Record, Records};
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::ops::Range;
 use std::process::ExitCode;
-use std::time::Instant;
 use triergon_core::{Budget, Bytes, WorkBudget};
+use triergon_font::compat::libass;
 use triergon_font::{Font, Limits};
+use triergon_harness_runner::records::Dump;
+use triergon_harness_runner::{Invocation, Mode as RunMode, Totals, measure};
 use triergon_shape::bidi::{self, BaseDirection, BidiClass, Bracket, Level, Resolver};
+use triergon_shape::compat::libass::SizedMetrics;
 use triergon_shape::{
-    Buffer, Direction, Face, Feature, Language, Metrics, OtMetrics, Plan, Scale, Script,
-    SizedMetrics, Tag,
+    Buffer, Direction, Face, Feature, Language, Metrics, OtMetrics, Plan, Scale, Script, Tag,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -219,7 +221,7 @@ fn shape_text(
     file: &Bytes,
     budget: &Budget,
     settings: &Settings,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let faces = Font::face_count(file.as_ref()).unwrap_or(0);
     let mut buffer = Buffer::new(budget);
@@ -238,8 +240,7 @@ fn shape_text(
                 // The comparison measures answers, not work: a face's runs
                 // share an unbounded budget.
                 let mut work = WorkBudget::new(u64::MAX);
-                let Ok(metrics) = font
-                    .at_size(height)
+                let Ok(metrics) = libass::at_size(&font, height)
                     .and_then(|sized| SizedMetrics::new(sized, &mut work))
                 else {
                     sink.record(Record::FaceError(index))?;
@@ -260,7 +261,7 @@ fn shape_texts(
     budget: &Budget,
     settings: &Settings,
     buffer: &mut Buffer,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let face = Face::new(font);
     let plan = Plan::new(
@@ -304,7 +305,7 @@ fn shape_texts(
 
 /// Every glyph's extents through [`OtMetrics`] at units per em, the font
 /// functions `shape` uses, for every face of the file.
-fn shape_extents(file: &Bytes, budget: &Budget, sink: &mut impl Sink) -> Result<()> {
+fn shape_extents(file: &Bytes, budget: &Budget, sink: &mut impl Records) -> Result<()> {
     let faces = Font::face_count(file.as_ref()).unwrap_or(0);
     for index in 0..faces {
         let Ok(font) = Font::new(file.clone(), index, budget, Limits::default()) else {
@@ -376,7 +377,7 @@ fn shape_bidi(
     budget: &Budget,
     base: BaseDirection,
     brackets: bool,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let mut resolver = Resolver::new(budget);
     for (index, line) in lines(data).enumerate() {
@@ -404,7 +405,7 @@ fn shape_simple(
     data: &[u8],
     budget: &Budget,
     base: BaseDirection,
-    sink: &mut impl Sink,
+    sink: &mut impl Records,
 ) -> Result<()> {
     let mut resolver = Resolver::new(budget);
     for (index, line) in lines(data).enumerate() {
@@ -425,7 +426,7 @@ fn shape_simple(
     Ok(())
 }
 
-fn shape_unicode(data: &[u8], sink: &mut impl Sink) -> Result<()> {
+fn shape_unicode(data: &[u8], sink: &mut impl Records) -> Result<()> {
     for (index, line) in lines(data).enumerate() {
         let range = line.iter().position(|&b| b == b' ').and_then(|space| {
             let (first, last) = (scalar(&line[..space])?, scalar(&line[space + 1..])?);
@@ -444,7 +445,12 @@ fn shape_unicode(data: &[u8], sink: &mut impl Sink) -> Result<()> {
     Ok(())
 }
 
-fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Sink) -> Result<()> {
+fn read(
+    file: &Bytes,
+    budget: &Budget,
+    operation: &Operation,
+    sink: &mut impl Records,
+) -> Result<()> {
     match operation {
         Operation::Shape(settings) => shape_text(file, budget, settings, sink),
         Operation::Bidi(base, brackets) => {
@@ -458,23 +464,11 @@ fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Si
 
 // --------------------------------------------------------------------- main
 
-enum Action {
-    Fold,
-    Bench(u64),
-    Memory,
-    Dump,
-}
-
-fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
+fn parse(args: &[String]) -> Result<(Invocation<'_>, Operation)> {
     let (mode, rest) = args.split_first().ok_or(USAGE)?;
     let (operation, action) = mode.rsplit_once('-').ok_or(USAGE)?;
-    let (action, path, arguments) = match (action, rest) {
-        ("bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), path, rest),
-        ("fold", [path, rest @ ..]) => (Action::Fold, path, rest),
-        ("memory", [path, rest @ ..]) => (Action::Memory, path, rest),
-        ("dump", [path, rest @ ..]) => (Action::Dump, path, rest),
-        _ => return Err(USAGE.into()),
-    };
+    let invocation = Invocation::parse_mode(action, rest, Some("dump"), || USAGE)?;
+    let arguments = invocation.arguments;
     let operation = match (operation, arguments) {
         ("shape", arguments) => Operation::Shape(shape_settings(Functions::OpenType, arguments)?),
         ("shape-libass", [size, arguments @ ..]) => {
@@ -492,7 +486,7 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         ("extents", []) => Operation::Extents,
         _ => return Err(USAGE.into()),
     };
-    Ok((action, operation, path))
+    Ok((invocation, operation))
 }
 
 /// `DIRECTION SCRIPT LANGUAGE FEATURES TEXT...`.
@@ -520,68 +514,32 @@ fn shape_settings(functions: Functions, arguments: &[String]) -> Result<Settings
 }
 
 fn run(args: &[String]) -> Result<()> {
-    let (action, operation, path) = parse(args)?;
-    let iterations = match action {
-        Action::Bench(count) => count,
-        _ => 1,
-    };
-    if !(1..=1_000_000).contains(&iterations) {
-        return Err(USAGE.into());
-    }
+    let (invocation, operation) = parse(args)?;
+    invocation.check_iterations(|| USAGE)?;
+    let Invocation {
+        mode: action, path, ..
+    } = invocation;
     let size = std::fs::metadata(path)?.len();
     if size > MAX_INPUT {
         return Err("input exceeds the size bound".into());
     }
     let budget = Budget::new(1 << 30)?;
-    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error())?;
-    let retained = budget.used();
-    let mut out = io::stdout().lock();
-    if let Action::Dump = action {
-        let mut dump = Dump(BufWriter::new(out));
+    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error)?;
+    if action == RunMode::Trace {
+        let mut dump = Dump(BufWriter::new(io::stdout().lock()));
         read(&file, &budget, &operation, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
-    let memory = matches!(action, Action::Memory);
-    if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
-    }
-    let start = matches!(action, Action::Bench(_)).then(Instant::now);
-    let mut total = Work::default();
-    for _ in 0..iterations {
-        let mut work = Work::default();
+    measure(&invocation, operation.name(), Some(&budget), || {
+        let mut work = Totals::default();
         read(std::hint::black_box(&file), &budget, &operation, &mut work)?;
-        total.accumulate(&work);
-        if budget.used() != retained {
-            return Err("shaping operation retained charged storage".into());
-        }
-    }
-    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
-    if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
-    }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"{}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        operation.name(),
-        total.packets,
-        total.bytes,
-        total.digest,
-    )?;
-    Ok(out.flush()?)
+        Ok(work)
+    })
 }
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("shape-worker: {error}");
-            ExitCode::FAILURE
-        }
-    }
+    triergon_harness_runner::command(Some("shape-worker"), 1, run)
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`

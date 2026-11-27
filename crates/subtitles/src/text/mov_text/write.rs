@@ -44,7 +44,6 @@ impl<const N: usize> fmt::Write for Fixed<N> {
 #[derive(Debug)]
 pub(super) struct Writer<const N: usize> {
     pub pending: Fixed<N>,
-    at: usize,
     data: BudgetVec<u8>,
     pub frozen: Option<Bytes>,
 }
@@ -52,7 +51,6 @@ impl<const N: usize> Writer<N> {
     pub(super) fn new(pool: &Budget) -> Self {
         Self {
             pending: Fixed::new(),
-            at: 0,
             data: BudgetVec::new(pool),
             frozen: None,
         }
@@ -65,7 +63,7 @@ impl<const N: usize> Writer<N> {
         funding: &mut Funding,
         caller: &mut WorkBudget,
     ) -> Result<bool> {
-        let pending = &self.pending.bytes[self.at..self.pending.length];
+        let pending = self.pending.as_bytes();
         if pending.is_empty() {
             return Ok(true);
         }
@@ -81,7 +79,6 @@ impl<const N: usize> Writer<N> {
         self.data.try_reserve(pending.len())?;
         self.data.try_extend_from_slice(pending)?;
         funding.commit();
-        self.at = 0;
         self.pending.clear();
         Ok(true)
     }
@@ -120,24 +117,35 @@ impl<const N: usize> Writer<N> {
         funding: &mut Funding,
         caller: &mut WorkBudget,
     ) -> Result<bool> {
-        if self.frozen.is_some() {
-            return Ok(true);
+        if self.frozen.is_none() {
+            let Some(bytes) = freeze(&mut self.data, funding, caller)? else {
+                return Ok(false);
+            };
+            self.frozen = Some(bytes);
         }
-        if !funding.pay(1, caller)? {
-            return Ok(false);
+        Ok(true)
+    }
+}
+
+/// Freezes `data` for one unit, leaving it empty; `None` when the unit is not
+/// funded yet. A refused freeze leaves `data` as it was.
+pub(super) fn freeze(
+    data: &mut BudgetVec<u8>,
+    funding: &mut Funding,
+    caller: &mut WorkBudget,
+) -> Result<Option<Bytes>> {
+    if !funding.pay(1, caller)? {
+        return Ok(None);
+    }
+    let empty = BudgetVec::new(data.budget());
+    match std::mem::replace(data, empty).freeze() {
+        Ok(bytes) => {
+            funding.commit();
+            Ok(Some(bytes))
         }
-        let empty = BudgetVec::new(self.data.budget());
-        let data = std::mem::replace(&mut self.data, empty);
-        match data.freeze() {
-            Ok(bytes) => {
-                self.frozen = Some(bytes);
-                funding.commit();
-                Ok(true)
-            }
-            Err(failure) => {
-                self.data = failure.buffer;
-                Err(failure.error)
-            }
+        Err(failure) => {
+            *data = failure.value;
+            Err(failure.error)
         }
     }
 }

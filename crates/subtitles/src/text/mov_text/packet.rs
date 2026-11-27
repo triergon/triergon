@@ -1,14 +1,15 @@
-//! Incremental native-view box selection and forward ASS emission.
+//! One tx3g sample decoded as the `mov_text` decoder decodes it: the modifier
+//! boxes it reads, then the ASS event written forward from the text.
 use super::{
-    Clock, Funding, Limits, Options, Output, Subtitle,
+    Clock, Decoded, Funding, Limits, Options, Output, Subtitle,
     config::{Configuration, Style, until_nul},
     write::{Fixed, Writer},
 };
-use crate::text::{Input, unicode::cancelled};
+use crate::cancelled;
+use crate::text::Input;
 use std::{fmt::Write, sync::atomic::AtomicBool};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
-const INVALID_DATA: i32 = -1094995529;
 /// Room for the event prefix: the read order, at most ten digits, the fixed
 /// fields and a wrap tag.
 const PREFIX_BYTES: usize = 64;
@@ -18,18 +19,54 @@ struct Span {
     end: u16,
     style: Style,
 }
+/// A modifier box the decoder reads; it skips every other kind.
 #[derive(Debug, Clone, Copy)]
+enum Modifier {
+    Styles,
+    Highlight,
+    HighlightColour,
+    Wrap,
+}
+impl Modifier {
+    fn of(kind: &[u8]) -> Option<Self> {
+        match kind {
+            b"styl" => Some(Self::Styles),
+            b"hlit" => Some(Self::Highlight),
+            b"hclr" => Some(Self::HighlightColour),
+            b"twrp" => Some(Self::Wrap),
+            _ => None,
+        }
+    }
+    /// The bytes of the box's fixed fields; a shorter box is skipped.
+    fn fixed_bytes(self) -> usize {
+        match self {
+            Self::Styles => 2,
+            Self::Highlight | Self::HighlightColour => 4,
+            Self::Wrap => 1,
+        }
+    }
+}
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
 enum Phase {
     Begin,
     BoxHeader,
-    BoxBody,
-    Styles,
+    /// The fixed fields of a box the decoder reads.
+    BoxBody(Modifier),
+    /// The style records of a `styl` box still to read.
+    Styles(u16),
     Skip,
     Validate,
     Prefix,
     Render,
     Freeze,
-    Ready,
+    /// Ended: an empty sample, which gives no subtitle.
+    Empty,
+    /// Ended: refused. `true` when its text, or a font name it would write,
+    /// was refused: the call then still takes a read order.
+    Refused(bool),
+    /// Ended: the event is written.
+    Written,
 }
 /// The emission stages at a character where a style or the highlight starts or
 /// ends, in the order the reference writes them; each is one unit of work.
@@ -50,16 +87,11 @@ pub(super) struct PacketJob {
     input: Input,
     clock: Clock,
     phase: Phase,
-    returned: i32,
-    advance: bool,
     text_end: usize,
     visible_end: usize,
     at: usize,
     box_end: usize,
-    box_kind: [u8; 4],
     box_count: usize,
-    style_count: usize,
-    style_read: usize,
     styles: BudgetVec<Span>,
     highlight: Option<(u16, u16)>,
     highlight_color: Option<[u8; 4]>,
@@ -78,16 +110,11 @@ impl PacketJob {
             input,
             clock,
             phase: Phase::Begin,
-            returned: 0,
-            advance: false,
             text_end: 0,
             visible_end: 0,
             at: 0,
             box_end: 0,
-            box_kind: [0; 4],
             box_count: 0,
-            style_count: 0,
-            style_read: 0,
             styles: BudgetVec::new(pool),
             highlight: None,
             highlight_color: None,
@@ -102,18 +129,16 @@ impl PacketJob {
         }
     }
     pub(super) fn ready(&self) -> bool {
-        matches!(self.phase, Phase::Ready)
+        matches!(
+            self.phase,
+            Phase::Empty | Phase::Refused(_) | Phase::Written
+        )
     }
     pub(super) fn advances_read_order(&self) -> bool {
-        self.advance
+        matches!(self.phase, Phase::Refused(true) | Phase::Written)
     }
     fn bytes(&self) -> &[u8] {
         self.input.payload.as_ref()
-    }
-    fn refuse(&mut self, advance: bool) {
-        self.returned = INVALID_DATA;
-        self.advance = advance;
-        self.phase = Phase::Ready;
     }
     fn validation(&mut self) {
         self.at = 2;
@@ -125,6 +150,7 @@ impl PacketJob {
         clippy::too_many_arguments,
         reason = "Explicit immutable context and caller funding avoid hidden global state."
     )]
+    // Splitting the modifier header and body reads costs up to 0.165% more instructions.
     pub(super) fn poll(
         &mut self,
         config: &Configuration,
@@ -138,27 +164,26 @@ impl PacketJob {
         loop {
             cancelled(cancel)?;
             match self.phase {
-                Phase::Ready => return Ok(true),
+                Phase::Empty | Phase::Refused(_) | Phase::Written => return Ok(true),
                 Phase::Begin => {
                     let size = self.bytes().len();
                     if !funding.pay(size.clamp(1, 2), caller)? {
                         return Ok(false);
                     }
                     if size == 0 {
-                        self.phase = Phase::Ready;
+                        self.phase = Phase::Empty;
                     } else if size < 2 {
-                        self.refuse(false);
+                        self.phase = Phase::Refused(false);
                     } else {
                         let length =
                             usize::from(u16::from_be_bytes([self.bytes()[0], self.bytes()[1]]));
                         if size == 2 {
-                            if length == 0 {
-                                self.phase = Phase::Ready;
+                            self.phase = if length == 0 {
+                                Phase::Empty
                             } else {
-                                self.refuse(false);
-                            }
+                                Phase::Refused(false)
+                            };
                         } else {
-                            self.returned = i32::try_from(size).map_err(|_| Error::Overflow)?;
                             self.text_end = (length + 2).min(size);
                             self.at = self.text_end;
                             self.phase = Phase::BoxHeader;
@@ -204,7 +229,7 @@ impl PacketJob {
                     };
                     if size < header as u64 {
                         funding.commit();
-                        self.refuse(false);
+                        self.phase = Phase::Refused(false);
                         continue;
                     }
                     if size > remaining as u64 {
@@ -218,24 +243,17 @@ impl PacketJob {
                             maximum: limits.maximum_boxes,
                         });
                     }
-                    self.box_kind = self.bytes()[self.at + 4..self.at + 8]
-                        .try_into()
-                        .map_err(|_| Error::Truncated)?;
+                    let modifier = Modifier::of(&self.bytes()[self.at + 4..self.at + 8]);
                     self.box_end = self.at + usize::try_from(size).map_err(|_| Error::Overflow)?;
                     self.at += header;
                     self.box_count += 1;
-                    self.phase = Phase::BoxBody;
+                    self.phase = modifier.map_or(Phase::Skip, Phase::BoxBody);
                     funding.commit();
                 }
-                Phase::BoxBody => {
+                Phase::BoxBody(modifier) => {
                     let available = self.box_end - self.at;
-                    let needed = match &self.box_kind {
-                        b"styl" => 2,
-                        b"hlit" | b"hclr" => 4,
-                        b"twrp" => 1,
-                        _ => 0,
-                    };
-                    if needed == 0 || available < needed {
+                    let needed = modifier.fixed_bytes();
+                    if available < needed {
                         self.phase = Phase::Skip;
                         continue;
                     }
@@ -243,51 +261,45 @@ impl PacketJob {
                         return Ok(false);
                     }
                     let bytes = &self.bytes()[self.at..self.at + needed];
-                    match &self.box_kind {
-                        b"styl" => {
-                            let count = usize::from(u16::from_be_bytes([bytes[0], bytes[1]]));
-                            if count
-                                .checked_mul(12)
-                                .and_then(|n| n.checked_add(2))
-                                .is_some_and(|n| n <= available)
-                            {
-                                if count > limits.maximum_styles {
+                    let next = match modifier {
+                        Modifier::Styles => {
+                            let count = u16::from_be_bytes([bytes[0], bytes[1]]);
+                            if 12 * usize::from(count) + 2 <= available {
+                                if usize::from(count) > limits.maximum_styles {
                                     return Err(Error::Limit {
-                                        requested: count,
+                                        requested: count.into(),
                                         maximum: limits.maximum_styles,
                                     });
                                 }
                                 self.styles.clear();
-                                self.style_count = count;
-                                self.style_read = 0;
-                                self.phase = Phase::Styles;
+                                Phase::Styles(count)
                             } else {
-                                self.phase = Phase::Skip;
+                                Phase::Skip
                             }
                         }
-                        b"hlit" => {
+                        Modifier::Highlight => {
                             self.highlight = Some((
                                 u16::from_be_bytes([bytes[0], bytes[1]]),
                                 u16::from_be_bytes([bytes[2], bytes[3]]),
                             ));
-                            self.phase = Phase::Skip;
+                            Phase::Skip
                         }
-                        b"hclr" => {
+                        Modifier::HighlightColour => {
                             self.highlight_color =
                                 Some(bytes.try_into().map_err(|_| Error::Truncated)?);
-                            self.phase = Phase::Skip;
+                            Phase::Skip
                         }
-                        b"twrp" => {
+                        Modifier::Wrap => {
                             self.wrap = Some(bytes[0]);
-                            self.phase = Phase::Skip;
+                            Phase::Skip
                         }
-                        _ => return Err(Error::Invalid("native mov_text box dispatch")),
-                    }
+                    };
+                    self.phase = next;
                     self.at += needed;
                     funding.commit();
                 }
-                Phase::Styles => {
-                    if self.style_read == self.style_count {
+                Phase::Styles(left) => {
+                    if left == 0 {
                         self.phase = Phase::Skip;
                         continue;
                     }
@@ -308,22 +320,23 @@ impl PacketJob {
                         end: u16::from_be_bytes([b[2], b[3]]),
                         style: Style::read(&b[4..12]),
                     };
-                    let previous = self.styles.as_slice().last().copied();
-                    if span.end < span.start || previous.is_some_and(|p| span.start < p.end) {
+                    let previous = self.styles.as_mut_slice().last_mut();
+                    if span.end < span.start
+                        || previous.as_ref().is_some_and(|p| span.start < p.end)
+                    {
                         self.styles.clear();
                         self.phase = Phase::Skip;
-                    } else if span.start != span.end && span.style != config.style {
-                        if previous.is_some_and(|p| p.end == span.start && p.style == span.style) {
-                            self.styles
-                                .as_mut_slice()
-                                .last_mut()
-                                .ok_or(Error::Invalid("native style merge"))?
-                                .end = span.end;
-                        } else {
-                            self.styles.try_push(span).map_err(|e| e.error)?;
+                    } else {
+                        if span.start != span.end && span.style != config.style {
+                            match previous {
+                                Some(p) if p.end == span.start && p.style == span.style => {
+                                    p.end = span.end;
+                                }
+                                _ => self.styles.try_push(span).map_err(|e| e.error)?,
+                            }
                         }
+                        self.phase = Phase::Styles(left - 1);
                     }
-                    self.style_read += 1;
                     self.at += 12;
                     funding.commit();
                 }
@@ -346,10 +359,9 @@ impl PacketJob {
                     let visible = until_nul(text);
                     if is_valid_text(visible) {
                         self.visible_end = self.at + visible.len();
-                        self.advance = true;
                         self.phase = Phase::Prefix;
                     } else {
-                        self.refuse(true);
+                        self.phase = Phase::Refused(true);
                     }
                 }
                 Phase::Prefix => {
@@ -405,7 +417,7 @@ impl PacketJob {
                     if !self.writer.freeze(funding, caller)? {
                         return Ok(false);
                     }
-                    self.phase = Phase::Ready;
+                    self.phase = Phase::Written;
                 }
             }
         }
@@ -503,10 +515,11 @@ impl PacketJob {
     /// - The character itself, unless it is the NUL that ends the visible
     ///   text, where the rendering ends.
     ///
-    /// A font name that is not UTF-8 or holds U+FFFE refuses the sample with
-    /// -1094995529, as such text does; the call still takes a read order.
+    /// A font name that is not UTF-8 or holds U+FFFE refuses the sample as
+    /// such text does; the call still takes a read order.
     /// U+FFFF is written. Each stage, and each font table entry it writes, is
     /// funded on its own: one unit and one per byte it writes.
+    // Extracting the render-state update costs up to 1.87% more instructions.
     fn render_transition(
         &mut self,
         config: &Configuration,
@@ -607,7 +620,7 @@ impl PacketJob {
             }
             if name.is_some_and(|name| !is_valid_text(name)) {
                 funding.commit();
-                self.refuse(true);
+                self.phase = Phase::Refused(true);
                 return Ok(true);
             }
             self.writer.push_parts(&parts, limits.maximum_ass_bytes)?;
@@ -654,22 +667,18 @@ impl PacketJob {
             }
         }
     }
+    /// The output: the subtitle of the written event, a refusal, or nothing
+    /// for an empty sample.
     pub(super) fn take_output(mut self, options: Options) -> Result<Output> {
-        let subtitle = if self.returned > 0 && self.advance {
-            let ass = self
-                .writer
-                .frozen
-                .take()
-                .ok_or(Error::Invalid("native ASS missing owner"))?;
-            Some(Subtitle::at(ass, self.clock, options.packet_timebase)?)
-        } else {
-            None
+        let decoded = match self.writer.frozen.take() {
+            Some(ass) => Decoded::Subtitle(Subtitle::at(ass, self.clock, options.packet_timebase)?),
+            None if matches!(self.phase, Phase::Refused(_)) => Decoded::Refused,
+            None => Decoded::Nothing,
         };
         Ok(Output {
             input: self.input,
             clock: self.clock,
-            returned: self.returned,
-            subtitle,
+            decoded,
         })
     }
 }
@@ -693,7 +702,9 @@ fn hex_tag(
     }
     tags.append(b"&}")
 }
-/// Appends `value` in decimal.
+/// Appends `value` in decimal, a byte at a time. Through the receivers'
+/// [`decimal`](crate::decimal::decimal), a `u32` loop handing over a slice, a
+/// size tag cost a library copy call (17 instructions) and a sample up to 23.
 fn decimal(tags: &mut Fixed<64>, value: u8) -> Result<()> {
     if value >= 100 {
         tags.append(&[b'0' + value / 100])?;

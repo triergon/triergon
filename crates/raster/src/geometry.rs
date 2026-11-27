@@ -1,13 +1,13 @@
 //! Integer points and rectangles, y down: 26.6 fixed point (1/64 pixel) for
 //! outlines, whole pixels for bitmap positions.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 /// The largest coordinate magnitude an outline point may have: 2²⁸ − 1, so that
 /// cubic subdivision (`8 · max + 4`) stays within 32 bits.
 pub const OUTLINE_MAX: i32 = (1 << 28) - 1;
 
-/// libass's `double_to_d6`: pixels to 26.6 fixed point, rounding half to
-/// even. Beyond the `i32` range it saturates and NaN is 0, as libass gives
-/// them on 32-bit ARM with GCC.
+/// Pixels to 26.6 fixed point, rounding half to even. Beyond the `i32` range
+/// it saturates and NaN is 0, as libass gives them on 32-bit ARM with GCC.
 pub fn pixels_26_6(pixels: f64) -> i32 {
     triergon_core::round_ties_even_i32(pixels * 64.0)
 }
@@ -32,13 +32,20 @@ impl Vector {
     pub const fn in_outline_range(self) -> bool {
         self.x.unsigned_abs() <= OUTLINE_MAX as u32 && self.y.unsigned_abs() <= OUTLINE_MAX as u32
     }
+
+    /// This point counted from `origin`, each coordinate wrapping in 32 bits.
+    #[inline]
+    #[must_use]
+    pub const fn offset_from(self, origin: Self) -> Self {
+        Self::new(self.x.wrapping_sub(origin.x), self.y.wrapping_sub(origin.y))
+    }
 }
 
 /// The closed rectangle `x_min ≤ x ≤ x_max`, `y_min ≤ y ≤ y_max`. It bounds
 /// points (an outline's control box in 26.6, both corners included) or whole
 /// pixels (an area in frame pixels: columns `x_min..x_max` and rows
-/// `y_min..y_max`, whose squares it covers). [`Rect::EMPTY`] is the identity
-/// of [`Rect::include`] and reports [`Rect::is_empty`].
+/// `y_min..y_max`, whose squares it covers). Start with [`Rect::EMPTY`]
+/// to bound successive points with [`Rect::include_point`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Rect {
     /// The left edge.
@@ -53,7 +60,7 @@ pub struct Rect {
 
 impl Rect {
     /// The rectangle covering nothing: minima at `i32::MAX`, maxima at
-    /// `i32::MIN`, as libass's `rectangle_reset` leaves one.
+    /// `i32::MIN`.
     pub const EMPTY: Self = Self {
         x_min: i32::MAX,
         y_min: i32::MAX,
@@ -74,7 +81,7 @@ impl Rect {
 
     /// Grows the rectangle to cover `other`.
     #[inline]
-    pub fn include(&mut self, other: Self) {
+    pub(crate) fn include(&mut self, other: Self) {
         self.x_min = self.x_min.min(other.x_min);
         self.y_min = self.y_min.min(other.y_min);
         self.x_max = self.x_max.max(other.x_max);

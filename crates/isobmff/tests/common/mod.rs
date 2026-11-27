@@ -1,8 +1,29 @@
 #![allow(dead_code)]
+pub(crate) mod demux;
+pub(crate) mod encoded_track;
 pub mod fixtures;
+pub(crate) mod movie;
+pub(crate) mod recovery;
+#[cfg(feature = "reference-trace")]
+pub(crate) mod transport_cases;
 
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
-use triergon_isobmff::{BoxStep, BoxView, BuildStatus, Limits, SampleTable, SampleTableBuilder};
+use triergon_isobmff::{
+    BuildStatus, Limits, Next,
+    boxes::BoxView,
+    table::{SampleTable, SampleTableBuilder},
+};
+
+/// A box with a 32-bit size: the size, `kind` and `body`.
+pub fn atom(kind: &[u8; 4], body: &[u8]) -> Vec<u8> {
+    let mut raw = u32::try_from(body.len() + 8)
+        .unwrap()
+        .to_be_bytes()
+        .to_vec();
+    raw.extend_from_slice(kind);
+    raw.extend_from_slice(body);
+    raw
+}
 
 pub fn bytes(budget: &Budget, input: &[u8]) -> Bytes {
     Bytes::copy_from_slice(budget, input).expect("test fixture budget")
@@ -13,9 +34,9 @@ pub fn children(parent: &BoxView, skip: usize) -> Result<Vec<BoxView>, Error> {
     let mut output = Vec::new();
     loop {
         match cursor.poll(&mut WorkBudget::new(7))? {
-            BoxStep::Box(value) => output.push(value),
-            BoxStep::End => return Ok(output),
-            BoxStep::Yield => {}
+            Next::Item(value) => output.push(value),
+            Next::End => return Ok(output),
+            Next::Yield => {}
         }
     }
 }
@@ -37,13 +58,13 @@ pub fn roots(budget: &Budget, input: &[u8]) -> Result<Vec<BoxView>, Error> {
     let mut position = 0usize;
     while position < storage.len() {
         let end = u64::try_from(storage.len()).map_err(|_| Error::Overflow)?;
-        let status = triergon_isobmff::BoxHeader::parse(
+        let status = triergon_isobmff::boxes::BoxHeader::parse(
             &storage[position..],
             position as u64,
             Some(end),
             true,
         )?;
-        let triergon_isobmff::HeaderRead::Ready(header) = status else {
+        let triergon_isobmff::boxes::HeaderRead::Ready(header) = status else {
             return Err(Error::Truncated);
         };
         let count =

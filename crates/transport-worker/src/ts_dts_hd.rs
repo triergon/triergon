@@ -6,7 +6,8 @@ use std::sync::atomic::AtomicBool;
 use triergon_core::container::{Event, PacketInfo};
 use triergon_core::{Budget, Error, InputWindow, Step, WorkBudget};
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
-use triergon_mpegts::{AccessUnit, Packet, Reader, ReaderEvent, ReaderLimits, TraceEvent};
+use triergon_mpegts::stream::TraceEvent;
+use triergon_mpegts::{AccessUnit, Packet, Reader, ReaderEvent, ReaderLimits};
 
 pub(crate) const PREFIX: &str = "ts-dts-hd-";
 const OPERATION: &str = "mpegts-dts-hd-source-access-units";

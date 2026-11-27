@@ -6,7 +6,6 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const USAGE: &str = "usage: cargo xtask subtitle-fixtures record|verify FEATURE REFERENCE [--target TRIPLE] [--corpus DIR] [--manifest FILE]";
 type R<T> = Result<T, String>;
 
 #[derive(Clone, Copy, PartialEq)]
@@ -232,17 +231,13 @@ impl Recorder<'_> {
 }
 
 pub fn main(root: &Path, args: &[String]) -> R<()> {
-    if args == ["--help"] {
-        println!("{USAGE}");
-        return Ok(());
-    }
     let [mode, name, reference, options @ ..] = args else {
-        return Err(USAGE.into());
+        return Err(crate::usage_of("subtitle-fixtures"));
     };
     let record = match mode.as_str() {
         "record" => true,
         "verify" => false,
-        _ => return Err(USAGE.into()),
+        _ => return Err(crate::usage_of("subtitle-fixtures")),
     };
     let family = Family::named(name)?;
     let mut recorder = Recorder {
@@ -257,19 +252,20 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
     };
     let mut manifest = root.join("harness/features").join(name).join("corpus.json");
     let mut stdin_inventory = false;
+    let usage = || crate::usage_of("subtitle-fixtures");
     let mut iter = options.iter();
     while let Some(key) = iter.next() {
         match key.as_str() {
             "--corpus" => {
-                recorder.corpus =
-                    std::path::absolute(iter.next().ok_or(USAGE)?).map_err(|e| e.to_string())?;
+                recorder.corpus = std::path::absolute(iter.next().ok_or_else(usage)?)
+                    .map_err(|e| e.to_string())?;
             }
-            "--manifest" => manifest = PathBuf::from(iter.next().ok_or(USAGE)?),
+            "--manifest" => manifest = PathBuf::from(iter.next().ok_or_else(usage)?),
             "--target" => {
-                recorder.target = Some(iter.next().filter(|s| !s.is_empty()).ok_or(USAGE)?);
+                recorder.target = Some(iter.next().filter(|s| !s.is_empty()).ok_or_else(usage)?);
             }
             "--cases-stdin" => stdin_inventory = true,
-            _ => return Err(USAGE.into()),
+            _ => return Err(usage()),
         }
     }
     if (family == Family::HostText) != recorder.target.is_some() {
@@ -345,7 +341,6 @@ pub fn main(root: &Path, args: &[String]) -> R<()> {
 #[cfg(all(test, unix))]
 mod tests {
     use super::*;
-    use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     struct Fixture(PathBuf);
@@ -361,8 +356,7 @@ mod tests {
             fs::create_dir(&dir).unwrap();
             // Each test controls both the child's final stdout line and its exit.
             let script = dir.join("reference");
-            fs::write(&script, "#!/bin/sh\ncat \"$2\"\nexit \"$3\"\n").unwrap();
-            fs::set_permissions(&script, fs::Permissions::from_mode(0o755)).unwrap();
+            crate::files::write_script(&script, "#!/bin/sh\ncat \"$2\"\nexit \"$3\"\n");
             Self(dir)
         }
     }
@@ -431,9 +425,7 @@ mod tests {
         let inventory = output(python).unwrap();
         let inventory = json::parse_strict(&inventory).unwrap();
         let rows = inventory.as_array().unwrap();
-        let pins =
-            crate::checks::read_json(&root.join("harness/features/subtitle-dvb/corpus.json"))
-                .unwrap();
+        let pins = json::read(&root.join("harness/features/subtitle-dvb/corpus.json")).unwrap();
         assert_eq!(rows.len(), cases(&pins).unwrap().len());
         for (row, pin) in rows.iter().zip(cases(&pins).unwrap()) {
             for field in ["id", "profile", "file", "source", "rights", "arguments"] {

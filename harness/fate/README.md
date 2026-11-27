@@ -61,9 +61,9 @@ enhancement support. Base AVC/HEVC coverage does not establish enhancement parit
 
 The program inventory also lists absent playback profiles: original PMT merging,
 original multi-program selection, LATM discovery, automatic-selection refusal,
-program removal/PMT PID changes, complete M2TS multi-PID playback and strict
-original clock/PES facts. The existing `ts-program` corpus explicitly selects PIDs
-of program 1; its M2TS cases each select one PID.
+program removal/PMT PID changes and strict original clock/PES facts. The
+`ts-program` corpus includes single-PID and combined AVC/AAC M2TS selections
+in program 1, through physical EOF.
 
 The original PMT-merge probe reports program 4. For that input the reference
 emits seven PES packets and eight access units. The program and LATM probes use

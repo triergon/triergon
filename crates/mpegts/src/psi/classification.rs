@@ -27,8 +27,8 @@ impl TrackInfo for ElementaryStream {
         std::slice::from_ref(&self.stream_type)
     }
 
-    fn codec(&self) -> CodecId<'_> {
-        ElementaryStream::codec(self).unwrap_or_else(|| CodecId::Other(self.codec_tag()))
+    fn codec(&self) -> CodecId {
+        ElementaryStream::codec(self).unwrap_or(CodecId::Other)
     }
 
     fn configuration(&self) -> &[u8] {

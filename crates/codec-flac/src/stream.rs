@@ -2,9 +2,7 @@
 use crate::layout::{default_layout, masked_layout};
 use crate::{DecodeError, FrameInfo};
 use triergon_codec::ChannelLayout;
-use triergon_framing::{
-    FLAC_STREAMINFO, FLAC_VORBIS_COMMENT, FlacFrameHeader, FlacStreamInfo, flac_metadata_blocks,
-};
+use triergon_framing::flac::{self, FlacFrameHeader, FlacStreamInfo};
 
 /// What the configuration fixes for every frame.
 #[derive(Clone, Copy, Debug)]
@@ -28,12 +26,12 @@ impl Stream {
             });
         }
         let invalid = |_| DecodeError::Invalid("FLAC configuration");
-        let mut blocks = flac_metadata_blocks(configuration).map_err(invalid)?;
+        let mut blocks = flac::metadata_blocks(configuration).map_err(invalid)?;
         let first = blocks
             .next()
             .ok_or(DecodeError::Invalid("FLAC configuration"))?
             .map_err(invalid)?;
-        if first.kind != FLAC_STREAMINFO {
+        if first.kind != flac::STREAMINFO {
             return Err(DecodeError::Invalid(
                 "first metadata block is not STREAMINFO",
             ));
@@ -48,7 +46,7 @@ impl Stream {
         // Later blocks are optional: a damaged one ends the search for a channel mask.
         let layout = blocks
             .map_while(Result::ok)
-            .find(|block| block.kind == FLAC_VORBIS_COMMENT)
+            .find(|block| block.kind == flac::VORBIS_COMMENT)
             .and_then(|block| masked_layout(block.body, info.channels))
             .unwrap_or_else(|| default_layout(info.channels));
         Ok(Stream {

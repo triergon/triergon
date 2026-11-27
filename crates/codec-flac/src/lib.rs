@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,8 +9,8 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 
+pub mod compat;
 mod error;
 mod frame;
 mod layout;
@@ -24,20 +25,21 @@ mod subframe;
 
 pub use error::DecodeError;
 pub use output::IntegerFrame;
-pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, StorageError};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
+use compat::ffmpeg::CrcPolicy;
 use frame::FrameDecoder;
 use output::{FloatOutput, IntegerOutput};
 use stream::Stream;
-use triergon_codec::{AudioDecoder, DecodeFailure, DownmixLevels, Reservation};
+use triergon_codec::{AudioDecoder, DownmixLevels, Reservation};
 
-/// Bounds of one decoder.
+/// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold: its channel buffers and the output frames it
-    /// fills. The default holds the largest frame RFC 9639 allows (65536 samples of eight
-    /// channels) in both outputs, the buffers of a 32-bit stereo frame, and a copy of the
-    /// largest buffer while it grows.
+    /// Bytes of storage that depends on the stream: the channel buffers and the output
+    /// frames the decoder fills. The default, 7 MiB, holds the largest frame RFC 9639
+    /// allows (65536 samples of eight channels) in both outputs, the buffers of a 32-bit
+    /// stereo frame, and a copy of the largest buffer while it grows.
     pub live_storage_bytes: usize,
 }
 
@@ -49,22 +51,17 @@ impl Default for Limits {
     }
 }
 
-/// What to do with the CRC-16 that ends every frame.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum CrcPolicy {
-    /// Do not compute it; a damaged frame decodes to whatever it holds. FFmpeg's default.
-    #[default]
-    Ignore,
-    /// Refuse a frame whose CRC-16 does not match with [`DecodeError::CrcMismatch`].
-    Reject,
-}
-
 /// The format of one decoded frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FrameInfo {
+    /// Samples per second: the frame header's, else STREAMINFO's.
     pub sample_rate: u32,
+    /// The sample size, 4 to 32: the frame header's, else the stream's.
     pub bits_per_sample: u8,
+    /// The output planes: STREAMINFO's layout when the frame has its channel count, else
+    /// the default layout of the frame's count.
     pub layout: ChannelLayout,
+    /// The block size, 1 to 65536 (at most STREAMINFO's maximum).
     pub samples_per_channel: usize,
 }
 
@@ -88,7 +85,8 @@ impl Decoder {
         Decoder::with_limits(configuration, Limits::default())
     }
 
-    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`.
+    /// As [`Decoder::new`], with its own pool of `limits.live_storage_bytes`. Fails as
+    /// `new` does, or for a limit below a pool's own charge.
     pub fn with_limits(configuration: &[u8], limits: Limits) -> Result<Decoder, DecodeError> {
         Decoder::new_in(configuration, &Budget::new(limits.live_storage_bytes)?)
     }
@@ -109,13 +107,14 @@ impl Decoder {
         self
     }
 
-    /// Replaces `out` with the frame `au` holds as planar `f32`, scaled as FFmpeg's FLAC
-    /// decoder output converts to `f32`. On failure `out` is left empty.
-    pub fn decode_float(
-        &mut self,
-        au: &[u8],
-        out: &mut AudioFrame,
-    ) -> Result<FrameInfo, DecodeError> {
+    /// Decodes the frame as planar `f32` scaled to full scale for its sample size.
+    /// Replaces `out`, leaving `samples_per_channel == 0` on refusal.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed or unsupported frames, CRC mismatches under the rejecting
+    /// policy and storage charges the pool cannot cover.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<FrameInfo, DecodeError> {
         let mut output = FloatOutput::new(out, &mut self.output_charge);
         self.frames.decode(au, &mut output)
     }
@@ -135,19 +134,24 @@ impl Decoder {
         let mut output = IntegerOutput::new(out);
         self.frames.decode(au, &mut output)
     }
+
+    /// Does nothing: FLAC frames are independent, so there is no signal history to drop.
+    pub fn reset(&mut self) {}
 }
 
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_float(au, out)
-            .map(|_| None)
-            .map_err(DecodeFailure::from_error)
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out)?;
+        Ok(None)
     }
 
-    /// FLAC frames are independent: there is no signal history to drop.
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        Decoder::reset(self);
+    }
 }

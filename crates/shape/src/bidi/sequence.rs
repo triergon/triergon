@@ -21,9 +21,12 @@
 //! (see `paragraph.rs`).
 
 use super::class::{BidiClass, Bracket, Level};
-use super::explicit::{MAX_ISOLATE_DEPTH, NONE};
+use super::explicit::{MAX_ISOLATE_DEPTH, Partner};
 use super::{charge, neutral, weak};
 use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
+
+/// The absent index in a sequence's links and in the bracket stacks.
+pub(super) const NONE: u32 = u32::MAX;
 
 /// One isolating run sequence.
 #[derive(Clone, Copy, Debug)]
@@ -78,7 +81,7 @@ pub(super) struct Paragraph<'a> {
     pub classes: &'a [BidiClass],
     pub brackets: Option<&'a [Option<Bracket>]>,
     /// [`super::explicit::match_isolates`]'s partners.
-    pub partner: &'a [u32],
+    pub partner: &'a [Partner],
     pub level: u8,
     /// The characters' isolate depths.
     pub depths: &'a [u8],
@@ -98,9 +101,10 @@ impl Paragraph<'_> {
         // The paragraph has partners: it holds an isolate initiator.
         last < self.explicit_end
             && self.classes[last].is_isolate_initiator()
-            && (self.partner[last] == NONE || self.partner[last] as usize >= self.explicit_end)
+            && (self.partner[last] == Partner::NONE
+                || self.partner[last].index() >= self.explicit_end)
             && !(self.classes[next] == BidiClass::Pdi
-                && (self.partner[next] as usize) < self.explicit_end)
+                && self.partner[next].index() < self.explicit_end)
     }
 
     /// The level sos and eos compare with at the start and end of a depth for
@@ -364,7 +368,7 @@ fn sequences(
                 // After an isolate initiator and its matching PDI right after
                 // it, the higher level counts only where the stretch from the
                 // PDI holds a strong class.
-                let empty = paragraph.partner.get(s.last as usize) == Some(&(at as u32));
+                let empty = paragraph.partner.get(s.last as usize) == Some(&Partner::of(at));
                 s.eos = if empty && !strong_ahead(paragraph, types, levels, at, work)? {
                     direction(s.level.max(s.base))
                 } else {

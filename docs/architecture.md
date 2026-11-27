@@ -1,34 +1,36 @@
 # Architecture
 
 Triergon is a set of small crates that read media containers, frame codec packets,
-decode subtitles and selected codecs, read fonts, and compose them into a playback feed. Every
-crate is safe Rust with no third-party dependencies. The design favours incremental
-input, explicit resource bounds and exact timing over convenience.
+decode subtitles and selected codecs, read fonts, render ASS subtitles, and compose them
+into playback feeds and decode sessions. Every crate is safe Rust with no third-party
+dependencies. The design favours incremental input, explicit resource bounds and exact
+timing over convenience.
 
 ## Layers
 
-Crates depend only on layers below them. Core never depends on a format. The subtitle and
-H.264/HEVC decoder crates take NAL unit splitting, headers and type classes from
-`triergon-framing`.
+The table lists the layers from the bottom up. A crate depends only on crates in its own
+row or in rows above it; `triergon-core` depends on no format. Formats, subtitles and
+decoders use `triergon-framing` for packet boundaries, header metadata, configuration
+records and NAL unit splitting. The AAC, AC-3 and DTS decoders read the complete
+syntax with their decoder state, including bit positions, CRC coverage and refusals.
 
 | Layer | Crates | Role |
 |---|---|---|
-| Foundation | [`triergon-core`](../crates/core), [`triergon-bitstream`](../crates/bitstream) | Budgets, shared byte storage, exact time, input windows, resumable steps, errors, the neutral container model (`ContainerReader`); bit reading, RBSP, CABAC and CRCs |
-| Formats | [`triergon-matroska`](../crates/media) (Matroska/WebM), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts), [`triergon-ogg`](../crates/ogg), [`triergon-elementary`](../crates/elementary) (native FLAC, MPEG audio, ADTS, AC-3) | Container readers: tracks, packets, metadata, seeking |
-| Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters (Annex-B, H.264 and HEVC NAL units and their type classes, ADTS, AC-3 and E-AC-3, DTS core and DTS-HD extension substreams, AV1, VP9; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations) |
-| Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction and bitmap subtitle decoding |
+| Foundation | [`triergon-core`](../crates/core), [`triergon-bitstream`](../crates/bitstream) | Budgets, shared byte storage, exact time, input windows, resumable steps, the workspace error, the neutral container model (`ContainerReader`); bit readers, RBSP, CABAC and CRCs |
+| Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterboxing into an RGBA canvas, subtitle palette Y'CbCr to RGB |
+| Framing | [`triergon-framing`](../crates/framing) | Codec configuration and packet-format adapters: Annex B, H.264 and HEVC NAL units and their type classes, AV1, VP9, ADTS, AC-3 and E-AC-3, DTS core and DTS-HD substreams; FLAC, Opus, Vorbis and MPEG audio headers and their canonical configurations |
+| Formats | [`triergon-matroska`](../crates/matroska), [`triergon-isobmff`](../crates/isobmff), [`triergon-mpegts`](../crates/mpegts), [`triergon-ogg`](../crates/ogg), [`triergon-elementary`](../crates/elementary) | Container readers: tracks, packets, metadata, seeking |
+| Subtitles | [`triergon-subtitles`](../crates/subtitles) | Text cue extraction, bitmap subtitle decoding, closed captions and teletext |
 | Fonts | [`triergon-font`](../crates/font) | OpenType and TrueType faces: tables, collections, cmap, names, `glyf` and CFF/CFF2 outlines, metrics, kerning, face matching |
 | Shaping | [`triergon-shape`](../crates/shape) | OpenType shaping with the script shapers, the bidirectional algorithm, Unicode properties |
-| Rasterising | [`triergon-raster`](../crates/raster) | Glyph outlines in 26.6 fixed point, their transforms, border stroking, the tile rasteriser, blur, composition and clipping of the alpha bitmaps a subtitle is drawn from |
+| Rasterising | [`triergon-raster`](../crates/raster) | Glyph outlines in 26.6 fixed point and their transforms, border stroking, the tile rasteriser, blur, composition and clipping of the alpha bitmaps a subtitle is drawn from |
 | Subtitle scripts | [`triergon-ass`](../crates/ass) | ASS and SSA scripts and Matroska packet streams, styles, typed override tags, the state of every glyph of an event at a time, karaoke, drawings, and rendering them to positioned alpha images |
-| Pixels | [`triergon-pixel`](../crates/pixel) | Decoded-picture views, coded YUV 4:2:0 pictures, BT.601 RGBA to YUV, letterbox into 1920×1080 RGBA, subtitle palette Y'CbCr to RGB |
 | Codecs | [`triergon-codec`](../crates/codec); [`triergon-codec-aac`](../crates/codec-aac), [`-ac3`](../crates/codec-ac3), [`-dca`](../crates/codec-dca), [`-flac`](../crates/codec-flac), [`-mp3`](../crates/codec-mp3), [`-opus`](../crates/codec-opus), [`-vorbis`](../crates/codec-vorbis), [`-h264`](../crates/codec-h264), [`-hevc`](../crates/codec-hevc); [`triergon-codec-mpeg1`](../crates/codec-mpeg1) | Decoder traits, audio vocabulary and the shared inverse MDCT; software decoders; MPEG-1 video encoder |
-| Composition | [`triergon`](../crates/triergon), [`triergon-playback`](../crates/playback), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture) | Consumer facade with `AnyReader`; packet feeds over the readers; decode sessions over the codecs; capture sessions from RGBA to MPEG-TS |
-| Tooling | [`media-worker`](../crates/worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`playback-worker`](../crates/playback-worker), [`transport-worker`](../crates/transport-worker), [`subtitle-worker`](../crates/subtitle-worker), [`triergon-harness-protocol`](../crates/harness-protocol), [`triergon-harness-runner`](../crates/harness-runner), [`triergon-worker-entry`](../crates/worker-entry), [`font-worker`](../crates/font-worker), [`shape-worker`](../crates/shape-worker), [`raster-worker`](../crates/raster-worker), [`ass-worker`](../crates/ass-worker), [`harness/`](../harness), [`tools/`](../tools) | Differential and benchmark workers; not part of the library |
+| Composition | [`triergon-playback`](../crates/playback), [`triergon-raw-video`](../crates/raw-video), [`triergon-hls`](../crates/hls), [`triergon-bridge`](../crates/bridge), [`triergon-session`](../crates/session), [`triergon-capture`](../crates/capture), [`triergon`](../crates/triergon) | Matroska, MP4 and MPEG-TS packet feeds with probing, track selection and seeking; raw AVC and HEVC Annex B feeds; HLS segments and forward-only TS188; decoder access units and subtitle receivers over playback packets; decode sessions over the codecs; capture from RGBA to MPEG-1 video in MPEG-TS; the consumer facade with `AnyReader` |
+| Tooling | [`media-worker`](../crates/media-worker), [`codec-worker`](../crates/codec-worker), [`capture-worker`](../crates/capture-worker), [`playback-worker`](../crates/playback-worker), [`transport-worker`](../crates/transport-worker), [`subtitle-worker`](../crates/subtitle-worker), [`font-worker`](../crates/font-worker), [`shape-worker`](../crates/shape-worker), [`raster-worker`](../crates/raster-worker), [`ass-worker`](../crates/ass-worker), [`triergon-harness-protocol`](../crates/harness-protocol), [`triergon-harness-runner`](../crates/harness-runner), [`triergon-worker-entry`](../crates/worker-entry), [`harness/`](../harness), [`tools/`](../tools), `xtask` | Differential and benchmark workers and the repository tooling; not part of the library |
 
-The FFmpeg reference workers, the FreeType font reference, the HarfBuzz and FriBidi
-shaping reference and the libass rasterising and ASS parsing references live in
-`harness/` as separate processes. They are never linked into a library crate.
+The reference workers (FFmpeg, mpg123, FreeType, HarfBuzz and FriBidi, libass) live in
+`harness/` as separate processes and are never linked into a library crate.
 
 ## Input and work model
 
@@ -52,13 +54,13 @@ Parsers never perform I/O. The caller owns the transport and feeds bounded windo
 Every allocation that depends on input is charged to a `Budget` before it happens,
 using checked arithmetic. Shared buffers (`Bytes`, `BudgetVec`) carry their charge
 through clones and caller retention. Work, decompression ratio, nesting depth, index
-size and scan distance have separate limits. Formats expose their limits as plain
-`Limits` structs with conservative defaults; there is no unlimited mode. Codecs take
-the same kind of `Limits` (`live_storage_bytes`, with a default that holds every
-conformance stream) and charge pictures, reference pools, NAL and slice storage,
-per-channel state and the output frames they fill; a refused charge is the codec's
-`Budget` error. Fixed-size state allocated at construction and short lists the
-specification caps (reference lists, parameter-set slots) are not charged.
+size and scan distance have separate limits. Each format exposes its limits as a plain
+struct (`Limits`, `ReaderLimits`) with conservative defaults; there is no unlimited
+mode. Codecs take a `Limits` of the same kind (`live_storage_bytes`, with a default that
+holds every conformance stream) and charge pictures, reference pools, NAL and slice
+storage, per-channel state and the output frames they fill; a refused charge is the
+decoder's `Budget` error. Fixed-size state allocated at construction and short lists
+the specification caps (reference lists, parameter-set slots) are not charged.
 
 Two outcomes are kept apart everywhere: a *limit* violation is permanent for that
 input, while *backpressure* means the caller is holding too much output and the
@@ -76,34 +78,40 @@ All readers follow the same semantic rules, and the harness checks them:
    attachments and chapters either surface as typed data or as bounded opaque data.
 5. Packets keep per-track decode order. Decode and presentation order are never
    conflated.
-6. A seek returns a receipt with the actual landing point, the preceding
-   random-access point, preroll and the method used (index, bounded scan or restart).
-   A timestamp alone is not proof that the next packet is decodable.
+6. A seek returns a receipt with the actual landing point, the time before which
+   output is decoded but not presented, and the method used (index, bounded scan or
+   restart). A timestamp alone is not proof that the next packet is decodable.
 7. A track reports its container's own codec tag unchanged and one neutral `CodecId`.
    Each reader owns one mapping from its native identifier. A codec the source does
    not identify is `CodecId::Other` with that tag, never a guess.
 
 ## Reference-compatible behaviour
 
-FFmpeg is the behavioural reference. Where the specification leaves room and
-consumers depend on FFmpeg's choice (malformed-MOV recovery, edit-list clocks,
-transport-stream PES completion, subtitle timing), the format crates implement that
+Each module's reference is its behavioural reference, not its specification. Where the
+specification leaves room and consumers depend on the reference's choice (FFmpeg's
+malformed-MOV recovery, edit-list clocks, transport-stream PES completion and subtitle
+timing; libass's face metrics, shaping and composition), the crates implement that
 choice deliberately and document it. A crate keeps three kinds of API apart:
 
 - **Specification behaviour** lives at the crate root.
-- **Compatibility policies** reproduce FFmpeg where a consumer may choose its
-  result. They live in `compat::<family>` (for example
-  `triergon_framing::compat::nal`) and are named for what they do. A version, revision or
-  history marker (a revision hash, `Pinned…`, `…V1`) is never part of an
-  identifier: each family's module documentation names the FFmpeg revision it
+- **Compatibility policies** reproduce the reference where a consumer may choose its
+  result. They live in `compat::<family>` (for example `triergon_framing::compat::nal`
+  or `triergon_font::compat::libass`) and are named for what they do. A version,
+  revision or history marker (a revision hash, `Pinned…`, `…V1`) is never part of an
+  identifier: each family's module documentation names the reference revision it
   reproduces, once.
 - **Comparison-only projections** are anything a consumer cannot use outside a
-  comparison with FFmpeg, such as FFmpeg return codes, parser byte positions or a
-  whole parser model (`triergon_framing::reference_trace::dts`). They are compiled only with the crate's non-default
-  `reference-trace` feature: types under `reference_trace::<family>`, accessors on
-  other types behind `#[cfg(feature = "reference-trace")]`. Examples and tests that
-  use them declare `required-features = ["reference-trace"]` or gate the individual
-  assertion; workers enable the feature on their dependency.
+  comparison with the reference, such as FFmpeg return codes, parser byte positions or
+  a whole parser model (`triergon_framing::reference_trace::dts`). They are compiled
+  only with the crate's non-default `reference-trace` feature: types under
+  `reference_trace::<family>`, accessors on other types behind
+  `#[cfg(feature = "reference-trace")]`. Examples and tests that use them declare
+  `required-features = ["reference-trace"]` or gate the individual assertion; workers
+  enable the feature on their dependency.
+
+The text stack exposes each layer’s reference-compatible operations at its crate root.
+Its `compat` modules hold the choices a caller makes when composing the layers, such as
+the face metrics used to request a size or the transforms used to composite glyphs.
 
 A rename keeps every value that reaches a trace (profile strings, error texts)
 unchanged, so worker traces stay byte-identical.
@@ -113,42 +121,17 @@ The DVB, PGS and DVD bitmap subtitles in `triergon-subtitles` are decoded only b
 their receivers in `compat`. The crate root keeps the segment, packet and container
 configuration types that playback binds its tracks with.
 
-`triergon-framing`, `triergon-matroska`, `triergon-isobmff`, `triergon-mpegts`,
-`triergon-ogg`, `triergon-subtitles` and `triergon-playback` keep their policies in
-`compat`. All but `triergon-ogg` and `triergon-playback` also have the
-`reference-trace` feature.
-
 ## Dispatch and errors
 
 Readers are concrete types implementing `ContainerReader`, used through generics. A
 consumer that accepts several formats uses the closed enum `triergon::AnyReader`.
-There is no global registry and no dynamic dispatch on the per-packet path. Errors
-are typed and keep their detail (for example the requested and maximum size of a
-limit violation).
+There is no global registry and no dynamic dispatch on the per-packet path.
 
-## Direction
-
-Open structural work. Each step keeps worker traces byte-identical and re-runs the
-performance gates where it touches hot code.
-
-1. **Formats.** The MPEG-TS access-unit reader implements `ContainerReader` and
-   is available through `AnyReader`. Its [supported carriages](../crates/mpegts/README.md#access-units)
-   use format-owned track classification. Bounded seeking of AVC, HEVC, AAC in ADTS
-   or LOAS, AC-3, E-AC-3, MPEG audio, DTS core and self-contained DTS-HD XLL tracks
-   scans one seekable entity or a declared contiguous sequence, optionally within one
-   explicit clock and configuration epoch. An optional timestamp index selects repeat
-   landings. For independently framed Layer I/II audio and self-contained AVC IDR or
-   HEVC IDR_N_LP pictures with in-band tables and local decoder setup, bounded source
-   checkpoints in 188- or 192-byte packets also permit direct physical-offset reads.
-   Other landings replay transport state before delivering the original packet
-   suffix. Additional carriages and broader direct access are open.
-2. **Composition.** HLS and codec bridges become separate crates. Playback keeps its own
-   container engines: it carries source and native clocks, range plans and per-step
-   parsing that `ContainerReader` does not.
-3. **Subtitle rendering.** `triergon-font`, `triergon-shape`, `triergon-raster` and
-   `triergon-ass` render ASS/SSA scripts and Matroska packet streams to positioned
-   alpha images, compared exactly against a pinned libass build at the same times and
-   frame sizes. Behaviour where libass departs from the ASS specification by choice
-   will follow the compat-policy convention above. The renderer offers no hinting
-   option until libass's hinting-enabled modes and FreeType's auto-hinter pass the
-   reference and are gated.
+Readers, framers, subtitle decoders, the font and rendering crates and the composition
+crates report `triergon_core::Error`: a small `Copy` enum whose variant is the class of the failure
+(malformed input, a limit, backpressure, truncation, a transport failure,
+cancellation, an unsupported feature) and keeps its detail, such as the requested and
+maximum size of a limit violation or a `&'static str` naming the failed check.
+Decoders report `triergon_codec::DecodeError`, or an enum of their own that names the
+same classes, and convert into `Error`. The capture pipeline's `CaptureError` wraps the
+pixel, encoder and multiplex errors it meets.

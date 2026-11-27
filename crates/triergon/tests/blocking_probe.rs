@@ -2,8 +2,8 @@
 use std::io::{self, Cursor, ErrorKind, Read, Seek, SeekFrom};
 use std::mem::discriminant;
 use triergon::{
-    AnyReader, Budget, ContainerReader, Error, Probe, SourceCapabilities, SourceId, open_blocking,
-    open_sequential, probe,
+    AnyReader, Budget, ContainerReader, Error, Probed, SourceCapabilities, SourceFormat, SourceId,
+    open_blocking, open_sequential, probe, probe_whole,
 };
 
 /// Short reads with an interruption before each one. At the end the source
@@ -65,8 +65,29 @@ impl Seek for Fragmented<'_> {
     }
 }
 
-fn check_openers(bytes: &[u8], expected: Probe, consumed: usize, end_error: Option<ErrorKind>) {
-    assert_eq!(probe(bytes), expected);
+/// The format a prefix decides, if it decides one.
+fn decided(prefix: &[u8]) -> Option<SourceFormat> {
+    match probe(prefix) {
+        Probed::Format(format) => Some(format),
+        Probed::Need(_) | Probed::Unrecognised => None,
+    }
+}
+
+/// Both openers select `expected` from `bytes` after reading `consumed` of them, as the
+/// slice API does: from the prefix while the source holds more (`end_error`), from the
+/// whole source at its end.
+fn check_openers(
+    bytes: &[u8],
+    expected: Option<SourceFormat>,
+    consumed: usize,
+    end_error: Option<ErrorKind>,
+) {
+    let ends = end_error.is_none();
+    if ends {
+        assert_eq!(probe_whole(bytes), expected);
+    } else {
+        assert_eq!(decided(bytes), expected);
+    }
     for chunk in [1, 4096] {
         let pool = Budget::new(1 << 20).unwrap();
         for seekable in [false, true] {
@@ -74,7 +95,12 @@ fn check_openers(bytes: &[u8], expected: Probe, consumed: usize, end_error: Opti
                 length: seekable.then_some(bytes.len() as u64),
                 random_access: seekable,
             };
-            let direct = AnyReader::open(bytes, &pool, SourceId(1), caps).map(|r| discriminant(&r));
+            let known = SourceCapabilities {
+                length: (seekable || ends).then_some(bytes.len() as u64),
+                ..caps
+            };
+            let direct =
+                AnyReader::open(bytes, &pool, SourceId(1), known).map(|r| discriminant(&r));
             let mut source = Fragmented::new(bytes, chunk, end_error);
             let opened = if seekable {
                 source.data.set_position(2);
@@ -110,24 +136,25 @@ fn check_openers(bytes: &[u8], expected: Probe, consumed: usize, end_error: Opti
 #[test]
 fn conclusive_signatures_open_before_another_read_and_rewind_or_replay() {
     for (bytes, kind) in [
-        (&b"\x1a\x45\xdf\xa3"[..], Probe::Matroska),
-        (&b"OggS\0"[..], Probe::Ogg),
+        (&b"\x1a\x45\xdf\xa3"[..], SourceFormat::Matroska),
+        (&b"OggS\0"[..], SourceFormat::Ogg),
     ] {
-        check_openers(bytes, kind, bytes.len(), Some(ErrorKind::WouldBlock));
+        check_openers(bytes, Some(kind), bytes.len(), Some(ErrorKind::WouldBlock));
     }
     for kind in [
-        b"ftyp", b"styp", b"moov", b"moof", b"mdat", b"free", b"skip", b"sidx",
+        b"ftyp", b"styp", b"moov", b"moof", b"mdat", b"free", b"skip", b"sidx", b"wide",
     ] {
         // The opening box takes precedence over a putative FLAC marker.
         let bytes = [b"fLaC".as_slice(), kind].concat();
-        check_openers(&bytes, Probe::Isobmff, 8, Some(ErrorKind::WouldBlock));
+        check_openers(
+            &bytes,
+            Some(SourceFormat::Isobmff),
+            8,
+            Some(ErrorKind::WouldBlock),
+        );
     }
-    assert_eq!(probe(b"\0\0\0\x10wide"), Probe::Unknown);
-    let flac = if cfg!(feature = "elementary") {
-        Probe::Flac
-    } else {
-        Probe::Unknown
-    };
+    assert_eq!(probe(b"fLaC"), Probed::Need(5));
+    let flac = cfg!(feature = "elementary").then_some(SourceFormat::Flac);
     check_openers(b"fLaC\0", flac, 5, Some(ErrorKind::WouldBlock));
 }
 
@@ -137,29 +164,56 @@ fn facade_prefers_ts188_even_if_the_m2ts_signature_also_matches() {
     for at in [4, 196, 388] {
         bytes[at] = 0x47;
     }
-    check_openers(&bytes, Probe::M2ts, 389, Some(ErrorKind::WouldBlock));
+    check_openers(
+        &bytes,
+        Some(SourceFormat::M2ts),
+        389,
+        Some(ErrorKind::WouldBlock),
+    );
     for at in [0, 188, 376] {
         bytes[at] = 0x47;
     }
-    check_openers(&bytes, Probe::Ts, 377, Some(ErrorKind::WouldBlock));
-    check_openers(&bytes[..377], Probe::Ts, 377, Some(ErrorKind::WouldBlock));
+    check_openers(
+        &bytes,
+        Some(SourceFormat::Ts),
+        377,
+        Some(ErrorKind::WouldBlock),
+    );
+    check_openers(
+        &bytes[..377],
+        Some(SourceFormat::Ts),
+        377,
+        Some(ErrorKind::WouldBlock),
+    );
+}
+
+#[test]
+fn a_transport_stream_that_ends_before_its_third_sync_is_selected_by_two() {
+    let mut bytes = [0; 384];
+    bytes[0] = 0x47;
+    bytes[188] = 0x47;
+    assert_eq!(probe(&bytes[..376]), Probed::Need(377));
+    check_openers(&bytes[..376], Some(SourceFormat::Ts), 376, None);
+    check_openers(&bytes[..188], None, 188, None);
+    let mut m2ts = [0; 384];
+    m2ts[4] = 0x47;
+    m2ts[196] = 0x47;
+    check_openers(&m2ts, Some(SourceFormat::M2ts), 384, None);
+    check_openers(&m2ts[..377], Some(SourceFormat::M2ts), 377, None);
 }
 
 #[test]
 fn short_eof_and_transport_errors_remain_distinct() {
     let pool = Budget::new(1 << 20).unwrap();
     for bytes in [&b""[..], b"\x1a\x45\xdf", b"OggS", b"ID3"] {
-        check_openers(bytes, Probe::Unknown, bytes.len(), None);
-        for kind in [ErrorKind::WouldBlock, ErrorKind::UnexpectedEof] {
+        check_openers(bytes, None, bytes.len(), None);
+        for (kind, error) in [
+            (ErrorKind::WouldBlock, Error::Io(ErrorKind::WouldBlock)),
+            (ErrorKind::UnexpectedEof, Error::Truncated),
+        ] {
             let mut source = Fragmented::new(bytes, 1, Some(kind));
-            assert_eq!(
-                open_sequential(&mut source, &pool).err(),
-                Some(Error::Io(kind))
-            );
-            assert_eq!(
-                open_blocking(&mut source, &pool).err(),
-                Some(Error::Io(kind))
-            );
+            assert_eq!(open_sequential(&mut source, &pool).err(), Some(error));
+            assert_eq!(open_blocking(&mut source, &pool).err(), Some(error));
         }
     }
 }
@@ -172,7 +226,7 @@ fn disabled_transport_reader_is_refused_at_the_signature_without_replay_storage(
     let source = Fragmented::new(&bytes, 1, Some(ErrorKind::WouldBlock));
     assert_eq!(
         open_sequential(source, &pool).err(),
-        Some(Error::Unsupported("MPEG-TS reader feature disabled"))
+        Some(Error::Unsupported("reader feature not enabled"))
     );
 }
 
@@ -183,16 +237,20 @@ fn tagged_elementary_frames_keep_the_slice_probes_confirmation_rules() {
     let mut tag = b"ID3\x04\0\x10\0\0\0\x05".to_vec();
     tag.resize(25, 0);
     for (header, frame_bytes, kind) in [
-        (&b"\xff\xfb\x90\x64"[..], 417, Probe::MpegAudio),
-        (&b"\xff\xf1\x50\x80\x01\x3f\xfc"[..], 9, Probe::Adts),
-        (&b"\x0b\x77\x12\x34\x10\x40\x40\0"[..], 512, Probe::Ac3),
+        (&b"\xff\xfb\x90\x64"[..], 417, SourceFormat::MpegAudio),
+        (&b"\xff\xf1\x50\x80\x01\x3f\xfc"[..], 9, SourceFormat::Adts),
+        (
+            &b"\x0b\x77\x12\x34\x10\x40\x40\0"[..],
+            512,
+            SourceFormat::Ac3,
+        ),
     ] {
         let mut frame = header.to_vec();
         frame.resize(frame_bytes, 0);
         let mut bytes = [tag.as_slice(), &frame].concat();
-        check_openers(&bytes, Probe::Unknown, bytes.len(), None);
+        check_openers(&bytes, None, bytes.len(), None);
         bytes.extend_from_slice(header);
-        check_openers(&bytes, kind, bytes.len(), None);
+        check_openers(&bytes, Some(kind), bytes.len(), None);
     }
     // The declared tag includes these apparent MPEG headers and continues
     // past EOF. Probing inside its body would pick an incorrect reader.
@@ -200,10 +258,10 @@ fn tagged_elementary_frames_keep_the_slice_probes_confirmation_rules() {
     let mut frame = b"\xff\xfb\x90\x64".to_vec();
     frame.resize(417, 0);
     truncated.extend(frame.repeat(3));
-    check_openers(&truncated, Probe::Unknown, truncated.len(), None);
+    check_openers(&truncated, None, truncated.len(), None);
 
     tag.extend_from_slice(b"fLaC");
-    check_openers(&tag, Probe::Flac, tag.len(), None);
+    check_openers(&tag, Some(SourceFormat::Flac), tag.len(), None);
 }
 
 #[cfg(feature = "elementary")]
@@ -214,8 +272,11 @@ fn last_probe_byte_confirms_late_mpeg_audio_and_replay_releases_its_charge() {
     frame.resize(417, 0);
     let mut bytes = vec![0; LIMIT - 2 * frame.len() - 4];
     bytes.extend(frame.repeat(3));
-    assert_eq!(probe(&bytes[..LIMIT - 1]), Probe::Unknown);
-    assert_eq!(probe(&bytes[..LIMIT]), Probe::MpegAudio);
+    assert_eq!(probe(&bytes[..LIMIT - 1]), Probed::Need(LIMIT));
+    assert_eq!(
+        probe(&bytes[..LIMIT]),
+        Probed::Format(SourceFormat::MpegAudio)
+    );
     let pool = Budget::new(1 << 20).unwrap();
     let mut input = Fragmented::new(&bytes, 1, Some(ErrorKind::WouldBlock));
     let mut replay = open_sequential(&mut input, &pool).unwrap().into_inner();
@@ -259,8 +320,8 @@ fn sequential_budget_pressure_leaves_the_pipe_at_the_signature() {
         frames[at..at + 4].copy_from_slice(&[0xff, 0xfb, 0x90, 0x64]);
     }
     for (input, expected) in [
-        (&b"fLaC\x00\x00\x00\x22"[..], Probe::Flac),
-        (&frames, Probe::MpegAudio),
+        (&b"fLaC\x00\x00\x00\x22"[..], SourceFormat::Flac),
+        (&frames, SourceFormat::MpegAudio),
     ] {
         let pool = Budget::new(Budget::control_storage_bytes() + 65536).unwrap();
         let mut pipe = input;
@@ -276,7 +337,8 @@ fn sequential_budget_pressure_leaves_the_pipe_at_the_signature() {
         let opened = open_sequential(&mut pipe, &pool).unwrap();
         assert!(matches!(
             (opened.reader(), expected),
-            (AnyReader::Flac(_), Probe::Flac) | (AnyReader::MpegAudio(_), Probe::MpegAudio)
+            (AnyReader::Flac(_), SourceFormat::Flac)
+                | (AnyReader::MpegAudio(_), SourceFormat::MpegAudio)
         ));
         let mut bytes = Vec::new();
         opened.into_inner().read_to_end(&mut bytes).unwrap();
@@ -324,8 +386,12 @@ fn seekable_probe_uses_reported_length_only_to_size_the_read() {
         assert_eq!(file.request_at_4k, Some(request));
     }
     // A padded zero would complete the last header after an early EOF.
-    assert_eq!(probe(&bytes[..7838]), Probe::MpegAudio);
-    assert_eq!(probe(&bytes[..7837]), Probe::Unknown);
+    assert_eq!(
+        probe(&bytes[..7838]),
+        Probed::Format(SourceFormat::MpegAudio)
+    );
+    assert_eq!(probe(&bytes[..7837]), Probed::Need(65536));
+    assert_eq!(probe_whole(&bytes[..7837]), None);
     let mut short = Fragmented::new(&bytes[..7837], 113, None);
     short.reported_length = Some(9000);
     assert_eq!(

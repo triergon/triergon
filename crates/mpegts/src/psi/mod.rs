@@ -1,15 +1,19 @@
 //! H.222.0 2.4.4/2.6 and Annex A; DVB descriptor framing from EN 300 468.
 mod classification;
 mod codec;
+pub mod descriptor_tag;
 mod descriptors;
 mod dts_hd;
 pub(crate) mod dvb;
+pub(crate) mod fields;
 mod pat_table;
 mod section;
 mod signalling;
+pub mod stream_type;
 mod tables;
 
-pub(crate) use codec::PES_PRIVATE_DATA;
+#[cfg(feature = "reference-trace")]
+pub(crate) use descriptors::DESCRIPTOR_LENGTH;
 pub use descriptors::{Descriptor, Descriptors};
 pub use dts_hd::{DvbDtsHd, DvbDtsHdAsset, DvbDtsHdSubstream};
 pub use dvb::{
@@ -17,10 +21,13 @@ pub use dvb::{
     DvbSubtitlingService, DvbSubtitlingServices, DvbSubtitlingSignalling,
 };
 pub use pat_table::{PatCollector, PatSourceRange, PatTable};
+pub(crate) use section::POINTER_FIELD;
 pub use section::{PsiCrc32, Section, SectionAssembler};
 pub use signalling::{
     AvcVideo, DvbAc3, DvbEac3, HevcVideo, LanguageEntries, LanguageEntry, Registration,
 };
+#[cfg(feature = "reference-trace")]
+pub(crate) use tables::PMT_PROGRAM_IDENTITY;
 pub use tables::{
     ElementaryStream, PatReader, PatSection, PmtReader, ProgramAssociation, ProgramMap,
     SectionHeader, TableStep,

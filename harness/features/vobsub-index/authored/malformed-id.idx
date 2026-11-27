@@ -1,0 +1,8 @@
+# VobSub index file, v7 (do not modify this line!)
+#
+size: 720x480
+palette: 000000, f0f0f0, cccccc, 999999, 3333fa, 1111bb, fa3333, bb1111, 33fa33, 11bb11, fafa33, bbbb11, fa33fa, bb11bb, 33fafa, 11bbbb
+
+# Language index in use
+id: invalid
+timestamp: 00:00:01:000, filepos: 000000000

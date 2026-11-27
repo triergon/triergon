@@ -1,14 +1,16 @@
 //! Glyph positioning subtables, and the passes before and after them that clear
 //! and resolve attachments.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::apply::{Apply, Values};
 use super::context;
-use super::data::{Data, bsearch};
+use super::data::Data;
 use super::layout::{LookupFlags, LookupType, class, coverage};
 use crate::buffer::{Attachment, Buffer, Info, Pos, Position};
 use crate::metrics::Scaled;
 use crate::tag::Direction;
 use triergon_core::Result;
+use triergon_font::read::bsearch;
 
 /// Applies one subtable of type `kind` at the current glyph.
 pub(crate) fn apply<'a>(ctx: &mut Apply<'a, '_>, kind: LookupType, data: Data<'a>) -> Result<bool> {
@@ -46,13 +48,13 @@ impl ValueFormat {
         };
         let format = self.0;
         if let Some(v) = next(format & 0x01 != 0) {
-            pos.x_offset = pos.x_offset.saturating_add(font.em_scale_x(i32::from(v)));
+            pos.x_offset = pos.x_offset.saturating_add(font.em.scale_x(i32::from(v)));
         }
         if let Some(v) = next(format & 0x02 != 0) {
-            pos.y_offset = pos.y_offset.saturating_add(font.em_scale_y(i32::from(v)));
+            pos.y_offset = pos.y_offset.saturating_add(font.em.scale_y(i32::from(v)));
         }
         if let Some(v) = next(format & 0x04 != 0) {
-            pos.x_advance = pos.x_advance.saturating_add(font.em_scale_x(i32::from(v)));
+            pos.x_advance = pos.x_advance.saturating_add(font.em.scale_x(i32::from(v)));
         }
         let _y_advance = next(format & 0x08 != 0);
         if format & 0xf0 == 0 {
@@ -115,8 +117,8 @@ fn anchor(ctx: &Apply<'_, '_>, anchor: Data<'_>, glyph: u32) -> (f32, f32) {
     if !(1..=3).contains(&format) {
         return (0.0, 0.0);
     }
-    let mut x = font.em_fscale_x(i32::from(anchor.i16(2)));
-    let mut y = font.em_fscale_y(i32::from(anchor.i16(4)));
+    let mut x = font.em.fscale_x(i32::from(anchor.i16(2)));
+    let mut y = font.em.fscale_y(i32::from(anchor.i16(4)));
     match format {
         2 if scale.x_ppem != 0 || scale.y_ppem != 0 => {
             if let Some((cx, cy)) = font.contour_point(glyph, anchor.u16(6)) {

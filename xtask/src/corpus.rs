@@ -9,6 +9,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::ebml::{cat, element as e, float64, header, int8, uint as u, vint};
+use crate::files::write;
 use crate::json::{self, Value};
 use crate::pyrandom::PyRandom;
 use crate::sha256;
@@ -37,21 +38,9 @@ impl Paths {
 
     pub(crate) fn manifest(&self, name: &str, value: &Value) -> Result<PathBuf, String> {
         let path = self.out.join("harness").join(name);
-        write_json(&path, value)?;
+        json::write(&path, value)?;
         Ok(path)
     }
-}
-
-pub fn write_json(path: &Path, value: &Value) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-    }
-    fs::write(path, json::to_python(value, Some(2)) + "\n")
-        .map_err(|e| format!("{}: {e}", path.display()))
-}
-
-fn write(path: &Path, data: &[u8]) -> Result<(), String> {
-    fs::write(path, data).map_err(|e| format!("{}: {e}", path.display()))
 }
 
 /// Generate every corpus family; returns one summary line per family.
@@ -64,12 +53,52 @@ pub fn generate_all(paths: &Paths) -> Result<Vec<String>, String> {
         seek(paths, &source)?,
         colour(paths, &source)?,
         catalogue(paths, &source)?,
+        crate::matroska_views::generate(&paths.out)?,
         playback_capsules(paths)?,
+        subtitle_palette_fixtures(paths)?,
         mp4_range(paths)?,
         crate::transport_fixtures::generate(paths)?,
         crate::transport_fixtures::dts_hd::generate(paths, None)?,
+        dts_view_fixtures(paths)?,
+        crate::framing_views::nal::fixtures(paths, false)?,
+        crate::framing_views::config::fixtures(paths, false)?,
+        crate::transport_views::fixtures(paths)?,
+        crate::isobmff_views::index::fixtures(paths, false)?,
         crate::transport_fixtures::eac3_probe::generate(paths, None)?,
     ])
+}
+
+fn dts_view_fixtures(paths: &Paths) -> Result<String, String> {
+    // Gate images supply the pinned streams. Scratch and fixture-only runs
+    // generate just the authored subset without that external input.
+    if paths.root == paths.out && paths.root.join(".research/codec-derived/dts").is_dir() {
+        crate::framing_views::main(&paths.root, &["fixtures".into(), "dts".into()])?;
+        Ok("Prepared authored and pinned DTS view fixtures".into())
+    } else {
+        crate::framing_views::dts::gate_fixtures(&paths.root, &paths.out)?;
+        Ok("Generated authored DTS view fixtures".into())
+    }
+}
+
+fn subtitle_palette_fixtures(paths: &Paths) -> Result<String, String> {
+    use std::process::Command;
+
+    let dvd = paths.fixtures("subtitle-corpus/dvd")?;
+    crate::process::run(
+        Command::new("python3")
+            .arg("-B")
+            .arg(paths.root.join("harness/subtitles/dvd_streams.py"))
+            .arg("--ifo-offset-fixtures")
+            .arg(dvd),
+    )?;
+    crate::process::run(
+        Command::new("python3")
+            .arg("-B")
+            .arg(paths.root.join("harness/subtitles/palette_sweep.py"))
+            .arg("--output-root")
+            .arg(&paths.out),
+    )?;
+    Ok("Generated DVD IFO companions and PGS and DVB palette sweeps".into())
 }
 
 fn mp4_range(paths: &Paths) -> Result<String, String> {
@@ -80,7 +109,7 @@ fn mp4_range(paths: &Paths) -> Result<String, String> {
     let output = paths.fixtures("mp4-range-fixtures")?;
     let seed = paths
         .root
-        .join("crates/isobmff/tests/fixtures/encoded-edit-v2/original.mp4");
+        .join("crates/isobmff/tests/fixtures/encoded-edit/original.mp4");
     let control = fs::read(&seed).map_err(|e| format!("{}: {e}", seed.display()))?;
     if sha256::hex(&control) != "7f2f92cb0e7a97920828fc9f79daeec2471a58d990572305d7aa08c30fb512fd" {
         return Err("MP4 range seed changed".into());
@@ -797,7 +826,7 @@ fn mp4_range_expected((packets, bytes, digest): (u32, u32, u64)) -> Value {
 }
 
 fn mp4_range_fate_cases(root: &Path) -> Result<Vec<Value>, String> {
-    let registry = crate::checks::read_json(&root.join("harness/fate/samples.json"))?;
+    let registry = json::read(&root.join("harness/fate/samples.json"))?;
     let samples = registry
         .get("samples")
         .and_then(Value::as_array)
@@ -964,8 +993,7 @@ pub struct Source {
 
 impl Source {
     pub fn load(root: &Path) -> Result<Self, String> {
-        let trace = crate::checks::read_json(&root.join(SOURCE_TRACE))
-            .map_err(|e| format!("{SOURCE_TRACE}: {e}"))?;
+        let trace = json::read(&root.join(SOURCE_TRACE))?;
         let data = trace
             .get("data")
             .cloned()
@@ -1104,7 +1132,7 @@ pub fn structural(profile: &str) -> Vec<u8> {
 fn base(paths: &Paths) -> Result<String, String> {
     let output = paths.fixtures("fixtures")?;
     let seeds = paths.root.join("harness/fixtures/encoded");
-    let canonical = crate::checks::read_json(&seeds.join("manifest.json"))?;
+    let canonical = json::read(&seeds.join("manifest.json"))?;
     let mut cases = Vec::new();
     for case in canonical
         .get("cases")
@@ -2888,14 +2916,14 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        let out = crate::walk::scratch("capsules");
+        let out = crate::files::scratch("capsules");
         let paths = Paths {
             root: root.clone(),
             out: out.clone(),
         };
         assert_eq!(
             playback_capsules(&paths).unwrap(),
-            "Built 45 playback capsules"
+            "Built 46 playback capsules"
         );
         let capsule =
             fs::read(out.join(".research/startup-seek-fixtures/seek-hevc-seek-700-eof.case"))
@@ -2913,12 +2941,36 @@ mod tests {
             .parent()
             .unwrap()
             .to_path_buf();
-        let out = crate::walk::scratch("corpus");
+        let out = crate::files::scratch("corpus");
         generate_all(&Paths {
             root: root.clone(),
             out: out.clone(),
         })
         .unwrap();
+        let args = [
+            ("subtitle-dvd", "subtitle-corpus"),
+            ("pgs-palette-sweep", "pgs-palette-sweep"),
+            ("dvb-palette-sweep", "dvb-palette-sweep"),
+        ]
+        .into_iter()
+        .flat_map(|(id, directory)| {
+            [
+                "--feature".to_owned(),
+                id.to_owned(),
+                "--corpus".to_owned(),
+                format!("{id}=.research/{directory}"),
+            ]
+        })
+        .collect::<Vec<_>>();
+        let mut count = 0;
+        for input in crate::harness::preflight::inputs(&root, &args, &json::read).unwrap() {
+            let path = out.join(input.path.strip_prefix(&root).unwrap());
+            if path.is_file() {
+                assert_eq!(sha256::file_hex(&path).unwrap(), input.sha256.unwrap());
+                count += 1;
+            }
+        }
+        assert_eq!(count, 3 + 236 + 120);
         for name in [
             "features/matroska-demux/corpus.json",
             "features/matroska-header-removal/corpus.json",

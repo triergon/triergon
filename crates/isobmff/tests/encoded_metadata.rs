@@ -1,21 +1,20 @@
-mod common;
+use crate::common;
 use common::{child, children, roots, table};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, SampleTable, TrackHeader,
-    compat::mov::{
-        encoded::{
-            EncodedCreationSource, EncodedMetadataProfile, EncodedSelection, EncodedStream,
-            EncodedStreamJob,
-        },
-        packets::CursorStatus,
+    CursorStatus,
+    compat::mov::encoded::{
+        EncodedCreationSource, EncodedSelection, EncodedStream, EncodedStreamJob,
     },
+    config::ConfigurationLimits,
+    movie::TrackHeader,
+    table::SampleTable,
 };
 
-const WAVE: &[u8] = include_bytes!("fixtures/encoded-metadata-v4/qt-v1-wave.mov");
+const WAVE: &[u8] = include_bytes!("fixtures/encoded-metadata/qt-v1-wave.mov");
 struct Source {
     pool: Budget,
     header: TrackHeader,
@@ -74,7 +73,6 @@ impl Source {
                 description: 1,
                 limits: ConfigurationLimits::default(),
             },
-            EncodedMetadataProfile,
         )
     }
 }
@@ -99,7 +97,7 @@ fn wave_v1_retains_words_and_full_backing_without_retyping_audio_v0() {
     let mut i = s.input();
     let before = s.pool.used();
     let result = finish(&mut s.job(&i).unwrap(), &mut i, 1).unwrap();
-    let source = result.receiver_source().unwrap();
+    let source = result.source().unwrap();
     let sound = source.sound.as_ref().unwrap();
     assert_eq!(
         (
@@ -134,14 +132,14 @@ fn wave_v1_retains_words_and_full_backing_without_retyping_audio_v0() {
 #[test]
 fn unknown_wave_child_is_retained_and_work_one_matches_bulk() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-unknown.mov"
+        "fixtures/encoded-metadata/qt-v1-unknown.mov"
     ));
     let mut a = s.input();
     let one = finish(&mut s.job(&a).unwrap(), &mut a, 1).unwrap();
     let mut b = s.input();
     let bulk = finish(&mut s.job(&b).unwrap(), &mut b, 4096).unwrap();
     let raw = one
-        .receiver_source()
+        .source()
         .unwrap()
         .wave
         .as_ref()
@@ -151,7 +149,7 @@ fn unknown_wave_child_is_retained_and_work_one_matches_bulk() {
     assert!(raw.windows(8).any(|x| x == b"original"));
     assert_eq!(
         raw,
-        bulk.receiver_source()
+        bulk.source()
             .unwrap()
             .wave
             .as_ref()
@@ -270,7 +268,6 @@ fn outer_and_nested_extensions_share_one_total_limit() {
                 ..ConfigurationLimits::default()
             },
         },
-        EncodedMetadataProfile,
     )
     .unwrap();
     assert_eq!(
@@ -285,7 +282,7 @@ fn outer_and_nested_extensions_share_one_total_limit() {
 #[test]
 fn empty_iso_handler_is_source_owned_but_receiver_tag_is_absent() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/creation-v0-1578905043.mov"
+        "fixtures/encoded-metadata/creation-v0-1578905043.mov"
     ));
     let mut i = s.input();
     let mut j = EncodedStreamJob::new_description_with_metadata(
@@ -297,11 +294,10 @@ fn empty_iso_handler_is_source_owned_but_receiver_tag_is_absent() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        EncodedMetadataProfile,
     )
     .unwrap();
     let r = finish(&mut j, &mut i, 1).unwrap();
-    let source = r.receiver_source().unwrap();
+    let source = r.source().unwrap();
     assert!(source.handler.demux.is_none());
     assert!(!source.handler.source_pascal);
     assert_eq!(source.handler.raw().payload().len(), 25);
@@ -315,7 +311,7 @@ macro_rules! refused {
         #[test]
         fn $name() {
             let s = Source::new(include_bytes!(concat!(
-                "fixtures/encoded-metadata-v4/",
+                "fixtures/encoded-metadata/",
                 $file,
                 ".mov"
             )));
@@ -332,7 +328,20 @@ macro_rules! refused {
     };
 }
 refused!(duplicate_frma_is_not_first_wins, "qt-v1-duplicate-frma");
-refused!(missing_frma_is_not_guessed_from_entry, "qt-v1-missing-frma");
+#[test]
+fn wave_without_optional_format_atom_keeps_aac_configuration() {
+    let s = Source::new(include_bytes!(
+        "fixtures/encoded-metadata/qt-v1-missing-frma.mov"
+    ));
+    let mut input = s.input();
+    let result = finish(&mut s.job(&input).unwrap(), &mut input, 1).unwrap();
+    assert_eq!(result.demux().codec, "aac");
+    assert_eq!(
+        result.demux().extradata.as_ref(),
+        [0x11, 0x88, 0x56, 0xe5, 0]
+    );
+    assert_eq!(result.configuration_box().header().kind, *b"esds");
+}
 refused!(conflicting_frma_is_not_relabelled, "qt-v1-wrong-frma");
 refused!(
     missing_terminator_remains_explicit,
@@ -350,7 +359,7 @@ refused!(
 #[test]
 fn uncompressed_sample_table_meaning_is_not_used_as_compressed_frames() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-unframed-compression.mov"
+        "fixtures/encoded-metadata/qt-v1-unframed-compression.mov"
     ));
     let i = s.input();
     assert!(matches!(
@@ -365,11 +374,11 @@ macro_rules! date {
         #[test]
         fn $name() {
             let s = Source::new(include_bytes!(concat!(
-                "fixtures/encoded-metadata-v4/",
+                "fixtures/encoded-metadata/",
                 $file,
                 ".mov"
             )));
-            let c = EncodedCreationSource::from_source(&s.header, EncodedMetadataProfile).unwrap();
+            let c = EncodedCreationSource::from_source(&s.header).unwrap();
             assert_eq!(c.source_seconds(), $word);
             assert_eq!(c.demux().map(|x| x.as_slice()), $expected);
             assert_eq!(c.raw().bytes().as_ref(), s.header.raw_mdhd.bytes().as_ref());

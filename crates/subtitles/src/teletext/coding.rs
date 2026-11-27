@@ -1,7 +1,8 @@
 //! Error protection of teletext bytes (EN 300 706 section 8).
 //!
 //! Every function takes bytes in teletext transmission order with bit b1 in the
-//! least significant position, as [`TeletextUnit::packet`](super::TeletextUnit) holds them.
+//! least significant position, as
+//! [`TeletextUnit::packet`](super::data_unit::TeletextUnit) holds them.
 
 /// The Hamming 8/4 code words of the sixteen nibbles (EN 300 706 table 3).
 const HAMMING_8_4: [u8; 16] = [

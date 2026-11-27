@@ -13,7 +13,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
 
-use crate::codecs::correctness::file_sha;
 use crate::harness::worker;
 use crate::json::{self, Value};
 use crate::process::TempDir;
@@ -69,7 +68,7 @@ pub fn take_output(output: &Path) -> Value {
     if !output.exists() {
         return Value::Null;
     }
-    let digest = file_sha(output).map_or(Value::Null, Value::str);
+    let digest = crate::files::sha256(output).map_or(Value::Null, Value::str);
     let _ = fs::remove_file(output);
     digest
 }
@@ -145,8 +144,7 @@ pub fn finish(
     let Some(compare) = compare else {
         return Ok(0);
     };
-    let before =
-        crate::checks::read_json(compare).map_err(|e| format!("{}: {e}", compare.display()))?;
+    let before = json::read(compare)?;
     let empty = Value::Object(Vec::new());
     let before = before.get("outputs").unwrap_or(&empty);
     let after = record.get("outputs").unwrap_or(&empty);
@@ -248,7 +246,7 @@ pub fn run(
             }
         }
     }
-    let workloads = crate::checks::read_json(&root.join("harness/codecs/workloads.json"))?;
+    let workloads = json::read(&root.join("harness/codecs/workloads.json"))?;
     for workload in workloads
         .get("workloads")
         .and_then(Value::as_array)

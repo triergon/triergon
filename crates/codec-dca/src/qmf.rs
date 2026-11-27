@@ -43,7 +43,7 @@ impl<const LEN: usize> QmfState<LEN> {
     }
 
     pub(crate) fn reset(&mut self) {
-        self.ring.iter_mut().for_each(|v| *v = 0.0);
+        self.ring.fill(0.0);
         self.pos = 0;
     }
 }
@@ -92,15 +92,19 @@ impl<const TAPS: usize> Qmf<TAPS> {
         out: &mut [f32],
     ) {
         debug_assert_eq!(LEN, 16 * N);
+        let Some(out) = out.first_chunk_mut::<N>() else {
+            return;
+        };
         // The new slot (time s) replaces the oldest one; slot (pos + m) & 15 holds s - m.
         st.pos = (st.pos + 15) & 15;
         let base = st.pos * N;
         let (u, w) = st.ring[base..base + N].split_at_mut(HALF);
-        let u: &mut [f32; HALF] = u.try_into().expect("slot");
-        let w: &mut [f32; HALF] = w.try_into().expect("slot");
+        let (Some(u), Some(w)) = (u.first_chunk_mut::<HALF>(), w.first_chunk_mut::<HALF>()) else {
+            return;
+        };
         // V = DCT-IV(X), the 0.25 factor of C.3.6 folded into the prototype;
         // U[i] = V[i] - V[N-1-i] and W[i] = -(V[i] + V[N-1-i]) for i < N/2.
-        self.dct.transform_pairs(input, |k, a, b| {
+        self.dct.transform::<N, HALF>(input, |k, a, b| {
             if k < HALF {
                 u[k] = a - b;
                 w[k] = -(a + b);
@@ -112,11 +116,9 @@ impl<const TAPS: usize> Qmf<TAPS> {
         // Slot m (time s - m) contributes U for even m and W for odd m. With
         // U[N-1-i] = -U[i] and W[N-1-i] = W[i], each loaded value serves output i and
         // its mirror N-1-i.
-        let taps: [&[f32; HALF]; 16] = std::array::from_fn(|m| {
-            let off = ((st.pos + m) & 15) * N + (m & 1) * HALF;
-            st.ring[off..off + HALF].try_into().expect("slot")
-        });
-        let out: &mut [f32; N] = (&mut out[..N]).try_into().expect("block length");
+        let (ring, _) = st.ring.as_chunks::<HALF>();
+        let taps: [&[f32; HALF]; 16] =
+            std::array::from_fn(|m| &ring[2 * ((st.pos + m) & 15) + (m & 1)]);
         let coef = &self.coef[..16 * N];
         // Each group's accumulators are held over all 16 taps: on targets where f32
         // arithmetic stays scalar, they then live in registers.

@@ -1,6 +1,8 @@
 //! SBR / PS constant tables.
-// tables keep the printed precision of their sources
-#![allow(clippy::excessive_precision)]
+#![expect(
+    clippy::excessive_precision,
+    reason = "the tables keep the printed precision of their sources"
+)]
 
 /// QMF prototype window, ETSI TS 101 980 V1.1.1 (2001-09) Annex I Table I.1, in that
 /// table's order (640 coefficients; the table mislabels its entries 297 and 305, the values

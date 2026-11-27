@@ -440,7 +440,9 @@ pub(crate) static TOTAL_ZEROS_2X2: [&[(u32, u8, u8)]; 3] = [
     &[(0b1, 1, 0), (0b01, 2, 1), (0b00, 2, 2)],
     &[(0b1, 1, 0), (0b0, 1, 1)],
 ];
-/// Table 9-10: run_before, index min(zerosLeft,7)-1: (code, len, run_before)
+/// Table 9-10: run_before, index min(zerosLeft,7)-1: (code, len, run_before). The decoder
+/// reads it in a closed form (`cavlc::read_run_before`), which its tests check against this.
+#[cfg(test)]
 pub(crate) static RUN_BEFORE: [&[(u32, u8, u8)]; 7] = [
     &[(0b1, 1, 0), (0b0, 1, 1)],
     &[(0b1, 1, 0), (0b01, 2, 1), (0b00, 2, 2)],

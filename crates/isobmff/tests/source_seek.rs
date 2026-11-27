@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::{child, fixtures::CASES};
 use std::{
     ops::Range,
@@ -6,9 +6,12 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Limits,
-    Sample, SampleStep, SampleTable, SourceSeekLimits, SourceSeekPlan, SourceSeekPlanner,
-    SourceSeekRequest, SourceTrack, Trex,
+    BuildStatus, Limits, Next, Sample,
+    boxes::BoxView,
+    fragment::{FragmentBuilder, FragmentContext, FragmentIndex, ImplicitBase, Trex},
+    interleave::SourceTrack,
+    seek::{SourceSeekLimits, SourceSeekPlan, SourceSeekPlanner, SourceSeekRequest},
+    table::SampleTable,
 };
 
 fn regular(pool: &Budget, name: &str) -> (SampleTable, Vec<Range<u64>>) {
@@ -21,7 +24,7 @@ fn regular(pool: &Budget, name: &str) -> (SampleTable, Vec<Range<u64>>) {
     let table = common::table(stbl, pool, 1).unwrap();
     let mut cursor = table.cursor();
     for expected in case.samples {
-        let SampleStep::Sample(actual) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
+        let Next::Item(actual) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
             panic!()
         };
         assert_eq!(actual.ordinal, expected.ordinal);
@@ -62,9 +65,9 @@ fn samples(plan: &SourceSeekPlan<'_>, quantum: u64) -> Vec<Sample> {
     let cancel = AtomicBool::new(false);
     for _ in 0..2048 {
         match cursor.poll(&mut WorkBudget::new(quantum), &cancel).unwrap() {
-            SampleStep::Sample(sample) => output.push(sample),
-            SampleStep::Yield => {}
-            SampleStep::End => return output,
+            Next::Item(sample) => output.push(sample),
+            Next::Yield => {}
+            Next::End => return output,
         }
     }
     panic!("seek sample iteration stalled");
@@ -258,8 +261,7 @@ fn fragmented_seek_prerolls_across_indexes_without_filling_unknown_source_clock(
         for (which, index) in indexes.iter().enumerate() {
             let mut cursor = index.cursor();
             for local in 0..3 {
-                let SampleStep::Sample(sample) = cursor.poll(&mut WorkBudget::new(1)).unwrap()
-                else {
+                let Next::Item(sample) = cursor.poll(&mut WorkBudget::new(1)).unwrap() else {
                     panic!()
                 };
                 let expected = (which == 0).then_some((1i128 << 63) + local * 10);

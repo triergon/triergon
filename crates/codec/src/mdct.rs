@@ -7,15 +7,27 @@
 //! ```
 //!
 //! which is the IMDCT of Vorbis I section 1.3.2 and RFC 6716 section 4.3.7 before
-//! windowing. It runs as a DCT-IV of size `K` through an `N / 4`-point complex FFT with
-//! pre- and post-twiddles. The FFT is mixed radix, so `N / 4` may be any product of 2, 3
-//! and 5: the power-of-two Vorbis blocks and the 120 · 2^j-sample CELT frames both fit.
-//! Windowing and overlap-add stay with each codec. Every table is charged to the budget
-//! the transform is built in.
+//! windowing. It runs as a DCT-IV of size `K` ([`Imdct::dct4`]) through an `N / 4`-point
+//! complex FFT with pre- and post-twiddles.
+//!
+//! What it guarantees:
+//!
+//! - **Lengths.** `N` is a multiple of 4 whose quarter is a product of 2, 3 and 5
+//!   ([`Imdct::supports`]): the power-of-two Vorbis blocks and the 120 · 2^j-sample CELT
+//!   frames. [`Imdct::new`] refuses any other length with `Error::Invalid("IMDCT length")`.
+//! - **Arithmetic.** `f32` throughout, with every twiddle computed in `f64` and rounded
+//!   once. The operation order is fixed: the FFT's stages run radix 4 innermost, then 2,
+//!   then 3 and 5 outermost, each in one order of additions on every target. The Vorbis
+//!   and Opus decoders' output is gated bit for bit on that order, so it is part of the
+//!   contract, not an implementation detail.
+//! - **Storage.** Every table and scratch plane is charged to the budget the transform is
+//!   built in; [`Imdct::dct4`] and [`Imdct::imdct`] do not allocate.
+//! - **Scope.** Windowing and overlap-add stay with each codec. AAC, AC-3 and DTS keep
+//!   transforms of their own, whose operation orders differ from this one.
 
 use core::f64::consts::PI;
 
-use triergon_core::{Budget, BudgetVec, Error as StorageError};
+use triergon_core::{Budget, BudgetVec, Error};
 
 /// `(a + ib)(c + id)`, in the order every stage uses.
 #[inline(always)]
@@ -28,13 +40,14 @@ fn mul(a: f32, b: f32, c: f32, d: f32) -> (f32, f32) {
 /// `1 <= q < radix` and `k < span` are stored `q` major in split real and imaginary
 /// parts, so a stage reads them as contiguous runs.
 #[derive(Debug)]
+#[repr(C)]
 struct Stage {
+    re: BudgetVec<f32>,
+    im: BudgetVec<f32>,
     radix: usize,
     span: usize,
     /// Blocks of `radix * span` points in the transform.
     blocks: usize,
-    re: BudgetVec<f32>,
-    im: BudgetVec<f32>,
 }
 
 impl Stage {
@@ -93,11 +106,9 @@ fn radices(len: usize) -> Option<([usize; 32], usize)> {
 }
 
 impl Fft {
-    /// `Ok(None)` unless `len` is a product of 2, 3 and 5.
-    fn new(len: usize, budget: &Budget) -> Result<Option<Fft>, StorageError> {
-        let Some((radices, count)) = radices(len) else {
-            return Ok(None);
-        };
+    /// `Invalid` unless `len` is a product of 2, 3 and 5; a refused charge.
+    fn new(len: usize, budget: &Budget) -> Result<Fft, Error> {
+        let (radices, count) = radices(len).ok_or(Error::Invalid("IMDCT length"))?;
         let radices = &radices[..count];
         let mut order = BudgetVec::try_filled(budget, 0, len)?;
         let mut next = 0;
@@ -125,7 +136,7 @@ impl Fft {
             stages.try_push(stage).map_err(|refused| refused.error)?;
             span *= radix;
         }
-        Ok(Some(Fft { len, stages, order }))
+        Ok(Fft { len, stages, order })
     }
 
     /// The input index each slot of the in-place buffer starts from.
@@ -466,17 +477,17 @@ impl Imdct {
     ///
     /// # Errors
     /// `Invalid` unless [`Imdct::supports`] `n`; a refused charge.
-    pub fn new(n: usize, scale: f64, budget: &Budget) -> Result<Imdct, StorageError> {
-        if !Imdct::supports(n) {
-            return Err(StorageError::Invalid("IMDCT length"));
+    pub fn new(n: usize, scale: f64, budget: &Budget) -> Result<Imdct, Error> {
+        if !n.is_multiple_of(4) {
+            return Err(Error::Invalid("IMDCT length"));
         }
         let q = n / 4;
         let k = n / 2;
-        let fft = Fft::new(q, budget)?.ok_or(StorageError::Invalid("IMDCT length"))?;
+        let fft = Fft::new(q, budget)?;
         // The twiddles of each `j` that `index` yields, scaled by `s`.
         let twiddles = |s: f64,
                         index: &mut dyn Iterator<Item = usize>|
-         -> Result<(BudgetVec<f32>, BudgetVec<f32>), StorageError> {
+         -> Result<(BudgetVec<f32>, BudgetVec<f32>), Error> {
             let angle = |j: usize| -PI * (j as f64 + 0.125) / k as f64;
             let mut re = BudgetVec::try_filled(budget, 0.0, q)?;
             let mut im = BudgetVec::try_filled(budget, 0.0, q)?;
@@ -497,18 +508,6 @@ impl Imdct {
             },
             dct: BudgetVec::try_filled(budget, 0.0, k)?,
         })
-    }
-
-    /// Output length `N`.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.dct4.len
-    }
-
-    /// Always false: a transform has at least four outputs.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        false
     }
 
     /// The DCT-IV of size `K = N / 2`:
@@ -664,7 +663,7 @@ mod tests {
         for len in [
             1, 2, 3, 4, 5, 6, 8, 12, 15, 16, 30, 60, 64, 120, 240, 480, 512,
         ] {
-            let fft = Fft::new(len, &budget()).unwrap().unwrap();
+            let fft = Fft::new(len, &budget()).unwrap();
             let input: Vec<(f32, f32)> =
                 (0..len).map(|_| (lcg(&mut seed), lcg(&mut seed))).collect();
             let mut re: Vec<f32> = fft.order().iter().map(|&j| input[j as usize].0).collect();
@@ -687,7 +686,10 @@ mod tests {
                 );
             }
         }
-        assert!(Fft::new(7, &budget()).unwrap().is_none());
+        assert_eq!(
+            Fft::new(7, &budget()).err(),
+            Some(Error::Invalid("IMDCT length"))
+        );
     }
 
     #[test]
@@ -736,7 +738,7 @@ mod tests {
         let small = Budget::new(1024).unwrap();
         assert!(matches!(
             Imdct::new(2048, 1.0, &small),
-            Err(StorageError::Limit { .. })
+            Err(Error::Limit { .. })
         ));
     }
 }

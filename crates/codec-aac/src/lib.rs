@@ -2,93 +2,56 @@
 #![forbid(unsafe_code)]
 #![cfg_attr(feature = "simd", feature(portable_simd))]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
-    clippy::print_stderr
-)]
-// Pending: `missing_docs`, `clippy::unwrap_used`, `clippy::expect_used`.
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
-#![allow(
-    clippy::bool_to_int_with_if,
-    clippy::needless_for_each,
-    clippy::nonminimal_bool,
-    clippy::redundant_closure_for_method_calls,
-    clippy::single_match_else,
-    clippy::unnested_or_patterns
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
 )]
 pub mod adts;
 mod cce;
+pub mod compat;
 mod decoder;
 mod error;
 mod fft;
 mod filterbank;
 mod huffman;
+#[rustfmt::skip] // Laid out by the table generator.
 mod huffman_probed;
 mod huffman_tables;
 mod ics;
 mod ltp;
 mod pce;
 mod pred;
+#[cfg(feature = "reference-trace")]
+pub mod reference_trace;
 mod sbr;
 mod tables;
 
 pub use adts::AdtsHeader;
 pub use error::{DecodeError, Feature};
-pub use triergon_codec::{AudioFrame, ChannelLayout, Speaker};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, Error, Speaker};
 
 use triergon_bitstream::CachedBitReader;
-use triergon_codec::{AudioDecoder, Budget, DecodeFailure, DownmixLevels};
-
-/// Optional AAC decoding policies.
-pub mod compat {
-    /// Handling of in-band delay signatures when a container provides priming.
-    pub mod priming {
-        /// Source of leading PCM discard for ADTS.
-        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-        pub enum Policy {
-            /// Apply the default delay signalled by a recognised encoder signature.
-            #[default]
-            EncoderSignature,
-            /// Leave leading discard to the caller's container edit.
-            Container,
-        }
-    }
-
-    /// Channel mappings for fixed AAC-LC access units.
-    ///
-    /// `ConventionalSurround` reproduces the default AAC decoder of FFmpeg 9.0.2
-    /// when it receives an AudioSpecificConfig and the original packets.
-    pub mod layout {
-        /// How to interpret the fixed channel configuration of a raw access unit.
-        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-        pub enum Policy {
-            /// Speaker assignments in ISO/IEC 14496-3 Table 1.19.
-            #[default]
-            Specification,
-            /// Use the back pair in configurations 5, 6, 11 and 14. Interpret
-            /// configuration 7 as the conventional 7.1 back layout.
-            ConventionalSurround,
-        }
-    }
-}
+use triergon_codec::{AudioDecoder, DownmixLevels};
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Live storage that depends on the stream: element and coupling-channel state
+    /// Bytes of storage that depends on the stream: element and coupling-channel state
     /// (overlap, prediction, LTP, spectra, SBR and PS) and the output frame the decoder
-    /// fills. The default holds 48 elements (16 tags each of SCE, CPE and LFE, the most a
-    /// PCE switch between two layouts holds) with SBR and Main prediction, 16 coupling
-    /// channels and four raw data blocks of 93 channels.
+    /// fills. The default, 32 MiB, holds 48 elements (16 tags each of SCE, CPE and LFE,
+    /// the most a PCE switch between two layouts holds) with SBR and Main prediction, 16
+    /// coupling channels and four raw data blocks of 93 channels.
     pub live_storage_bytes: usize,
 }
 
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            live_storage_bytes: 32 * 1024 * 1024,
+            live_storage_bytes: 32 << 20,
         }
     }
 }
@@ -108,11 +71,15 @@ impl Default for Decoder {
 impl Decoder {
     /// A decoder with a pool of the default limit.
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit is far above a pool's own charge"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
-    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    /// A decoder with its own pool of `limits.live_storage_bytes`. Fails only for a
+    /// limit below a pool's own charge.
     pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
         Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
     }
@@ -127,15 +94,32 @@ impl Decoder {
     /// Configure how this ADTS decoder handles an encoder delay signature.
     /// The policy persists across discontinuities.
     #[must_use]
-    pub fn with_priming_policy(mut self, policy: compat::priming::Policy) -> Self {
+    pub fn with_priming_policy(mut self, policy: compat::ffmpeg::priming::Policy) -> Self {
         self.core.priming_policy = policy;
         self.core.skip_samples = 0;
         self
     }
 
-    /// Decode exactly one ADTS frame (header included). `out` is cleared and refilled with
-    /// this frame's output (1024 or, with SBR, 2048 samples per raw_data_block). On error
-    /// `out` is left empty; the decoder stays usable for the next frame.
+    /// Selects recovery for damaged SBR and Parametric Stereo extensions.
+    #[must_use]
+    pub fn with_extension_policy(mut self, policy: compat::ffmpeg::extensions::Policy) -> Self {
+        self.core.extension_policy = policy;
+        for element in &mut self.core.elements {
+            if let Some(sbr) = &mut element.sbr {
+                sbr.ps.policy = policy;
+            }
+        }
+        self
+    }
+
+    /// Decodes one ADTS frame including its header, yielding 1024 samples per raw data
+    /// block or 2048 with spectral band replication.
+    /// Replaces `out`, leaving `samples_per_channel == 0` on refusal.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed, truncated or unsupported input and storage charges the pool
+    /// cannot cover. The decoder stays usable for the next frame.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         decode_with::<false>(&mut self.core, out, |core, out| decode_adts(core, au, out))
     }
@@ -145,43 +129,40 @@ impl Decoder {
         self.core.reset_history();
     }
 
-    /// Development aid: payload bit ranges of the SBR fill elements of the last frame.
-    #[cfg(feature = "inspect")]
-    pub fn sbr_fill_ranges(&self) -> &[(usize, usize)] {
-        &self.core.sbr_fil_ranges
-    }
-
-    /// Development aid: collect [`Self::stats`] from now on (it formats text per frame).
-    #[cfg(feature = "inspect")]
-    pub fn enable_stats(&mut self) {
-        self.core.stats_enabled = true;
-    }
-
-    /// Development aid: the QMF slots the Parametric Stereo tool received in the last
-    /// frame, 38 rows of 64 bands, re and im interleaved (empty without PS).
-    #[cfg(feature = "inspect")]
-    pub fn ps_input(&self) -> &[f32] {
-        self.core
-            .elements
-            .iter()
-            .find_map(|e| e.sbr.as_ref().filter(|s| !s.ps_input.is_empty()))
-            .map_or(&[], |s| &s.ps_input)
-    }
-
-    /// Development statistics of the last decoded block (unstable format).
-    #[cfg(feature = "inspect")]
-    pub fn stats(&self) -> &str {
-        &self.core.stats
-    }
-
     /// Current output sample rate (0 before the first frame).
     pub fn sample_rate(&self) -> u32 {
-        if self.core.configured {
+        if self.core.is_configured() {
             self.core.output_rate()
         } else {
             0
         }
     }
+}
+
+impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
+    fn decode(
+        &mut self,
+        au: &[u8],
+        out: &mut AudioFrame,
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out)?;
+        Ok(None)
+    }
+
+    fn reset(&mut self) {
+        Decoder::reset(self);
+    }
+}
+
+/// Fixed index fields from an AAC-LC AudioSpecificConfig.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RawLcConfig {
+    /// Sampling frequency index from 0 through 12.
+    pub frequency_index: u8,
+    /// Fixed channel configuration (1–7, 11, 12 or 14).
+    pub channel_configuration: u8,
 }
 
 /// Decoder for one raw AAC-LC access unit per packet.
@@ -196,35 +177,55 @@ impl RawLcDecoder {
     /// Maximum raw block size, including ancillary and fill data.
     pub const MAX_ACCESS_UNIT_BYTES: usize = 64 << 10;
 
-    /// Set up the fixed layout and charge its decoder state to `budget`.
-    pub fn new_in(
-        frequency_index: u8,
-        channel_configuration: u8,
-        budget: &Budget,
-    ) -> Result<Self, DecodeError> {
+    /// Creates a decoder with a pool of the default limit.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
+    pub fn new(config: RawLcConfig) -> Result<Self, DecodeError> {
+        Self::with_limits(config, Limits::default())
+    }
+
+    /// Creates a decoder with a pool of `limits.live_storage_bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
+    pub fn with_limits(config: RawLcConfig, limits: Limits) -> Result<Self, DecodeError> {
+        Self::new_in(config, &Budget::new(limits.live_storage_bytes)?)
+    }
+
+    /// Creates a decoder with the fixed layout, charging its state to `budget`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
+    pub fn new_in(config: RawLcConfig, budget: &Budget) -> Result<Self, DecodeError> {
         Self::with_layout_in(
-            frequency_index,
-            channel_configuration,
-            compat::layout::Policy::Specification,
+            config,
+            compat::ffmpeg::layout::Policy::Specification,
             budget,
         )
     }
 
-    /// Set up the configured decoder with an explicit speaker mapping.
+    /// Creates a decoder with an explicit speaker mapping.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or storage is refused.
     pub fn with_layout_in(
-        frequency_index: u8,
-        channel_configuration: u8,
-        layout: compat::layout::Policy,
+        config: RawLcConfig,
+        layout: compat::ffmpeg::layout::Policy,
         budget: &Budget,
     ) -> Result<Self, DecodeError> {
-        if !matches!(channel_configuration, 1..=7 | 11 | 12 | 14) {
-            return Err(DecodeError::InvalidData("raw AAC channel configuration"));
+        if !matches!(config.channel_configuration, 1..=7 | 11 | 12 | 14) {
+            return Err(DecodeError::Invalid("raw AAC channel configuration"));
         }
         let mut core = decoder::Core::new(budget);
         core.configure(
-            2,
-            frequency_index,
-            channel_configuration,
+            ics::ObjectType::Lc,
+            config.frequency_index,
+            config.channel_configuration,
             decoder::FixedLayout::Raw(layout),
         )?;
         Ok(Self { core })
@@ -241,35 +242,48 @@ impl RawLcDecoder {
         let mut reader = CachedBitReader::new(program_config);
         let program = pce::parse_pce(&mut reader, 0)?;
         if reader.left() != 0 {
-            return Err(DecodeError::InvalidData("raw AAC program extent"));
+            return Err(DecodeError::Invalid("raw AAC program extent"));
         }
         let core = decoder::Core::with_program(budget, frequency_index, &program)?;
         Ok(Self { core })
     }
 
-    /// Decode one complete raw data block from the container sample.
+    /// Decodes one complete raw data block from a container sample.
+    /// Replaces `out`, leaving `samples_per_channel == 0` on refusal.
+    ///
+    /// # Errors
+    ///
+    /// Refuses malformed or unsupported raw blocks and blocks exceeding the byte or
+    /// storage limits.
     pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
         decode_with::<true>(&mut self.core, out, |core, out| {
             if au.len() > Self::MAX_ACCESS_UNIT_BYTES {
-                return Err(DecodeError::ResourceLimit("raw AAC access unit"));
+                return Err(DecodeError::Policy("raw AAC access unit"));
             }
             decode_blocks::<true>(core, au, 1, false, out)
         })
     }
+
+    /// Reset overlap, prediction and PNS signal history after a discontinuity.
+    pub fn reset(&mut self) {
+        self.core.reset_history();
+    }
 }
 
 impl AudioDecoder for RawLcDecoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        RawLcDecoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        RawLcDecoder::decode(self, au, out)?;
         Ok(None)
     }
 
     fn reset(&mut self) {
-        self.core.reset_history();
+        RawLcDecoder::reset(self);
     }
 }
 
@@ -309,7 +323,7 @@ fn decode_adts(
         return Err(DecodeError::Truncated);
     }
     core.configure(
-        h.profile + 1,
+        ics::ObjectType::from_code(h.profile + 1)?,
         h.sf_index,
         h.channel_config,
         decoder::FixedLayout::Adts,
@@ -320,7 +334,7 @@ fn decode_adts(
         header_bytes += 2 * (usize::from(h.raw_data_blocks) - 1) + 2;
     }
     if h.frame_length < header_bytes {
-        return Err(DecodeError::InvalidData("ADTS frame length"));
+        return Err(DecodeError::Invalid("ADTS frame length"));
     }
     decode_blocks::<false>(
         core,
@@ -338,8 +352,6 @@ fn decode_blocks<const RAW: bool>(
     per_block_crc: bool,
     out: &mut AudioFrame,
 ) -> Result<(), DecodeError> {
-    #[cfg(feature = "inspect")]
-    core.sbr_fil_ranges.clear();
     let mut br = CachedBitReader::new(payload);
     core.reserve_output::<RAW>(out, usize::from(blocks))?;
     for block in 0..blocks {
@@ -353,7 +365,7 @@ fn decode_blocks<const RAW: bool>(
         }
     }
     if core.skip_samples > 0 {
-        let samples = out.planes.first().map_or(0, |p| p.len());
+        let samples = out.planes.first().map_or(0, Vec::len);
         let skip = core.skip_samples.min(samples);
         for plane in &mut out.planes {
             plane.drain(..skip);
@@ -363,50 +375,6 @@ fn decode_blocks<const RAW: bool>(
     core.frames_out += 1;
     out.sample_rate = core.output_rate();
     out.layout = core.layout;
-    out.samples_per_channel = out.planes.first().map_or(0, |p| p.len());
+    out.samples_per_channel = out.planes.first().map_or(0, Vec::len);
     Ok(())
-}
-
-impl AudioDecoder for Decoder {
-    fn decode(
-        &mut self,
-        au: &[u8],
-        out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        Decoder::decode(self, au, out).map_err(DecodeFailure::from_error)?;
-        Ok(None)
-    }
-    fn reset(&mut self) {
-        Decoder::reset(self);
-    }
-}
-
-/// FFmpeg's name for `layout` where one exists, else `"N channels (A+B+...)"` as
-/// ffprobe prints it.
-pub fn layout_name(layout: &ChannelLayout) -> String {
-    const NAMED: &[(u64, &str)] = &[
-        (0x4, "mono"),
-        (0x3, "stereo"),
-        (0x7, "3.0"),
-        (0x107, "4.0"),
-        (0x37, "5.0(back)"),
-        (0x607, "5.0"),
-        (0x3f, "5.1(back)"),
-        (0x60f, "5.1"),
-        (0xff, "7.1(wide)"),
-        (0x63f, "7.1"),
-        (0x503f, "5.1.2(back)"),
-        (0x13, "3.0(back)"),
-        (0x33, "quad"),
-        (0x603, "quad(side)"),
-        (0xb, "2.1"),
-        (0x70f, "6.1"),
-        (0x13f, "6.1(back)"),
-    ];
-    let mask = layout.mask();
-    if let Some((_, name)) = NAMED.iter().find(|(named, _)| *named == mask) {
-        return (*name).to_string();
-    }
-    let names: Vec<&str> = layout.speakers().iter().map(|s| s.name()).collect();
-    format!("{} channels ({})", names.len(), names.join("+"))
 }

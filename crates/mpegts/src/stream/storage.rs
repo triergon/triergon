@@ -1,7 +1,11 @@
-//! The transport storage pinned while a PES range or span replacement is refused.
+//! The storage an open transport stream holds: walked for a refused PES range or span
+//! replacement, or whole for the reader's audit inside the stream.
 
-use super::{Route, TransportStream};
-use crate::{PesAssembler, table_storage};
+use super::event::TraceEvent;
+use super::tables::PsiWork;
+use super::{Held, Route, Stage, TransportStream};
+use crate::pes::PesAssembler;
+use crate::table_storage;
 use triergon_core::{Bytes, Error, Result};
 
 pub(crate) enum StorageItem<'a> {
@@ -24,6 +28,7 @@ impl<'a> StorageItem<'a> {
 pub(crate) enum TransportStorageCursor {
     BlockedSpan(usize),
     BlockedPayload,
+    PsiFault,
     Carrier,
     PmtSource,
     PatVersion(usize),
@@ -37,23 +42,27 @@ pub(crate) enum TransportStorageCursor {
 }
 
 impl TransportStorageCursor {
-    // Each advance visits at most one section, route, or backing. At this
-    // transport phase PSI jobs have drained and the framer owns only its carry.
+    /// The start of a walk of every backing the open stream holds, for a stream that is
+    /// not stopped at a refused PES growth.
+    pub(crate) const OPEN: Self = Self::PsiFault;
+
+    // Each advance visits at most one section, route, or backing. `blocked` is the route
+    // whose refused growth the walk accounts for (its tables are in the growth floor); at
+    // that stage PSI jobs have drained and the framer owns only its carry.
     pub(crate) fn step<'a>(
         &mut self,
         stream: &'a TransportStream,
+        blocked: Option<usize>,
     ) -> Result<Option<StorageItem<'a>>> {
-        debug_assert_eq!(stream.phase, 6);
-        let Route::Pes(blocked) = stream.route else {
-            return Err(Error::Invalid("PES storage audit outside drain"));
-        };
         let routes = stream.routes.as_slice();
+        let blocked_assembler = || -> Result<Option<&'a PesAssembler>> {
+            let index = blocked.ok_or(Error::Invalid("PES storage audit outside drain"))?;
+            Ok(routes[index].assembler.as_ref())
+        };
         let item = match *self {
             Self::BlockedSpan(index) => {
-                if let Some(bytes) = routes[blocked]
-                    .assembler
-                    .as_ref()
-                    .and_then(|assembler| assembler.span_backing(index))
+                if let Some(bytes) =
+                    blocked_assembler()?.and_then(|assembler| assembler.span_backing(index))
                 {
                     *self = Self::BlockedSpan(index + 1);
                     Some(StorageItem::CountedBytes(bytes))
@@ -64,18 +73,26 @@ impl TransportStorageCursor {
             }
             Self::BlockedPayload => {
                 *self = Self::Carrier;
-                routes[blocked]
-                    .assembler
-                    .as_ref()
+                blocked_assembler()?
                     .and_then(PesAssembler::pending_backing)
                     .map(StorageItem::CountedBytes)
+            }
+            Self::PsiFault => {
+                *self = Self::Carrier;
+                match &stream.psi {
+                    PsiWork::Fault(fault) => fault
+                        .rejected
+                        .as_ref()
+                        .map(|rejected| StorageItem::Bytes(rejected.backing_bytes())),
+                    _ => None,
+                }
             }
             Self::Carrier => {
                 *self = Self::PmtSource;
                 stream
-                    .packet
+                    .held
                     .as_ref()
-                    .map(|packet| StorageItem::Bytes(&packet.source))
+                    .map(|held| StorageItem::Bytes(&held.packet.source))
             }
             Self::PmtSource => {
                 *self = Self::PatVersion(0);
@@ -99,8 +116,8 @@ impl TransportStorageCursor {
                 }
             }
             Self::PatSection(version, index) => {
-                let table =
-                    stream.collector.retained_sections()[version].expect("retained PAT version");
+                let table = stream.collector.retained_sections()[version]
+                    .ok_or(Error::Invalid("PAT storage audit version"))?;
                 if let Some(section) = table.as_slice().get(index) {
                     *self = Self::PatBacking(version, index);
                     let bytes = table_storage(&section.programs)?
@@ -114,8 +131,8 @@ impl TransportStorageCursor {
             }
             Self::PatBacking(version, index) => {
                 *self = Self::PatSection(version, index + 1);
-                let table =
-                    stream.collector.retained_sections()[version].expect("retained PAT version");
+                let table = stream.collector.retained_sections()[version]
+                    .ok_or(Error::Invalid("PAT storage audit version"))?;
                 Some(StorageItem::Bytes(&table.as_slice()[index].source))
             }
             Self::Route(index) => {
@@ -128,7 +145,7 @@ impl TransportStorageCursor {
                 }
             }
             Self::Assembler(index) => {
-                if index != blocked
+                if Some(index) != blocked
                     && let Some(assembler) = &routes[index].assembler
                 {
                     *self = Self::Span(index, 0);
@@ -142,7 +159,7 @@ impl TransportStorageCursor {
                 let assembler = routes[route]
                     .assembler
                     .as_ref()
-                    .expect("retained PES route");
+                    .ok_or(Error::Invalid("PES storage audit route"))?;
                 if let Some(bytes) = assembler.span_backing(index) {
                     *self = Self::Span(route, index + 1);
                     Some(StorageItem::Bytes(bytes))
@@ -162,5 +179,67 @@ impl TransportStorageCursor {
             Self::End => None,
         };
         Ok(item)
+    }
+}
+
+impl TransportStream {
+    /// The PES route whose assembly holds the carrier in hand, as it does while a range
+    /// or span growth is refused.
+    pub(crate) fn assembling_route(&self) -> Option<usize> {
+        match (self.route, &self.held) {
+            (
+                Route::Pes(index),
+                Some(Held {
+                    stage: Stage::Assemble,
+                    ..
+                }),
+            ) => Some(index),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn blocked_pes_growth_floor(&self) -> Result<Option<usize>> {
+        let Some(index) = self.assembling_route() else {
+            return Ok(None);
+        };
+        let Some(span_floor) = self.routes.as_slice()[index]
+            .assembler
+            .as_ref()
+            .and_then(PesAssembler::blocked_growth_floor)
+        else {
+            return Ok(None);
+        };
+        span_floor
+            .checked_add(self.table_storage()?)
+            .map(Some)
+            .ok_or(Error::Overflow)
+    }
+
+    /// Storage of the open stream that a walk from [`TransportStorageCursor::OPEN`] does
+    /// not visit: the route table, the section assemblers' buffers and the framer carry.
+    /// `None` while table work holds a section, table or map in progress, which the walk
+    /// does not count; the stream holds none of those while it reports an event.
+    pub(crate) fn open_storage(&self) -> Result<Option<usize>> {
+        if !matches!(self.psi, PsiWork::Idle | PsiWork::Fault(_)) {
+            return Ok(None);
+        }
+        self.table_storage().map(Some)
+    }
+
+    fn table_storage(&self) -> Result<usize> {
+        let pmt = self
+            .pmt
+            .as_ref()
+            .map_or(Ok(0), |route| route.assembler.table_storage())?;
+        table_storage(&self.routes)?
+            .checked_add(self.pat.assembler.table_storage()?)
+            .and_then(|n| n.checked_add(pmt))
+            .and_then(|n| n.checked_add(self.framer.carry_storage().ok()?))
+            .ok_or(Error::Overflow)
+    }
+
+    pub(crate) fn refuse_blocked_pes_growth(&mut self, error: Error) -> TraceEvent {
+        debug_assert!(matches!(self.blocked_pes_growth_floor(), Ok(Some(_))));
+        self.discard_faulted_route(error)
     }
 }

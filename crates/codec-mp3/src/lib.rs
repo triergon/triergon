@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(
+    missing_docs,
     missing_debug_implementations,
     unreachable_pub,
     clippy::print_stdout,
@@ -8,7 +9,6 @@
     clippy::unwrap_used,
     clippy::expect_used
 )]
-// Pending: `missing_docs`.
 
 mod layer1;
 mod layer2;
@@ -16,21 +16,20 @@ mod layer3;
 mod subband;
 mod synthesis;
 
-use triergon_codec::{
-    AudioDecoder, AudioFrame, Budget, ChannelLayout, Charged, DecodeFailure, DownmixLevels,
-    Reservation, Speaker, StorageError,
-};
-use triergon_framing::{MpegAudioHeader, MpegLayer};
+pub use triergon_codec::{AudioFrame, Budget, ChannelLayout, DecodeError, Error, Speaker};
+
+use triergon_codec::{AudioDecoder, Charged, DownmixLevels, Reservation};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegLayer};
 
 use layer3::Layer3;
 use synthesis::Synthesis;
 
-/// Bounds of one decoder.
+/// Storage limits of one decoder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
-    /// Heap bytes the decoder may hold: its signal state, built with the first frame,
-    /// and the output frame it fills (at most 1152 samples of two channels). The default
-    /// leaves a wide margin above both.
+    /// Bytes of storage that depends on the stream: the signal state, built with the
+    /// first frame, and the output frame the decoder fills (at most 1152 samples of two
+    /// channels). The default, 1 MiB, leaves a wide margin above both.
     pub live_storage_bytes: usize,
 }
 
@@ -41,35 +40,6 @@ impl Default for Limits {
         }
     }
 }
-
-/// Why a decoder refused a configuration or an access unit.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    /// A feature this decoder does not implement.
-    Unsupported(&'static str),
-    /// Malformed data.
-    Invalid(&'static str),
-    /// The storage budget refused an allocation.
-    Budget(StorageError),
-}
-
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
-        DecodeError::Budget(error)
-    }
-}
-
-impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            DecodeError::Unsupported(what) => write!(f, "unsupported: {what}"),
-            DecodeError::Invalid(what) => write!(f, "invalid data: {what}"),
-            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
 
 /// An MPEG-1/2 audio Layer I, II and III decoder. Each access unit is one frame,
 /// header included.
@@ -97,13 +67,17 @@ impl Default for Decoder {
 }
 
 impl Decoder {
-    /// A decoder with the default limits.
+    /// A decoder with a pool of the default limit.
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit is far above a pool's own charge"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
-    /// A decoder with its own pool of `limits.live_storage_bytes`.
+    /// A decoder with its own pool of `limits.live_storage_bytes`. Fails only for a
+    /// limit below a pool's own charge.
     pub fn with_limits(limits: Limits) -> Result<Self, DecodeError> {
         Ok(Self::new_in(&Budget::new(limits.live_storage_bytes)?))
     }
@@ -117,19 +91,39 @@ impl Decoder {
         }
     }
 
-    /// Decode one frame into `out`. A frame cut short decodes as if the missing bytes
-    /// were zero; bytes after the frame are ignored. A frame refused after its header
-    /// leaves `out` empty.
-    pub fn decode_frame(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
-        let header = frame_header(au).ok_or(DecodeError::Invalid("frame header"))?;
-        let length = header
-            .frame_bytes()
-            .ok_or(DecodeError::Unsupported("free-format frame"))?;
+    /// Decodes one MPEG audio frame. The output holds the rate, layout and sample count;
+    /// additional header fields are available from framing's `MpegAudioHeader`.
+    /// Replaces `out`; a refusal leaves `samples_per_channel == 0`.
+    ///
+    /// # Errors
+    ///
+    /// Refuses an invalid or free-format frame and a storage charge the pool cannot cover.
+    pub fn decode(&mut self, au: &[u8], out: &mut AudioFrame) -> Result<(), DecodeError> {
+        let header = MpegAudioHeader::from_bytes(au).ok_or_else(|| {
+            out.clear();
+            DecodeError::Invalid("frame header")
+        })?;
+        let length = header.frame_bytes().ok_or_else(|| {
+            out.clear();
+            DecodeError::Unsupported("free-format frame")
+        })?;
         let decoded = self.decode_body(&header, &au[..length.min(au.len())], out);
         if decoded.is_err() {
             out.clear();
         }
         decoded
+    }
+
+    /// Drop the bit reservoir and the filter bank and overlap history after a
+    /// discontinuity. Layer III scalefactors stay, as FFmpeg keeps them for a granule
+    /// that reuses them (`scfsi`) after a flush.
+    pub fn reset(&mut self) {
+        if let Some(state) = &mut self.state {
+            for filter in &mut state.synthesis {
+                filter.reset();
+            }
+            state.layer3.reset();
+        }
     }
 
     fn decode_body(
@@ -166,29 +160,20 @@ impl Decoder {
     }
 }
 
-/// The header of the frame at the start of `bytes`.
-pub fn frame_header(bytes: &[u8]) -> Option<MpegAudioHeader> {
-    MpegAudioHeader::from_bytes(bytes)
-}
-
 impl AudioDecoder for Decoder {
+    type Error = DecodeError;
+
     fn decode(
         &mut self,
         au: &[u8],
         out: &mut AudioFrame,
-    ) -> Result<Option<DownmixLevels>, DecodeFailure> {
-        self.decode_frame(au, out)
-            .map_err(DecodeFailure::from_error)?;
+    ) -> Result<Option<DownmixLevels>, DecodeError> {
+        Decoder::decode(self, au, out)?;
         Ok(None)
     }
 
     fn reset(&mut self) {
-        if let Some(state) = &mut self.state {
-            for filter in &mut state.synthesis {
-                filter.reset();
-            }
-            state.layer3.reset();
-        }
+        Decoder::reset(self);
     }
 }
 
@@ -197,9 +182,8 @@ impl State {
         State {
             synthesis: [Synthesis::default(), Synthesis::default()],
             layer3: Layer3::new(),
-            mono: ChannelLayout::new([Speaker::FrontCenter]).unwrap_or_default(),
-            stereo: ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight])
-                .unwrap_or_default(),
+            mono: ChannelLayout::MONO,
+            stereo: ChannelLayout::STEREO,
         }
     }
 }

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "id": "progressive-ts188",
-  "operation": "ProgressiveAvcAacTsOwnedFeedV1",
+  "operation": "progressive-avc-aac-ts188",
   "candidate": "playback-worker",
   "worker_operation": "progressive-",
   "reference": "ffmpeg-formats-native",

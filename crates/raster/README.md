@@ -18,10 +18,10 @@ frame.
 ```rust
 use triergon_core::{Budget, WorkBudget};
 use triergon_font::{OutlinePoint, Point, PointKind};
-use triergon_raster::{
-    Border, Effects, FrameScale, GlyphRequest, Limits, Outline, Placement, Raster, Run, Shadow,
-    Shape, Vector,
+use triergon_raster::compat::libass::{
+    Border, Composite, Effects, FrameScale, GlyphRequest, Placement, Run, Shadow,
 };
+use triergon_raster::{Limits, Outline, Raster, Shape, Vector};
 
 let budget = Budget::new(64 << 20)?;
 let mut raster = Raster::new(&budget, Limits::default());
@@ -57,12 +57,12 @@ let effects = Effects {
     blur: 1.0,
     be: 0,
 };
-let request = GlyphRequest { shape: &shape, placement, frame, effects: &effects, karaoke: false };
+let request = GlyphRequest::new(&shape, &placement, &frame, &effects);
 let mut run = Run::default();
-let glyph = raster.render(&request, &mut run, &mut work)?.ok_or("nothing drawn")?;
+let glyph = run.render(&mut raster, &request, &mut work)?.ok_or("nothing drawn")?;
 
 // The run's fill, border and shadow.
-let composite = raster.compose(&effects, &frame, [&glyph], &mut work)?;
+let composite = Composite::new(&mut raster, &effects, &frame, [&glyph], &mut work)?;
 assert_eq!(composite.origin, glyph.origin());
 assert!(composite.fill.is_some() && composite.border.is_some() && composite.shadow.is_some());
 # Ok::<(), Box<dyn std::error::Error>>(())
@@ -72,32 +72,33 @@ A bitmap's `position` is its first pixel relative to the origin it is placed
 against: a glyph's fill and border each count from their `PlacedBitmap::origin`,
 and a run's composite from `Composite::origin`, the least origin of its glyphs.
 
-`Raster::render` draws a glyph in one call. A renderer that keeps the bitmaps it
-draws, as libass's caches do, renders through `Raster::render_with` and a
-`GlyphSource` of its own, which hands out the fill, the opaque box and the
-border it has and draws only the others, held through a handle of its own
-(`GlyphSource::Bitmap`; `Raster::render` uses `Arc<Bitmap>`), which the run
-and `Raster::compose` hold them by. The steps are public too: `Run::place`
-quantises and places the glyph without drawing it, giving the `BitmapTransform`
-its fill and border are drawn under; `Raster::stroke_border` strokes the border,
-returning it in storage of exactly its size, `Raster::draw` draws each and
-`Raster::draw_box` the opaque box, from `Shape::unit_box`; and
-`Run::add` adds what was drawn to the run. A bitmap is then keyed by its shape
-and its transform, a stroked border by its glyph and its `BorderStroke`, and a
-composite by `Effects::key` and its glyphs' bitmaps and places, as libass keys
-them.
+`Run::render` draws one glyph of a run in one call. A renderer that keeps the
+bitmaps it draws, as libass's caches do, renders through `Run::render_with` and
+a `GlyphSource` of its own. The run places the glyph and asks the source for
+its fill under a `Quantized` transform, its opaque box (`Shape::unit_box` under
+the box's transform) and its border, a `PlacedStroke`: how the outline is
+stroked (`BorderStroke::stroke`, which returns the border in storage of exactly
+its size) and where the stroked outline is placed (`PlacedStroke::place`). The
+source hands out what it keeps and draws the rest (`Raster::draw`), held
+through a handle of its own (`GlyphSource::Bitmap`; `Run::render` uses
+`Arc<Bitmap>`), which the run and `Composite::new` hold them by. A bitmap is
+then keyed by its shape and its `BitmapTransform`, a stroked border by its
+glyph and its `BorderStroke`, and a composite by `Effects::key` and its glyphs'
+bitmaps and places in the run, whose origin `Composite::origin_of` gives before
+the composite exists, as libass keys them. Use `compat::libass::float_max`
+when applying the same style policy to a pair of floating-point values.
 
-## What it matches
+## Supported
 
-| Stage | libass | Here |
+| Stage | What libass does | Here |
 |---|---|---|
-| Outlines | `ass_outline.c`: conversion from font outlines, rectangles, rotation by 90°, affine and perspective transforms, the karaoke leftmost x, control boxes | `Outline`, `Matrix`, `Projection` |
-| Borders | `ass_outline_stroke`, and the stroking scale `get_bitmap_glyph` chooses | `Raster::stroke`, `Pen` |
-| Rasteriser | `ass_rasterizer.c` with 16×16 tiles (the default build, without large tiles) | `Raster::rasterize`, `Shape` |
-| Glyph bitmaps | `calc_transform_matrix`, `quantize_transform`, `restore_transform`, `get_bitmap_glyph` with its border and the opaque box of `\bord` style 3 | `Raster::render`, `GlyphRequest`, `Placement`, `FrameScale`, `Run`, `GlyphPlacement`, `GlyphBitmaps`; `Quantized::standalone` and `Raster::draw` for the drawing of a vector clip |
-| Blur | `ass_blur.c` (the cascade Gaussian and its coefficient solver), the `\be` box blur, `ass_synth_blur` | `Raster::blur` |
-| Composition | the filter flags `render_and_combine_glyphs` derives, `quantize_blur`, `restore_blur`, `ass_composite_construct`, `ass_fix_outline`, `ass_shift_bitmap`, the additive blend | `Raster::compose`, `Effects`, `Border`, `Shadow`, `Composite`, `Bitmap` |
-| Clipping | `render_glyph`: `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |
+| Outlines | conversion from font outlines, rectangles, rotation by 90°, affine and perspective transforms, the least x a `\kf` run is timed from, control boxes | `Outline`, `Matrix`, `Projection` |
+| Borders | offset outlines of `\bord`, `\xbord` and `\ybord`, at the scale a glyph's border is stroked at | `Raster::stroke`, `Pen`, `BorderStroke` |
+| Rasteriser | the tile rasteriser with 16×16 tiles (the default build, without large tiles) | `Raster::rasterize`, `Shape` |
+| Glyph bitmaps | the 3D transform of `\frx` `\fry` `\frz` `\fax` `\fay`, its quantisation and restoration, each glyph's fill and border and the opaque box of `\bord` style 3 | `Run::render`, `GlyphRequest`, `Placement`, `FrameScale`, `Run`, `PlacedStroke`, `GlyphBitmaps`; `Quantized::standalone` and `Raster::draw` for the drawing of a vector clip |
+| Blur | the cascade Gaussian of `\blur` and its coefficients, the `\be` box blur | `Raster::blur` |
+| Composition | how a run's fill, border and shadow combine, the quantised blur and shadow offset, the border's subtraction of the fill, the sub-pixel shadow shift, the additive blend | `Composite::new`, `Effects`, `Border`, `Shadow`, `Composite`, `Bitmap` |
+| Clipping | `\clip` and `\iclip` rectangles and the `\kf` split; the multiply blends of vector clips | `Clip`, `ClipFrame`, `Bitmap::multiply`, `Bitmap::multiply_inverse` |
 
 `Raster::stroke` writes the outer (+offset) and inner (−offset) outline of a
 border in one pass over the source's contours, with libass's joins, round caps,
@@ -105,8 +106,8 @@ spline fitting and error bounds, and matches libass point for point and segment
 for segment.
 
 The arithmetic is libass's own: 26.6 integer subdivision with its rounding, the
-16-bit wrapping of the tile and blur engines, `lrint` rounding to even, and the C
-`FFMAX`/`FFMIN` treatment of NaN. Floating-point expressions keep the C source's
+16-bit wrapping of the tile and blur engines, `lrint` rounding to even, and the
+treatment of NaN by C's `a > b ? a : b`. Floating-point expressions keep the C source's
 order and grouping without fused multiply-adds, so the correctly rounded
 operations give the same result on every target. Two further properties:
 
@@ -120,7 +121,7 @@ operations give the same result on every target. Two further properties:
   sine and cosine of the `\frx`, `\fry` and `\frz` rotations
   (`Placement::rotation`), `log1p` and `expm1`, which quantise the `\blur`
   radius and restore its variance (`Effects::blur`), and `exp` in the Gaussian
-  blur's coefficients (`Raster::blur` and `Raster::compose`). Libms do not
+  blur's coefficients (`Raster::blur` and `Composite::new`). Libms do not
   guarantee correct rounding for these, so results that depend on them match
   libass built against the same libm and can differ between platforms.
 
@@ -155,12 +156,14 @@ including arithmetic overflow in debug builds.
   how their images are allocated (the renderer).
 - The large-tile build of libass (`--enable-large-tiles`) and its SIMD engines.
 
-## Verification
+## Conformance
 
-`cargo test -p triergon-raster` runs unit tests and a mutation test. The
-comparison with libass 0.17.5's C engine runs through
+The comparison with libass 0.17.5's C engine runs through
 [raster-worker](../raster-worker/README.md) and the `harness/features/raster-*`
-features; [docs/status.md](../../docs/status.md) has the results.
+features (`cargo xtask raster compare`). The on-demand
+[raster sweep](../../harness/features/raster-sweep/contract.json) records a composite
+whose allocation fails as `Error::Allocation` where the 32-bit ARMv7 reference omits it.
+Results are in [docs/status.md](../../docs/status.md).
 
 ## Licence
 

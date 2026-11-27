@@ -1,5 +1,6 @@
 //! Applying lookups: the context every subtable sees, glyph skipping and matching,
 //! and the sequence machinery shared by ligatures and contextual lookups.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::data::Data;
 use super::gdef::Gdef;

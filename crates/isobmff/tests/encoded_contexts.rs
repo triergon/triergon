@@ -1,22 +1,19 @@
-mod common;
+use crate::common;
 use common::{child, children, roots, table};
 use std::{ops::Range, sync::atomic::AtomicBool};
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceId, TimeBase, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, EditList, Limits, SampleTable, TrackHeader,
+    CursorStatus, Limits,
     compat::mov::{
-        edits::{
-            EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
-            EncodedEditProfile,
-        },
-        encoded::{
-            EncodedMetadataProfile, EncodedRecoveryProfile, EncodedSelection, EncodedStream,
-            EncodedStreamJob,
-        },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+        edits::{EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan},
+        encoded::{EncodedSelection, EncodedStream, EncodedStreamJob},
+        packets::{DemuxTrack, PacketCursor, PacketLimits},
     },
+    config::ConfigurationLimits,
+    movie::{EditList, TrackHeader},
+    table::SampleTable,
 };
 
 #[cfg(feature = "reference-trace")]
@@ -96,7 +93,6 @@ impl Source {
                 description: 1,
                 limits: ConfigurationLimits::default(),
             },
-            triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
         )
         .unwrap();
         for _ in 0..20000 {
@@ -124,7 +120,6 @@ impl Source {
             configs,
             i,
             EncodedEditLimits::default(),
-            triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
         )
         .unwrap()
     }
@@ -172,7 +167,6 @@ fn rows(
         &s.media,
         PacketLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut rows = Vec::new();
@@ -199,7 +193,6 @@ fn strict_config(s: &Source) -> Result<EncodedStream, Error> {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        EncodedMetadataProfile,
     )?;
     finish_config(job, &mut i)
 }
@@ -238,23 +231,22 @@ fn strict_plan(s: &Source) -> Result<EncodedEditPlan, Error> {
         &configs,
         &i,
         EncodedEditLimits::default(),
-        EncodedRecoveryProfile,
     )?;
     finish(&mut j, &mut i, 1)
 }
 macro_rules! wave_case {
     ($name:ident,$file:literal) => {
+        wave_case!($name, $file, true);
+    };
+    ($name:ident,$file:literal,$fault:literal) => {
         #[test]
         fn $name() {
             let s = Source::new(include_bytes!(concat!(
-                "fixtures/encoded-metadata-v4/",
+                "fixtures/encoded-metadata/",
                 $file,
                 ".mov"
             )));
-            assert!(
-                strict_config(&s).is_err(),
-                "original strict operation must stay strict"
-            );
+            assert_eq!(strict_config(&s).is_err(), $fault);
             let mut i = s.input();
             let configs = s.configs(&mut i);
             let demux = configs[0].demux();
@@ -262,8 +254,8 @@ macro_rules! wave_case {
             assert_eq!(demux.extradata.as_ref(), [0x11, 0x88, 0x56, 0xe5, 0]);
             let report = configs[0].wave_source().expect("owned source wave report");
             assert_eq!(report.raw.header().kind, *b"wave");
-            assert!(report.first_default_profile_fault.is_some());
-            assert!(report.fault_count > 0);
+            assert_eq!(report.first_default_profile_fault.is_some(), $fault);
+            assert_eq!(report.fault_count > 0, $fault);
             assert!(report.raw.bytes().belongs_to(&s.pool));
             let packets = rows(&s, None);
             assert_eq!(packets.len(), 2);
@@ -286,13 +278,15 @@ macro_rules! wave_case {
         }
     };
 }
-macro_rules! recovery_case {($name:ident,$file:literal)=>{#[test]fn $name(){
- let s=Source::new(include_bytes!(concat!("fixtures/encoded-recovery-v5/",$file,".mp4")));assert!(strict_plan(&s).is_err(),"original source/default strict profile remains refused");let plan=s.plan(1).unwrap();let report=plan.recovery_observation().expect("owned source recovery result");assert!(report.ignored_group_boxes()>0);assert_eq!(report.raw_source_table().header(),s.table.raw().header());
- match report.source_result(){Ok(_facts)=>{#[cfg(feature = "reference-trace")]assert_eq!(_facts.receiver_cause(),triergon_isobmff::reference_trace::mov::encoded::RecoveryReceiverCause::RollProlNotAppliedByOpenIndex);},Err(fault)=>{assert!(matches!(fault.error,Error::Invalid(_)|Error::Unsupported(_)|Error::Truncated));assert!(matches!(&fault.raw.header().kind,b"sgpd"|b"sbgp"));assert!(fault.raw.bytes().belongs_to(&s.pool));}}
+macro_rules! recovery_case {
+ ($name:ident,$file:literal) => { recovery_case!($name, $file, true); };
+ ($name:ident,$file:literal,$refused:literal)=>{#[test]fn $name(){
+ let s=Source::new(include_bytes!(concat!("fixtures/encoded-recovery/",$file,".mp4")));assert_eq!(strict_plan(&s).is_err(), $refused);let plan=s.plan(1).unwrap();let report=plan.recovery_observation().expect("owned source recovery result");assert!(report.ignored_group_boxes()>0);assert_eq!(report.raw_source_table().header(),s.table.raw().header());
+ match report.source_result(){Ok(_facts)=>{#[cfg(feature = "reference-trace")]assert_eq!(_facts.cause(),triergon_isobmff::reference_trace::mov::encoded::RecoveryReceiverCause::RollProlNotAppliedByOpenIndex);},Err(fault)=>{assert!(matches!(fault.error,Error::Invalid(_)|Error::Unsupported(_)|Error::Truncated));assert!(matches!(&fault.raw.header().kind,b"sgpd"|b"sbgp"));assert!(fault.raw.bytes().belongs_to(&s.pool));}}
  let packets=rows(&s,Some(plan));assert_eq!(packets.len(),2);assert_eq!((packets[0].demux.pts,packets[1].demux.pts),(Some(0),Some(40)));assert_eq!((packets[0].demux.flags,packets[1].demux.flags),(1,0));for p in packets{assert_eq!(p.demux.source_range,p.source.range);}
 }};}
 wave_case!(wave_duplicate_frma, "qt-v1-duplicate-frma");
-wave_case!(wave_missing_frma, "qt-v1-missing-frma");
+wave_case!(wave_missing_frma, "qt-v1-missing-frma", false);
 wave_case!(wave_wrong_frma, "qt-v1-wrong-frma");
 wave_case!(wave_missing_terminator, "qt-v1-missing-terminator");
 wave_case!(wave_terminator_body, "qt-v1-terminator-body");
@@ -306,7 +300,7 @@ fn range_playback_refuses_malformed_quicktime_aac_wave() {
         ($name:literal) => {
             assert!(
                 range_config(&Source::new(include_bytes!(concat!(
-                    "fixtures/encoded-metadata-v4/qt-v1-",
+                    "fixtures/encoded-metadata/qt-v1-",
                     $name,
                     ".mov"
                 ))))
@@ -328,9 +322,9 @@ fn range_playback_refuses_malformed_quicktime_aac_wave() {
 #[test]
 fn range_playback_keeps_valid_quicktime_aac_wave() {
     for raw in [
-        include_bytes!("fixtures/encoded-metadata-v4/qt-v1-wave.mov").as_slice(),
-        include_bytes!("fixtures/encoded-metadata-v4/qt-v1-unknown.mov").as_slice(),
-        include_bytes!("fixtures/encoded-metadata-v4/qt-v1-unframed-compression.mov").as_slice(),
+        include_bytes!("fixtures/encoded-metadata/qt-v1-wave.mov").as_slice(),
+        include_bytes!("fixtures/encoded-metadata/qt-v1-unknown.mov").as_slice(),
+        include_bytes!("fixtures/encoded-metadata/qt-v1-unframed-compression.mov").as_slice(),
     ] {
         let s = Source::new(raw);
         let config = range_config(&s).unwrap();
@@ -344,7 +338,7 @@ fn range_playback_keeps_valid_quicktime_aac_wave() {
 
 #[test]
 fn range_playback_refuses_an_extra_iso_aac_wave_path() {
-    let mut raw = include_bytes!("fixtures/encoded-metadata-v4/creation-v0-0.mov").to_vec();
+    let mut raw = include_bytes!("fixtures/encoded-metadata/creation-v0-0.mov").to_vec();
     assert!(range_config(&Source::new(&raw)).is_ok());
     let bitrate = raw.windows(4).position(|bytes| bytes == b"btrt").unwrap();
     raw[bitrate..bitrate + 4].copy_from_slice(b"wave");
@@ -353,7 +347,7 @@ fn range_playback_refuses_an_extra_iso_aac_wave_path() {
 
 #[test]
 fn range_playback_keeps_the_base_config_for_dolby_vision_hevc_entries() {
-    let raw = include_bytes!("fixtures/encoded-v1/control-hevc-aac-front.mp4");
+    let raw = include_bytes!("fixtures/encoded-stream/control-hevc-aac-front.mp4");
     let source = Source::new(raw);
     let control = range_config(&source).unwrap();
     let entry = &source.table.descriptions()[0];
@@ -375,26 +369,26 @@ fn range_playback_keeps_the_base_config_for_dolby_vision_hevc_entries() {
 }
 
 recovery_case!(recovery_dangling_description, "dangling-description");
-recovery_case!(recovery_empty_run, "empty-run");
+recovery_case!(recovery_empty_run, "empty-run", false);
 recovery_case!(recovery_coverage_over, "coverage-over");
-recovery_case!(recovery_coverage_under, "coverage-under");
+recovery_case!(recovery_coverage_under, "coverage-under", false);
 recovery_case!(recovery_fragment_namespace, "fragment-namespace");
-recovery_case!(recovery_grouping_parameter, "grouping-parameter");
+recovery_case!(recovery_grouping_parameter, "grouping-parameter", false);
 recovery_case!(
     recovery_variable_length_unadmitted,
-    "variable-length-unadmitted"
+    "variable-length-unadmitted",
+    false
 );
 recovery_case!(recovery_duplicate_description, "duplicate-description");
 recovery_case!(
     recovery_unknown_group_unadmitted,
-    "unknown-group-unadmitted"
+    "unknown-group-unadmitted",
+    false
 );
 
 #[test]
 fn wave_work_zero_cancel_and_request_generation_stay_checked() {
-    let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-wave.mov"
-    ));
+    let s = Source::new(include_bytes!("fixtures/encoded-metadata/qt-v1-wave.mov"));
     let mut i = s.input();
     let mut j = EncodedStreamJob::new_description_with_contexts(
         &s.header,
@@ -405,7 +399,6 @@ fn wave_work_zero_cancel_and_request_generation_stay_checked() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     let used = s.pool.used();
@@ -430,7 +423,6 @@ fn wave_work_zero_cancel_and_request_generation_stay_checked() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     i.reset(0).unwrap();
@@ -441,9 +433,7 @@ fn wave_work_zero_cancel_and_request_generation_stay_checked() {
 }
 #[test]
 fn foreign_pool_is_not_recovery_or_wave_policy() {
-    let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-wave.mov"
-    ));
+    let s = Source::new(include_bytes!("fixtures/encoded-metadata/qt-v1-wave.mov"));
     let other = Budget::new(1 << 20).unwrap();
     let i = InputCursor::new(
         &other,
@@ -464,15 +454,14 @@ fn foreign_pool_is_not_recovery_or_wave_policy() {
                 major_brand: Some(s.brand),
                 description: 1,
                 limits: ConfigurationLimits::default()
-            },
-            triergon_isobmff::compat::mov::encoded::EncodedContextProfile
+            }
         ),
         Err(Error::ForeignPool)
     ));
 }
 #[test]
 fn later_real_esds_fault_is_not_hidden_by_earlier_allowed_wave_fault() {
-    let mut b = include_bytes!("fixtures/encoded-metadata-v4/qt-v1-wrong-frma.mov").to_vec();
+    let mut b = include_bytes!("fixtures/encoded-metadata/qt-v1-wrong-frma.mov").to_vec();
     let at = b.windows(4).position(|w| w == b"esds").unwrap();
     b[at + 4] = 1;
     let s = Source::new(&b);
@@ -486,7 +475,6 @@ fn later_real_esds_fault_is_not_hidden_by_earlier_allowed_wave_fault() {
             description: 1,
             limits: ConfigurationLimits::default(),
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     let mut error = None;
@@ -507,9 +495,7 @@ fn later_real_esds_fault_is_not_hidden_by_earlier_allowed_wave_fault() {
 }
 #[test]
 fn configuration_and_group_limits_are_never_converted_to_demux_context() {
-    let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-wave.mov"
-    ));
+    let s = Source::new(include_bytes!("fixtures/encoded-metadata/qt-v1-wave.mov"));
     let mut i = s.input();
     let limits = ConfigurationLimits {
         max_config_bytes: 1,
@@ -524,7 +510,6 @@ fn configuration_and_group_limits_are_never_converted_to_demux_context() {
             description: 1,
             limits,
         },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     let mut rejected = false;
@@ -540,7 +525,7 @@ fn configuration_and_group_limits_are_never_converted_to_demux_context() {
     }
     assert!(rejected);
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-recovery-v5/roll-negative-v0.mp4"
+        "fixtures/encoded-recovery/roll-negative-v0.mp4"
     ));
     let mut i = s.input();
     let configs = s.configs(&mut i);
@@ -549,7 +534,6 @@ fn configuration_and_group_limits_are_never_converted_to_demux_context() {
         &configs,
         &i,
         EncodedEditLimits { max_samples: 1 },
-        triergon_isobmff::compat::mov::encoded::EncodedContextProfile,
     )
     .unwrap();
     assert!(matches!(
@@ -559,9 +543,7 @@ fn configuration_and_group_limits_are_never_converted_to_demux_context() {
 }
 #[test]
 fn valid_context_outputs_retain_original_whole_backing_after_parser_drop() {
-    let s = Source::new(include_bytes!(
-        "fixtures/encoded-metadata-v4/qt-v1-wave.mov"
-    ));
+    let s = Source::new(include_bytes!("fixtures/encoded-metadata/qt-v1-wave.mov"));
     let pool = s.pool.clone();
     let mut i = s.input();
     let configs = s.configs(&mut i);
@@ -593,7 +575,7 @@ fn valid_context_outputs_retain_original_whole_backing_after_parser_drop() {
 #[test]
 fn recovery_cancel_and_logical_generation_do_not_become_source_fault_reports() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-recovery-v5/coverage-under.mp4"
+        "fixtures/encoded-recovery/coverage-under.mp4"
     ));
     let mut i = s.input();
     let configs = s.configs(&mut i);
@@ -641,7 +623,7 @@ macro_rules! diagnostic_case {
         #[cfg(feature = "reference-trace")]
         #[test]
         fn $name() {
-            let data = include_bytes!(concat!("fixtures/private-catalogue-v8/", $file, ".mov"));
+            let data = include_bytes!(concat!("fixtures/private-catalogue/", $file, ".mov"));
             let expected: Vec<String> = $expected.iter().map(|s: &&str| s.to_string()).collect();
             assert_eq!(diagnostics(data, 1), expected);
             assert_eq!(diagnostics(data, 4096), expected);
@@ -701,9 +683,7 @@ diagnostic_case!(
 #[cfg(feature = "reference-trace")]
 #[test]
 fn diagnostic_backpressure_cancel_and_zero_work_keep_owned_pending_event() {
-    let s = Source::new(include_bytes!(
-        "fixtures/private-catalogue-v8/drop-dOps.mov"
-    ));
+    let s = Source::new(include_bytes!("fixtures/private-catalogue/drop-dOps.mov"));
     let mut job = PrivateDiagnosticJob::new(&s.table, &s.pool, Limits::default()).unwrap();
     let before = s.pool.used();
     let mut w = WorkBudget::new(0);
@@ -743,9 +723,7 @@ fn diagnostic_backpressure_cancel_and_zero_work_keep_owned_pending_event() {
 #[cfg(feature = "reference-trace")]
 #[test]
 fn diagnostic_cancel_is_sticky_and_never_publishes_partial_events() {
-    let s = Source::new(include_bytes!(
-        "fixtures/private-catalogue-v8/drop-dOps.mov"
-    ));
+    let s = Source::new(include_bytes!("fixtures/private-catalogue/drop-dOps.mov"));
     let mut job = PrivateDiagnosticJob::new(&s.table, &s.pool, Limits::default()).unwrap();
     assert_eq!(
         job.poll(&mut WorkBudget::new(1), &AtomicBool::new(false))

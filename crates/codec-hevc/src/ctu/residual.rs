@@ -51,14 +51,10 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             qpc_from_qpi(qpi) + self.qp_bd_off
         };
         let bd_shift = bd + log2 + 10 - 15; // (8-301) with log2TransformRange = 15
-        let scale_list: Option<&[u8]> =
-            if self.sps.scaling_list_enabled && !(transform_skip && n > 4) {
-                let sl = self
-                    .pps
-                    .scaling_list
-                    .as_ref()
-                    .or(self.sps.scaling_list.as_ref())
-                    .unwrap();
+        // With scaling lists enabled, lists the PPS carries replace the SPS ones.
+        let scale_list: Option<&[u8]> = match &self.sps.scaling_list {
+            Some(sps_list) if !(transform_skip && n > 4) => {
+                let sl = self.pps.scaling_list.as_ref().unwrap_or(sps_list);
                 let matrix = c_idx + if cu.intra { 0 } else { 3 };
                 Some(match log2 {
                     2 => &sl.sl4[matrix][..],
@@ -66,9 +62,9 @@ impl<P: Pixel> SliceDecoder<'_, P> {
                     4 => &sl.sl16[matrix][..],
                     _ => &sl.sl32[if matrix >= 3 { 3 } else { 0 }][..],
                 })
-            } else {
-                None
-            };
+            }
+            _ => None,
+        };
         let ls = (LEVEL_SCALE[(qp % 6) as usize] as i64) << (qp / 6);
         let flat_scale = 16 * ls;
         let rnd = 1i64 << (bd_shift - 1);

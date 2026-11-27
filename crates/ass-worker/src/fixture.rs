@@ -29,7 +29,7 @@
 //! optional `-` and 1 to 18 digits after any spaces; `@chunk` without two
 //! of them is ignored, and leaves its next line to be read as a command.
 
-/// Directives bound the work of the harness itself, as the reference's
+/// Directives bound the work of the harness itself, as the libass worker's
 /// arrays do.
 const MAX_OVERRIDES: usize = 255;
 const MAX_TIMES: usize = 64;
@@ -247,7 +247,7 @@ mod tests {
     use super::{Command, Fixture, frames_error, number};
 
     #[test]
-    fn directives_and_commands_read_as_the_reference_reads_them() {
+    fn directives_and_commands_read_as_the_libass_worker_reads_them() {
         assert_eq!(number(b"  -12 7"), Some((-12, &b" 7"[..])));
         assert_eq!(number(b"+1"), None);
         assert_eq!(number(b"1234567890123456789"), None);

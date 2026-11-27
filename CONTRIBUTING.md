@@ -4,48 +4,32 @@
 
 You need Rust (see `rust-version` in `Cargo.toml`; `build-workers` and the full check
 also install the dated nightly toolchain pinned in xtask, which builds the AAC codec
-worker and the SIMD lane), Python 3, a C compiler,
-a C++ compiler and `make` (for the FFmpeg, FreeType, HarfBuzz, FriBidi, libass and mpg123 builds),
-`pkg-config` and zlib headers (NASM on x86), and `zstd` (for zstd-compressed evidence sets
-and their test). The references are only needed for differential and performance work.
+worker and runs the `std::simd` checks), Python 3, a C compiler, a C++ compiler and
+`make` (for the FFmpeg, mpg123, FreeType, HarfBuzz, FriBidi and libass builds),
+`pkg-config` and zlib headers (NASM on x86), and `zstd` (for zstd-compressed evidence
+sets and their test). The references are only needed for differential and performance
+work.
 
 ```sh
 cargo xtask fixtures              # generate the authored test corpus into .research/
 cargo test --workspace            # library tests
-cargo xtask prepare-check         # once: pinned references (FFmpeg, FreeType,
-                                  # HarfBuzz, FriBidi, libass), fixtures, font
-                                  # corpus, workers
+cargo xtask prepare-check         # once: the pinned references, fixtures, vectors,
+                                  # font corpus and workers
 cargo xtask check                 # everything CI runs
 ```
 
-CI runs the check in four parts as parallel jobs, each after `cargo xtask prepare-check
-PART`: `cargo xtask check lint`, `test`, `variants` and `parity`. Each part runs
-locally the same way. The jobs restore the packed reference builds (`cargo xtask
-references`) and the target directory of an earlier run; `tools/target-cache.py` marks
-every tracked file whose content differs from that run's as new, so cargo rebuilds
-whatever reads it. Beside them, the `armv7 tests` job runs the tests of `triergon-framing`,
-`triergon-isobmff` and `triergon-mpegts` in the `checked` profile for the 32-bit gate
-target `thumbv7neon-unknown-linux-gnueabihf` under user-mode QEMU, where smaller
-pointers change the storage sizes their budget tests pin. The required `check` status passes
-only when the four parts and this job pass.
-
-A pull request that changes only `docs/`, `harness/evidence/sets/` or Markdown files
-no code reads runs `cargo xtask check docs` instead: formatting, check-design,
-check-links, check-revisions and the evidence index tests. `tools/ci-scope.py` decides
-this against the merge base; any other change, and every push to main, runs the full
-check.
-
-Set `CARGO_INCREMENTAL=0` for direct cargo commands; the reference builds and
-benchmarks assume it.
+`cargo xtask help` lists every command. CI runs `check` in four parts and a 32-bit ARM
+test job, and a pull request that changes only documentation runs `cargo xtask check
+docs` instead; [quality](docs/quality.md#harness) describes each part. Set
+`CARGO_INCREMENTAL=0` for direct cargo commands; the reference builds and benchmarks
+assume it.
 
 ## Ground rules
 
-- **Safe Rust only.** Every library crate forbids `unsafe_code`. There is no exception
-  for performance. Packages that build a worker binary (the worker crates, and
-  `triergon-framing` and `triergon-isobmff` for their worker examples) deny it at
-  package level instead, so that each worker binary's C entry point is its one allowed
-  exception
-  ([quality](docs/quality.md#measuring-performance)).
+- **Safe Rust only.** Every library crate forbids `unsafe_code` in its `lib.rs`. There is
+  no exception for performance. The workspace lint table, which every package inherits,
+  denies it rather than forbidding it, so that each worker binary's C entry point is its
+  one allowed exception ([quality](docs/quality.md#measuring-performance)).
 - **No dependencies by default.** A third-party crate is admitted only if its whole
   dependency graph is safe Rust, it fits the exact contract (timing, bounds, errors,
   incremental input), it passes the same gates as our own code, and reusing it is
@@ -53,15 +37,10 @@ benchmarks assume it.
   that comparison before adding one. Tooling follows the same rule.
 - **Specifications first.** Implement from the standard. Every reference
   implementation (FFmpeg, FreeType, HarfBuzz, libass and the rest) is consulted as a
-  black box: its inputs and outputs, never its source. Nothing new is translated from
-  another implementation. The modules listed in
-  [docs/provenance.md](docs/provenance.md) are earlier translations of FreeType,
-  HarfBuzz and libass, kept for now under those projects' permissive licences and
-  notices. They may be rewritten from specifications later, and a listed module that
-  has a public specification may be rewritten from it whenever it is being changed
-  anyway. The CJK auto-hinter in `triergon-font` is the only translation added after
-  this rule, by explicit decision; it is listed with the others and may likewise be
-  rewritten later. The reference implementations Unicode publishes with its standards
+  black box: its inputs and outputs, never its source. Nothing is translated from
+  another implementation; [docs/provenance.md](docs/provenance.md) lists the modules
+  that are translations, and a change that rewrites one from its specification removes
+  it from that list. The reference implementations Unicode publishes with its standards
   count as specification. Tables the specification declares normative but does not
   print may be recovered from reference output, provided the recovery is scripted and
   reproducible (see `crates/codec-dca`). Behaviour, rules as well as tables, may
@@ -70,44 +49,41 @@ benchmarks assume it.
   behaviour and names the probe that establishes it.
 - **Lints are policy.** Clippy (`all` and `pedantic`) and rustdoc run with
   `-D warnings`. The workspace `[lints]` table states the pedantic lints the code does
-  not follow and why; each library's `lib.rs` enables the documentation, visibility,
-  console and `unwrap` lints it already passes and lists those still pending. Fix the
+  not follow and why; each library's `lib.rs` also enables `missing_docs`,
+  `missing_debug_implementations`, `unreachable_pub`, `clippy::print_stdout`,
+  `clippy::print_stderr`, `clippy::unwrap_used` and `clippy::expect_used`. Fix the
   cause; an `#[allow]` needs a one-line reason.
 - **Bounded by construction.** Input-dependent allocation goes through a `Budget`;
   loops over input run under a `WorkBudget`. Malformed input must never panic or hang.
 - **Rust first in tooling.** Prefer Rust for tools and tests; the repository tooling is
   `cargo xtask`. Python is used where it is clearly the better fit: the independent
-  oracles (`harness/*_oracle.py`), the numpy table-recovery chains under
+  oracles (`harness/*_oracle.py`), the numpy table-recovery and model scripts under
   `harness/codecs/`, the capture input generator `harness/capture/generate_inputs.py`
   (numpy's PCG64 generator and float draws; the cited capture inputs must not change)
-  and fixture authoring scripts. C is used only for workers that link a reference
-  (FFmpeg, FreeType, HarfBuzz, FriBidi, libass and mpg123).
+  and fixture authoring scripts. C is used only for workers that link a reference.
 
 ## Changing behaviour
 
 1. Describe the feature and the reference operation it must match.
-2. Add or extend the corpus and the comparison in the harness.
+2. Add or extend its [feature contract](docs/quality.md#feature-contracts) and corpus.
 3. Implement it. Keep worker traces byte-identical for everything you did not mean to
    change.
-4. Run `cargo xtask report --fate-cache .research/fate-samples`, and the same with
-   `--benchmark --memory --require-acceptance` on an isolated Linux machine of each gate
-   target (AArch64 and 32-bit ARMv7) when the change touches parsing or decoding hot
-   paths; for `triergon-font`,
-   `cargo xtask fonts compare --all` with the same options, for `triergon-shape`
-   `cargo xtask shape compare --all`, for `triergon-raster`
-   `cargo xtask raster compare --all`, for `triergon-ass` `cargo xtask ass compare`,
-   and `cargo xtask fuzz --contract harness/features/<feature>/contract.json --output
-   DIR`. When a reference or a fixture changes, re-record its pins with `cargo xtask
-   <fonts|shape|raster|ass> manifest --record`; pins are never edited by hand. Put the
-   per-case results in the pull request and update [docs/status.md](docs/status.md).
-
-Register comparisons in `harness/features/<id>/contract.json`: it selects the
-candidate, reference and operation; `"gate": "required"` includes it in `cargo xtask
-check`; `"runner": "cargo xtask report"` runs it with the standard report command, with
-`corpus_directory` as the input directory when the manifest omits it. Generated
-manifests record and verify their pins against the contract's reference (`pin_note`
-describes them), and `compare_order` orders a generator's reports. Worker identities
-bind the registered contracts and their corpus inputs.
+4. Compare it: `cargo xtask report --contract harness/features/<feature>/contract.json`
+   (or the family's command: `fonts|shape|raster compare --all`, `ass compare`,
+   `oracle-compare`, `codecs`, `capture`), and `cargo xtask fuzz --contract
+   harness/features/<feature>/contract.json --output DIR`. When the change touches a
+   parsing or decoding hot path, run the comparison with `--benchmark --memory
+   --require-acceptance` on an isolated Linux host of each gate target (AArch64 and
+   32-bit ARMv7), or gate the items it reaches
+   ([running the gates](docs/quality.md#running-the-gates)). When a reference or a
+   fixture changes, re-record its pins with `cargo xtask
+   <fonts|shape|raster|ass> manifest --record`; pins are never edited by hand.
+5. Register every difference that remains as
+   [when a result differs](docs/quality.md#when-a-result-differs) describes, never by
+   weakening the comparison.
+6. Put the per-case results in the pull request. Index the evidence set that holds
+   cited results ([evidence](docs/quality.md#evidence)) and regenerate the status page
+   with `cargo xtask status --write`.
 
 See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, and
 [docs/architecture.md](docs/architecture.md) for where code belongs.
@@ -119,7 +95,7 @@ See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, 
 - The description says what changed, why, and how it was verified, with numbers for
   performance work.
 - Docs change with the code they describe. A crate README describes the crate as it
-  is today.
+  is.
 - Commit messages are plain: an imperative subject line and a body that explains why.
 
 ## Licence
@@ -127,13 +103,9 @@ See [docs/quality.md](docs/quality.md) for the gates and the measurement rules, 
 Contributions are dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
 Media fixtures and specification texts keep their own terms; record the source,
 licence and hash of any new input, and keep inputs without redistribution rights out
-of the repository.
-
-`triergon-font`, `triergon-shape`, `triergon-ass` and `triergon-raster` contain modules
-translated from FreeType, HarfBuzz and libass. Each of these crates ships the projects'
-notices in its `LICENSE` file, and [docs/provenance.md](docs/provenance.md) lists the
-modules, versions and licences. A change that rewrites a listed module from its
-specification updates that list.
+of the repository. The translated modules of `triergon-font`, `triergon-shape`,
+`triergon-ass` and `triergon-raster` keep their projects' notices in each crate's
+`LICENSE` ([provenance](docs/provenance.md)).
 
 `xtask` (repository tooling, never linked into a library crate) contains a deflate
 encoder derived from zlib, under the zlib licence, and an MT19937 generator seeded as

@@ -7,7 +7,7 @@
 //! ARMv7 NEON flushes subnormal operands and results to zero, so there the results can
 //! differ from the scalar code's for subnormal values.
 
-use super::{Covariance, XL_LEN};
+use super::{Covariance, XL_LEN, predictor};
 use crate::fft::Cpx;
 use std::simd::{f32x4, simd_swizzle};
 
@@ -34,13 +34,11 @@ fn rev(v: V) -> V {
 /// reversed and scaled to `x[..32]`, then returns u\[n\] = sum_{j<5} x\[64j + n\]
 /// w\[64j + n\], n < 64, each summed in tap order from zero.
 pub(super) fn analysis_window(
-    x: &mut [f32],
-    input: &[f32],
+    x: &mut [f32; 320],
+    input: &[f32; 32],
     scale: f32,
     w: &[f32; 320],
 ) -> [f32; 64] {
-    let x: &mut [f32; 320] = x.try_into().expect("320 samples");
-    let input: &[f32; 32] = input[..32].try_into().expect("32 samples");
     let s = V::splat(scale);
     for b in 0..8 {
         (rev(ld(input, 4 * b)) * s).copy_to_slice(&mut x[28 - 4 * b..32 - 4 * b]);
@@ -68,8 +66,7 @@ pub(super) fn analysis_fold(u: &[f32; 64]) -> ([f32; 32], [f32; 32]) {
 }
 
 /// The synthesis inputs: a\[k\] = (-1)^k Im x\[k\] and b\[k\] = -(-1)^k Re x\[63 - k\].
-pub(super) fn synthesis_inputs(x: &[Cpx], a: &mut [f32; 64], b: &mut [f32; 64]) {
-    let x: &[Cpx; 64] = x[..64].try_into().expect("64 bands");
+pub(super) fn synthesis_inputs(x: &[Cpx; 64], a: &mut [f32; 64], b: &mut [f32; 64]) {
     let sgn = V::from_array([1.0, -1.0, 1.0, -1.0]);
     for blk in 0..16 {
         let k = 4 * blk;
@@ -86,14 +83,12 @@ pub(super) fn synthesis_inputs(x: &[Cpx], a: &mut [f32; 64], b: &mut [f32; 64]) 
 /// The synthesis butterflies into v (128): v\[64 + 2k\] = ce + se, v\[63 - 2k\] = ce - se,
 /// v\[127 - 2k\] = co - so and v\[2k\] = co + so, k < 32.
 pub(super) fn synthesis_butterflies(
-    ce: &[f32],
-    co: &[f32],
-    se: &[f32],
-    so: &[f32],
+    ce: &[f32; 32],
+    co: &[f32; 32],
+    se: &[f32; 32],
+    so: &[f32; 32],
     v: &mut [f32; 128],
 ) {
-    let [ce, co, se, so]: [&[f32; 32]; 4] =
-        [ce, co, se, so].map(|s| s[..32].try_into().expect("32 values"));
     for b in 0..8 {
         let k = 4 * b;
         let r = 28 - k;
@@ -110,9 +105,7 @@ pub(super) fn synthesis_butterflies(
 
 /// The synthesis window sums: out\[n\] = scale sum_{i<5} (v\[256i + n\] w\[128i + n\] +
 /// v\[256i + 192 + n\] w\[128i + 64 + n\]), n < 64, summed in tap order from zero.
-pub(super) fn synthesis_window(v: &[f32], w: &[f32; 640], scale: f32, out: &mut [f32]) {
-    let v: &[f32; 1280] = v.try_into().expect("1280 samples");
-    let out: &mut [f32; 64] = (&mut out[..64]).try_into().expect("64 samples");
+pub(super) fn synthesis_window(v: &[f32; 1280], w: &[f32; 640], scale: f32, out: &mut [f32; 64]) {
     for b in 0..16 {
         let n = 4 * b;
         let mut acc = V::splat(0.0);
@@ -124,11 +117,23 @@ pub(super) fn synthesis_window(v: &[f32], w: &[f32; 640], scale: f32, out: &mut 
     }
 }
 
-/// The covariances of [`super::covariance`] for four bands, lane j from band `x[j]`. Each
-/// lane adds the scalar code's terms in its order. The bands are transposed two slots at a
+/// The prediction coefficients of each band of `xl`, into `alpha`: the covariances of four
+/// bands at a time.
+pub(super) fn predictors(xl: &[[Cpx; XL_LEN]], alpha: &mut [(Cpx, Cpx)]) {
+    for (rows, alpha) in xl.chunks(4).zip(alpha.chunks_mut(4)) {
+        // a short last group repeats its last band in the spare lanes
+        let lanes: [&[Cpx; XL_LEN]; 4] = std::array::from_fn(|j| &rows[j.min(rows.len() - 1)]);
+        for (a, sums) in alpha.iter_mut().zip(covariance4(lanes)) {
+            *a = predictor(&sums);
+        }
+    }
+}
+
+/// The covariances of one band each for four bands, lane j from band `x[j]`. Each lane
+/// adds the scalar code's terms in its order. The bands are transposed two slots at a
 /// time, so that every vector holds one slot's real or imaginary parts of the four bands,
 /// and the sums run over a window of the last three slots.
-pub(super) fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
+fn covariance4(x: [&[Cpx; XL_LEN]; 4]) -> [Covariance; 4] {
     // slots n and n + 1 of the four bands, as (re, im) vectors
     let slots = |n: usize| {
         let [a, b, c, d] = x.map(|x| ld2(x, n));
@@ -215,97 +220,27 @@ pub(super) fn hybrid_filter(f: &[Cpx; 13], e: &[Cpx; 44], real: bool, out: &mut 
 }
 
 #[cfg(test)]
-// the scalar forms are written index-style, as the default code's loops are
-#[allow(clippy::needless_range_loop)]
 mod tests {
+    use super::super::scalar;
     use super::*;
 
     /// Values well inside the normal range, so that no product or sum is subnormal and
     /// the kernels must equal the scalar arithmetic bit for bit on every target.
-    fn values(seed: u32, n: usize) -> Vec<f32> {
+    fn values<const N: usize>(seed: u32) -> [f32; N] {
         let mut s = seed;
-        (0..n)
-            .map(|_| {
-                s = s.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-                (s as i32) as f32 / 2_147_483_648.0 * 1000.0
-            })
-            .collect()
+        std::array::from_fn(|_| {
+            s = s.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (s as i32) as f32 / 2_147_483_648.0 * 1000.0
+        })
+    }
+
+    fn cpx<const N: usize>(seed: u32) -> [Cpx; N] {
+        let (re, im) = (values::<N>(seed), values::<N>(seed + 1000));
+        std::array::from_fn(|k| Cpx::new(re[k], im[k]))
     }
 
     fn bits(v: &[f32]) -> Vec<u32> {
         v.iter().map(|x| x.to_bits()).collect()
-    }
-
-    #[test]
-    fn analysis_kernels_equal_the_scalar_arithmetic() {
-        let w: [f32; 320] = values(1, 320).try_into().unwrap();
-        let input = values(2, 32);
-        let mut x = values(3, 320);
-        let mut expected = x.clone();
-        for n in 0..32 {
-            expected[31 - n] = input[n] * 0.5;
-        }
-        let u = analysis_window(&mut x, &input, 0.5, &w);
-        assert_eq!(bits(&x), bits(&expected));
-        let scalar_u: Vec<f32> = (0..64)
-            .map(|n| (0..5).fold(0.0, |u, j| u + expected[64 * j + n] * w[64 * j + n]))
-            .collect();
-        assert_eq!(bits(&u), bits(&scalar_u));
-        let (d, r) = analysis_fold(&u);
-        let scalar_d: Vec<f32> = (0..32).map(|n| u[n] - u[63 - n]).collect();
-        let scalar_r: Vec<f32> = (0..32).map(|n| u[31 - n] + u[32 + n]).collect();
-        assert_eq!(bits(&d), bits(&scalar_d));
-        assert_eq!(bits(&r), bits(&scalar_r));
-    }
-
-    #[test]
-    fn synthesis_kernels_equal_the_scalar_arithmetic() {
-        let re = values(4, 64);
-        let im = values(5, 64);
-        let x: Vec<Cpx> = (0..64).map(|k| Cpx::new(re[k], im[k])).collect();
-        let (mut a, mut b) = ([0f32; 64], [0f32; 64]);
-        synthesis_inputs(&x, &mut a, &mut b);
-        for k in 0..64 {
-            let sgn = if k & 1 == 0 { 1.0 } else { -1.0 };
-            assert_eq!(a[k].to_bits(), (sgn * x[k].im).to_bits(), "a[{k}]");
-            assert_eq!(b[k].to_bits(), (-sgn * x[63 - k].re).to_bits(), "b[{k}]");
-        }
-
-        let [ce, co, se, so] = [6, 7, 8, 9].map(|seed| values(seed, 32));
-        let mut v = [0f32; 128];
-        synthesis_butterflies(&ce, &co, &se, &so, &mut v);
-        let mut expected = [0f32; 128];
-        for k in 0..32 {
-            expected[64 + 2 * k] = ce[k] + se[k];
-            expected[63 - 2 * k] = ce[k] - se[k];
-            expected[127 - 2 * k] = co[k] - so[k];
-            expected[2 * k] = co[k] + so[k];
-        }
-        assert_eq!(bits(&v), bits(&expected));
-
-        let history = values(10, 1280);
-        let w: [f32; 640] = values(11, 640).try_into().unwrap();
-        let mut out = [0f32; 64];
-        synthesis_window(&history, &w, 0.25, &mut out);
-        let scalar: Vec<f32> = (0..64)
-            .map(|n| {
-                let acc = (0..5).fold(0.0, |acc, i| {
-                    acc + (history[256 * i + n] * w[128 * i + n]
-                        + history[256 * i + 192 + n] * w[128 * i + 64 + n])
-                });
-                acc * 0.25
-            })
-            .collect();
-        assert_eq!(bits(&out), bits(&scalar));
-    }
-
-    fn cpx(seed: u32, n: usize) -> Vec<Cpx> {
-        let re = values(seed, n);
-        let im = values(seed + 1000, n);
-        re.into_iter()
-            .zip(im)
-            .map(|(re, im)| Cpx::new(re, im))
-            .collect()
     }
 
     fn cpx_bits(v: &[Cpx]) -> Vec<(u32, u32)> {
@@ -313,42 +248,72 @@ mod tests {
     }
 
     #[test]
+    fn analysis_kernels_equal_the_scalar_arithmetic() {
+        let w = values::<320>(1);
+        let input = values::<32>(2);
+        let (mut x, mut expected) = (values::<320>(3), values::<320>(3));
+        let u = analysis_window(&mut x, &input, 0.5, &w);
+        let scalar_u = scalar::analysis_window(&mut expected, &input, 0.5, &w);
+        assert_eq!(bits(&x), bits(&expected));
+        assert_eq!(bits(&u), bits(&scalar_u));
+        let ((d, r), (scalar_d, scalar_r)) = (analysis_fold(&u), scalar::analysis_fold(&u));
+        assert_eq!(bits(&d), bits(&scalar_d));
+        assert_eq!(bits(&r), bits(&scalar_r));
+    }
+
+    #[test]
+    fn synthesis_kernels_equal_the_scalar_arithmetic() {
+        let x = cpx::<64>(4);
+        let (mut a, mut b) = ([0f32; 64], [0f32; 64]);
+        let (mut scalar_a, mut scalar_b) = ([0f32; 64], [0f32; 64]);
+        synthesis_inputs(&x, &mut a, &mut b);
+        scalar::synthesis_inputs(&x, &mut scalar_a, &mut scalar_b);
+        assert_eq!((bits(&a), bits(&b)), (bits(&scalar_a), bits(&scalar_b)));
+
+        let [ce, co, se, so] = [6, 7, 8, 9].map(values::<32>);
+        let (mut v, mut expected) = ([0f32; 128], [0f32; 128]);
+        synthesis_butterflies(&ce, &co, &se, &so, &mut v);
+        scalar::synthesis_butterflies(&ce, &co, &se, &so, &mut expected);
+        assert_eq!(bits(&v), bits(&expected));
+
+        let history = values::<1280>(10);
+        let w = values::<640>(11);
+        let (mut out, mut scalar_out) = ([0f32; 64], [0f32; 64]);
+        synthesis_window(&history, &w, 0.25, &mut out);
+        scalar::synthesis_window(&history, &w, 0.25, &mut scalar_out);
+        assert_eq!(bits(&out), bits(&scalar_out));
+    }
+
+    #[test]
     fn covariance_kernel_equals_the_scalar_arithmetic() {
-        let bands: Vec<[Cpx; XL_LEN]> = (0..4)
-            .map(|j| cpx(20 + j, XL_LEN).try_into().unwrap())
-            .collect();
+        let bands: [[Cpx; XL_LEN]; 5] = std::array::from_fn(|j| cpx::<XL_LEN>(20 + j as u32));
         let sums = covariance4(std::array::from_fn(|j| &bands[j]));
         for (band, sums) in bands.iter().zip(sums) {
-            let scalar = super::super::covariance(band);
+            let scalar = scalar::covariance(band);
             let parts = |c: &Covariance| cpx_bits(&[c.r01, c.r02, c.r12, Cpx::new(c.r11, c.r22)]);
             assert_eq!(parts(&sums), parts(&scalar));
         }
+        // five bands: the second group repeats its one band in the spare lanes
+        let (mut alpha, mut scalar_alpha) = (
+            [(Cpx::default(), Cpx::default()); 5],
+            [(Cpx::default(), Cpx::default()); 5],
+        );
+        predictors(&bands, &mut alpha);
+        scalar::predictors(&bands, &mut scalar_alpha);
+        let flat = |a: &[(Cpx, Cpx)]| {
+            cpx_bits(&a.iter().flat_map(|&(a0, a1)| [a0, a1]).collect::<Vec<_>>())
+        };
+        assert_eq!(flat(&alpha), flat(&scalar_alpha));
     }
 
     #[test]
     fn hybrid_filter_equals_the_scalar_arithmetic() {
-        let f: [Cpx; 13] = cpx(30, 13).try_into().unwrap();
-        let e: [Cpx; 44] = cpx(31, 44).try_into().unwrap();
+        let (f, e) = (cpx::<13>(30), cpx::<44>(31));
         for real in [false, true] {
-            let mut out = [Cpx::default(); 32];
+            let (mut out, mut scalar_out) = ([Cpx::default(); 32], [Cpx::default(); 32]);
             hybrid_filter(&f, &e, real, &mut out);
-            let scalar: Vec<Cpx> = (0..32)
-                .map(|t| {
-                    let mut acc = Cpx::default();
-                    for (c, v) in f.iter().zip(e[t..t + 13].iter().rev()) {
-                        if real {
-                            acc.re += c.re * v.re;
-                            acc.im += c.re * v.im;
-                        } else {
-                            let p = c.mul(*v);
-                            acc.re += p.re;
-                            acc.im += p.im;
-                        }
-                    }
-                    acc
-                })
-                .collect();
-            assert_eq!(cpx_bits(&out), cpx_bits(&scalar), "real taps {real}");
+            scalar::hybrid_filter(&f, &e, real, &mut scalar_out);
+            assert_eq!(cpx_bits(&out), cpx_bits(&scalar_out), "real taps {real}");
         }
     }
 }

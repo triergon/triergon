@@ -17,18 +17,23 @@ use core::ops::Range;
 use triergon_core::container::{CodecId, MediaKind, RandomAccess};
 use triergon_core::{Budget, BudgetVec, Error, Result, TimeBase};
 use triergon_framing::{
-    FlacFrameHeader, FlacStreamInfo, OPUS_RATE, OpusHead, VorbisIdentification, VorbisModes,
-    opus_packet_samples, vorbis_header_type,
+    flac::{FlacFrameHeader, FlacStreamInfo},
+    opus::{self, OpusHead},
+    vorbis::{self, VorbisIdentification, VorbisModes},
 };
 
 /// The mapping a logical stream's first packet identifies.
-#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Mapping {
+pub(crate) enum Mapping {
+    /// Vorbis I: the first packet is the identification header (`\x01vorbis`).
     Vorbis,
+    /// Opus (RFC 7845): the first packet is `OpusHead`.
     Opus,
+    /// FLAC (Ogg FLAC 1.0): the first packet is `\x7fFLAC` with the native stream header.
     Flac,
+    /// Theora I: the first packet is the identification header (`\x80theora`).
     Theora,
+    /// Speex: the first packet is the Speex header (`Speex   `).
     Speex,
     /// A mapping this reader does not interpret; [`Track::codec_tag`](crate::Track)
     /// holds the start of its first packet.
@@ -60,8 +65,8 @@ const UNKNOWN_TAG: usize = 8;
 
 impl Mapping {
     /// The mapping and its identifying magic (the codec tag) of a first packet.
-    pub fn identify(first: &[u8]) -> (Mapping, &[u8]) {
-        if vorbis_header_type(first) == Some(1) {
+    pub(crate) fn identify(first: &[u8]) -> (Mapping, &[u8]) {
+        if vorbis::header_type(first) == Some(1) {
             return (Mapping::Vorbis, &first[..7]);
         }
         if first.starts_with(b"OpusHead") {
@@ -87,7 +92,8 @@ impl Mapping {
         )
     }
 
-    pub fn kind(self) -> MediaKind {
+    /// What the mapping codes.
+    pub(crate) fn kind(self) -> MediaKind {
         match self {
             Mapping::Vorbis | Mapping::Opus | Mapping::Flac | Mapping::Speex => MediaKind::Audio,
             Mapping::Theora => MediaKind::Video,
@@ -95,15 +101,15 @@ impl Mapping {
         }
     }
 
-    /// The neutral codec; `tag` is the track's codec tag.
-    pub fn codec(self, tag: &[u8]) -> CodecId<'_> {
+    /// The neutral codec.
+    pub(crate) fn codec(self) -> CodecId {
         match self {
             Mapping::Vorbis => CodecId::Vorbis,
             Mapping::Opus => CodecId::Opus,
             Mapping::Flac => CodecId::Flac,
             Mapping::Theora => CodecId::Theora,
             Mapping::Speex => CodecId::Speex,
-            Mapping::Other(_) => CodecId::Other(tag),
+            Mapping::Other(_) => CodecId::Other,
         }
     }
 }
@@ -172,7 +178,12 @@ impl Durations {
 const OPUS_PREROLL: i64 = 3840;
 
 impl Timeline {
-    pub(crate) fn durations(&self, packet: &[u8], previous: &mut Previous) -> Durations {
+    pub(crate) fn durations(
+        &self,
+        packet: &[u8],
+        previous: &mut Previous,
+        reference: bool,
+    ) -> Durations {
         match *self {
             Timeline::Vorbis { blocksize, modes } => {
                 let Ok(block) = modes.block(packet) else {
@@ -181,29 +192,25 @@ impl Timeline {
                 };
                 let size = block.size(blocksize);
                 let flagged = block.previous_long.map(|long| blocksize[usize::from(long)]);
-                let standalone = block.samples_after(flagged.unwrap_or(blocksize[0]), blocksize);
                 let after = |previous: u16| block.samples_after(previous, blocksize);
-                let durations = match *previous {
-                    Previous::Start => Durations {
-                        exact: Some(0),
-                        standalone: Some(standalone),
-                        carried: Some(standalone),
-                    },
-                    Previous::Unknown => Durations {
-                        exact: flagged.map(after),
-                        standalone: Some(standalone),
-                        carried: Some(standalone),
-                    },
-                    Previous::Block(last) => Durations {
-                        exact: Some(after(last)),
-                        standalone: Some(standalone),
-                        carried: Some(after(last)),
-                    },
+                let exact = match *previous {
+                    Previous::Start => Some(0),
+                    Previous::Unknown => flagged.map(after),
+                    Previous::Block(last) => Some(after(last)),
+                };
+                let standalone = reference.then(|| after(flagged.unwrap_or(blocksize[0])));
+                let carried = match *previous {
+                    Previous::Start | Previous::Unknown => standalone,
+                    Previous::Block(_) => exact,
                 };
                 *previous = Previous::Block(size);
-                durations
+                Durations {
+                    exact,
+                    standalone,
+                    carried,
+                }
             }
-            Timeline::Opus { .. } => Durations::uniform(opus_packet_samples(packet).ok()),
+            Timeline::Opus { .. } => Durations::uniform(opus::packet_samples(packet).ok()),
             Timeline::Flac => {
                 Durations::uniform(FlacFrameHeader::parse(packet).ok().map(|h| h.block_size))
             }
@@ -309,6 +316,8 @@ pub(crate) enum Headers {
     /// Speex extra headers still to come.
     SpeexExtra(u32),
     Done,
+    /// A packet was not the header the mapping requires there: the stream is invalid.
+    Invalid,
 }
 
 /// Whether a packet is a header.
@@ -361,7 +370,7 @@ impl Configuration {
             }
             Mapping::Opus => {
                 let head = OpusHead::parse(packet)?;
-                config.sample_rate = Some(OPUS_RATE);
+                config.sample_rate = Some(opus::SAMPLE_RATE);
                 config.channels = Some(head.channels);
                 config.append(packet)?;
                 config.configuration = 0..packet.len();
@@ -461,12 +470,12 @@ impl Configuration {
             Headers::Flac(_) => {
                 let start = self.bytes.len();
                 self.append(packet)?;
-                if packet[0] & 0x7f == triergon_framing::FLAC_VORBIS_COMMENT {
+                if packet[0] & 0x7f == triergon_framing::flac::VORBIS_COMMENT {
                     self.comments = Some(start + 4..self.bytes.len());
                 }
                 self.configuration = 0..self.bytes.len();
             }
-            Headers::SpeexExtra(_) | Headers::Done => {}
+            Headers::SpeexExtra(_) | Headers::Done | Headers::Invalid => {}
         }
         Ok(())
     }
@@ -550,7 +559,7 @@ impl Headers {
         match self {
             Headers::Vorbis(read) => {
                 let expected = if read == 1 { 3 } else { 5 };
-                if vorbis_header_type(packet) != Some(expected) {
+                if vorbis::header_type(packet) != Some(expected) {
                     return Err(Error::Invalid("Vorbis header packet order"));
                 }
                 Ok(if read == 1 {
@@ -560,10 +569,12 @@ impl Headers {
                 })
             }
             Headers::OpusTags => {
-                if !packet.starts_with(b"OpusTags") {
-                    return Err(Error::Invalid("Opus comment header"));
+                // RFC 7845 section 5.2: a comment header too short for its comment list
+                // makes the stream invalid.
+                match packet.strip_prefix(b"OpusTags") {
+                    Some(list) if comment_list_fits(list) => Ok(HeaderStep::Last),
+                    _ => Err(Error::Invalid("Opus comment header")),
                 }
-                Ok(HeaderStep::Last)
             }
             Headers::Flac(remaining) => {
                 // A frame starts with its sync code; a metadata block never has type 127.
@@ -605,7 +616,7 @@ impl Headers {
             } else {
                 HeaderStep::More
             }),
-            Headers::Done => Ok(HeaderStep::Media),
+            Headers::Done | Headers::Invalid => Ok(HeaderStep::Media),
         }
     }
 
@@ -621,6 +632,27 @@ impl Headers {
             _ => Headers::Done,
         }
     }
+}
+
+/// Whether a comment list fits in `list`: a vendor string and a count of comments, each
+/// after its 32-bit little-endian length (RFC 7845 section 5.2, Vorbis I section 5.2.1).
+/// Bytes after the list are allowed.
+fn comment_list_fits(list: &[u8]) -> bool {
+    fn take(rest: &mut &[u8]) -> Option<()> {
+        let (field, tail) = rest.split_first_chunk::<4>()?;
+        *rest = tail.get(usize::try_from(u32::from_le_bytes(*field)).ok()?..)?;
+        Some(())
+    }
+    let mut rest = list;
+    if take(&mut rest).is_none() {
+        return false;
+    }
+    let Some((count, tail)) = rest.split_first_chunk::<4>() else {
+        return false;
+    };
+    rest = tail;
+    // Each comment takes at least its four length bytes, so a false count stops early.
+    (0..u32::from_le_bytes(*count)).all(|_| take(&mut rest).is_some())
 }
 
 /// What the Theora identification header (Theora I section 6.2) says about timing.
@@ -716,7 +748,7 @@ fn ogg_flac_first(packet: &[u8]) -> Result<(&[u8], u16)> {
     }
     let native = &rest[4..];
     if !native.starts_with(b"fLaC")
-        || native.get(4).map(|kind| kind & 0x7f) != Some(triergon_framing::FLAC_STREAMINFO)
+        || native.get(4).map(|kind| kind & 0x7f) != Some(triergon_framing::flac::STREAMINFO)
         || native.len() < 8 + FlacStreamInfo::BYTES
     {
         return Err(Error::Invalid("Ogg FLAC STREAMINFO"));
@@ -735,14 +767,14 @@ mod tests {
         assert_eq!(Mapping::identify(b"\x7fFLAC\x01\0").0, Mapping::Flac);
         let (theora, tag) = Mapping::identify(b"\x80theora\x03\x02");
         assert_eq!((theora.kind(), tag), (MediaKind::Video, &b"\x80theora"[..]));
-        assert_eq!(theora.codec(tag), CodecId::Theora);
-        let (speex, tag) = Mapping::identify(b"Speex   1.2");
+        assert_eq!(theora.codec(), CodecId::Theora);
+        let (speex, _) = Mapping::identify(b"Speex   1.2");
         assert_eq!(
-            (speex.kind(), speex.codec(tag)),
+            (speex.kind(), speex.codec()),
             (MediaKind::Audio, CodecId::Speex)
         );
         let (daala, tag) = Mapping::identify(b"\x80daala\0");
-        assert_eq!(daala.codec(tag), CodecId::Other(b"\x80daala"));
+        assert_eq!((daala.codec(), tag), (CodecId::Other, &b"\x80daala"[..]));
         let (unknown, tag) = Mapping::identify(b"abcdefghijkl");
         assert_eq!(
             (unknown, tag),
@@ -836,7 +868,10 @@ mod tests {
         assert_eq!(timeline.random_access(&[0x40, 1]), RandomAccess::NotSync);
         assert_eq!(timeline.random_access(&[]), RandomAccess::NotSync);
         let mut previous = Previous::Start;
-        assert_eq!(timeline.durations(&[0x40], &mut previous).exact, Some(1));
+        assert_eq!(
+            timeline.durations(&[0x40], &mut previous, false).exact,
+            Some(1)
+        );
         // Bitstream 3.2.0 counts frame indices: the first frame is 0|0.
         let old = Configuration::first(
             &budget,
@@ -881,7 +916,10 @@ mod tests {
         assert_eq!(&config.bytes[config.configuration.clone()], &first[..]);
         let mut previous = Previous::Start;
         assert_eq!(
-            config.timeline.durations(b"any", &mut previous).exact,
+            config
+                .timeline
+                .durations(b"any", &mut previous, false)
+                .exact,
             Some(640)
         );
         assert!(config.timeline.trims());

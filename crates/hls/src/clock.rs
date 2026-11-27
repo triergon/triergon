@@ -1,0 +1,321 @@
+//! Segment-local AAC presentation clocks, separate from the original PES facts.
+
+use crate::aac::HlsAacFrame;
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Budget, BudgetVec, Error, Result, Rounding, Time, TimeBase};
+
+/// Where an AAC frame's segment presentation time comes from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HlsAacPtsOrigin {
+    /// The frame's own PES timestamp.
+    Pes,
+    /// Counted back from the first PES timestamp by the durations of the frames before it.
+    BeforeFirstPes,
+    /// Counted on from the end of the previous frame, after a PES timestamp.
+    AfterPes,
+    /// Counted from zero: the segment has no AAC PES timestamp.
+    SegmentLocal,
+}
+
+/// The segment presentation clock of one AAC frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HlsAacClock {
+    /// The presentation time.
+    pub pts: Time,
+    /// The decode time: the PES DTS, or `pts` without one.
+    pub dts: Time,
+    /// Where `pts` comes from.
+    pub origin: HlsAacPtsOrigin,
+    /// The same clock in 90 kHz ticks.
+    pub demux90: HlsAacDemuxClock90,
+}
+
+/// The AAC demux clock in 90 kHz ticks. The reference reports the same decode
+/// and presentation tick for AAC. Source DTS stays available on the frame.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HlsAacDemuxClock90 {
+    /// The presentation and decode tick.
+    pub pts_and_dts: i64,
+    /// The frame duration in ticks, rounded down.
+    pub duration: i64,
+}
+
+/// Presentation and frame duration in integer nanoseconds before playlist mapping.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HlsAudioClockNs {
+    /// The presentation time in nanoseconds.
+    pub pts_ns: i64,
+    /// The frame duration in nanoseconds.
+    pub duration_ns: i64,
+}
+
+/// Resolve a complete segment's audio lane using exact frame durations. A
+/// missing leading timestamp is computed backwards from the first PES anchor.
+/// With no PES anchor, the first frame is segment-local zero. Each later PES
+/// timestamp keeps its own value. An absent DTS takes the selected AAC
+/// receiver's presentation time. The input frames retain their original facts.
+pub fn resolve_hls_aac_clocks(
+    pool: &Budget,
+    frames: &[HlsAacFrame],
+    maximum_frames: usize,
+    cancel: &AtomicBool,
+) -> Result<BudgetVec<HlsAacClock>> {
+    if cancel.load(Ordering::Relaxed) {
+        return Err(Error::Cancelled);
+    }
+    if frames.len() > maximum_frames {
+        return Err(Error::Limit {
+            requested: frames.len(),
+            maximum: maximum_frames,
+        });
+    }
+    let mut clocks = BudgetVec::new(pool);
+    let tick = TimeBase::HZ_90000;
+    let mut prefix_duration = Time::new(0, 1)?;
+    let mut first_anchor = None;
+    for (index, frame) in frames.iter().enumerate() {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if let Some(pts) = frame.pts {
+            first_anchor = Some((index, pts));
+            break;
+        }
+        prefix_duration = prefix_duration.checked_add(frame.duration)?;
+    }
+    let (mut next, mut next90) = match first_anchor {
+        Some((index, pts)) => {
+            let mut projected = pts.to_i64_ticks(tick, Rounding::NearestAway)?;
+            for frame in frames[..index].iter().rev() {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(Error::Cancelled);
+                }
+                projected = step_on_frame_grid(tick, projected, frame.duration, -1)?;
+            }
+            (pts.checked_sub(prefix_duration)?, projected)
+        }
+        None => (Time::new(0, 1)?, 0),
+    };
+    let mut missing_origin = if first_anchor.is_some() {
+        HlsAacPtsOrigin::BeforeFirstPes
+    } else {
+        HlsAacPtsOrigin::SegmentLocal
+    };
+    clocks.try_reserve_exact(frames.len())?;
+    let mut previous = None;
+    for frame in frames {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if frame.duration.numerator() <= 0 {
+            return Err(Error::Invalid("AAC segment frame duration"));
+        }
+        let (pts, pts90, origin) = match frame.pts {
+            Some(pts) => {
+                missing_origin = HlsAacPtsOrigin::AfterPes;
+                (
+                    pts,
+                    pts.to_i64_ticks(tick, Rounding::NearestAway)?,
+                    HlsAacPtsOrigin::Pes,
+                )
+            }
+            None => (next, next90, missing_origin),
+        };
+        if previous.is_some_and(|previous| pts < previous) {
+            return Err(Error::Invalid("AAC segment timestamps move backwards"));
+        }
+        let dts = frame.dts.unwrap_or(pts);
+        let demux90 = HlsAacDemuxClock90 {
+            pts_and_dts: pts90,
+            duration: frame.duration.to_i64_ticks(tick, Rounding::Floor)?,
+        };
+        clocks
+            .try_push(HlsAacClock {
+                pts,
+                dts,
+                origin,
+                demux90,
+            })
+            .map_err(|error| error.error)?;
+        previous = Some(pts);
+        next = pts.checked_add(frame.duration)?;
+        next90 = step_on_frame_grid(tick, pts90, frame.duration, 1)?;
+    }
+    Ok(clocks)
+}
+
+/// [`ns_audio_clocks`] of AAC frames.
+pub(crate) fn ns_aac_clocks(
+    frames: &BudgetVec<HlsAacFrame>,
+    cancel: &AtomicBool,
+) -> Result<BudgetVec<HlsAudioClockNs>> {
+    ns_audio_clocks(frames, cancel, |frame| {
+        (frame.pts.or(frame.dts), frame.duration)
+    })
+}
+
+/// The nanosecond clock of each frame, from its anchor and duration (`facts`): a frame
+/// without an anchor follows the previous one; frames before the first anchor are
+/// counted back from it.
+pub(crate) fn ns_audio_clocks<F>(
+    frames: &BudgetVec<F>,
+    cancel: &AtomicBool,
+    facts: impl Fn(&F) -> (Option<Time>, Time),
+) -> Result<BudgetVec<HlsAudioClockNs>> {
+    let mut output = BudgetVec::new(frames.budget());
+    if cancel.load(Ordering::Relaxed) {
+        return Err(Error::Cancelled);
+    }
+    let mut last_duration = None;
+    let mut duration_nanoseconds = |duration: Time| -> Result<i64> {
+        if let Some((cached, nanoseconds)) = last_duration
+            && duration == cached
+        {
+            return Ok(nanoseconds);
+        }
+        let nanoseconds = duration.to_nanoseconds(Rounding::Floor)?;
+        last_duration = Some((duration, nanoseconds));
+        Ok(nanoseconds)
+    };
+    let mut leading = 0_i64;
+    let mut next = 0;
+    for frame in frames.as_slice() {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        let (anchor, duration) = facts(frame);
+        if let Some(time) = anchor {
+            next = time
+                .to_nanoseconds(Rounding::NearestAway)?
+                .checked_sub(leading)
+                .ok_or(Error::Overflow)?;
+            break;
+        }
+        leading = leading
+            .checked_add(duration_nanoseconds(duration)?)
+            .ok_or(Error::Overflow)?;
+    }
+    output.try_reserve_exact(frames.len())?;
+    let mut previous = None;
+    for frame in frames.as_slice() {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        let (anchor, duration) = facts(frame);
+        let pts = match anchor {
+            Some(time) => time.to_nanoseconds(Rounding::NearestAway)?,
+            None => next,
+        };
+        if previous.is_some_and(|previous| pts < previous) {
+            return Err(Error::Invalid("HLS audio timestamps move backwards"));
+        }
+        let duration_ns = duration_nanoseconds(duration)?;
+        output
+            .try_push(HlsAudioClockNs {
+                pts_ns: pts,
+                duration_ns,
+            })
+            .map_err(|error| error.error)?;
+        previous = Some(pts);
+        next = pts.checked_add(duration_ns).ok_or(Error::Overflow)?;
+    }
+    Ok(output)
+}
+
+// Keep the tick displacement from the nearest rounded frame-grid point.
+// Observed libavformat packet timestamps use that phase across AAC frames.
+fn step_on_frame_grid(tick: TimeBase, pts: i64, duration: Time, step: i128) -> Result<i64> {
+    let numerator = u64::try_from(duration.numerator())
+        .map_err(|_| Error::Invalid("AAC segment frame duration"))?;
+    let denominator = u64::try_from(duration.denominator()).map_err(|_| Error::Overflow)?;
+    let frame = TimeBase::new(numerator, denominator)?;
+    let current =
+        Time::from_ticks(i128::from(pts), tick)?.to_ticks(frame, Rounding::NearestAway)?;
+    let adjacent = current.checked_add(step).ok_or(Error::Overflow)?;
+    let project = |index| Time::from_ticks(index, frame)?.to_ticks(tick, Rounding::NearestAway);
+    let delta = project(adjacent)?
+        .checked_sub(project(current)?)
+        .ok_or(Error::Overflow)?;
+    i64::try_from(i128::from(pts).checked_add(delta).ok_or(Error::Overflow)?)
+        .map_err(|_| Error::Overflow)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use triergon_core::Bytes;
+    use triergon_framing::aac;
+
+    fn frame(pool: &Budget, ticks: Option<i128>) -> HlsAacFrame {
+        let bytes = [0xff, 0xf1, 0x50, 0x80, 0x01, 0x1f, 0xfc, 0];
+        HlsAacFrame {
+            bytes: Bytes::copy_from_slice(pool, &bytes).unwrap(),
+            header: aac::inspect_adts_header(&bytes).unwrap(),
+            pts: ticks.map(|ticks| Time::new(ticks * 1024, 44100).unwrap()),
+            dts: None,
+            duration: Time::new(1024, 44100).unwrap(),
+        }
+    }
+
+    #[test]
+    fn exact_44100_clock_marks_leading_holes_explicit_anchors_and_discontinuities() {
+        let pool = Budget::new(8192).unwrap();
+        let frames = [None, Some(3), None, Some(8), None].map(|pts| frame(&pool, pts));
+        let result = resolve_hls_aac_clocks(&pool, &frames, 5, &AtomicBool::new(false)).unwrap();
+        let expected = [
+            (2, HlsAacPtsOrigin::BeforeFirstPes),
+            (3, HlsAacPtsOrigin::Pes),
+            (4, HlsAacPtsOrigin::AfterPes),
+            (8, HlsAacPtsOrigin::Pes),
+            (9, HlsAacPtsOrigin::AfterPes),
+        ];
+        for (stamp, (index, origin)) in result.as_slice().iter().zip(expected) {
+            assert_eq!(stamp.pts, Time::new(index * 1024, 44100).unwrap());
+            assert_eq!(stamp.dts, stamp.pts);
+            assert_eq!(stamp.origin, origin);
+        }
+        let no_anchors = [frame(&pool, None), frame(&pool, None)];
+        let result =
+            resolve_hls_aac_clocks(&pool, &no_anchors, 2, &AtomicBool::new(false)).unwrap();
+        assert_eq!(result.as_slice()[0].pts, Time::new(0, 1).unwrap());
+        assert_eq!(result.as_slice()[1].pts, no_anchors[0].duration);
+        assert!(
+            result
+                .as_slice()
+                .iter()
+                .all(|stamp| stamp.origin == HlsAacPtsOrigin::SegmentLocal)
+        );
+        let backwards = [frame(&pool, Some(2)), frame(&pool, Some(1))];
+        assert!(matches!(
+            resolve_hls_aac_clocks(&pool, &backwards, 2, &AtomicBool::new(false)),
+            Err(Error::Invalid("AAC segment timestamps move backwards"))
+        ));
+    }
+
+    #[test]
+    fn parser_only_clock_uses_rounded_anchors_and_integer_adts_duration() {
+        let pool = Budget::new(8192).unwrap();
+        let mut frames = BudgetVec::new(&pool);
+        for pts in [None, Some(3), None, Some(8), None] {
+            frames.try_push(frame(&pool, pts)).unwrap();
+        }
+        let stamps = ns_aac_clocks(&frames, &AtomicBool::new(false)).unwrap();
+        let stamps: Vec<_> = stamps.as_slice().iter().map(|clock| clock.pts_ns).collect();
+        let step = 1_024_000_000_000 / 44_100;
+        let first = frames.as_slice()[1]
+            .pts
+            .unwrap()
+            .to_nanoseconds(Rounding::NearestAway)
+            .unwrap();
+        let next = frames.as_slice()[3]
+            .pts
+            .unwrap()
+            .to_nanoseconds(Rounding::NearestAway)
+            .unwrap();
+        assert_eq!(
+            stamps,
+            [first - step, first, first + step, next, next + step]
+        );
+        assert!(frames.as_slice()[0].pts.is_none());
+    }
+}

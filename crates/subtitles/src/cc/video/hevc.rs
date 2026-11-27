@@ -3,15 +3,19 @@
 //! picture set, `no_output_of_prior_pics_flag`, `pic_output_flag`, the
 //! sub-layer buffering values and the VUI frame period. The rest of each RBSP
 //! is passed over.
+// The framing reader skips the short-term reference sets needed for caption picture output.
 
 use super::nal::{LastPayload, Timing, vui_timing};
 use triergon_bitstream::{BitError, BitSource, Rbsp};
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_framing::{Codec as Coding, picture_output::HevcLimits, skip_hevc_profile_tier_level};
+use triergon_framing::{
+    nal::{Codec as Coding, skip_hevc_profile_tier_level},
+    picture_output::HevcLimits,
+};
 
 /// The largest `sps_max_dec_pic_buffering_minus1` the reference takes, after
 /// raising it to `sps_max_num_reorder_pics`; an SPS above it is not taken
-/// (case `hevc-dpb-ts`, probe p17).
+/// (case `hevc-dpb-ts`).
 const MOST_DEC_PIC_BUFFERING_MINUS1: u32 = 15;
 
 /// The fields of a sequence parameter set.
@@ -308,7 +312,7 @@ impl Tables {
         bits.ue()?; // bit_depth_luma_minus8
         bits.ue()?; // bit_depth_chroma_minus8
         // log2_max_pic_order_cnt_lsb_minus4 plus 4, summed in 32 bits, and
-        // refused above 16 (7.4.3.2 allows 0 to 12). Probe p95: the reference
+        // refused above 16 (7.4.3.2 allows 0 to 12). As observed, the reference
         // takes 16-bit LSBs and outputs nothing with 17 or 24; a coded
         // 0xFFFFFFFE gives two-bit LSBs, whose slices it then decodes.
         let log2_max_lsb = bits.ue()?.wrapping_add(4);
@@ -323,7 +327,7 @@ impl Tables {
             let reorder = bits.ue()?;
             let latency = bits.ue()?;
             // The reference raises the buffer to the reorder count (case
-            // `hevc-dpb-ts`, probe p17) and refuses one above 16 pictures.
+            // `hevc-dpb-ts`) and refuses one above 16 pictures.
             let dpb = dpb.max(reorder);
             if dpb > MOST_DEC_PIC_BUFFERING_MINUS1 {
                 return Err(Failure::Invalid);
@@ -674,7 +678,7 @@ mod tests {
 
     #[test]
     fn hevc_poc_lsb_lengths_above_16_bits_refuse_the_parameter_set() {
-        // Probe p95: w16 taken, w17 and w24 refused, w2-fffffffe taken.
+        // As observed: 16-bit LSBs are taken and longer ones refused.
         let expected = (
             true,
             Some(Timing {

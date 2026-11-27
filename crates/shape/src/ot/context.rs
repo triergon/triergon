@@ -2,6 +2,7 @@
 //! and 8): rules that match a glyph sequence and apply nested lookups to it.
 //! The rules are read here once, for applying them and for asking whether one
 //! would apply ([`super::would_apply`]).
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::apply::{Apply, Values};
 use super::data::Data;

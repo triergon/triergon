@@ -6,6 +6,7 @@
 
 use super::math::{self, Round, Vector};
 use super::zone::{ON_CURVE, TOUCHED_X, TOUCHED_Y, Zone};
+use crate::fixed;
 use crate::outline::Point;
 use triergon_core::{BudgetVec, Error, Result, WorkBudget};
 
@@ -1515,8 +1516,8 @@ fn interpolate_run(z: &mut Zone, x: bool, a: usize, b: usize, range: std::ops::R
     let (o_low, o_high) = (at(&z.original, low), at(&z.original, high));
     let (c_low, c_high) = (at(&z.current, low), at(&z.current, high));
     let ratio = (u_high > u_low).then(|| {
-        math::div_round(
-            (i64::from(c_high) - i64::from(c_low)) << 16,
+        fixed::div_fix(
+            i64::from(c_high) - i64::from(c_low),
             i64::from(u_high) - i64::from(u_low),
         )
     });
@@ -1533,7 +1534,7 @@ fn interpolate_run(z: &mut Zone, x: bool, a: usize, b: usize, range: std::ops::R
             _ if o <= o_low => c.wrapping_add(c_low.wrapping_sub(o_low)),
             _ if o >= o_high => c.wrapping_add(c_high.wrapping_sub(o_high)),
             Some(ratio) => {
-                let offset = math::div_round((i64::from(u) - i64::from(u_low)) * ratio, 1 << 16);
+                let offset = fixed::mul_fix(i64::from(u) - i64::from(u_low), ratio);
                 c_low.wrapping_add(offset as i32)
             }
             None => c,
@@ -1553,7 +1554,7 @@ fn interpolate_run(z: &mut Zone, x: bool, a: usize, b: usize, range: std::ops::R
 /// quotient rounded; lines within about three degrees of parallel give the
 /// average of the four points, truncated (`intersections`).
 fn intersection(a: [Point; 2], b: [Point; 2]) -> Point {
-    let product = |u: i32, v: i32| math::mul_div(u, v, 64);
+    let product = math::mul;
     let (dax, day) = (a[1].x.wrapping_sub(a[0].x), a[1].y.wrapping_sub(a[0].y));
     let (dbx, dby) = (b[1].x.wrapping_sub(b[0].x), b[1].y.wrapping_sub(b[0].y));
     let (dx, dy) = (b[0].x.wrapping_sub(a[0].x), b[0].y.wrapping_sub(a[0].y));

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "audio-session-lifecycle",
+  "gate": "required",
+  "operation": "audio-session-lifecycle",
+  "candidate": "codec-views-worker",
+  "worker_operation": "audio-session-lifecycle-",
+  "oracle": "audio-session-lifecycle",
+  "contract": [
+    "Compare the AudioSession, PcmBlock, QueueLimits and Discard contracts with a caller-provided AudioDecoder. The input uses three four-sample mono units whose binary-exact normalized PCM and frequencies are known independently.",
+    "Require input backpressure and retry, no consumption before the PTS minus lead, and a start trim and decoder delay that carry across a complete packet. Compare the remaining PCM, end trim and first retained sample time.",
+    "Hold distinct sample rates in separate blocks. Compare a drain-only block with absent PTS and verify that a caller's occupied block is retained. After stop or unload, verify reset of queued input, carried drain and diagnostics.",
+    "Exercise Fail and Skip for a refused unit and an independent drain-only refusal. Compare the resulting PCM, counts, state and typed last error. A rejected StreamSelection audio configuration changes neither session."
+  ],
+  "required_profiles": ["lifecycle", "refusals"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["lifecycle", "refusals"], "cause": "The caller-decoder session oracle only compares parity."},
+    {"bound": "heap", "cases": ["lifecycle", "refusals"], "cause": "The caller-decoder session oracle only compares parity."},
+    {"bound": "total_rss", "cases": ["lifecycle", "refusals"], "cause": "The caller-decoder session oracle only compares parity."}
+  ]
+}

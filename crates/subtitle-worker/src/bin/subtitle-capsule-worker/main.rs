@@ -19,22 +19,16 @@ use std::process::ExitCode;
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let words: Vec<String> = std::env::args().skip(1).collect();
-    let result = match words.first().map(String::as_str) {
-        Some(mode) if mode.starts_with(pgs::PREFIX) => pgs::run(&words),
-        _ => Err(format!(
-            "usage: subtitle-capsule-worker {}{{fold,bench,memory}}",
-            pgs::PREFIX
-        )
-        .into()),
-    };
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("subtitle-capsule-worker: {error}");
-            ExitCode::from(2)
+    triergon_harness_runner::command(Some("subtitle-capsule-worker"), 2, |words| {
+        match words.first().map(String::as_str) {
+            Some(mode) if mode.starts_with(pgs::PREFIX) => pgs::run(words),
+            _ => Err(format!(
+                "usage: subtitle-capsule-worker {}{{fold,bench,memory}}",
+                pgs::PREFIX
+            )
+            .into()),
         }
-    }
+    })
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`

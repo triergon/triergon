@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "id": "hevc-record-annexb",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "hvcc-annexb",
+  "candidate": "framing-views-worker",
+  "worker_operation": "hvcc-annexb-",
+  "reference": "ffmpeg-framing-views-native",
+  "contract": [
+    "Parse hvcC with HvcConfigParser. In all mode write every unit with HvcAnnexBWriter. In decoder mode HvcDecoderConfigWriter accepts records whose declared array types are VPS, SPS, PPS, prefix SEI or suffix SEI. A disallowed array refuses the record as a whole.",
+    "The pinned hevc_mp4toannexb initializer converts those same five array types and refuses other declared types. When initialization retains extradata byte for byte, it did not convert an hvcC record. In decoder mode the public FFmpeg log gives the first disallowed declaration after a reference refusal. The candidate array index is printed in trace.",
+    "Compare Annex B output in record order. Each unit begins with a four-byte start code. Fold kind 1 with the type and length and bytes including the header, and kind 7 with the count and decoder refusal absence. Fold kind 8 for a parse or filter refusal, adding the type for the typed decoder refusal.",
+    "Loading is outside the operation. Parser and filter setup, writing, folding and teardown are inside."
+  ],
+  "required_profiles": [
+    "script",
+    "reference-written",
+    "authored"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_deviations": [
+    {
+      "reading": "A three-byte sample length in a strict hvcC record",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord lengthSizeMinusOne, as documented by HvcConfigFields and HvcConfigParser",
+      "candidate": "refuses the record before writing parameter sets",
+      "reference": "initializes it and writes VPS, SPS and PPS",
+      "compat": "triergon_framing::compat::nal::HevcRecordParser",
+      "cases": [
+        "hvcc-hevc-width3-all",
+        "hvcc-hevc-width3-decoder"
+      ]
+    },
+    {
+      "reading": "The all-array writer writes arrays of types the record's definition does not allow; the reference refuses the record",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array syntax, as documented by HvcAnnexBWriter; ITU-T H.265 Table 7-1; the record's NAL_unit_type is restricted to VPS, SPS, PPS and SEI, which the reference enforces as the decoder writer (HvcDecoderConfigWriter) does, and the all-array writer is an opaque mode by choice",
+      "candidate": "writes the available units in record order, including AUD or opaque types, and emits nothing for an empty array",
+      "reference": "refuses the record as a whole on a disallowed array declaration, including empty declarations",
+      "cases": [
+        "hvcc-hevc-config-unknown_empty-all",
+        "hvcc-aud-array-all",
+        "hvcc-unknown-array-all",
+        "hvcc-unknown-empty-all",
+        "hvcc-opaque-arrays-all"
+      ]
+    },
+    {
+      "reading": "A record ending inside an array header",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array syntax, as documented by HvcConfigParser: NAL_unit_type is followed by a 16-bit numNalus",
+      "candidate": "refuses truncation without a disallowed-array diagnostic",
+      "reference": "refuses but logs a disallowed type of 0 from the truncated declaration",
+      "cases": [
+        "hvcc-truncated-array-header-decoder"
+      ]
+    }
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "hvcc-hevc-flush-all", "hvcc-hevc-flush-decoder", "hvcc-hevc-no-extra-all", "hvcc-hevc-no-extra-decoder", "hvcc-hevc-annexb-extra-all",
+        "hvcc-hevc-annexb-extra-decoder", "hvcc-hevc-width1-all", "hvcc-hevc-width1-decoder", "hvcc-hevc-width2-all", "hvcc-hevc-width2-decoder",
+        "hvcc-hevc-width3-all", "hvcc-hevc-width3-decoder", "hvcc-hevc-config-empty-all", "hvcc-hevc-config-empty-decoder", "hvcc-hevc-config-sei-all",
+        "hvcc-hevc-config-sei-decoder", "hvcc-hevc-config-duplicate-all", "hvcc-hevc-config-duplicate-decoder", "hvcc-hevc-config-unknown_empty-all", "hvcc-remux-hevc-aud0-all",
+        "hvcc-remux-hevc-aud0-decoder",
+        "hvcc-out-of-order-all", "hvcc-out-of-order-decoder", "hvcc-aud-array-all", "hvcc-unknown-array-all", "hvcc-unknown-empty-all",
+        "hvcc-empty-array-all", "hvcc-empty-array-decoder", "hvcc-zero-arrays-all", "hvcc-zero-arrays-decoder", "hvcc-duplicate-array-all",
+        "hvcc-duplicate-array-decoder", "hvcc-declaration-mismatch-all", "hvcc-declaration-mismatch-decoder", "hvcc-complete-all", "hvcc-complete-decoder",
+        "hvcc-incomplete-all", "hvcc-incomplete-decoder", "hvcc-array-limit-all", "hvcc-array-limit-decoder", "hvcc-array-limit-plus-one-all",
+        "hvcc-array-limit-plus-one-decoder", "hvcc-nal-count-limit-all", "hvcc-nal-count-limit-decoder", "hvcc-nal-count-limit-plus-one-all", "hvcc-nal-count-limit-plus-one-decoder",
+        "hvcc-nal-size-limit-all", "hvcc-nal-size-limit-decoder", "hvcc-record-size-limit-all", "hvcc-record-size-limit-decoder", "hvcc-record-size-limit-plus-one-all",
+        "hvcc-record-size-limit-plus-one-decoder", "hvcc-truncated-array-header-decoder", "hvcc-opaque-arrays-all"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "runtime",
+      "cases": [
+        "hvcc-aud-array-decoder", "hvcc-hevc-config-unknown_empty-decoder", "hvcc-opaque-arrays-decoder", "hvcc-truncated-array-header-all", "hvcc-truncated-length-all",
+        "hvcc-truncated-length-decoder", "hvcc-truncated-payload-all", "hvcc-truncated-payload-decoder", "hvcc-unknown-array-decoder", "hvcc-unknown-empty-decoder",
+        "hvcc-zero-length-nal-all", "hvcc-zero-length-nal-decoder"
+      ],
+      "cause": "both workers refuse the input"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "hvcc-hevc-flush-all", "hvcc-hevc-flush-decoder", "hvcc-hevc-no-extra-all", "hvcc-hevc-no-extra-decoder", "hvcc-hevc-annexb-extra-all",
+        "hvcc-hevc-annexb-extra-decoder", "hvcc-hevc-width1-all", "hvcc-hevc-width1-decoder", "hvcc-hevc-width2-all", "hvcc-hevc-width2-decoder",
+        "hvcc-hevc-width3-all", "hvcc-hevc-width3-decoder", "hvcc-hevc-config-empty-all", "hvcc-hevc-config-empty-decoder", "hvcc-hevc-config-sei-all",
+        "hvcc-hevc-config-sei-decoder", "hvcc-hevc-config-duplicate-all", "hvcc-hevc-config-duplicate-decoder", "hvcc-hevc-config-unknown_empty-all", "hvcc-remux-hevc-aud0-all",
+        "hvcc-remux-hevc-aud0-decoder",
+        "hvcc-out-of-order-all", "hvcc-out-of-order-decoder", "hvcc-aud-array-all", "hvcc-unknown-array-all", "hvcc-unknown-empty-all",
+        "hvcc-empty-array-all", "hvcc-empty-array-decoder", "hvcc-zero-arrays-all", "hvcc-zero-arrays-decoder", "hvcc-duplicate-array-all",
+        "hvcc-duplicate-array-decoder", "hvcc-declaration-mismatch-all", "hvcc-declaration-mismatch-decoder", "hvcc-complete-all", "hvcc-complete-decoder",
+        "hvcc-incomplete-all", "hvcc-incomplete-decoder", "hvcc-array-limit-all", "hvcc-array-limit-decoder", "hvcc-array-limit-plus-one-all",
+        "hvcc-array-limit-plus-one-decoder", "hvcc-nal-count-limit-all", "hvcc-nal-count-limit-decoder", "hvcc-nal-count-limit-plus-one-all", "hvcc-nal-count-limit-plus-one-decoder",
+        "hvcc-nal-size-limit-all", "hvcc-nal-size-limit-decoder", "hvcc-record-size-limit-all", "hvcc-record-size-limit-decoder", "hvcc-record-size-limit-plus-one-all",
+        "hvcc-record-size-limit-plus-one-decoder", "hvcc-truncated-array-header-decoder", "hvcc-opaque-arrays-all"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "hvcc-aud-array-decoder", "hvcc-hevc-config-unknown_empty-decoder", "hvcc-opaque-arrays-decoder", "hvcc-truncated-array-header-all", "hvcc-truncated-length-all",
+        "hvcc-truncated-length-decoder", "hvcc-truncated-payload-all", "hvcc-truncated-payload-decoder", "hvcc-unknown-array-decoder", "hvcc-unknown-empty-decoder",
+        "hvcc-zero-length-nal-all", "hvcc-zero-length-nal-decoder"
+      ],
+      "cause": "both workers refuse the input"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "hvcc-hevc-flush-all", "hvcc-hevc-flush-decoder", "hvcc-hevc-no-extra-all", "hvcc-hevc-no-extra-decoder", "hvcc-hevc-annexb-extra-all",
+        "hvcc-hevc-annexb-extra-decoder", "hvcc-hevc-width1-all", "hvcc-hevc-width1-decoder", "hvcc-hevc-width2-all", "hvcc-hevc-width2-decoder",
+        "hvcc-hevc-width3-all", "hvcc-hevc-width3-decoder", "hvcc-hevc-config-empty-all", "hvcc-hevc-config-empty-decoder", "hvcc-hevc-config-sei-all",
+        "hvcc-hevc-config-sei-decoder", "hvcc-hevc-config-duplicate-all", "hvcc-hevc-config-duplicate-decoder", "hvcc-hevc-config-unknown_empty-all", "hvcc-remux-hevc-aud0-all",
+        "hvcc-remux-hevc-aud0-decoder",
+        "hvcc-out-of-order-all", "hvcc-out-of-order-decoder", "hvcc-aud-array-all", "hvcc-unknown-array-all", "hvcc-unknown-empty-all",
+        "hvcc-empty-array-all", "hvcc-empty-array-decoder", "hvcc-zero-arrays-all", "hvcc-zero-arrays-decoder", "hvcc-duplicate-array-all",
+        "hvcc-duplicate-array-decoder", "hvcc-declaration-mismatch-all", "hvcc-declaration-mismatch-decoder", "hvcc-complete-all", "hvcc-complete-decoder",
+        "hvcc-incomplete-all", "hvcc-incomplete-decoder", "hvcc-array-limit-all", "hvcc-array-limit-decoder", "hvcc-array-limit-plus-one-all",
+        "hvcc-array-limit-plus-one-decoder", "hvcc-nal-count-limit-all", "hvcc-nal-count-limit-decoder", "hvcc-nal-count-limit-plus-one-all", "hvcc-nal-count-limit-plus-one-decoder",
+        "hvcc-nal-size-limit-all", "hvcc-nal-size-limit-decoder", "hvcc-record-size-limit-all", "hvcc-record-size-limit-decoder", "hvcc-record-size-limit-plus-one-all",
+        "hvcc-record-size-limit-plus-one-decoder", "hvcc-truncated-array-header-decoder", "hvcc-opaque-arrays-all"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "hvcc-aud-array-decoder", "hvcc-hevc-config-unknown_empty-decoder", "hvcc-opaque-arrays-decoder", "hvcc-truncated-array-header-all", "hvcc-truncated-length-all",
+        "hvcc-truncated-length-decoder", "hvcc-truncated-payload-all", "hvcc-truncated-payload-decoder", "hvcc-unknown-array-decoder", "hvcc-unknown-empty-decoder",
+        "hvcc-zero-length-nal-all", "hvcc-zero-length-nal-decoder"
+      ],
+      "cause": "both workers refuse the input"
+    }
+  ],
+  "open_policies": [
+    {
+      "policy": "A record above the configured HvcConfigLimits is refused; the reference converts it",
+      "undecided": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord field widths, as documented by HvcConfigLimits and HvcConfigParser; the 8-bit numOfArrays and the 16-bit numNalus and lengths make these records valid, and the refusal is the resource limit the caller sets",
+      "rule": "refuses limits of 131072 record bytes, 64 arrays or 256 NALs when exceeded",
+      "documented": "crates/framing/README.md#behaviour-and-limits",
+      "reference_rule": "emits the full output at the next size or count",
+      "compat": "none: no compat item reproduces the reference's rule",
+      "cases": [
+        "hvcc-array-limit-plus-one-all",
+        "hvcc-array-limit-plus-one-decoder",
+        "hvcc-nal-count-limit-plus-one-all",
+        "hvcc-nal-count-limit-plus-one-decoder",
+        "hvcc-record-size-limit-plus-one-all",
+        "hvcc-record-size-limit-plus-one-decoder"
+      ]
+    }
+  ]
+}

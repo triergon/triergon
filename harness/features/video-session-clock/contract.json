@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "id": "video-session-clock",
+  "gate": "required",
+  "operation": "video-session-clock",
+  "candidate": "codec-views-worker",
+  "worker_operation": "video-session-clock-",
+  "oracle": "video-session-clock",
+  "contract": [
+    "Use a distinct signed timestamp for each coded access unit. Compare picture publication in native decode output order by the original packet positions reported by FFprobe, as specified by H.264 §§8.2.1, C.4 and H.265 §§8.3.1, C.5.2.",
+    "Compare VideoSession's one-picture clock hold with a clock exactly one nanosecond early and then due. On release, compare sequence, generation, timestamp, canvas geometry and every RGBA byte against an unclocked session for the same input.",
+    "Check full-queue, empty, EOF and idle input refusals. After flush, retain the prior on-screen picture and publish the replay on a new clock and generation. Stop clears the picture and rejects input.",
+    "For a refused AVC or HEVC access unit, compare failing and skipping after observing the same typed decoder error. The AVC input sets forbidden_zero_bit (H.264 §7.4.1). The HEVC input names a missing picture parameter set (H.265 §§7.4.3.3 and 7.4.7.1). Preserve the following valid picture under Skip."
+  ],
+  "required_profiles": ["avc", "hevc"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["avc-single", "avc-reordered", "hevc-reordered"], "cause": "The clock and lifecycle oracle has no native timing workload."},
+    {"bound": "heap", "cases": ["avc-single", "avc-reordered", "hevc-reordered"], "cause": "The clock and lifecycle oracle has no native heap workload."},
+    {"bound": "total_rss", "cases": ["avc-single", "avc-reordered", "hevc-reordered"], "cause": "The clock and lifecycle oracle has no native resident-memory workload."}
+  ]
+}

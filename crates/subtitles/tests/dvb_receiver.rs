@@ -8,7 +8,7 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_harness_protocol::digest::{fold, fold_bytes};
-use triergon_subtitles::compat::dvb::{AutomaticPalette, Options, ReceiverDecoder, Status};
+use triergon_subtitles::compat::dvb::{AutomaticPalette, Decoder, Options, Status};
 
 struct Case {
     id: String,
@@ -95,7 +95,7 @@ fn cases() -> Vec<Case> {
 fn run(case: &Case, quantum: u64) -> ([u64; 3], u64) {
     let pool = Budget::new(1 << 28).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+    let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
     let (mut events, mut bytes, mut digest, mut yields) = (0, 0, 0, 0);
     let text = |digest: &mut u64| fold(digest, 0);
     text(&mut digest);
@@ -106,7 +106,7 @@ fn run(case: &Case, quantum: u64) -> ([u64; 3], u64) {
             status = decoder.resume(&mut WorkBudget::new(quantum), &cancel);
         }
         let subtitle = match status {
-            Ok(Status::Subtitle(subtitle)) => subtitle,
+            Ok(Status::Ready(subtitle)) => subtitle,
             Ok(_) | Err(Error::Invalid(_)) => continue,
             Err(error) => panic!("{}: {error:?}", case.id),
         };
@@ -193,7 +193,7 @@ fn reduced_depth_pixels_have_colours() {
     for case in &cases {
         let pool = Budget::new(1 << 24).unwrap();
         let cancel = AtomicBool::new(false);
-        let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+        let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
         let mut last = None;
         for (pts, packet) in &case.packets {
             let mut work = WorkBudget::new(u64::MAX);
@@ -224,7 +224,7 @@ fn reduced_depth_pixels_have_colours() {
 fn refuses_packets_without_a_segment() {
     let pool = Budget::new(1 << 20).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut decoder = Decoder::new(&pool, &[], Options::default());
     let mut work = WorkBudget::new(u64::MAX);
     for packet in [
         &b""[..],
@@ -247,7 +247,7 @@ fn charges_work_and_respects_the_pool() {
     let cancel = AtomicBool::new(false);
     let (pts, packet) = &case.packets[0];
     let pool = Budget::new(1 << 20).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+    let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
     let mut work = WorkBudget::new(1 << 20);
     let status = decoder.decode(packet, *pts, &mut work, &cancel).unwrap();
     assert!(status.subtitle().is_some());
@@ -255,7 +255,7 @@ fn charges_work_and_respects_the_pool() {
     assert!(whole >= packet.len() as u64);
     // A small budget yields, spending it all; the calls together spend what
     // one call with enough work does.
-    let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+    let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
     let mut spent = 0;
     for call in 0..whole.div_ceil(64) - 1 {
         let mut small = WorkBudget::new(64);
@@ -282,12 +282,12 @@ fn charges_work_and_respects_the_pool() {
         Err(Error::Invalid(_))
     ));
     let pool = Budget::new(256).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+    let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
     let mut work = WorkBudget::new(u64::MAX);
     assert!(decoder.decode(packet, *pts, &mut work, &cancel).is_err());
     // A cancelled packet is kept, to be resumed or abandoned.
     let pool = Budget::new(1 << 20).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+    let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
     assert!(matches!(
         decoder.decode(packet, *pts, &mut work, &AtomicBool::new(true)),
         Err(Error::Cancelled)
@@ -316,7 +316,7 @@ fn mutated_packets() {
     };
     for case in cases().iter().step_by(3) {
         let pool = Budget::new(1 << 26).unwrap();
-        let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+        let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
         for (pts, packet) in &case.packets {
             for round in 0..8 {
                 let mut bytes = packet.clone();
@@ -335,7 +335,7 @@ fn mutated_packets() {
                 let mut work = WorkBudget::new(1 << 32);
                 let status = decoder.decode(&bytes, *pts, &mut work, &cancel);
                 assert!(
-                    !matches!(status, Ok(Status::Yield | Status::Stalled(_))),
+                    !matches!(status, Ok(Status::Yield | Status::NeedOutput(_))),
                     "{}: {status:?}",
                     case.id
                 );
@@ -412,7 +412,7 @@ fn work_scales_with_placements() {
             segments::end(),
         ]);
         let pool = Budget::new(1 << 22).unwrap();
-        let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+        let mut decoder = Decoder::new(&pool, &[], Options::default());
         let mut work = WorkBudget::new(u64::MAX);
         let presented = decoder
             .decode(&packet, None, &mut work, &AtomicBool::new(false))
@@ -439,7 +439,7 @@ fn decode_all(
 ) -> (Vec<Result<Shown, Error>>, usize) {
     let pool = Budget::new(limit).unwrap();
     let cancel = AtomicBool::new(false);
-    let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+    let mut decoder = Decoder::new(&pool, &[], options);
     let outcomes = packets
         .iter()
         .map(|packet| {
@@ -522,7 +522,7 @@ fn refusals_pay_for_the_check_and_say_whether_to_retry() {
     ]);
     let cancel = AtomicBool::new(false);
     let pool = Budget::new(1 << 20).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut decoder = Decoder::new(&pool, &[], Options::default());
     let mut work = WorkBudget::new(u64::MAX);
     assert!(matches!(
         decoder.decode(&large, Some(0), &mut work, &cancel),
@@ -531,7 +531,7 @@ fn refusals_pay_for_the_check_and_say_whether_to_retry() {
     assert!(work.spent() >= large.len() as u64);
     assert!(!decoder.has_kept_packet());
     let pool = Budget::new(1 << 22).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut decoder = Decoder::new(&pool, &[], Options::default());
     let taken = pool.reserve(pool.available() - (1 << 20)).unwrap();
     let mut work = WorkBudget::new(u64::MAX);
     assert!(matches!(
@@ -542,7 +542,7 @@ fn refusals_pay_for_the_check_and_say_whether_to_retry() {
     drop(taken);
     // Once the pool has room, it is decoded.
     let status = decoder.decode(&large, Some(0), &mut WorkBudget::new(u64::MAX), &cancel);
-    assert!(matches!(status, Ok(Status::Subtitle(_))));
+    assert!(matches!(status, Ok(Status::Ready(_))));
 }
 
 /// A packet that fits the pool but never beside what the decoder holds is
@@ -564,7 +564,7 @@ fn a_packet_that_never_fits_beside_the_decoder_is_refused_with_limit() {
     ]);
     let cancel = AtomicBool::new(false);
     let pool = Budget::new(3 << 20).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut decoder = Decoder::new(&pool, &[], Options::default());
     let mut work = WorkBudget::new(u64::MAX);
     decoder.decode(&drawn, Some(0), &mut work, &cancel).unwrap();
     let error = decoder
@@ -611,7 +611,7 @@ fn end_from_next_at_the_ends_of_the_time_range() {
     let cancel = AtomicBool::new(false);
     let ends = |times: &[Option<i64>]| {
         let pool = Budget::new(1 << 20).unwrap();
-        let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+        let mut decoder = Decoder::new(&pool, &[], options);
         let mut work = WorkBudget::new(u64::MAX);
         times
             .iter()
@@ -686,7 +686,7 @@ fn a_stalled_packet_resumes_to_the_same_output() {
             .collect()
     };
     let pool = Budget::new(1 << 22).unwrap();
-    let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+    let mut decoder = Decoder::new(&pool, &[], Options::default());
     let whole = decoder
         .decode(&drawn, Some(0), &mut WorkBudget::new(u64::MAX), &cancel)
         .map(shown)
@@ -694,7 +694,7 @@ fn a_stalled_packet_resumes_to_the_same_output() {
     let mut stalls = 0;
     for quantum in (1..20_000).step_by(97) {
         let pool = Budget::new(1 << 22).unwrap();
-        let mut decoder = ReceiverDecoder::new(&pool, &[], Options::default());
+        let mut decoder = Decoder::new(&pool, &[], Options::default());
         let status = decoder.decode(&drawn, Some(0), &mut WorkBudget::new(quantum), &cancel);
         if !matches!(status, Ok(Status::Yield)) {
             continue;
@@ -704,13 +704,13 @@ fn a_stalled_packet_resumes_to_the_same_output() {
         let taken = take(&pool, pool.available());
         let mut work = WorkBudget::new(u64::MAX);
         let status = decoder.resume(&mut work, &cancel).unwrap();
-        if let Status::Stalled(error) = status {
+        if let Status::NeedOutput(error) = status {
             assert!(matches!(error, Error::Backpressure { .. }), "{error:?}");
             stalls += 1;
             // Still no room: stalled again, at the same segment.
             assert!(matches!(
                 decoder.resume(&mut work, &cancel),
-                Ok(Status::Stalled(_))
+                Ok(Status::NeedOutput(_))
             ));
             drop(taken);
             let status = decoder.resume(&mut work, &cancel).unwrap();
@@ -738,7 +738,7 @@ fn admitted_packets_never_stall() {
     let mut checked = 0;
     for case in &cases() {
         let pool = Budget::new(1 << 26).unwrap();
-        let mut decoder = ReceiverDecoder::new(&pool, &case.configuration, case.options);
+        let mut decoder = Decoder::new(&pool, &case.configuration, case.options);
         for (pts, packet) in &case.packets {
             let mut variants = vec![packet.clone()];
             for _ in 0..2 {
@@ -762,10 +762,10 @@ fn admitted_packets_never_stall() {
                     let status = decoder.decode(bytes, *pts, &mut work, &cancel);
                     drop(taken);
                     match status {
-                        Err(Error::Backpressure {
+                        Err(Error::Backpressure(triergon_core::Backpressure {
                             requested,
                             available,
-                        }) => room += requested - available,
+                        })) => room += requested - available,
                         status => break status.map(|_| ()),
                     }
                 };

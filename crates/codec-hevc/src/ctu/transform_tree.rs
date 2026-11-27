@@ -3,13 +3,12 @@
 
 use super::{Cu, PART_2NX2N, SliceDecoder};
 use crate::cabac::ctx;
-use crate::error::{DecodeError, Result};
 use crate::intra::{self, MAX_REF};
 use crate::picture::Pixel;
 use crate::state::*;
+use crate::{DecodeError, Result};
 
 impl<P: Pixel> SliceDecoder<'_, P> {
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn transform_tree(
         &mut self,
         cu: &Cu,
@@ -107,7 +106,6 @@ impl<P: Pixel> SliceDecoder<'_, P> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
     #[inline(never)]
     fn transform_unit(
         &mut self,
@@ -147,7 +145,7 @@ impl<P: Pixel> SliceDecoder<'_, P> {
             }
             let off = self.qp_bd_off;
             if v < -(26 + off / 2) || v > 25 + off / 2 {
-                return Err(DecodeError::InvalidData("CuQpDeltaVal"));
+                return Err(DecodeError::Invalid("CuQpDeltaVal"));
             }
             self.is_cu_qp_delta_coded = true;
             self.cu_qp_delta = v;

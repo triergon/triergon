@@ -21,8 +21,11 @@ use triergon_core::{Budget, BudgetVec, Result, WorkBudget};
 /// One packet: times in milliseconds and its `cc_data`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SccPacket<'a> {
+    /// Presentation time in milliseconds.
     pub pts: i64,
+    /// Duration in milliseconds.
     pub duration: i64,
+    /// The packet's `cc_data` constructs, three bytes each.
     pub data: &'a [u8],
 }
 
@@ -128,16 +131,19 @@ impl SccPackets {
         }
     }
 
+    /// The number of packets.
     #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    /// Whether the file produced no packet.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    /// The packets, in the order the demuxer returns them.
     pub fn iter(&self) -> impl ExactSizeIterator<Item = SccPacket<'_>> {
         self.entries.as_slice().iter().map(|entry| SccPacket {
             pts: entry.pts,

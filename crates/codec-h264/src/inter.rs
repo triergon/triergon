@@ -101,7 +101,6 @@ impl SliceDecoder<'_> {
 
     /// Luma motion vector prediction (8.4.1.3). `shape`: 0 generic, 1 16x8, 2 8x16 with
     /// partition index `p`.
-    #[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
     fn mvp(
         &self,
         list: usize,
@@ -118,6 +117,10 @@ impl SliceDecoder<'_> {
 
     /// 8.4.1.3 from already derived neighbours A, B, C.
     #[inline]
+    #[expect(
+        clippy::map_unwrap_or,
+        reason = "map_or combined with the list-index rewrite added 0.147% instructions"
+    )]
     fn mvp_from(abc: (NbMv, NbMv, NbMv), ref_idx: i32, shape: u8, p: usize) -> [i32; 2] {
         let (a, b, c) = abc;
         let ra = a.map(|v| v.1).unwrap_or(-1);
@@ -177,7 +180,7 @@ impl SliceDecoder<'_> {
     fn store_ref(&mut self, list: usize, b8: usize, r: i32) {
         let cur = self.cur;
         let id = if r >= 0 {
-            self.ref_pic(list, r).map(|p| p.id).unwrap_or(-1)
+            self.ref_pic(list, r).map_or(-1, |p| p.id)
         } else {
             -1
         };
@@ -191,14 +194,15 @@ impl SliceDecoder<'_> {
         let l = &self.s.ref_list[list];
         if self.pic.mbaff && self.pic.mbs[self.cur].field {
             let f = *l.get((r >> 1) as usize)?;
-            let cur_par = 1 + (self.cur & 1) as u8;
-            let par = if r & 1 == 0 { cur_par } else { 3 - cur_par };
+            // An even index is the field of the current MB's parity, an odd one the other.
+            let field = (self.cur & 1) ^ (r & 1) as usize;
+            let par = Structure::FIELDS[field];
             let st = self.refs.dpb[f.idx];
             // A frame of a frame list is short-term or long-term in both fields.
             Some(RefPic {
                 idx: f.idx,
                 parity: par,
-                poc: st.poc[(par - 1) as usize],
+                poc: st.poc[field],
                 long: f.long,
                 id: ref_id(st.uid, par),
             })
@@ -399,9 +403,9 @@ impl SliceDecoder<'_> {
         };
         for list in 0..2 {
             let (a, b, c) = abcs[list];
-            let ra = a.map(|v| v.1).unwrap_or(-1);
-            let rb = b.map(|v| v.1).unwrap_or(-1);
-            let rc = c.map(|v| v.1).unwrap_or(-1);
+            let ra = a.map_or(-1, |v| v.1);
+            let rb = b.map_or(-1, |v| v.1);
+            let rc = c.map_or(-1, |v| v.1);
             refs[list] = min_positive(ra, min_positive(rb, rc));
         }
         let mut zero = false;
@@ -428,7 +432,7 @@ impl SliceDecoder<'_> {
         let cur = self.cur;
         for list in 0..2 {
             let id = if refs[list] >= 0 {
-                self.ref_pic(list, refs[list]).map(|p| p.id).unwrap_or(-1)
+                self.ref_pic(list, refs[list]).map_or(-1, |p| p.id)
             } else {
                 -1
             };
@@ -440,12 +444,13 @@ impl SliceDecoder<'_> {
             self.mb_motion = Some((refs, [[0, 0]; 2]));
             return Ok(()); // all motion vectors are zero
         }
-        let col = self.s.col.ok_or(SliceError::InvalidData(
-            "direct prediction without RefPicList1",
-        ))?;
+        let col = self
+            .s
+            .col
+            .ok_or(SliceError::Invalid("direct prediction without RefPicList1"))?;
         // colZeroFlag only matters for a list whose refIdx is 0 (8-190 / 8-191).
         let mut colz: u16 = 0;
-        let frm_frm = self.pic.structure == 0
+        let frm_frm = self.pic.structure == Structure::Frame
             && !self.pic.mbaff
             && self.refs.dpb[col.idx].coding == Coding::Frame;
         if col.short_term
@@ -457,9 +462,7 @@ impl SliceDecoder<'_> {
             // 8x8 uses its corner 4x4 block, as in `colocated`.
             let motion = &self.refs.dpb[col.idx].motion[0];
             if cur >= motion.mbs {
-                return Err(SliceError::InvalidData(
-                    "co-located macroblock out of range",
-                ));
+                return Err(SliceError::Invalid("co-located macroblock out of range"));
             }
             if motion.mb_flags[cur] & MBF_INTRA == 0 {
                 for (i, b4) in [0usize, 3, 12, 15].into_iter().enumerate() {
@@ -523,7 +526,6 @@ impl SliceDecoder<'_> {
     }
 
     #[inline(never)]
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
     fn direct_spatial(&mut self, i: usize) -> Result<(), SliceError> {
         let (refs, mvps, zero) = self.spatial_refs();
         let x0 = (i as i32 & 1) * 8;
@@ -531,7 +533,7 @@ impl SliceDecoder<'_> {
         for list in 0..2 {
             self.store_ref(list, i, refs[list]);
         }
-        let l1_short = self.s.col.map(|c| c.short_term).unwrap_or(false);
+        let l1_short = self.s.col.is_some_and(|c| c.short_term);
         let blocks: &[(i32, i32)] = if self.s.direct_8x8_inference {
             &[(0, 0)]
         } else {
@@ -575,18 +577,17 @@ impl SliceDecoder<'_> {
         xcol: i32,
         ycol: i32,
     ) -> Result<([i32; 2], i32, i32, VertScale), SliceError> {
-        let col = self.s.col.ok_or(SliceError::InvalidData(
-            "direct prediction without RefPicList1",
-        ))?;
+        let col = self
+            .s
+            .col
+            .ok_or(SliceError::Invalid("direct prediction without RefPicList1"))?;
         let st = &self.refs.dpb[col.idx];
-        if self.pic.structure == 0 && !self.pic.mbaff && st.coding == Coding::Frame {
+        if self.pic.structure == Structure::Frame && !self.pic.mbaff && st.coding == Coding::Frame {
             // FRM / FRM: co-located MB is CurrMbAddr, yM = yCol, One_To_One (Table 8-8).
             let motion = &st.motion[0];
             let mb_col = self.cur;
             if mb_col >= motion.mbs {
-                return Err(SliceError::InvalidData(
-                    "co-located macroblock out of range",
-                ));
+                return Err(SliceError::Invalid("co-located macroblock out of range"));
             }
             if motion.mb_flags[mb_col] & MBF_INTRA != 0 {
                 return Ok(([0, 0], -1, -1, VertScale::One));
@@ -620,11 +621,11 @@ impl SliceDecoder<'_> {
             let b = (st.poc[1] - cur_poc).abs();
             t < b
         };
-        if self.pic.structure != 0 {
+        if self.pic.structure.is_field() {
             // Current is a field.
             match st.coding {
                 Coding::Fields => {
-                    motion = &st.motion[(col.parity.max(1) - 1) as usize];
+                    motion = &st.motion[usize::from(col.parity == Structure::Bottom)];
                     mb_col = cur;
                     ym = ycol;
                     vs = VertScale::One;
@@ -643,71 +644,63 @@ impl SliceDecoder<'_> {
                         ym = (2 * ycol) % 16;
                         vs = VertScale::FrmToFld;
                     } else {
-                        mb_col = 2 * cur + (self.pic.structure as usize - 1);
+                        mb_col = 2 * cur + self.pic.structure.index();
                         ym = ycol;
                         vs = VertScale::One;
                     }
                 }
             }
         } else if !self.pic.mbaff {
-            match st.coding {
-                Coding::Fields => {
-                    motion = &st.motion[if top_closer { 0 } else { 1 }];
-                    mb_col = w * (cur_y / 2) + cur_x;
-                    ym = 8 * (cur_y % 2) as i32 + 4 * (ycol / 8);
+            if st.coding == Coding::Fields {
+                motion = &st.motion[usize::from(!top_closer)];
+                mb_col = w * (cur_y / 2) + cur_x;
+                ym = 8 * (cur_y % 2) as i32 + 4 * (ycol / 8);
+                vs = VertScale::FldToFrm;
+            } else {
+                motion = &st.motion[0];
+                mb_col = cur;
+                ym = ycol;
+                vs = VertScale::One;
+            }
+        } else {
+            let cur_field = self.pic.mbs[cur].field;
+            if st.coding == Coding::Fields {
+                mb_col = cur / 2;
+                if !cur_field {
+                    motion = &st.motion[usize::from(!top_closer)];
+                    ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
                     vs = VertScale::FldToFrm;
+                } else {
+                    motion = &st.motion[cur & 1];
+                    ym = ycol;
+                    vs = VertScale::One;
                 }
-                _ => {
-                    motion = &st.motion[0];
+            } else {
+                motion = &st.motion[0];
+                let x_field = motion.mb_flags.get(cur).copied().unwrap_or(0) & MBF_FIELD != 0;
+                if !cur_field {
+                    if !x_field {
+                        mb_col = cur;
+                        ym = ycol;
+                        vs = VertScale::One;
+                    } else {
+                        mb_col = 2 * (cur / 2) + usize::from(!top_closer);
+                        ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
+                        vs = VertScale::FldToFrm;
+                    }
+                } else if !x_field {
+                    mb_col = 2 * (cur / 2) + (ycol as usize / 8);
+                    ym = (2 * ycol) % 16;
+                    vs = VertScale::FrmToFld;
+                } else {
                     mb_col = cur;
                     ym = ycol;
                     vs = VertScale::One;
                 }
             }
-        } else {
-            let cur_field = self.pic.mbs[cur].field;
-            match st.coding {
-                Coding::Fields => {
-                    mb_col = cur / 2;
-                    if !cur_field {
-                        motion = &st.motion[if top_closer { 0 } else { 1 }];
-                        ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
-                        vs = VertScale::FldToFrm;
-                    } else {
-                        motion = &st.motion[cur & 1];
-                        ym = ycol;
-                        vs = VertScale::One;
-                    }
-                }
-                _ => {
-                    motion = &st.motion[0];
-                    let x_field = motion.mb_flags.get(cur).copied().unwrap_or(0) & MBF_FIELD != 0;
-                    if !cur_field {
-                        if !x_field {
-                            mb_col = cur;
-                            ym = ycol;
-                            vs = VertScale::One;
-                        } else {
-                            mb_col = 2 * (cur / 2) + if top_closer { 0 } else { 1 };
-                            ym = 8 * (cur % 2) as i32 + 4 * (ycol / 8);
-                            vs = VertScale::FldToFrm;
-                        }
-                    } else if !x_field {
-                        mb_col = 2 * (cur / 2) + (ycol as usize / 8);
-                        ym = (2 * ycol) % 16;
-                        vs = VertScale::FrmToFld;
-                    } else {
-                        mb_col = cur;
-                        ym = ycol;
-                        vs = VertScale::One;
-                    }
-                }
-            }
         }
         if mb_col >= motion.mbs {
-            return Err(SliceError::InvalidData(
-                "co-located macroblock out of range",
-            ));
+            return Err(SliceError::Invalid("co-located macroblock out of range"));
         }
         if motion.mb_flags[mb_col] & MBF_INTRA != 0 {
             return Ok(([0, 0], -1, -1, vs));
@@ -763,10 +756,10 @@ impl SliceDecoder<'_> {
             }
             let p0 = self
                 .ref_pic(0, ref0)
-                .ok_or(SliceError::InvalidData("direct ref_idx_l0"))?;
+                .ok_or(SliceError::Invalid("direct ref_idx_l0"))?;
             let p1 = self
                 .ref_pic(1, 0)
-                .ok_or(SliceError::InvalidData("direct ref_idx_l1"))?;
+                .ok_or(SliceError::Invalid("direct ref_idx_l1"))?;
             let (mv0, mv1) = if p0.long || p1.poc - p0.poc == 0 {
                 (mv_col, [0, 0])
             } else {
@@ -790,7 +783,7 @@ impl SliceDecoder<'_> {
         let l0 = &self.s.ref_list[0];
         let uid = id >> 2;
         let st_code = id & 3;
-        let field_pic = self.pic.structure != 0;
+        let field_pic = self.pic.structure.is_field();
         let cur_field_mb = self.pic.mbaff && self.pic.mbs[self.cur].field;
         let find = |pred: &dyn Fn(&RefPic) -> bool| -> Option<i32> {
             l0.iter().position(pred).map(|p| p as i32)
@@ -822,7 +815,7 @@ impl SliceDecoder<'_> {
             }
             VertScale::FldToFrm => find(&|p: &RefPic| uid_of(p) == uid),
         };
-        res.ok_or(SliceError::InvalidData(
+        res.ok_or(SliceError::Invalid(
             "temporal direct: co-located reference not in RefPicList0",
         ))
     }
@@ -837,7 +830,7 @@ impl SliceDecoder<'_> {
             let refs = self.refs;
             for rp in p.refs.iter().flatten() {
                 if refs.dpb[rp.idx].buf.is_none() {
-                    return Err(SliceError::InvalidData("reference picture missing"));
+                    return Err(SliceError::Invalid("reference picture missing"));
                 }
             }
             let ctx = McCtx {
@@ -921,7 +914,7 @@ impl SliceDecoder<'_> {
                 let p = self.part_motion(x, y, w, h)?;
                 for r in p.refs.iter().flatten() {
                     if refs.dpb[r.idx].buf.is_none() {
-                        return Err(SliceError::InvalidData("reference picture missing"));
+                        return Err(SliceError::Invalid("reference picture missing"));
                     }
                 }
                 mc_part(
@@ -940,7 +933,7 @@ impl SliceDecoder<'_> {
                 pm[k] = self.part_motion(x, y, w, h)?;
                 for r in pm[k].refs.iter().flatten() {
                     if Some(r.idx) != self.pic.first_field && self.refs.dpb[r.idx].buf.is_none() {
-                        return Err(SliceError::InvalidData("reference picture missing"));
+                        return Err(SliceError::Invalid("reference picture missing"));
                     }
                 }
             }
@@ -1005,7 +998,6 @@ impl SliceDecoder<'_> {
     }
 
     /// Prediction block with refIdx `r` (-1: list unused) and vectors `mv` per list.
-    #[allow(clippy::too_many_arguments)] // kernel takes explicit sample geometry instead of a wrapper struct
     fn make_part(
         &self,
         x: i32,
@@ -1033,7 +1025,7 @@ impl SliceDecoder<'_> {
             pm.ref_idx[list] = r;
             pm.refs[list] = Some(
                 self.ref_pic(list, r)
-                    .ok_or(SliceError::InvalidData("ref_idx beyond reference list"))?,
+                    .ok_or(SliceError::Invalid("ref_idx beyond reference list"))?,
             );
             pm.mv[list] = mv[list];
         }
@@ -1097,6 +1089,8 @@ struct PartMv {
     wbi: (i32, i32),
 }
 
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 struct McCtx<'s> {
     s: &'s SliceCtx,
     /// Destination geometry (picture position via mbx / y_pic, write offsets via off_* / stride_*).
@@ -1176,9 +1170,10 @@ impl McOut for MbSamples {
 }
 
 /// Reference-plane geometry of one list of a block.
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 struct ListPos<'r> {
     fb: &'r FrameBuf,
-    parity: u8,
     /// Luma integer position and quarter-sample fraction.
     xi: i32,
     yi: i32,
@@ -1189,6 +1184,7 @@ struct ListPos<'r> {
     yc: i32,
     cfx: u32,
     cfy: u32,
+    parity: Structure,
 }
 
 fn list_pos<'r>(g: &MbGeom, p: &PartMv, list: usize, rp: &RefPic, fb: &'r FrameBuf) -> ListPos<'r> {
@@ -1197,10 +1193,10 @@ fn list_pos<'r>(g: &MbGeom, p: &PartMv, list: usize, rp: &RefPic, fb: &'r FrameB
     let ya = g.y_pic as i32 + p.y;
     // Chroma vertical offset between fields of opposite parity (Table 8-9 / 8-10).
     let mut mvcy = mvy;
-    if g.field_parity != 0 && rp.parity != 0 {
-        if rp.parity == 1 && g.field_parity == 2 {
+    if g.field_parity.is_field() && rp.parity.is_field() {
+        if rp.parity == Structure::Top && g.field_parity == Structure::Bottom {
             mvcy += 2;
-        } else if rp.parity == 2 && g.field_parity == 1 {
+        } else if rp.parity == Structure::Bottom && g.field_parity == Structure::Top {
             mvcy -= 2;
         }
     }
@@ -1361,6 +1357,10 @@ fn mc_part<'r, F: Fn(usize) -> &'r FrameBuf, O: McOut>(
         }
         return;
     }
+    #[expect(
+        clippy::bool_to_int_with_if,
+        reason = "integer conversion combined with the map_or rewrite added 0.147% instructions"
+    )]
     let list = if p.refs[0].is_some() { 0 } else { 1 };
     let Some(rp) = &p.refs[list] else { return };
     let lp = list_pos(&g, p, list, rp, refbuf(rp.idx));

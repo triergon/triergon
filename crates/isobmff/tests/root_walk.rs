@@ -1,6 +1,5 @@
-#[path = "common/transport_cases.rs"]
-mod cases;
-mod common;
+use crate::common;
+use crate::common::transport_cases as cases;
 use common::{child, roots};
 use std::{
     ops::Range,
@@ -8,13 +7,13 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxHeader, BoxView, BuildStatus, Limits,
+    BuildStatus, CursorStatus, Limits,
+    boxes::{BoxHeader, BoxView},
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DescriptionContext, DescriptionRead, DescriptionRecoveryBuilder,
-            DescriptionRecoveryProfile, DescriptionRecoveryTable, RecoveryTrackHeader,
-            RunRecoveryProfile,
+            DescriptionRecoveryTable, RecoveryTrackHeader,
         },
         seek::IndexLimits,
     },
@@ -56,17 +55,11 @@ impl Source {
             &child(&trak, b"tkhd").unwrap(),
             &child(&mdia, b"mdhd").unwrap(),
             &child(&mdia, b"hdlr").unwrap(),
-            RunRecoveryProfile,
         )
         .unwrap();
         let raw = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-        let mut build = DescriptionRecoveryBuilder::new(
-            raw,
-            pool.clone(),
-            Limits::default(),
-            DescriptionRecoveryProfile,
-        )
-        .unwrap();
+        let mut build =
+            DescriptionRecoveryBuilder::new(raw, pool.clone(), Limits::default()).unwrap();
         while build
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()
@@ -178,7 +171,9 @@ fn original_terminal_only_refusal_is_unchanged() {
     );
     assert!(matches!(
         old,
-        Err(Error::Unsupported("v3 media is not terminal"))
+        Err(Error::Unsupported(
+            "raw-video transport media is not terminal"
+        ))
     ));
     assert!(source.model(64, 1).is_ok());
 }

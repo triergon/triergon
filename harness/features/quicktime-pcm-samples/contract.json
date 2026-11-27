@@ -1,0 +1,190 @@
+{
+  "schema": 1,
+  "id": "quicktime-pcm-samples",
+  "gate": "required",
+  "operation": "qt-pcm",
+  "candidate": "isobmff-views-worker",
+  "worker_operation": "qt-pcm-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-isobmff-views-native",
+  "contract": [
+    "Read all QuickTime PCM samples in each audio stream and compare the source byte stream with the concatenated demuxed packet bytes for that stream.",
+    "Fold each audio stream index, PCM encoding, channel count, integral rate, coded depth and bytes per PCM frame. When block alignment is unset, derive alignment from coded depth and channel count.",
+    "PCM encoding codes are 1 unsigned 8-bit, 2 signed 16-bit BE, 3 signed 16-bit LE, 4 signed 24-bit BE, 5 signed 24-bit LE, 6 signed 32-bit BE, 7 signed 32-bit LE and 8 signed 8-bit. Code 0 denotes any other reference encoding.",
+    "Compare the total count of whole frames, byte count and ordered byte fold for each audio stream, irrespective of packet boundaries. A partial source frame is a refusal.",
+    "Input loading and schedule parsing precede the operation. Both sides open, consume and release their readers inside it."
+  ],
+  "required_profiles": [
+    "pcm"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch",
+        "twos-8bit-1ch-adjacent"
+      ],
+      "cause": "paired runtime and memory collections are pending on isolated gate hosts"
+    }
+  ],
+  "open_deviations": [
+    {
+      "reading": "A version 0 description outside the version 0 layout",
+      "clause": "Apple QuickTime File Format 'Sound sample description version 0 (stsd)': version 0 is uncompressed raw or twos audio with one or two channels, 8 or 16 bits per sample and compression ID 0; this description lies outside it (more than two channels, or sowt byte order)",
+      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2; Unsupported: QT v0 PCM other than 8-bit raw or 8- or 16-bit twos)",
+      "reference": "reads it as PCM: 3 to 8 channels, 16- to 32-bit sowt and 24- and 32-bit twos",
+      "cases": [
+        "raw-16bit-4ch",
+        "raw-8bit-3ch",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch"
+      ]
+    },
+    {
+      "reading": "Zero channels in a version 0 description",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’: the supported channel counts are 1 and 2",
+      "candidate": "refuses the description (Unsupported: QT v0 PCM channel count other than 1 or 2)",
+      "reference": "reports a zero channel count and reads 16 payload bytes",
+      "cases": [
+        "raw-8bit-0ch"
+      ]
+    },
+    {
+      "reading": "Compressed-audio fields carried in a version 0 PCM entry",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’ requires compression ID zero; Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ uses -2 for redefined sample tables",
+      "candidate": "refuses the description (Unsupported: QT v0 compressed/nonzero packet layout)",
+      "reference": "reads 32 bytes as ordinary PCM",
+      "cases": [
+        "compression-and-packet-size"
+      ]
+    },
+    {
+      "reading": "A sample that ends inside a PCM frame",
+      "clause": "Apple QuickTime File Format ‘Sound sample description version 0 (stsd)’ and ‘Sound sample data’ defines the sample width and interleaved layout; Apple QuickTime File Format ‘Sound sample description version 1 (stsd)’ defines one frame as one sample from each channel; ISO/IEC 14496-12:2015 §8.7.3.2.2 fixes each sample extent",
+      "candidate": "refuses the one-byte sample of a 16-bit mono track (Invalid: QT PCM incomplete source frame)",
+      "reference": "reads the configured two-byte width over the one-byte sample and emits 32 bytes, one past the declared extent",
+      "cases": [
+        "partial-frame"
+      ]
+    },
+    {
+      "reading": "A sample-description change within a PCM track",
+      "clause": "ISO/IEC 14496-12:2015 §§8.5.2.1 and 8.7.4.3 and Apple QuickTime File Format ‘Sample-to-chunk table’: each chunk uses its own indexed description",
+      "candidate": "uses the description selected for each sample and reports 16 frames from 56 bytes; the track starts at 48000 Hz",
+      "reference": "uses the initial frame width for 16 frames from 64 bytes and reports 44100 Hz from the last description",
+      "compat": "compat::mov::pcm::PcmCursor",
+      "cases": [
+        "pcm-description-1-2-1-unused3"
+      ]
+    },
+    {
+      "reading": "A chunk stored in the Movie Box",
+      "clause": "ISO/IEC 14496-12:2015 6.1.3: the media data of a file is contained within its Media Data Boxes; stco places the second chunk of eight one-byte samples at offset 44, where the Movie Box starts (the mdat payload is 28..44)",
+      "candidate": "refuses the track, whose second chunk lies outside the media data (Invalid: sample range outside media)",
+      "reference": "reads 16 bytes as PCM, the last eight of them the start of the Movie Box",
+      "cases": [
+        "twos-8bit-1ch"
+      ]
+    }
+  ],
+  "open_unimplemented": [
+    {
+      "feature": "Sound sample descriptions version 1 and 2",
+      "documented": "crates/isobmff/README.md#supported",
+      "clause": "Apple QuickTime File Format 'Sound sample description version 1 (stsd)' and 'version 2' extend version 0 for uncompressed audio; the crate README reads QuickTime sound through SoundDescriptionV0 and PCM in version 0 only",
+      "candidate": "Refuses the description as unsupported: QT sound description version1/2",
+      "reference": "Reads the PCM samples of the version 1 and version 2 descriptions",
+      "detail": "QT sound description version1/2",
+      "cases": [
+        "sound-v1",
+        "sound-v2"
+      ]
+    }
+  ]
+}

@@ -6,6 +6,11 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
 };
 
+/// Collects one track's header, attachments and metadata into a [`Context`].
+///
+/// Offered bytes must belong to the builder's pool (`Error::ForeignPool`
+/// otherwise) and positions must name the header's source
+/// (`Error::SourceMismatch`). A rejected offer stays in the caller's option.
 #[derive(Debug)]
 pub struct Builder {
     pool: Budget,
@@ -23,6 +28,7 @@ pub struct Builder {
 }
 
 impl Builder {
+    /// An empty builder whose records are charged to `pool`.
     pub fn new(pool: &Budget, limits: Limits) -> Self {
         Self {
             pool: pool.clone(),
@@ -95,7 +101,9 @@ impl Builder {
         limit(total, self.limits.max_visible_bytes)
     }
 
-    /// Every rejection leaves the caller's owner in the original option.
+    /// Takes the header out of `offered`, starting a context. `Error::Invalid`
+    /// while a header or an untaken context is held, for an empty offer or a
+    /// zero track number or UID; `Error::Limit` for a field past its limit.
     pub fn provide_header(&mut self, offered: &mut Option<Header>) -> Result<()> {
         if self.header.is_some() || self.output.is_some() {
             return Err(Error::Invalid("subtitle context header is busy"));
@@ -111,6 +119,10 @@ impl Builder {
         self.ended = false;
         Ok(())
     }
+    /// Takes an attachment out of `offered`; the next poll commits it.
+    /// `Error::Invalid` without a header, after `finish`, while a record is
+    /// pending, for an empty offer or a zero UID; `Error::Limit` past
+    /// `max_attachments` or a byte limit.
     pub fn provide_attachment(&mut self, offered: &mut Option<Attachment>) -> Result<()> {
         let source = self.accepting_record()?;
         let attachment = offered
@@ -145,6 +157,10 @@ impl Builder {
         self.pending_bytes = total;
         Ok(())
     }
+    /// Takes a metadata record out of `offered`; the next poll commits it.
+    /// `Error::Invalid` without a header, after `finish`, while a record is
+    /// pending or for an empty offer; `Error::Limit` past `max_metadata` or a
+    /// byte limit.
     pub fn provide_metadata(&mut self, offered: &mut Option<Metadata>) -> Result<()> {
         let source = self.accepting_record()?;
         let metadata = offered
@@ -165,7 +181,8 @@ impl Builder {
         self.pending_bytes = total;
         Ok(())
     }
-    /// End this context entity explicitly. A source gap never calls this.
+    /// Ends the records; the next polls publish the context. A gap in the
+    /// source is not an end. `Error::Invalid` without a header.
     pub fn finish(&mut self) -> Result<()> {
         if self.header.is_none() {
             return Err(Error::Invalid("subtitle context has no header"));
@@ -174,6 +191,10 @@ impl Builder {
         Ok(())
     }
 
+    /// Commits the pending record, then, once finished, publishes the
+    /// context; one work unit each. `Error::Cancelled` when `cancel` is set;
+    /// a record the pool cannot store returns the pool's error and stays
+    /// pending.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
@@ -230,6 +251,7 @@ impl Builder {
         });
         Ok(Status::Ready)
     }
+    /// The published context, once; later polls report [`Status::End`].
     pub fn take_output(&mut self) -> Option<Context> {
         let output = self.output.take();
         if output.is_some() {
@@ -237,6 +259,7 @@ impl Builder {
         }
         output
     }
+    /// Hands back every owner the builder holds, committed or pending.
     pub fn recover(self) -> Recovery {
         Recovery {
             header: self.header,

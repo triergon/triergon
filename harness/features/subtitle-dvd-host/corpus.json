@@ -31,6 +31,13 @@
           "digest": 1703029331289754392,
           "host_dependent": true
         }
+      },
+      "candidate_expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 12,
+          "bytes": 56142,
+          "digest": 1703029331289754392
+        }
       }
     },
     {
@@ -62,6 +69,13 @@
           "digest": 18446744073709551615,
           "host_dependent": true
         }
+      },
+      "candidate_expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 0,
+          "bytes": 0,
+          "digest": 18446744073709551615
+        }
       }
     },
     {
@@ -92,6 +106,13 @@
           "bytes": 0,
           "digest": 18446744073709551615,
           "host_dependent": true
+        }
+      },
+      "candidate_expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 0,
+          "bytes": 0,
+          "digest": 18446744073709551615
         }
       }
     },
@@ -154,6 +175,13 @@
           "bytes": 56142,
           "digest": 17193506398397371131,
           "host_dependent": true
+        }
+      },
+      "candidate_expected_by_target": {
+        "aarch64-unknown-linux-gnu": {
+          "packets": 12,
+          "bytes": 56142,
+          "digest": 17193506398397371131
         }
       }
     }

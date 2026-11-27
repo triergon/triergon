@@ -12,7 +12,7 @@ use triergon_pixel::{ChannelRounding, YcbcrMatrix};
 /// The receiver's colour and selection settings and its canvas: the decoder
 /// options and the `palette:` and `size:` lines of the stream configuration.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Settings {
+pub struct Options {
     /// Sixteen `0xRRGGBB` colours, or `None` for the receiver's automatic greys.
     pub palette: Option<[u32; 16]>,
     /// The width and height the subpictures are placed on, from the last
@@ -22,8 +22,8 @@ pub struct Settings {
     pub forced_only: bool,
 }
 
-impl Settings {
-    /// Settings from VobSub-style configuration text, read as the reference
+impl Options {
+    /// Options from VobSub-style configuration text, read as the reference
     /// reads it: up to the first NUL, a line at a time (CR and LF both end a
     /// line). A line beginning `palette:` replaces the palette and one
     /// beginning `size:` the canvas; other lines are ignored. Both values are
@@ -164,7 +164,10 @@ fn checked_canvas([width, height]: [i32; 2]) -> Result<[u32; 2]> {
 }
 
 /// The colour table of the first program chain of a DVD-Video title set IFO
-/// (`DVDVIDEO-VTS`), converted to RGB as the reference does.
+/// (`DVDVIDEO-VTS`), converted to RGB as the reference does. The program
+/// chain table's sector is turned into a byte offset in 32 bits, as the
+/// reference does: a sector of 2²¹ or more wraps to an offset in the file.
+/// `None` when the table or its colours lie past the end of the file.
 pub fn ifo_palette(ifo: &[u8]) -> Option<[u32; 16]> {
     if ifo.get(..12)? != b"DVDVIDEO-VTS" {
         return None;
@@ -174,7 +177,7 @@ pub fn ifo_palette(ifo: &[u8]) -> Option<[u32; 16]> {
             ifo.get(at..at.checked_add(4)?)?.try_into().ok()?,
         ))
     };
-    let table = usize::try_from(word(0xcc)?).ok()?.checked_mul(0x800)?;
+    let table = usize::try_from(word(0xcc)?.wrapping_mul(0x800)).ok()?;
     let first = table.checked_add(usize::try_from(word(table.checked_add(12)?)?).ok()?)?;
     let clut = ifo.get(first.checked_add(0xa4)?..first.checked_add(0xe4)?)?;
     let mut colours = [0; 16];
@@ -211,6 +214,7 @@ pub struct Subtitle<'a> {
     pub end_ms: u32,
     /// A forced start preceded the displayed bitmap.
     pub forced: bool,
+    /// The displayed rectangle.
     pub bitmap: Bitmap<'a>,
 }
 
@@ -234,12 +238,20 @@ impl Subtitle<'_> {
 /// pixels) and `height` rows of `width` colour indices, `stride` bytes apart.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Bitmap<'a> {
+    /// Left column on the canvas, after any transparent border is removed.
     pub x: u16,
+    /// Top row on the canvas, after any transparent border is removed.
     pub y: u16,
+    /// Width in pixels.
     pub width: u16,
+    /// Height in rows.
     pub height: u16,
+    /// `0xAARRGGBB` colours by pixel value.
     pub palette: &'a [u32],
+    /// The colour indices from the rectangle's first pixel to the end of the
+    /// decoder's plane; row `r` starts at `r * stride`.
     pub pixels: &'a [u8],
+    /// Bytes from one row to the next: the drawn area's width plus 16.
     pub stride: usize,
 }
 
@@ -247,7 +259,7 @@ pub struct Bitmap<'a> {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Status<'a> {
     /// The packet completed a unit that presents this subpicture.
-    Subtitle(Subtitle<'a>),
+    Ready(Subtitle<'a>),
     /// Nothing to present: the packet was buffered, dropped, or its unit shows
     /// no visible pixels.
     Nothing,
@@ -301,7 +313,7 @@ pub enum Status<'a> {
 ///   if the packet had never been sent.
 #[derive(Debug)]
 pub struct Decoder {
-    settings: Settings,
+    settings: Options,
     limits: Limits,
     pending: BudgetVec<u8>,
     plane: BudgetVec<u8>,
@@ -366,17 +378,19 @@ impl Default for Colours {
 }
 
 impl Decoder {
-    pub fn new(budget: &Budget, settings: Settings, limits: Limits) -> Self {
+    /// A decoder with nothing buffered and no colours carried, charging its
+    /// buffers to `pool`.
+    pub fn new(pool: &Budget, options: Options, limits: Limits) -> Self {
         Self {
-            settings,
+            settings: options,
             limits,
-            pending: BudgetVec::new(budget),
-            plane: BudgetVec::new(budget),
+            pending: BudgetVec::new(pool),
+            plane: BudgetVec::new(pool),
             colours: Colours::default(),
             palette: [0; 256],
             last: None,
             suspended: None,
-            held: BudgetVec::new(budget),
+            held: BudgetVec::new(pool),
         }
     }
 
@@ -396,7 +410,8 @@ impl Decoder {
         Ok(())
     }
 
-    pub fn settings(&self) -> &Settings {
+    /// The settings the decoder was made with.
+    pub fn settings(&self) -> &Options {
         &self.settings
     }
 
@@ -544,7 +559,7 @@ impl Decoder {
             }
         }
         match outcome {
-            Ok(shown) => Ok(Status::Subtitle(
+            Ok(shown) => Ok(Status::Ready(
                 shown.subtitle(&self.palette, self.plane.as_slice()),
             )),
             Err(Halt::Malformed) => Ok(Status::Nothing),
@@ -668,6 +683,7 @@ struct UnitState {
 
 /// How far a run through a unit got. Every step is paid for before it changes
 /// anything, so a run that yields stops between steps and continues from here.
+// Packing the command and drawing phases into enums costs up to 1.38% more instructions.
 #[derive(Clone, Copy, Debug)]
 struct Cursor {
     /// The unit's bytes are paid for.
@@ -726,7 +742,7 @@ struct Fields {
 
 /// One slice of a unit's run through its control sequences.
 struct Pass<'d, 'w> {
-    settings: &'d Settings,
+    settings: &'d Options,
     limits: Limits,
     palette: &'d mut [u32; 256],
     plane: &'d mut BudgetVec<u8>,
@@ -830,7 +846,7 @@ impl Pass<'_, '_> {
         let mut commands = Commands::resume(body, self.cursor.read);
         while commands.position() < body.len() {
             let from = commands.position();
-            let command = commands.next().ok_or(Halt::Malformed)?;
+            let command = commands.next_command().ok_or(Halt::Malformed)?;
             // A sequence reads on to its end command, through the bytes of the
             // sequences after it if need be: each sequence pays for what it
             // reads.
@@ -839,7 +855,7 @@ impl Pass<'_, '_> {
             }
             self.cursor.read = commands.position();
             let cursor = &mut *self.cursor;
-            match command.map_err(|_| Halt::Malformed)? {
+            match command {
                 Command::ForcedStart => cursor.state.forced = true,
                 Command::Start => cursor.state.start = date,
                 Command::Stop => cursor.state.stop = date,
@@ -866,13 +882,7 @@ impl Pass<'_, '_> {
                     cursor.area = Some(value);
                     cursor.state.eight_bit = true;
                 }
-                Command::Fields(value) => {
-                    cursor.fields = Some(Fields {
-                        top: usize::from(value.top),
-                        bottom: usize::from(value.bottom),
-                    });
-                }
-                Command::ExtendedFields { top, bottom } => {
+                Command::Fields { top, bottom } => {
                     cursor.fields = Some(Fields {
                         top: top as usize,
                         bottom: bottom as usize,
@@ -893,7 +903,7 @@ impl Pass<'_, '_> {
         fields: Fields,
         state: &UnitState,
     ) -> std::result::Result<Option<Drawn>, Halt> {
-        let Ok((width, height)) = area.dimensions() else {
+        let Some((width, height)) = area.dimensions() else {
             return Ok(None);
         };
         let (width, height) = (usize::from(width), usize::from(height));
@@ -1044,8 +1054,9 @@ static SPLATS: Splats = {
 /// Expand the two interlaced fields into `rows` (each `width` pixels and 16
 /// more), returning the bounds of the visible pixels. Lines are decoded one
 /// at a time, alternating between the fields: interleaving the runs of two
-/// lines mixes their run lengths in the branch history, and the stores of
-/// short and long runs then mispredict about once a run.
+/// lines changes the order in which pixels reach the plane.
+// Inlining into the control pass costs up to 0.77% more instructions.
+#[inline(never)]
 fn fill_fields(
     rows: &mut [u8],
     width: usize,
@@ -1315,7 +1326,7 @@ impl Bounds {
 
 #[cfg(test)]
 mod tests {
-    use super::{Settings, below_0e};
+    use super::{Options, below_0e};
 
     #[test]
     fn below_0e_flags_exactly_the_words_with_a_low_byte() {
@@ -1340,7 +1351,7 @@ mod tests {
                 let mut text = vec![b'.'; prefix];
                 text.push(stop);
                 text.extend_from_slice(b"palette: 7");
-                let palette = Settings::from_configuration(&text).unwrap().palette;
+                let palette = Options::from_configuration(&text).unwrap().palette;
                 assert_eq!(palette.map(|p| p[0]), found.then_some(7), "{text:?}");
             }
         }

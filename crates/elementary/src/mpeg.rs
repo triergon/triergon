@@ -19,8 +19,8 @@ use crate::stream::Limits;
 use crate::syntax::{Gap, Length, Plan, Probe, SeekBasis, SeekContext, Syntax, TrackFacts};
 use triergon_core::container::{CodecId, Trim};
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_framing::{
-    LameTag, MpegAudioHeader, MpegInfoFrame, MpegInfoKind, MpegLayer, mpeg_info_frame,
+use triergon_framing::mpeg_audio::{
+    self, LameTag, MpegAudioHeader, MpegInfoFrame, MpegInfoKind, MpegLayer,
 };
 
 /// Samples the reference decoder outputs before the first encoded sample, plus the one
@@ -30,6 +30,7 @@ const DECODER_DELAY: u32 = 528 + 1;
 /// The information frame a stream starts with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct InfoFrame {
+    /// What the frame states.
     pub frame: MpegInfoFrame,
     /// Source offset of the frame.
     pub offset: u64,
@@ -42,12 +43,12 @@ pub struct InfoFrame {
 
 /// Samples the stream's LAME tag removes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Gapless {
+struct Gapless {
     /// Samples dropped from the first packet.
-    pub start: u32,
+    start: u32,
     /// The packet (frame index from the first audio frame) and samples dropped from its
     /// end.
-    pub end: Option<(u64, u32)>,
+    end: Option<(u64, u32)>,
 }
 
 /// MPEG audio elementary stream facts.
@@ -71,11 +72,6 @@ impl MpegAudio {
     pub fn lame(&self) -> Option<LameTag> {
         self.info.and_then(|info| info.frame.lame)
     }
-    /// The trim the stream's LAME tag implies.
-    pub fn gapless(&self) -> Option<Gapless> {
-        self.gapless
-    }
-
     fn samples_per_frame(&self) -> u32 {
         self.first.map_or(1152, |h| h.samples_per_frame())
     }
@@ -186,7 +182,7 @@ impl Syntax for MpegAudio {
         offset: u64,
         source_len: Option<u64>,
     ) -> bool {
-        let Some(description) = mpeg_info_frame(frame, header) else {
+        let Some(description) = mpeg_audio::info_frame(frame, header) else {
             return false;
         };
         let consistent = match (description.bytes, source_len) {
@@ -247,6 +243,9 @@ impl Syntax for MpegAudio {
     }
 
     fn plan_seek(&self, target: u64, context: SeekContext) -> Plan {
+        if target == 0 && self.info.is_some() {
+            return Plan::Scan;
+        }
         let spf = u64::from(self.samples_per_frame());
         if let (Some(info), Some(frames)) = (self.info, self.audio_frames())
             && let (Some(toc), Some(bytes)) = (info.frame.toc, info.frame.bytes)

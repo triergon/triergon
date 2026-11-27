@@ -7,15 +7,15 @@
 use crate::runner::{Invocation, MAX_INPUT, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, InputCursor, SourceCapabilities, SourceId, WorkBudget};
-use triergon_playback::{
-    ByteSource,
-    hls_clock::HlsParserOnlyAudioClock,
-    hls_segment::{
+use triergon_hls::{
+    clock::HlsAudioClockNs,
+    segment::{
         HlsAudioCodec, HlsFeedUnit, HlsMediaProfile, HlsMediaSegment, HlsMediaSegmentReader,
         HlsSegment, HlsSegmentLimits, HlsSegmentProgress, HlsSegmentReader, HlsSegmentTracks,
         HlsVideoCodec,
     },
 };
+use triergon_playback::ByteSource;
 
 pub const PREFIX: &str = "hls-";
 const OPERATION: &str = "hls-segment-feed";
@@ -29,7 +29,7 @@ enum Reader {
 }
 
 enum Segment {
-    AvcAac(HlsSegment<HlsParserOnlyAudioClock>),
+    AvcAac(HlsSegment<HlsAudioClockNs>),
     Family(HlsMediaSegment),
 }
 
@@ -140,7 +140,7 @@ fn open_segment(pool: &Budget, raw: &Bytes, profile: HlsMediaProfile) -> Result<
             HlsSegmentProgress::Ready => {
                 let segment = match &mut reader {
                     Reader::AvcAac(reader) => reader
-                        .take_parser_only(&cancel)
+                        .take_with_ns_clocks(&cancel)
                         .map(|s| s.map(Segment::AvcAac)),
                     Reader::Family(reader) => reader.take(&cancel).map(|s| s.map(Segment::Family)),
                 }
@@ -254,7 +254,7 @@ pub fn run(args: &[String]) -> Result<()> {
         return Err("input must be bounded TS188".into());
     }
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error())?;
+    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error)?;
     measure(&invocation, OPERATION, Some(&pool), || {
         let segment = open_segment(&pool, std::hint::black_box(&raw), profile)?;
         Ok(fold_segment(&pool, segment)?.totals())

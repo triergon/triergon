@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "cursor",
+      "profile": "cursor",
+      "file": "harness/features/core-reader-protocol/reader.aac",
+      "sha256": "d0bb0f3d45539b6fc95f9852b207fbcdfb77fbe2e12b2200c197c8d8b955de56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "cursor"
+      ],
+      "expected": {
+        "trace_sha256": "4e35a86f4af72a08e09be5740d66dce8daa05d4ea699cf5e8ecd9d30d97c0c2c"
+      }
+    },
+    {
+      "id": "feed",
+      "profile": "feed",
+      "file": "harness/features/core-reader-protocol/reader.aac",
+      "sha256": "d0bb0f3d45539b6fc95f9852b207fbcdfb77fbe2e12b2200c197c8d8b955de56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "feed"
+      ],
+      "expected": {
+        "trace_sha256": "beccde7146a4d7ac86e504b54c3c0f4f6e4c0f92bf679cb5f922ed459ed09b41"
+      }
+    },
+    {
+      "id": "blocking",
+      "profile": "blocking",
+      "file": "harness/features/core-reader-protocol/reader.aac",
+      "sha256": "d0bb0f3d45539b6fc95f9852b207fbcdfb77fbe2e12b2200c197c8d8b955de56",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "blocking"
+      ],
+      "expected": {
+        "trace_sha256": "a07bbc5bd0b2a00e1946209ea79f38c8b64741a25373071c2d0b1d007bbdd57f"
+      }
+    }
+  ]
+}

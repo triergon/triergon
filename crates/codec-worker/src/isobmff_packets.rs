@@ -34,14 +34,14 @@ const WINDOW: usize = 1 << 16;
 
 /// A seek: the track by its `track_ID` and the target in microseconds.
 #[derive(Clone, Copy)]
-pub struct Seek {
+pub(crate) struct Seek {
     track: u64,
     micros: i64,
 }
 
 impl Seek {
     /// `TRACK_ID@MICROSECONDS`.
-    pub fn parse(text: &str) -> Result<Seek, String> {
+    pub(crate) fn parse(text: &str) -> Result<Seek, String> {
         let (track, micros) = text
             .split_once('@')
             .ok_or_else(|| format!("seek {text}: expected TRACK_ID@MICROSECONDS"))?;
@@ -161,7 +161,7 @@ fn read(
                             target,
                             policy: SeekPolicy::PreviousRandomAccess,
                         });
-                    if let Err(error) = request.and_then(|request| blocking.seek(request)) {
+                    if let Err(error) = request.and_then(|request| blocking.begin_seek(request)) {
                         return Ok(Err(error));
                     }
                 }
@@ -172,7 +172,7 @@ fn read(
 }
 
 /// Print the packets of `path`, seeking first when `seek` is given.
-pub fn packets(file: File, seek: Option<Seek>, out: &mut impl Write) -> std::io::Result<()> {
+pub(crate) fn packets(file: File, seek: Option<Seek>, out: &mut impl Write) -> std::io::Result<()> {
     let opened = Budget::new(POOL).and_then(|pool| {
         let capabilities = SourceCapabilities {
             length: Some(file.metadata()?.len()),

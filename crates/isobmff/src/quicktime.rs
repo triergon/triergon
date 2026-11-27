@@ -1,0 +1,355 @@
+//! QuickTime version 0 sound descriptions and their PCM samples. [`SoundDescriptionV0`]
+//! reads a description's fields, [`PcmLayout`] names a supported PCM format, and
+//! [`PcmSampleReader`] reads one sample as whole PCM frames. FFmpeg's grouping of samples
+//! into packets is in [`compat::mov::pcm`](crate::compat::mov::pcm).
+//!
+//! Specification: Apple QuickTime File Format (sound sample descriptions, sound data).
+use crate::{
+    Sample, fields,
+    movie::{SampleDescription, TrackHeader},
+    payload::{SampleReader, SourcePacket},
+};
+use std::{
+    ops::Range,
+    sync::atomic::{AtomicBool, Ordering},
+};
+use triergon_core::{Budget, Error, InputCursor, InputToken, Result, SourceId, Step, WorkBudget};
+
+/// The fields of a version 0 QuickTime sound description as stored, whatever format they
+/// describe. Version 1 and 2 descriptions are refused.
+#[derive(Clone, Debug)]
+pub struct SoundDescriptionV0 {
+    entry: SampleDescription,
+    revision: u16,
+    vendor: [u8; 4],
+    channels: u16,
+    sample_bits: u16,
+    compression_id: i16,
+    packet_size: u16,
+    sample_rate_16_16: u32,
+}
+/// A PCM sample format that [`PcmLayout`] supports.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PcmEncoding {
+    /// 8-bit unsigned samples, entry code `raw `.
+    Unsigned8,
+    /// 8-bit signed samples, entry code `twos`.
+    Signed8,
+    /// 16-bit signed big-endian samples, entry code `twos`.
+    Signed16BigEndian,
+}
+/// A supported PCM layout; from [`SoundDescriptionV0::pcm_layout`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PcmLayout {
+    encoding: PcmEncoding,
+    channels: u16,
+    frame_bytes: usize,
+    sample_rate_16_16: u32,
+}
+impl PcmLayout {
+    /// Byte encoding of each channel sample in an interleaved frame.
+    pub fn encoding(self) -> PcmEncoding {
+        self.encoding
+    }
+    /// Number of channels: 1 or 2.
+    pub fn channels(self) -> u16 {
+        self.channels
+    }
+    pub(crate) fn frame_bytes(self) -> usize {
+        self.frame_bytes
+    }
+    /// Sample rate in Hz as a 16.16 fixed-point value; never zero.
+    pub fn sample_rate_16_16(self) -> u32 {
+        self.sample_rate_16_16
+    }
+}
+impl SoundDescriptionV0 {
+    /// Reads `entry` of the track whose header is `header`. The handler must be `soun`,
+    /// since `raw ` is also a video entry code; `Error::Invalid` otherwise, and
+    /// `Error::Unsupported` for a version 1 or 2 description.
+    pub fn parse(header: &TrackHeader, entry: &SampleDescription) -> Result<Self> {
+        Self::parse_prefix(header, entry, 0)
+    }
+
+    pub(crate) fn parse_prefix(
+        header: &TrackHeader,
+        entry: &SampleDescription,
+        version: u16,
+    ) -> Result<Self> {
+        check_sound_description(header, entry)?;
+        let body = entry.raw().payload();
+        if fields::u16_at(body, 8)? != version {
+            return Err(Error::Unsupported("QT sound description version1/2"));
+        }
+        fields::slice(body, 0, 28)?;
+        Ok(Self {
+            entry: entry.clone(),
+            revision: fields::u16_at(body, 10)?,
+            vendor: fields::fourcc(body, 12)?,
+            channels: fields::u16_at(body, 16)?,
+            sample_bits: fields::u16_at(body, 18)?,
+            compression_id: i16::from_be_bytes(fields::u16_at(body, 20)?.to_be_bytes()),
+            packet_size: fields::u16_at(body, 22)?,
+            sample_rate_16_16: fields::u32_at(body, 24)?,
+        })
+    }
+    /// The sample description it was read from.
+    pub fn source(&self) -> &SampleDescription {
+        &self.entry
+    }
+    /// Revision level field.
+    pub fn revision(&self) -> u16 {
+        self.revision
+    }
+    /// Four vendor bytes in wire order, including a possible all-zero code.
+    pub fn vendor(&self) -> [u8; 4] {
+        self.vendor
+    }
+    /// Number of channels, as stored.
+    pub fn channels(&self) -> u16 {
+        self.channels
+    }
+    /// Bits per sample, as stored.
+    pub fn sample_bits(&self) -> u16 {
+        self.sample_bits
+    }
+    /// Compression ID; 0 for uncompressed samples.
+    pub fn compression_id(&self) -> i16 {
+        self.compression_id
+    }
+    /// Packet size field; 0 for uncompressed samples.
+    pub fn packet_size(&self) -> u16 {
+        self.packet_size
+    }
+    /// Sample rate in Hz as a 16.16 fixed-point value, as stored.
+    pub fn sample_rate_16_16(&self) -> u32 {
+        self.sample_rate_16_16
+    }
+    /// Exact 16.16 numerator/denominator. It is not the track's media clock.
+    pub fn sample_rate_fraction(&self) -> (u32, u32) {
+        (self.sample_rate_16_16, 65536)
+    }
+    /// The PCM layout of an uncompressed mono or stereo entry of 8-bit `raw ` samples or
+    /// of 8- or 16-bit `twos` samples. `Error::Unsupported` for anything else,
+    /// `Error::Invalid` for a zero sample rate.
+    pub fn pcm_layout(&self) -> Result<PcmLayout> {
+        if self.compression_id != 0 || self.packet_size != 0 {
+            return Err(Error::Unsupported("QT v0 compressed/nonzero packet layout"));
+        }
+        if !(1..=2).contains(&self.channels) {
+            return Err(Error::Unsupported(
+                "QT v0 PCM channel count other than 1 or 2",
+            ));
+        }
+        if self.sample_rate_16_16 == 0 {
+            return Err(Error::Invalid("QT PCM zero source sample rate"));
+        }
+        let (encoding, bytes) = match (&self.entry.format, self.sample_bits) {
+            (b"raw ", 8) => (PcmEncoding::Unsigned8, 1_usize),
+            (b"twos", 8) => (PcmEncoding::Signed8, 1_usize),
+            (b"twos", 16) => (PcmEncoding::Signed16BigEndian, 2_usize),
+            _ => {
+                return Err(Error::Unsupported(
+                    "QT v0 PCM other than 8-bit raw or 8- or 16-bit twos",
+                ));
+            }
+        };
+        Ok(PcmLayout {
+            encoding,
+            channels: self.channels,
+            frame_bytes: usize::from(self.channels)
+                .checked_mul(bytes)
+                .ok_or(Error::Overflow)?,
+            sample_rate_16_16: self.sample_rate_16_16,
+        })
+    }
+}
+
+pub(crate) fn check_sound_description(
+    header: &TrackHeader,
+    entry: &SampleDescription,
+) -> Result<()> {
+    if header.handler != *b"soun" || fields::fourcc(header.raw_hdlr.payload(), 8)? != header.handler
+    {
+        return Err(Error::Invalid("QT sound description needs sound handler"));
+    }
+    if entry.index == 0
+        || entry.format != entry.raw().header().kind
+        || entry.data_reference_index != fields::u16_at(entry.raw().payload(), 6)?
+    {
+        return Err(Error::Invalid(
+            "QT sound entry fields differ from raw source",
+        ));
+    }
+    Ok(())
+}
+
+/// One whole PCM sample with its description and layout; from [`PcmSampleReader`].
+#[derive(Debug)]
+pub struct PcmSourcePacket {
+    packet: SourcePacket,
+    description: SoundDescriptionV0,
+    layout: PcmLayout,
+    complete_frames: usize,
+}
+impl PcmSourcePacket {
+    /// Source ordinal, absolute range and bytes of this sample's complete PCM frames.
+    pub fn packet(&self) -> &SourcePacket {
+        &self.packet
+    }
+    /// The version 0 description selected by this sample's `stsd` index.
+    pub fn description(&self) -> &SoundDescriptionV0 {
+        &self.description
+    }
+    /// Mono or stereo layout and the entry's sample rate in 16.16 fixed-point Hz.
+    pub fn layout(&self) -> PcmLayout {
+        self.layout
+    }
+    /// Number of PCM frames, one value per channel each, in the payload.
+    pub fn complete_frames(&self) -> usize {
+        self.complete_frames
+    }
+}
+
+/// Reads one PCM sample of a [`SoundDescriptionV0`] track through [`SampleReader`]. A
+/// failure other than backpressure is kept for later polls.
+#[derive(Debug)]
+pub struct PcmSampleReader {
+    inner: Option<SampleReader>,
+    description: Option<SoundDescriptionV0>,
+    layout: PcmLayout,
+    pool: Budget,
+    source: SourceId,
+    token: InputToken,
+    position: u64,
+    failed: Option<Error>,
+}
+impl PcmSampleReader {
+    /// A reader for `sample`, inside `media`, as [`SampleReader::new`] checks it.
+    /// `Error::Invalid` for a sample of another description or a size that is zero or not
+    /// whole frames; `Error::ForeignPool` for a description stored in another budget.
+    pub fn new(
+        input: &mut InputCursor,
+        description: SoundDescriptionV0,
+        sample: Sample,
+        media: Range<u64>,
+        maximum_packet: usize,
+    ) -> Result<Self> {
+        if !description
+            .source()
+            .raw()
+            .bytes()
+            .belongs_to(input.budget())
+        {
+            return Err(Error::ForeignPool);
+        }
+        if sample.description_index != description.source().index {
+            return Err(Error::Invalid("QT PCM source description mismatch"));
+        }
+        let layout = description.pcm_layout()?;
+        let bytes = sample
+            .range
+            .end
+            .checked_sub(sample.range.start)
+            .ok_or(Error::Overflow)?;
+        if bytes == 0
+            || bytes % u64::try_from(layout.frame_bytes).map_err(|_| Error::Overflow)? != 0
+        {
+            return Err(Error::Invalid("QT PCM incomplete source frame"));
+        }
+        let inner = SampleReader::new(input, sample, media, maximum_packet)?;
+        Ok(Self {
+            inner: Some(inner),
+            description: Some(description),
+            layout,
+            pool: input.budget().clone(),
+            source: input.source(),
+            token: input.token(),
+            position: input.position(),
+            failed: None,
+        })
+    }
+    fn poison(&mut self, error: Error) -> Error {
+        self.inner = None;
+        self.description = None;
+        self.failed = Some(error);
+        error
+    }
+    /// One bounded step towards the [`PcmSourcePacket`]; `Error::Cancelled` once `cancel`
+    /// is set.
+    pub fn poll(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<PcmSourcePacket>> {
+        if let Some(error) = self.failed {
+            return Err(error);
+        }
+        match self.inner_poll(input, work, cancel) {
+            Err(error @ Error::Backpressure { .. }) => Err(error),
+            Err(error) => Err(self.poison(error)),
+            step => step,
+        }
+    }
+    fn inner_poll(
+        &mut self,
+        input: &mut InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Step<PcmSourcePacket>> {
+        if !input.budget().same_pool(&self.pool) {
+            return Err(Error::ForeignPool);
+        }
+        if input.source() != self.source {
+            return Err(Error::SourceMismatch);
+        }
+        let token = input.token();
+        if token.generation() != self.token.generation() {
+            return Err(Error::StaleGeneration {
+                expected: self.token.generation(),
+                received: token.generation(),
+            });
+        }
+        if token != self.token {
+            return Err(Error::StaleRequest {
+                expected: self.token.request(),
+                received: token.request(),
+            });
+        }
+        if input.position() != self.position {
+            return Err(Error::Invalid("QT PCM input moved outside reader"));
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        input.read_into(&mut [], work, cancel)?;
+        if work.remaining() == 0 {
+            return Ok(Step::Yield);
+        }
+        let step = self
+            .inner
+            .as_mut()
+            .ok_or(Error::Invalid("QT PCM source reader finished"))?
+            .poll(input, work, cancel);
+        self.position = input.position();
+        match step? {
+            Step::Ready(packet) => {
+                let frames = packet.payload.len() / self.layout.frame_bytes;
+                self.inner = None;
+                Ok(Step::Ready(PcmSourcePacket {
+                    packet,
+                    layout: self.layout,
+                    description: self
+                        .description
+                        .take()
+                        .ok_or(Error::Invalid("QT PCM source description absent"))?,
+                    complete_frames: frames,
+                }))
+            }
+            Step::NeedInput(request) => Ok(Step::NeedInput(request)),
+            Step::Yield => Ok(Step::Yield),
+            Step::End(end) => Ok(Step::End(end)),
+        }
+    }
+}

@@ -1,61 +1,88 @@
 //! Bounded source-clock interpretation. `compat::pes` holds the separate demux view.
 //! Raw33/None, source epochs and payloads remain authoritative. Source lifting
 //! uses admitted same-clock bounds; the demux view uses its own fixed interval.
-//! Independently authored from source facts, mathematics and the observed contract.
 use triergon_core::{Error, Result, Time};
 
 pub(crate) const PERIOD90: i128 = 1_i128 << 33;
 const SCALE27: i128 = 300;
 const HALF_PERIOD27: i128 = PERIOD90 * SCALE27 / 2;
 
-/// Source clock identity; not an I/O token, parser generation or byte-run epoch.
+/// The PCR clock binding for a program within one source timeline epoch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ClockKey {
+    /// The 16-bit transport stream ID in the PAT table extension.
     pub tsid: u16,
+    /// The 16-bit program number whose PMT binds the PCR PID.
     pub program: u16,
+    /// The 13-bit PID that carries the program's PCR.
     pub pcr_pid: u16,
+    /// The source clock epoch: 0 at the start, advanced at each accepted PCR discontinuity and
+    /// each explicit stream discontinuity.
     pub epoch: u64,
 }
 
+/// A clock sample that anchors source timestamps, unwrapped and exact.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceClockSample {
+    /// A PTS-domain sample in 90 kHz ticks.
     Pts90(i128),
+    /// A PCR-domain sample in 27 MHz ticks.
     Pcr27(i128),
 }
 
-/// Caller admits this source relationship/bound; no anchor comes from demux
-/// peer output. PCR fractions remain exact rather than rounded to 90-kHz ticks.
+/// A clock reading the caller supplies for [`SourceTimePolicy::Bounded`]: timestamps of its
+/// clock are unwrapped to the instant nearest it, within `maximum_distance27`. The crate never
+/// derives one itself; a PCR sample keeps its 27 MHz precision.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceClockAnchor {
+    /// The clock the anchor belongs to; timestamps of another clock stay unresolved.
     pub key: ClockKey,
+    /// An unwrapped clock reading in 90 kHz or 27 MHz ticks.
     pub sample: SourceClockSample,
-    /// Inclusive distance bound, strictly below half the source clock period.
+    /// Maximum permitted distance in 27 MHz ticks, inclusive and below half a clock period.
     pub maximum_distance27: u64,
 }
 
+/// How [`source_timestamp`] lifts a 33-bit timestamp to an unwrapped tick count.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceTimePolicy {
+    /// Leave every timestamp unresolved.
     Unanchored,
+    /// Take the raw 33-bit value as the tick count, as if the clock started at epoch zero.
     RelativeEpochZero,
+    /// Unwrap to the instant nearest the caller's anchor, within its bound.
     Bounded(SourceClockAnchor),
 }
 
+/// Explains whether a timestamp was lifted to exact time and which policy chose the instant.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SourceTimeStatus {
+    /// The source carried no timestamp.
     Absent,
+    /// The policy is [`SourceTimePolicy::Unanchored`], so no tick count is chosen.
     AnchorBoundMissing,
+    /// The tick count is the raw value under [`SourceTimePolicy::RelativeEpochZero`].
     RelativeEpochChoice,
+    /// The tick count is unwrapped relative to the anchor and within its bound.
     Anchored,
+    /// The timestamp lies exactly half a clock period from the anchor, so neither unwrap is nearer.
     AmbiguousHalfPeriod,
+    /// The anchor belongs to a different [`ClockKey`].
     AnchorIdentityMismatch,
+    /// The nearest unwrap lies further from the anchor than its bound.
     OutsideAnchorBound,
 }
 
+/// One source timestamp with its interpretation; the raw value is always kept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SourceTimestamp {
+    /// The raw 33-bit PTS or DTS in 90 kHz ticks, `None` when the source carried none.
     pub raw33: Option<u64>,
+    /// The unwrapped tick count in 90 kHz ticks, when `status` resolved one.
     pub ticks90: Option<i128>,
+    /// `ticks90` as an exact time, when resolved.
     pub exact: Option<Time>,
+    /// Interpretation outcome. Only a resolved status provides `ticks90` and `exact`.
     pub status: SourceTimeStatus,
 }
 
@@ -84,9 +111,10 @@ pub(crate) fn check_raw33(raw: u64) -> Result<()> {
     Ok(())
 }
 
-/// Source interpretation; never mutates a timestamp/header or creates
-/// a source DTS. Only already validated source fields are admissible inputs.
-/// Actual output overflow is Error::Overflow; raw33 outside its width is Invalid.
+/// Interpret an optional 33-bit source timestamp in 90 kHz ticks under `policy`.
+/// A bounded unwrap uses the anchor only when its key matches `key`.
+/// Returns `Invalid` for an out-of-width timestamp or a matching anchor bound at or above
+/// half a clock period. Returns `Overflow` if the lifted time cannot be represented.
 pub fn source_timestamp(
     raw33: Option<u64>,
     key: ClockKey,

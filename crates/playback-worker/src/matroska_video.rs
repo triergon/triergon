@@ -9,16 +9,15 @@
 use crate::matroska::{AVC_AAC, HEVC_DOLBY, WORK, ready};
 use crate::runner::{Invocation, Result, Totals, measure};
 use std::sync::atomic::AtomicBool;
+use triergon_bridge::matroska::{
+    MatroskaCompactDiscovery, MatroskaDiscoveryLimits, MatroskaDiscoveryStep, MatroskaFeedSetup,
+    MatroskaHevcDolbySetup, MatroskaPacketTiming, MatroskaVideoSeekGate,
+};
 use triergon_core::{Budget, Bytes, SourceId, Time, WorkBudget};
 use triergon_harness_protocol::digest::{fold, signed};
-use triergon_matroska::typed::{Event, Reader};
+use triergon_matroska::{Event as MkvEvent, Reader};
 use triergon_playback::{
-    ByteSource, Engine, Output, PlayerPolicy, Progress, RawEvent, Selection, TrackKey,
-    io::SourceOwner,
-    matroska_feed::{
-        MatroskaCompactDiscovery, MatroskaDiscoveryLimits, MatroskaDiscoveryStep,
-        MatroskaFeedSetup, MatroskaHevcDolbySetup, MatroskaPacketTiming, MatroskaVideoSeekGate,
-    },
+    ByteSource, Engine, Event, Output, PlayerPolicy, Progress, Selection, SourceOwner, TrackKey,
 };
 
 pub const PREFIX: &str = "feed-";
@@ -92,7 +91,8 @@ impl Work {
     }
 }
 
-/// One session. A failure inside it is a broken invariant of the corpus and panics.
+/// Discover, optionally seek, and fold one video session from the validated corpus.
+// Propagating session errors through the runner cost up to +2.92% on the Matroska video workloads.
 fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
     let cancel = AtomicBool::new(false);
     let id = SourceId(31);
@@ -104,7 +104,7 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
         QUANTUM,
     )
     .unwrap();
-    let engine = Engine::matroska_reader(reader);
+    let engine = Engine::matroska(reader);
     let source = ByteSource::new(id, raw.clone(), QUANTUM).unwrap();
     let mut discovery = MatroskaCompactDiscovery::new(
         engine,
@@ -127,7 +127,7 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
     let mut configuration = prefix
         .events()
         .find_map(|event| match event {
-            Event::Configuration(configuration) => Some(configuration),
+            MkvEvent::Configuration(configuration) => Some(configuration),
             _ => None,
         })
         .unwrap()
@@ -178,14 +178,14 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
                     .unwrap();
                 if let Some(output) = pending.take() {
                     match output.event() {
-                        RawEvent::Seek(_) => intent = Some(output),
-                        RawEvent::Matroska(Event::Seek(_)) => {
+                        Event::Seek(_) => intent = Some(output),
+                        Event::Matroska(MkvEvent::Seek(_)) => {
                             gate = Some(
                                 MatroskaVideoSeekGate::new(intent.as_ref().unwrap(), &output)
                                     .unwrap(),
                             );
                         }
-                        RawEvent::Matroska(Event::Packet(packet))
+                        Event::Matroska(MkvEvent::Packet(packet))
                             if packet.packet.track == track
                                 && gate.as_mut().unwrap().admits(&output).unwrap() =>
                         {
@@ -216,13 +216,13 @@ fn session(pool: &Budget, raw: &Bytes, operation: Operation) -> Work {
     };
     let mut avc_clock = avc
         .as_ref()
-        .map(|feed| feed.native_avc_clock().unwrap().unwrap());
+        .map(|feed| feed.demux_avc_clock().unwrap().unwrap());
     let mut hevc_clock = hevc
         .as_ref()
-        .map(|feed| feed.native_hevc_clock().unwrap().unwrap());
+        .map(|feed| feed.demux_hevc_clock().unwrap().unwrap());
     let mut work = Work::default();
     let mut output = |event: &Output| {
-        let RawEvent::Matroska(Event::Packet(packet)) = event.event() else {
+        let Event::Matroska(MkvEvent::Packet(packet)) = event.event() else {
             return;
         };
         if packet.packet.track != track

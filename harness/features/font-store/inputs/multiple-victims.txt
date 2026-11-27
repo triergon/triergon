@@ -1,0 +1,8 @@
+budget 3 7
+get 1 1
+get 2 1
+get 3 1
+hold 2
+get 4 7
+get 2 4
+release 2

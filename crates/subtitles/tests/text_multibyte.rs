@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Budget, Bytes, Error, WorkBudget};
+use triergon_subtitles::compat::charset::Profile;
 use triergon_subtitles::text::{
     Limits,
     charset::{
@@ -7,6 +8,10 @@ use triergon_subtitles::text::{
         multibyte::{DecodeStep, MultibyteCharset as M, MultibyteDecoder},
     },
 };
+const RECEIVER_GBK: M = Profile::Gbk.multibyte();
+const RECEIVER_BIG5: M = Profile::Big5.multibyte();
+const RECEIVER_SHIFT_JIS: M = Profile::ShiftJis.multibyte();
+const RECEIVER_EUC_KR: M = Profile::EucKr.multibyte();
 
 fn decode(raw: &[u8], profile: M, quantum: u64) -> Result<Vec<u8>, Error> {
     let pool = Budget::new(1024 * 1024).unwrap();
@@ -32,10 +37,10 @@ fn decode(raw: &[u8], profile: M, quantum: u64) -> Result<Vec<u8>, Error> {
 #[test]
 fn multibyte_missing_api_and_four_selected_scripts() {
     for (profile, raw, text) in [
-        (M::GbkCp936, &[0xd6, 0xd0, 0xce, 0xc4][..], "中文"),
-        (M::Big5Unicode, &[0xa4, 0xa4, 0xa4, 0xe5][..], "中文"),
-        (M::ShiftJisUnicode, &[0x93, 0xfa, 0x96, 0x7b][..], "日本"),
-        (M::EucKr, &[0xc7, 0xd1, 0xb1, 0xdb][..], "한글"),
+        (M::GBK, &[0xd6, 0xd0, 0xce, 0xc4][..], "中文"),
+        (M::BIG5, &[0xa4, 0xa4, 0xa4, 0xe5][..], "中文"),
+        (M::SHIFT_JIS, &[0x93, 0xfa, 0x96, 0x7b][..], "日本"),
+        (M::EUC_KR, &[0xc7, 0xd1, 0xb1, 0xdb][..], "한글"),
     ] {
         for q in [1, 7, 4096] {
             assert_eq!(decode(raw, profile, q).unwrap(), text.as_bytes());
@@ -45,26 +50,23 @@ fn multibyte_missing_api_and_four_selected_scripts() {
 #[test]
 fn windows_variants_are_observably_distinct() {
     assert_eq!(
-        decode(&[0x81, 0x60], M::ShiftJisUnicode, 1).unwrap(),
+        decode(&[0x81, 0x60], RECEIVER_SHIFT_JIS, 1).unwrap(),
         "〜".as_bytes()
     );
+    for profile in [M::SHIFT_JIS, M::WINDOWS_932] {
+        assert_eq!(decode(&[0x81, 0x60], profile, 1).unwrap(), "～".as_bytes());
+    }
+    assert_eq!(decode(&[0xa1, 0x45], M::BIG5, 1).unwrap(), "‧".as_bytes());
     assert_eq!(
-        decode(&[0x81, 0x60], M::Windows932, 1).unwrap(),
-        "～".as_bytes()
-    );
-    assert_eq!(
-        decode(&[0xa1, 0x45], M::Big5Unicode, 1).unwrap(),
-        "•".as_bytes()
-    );
-    assert_eq!(
-        decode(&[0xa1, 0x45], M::Windows950, 1).unwrap(),
+        decode(&[0xa1, 0x45], M::WINDOWS_950, 1).unwrap(),
         "‧".as_bytes()
     );
-    assert!(decode(&[0x81, 0x41], M::EucKr, 1).is_err());
-    assert_eq!(
-        decode(&[0x81, 0x41], M::Windows949, 1).unwrap(),
-        "갂".as_bytes()
-    );
+    // UHC pairs: the receiver's EUC-KR refuses them, the Encoding Standard's
+    // decodes them as code page 949 does.
+    assert!(decode(&[0xa1, 0x41], RECEIVER_EUC_KR, 1).is_err());
+    for profile in [M::EUC_KR, M::WINDOWS_949] {
+        assert_eq!(decode(&[0x81, 0x41], profile, 1).unwrap(), "갂".as_bytes());
+    }
 }
 #[test]
 fn old_resolver_refusals_are_preserved_and_new_aliases_are_explicit() {
@@ -93,7 +95,7 @@ fn old_resolver_refusals_are_preserved_and_new_aliases_are_explicit() {
     ] {
         assert!(matches!(M::from_label(name), Err(Error::Unsupported(_))));
     }
-    assert_eq!(M::from_label(b"WINDOWS-932").unwrap(), M::Windows932);
+    assert_eq!(M::from_label(b"WINDOWS-932").unwrap(), M::WINDOWS_932);
     assert!(matches!(
         M::from_label(&[b'a'; 257]),
         Err(Error::Limit { .. })
@@ -102,39 +104,39 @@ fn old_resolver_refusals_are_preserved_and_new_aliases_are_explicit() {
 
 const PROFILES: [(M, &str, usize); 7] = [
     (
-        M::GbkCp936,
+        RECEIVER_GBK,
         include_str!("multibyte-mapping-data/CP936.TXT"),
         21920,
     ),
     (
-        M::Big5Unicode,
-        include_str!("multibyte-mapping-data/BIG5.TXT"),
-        13831,
-    ),
-    (
-        M::ShiftJisUnicode,
+        RECEIVER_SHIFT_JIS,
         include_str!("multibyte-mapping-data/SHIFTJIS.TXT"),
         7070,
     ),
     (
-        M::EucKr,
-        include_str!("multibyte-mapping-data/CP949.TXT"),
-        8354,
-    ),
-    (
-        M::Windows932,
-        include_str!("multibyte-mapping-data/CP932.TXT"),
-        7915,
-    ),
-    (
-        M::Windows949,
+        M::EUC_KR,
         include_str!("multibyte-mapping-data/CP949.TXT"),
         17176,
     ),
     (
-        M::Windows950,
+        M::WINDOWS_932,
+        include_str!("multibyte-mapping-data/CP932.TXT"),
+        9795,
+    ),
+    (
+        M::WINDOWS_949,
+        include_str!("multibyte-mapping-data/CP949.TXT"),
+        17176,
+    ),
+    (
+        M::WINDOWS_950,
         include_str!("multibyte-mapping-data/CP950.TXT"),
-        13631,
+        19850,
+    ),
+    (
+        M::SHIFT_JIS,
+        include_str!("multibyte-mapping-data/CP932.TXT"),
+        9796,
     ),
 ];
 
@@ -150,18 +152,63 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
         };
         let code = u16::from_str_radix(code.strip_prefix("0x").unwrap(), 16).unwrap();
         let value = char::from_u32(u32::from_str_radix(value, 16).unwrap()).unwrap();
-        if profile == M::Big5Unicode && value == '\u{fffd}' {
+        // The receiver's EUC-KR holds KS X 1001's A1–FE byte pairs.
+        if profile == RECEIVER_EUC_KR && !(0xa1..=0xfe).contains(&(code >> 8)) {
             continue;
         }
-        if profile == M::EucKr && !(0xa1..=0xfe).contains(&(code >> 8)) {
-            continue;
-        }
-        if profile == M::EucKr && !(0xa1..=0xfe).contains(&(code & 255)) {
+        if profile == RECEIVER_EUC_KR && !(0xa1..=0xfe).contains(&(code & 255)) {
             continue;
         }
         assert!(map.insert(code, value).is_none());
     }
-    if matches!(profile, M::Big5Unicode | M::EucKr) {
+    if profile == RECEIVER_SHIFT_JIS {
+        // JIS X 0208 1-32, the reverse solidus, as JIS0208.TXT, Windows and the
+        // WHATWG Shift_JIS decoder map it; SHIFTJIS.TXT gives U+005C.
+        assert_eq!(map.insert(0x815f, '\u{ff3c}'), Some('\\'));
+    }
+    if matches!(profile, M::WINDOWS_932 | M::SHIFT_JIS) {
+        // CP932.TXT 2.01 leaves out the user-defined area, which Windows
+        // converts to the private use area, row by row.
+        let trails = (0x40..=0x7e).chain(0x80..=0xfc);
+        let codes =
+            (0xf0_u16..=0xf9).flat_map(|lead| trails.clone().map(move |trail| lead << 8 | trail));
+        for (code, scalar) in codes.zip(0xe000..) {
+            assert!(map.insert(code, char::from_u32(scalar).unwrap()).is_none());
+        }
+    }
+    if profile == M::WINDOWS_950 {
+        // CP950.TXT 2.01 leaves out the four user-defined areas, which Windows
+        // converts to the private use area, area by area and row by row, and
+        // the two single bytes it converts outside the table.
+        let rows = |leads: std::ops::RangeInclusive<u16>, trails: Vec<u16>| {
+            leads.flat_map(move |lead| {
+                trails
+                    .clone()
+                    .into_iter()
+                    .map(move |trail| lead << 8 | trail)
+            })
+        };
+        let whole: Vec<u16> = (0x40..=0x7e).chain(0xa1..=0xfe).collect();
+        let codes = rows(0xfa..=0xfe, whole.clone())
+            .chain(rows(0x8e..=0xa0, whole.clone()))
+            .chain(rows(0x81..=0x8d, whole.clone()))
+            .chain(rows(0xc6..=0xc6, (0xa1..=0xfe).collect()))
+            .chain(rows(0xc7..=0xc8, whole));
+        for (code, scalar) in codes.zip(0xe000..) {
+            assert!(map.insert(code, char::from_u32(scalar).unwrap()).is_none());
+        }
+        assert!(map.insert(0x80, '\u{80}').is_none());
+        assert!(map.insert(0xff, '\u{f8f8}').is_none());
+    }
+    if profile == M::SHIFT_JIS {
+        // The Encoding Standard's Shift_JIS decoder gives 0x80 as U+0080.
+        assert!(map.insert(0x80, '\u{80}').is_none());
+    }
+    if profile == RECEIVER_EUC_KR {
+        // CP949.TXT 2.01 predates A2E8, which KS X 1001:2002 assigns.
+        assert!(map.insert(0xa2e8, '\u{327e}').is_none());
+    }
+    if profile == RECEIVER_EUC_KR {
         for byte in 0..128 {
             assert!(
                 map.insert(byte, char::from_u32(u32::from(byte)).unwrap())
@@ -169,7 +216,7 @@ fn mapping(profile: M, original: &str) -> std::collections::BTreeMap<u16, char> 
             );
         }
     }
-    if profile == M::ShiftJisUnicode {
+    if profile == RECEIVER_SHIFT_JIS {
         for byte in (0..32).chain(std::iter::once(127)) {
             assert!(
                 map.insert(byte, char::from_u32(u32::from(byte)).unwrap())
@@ -224,6 +271,9 @@ fn all_short_inputs(index: usize) {
 }
 
 fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>) {
+    // The Big5 codes that are two characters have a test of their own.
+    let two_characters =
+        |raw: [u8; 2]| profile == M::BIG5 && matches!(raw, [0x88, 0x62 | 0x64 | 0xa3 | 0xa5]);
     for first in 0u16..256 {
         match table.get(&first) {
             Some(value) => assert_eq!(
@@ -234,6 +284,9 @@ fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>)
         }
         for second in 0u16..256 {
             let raw = [first as u8, second as u8];
+            if two_characters(raw) {
+                continue;
+            }
             let expected = if let Some(a) = table.get(&first) {
                 table.get(&second).map(|b| format!("{a}{b}"))
             } else {
@@ -252,32 +305,102 @@ fn check_short_inputs(profile: M, table: &std::collections::BTreeMap<u16, char>)
     }
 }
 
-// These receiver profiles use distinct tables. Compare the public decoder,
-// including the direct ASCII path, with every one- and two-byte table result.
+/// The records of a packed table, with ASCII, which every profile decodes as
+/// itself.
+fn packed(records: &[u8]) -> std::collections::BTreeMap<u16, char> {
+    let (records, remainder) = records.as_chunks::<4>();
+    assert!(remainder.is_empty());
+    let ascii = (0..128).map(|byte| (byte, char::from(byte as u8)));
+    ascii
+        .chain(records.iter().map(|&[a, b, c, d]| {
+            let code = u16::from_be_bytes([a, b]);
+            let value = char::from_u32(u32::from(u16::from_be_bytes([c, d]))).unwrap();
+            (code, value)
+        }))
+        .collect()
+}
+
+const GBK: &[u8] = include_bytes!("../src/text/charset/mapping-data/gbk.bin");
+const BIG5: &[u8] = include_bytes!("../src/text/charset/mapping-data/big5.bin");
+const BIG5_PLANE2: &[u8] = include_bytes!("../src/text/charset/mapping-data/big5_plane2.bin");
+const WINDOWS932: &[u8] = include_bytes!("../src/text/charset/mapping-data/windows932.bin");
+const WINDOWS949: &[u8] = include_bytes!("../src/text/charset/mapping-data/windows949.bin");
+
 #[test]
-fn every_receiver_big5_and_cp932_one_and_two_byte_input() {
+fn encoding_standard_tables_match_the_verified_index_outputs() {
+    use triergon_harness_protocol::{hex, md5};
+
+    // The index identifiers and SHA-256 pins, including the reproduction
+    // commands, are in multibyte-mapping-data/SOURCE-LOCK.json.
+    let ranges = include_bytes!("../src/text/charset/mapping-data/gb18030_ranges.bin");
+    for (name, table, digest) in [
+        ("Big5", BIG5, "09c63c3998177fd6627bbaf7b4c1205a"),
+        (
+            "Big5 plane 2",
+            BIG5_PLANE2,
+            "25c4b9540b8c43b9e8597cd292370005",
+        ),
+        ("Shift_JIS", WINDOWS932, "29ada05a815e8e65b3414c936cbf6054"),
+        ("EUC-KR", WINDOWS949, "35b6d1280cd2f0a1b6ea82e1123496fd"),
+        ("GBK", GBK, "a86a3473b4e35ab4383a8fffe11984ba"),
+        ("GB18030 ranges", ranges, "89ab967460c5c2aec609f241d084bfcf"),
+    ] {
+        assert_eq!(hex(&md5::digest(table)), digest, "{name}");
+    }
+}
+
+// These profiles' tables come from the Encoding Standard's indexes or the
+// receiver's C library. Compare the public decoder, including the direct ASCII
+// path, with every one- and two-byte table result.
+#[test]
+fn every_one_and_two_byte_input_of_the_packed_tables() {
+    // Big5's plane 2 table holds the low 16 bits of its code points.
+    let mut big5 = packed(BIG5);
+    for &[a, b, c, d] in BIG5_PLANE2.as_chunks::<4>().0 {
+        let scalar = char::from_u32(0x20000 | u32::from(u16::from_be_bytes([c, d]))).unwrap();
+        assert_eq!(big5.insert(u16::from_be_bytes([a, b]), scalar), None);
+    }
+    // The index's 18,590 codes, ASCII, and none of the four of two characters.
+    assert_eq!(big5.len(), 18_590 + 128);
+    check_short_inputs(M::BIG5, &big5);
     for (profile, records) in [
         (
-            M::ReceiverBig5Glibc239,
-            include_bytes!("../src/text/charset/mapping-data/receiver_big5_glibc239.bin")
-                .as_slice(),
+            RECEIVER_BIG5,
+            include_bytes!("../src/text/charset/mapping-data/receiver_big5.bin").as_slice(),
         ),
-        (
-            M::ReceiverWindows932Pua,
-            include_bytes!("../src/text/charset/mapping-data/receiver_cp932_pua.bin").as_slice(),
-        ),
+        (M::WINDOWS_932, WINDOWS932),
+        (M::GBK, GBK),
     ] {
-        let (records, remainder) = records.as_chunks::<4>();
-        assert!(remainder.is_empty());
-        let table = records
-            .iter()
-            .map(|&[a, b, c, d]| {
-                let code = u16::from_be_bytes([a, b]);
-                let value = char::from_u32(u32::from(u16::from_be_bytes([c, d]))).unwrap();
-                (code, value)
-            })
-            .collect();
-        check_short_inputs(profile, &table);
+        check_short_inputs(profile, &packed(records));
+    }
+    // The Encoding Standard's Shift_JIS is code page 932 with 0x80, and its
+    // EUC-KR code page 949: the profiles decode those tables.
+    let mut shift_jis = packed(WINDOWS932);
+    assert_eq!(shift_jis.insert(0x80, '\u{80}'), None);
+    check_short_inputs(M::SHIFT_JIS, &shift_jis);
+    check_short_inputs(M::EUC_KR, &packed(WINDOWS949));
+}
+
+/// The Encoding Standard's GBK holds every CP936 code and adds GB18030's
+/// two-byte codes, the user-defined areas among them.
+#[test]
+fn gbk_extends_code_page_936() {
+    let gbk = packed(GBK);
+    let cp936 = mapping(
+        RECEIVER_GBK,
+        include_str!("multibyte-mapping-data/CP936.TXT"),
+    );
+    for (code, value) in &cp936 {
+        assert_eq!(gbk.get(code), Some(value), "{code:04X}");
+    }
+    assert_eq!(gbk.len() - cp936.len(), 2149);
+    for (code, value) in [
+        (0xa2e3, '\u{20ac}'),
+        (0xa6d9, '\u{fe10}'),
+        (0xaaa1, '\u{e000}'),
+        (0xa140, '\u{e4c6}'),
+    ] {
+        assert_eq!(gbk.get(&code), Some(&value), "{code:04X}");
     }
 }
 
@@ -292,15 +415,8 @@ fn euc_kr_single(byte: u8, single_max: u8) -> Result<String, Error> {
 
 #[test]
 fn every_euc_kr_profile_reports_exact_scalars_and_refusals() {
-    for (profile, single_max) in [
-        (M::EucKr, 0x7f),
-        (M::ReceiverEucKrC1, 0x9f),
-        (M::ReceiverEucKrGlibc239, 0x9f),
-    ] {
-        let mut pairs = mapping(M::EucKr, include_str!("multibyte-mapping-data/CP949.TXT"));
-        if profile == M::ReceiverEucKrGlibc239 {
-            assert!(pairs.insert(0xa2e8, '\u{327e}').is_none());
-        }
+    for (profile, single_max) in [(RECEIVER_EUC_KR, 0x9f)] {
+        let pairs = mapping(profile, include_str!("multibyte-mapping-data/CP949.TXT"));
         for first in 0..=u8::MAX {
             let prefix = euc_kr_single(first, single_max);
             assert_eq!(
@@ -337,27 +453,35 @@ macro_rules! table_tests {
         }
     };
 }
-table_tests!(whole_gbk_mapping, every_gbk_one_and_two_byte_input, 0);
-table_tests!(whole_big5_mapping, every_big5_one_and_two_byte_input, 1);
 table_tests!(
-    whole_shift_jis_mapping,
-    every_shift_jis_one_and_two_byte_input,
-    2
+    whole_receiver_gbk_mapping,
+    every_receiver_gbk_one_and_two_byte_input,
+    0
 );
-table_tests!(whole_euc_kr_mapping, every_euc_kr_one_and_two_byte_input, 3);
+table_tests!(
+    whole_receiver_shift_jis_mapping,
+    every_receiver_shift_jis_one_and_two_byte_input,
+    1
+);
+table_tests!(whole_euc_kr_mapping, every_euc_kr_one_and_two_byte_input, 2);
 table_tests!(
     whole_windows932_mapping,
     every_windows932_one_and_two_byte_input,
-    4
+    3
 );
 table_tests!(
     whole_windows949_mapping,
     every_windows949_one_and_two_byte_input,
-    5
+    4
 );
 table_tests!(
     whole_windows950_mapping,
     every_windows950_one_and_two_byte_input,
+    5
+);
+table_tests!(
+    whole_shift_jis_mapping,
+    every_shift_jis_one_and_two_byte_input,
     6
 );
 
@@ -365,10 +489,10 @@ table_tests!(
 fn every_physical_partition_retains_lead_and_exact_ranges() {
     let cancel = AtomicBool::new(false);
     for (profile, raw) in [
-        (M::GbkCp936, &[0, 0xd6, 0xd0, 0x41, 0xce, 0xc4][..]),
-        (M::Big5Unicode, &[0, 0xa4, 0xa4, 0x41, 0xa4, 0xe5][..]),
-        (M::ShiftJisUnicode, &[0, 0x93, 0xfa, 0x41, 0x96, 0x7b][..]),
-        (M::EucKr, &[0, 0xc7, 0xd1, 0x41, 0xb1, 0xdb][..]),
+        (M::GBK, &[0, 0xd6, 0xd0, 0x41, 0xce, 0xc4][..]),
+        (M::BIG5, &[0, 0xa4, 0xa4, 0x41, 0xa4, 0xe5][..]),
+        (M::SHIFT_JIS, &[0, 0x93, 0xfa, 0x41, 0x96, 0x7b][..]),
+        (M::EUC_KR, &[0, 0xc7, 0xd1, 0x41, 0xb1, 0xdb][..]),
     ] {
         for mask in 0..(1usize << (raw.len() - 1)) {
             let mut decoder = MultibyteDecoder::at_offset(profile, 19);
@@ -401,15 +525,18 @@ fn every_physical_partition_retains_lead_and_exact_ranges() {
 fn lead_starvation_is_not_eof_and_finish_is_sticky_truncation() {
     let cancel = AtomicBool::new(false);
     for profile in [
-        M::GbkCp936,
-        M::Big5Unicode,
-        M::ShiftJisUnicode,
-        M::EucKr,
-        M::Windows932,
-        M::Windows949,
-        M::Windows950,
+        M::GBK,
+        M::BIG5,
+        M::SHIFT_JIS,
+        M::EUC_KR,
+        M::WINDOWS_932,
+        M::WINDOWS_949,
+        M::WINDOWS_950,
+        RECEIVER_GBK,
+        RECEIVER_SHIFT_JIS,
+        RECEIVER_EUC_KR,
     ] {
-        let lead = if matches!(profile, M::ShiftJisUnicode | M::Windows932) {
+        let lead = if matches!(profile, M::SHIFT_JIS | RECEIVER_SHIFT_JIS | M::WINDOWS_932) {
             0x81
         } else {
             0xa1
@@ -442,7 +569,7 @@ fn lead_starvation_is_not_eof_and_finish_is_sticky_truncation() {
 #[test]
 fn cancellation_between_lead_and_trail_preserves_pending_source() {
     let cancel = AtomicBool::new(false);
-    let mut decoder = MultibyteDecoder::new(M::GbkCp936);
+    let mut decoder = MultibyteDecoder::new(M::GBK);
     assert_eq!(
         decoder
             .push(0xd6, &mut WorkBudget::new(1), &cancel)
@@ -471,7 +598,7 @@ fn cancellation_between_lead_and_trail_preserves_pending_source() {
 #[test]
 fn invalid_trail_never_replays_as_ascii_or_publishes_replacement() {
     let cancel = AtomicBool::new(false);
-    let mut decoder = MultibyteDecoder::new(M::GbkCp936);
+    let mut decoder = MultibyteDecoder::new(M::GBK);
     decoder
         .push(0xd6, &mut WorkBudget::new(1), &cancel)
         .unwrap();
@@ -488,28 +615,190 @@ fn invalid_trail_never_replays_as_ascii_or_publishes_replacement() {
 }
 
 #[test]
-fn big5_seven_unmapped_records_are_all_required_refusals() {
-    for code in [0xa15au16, 0xa1c3, 0xa1c5, 0xa1fe, 0xa240, 0xa2cc, 0xa2ce] {
+fn big5_is_the_encoding_standards_index() {
+    // Pointers of index-big5.txt (identifier 8dfc7710..., 2024-09-18) and
+    // their code points as the index lists them: its first and last pointers,
+    // plane 2 characters, the neighbours of the two-character codes, and codes
+    // where Unicode's historical BIG5.TXT differs or has no mapping.
+    for (pointer, code, scalar) in [
+        (942, [0x87, 0x40], '\u{43f0}'),
+        (947, [0x87, 0x45], '\u{27267}'),
+        (1132, [0x88, 0x61], '\u{d2}'),
+        (1136, [0x88, 0x65], '\u{1ec0}'),
+        (4288, [0x9c, 0x71], '\u{20021}'),
+        (5029, [0xa1, 0x45], '\u{2027}'),
+        (5050, [0xa1, 0x5a], '\u{2574}'),
+        (5121, [0xa1, 0xc3], '\u{ffe3}'),
+        (5287, [0xa2, 0xcc], '\u{5341}'),
+        (10896, [0xc6, 0xa1], '\u{2460}'),
+        (18996, [0xf9, 0xfe], '\u{ffed}'),
+        (19781, [0xfe, 0xfe], '\u{79d4}'),
+    ] {
+        // The decoder's pointer: (lead - 0x81) * 157 + (trail - 0x40, or
+        // trail - 0x62 from 0xA1).
+        let [lead, trail] = code.map(u32::from);
+        let offset = if trail < 0x7f { 0x40 } else { 0x62 };
+        assert_eq!((lead - 0x81) * 157 + trail - offset, pointer);
+        assert_eq!(
+            decode(&code, M::BIG5, 1).unwrap(),
+            scalar.to_string().as_bytes(),
+            "{code:02x?}"
+        );
+    }
+    // No pointer below 942, and no single byte beyond ASCII.
+    for refused in [&[0x81, 0x40][..], &[0x86, 0xfe], &[0x80], &[0xff]] {
         assert!(matches!(
-            decode(&code.to_be_bytes(), M::Big5Unicode, 1),
+            decode(refused, M::BIG5, 1),
             Err(Error::Invalid(_))
         ));
-        assert!(decode(&code.to_be_bytes(), M::Windows950, 1).is_ok());
     }
 }
 
 #[test]
-fn no_private_use_or_gb18030_four_byte_inference() {
-    assert!(decode(&[0x81, 0x30, 0x81, 0x30], M::GbkCp936, 1).is_err());
-    assert!(decode(&[0xf0, 0x40], M::Windows932, 1).is_err());
-    assert!(decode(&[0xfa, 0x40], M::Windows950, 1).is_err());
-    assert!(decode(&[0x87, 0x40], M::Big5Unicode, 1).is_err());
+fn big5_codes_of_two_characters_give_a_letter_and_its_mark() {
+    let cancel = AtomicBool::new(false);
+    for (code, text) in [
+        ([0x88, 0x62], "\u{ca}\u{304}"),
+        ([0x88, 0x64], "\u{ca}\u{30c}"),
+        ([0x88, 0xa3], "\u{ea}\u{304}"),
+        ([0x88, 0xa5], "\u{ea}\u{30c}"),
+    ] {
+        let raw = [b'A', code[0], code[1], b'B'];
+        for quantum in [1, 7, 4096] {
+            assert_eq!(
+                decode(&raw, M::BIG5, quantum).unwrap(),
+                format!("A{text}B").as_bytes()
+            );
+        }
+        // The decoder gives the letter for the lead byte and the mark for the
+        // trail byte, which it takes on its second push.
+        let mut decoder = MultibyteDecoder::new(M::BIG5);
+        let mut scalars = Vec::new();
+        while decoder.position() < raw.len() {
+            let byte = raw[decoder.position()];
+            if let DecodeStep::Scalar(scalar) = decoder
+                .push(byte, &mut WorkBudget::new(1), &cancel)
+                .unwrap()
+            {
+                scalars.push((scalar.value, scalar.range));
+            }
+        }
+        decoder.finish(&cancel).unwrap();
+        let mut characters = text.chars();
+        assert_eq!(
+            scalars,
+            [
+                ('A', 0..1),
+                (characters.next().unwrap(), 1..2),
+                (characters.next().unwrap(), 2..3),
+                ('B', 3..4),
+            ]
+        );
+        // Without its trail byte the code is truncated.
+        assert_eq!(decode(&raw[..2], M::BIG5, 1), Err(Error::Truncated));
+    }
+}
+
+#[test]
+fn gbk_decodes_gb18030_four_byte_codes_by_their_ranges() {
+    for (code, scalar) in [
+        ([0x81, 0x30, 0x81, 0x30], '\u{80}'),
+        ([0x81, 0x30, 0x81, 0x31], '\u{81}'),
+        // Pointer 7457, which the standard decodes before its ranges.
+        ([0x81, 0x35, 0xf4, 0x37], '\u{e7c7}'),
+        // The last pointer below the gap, 39419.
+        ([0x84, 0x31, 0xa4, 0x39], '\u{ffff}'),
+        // Pointers from 189000 on are U+10000 onwards.
+        ([0x90, 0x30, 0x81, 0x30], '\u{10000}'),
+        ([0xe3, 0x32, 0x9a, 0x35], '\u{10ffff}'),
+    ] {
+        let raw = [b'A', code[0], code[1], code[2], code[3], b'B'];
+        for quantum in [1, 7, 4096] {
+            assert_eq!(
+                decode(&raw, M::GBK, quantum).unwrap(),
+                format!("A{scalar}B").as_bytes(),
+                "{code:02x?}"
+            );
+        }
+        let cancel = AtomicBool::new(false);
+        let mut decoder = MultibyteDecoder::new(M::GBK);
+        let mut scalars = Vec::new();
+        for byte in raw {
+            match decoder
+                .push(byte, &mut WorkBudget::new(1), &cancel)
+                .unwrap()
+            {
+                DecodeStep::Scalar(scalar) => scalars.push((scalar.value, scalar.range)),
+                DecodeStep::NeedInput => {}
+                DecodeStep::Yield => panic!("one byte must fit one work unit"),
+            }
+        }
+        decoder.finish(&cancel).unwrap();
+        assert_eq!(scalars, [('A', 0..1), (scalar, 1..5), ('B', 5..6)]);
+    }
+    for refused in [
+        // The gap after 39419, and beyond U+10FFFF.
+        &[0x84, 0x31, 0xa5, 0x30][..],
+        &[0xe3, 0x32, 0x9a, 0x36],
+        // A third byte that is not 81 to FE, a fourth that is not 30 to 39.
+        &[0x81, 0x30, 0x41, 0x30],
+        &[0x81, 0x30, 0x80, 0x30],
+        &[0x81, 0x30, 0x81, 0x41],
+    ] {
+        assert!(decode(refused, M::GBK, 1).is_err(), "{refused:02x?}");
+    }
+    for truncated in [&[0x81, 0x30][..], &[0x81, 0x30, 0x81]] {
+        assert_eq!(decode(truncated, M::GBK, 1), Err(Error::Truncated));
+    }
+    // The receiver's GBK has no four-byte codes.
+    assert!(decode(&[0x81, 0x30, 0x81, 0x30], RECEIVER_GBK, 1).is_err());
+}
+
+#[test]
+fn cp950_user_defined_areas_map_all_6217_codes_to_private_use() {
+    // The first and last code of each area, in the order Windows numbers them.
+    for (code, scalar) in [
+        ([0xfa, 0x40], '\u{e000}'),
+        ([0xfe, 0xfe], '\u{e310}'),
+        ([0x8e, 0x40], '\u{e311}'),
+        ([0xa0, 0xfe], '\u{eeb7}'),
+        ([0x81, 0x40], '\u{eeb8}'),
+        ([0x8d, 0xfe], '\u{f6b0}'),
+        ([0xc6, 0xa1], '\u{f6b1}'),
+        ([0xc8, 0xfe], '\u{f848}'),
+    ] {
+        assert_eq!(
+            decode(&code, M::WINDOWS_950, 1).unwrap(),
+            scalar.to_string().as_bytes()
+        );
+    }
+    assert_eq!(
+        decode(&[0x80], M::WINDOWS_950, 1).unwrap(),
+        "\u{80}".as_bytes()
+    );
+    assert_eq!(
+        decode(&[0xff], M::WINDOWS_950, 1).unwrap(),
+        "\u{f8f8}".as_bytes()
+    );
+    // The reference's C library converts cp950 with its Big5 charmap, which
+    // has the last area and byte 0x80 only.
+    assert_eq!(
+        decode(&[0xc6, 0xa1], RECEIVER_BIG5, 1).unwrap(),
+        "\u{f6b1}".as_bytes()
+    );
+    assert_eq!(
+        decode(&[0x80], RECEIVER_BIG5, 1).unwrap(),
+        "\u{80}".as_bytes()
+    );
+    for refused in [&[0xfa, 0x40][..], &[0x8e, 0x40], &[0x81, 0x40], &[0xff]] {
+        assert!(decode(refused, RECEIVER_BIG5, 1).is_err());
+    }
 }
 
 #[test]
 fn byte_origin_overflow_is_checked_before_source_progress() {
     let cancel = AtomicBool::new(false);
-    let mut decoder = MultibyteDecoder::at_offset(M::GbkCp936, usize::MAX);
+    let mut decoder = MultibyteDecoder::at_offset(M::GBK, usize::MAX);
     assert_eq!(
         decoder.push(b'A', &mut WorkBudget::new(1), &cancel),
         Err(Error::Overflow)
@@ -521,7 +810,7 @@ fn byte_origin_overflow_is_checked_before_source_progress() {
 #[test]
 fn finished_decoder_rejects_more_bytes_and_empty_input_is_real_empty_text() {
     let cancel = AtomicBool::new(false);
-    let mut decoder = MultibyteDecoder::new(M::Big5Unicode);
+    let mut decoder = MultibyteDecoder::new(M::BIG5);
     decoder.finish(&cancel).unwrap();
     decoder.finish(&cancel).unwrap();
     assert!(matches!(
@@ -540,7 +829,7 @@ fn complete_validation_refuses_malformed_tail_before_any_output() {
     let mut job = CharsetJob::new(
         &raw,
         None,
-        Charset::Multibyte(M::GbkCp936),
+        Charset::Multibyte(M::GBK),
         &pool,
         Limits::default(),
     )
@@ -570,7 +859,7 @@ fn declared_label_pool_and_backing_source_owner_survive_conversion() {
     let mut job = CharsetJob::new(
         &raw,
         Some(&label),
-        Charset::Multibyte(M::GbkCp936),
+        Charset::Multibyte(M::GBK),
         &pool,
         Limits::default(),
     )
@@ -605,7 +894,7 @@ fn foreign_source_and_label_rejected_without_consuming_caller_owners() {
         CharsetJob::new(
             &foreign,
             None,
-            Charset::Multibyte(M::GbkCp936),
+            Charset::Multibyte(M::GBK),
             &pool,
             Limits::default()
         ),
@@ -615,7 +904,7 @@ fn foreign_source_and_label_rejected_without_consuming_caller_owners() {
         CharsetJob::new(
             &source,
             Some(&foreign),
-            Charset::Multibyte(M::GbkCp936),
+            Charset::Multibyte(M::GBK),
             &pool,
             Limits::default()
         ),
@@ -633,8 +922,7 @@ fn decoded_byte_cap_checks_real_expansion_without_truncation() {
         max_decoded_bytes: 2,
         ..Limits::default()
     };
-    let mut job =
-        CharsetJob::new(&raw, None, Charset::Multibyte(M::GbkCp936), &pool, limits).unwrap();
+    let mut job = CharsetJob::new(&raw, None, Charset::Multibyte(M::GBK), &pool, limits).unwrap();
     assert_eq!(
         job.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Limit {
@@ -652,7 +940,7 @@ fn zero_work_job_has_no_progress_or_allocation() {
     let mut job = CharsetJob::new(
         &raw,
         None,
-        Charset::Multibyte(M::GbkCp936),
+        Charset::Multibyte(M::GBK),
         &pool,
         Limits::default(),
     )
@@ -682,7 +970,7 @@ fn job_cancellation_at_each_single_unit_boundary_is_resumable() {
         let mut job = CharsetJob::new(
             &source,
             None,
-            Charset::Multibyte(M::GbkCp936),
+            Charset::Multibyte(M::GBK),
             &pool,
             Limits::default(),
         )
@@ -718,7 +1006,7 @@ fn retained_output_pressure_retries_without_replaying_or_losing_source() {
     let mut job = CharsetJob::new(
         &raw,
         None,
-        Charset::Multibyte(M::GbkCp936),
+        Charset::Multibyte(M::GBK),
         &pool,
         Limits::default(),
     )
@@ -753,7 +1041,7 @@ fn utf8_packets_do_not_adopt_multibyte_selection() {
         let pool = Budget::new(4096).unwrap();
         let input = Input {
             format,
-            encoding: Encoding::Multibyte(M::GbkCp936),
+            encoding: Encoding::Multibyte(M::GBK),
             payload: Bytes::copy_from_slice(&pool, b"A").unwrap(),
             codec_id: None,
             codec_private: None,
@@ -772,5 +1060,35 @@ fn utf8_packets_do_not_adopt_multibyte_selection() {
             extractor.step(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
             Err(Error::Invalid(_))
         ));
+    }
+}
+
+#[test]
+fn shift_jis_815f_is_the_fullwidth_reverse_solidus() {
+    for profile in [M::SHIFT_JIS, RECEIVER_SHIFT_JIS, M::WINDOWS_932] {
+        assert_eq!(
+            decode(&[0x81, 0x5f], profile, 1).unwrap(),
+            "\u{ff3c}".as_bytes()
+        );
+    }
+}
+
+#[test]
+fn the_encoding_standards_shift_jis_keeps_ascii_and_adds_0x80() {
+    assert_eq!(decode(b"\\~", M::SHIFT_JIS, 1).unwrap(), b"\\~");
+    assert_eq!(
+        decode(b"\\~", RECEIVER_SHIFT_JIS, 1).unwrap(),
+        "\u{a5}\u{203e}".as_bytes()
+    );
+    assert_eq!(
+        decode(&[0x80], M::SHIFT_JIS, 1).unwrap(),
+        "\u{80}".as_bytes()
+    );
+    assert_eq!(
+        decode(&[0xa1, 0xdf], M::SHIFT_JIS, 1).unwrap(),
+        "｡ﾟ".as_bytes()
+    );
+    for refused in [&[0xa0][..], &[0xfd], &[0xfe], &[0xff]] {
+        assert!(decode(refused, M::SHIFT_JIS, 1).is_err(), "{refused:02x?}");
     }
 }

@@ -5,7 +5,7 @@ use core::f32::consts::FRAC_1_SQRT_2;
 use core::ops::Range;
 use std::sync::LazyLock;
 
-use triergon_framing::{MpegAudioHeader, MpegChannelMode, MpegVersion};
+use triergon_framing::mpeg_audio::{MpegAudioHeader, MpegChannelMode, MpegVersion};
 
 use super::bands::Bands;
 use super::requantize::pow2_quarters;

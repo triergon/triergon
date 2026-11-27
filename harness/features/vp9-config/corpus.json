@@ -1,0 +1,602 @@
+{
+  "schema": 1,
+  "directory": ".research",
+  "cases": [
+    {
+      "id": "vpcc-profile-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-profile-0.bin",
+      "sha256": "0ac9abffc36202d619a122263bb373bb00fc203e0cfa80d736ebe73e24d4dcfd",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "4dc4fb83ee333fa7f5d28f90a79093debbbddb990d17317ad8e7b3a9250028f8"
+      }
+    },
+    {
+      "id": "vpcc-profile-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-profile-1.bin",
+      "sha256": "376f0b4cc29781a4c319399cf37639585b9ae25abfc163dd2aa62989a3b83492",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "8c1d1075de6d7b53c3aafe3008f6ac61ead61b195b88a8d786587aa000e4f2e9"
+      }
+    },
+    {
+      "id": "vpcc-profile-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-profile-2.bin",
+      "sha256": "cd404bda80dbf2d84281556e74ae164fc962503b05fa4d23f32e077687bae8f4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "704926d2a7e52c88ad8235196990be0f749363d6bd518bae372b043e49b89093"
+      }
+    },
+    {
+      "id": "vpcc-profile-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-profile-3.bin",
+      "sha256": "76892becf7ac74b2ecd6e2898c7fb7d35cdffd62117dfea8594ad18a95499d43",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1b52f61b031ac11f722265b5acdb2c7f4ebc4b88f31b98ca9a9da694cb4a2f37"
+      }
+    },
+    {
+      "id": "vpcc-unknown-cicp-preserved",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-unknown-cicp-preserved.bin",
+      "sha256": "4b420bf42df12b570127432fd8e4c1ab84656f0124b38c6390caf78f89b58881",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ce4001a6378ebae8cd52e3b806ca600b9acd4f317a8fba3cf0032c8310d5878e"
+      }
+    },
+    {
+      "id": "vpcc-flags-preserved",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-flags-preserved.bin",
+      "sha256": "cd65e8bee0ff6e7bb25c444a249df38332884cb01885c004ae9197db0c4fd59e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "a6524ec68e4a9cc2b2fa3faad6f0b32c481183ec709f9a44633a4bd242b12b3d"
+      }
+    },
+    {
+      "id": "vpcc-nonempty-initialization",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-nonempty-initialization.bin",
+      "sha256": "bd00c470f3cb8969be1e5000ad6b13b769f1071337ac55902c414f582bfb1c8e",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "522ed0ef07992a280c1563d60823d606a866d63d45e8dc3ac5634b0113242846"
+      }
+    },
+    {
+      "id": "vpcc-raw-range-issues",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-raw-range-issues.bin",
+      "sha256": "5a30ecfec0d75bbb329155dc40f83619056d242f2a630c05d64e87695413d878",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "9ce5ddc0db4bcbbb3787a3a7efa8cf9484376b6af5fa2db6f9ca120393d4cfcd"
+      }
+    },
+    {
+      "id": "vpcc-rgb-with-subsampling",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-rgb-with-subsampling.bin",
+      "sha256": "93667783695b3718380f8a6202b21013f684aa295752ae83051a887886e74539",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "5e8f329b0c7469a292ba973c7ef4fc8fd60351592295ca1d73f833a894dace6c"
+      }
+    },
+    {
+      "id": "vpcc-version-zero-unsupported",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-version-zero-unsupported.bin",
+      "sha256": "27b0eba46ae3d3ca43a28f0b36cb0133a33ece9d4c2187d504b85abed92e0dd7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-future-version-unsupported",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-future-version-unsupported.bin",
+      "sha256": "f8877784f2cf71514329059bd050011141e56c2f270ee46bc9c589412af51386",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-flags-over-24-bits",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-flags-over-24-bits.bin",
+      "sha256": "3b76ca670d61fcb1cc2b23ae28568a9aaec09d24b8edcfed305cf80ba96e0ffb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "16777216"
+      ],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-initialization",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-initialization.bin",
+      "sha256": "c8f4e3fcdaa2c6a0a8fc30cc9f47bd05384fdae298d997cabad567025a9e4986",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-extra-record-tail",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-extra-record-tail.bin",
+      "sha256": "3c3729ddc995192e840c1a3bcf5f6b1aeff81fac345666bab3f3220a3d4c2b64",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-0.bin",
+      "sha256": "67abdd721024f0ff4e0b3f4c2fc13bc5bad42d0b7851d456d88d203d15aaa450",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-1.bin",
+      "sha256": "957b88b12730e646e0f33d3618b77dfa579e8231e3c59c7104be7165611c8027",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-2.bin",
+      "sha256": "8b06d71008bfca591d40f15f058bece45644ec17704c14a362494b17524d7d6c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-3.bin",
+      "sha256": "41750a119644cb6765aad0f5b90035557129867f0dfe7a1a463ab68121e395e2",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-4",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-4.bin",
+      "sha256": "bde6becdc6adc0f653c54c0488730759564906b92233a0821365c03772e0e893",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-5",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-5.bin",
+      "sha256": "fecb365aa0dfe7735dd18f9df97dfdbd71e1fc644a69c49698af201ebc0b6322",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-6",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-6.bin",
+      "sha256": "c41ab89ca21f148ad407032653d832a3fcfbf155e681b40b0d69d4af2c8567a3",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-record-7",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-record-7.bin",
+      "sha256": "dfae462610d0451c00b65920b00cc6588d364ae5f922024e8fa774f07191a116",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-fullbox-0.bin",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-fullbox-1.bin",
+      "sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-fullbox-2.bin",
+      "sha256": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-short-fullbox-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-short-fullbox-3.bin",
+      "sha256": "fb50dc0717ff266cf9baf82b1ce7a1c2ef6d9247859680b11a19fb7077f5f222",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "aa67a169b0bba217aa0aa88a65346920c84c42447c36ba5f7ea65f422c1fe5d8"
+      }
+    },
+    {
+      "id": "vpcc-level-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-0.bin",
+      "sha256": "b5c7df10e34cd159b228770a3782c196ddc3fea9439ca286eb4cebba7b7cdeb6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "a891ae427223fb51c5980cbf477a4c5777126c1fabbcbb34b6773a05b2451e37"
+      }
+    },
+    {
+      "id": "vpcc-level-10",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-10.bin",
+      "sha256": "0ac9abffc36202d619a122263bb373bb00fc203e0cfa80d736ebe73e24d4dcfd",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "4dc4fb83ee333fa7f5d28f90a79093debbbddb990d17317ad8e7b3a9250028f8"
+      }
+    },
+    {
+      "id": "vpcc-level-11",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-11.bin",
+      "sha256": "b29d5e651802712c3093d0a13ede8c28dc6d0ff65c7155b855458f7515461671",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "77cd07ed8d90674e355d9bfb5a4a75651d20bd8fe82f37f902c7aec9eae1b97d"
+      }
+    },
+    {
+      "id": "vpcc-level-20",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-20.bin",
+      "sha256": "b980c60d7a918a2a93d7c70806b6f89ea72bcf5042ee657110b308c49e801d96",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "6279d4602dc38ee77ddb019c73471b13c330ca39981126149827190cf64033ea"
+      }
+    },
+    {
+      "id": "vpcc-level-21",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-21.bin",
+      "sha256": "89cbb021cc8286cffcf355b92c3fdf8b7cc3fdc6373b748e864a9aa13fc93241",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "3b0784d97dc2b277a9a44e3cbc36704a53bdf57d07835fc55124bb64749ff3fa"
+      }
+    },
+    {
+      "id": "vpcc-level-30",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-30.bin",
+      "sha256": "417383ff163de12b810de8d0c3e7419faacf3a471611197d529dacb053308da4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "51205d472497c6ca7779f88e0d7b53fa5c90ea36911d7277b393699e8f348cec"
+      }
+    },
+    {
+      "id": "vpcc-level-31",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-31.bin",
+      "sha256": "80cb790b86ec94be3aa09e5ac8b041a35e80f22b8061734a6f956dafadc734b6",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "c34ea8ec4b18417d43b38a54e5da8326ba68fdb2d2db377310fe4bca4d2811dc"
+      }
+    },
+    {
+      "id": "vpcc-level-40",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-40.bin",
+      "sha256": "d85b2f92d3d96af3bd5285ef8f4e88a80da882ee4ae44f849bc6097d77e3d140",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "984889381b5a1b8cfc51445d2edc9f9245da88d38def4b18d988b96455b629d4"
+      }
+    },
+    {
+      "id": "vpcc-level-41",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-41.bin",
+      "sha256": "4d7a2b36a572a690bebd3453b16d24d41b9d0febe641e4f91b61e0661d9d530b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "8196a16bc2e197f547aa107bae99a96088676427241256b31b0ab99eef52834e"
+      }
+    },
+    {
+      "id": "vpcc-level-50",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-50.bin",
+      "sha256": "57742eeec9959242cb3b1eb65a4d607cefd780e302ab125edc32e69a436ca5a9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "34f7acc083eca7c7d379ef6a3c5487575ec9adb5aeb703b224ad2530a43b6e6a"
+      }
+    },
+    {
+      "id": "vpcc-level-51",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-51.bin",
+      "sha256": "c92e35b85f275bec553279911023528c508329feeeea75c6707d03bf72e49cc9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1e92e64ef95c502342526449f6276fb6346d80253508f3f66fd04b567358069a"
+      }
+    },
+    {
+      "id": "vpcc-level-52",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-52.bin",
+      "sha256": "26d2bb583d69317283b33374920098c39e746e6f540a99a042877214044d8996",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "be94166db0c83e64b9a850b1328ae6310207bcf21125a4675d7f4869e74ac05a"
+      }
+    },
+    {
+      "id": "vpcc-level-60",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-60.bin",
+      "sha256": "2de798936d65253c96b155d3d4049b073a2b4eac646890b15276c07573e1a742",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "edb9ccf4a84a53d447818b0d667e69ac067cef376410f0032d7f1e703b04db8d"
+      }
+    },
+    {
+      "id": "vpcc-level-61",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-61.bin",
+      "sha256": "fc13bddee6c84c58d39bee8d038aaaf9f3169b592d911d01f4d7707bd35f78e7",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "1ea9390b2437e18d0827dfeefdb0950f8e20d3a6f73a99dc101f2cd66ce382d1"
+      }
+    },
+    {
+      "id": "vpcc-level-62",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-level-62.bin",
+      "sha256": "9425fe14176556829cef243dbca09b0ec4105f3dbb7c77c16cbbfde8261846b9",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b40bff2c3be3fbdf89aa7c0027694b616bcc62ac2ebff49273a3103762e93919"
+      }
+    },
+    {
+      "id": "vpcc-depth-nine",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-depth-nine.bin",
+      "sha256": "36598f804322c0041c99b4b6575a1f68e7c504ef786b5da4248f1ff9428707d1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "c8758394b045e64053fea295d74f425c86ae0b103c3d252f2d5e6c093699f345"
+      }
+    },
+    {
+      "id": "vpcc-chroma-reserved",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-chroma-reserved.bin",
+      "sha256": "cac9387f20328847eb2753548cd8140c1ddacdf1eb8d8da990e1df284b534b01",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "192c70790de5417d3edb1c706ed87d789c73a85d7dd820db982b14f1000b7f2b"
+      }
+    },
+    {
+      "id": "vpcc-limited-range",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-limited-range.bin",
+      "sha256": "3b76ca670d61fcb1cc2b23ae28568a9aaec09d24b8edcfed305cf80ba96e0ffb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b1e055fd58ae4a631231287f4e0d2d574c9f7defea0e78783a035b8d932b4ef3"
+      }
+    },
+    {
+      "id": "vpcc-cicp-0",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-0.bin",
+      "sha256": "c6759c3e1a0cb7142ad807d8663d93abc09f39a14c323e9b7bfc9150dc76f3d0",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "2bc7ca927f5011ac51f8b095e4cc8b08589f41d3a2f161cf215648ae89f01e06"
+      }
+    },
+    {
+      "id": "vpcc-cicp-1",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-1.bin",
+      "sha256": "3b76ca670d61fcb1cc2b23ae28568a9aaec09d24b8edcfed305cf80ba96e0ffb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "b1e055fd58ae4a631231287f4e0d2d574c9f7defea0e78783a035b8d932b4ef3"
+      }
+    },
+    {
+      "id": "vpcc-cicp-2",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-2.bin",
+      "sha256": "7bad880ef0fa5b60a16814fea1a960545c3a7077e7c4f824c79e04e566588ab4",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "2a93dc34d4b481e9bca4b26b11ef3fb009049f13193efe5884b00579220c8276"
+      }
+    },
+    {
+      "id": "vpcc-cicp-3",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-3.bin",
+      "sha256": "6d529218f353458368b66374b0f4c2941b8562f165902d23754351469a19ee6b",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "7d5fa80684efbc4e269682983d4f076f7c49c7aa4a84c2d922990adafddb9a32"
+      }
+    },
+    {
+      "id": "vpcc-cicp-4",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-4.bin",
+      "sha256": "029815227dd5d1cd0eb9806d9b8944b675dc27fa5b0eb644d8d52a52905a2988",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "ef86faca1606b2b38c3e01ed8617edbe9f4e5c489c2067fabf7e70673e48245a"
+      }
+    },
+    {
+      "id": "vpcc-cicp-9",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-9.bin",
+      "sha256": "9147cff4db7a3fbd76baaad09b57ec41b6d88bf2e60f8dbd4b8fd82f083cb89c",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "97ef3f2b2de906e150e587e8ea98690d754d3120f3e3769094e304c1fbb97daa"
+      }
+    },
+    {
+      "id": "vpcc-cicp-16",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-16.bin",
+      "sha256": "591a5d76a4f135a7063155fa91615bc621e33e6efa04f9540c35b2bcbf85da69",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "f7a43f825e2249dc66bc99e6ea6354d5b50a57be75d9ba76bd72530d051949bc"
+      }
+    },
+    {
+      "id": "vpcc-cicp-18",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-18.bin",
+      "sha256": "bc699afc35449e5d56490c5dec85f722ae39dca00ccd39f7fc9aae18be6631cb",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "9f82fe8f3817f53dcd5fe577edff96bc0c5b11bd8a180f6a13e1e6268bdb8eb2"
+      }
+    },
+    {
+      "id": "vpcc-cicp-22",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-22.bin",
+      "sha256": "05f37f7a6237eeadf23795ac76b795bf12b1e2617c657cdf8d403240a53a7ff1",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "eaa01e0b67ed2336dbe009dfa1a7589f539957eabfb1779d1397210b2d0e3716"
+      }
+    },
+    {
+      "id": "vpcc-cicp-255",
+      "profile": "authored",
+      "file": "config-view-fixtures/vpcc-cicp-255.bin",
+      "sha256": "e4d49df0ea2ef701feaa61885cb000b1f45ac35cb3ac6756cca1e69247de94ce",
+      "rights": "authored-synthetic",
+      "arguments": [],
+      "expected": {
+        "trace_sha256": "e6748c86c7251bf27cf5d188eb1d1bff10cbe7d7ef72811b98df009ddb55a476"
+      }
+    }
+  ]
+}

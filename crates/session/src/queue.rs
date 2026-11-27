@@ -2,11 +2,27 @@
 //! feeder keeps it (backpressure).
 use crate::Discard;
 use std::collections::VecDeque;
+use triergon_core::container::PacketInfo;
+use triergon_core::{Rounding, TimeBase};
+
+pub(crate) fn packet_pts(packet: &impl PacketInfo) -> Result<Option<i64>, FeedError> {
+    packet
+        .pts()
+        .map(|pts| {
+            packet
+                .time_base()
+                .rescale(pts, TimeBase::NANOSECONDS, Rounding::Floor)
+        })
+        .transpose()
+        .map_err(|_| FeedError::Invalid)
+}
 
 /// Capacity of one lane's pending input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct QueueLimits {
+    /// Access units queued at most.
     pub units: usize,
+    /// Bytes of access units queued at most.
     pub bytes: usize,
     /// A single access unit larger than this is refused as invalid.
     pub unit_bytes: usize,
@@ -27,21 +43,35 @@ impl QueueLimits {
     };
 }
 
+/// Why a lane refused an access unit.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FeedError {
     /// The queue is full; retry the same access unit after output progresses.
     Backpressure,
-    /// The access unit exceeds the per-unit limit or is empty.
+    /// The lane has ended, the access unit is empty or oversized, or its timestamp
+    /// does not fit the session clock.
     Invalid,
     /// No session accepts input (nothing loaded or the lane has no codec).
     Idle,
 }
 
+impl std::fmt::Display for FeedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Backpressure => "decode queue is full",
+            Self::Invalid => "access unit cannot be queued",
+            Self::Idle => "decode session is idle",
+        })
+    }
+}
+
+impl std::error::Error for FeedError {}
+
 #[derive(Debug)]
 pub(crate) struct Unit {
-    pub data: Vec<u8>,
-    pub pts: Option<i64>,
-    pub discard: Discard,
+    pub(crate) data: Vec<u8>,
+    pub(crate) pts: Option<i64>,
+    pub(crate) discard: Discard,
 }
 
 #[derive(Debug)]
@@ -52,17 +82,17 @@ pub(crate) struct UnitQueue {
 }
 
 impl UnitQueue {
-    pub fn new(limits: QueueLimits) -> Self {
+    pub(crate) fn new(limits: QueueLimits) -> Self {
         Self {
             limits,
             units: VecDeque::new(),
             bytes: 0,
         }
     }
-    pub fn push(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
+    pub(crate) fn push(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), FeedError> {
         self.push_discarding(data, pts, Discard::default())
     }
-    pub fn push_discarding(
+    pub(crate) fn push_discarding(
         &mut self,
         data: &[u8],
         pts: Option<i64>,
@@ -82,23 +112,26 @@ impl UnitQueue {
         });
         Ok(())
     }
-    pub fn pop(&mut self) -> Option<Unit> {
+    pub(crate) fn pop(&mut self) -> Option<Unit> {
         let unit = self.units.pop_front()?;
         self.bytes -= unit.data.len();
         Some(unit)
     }
-    #[allow(clippy::option_option)] // `None`: empty queue; `Some(None)`: unit without a timestamp.
-    pub fn front_pts(&self) -> Option<Option<i64>> {
-        self.units.front().map(|unit| unit.pts)
+    /// The front unit, if there is one and `due` accepts its timestamp.
+    pub(crate) fn pop_if(&mut self, due: impl FnOnce(Option<i64>) -> bool) -> Option<Unit> {
+        if !due(self.units.front()?.pts) {
+            return None;
+        }
+        self.pop()
     }
-    pub fn is_empty(&self) -> bool {
+    pub(crate) fn is_empty(&self) -> bool {
         self.units.is_empty()
     }
     #[cfg(test)]
-    pub fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         self.units.len()
     }
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.units.clear();
         self.bytes = 0;
     }

@@ -3,6 +3,12 @@
   "frozen_utc": "2026-11-08T07:40:00Z",
   "frozen_before_grading": true,
   "reference": "FFmpeg 9.0.2 native decoders (exact build pinned separately in the decode reference receipt); MPEG audio Layer I and II against its float decoders mp1float and mp2float, whose fixed-point defaults output 16-bit samples (reviewed_rules: mpeg-audio-float-decoders); development-only oracle on macOS is Homebrew FFmpeg 9.0.2 and is never qualification evidence",
+  "imdct_float": {
+    "max_normalized_error": 5e-7,
+    "formula": "max(abs(candidate - expected)) / (N * max(abs(coefficients)) * abs(scale)), separately for IMDCT and DCT-IV",
+    "basis": "Binary32 rounding margin fixed after the AArch64 public transform and direct cosine probes and before grading. The cosine definition also verifies the reference disparities. ARMv7 confirmation is pending.",
+    "reference_projection": "Negate the av_tx inverse MDCT middle half for positive scale, derive both surrounding quarters by IMDCT symmetry and reverse and negate the normalized middle half for DCT-IV. Shape and finite values are required."
+  },
   "audio_decode": {
     "applies_to": ["ac3", "eac3", "aac-lc", "he-aac-sbr", "he-aac-v2-ps", "dts-core", "mp3", "mp2", "mp1", "vorbis", "opus"],
     "exact": ["sample_rate", "channel_count", "channel_layout_and_order", "samples_per_frame", "total_sample_count", "frame_count", "first_output_sample_position (codec delay / priming)"],
@@ -12,6 +18,10 @@
     "rms_formula": "sqrt(mean((candidate - reference)^2)) over every sample of the channel in the stream; 2^-15/sqrt(12) = 8.809e-06",
     "abs_formula": "max |candidate - reference|; 2^-14 = 6.1035e-05",
     "no_exclusions": "every decoded sample of every channel is compared; no normalization, delay search or gain fitting"
+  },
+  "ac3_dither_free_exact": {
+    "per_sample_abs_max": 0.0,
+    "scope": "AC-3 dither-stripped streams against FFmpeg with the default dynamic-range policy. Checks every sample. E-AC-3 retains the audio_decode rule, including streams with AHT or SPX noise."
   },
   "lossless_audio_decode": {
     "applies_to": ["flac"],

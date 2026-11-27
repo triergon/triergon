@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "directory": ".research/opus-testvectors",
+  "cases": [
+    {
+      "id": "testvector01",
+      "profile": "rfc8251",
+      "file": "testvector01.bit",
+      "sha256": "00a4d34e12a2a32a047bfcaf762f663430b2232bc76a1c21e3b598f060f99b7e",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "c3ad6186afbfab75376e9732f1c9e77e64c4c846372fc42acc76b958d93b4944"
+      }
+    },
+    {
+      "id": "testvector02",
+      "profile": "rfc8251",
+      "file": "testvector02.bit",
+      "sha256": "285deaf78e6b1ebdde7dc6a76af279a08bf0fa7a13e3a84e87ac3f76213626a6",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "538f0028758483c4d1babeaf1a139f476d3ac8f48bb287e9ff8032cc89f0cba6"
+      }
+    },
+    {
+      "id": "testvector03",
+      "profile": "rfc8251",
+      "file": "testvector03.bit",
+      "sha256": "811b3d28483c781e4d1a0f8008bf73c3882c6c9cf8dedc65c0c14fa4239bb9d9",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "0785dc3fa88a939b5892fdd951015286c11485f93d878f02fa3ec4ec49bb4fef"
+      }
+    },
+    {
+      "id": "testvector04",
+      "profile": "rfc8251",
+      "file": "testvector04.bit",
+      "sha256": "874b838699a471acd97bd13e11224a3ef71c95b018b85a9c93a41459a7185565",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "975c70c00083245a35b9474de757690eb2589a80cbe1f114141141d1198c433a"
+      }
+    },
+    {
+      "id": "testvector05",
+      "profile": "rfc8251",
+      "file": "testvector05.bit",
+      "sha256": "9b13f677c61cfad9a94460f986401b843e07e3245265067580539d9d8f1ec230",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "2bdef875bc47efcc2dd343b0d50fe3e6bca5211f9683fa0442341020e0f803bb"
+      }
+    },
+    {
+      "id": "testvector06",
+      "profile": "rfc8251",
+      "file": "testvector06.bit",
+      "sha256": "65a779507949842232cfb6119db3ec8c056c05b80d65abb7a3ae9b06b443e33f",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "4727ddaf55ae319004b1bf00265aa9c6e22254e559543e34fe2fcc75a087427c"
+      }
+    },
+    {
+      "id": "testvector07",
+      "profile": "rfc8251",
+      "file": "testvector07.bit",
+      "sha256": "ae7ae8f569807d4d964c574d7b1556e8b930307adfa9928942fe44f5e2bcc5f1",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "644f9a987d62b9039aac6cff72bf5168c761ed84a1cff26356f55238877afc3c"
+      }
+    },
+    {
+      "id": "testvector08",
+      "profile": "rfc8251",
+      "file": "testvector08.bit",
+      "sha256": "4de258de02ccc08c805b3d41414c3a0f2f607e57ea3a7a5cb9bef26c2f01eb01",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "03e85f4595187d6397d39f01ff7f598439b99ab466fc4e668cb1a99655ebe2fe"
+      }
+    },
+    {
+      "id": "testvector09",
+      "profile": "rfc8251",
+      "file": "testvector09.bit",
+      "sha256": "91a798186cd2483e47a6b3db44eb3f8fb7f5584c3ed2f2c8158ae8f9172a6b31",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "6e4b9f7c2832fddd00d746d24ef8ce734a09d5a3c343f6828c2dd3c025b9c333"
+      }
+    },
+    {
+      "id": "testvector10",
+      "profile": "rfc8251",
+      "file": "testvector10.bit",
+      "sha256": "7288deb8d0e9e49f7f8ae50d6b4f2221294faa222b9db69161951b928e62435a",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "b2f905b75c28476682d2705356cc9c300a0d8576d21c72223d471e2f6663a21b"
+      }
+    },
+    {
+      "id": "testvector11",
+      "profile": "rfc8251",
+      "file": "testvector11.bit",
+      "sha256": "ee3cd3c6f420d803f563af6518851316696fd121932a191045349a615df7a249",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "f5a12cebf2213d16e30a3f8eba383acfa4a7a89bfd42465e0e5979387cd56e3f"
+      }
+    },
+    {
+      "id": "testvector12",
+      "profile": "rfc8251",
+      "file": "testvector12.bit",
+      "sha256": "48df85083178e8fc9c31af3fa6d5b38377f0eb84da4931a8886af503b17a0218",
+      "rights": "fetched-not-redistributed",
+      "expected": {
+        "trace_sha256": "affbb698b80bd489ef40f9f4c3afe363a513c87be2a65dcffcb3d848a2a77179"
+      }
+    }
+  ]
+}

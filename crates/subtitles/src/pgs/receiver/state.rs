@@ -6,9 +6,8 @@
 //! (composition objects, palette entries, object data) stop at the segment end.
 
 use super::super::{CompositionObject, Crop};
-use super::{
-    DisplayLimits, PacketClock, ReceiverObservations, Refusal, reserve_amortised, reserve_room,
-};
+use super::{Clock, Limits, Refusal, reserve_amortised, reserve_room};
+use std::ops::Range;
 use std::sync::Arc;
 use triergon_core::{Budget, BudgetVec, Error, Reservation, Result};
 use triergon_pixel::{ChannelRounding, YcbcrMatrix};
@@ -27,7 +26,7 @@ fn word(raw: &[u8], at: usize) -> u16 {
 
 /// A packet's PTS in microseconds, as the receiver rescales it: `None` when
 /// unknown (absent or the unknown sentinel) or not representable.
-pub(super) fn microseconds(clock: PacketClock) -> Option<i64> {
+pub(super) fn microseconds(clock: Clock) -> Option<i64> {
     let pts = clock.pts.filter(|&pts| pts != i64::MIN)?;
     // `pts * num / den` seconds, rounded to the nearest microsecond with ties
     // away from zero, in 64-bit arithmetic while the product fits; the exact
@@ -90,7 +89,7 @@ fn stored(
     encoded: &mut BudgetVec<u8>,
     additional: usize,
     declared: usize,
-    limits: &DisplayLimits,
+    limits: &Limits,
 ) -> Result<()> {
     let requested = encoded
         .len()
@@ -111,7 +110,7 @@ const CONTINUATION_BYTES: usize = 0xffff - 4;
 fn first_part(
     data: &[u8],
     declared: usize,
-    limits: &DisplayLimits,
+    limits: &Limits,
     budget: &Budget,
 ) -> Result<BudgetVec<u8>> {
     held(data.len(), limits)?;
@@ -125,7 +124,7 @@ fn first_part(
 }
 
 /// `requested` RLE bytes of one object, refused beyond `limits.max_encoded`.
-fn held(requested: usize, limits: &DisplayLimits) -> Result<()> {
+fn held(requested: usize, limits: &Limits) -> Result<()> {
     if requested > limits.max_encoded {
         return Err(Error::Limit {
             requested,
@@ -136,7 +135,7 @@ fn held(requested: usize, limits: &DisplayLimits) -> Result<()> {
 }
 
 /// The count after one more fragment of an object.
-fn next_fragment(fragments: usize, limits: &DisplayLimits) -> Result<usize> {
+fn next_fragment(fragments: usize, limits: &Limits) -> Result<usize> {
     if fragments >= limits.max_fragments {
         return Err(Error::Limit {
             requested: fragments + 1,
@@ -181,7 +180,7 @@ impl Object {
         id: u16,
         fragment: &'a [u8],
         canvas: [u16; 2],
-        limits: &DisplayLimits,
+        limits: &Limits,
         budget: &Budget,
     ) -> Result<Update<'a>> {
         let [l0, l1, l2, w0, w1, h0, h1, data @ ..] = fragment else {
@@ -217,7 +216,7 @@ impl Object {
 
     /// A continuation fragment's data, accepted while it fits the length the
     /// first fragment declared. Room for it is reserved here.
-    fn continuation<'a>(&mut self, data: &'a [u8], limits: &DisplayLimits) -> Result<Update<'a>> {
+    fn continuation<'a>(&mut self, data: &'a [u8], limits: &Limits) -> Result<Update<'a>> {
         if self.width == 0 || data.len() > self.declared - self.encoded.len() {
             return Ok(Update::Keep);
         }
@@ -234,6 +233,7 @@ impl Object {
     /// Decodes the object into `plane` (`width * height` bytes), returning
     /// whether its RLE wrote every pixel. Only then is the plane output, so no
     /// byte it left unwritten is ever read.
+    // Inlining the object RLE into packet decoding costs 10.28% more instructions on short runs.
     #[inline(never)]
     pub(super) fn fill(&self, plane: &mut [u8]) -> bool {
         super::rle::decode(self.encoded.as_slice(), usize::from(self.height), plane)
@@ -301,8 +301,13 @@ impl Receiver {
         self.references.iter().map_while(|r| *r)
     }
 
-    pub(super) fn object(&self, id: u16) -> Option<&Object> {
-        self.objects.as_slice().iter().find(|o| o.id == id)
+    /// The object with `id` and its place in the cache.
+    pub(super) fn object(&self, id: u16) -> Option<(usize, &Object)> {
+        self.objects
+            .as_slice()
+            .iter()
+            .enumerate()
+            .find(|(_, o)| o.id == id)
     }
 
     /// The words of the palette the composition selects.
@@ -322,9 +327,9 @@ impl Receiver {
     pub(super) fn composition(
         &mut self,
         raw: &[u8],
-        body: std::ops::Range<usize>,
+        body: Range<usize>,
         subtitle_pts: Option<i64>,
-        limits: &DisplayLimits,
+        limits: &Limits,
     ) -> Result<()> {
         self.presentation = subtitle_pts;
         let at = body.start;
@@ -386,10 +391,9 @@ impl Receiver {
     pub(super) fn palette_definition(
         &mut self,
         raw: &[u8],
-        body: std::ops::Range<usize>,
-        limits: &DisplayLimits,
+        body: Range<usize>,
+        limits: &Limits,
         budget: &Budget,
-        observations: &mut ReceiverObservations,
     ) -> Result<()> {
         let id = byte(raw, body.start);
         let slots = self.palettes.as_slice();
@@ -411,27 +415,17 @@ impl Receiver {
             None => return Ok(()),
         };
         let matrix = ColourMatrix::for_canvas(self.canvas[1]);
+        let entries = body.start + 2..body.end.max(body.start + 2);
         let slot = &mut self.palettes.as_mut_slice()[index];
-        if Arc::get_mut(&mut slot.words).is_none() {
-            slot.words = PaletteWords::new(budget, slot.words.words)?;
+        // A palette a display still holds is written as a copy.
+        if let Some(owned) = Arc::get_mut(&mut slot.words) {
+            define(&mut owned.words, raw, entries, matrix);
+        } else {
+            let mut words = slot.words.words;
+            define(&mut words, raw, entries, matrix);
+            slot.words = PaletteWords::new(budget, words)?;
         }
         slot.id = Some(id);
-        let Some(PaletteWords { words, .. }) = Arc::get_mut(&mut slot.words) else {
-            return Err(Error::Invalid("PGS receiver palette shared"));
-        };
-        let entries = body.start + 2..body.end.max(body.start + 2);
-        let whole = raw.get(entries.clone()).unwrap_or_default().chunks_exact(5);
-        let tail = entries.start + 5 * whole.len();
-        for &[index, y, cr, cb, alpha] in whole.map(|e| <&[u8; 5]>::try_from(e).expect("5 bytes")) {
-            words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
-        }
-        // An entry starting inside the segment but ending past it reads on.
-        if tail < entries.end {
-            let [index, y, cr, cb, alpha] = std::array::from_fn(|i| byte(raw, tail + i));
-            words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
-            observations.palette_cross_segment_bytes += tail + 5 - entries.end;
-            observations.palette_zero_padding_bytes += (tail + 5).saturating_sub(raw.len());
-        }
         Ok(())
     }
 
@@ -445,7 +439,7 @@ impl Receiver {
     pub(super) fn object_fragment(
         &mut self,
         body: &[u8],
-        limits: &DisplayLimits,
+        limits: &Limits,
         budget: &Budget,
     ) -> Result<Option<Refusal>> {
         let [id_high, id_low, _version, flags, fragment @ ..] = body else {
@@ -484,6 +478,25 @@ impl Receiver {
             }
         }
         Ok(refusal)
+    }
+}
+
+/// Converts the PDS entries at `entries` of `raw` into `words`: each 5-byte
+/// entry that starts inside the segment, the last one reading on past its
+/// end, into the next segment and, past the packet, zeros.
+#[inline(always)]
+fn define(words: &mut [u32; 256], raw: &[u8], entries: Range<usize>, matrix: ColourMatrix) {
+    let (whole, _) = raw
+        .get(entries.clone())
+        .unwrap_or_default()
+        .as_chunks::<5>();
+    let tail = entries.start + 5 * whole.len();
+    for &[index, y, cr, cb, alpha] in whole {
+        words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
+    }
+    if tail < entries.end {
+        let [index, y, cr, cb, alpha] = std::array::from_fn(|i| byte(raw, tail + i));
+        words[usize::from(index)] = matrix.argb(y, cr, cb, alpha);
     }
 }
 
@@ -530,12 +543,11 @@ mod tests {
     }
 
     /// What a first fragment does to object 1 on a 16 × 4 canvas, as the
-    /// reference showed it (`ods_first` probe): `keep` leaves the object as it
-    /// was, `refuse` refuses the packet, and a replacement shows its declared
-    /// RLE length.
+    /// reference showed it: `keep` leaves the object as it was, `refuse`
+    /// refuses the packet, and a replacement shows its declared RLE length.
     fn outcome(fragment: &[u8]) -> String {
         let budget = Budget::new(1 << 20).unwrap();
-        let update = Object::start(1, fragment, [16, 4], &DisplayLimits::default(), &budget);
+        let update = Object::start(1, fragment, [16, 4], &Limits::default(), &budget);
         match update.unwrap() {
             Update::Keep => "keep".into(),
             Update::Unallocated(object) => {
@@ -620,7 +632,7 @@ mod tests {
         ];
         for (num, den) in bases {
             for pts in values.into_iter().chain(-500..500) {
-                let clock = PacketClock {
+                let clock = Clock {
                     pts: Some(pts),
                     dts: None,
                     timebase: TimeBase::new(num, den).unwrap(),

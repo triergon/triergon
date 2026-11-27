@@ -5,14 +5,16 @@
 #![cfg_attr(not(test), no_main)]
 
 mod record;
+mod store;
 
-use record::{Dump, Record, Sink, Size, Style, Work};
+use record::{Dump, Record, Sink, Size, Style};
 use std::error::Error;
 use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
-use std::time::Instant;
 use triergon_core::{Budget, Bytes, WorkBudget};
-use triergon_font::{Font, GlyphId, Limits, Load, NameRecord, Outline, SizedFont, Synthesis};
+use triergon_font::compat::libass::{self, Synthesis};
+use triergon_font::{Font, GlyphId, Limits, Load, NameRecord, Outline, OutlineFormat, SizedFont};
+use triergon_harness_runner::{Invocation, Mode as RunMode, Totals, measure};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -63,30 +65,14 @@ impl Operation {
     }
 }
 
-/// FreeType's ASCII form of a name: UTF-16 units, or bytes for Macintosh records,
-/// up to a NUL, with units outside 32..=127 shown as `?`.
+/// The ASCII form of a family or style name.
 fn ascii(record: NameRecord<'_>) -> String {
-    record
-        .code_units()
-        .take_while(|&u| u != 0)
-        .map(|u| {
-            u8::try_from(u)
-                .ok()
-                .filter(|b| (32..=127).contains(b))
-                .map_or('?', char::from)
-        })
-        .collect()
+    record.ascii().collect()
 }
 
-/// FreeType's PostScript form: printable ASCII other than `[](){}<>/%`, absent
-/// when nothing remains.
+/// The PostScript form of a name, absent when nothing of it remains.
 fn postscript(record: NameRecord<'_>) -> Option<String> {
-    let text: String = record
-        .code_units()
-        .filter_map(|u| u8::try_from(u).ok())
-        .filter(|&b| (33..=126).contains(&b) && !b"[](){}<>/%".contains(&b))
-        .map(char::from)
-        .collect();
+    let text: String = record.postscript().collect();
     (!text.is_empty()).then_some(text)
 }
 
@@ -115,19 +101,20 @@ fn read(file: &Bytes, budget: &Budget, operation: &Operation, sink: &mut impl Si
             if heights.len() > 1 {
                 sink.record(Record::Request(height))?;
             }
-            let Ok(sized) = font.at_size(height) else {
+            let Ok(sized) = libass::at_size(&font, height) else {
                 sink.record(Record::SizeError(height))?;
                 continue;
             };
-            match mode {
-                Mode::Scaled => scaled(&font, &sized, height, budget, sink)?,
-                Mode::Hinted => hinted(&font, &sized, sink)
-                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
-                Mode::Vertical => vertical(&font, &sized, &mut Outline::new(budget), sink)
-                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
-                Mode::Default => default(&font, &sized, &mut Outline::new(budget), sink)
-                    .map_err(|e| format!("face {index} at {height}: {e}"))?,
-            }
+            let measured = match mode {
+                Mode::Scaled => {
+                    scaled(&font, &sized, height, budget, sink)?;
+                    continue;
+                }
+                Mode::Hinted => hinted(&font, &sized, sink),
+                Mode::Vertical => vertical(&font, &sized, &mut Outline::new(budget), sink),
+                Mode::Default => default(&font, &sized, &mut Outline::new(budget), sink),
+            };
+            measured.map_err(|e| format!("face {index} at {height}: {e}"))?;
         }
     }
     Ok(())
@@ -175,7 +162,7 @@ fn face(font: &Font, outline: &mut Outline, sink: &mut impl Sink) -> io::Result<
             })?;
         }
     }
-    sink.record(Record::TextCharmap(font.text_charmap()))?;
+    sink.record(Record::TextCharmap(libass::text_charmap(font)))?;
     for (left, right) in kerning_pairs(font) {
         let value = font.kerning(left, right);
         if value != 0 {
@@ -211,7 +198,7 @@ fn scaled(
     sink.record(Record::Size(&Size::new(
         height,
         sized,
-        font.is_postscript(),
+        font.outline_format() == OutlineFormat::Cff,
     )))?;
     for (left, right) in kerning_pairs(font) {
         let value = sized.kerning(left, right);
@@ -239,10 +226,10 @@ fn scaled(
                 oblique: !matches!(style, Style::Bold),
                 embolden: !matches!(style, Style::Oblique),
             };
-            // `synthesize` answers `false` where it refuses to embolden, as
-            // FreeType refuses an outline without an orientation.
+            // `synthesize` answers `false` where it refuses to embolden: an
+            // outline without an orientation.
             let applied = styled.copy_from(&outline).is_ok()
-                && matches!(sized.synthesize(&mut styled, synthesis), Ok(true));
+                && matches!(libass::synthesize(sized, &mut styled, synthesis), Ok(true));
             sink.record(Record::Styled {
                 style,
                 index: glyph.0,
@@ -253,19 +240,23 @@ fn scaled(
     Ok(())
 }
 
-/// The default-load advances. An advance the crate cannot give (`Unsupported`)
-/// ends the operation with an error: it is not a value to compare.
+/// What the default load gives for `glyph`, absent where it fails. What the
+/// crate cannot give (`Unsupported`) ends the operation with an error naming
+/// `what`: it is not a value to compare.
+fn supported<T>(loaded: triergon_core::Result<T>, glyph: GlyphId, what: &str) -> Result<Option<T>> {
+    match loaded {
+        Ok(value) => Ok(Some(value)),
+        Err(triergon_core::Error::Unsupported(why)) => {
+            Err(format!("glyph {}: {what} unsupported: {why}", glyph.0).into())
+        }
+        Err(_) => Ok(None),
+    }
+}
+
+/// The default-load advances.
 fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()> {
     for glyph in font.glyphs() {
-        let advance = match sized.default_advance(glyph) {
-            Ok(advance) => Some(advance),
-            Err(triergon_core::Error::Unsupported(what)) => {
-                return Err(
-                    format!("glyph {}: hinted advance unsupported: {what}", glyph.0).into(),
-                );
-            }
-            Err(_) => None,
-        };
+        let advance = supported(sized.default_advance(glyph), glyph, "hinted advance")?;
         sink.record(Record::Hinted {
             index: glyph.0,
             advance,
@@ -275,8 +266,7 @@ fn hinted(font: &Font, sized: &SizedFont<'_>, sink: &mut impl Sink) -> Result<()
 }
 
 /// The vertical advances: of the unhinted load where the glyph's outline
-/// loads, and of the default load. A default-load advance the crate cannot
-/// give (`Unsupported`) ends the operation with an error.
+/// loads, and of the default load.
 fn vertical(
     font: &Font,
     sized: &SizedFont<'_>,
@@ -285,17 +275,11 @@ fn vertical(
 ) -> Result<()> {
     for glyph in font.glyphs() {
         let unhinted = sized.outline_into(glyph, outline).ok();
-        let hinted = match sized.default_vertical_advance(glyph) {
-            Ok(advance) => Some(advance),
-            Err(triergon_core::Error::Unsupported(what)) => {
-                return Err(format!(
-                    "glyph {}: hinted vertical advance unsupported: {what}",
-                    glyph.0
-                )
-                .into());
-            }
-            Err(_) => None,
-        };
+        let hinted = supported(
+            sized.default_vertical_advance(glyph),
+            glyph,
+            "hinted vertical advance",
+        )?;
         sink.record(Record::Vertical {
             index: glyph.0,
             unhinted,
@@ -305,8 +289,7 @@ fn vertical(
     Ok(())
 }
 
-/// The default-load metrics and outlines. A glyph the crate cannot load this
-/// way (`Unsupported`) ends the operation with an error.
+/// The default-load metrics and outlines.
 fn default(
     font: &Font,
     sized: &SizedFont<'_>,
@@ -315,26 +298,14 @@ fn default(
 ) -> Result<()> {
     for glyph in font.glyphs() {
         let mut work = WorkBudget::new(Limits::default().work);
-        let loaded = match sized.load(glyph, Load::Default, outline, &mut work) {
-            Ok(metrics) => Some(metrics),
-            Err(triergon_core::Error::Unsupported(what)) => {
-                return Err(format!("glyph {}: default load unsupported: {what}", glyph.0).into());
-            }
-            Err(_) => None,
-        };
+        let load = sized.load(glyph, Load::Default, outline, &mut work);
+        let loaded = supported(load, glyph, "default load")?;
         sink.record(Record::Default {
             index: glyph.0,
             loaded: loaded.map(|m| (m, &*outline)),
         })?;
     }
     Ok(())
-}
-
-enum Action {
-    Fold,
-    Bench(u64),
-    Memory,
-    Dump,
 }
 
 /// A height, or several separated by commas.
@@ -349,17 +320,11 @@ fn heights(text: &str) -> Result<Vec<i32>> {
     Ok(heights)
 }
 
-fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
+fn parse(args: &[String]) -> Result<(Invocation<'_>, Operation)> {
     let (mode, rest) = args.split_first().ok_or(USAGE)?;
     let (operation, action) = mode.rsplit_once('-').ok_or(USAGE)?;
-    let (action, rest) = match (action, rest) {
-        ("bench", [path, count, rest @ ..]) => (Action::Bench(count.parse()?), (path, rest)),
-        ("fold", [path, rest @ ..]) => (Action::Fold, (path, rest)),
-        ("memory", [path, rest @ ..]) => (Action::Memory, (path, rest)),
-        ("dump", [path, rest @ ..]) => (Action::Dump, (path, rest)),
-        _ => return Err(USAGE.into()),
-    };
-    let (path, arguments) = rest;
+    let invocation = Invocation::parse_mode(action, rest, Some("dump"), || USAGE)?;
+    let arguments = invocation.arguments;
     let operation = match (operation, arguments) {
         ("font", []) => Operation::Faces,
         ("font-sized", [mode, height]) => {
@@ -374,72 +339,39 @@ fn parse(args: &[String]) -> Result<(Action, Operation, &str)> {
         }
         _ => return Err(USAGE.into()),
     };
-    Ok((action, operation, path))
+    Ok((invocation, operation))
 }
 
 fn run(args: &[String]) -> Result<()> {
-    let (action, operation, path) = parse(args)?;
-    let iterations = match action {
-        Action::Bench(count) => count,
-        _ => 1,
-    };
-    if !(1..=1_000_000).contains(&iterations) {
-        return Err(USAGE.into());
+    if args.first().is_some_and(|mode| mode.starts_with("store-")) {
+        return store::run(args);
     }
+    let (invocation, operation) = parse(args)?;
+    invocation.check_iterations(|| USAGE)?;
+    let Invocation {
+        mode: action, path, ..
+    } = invocation;
     let size = std::fs::metadata(path)?.len();
     if size > MAX_INPUT {
         return Err("input exceeds the font size bound".into());
     }
     let budget = Budget::new(1 << 30)?;
-    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error())?;
-    let retained = budget.used();
-    let mut out = io::stdout().lock();
-    if let Action::Dump = action {
-        let mut dump = Dump(BufWriter::new(out));
+    let file = Bytes::try_from_vec(&budget, std::fs::read(path)?).map_err(|e| e.error)?;
+    if action == RunMode::Trace {
+        let mut dump = Dump(BufWriter::new(io::stdout().lock()));
         read(&file, &budget, &operation, &mut dump)?;
         return Ok(dump.0.flush()?);
     }
-    let memory = matches!(action, Action::Memory);
-    if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
-    }
-    let start = matches!(action, Action::Bench(_)).then(Instant::now);
-    let mut total = Work::default();
-    for _ in 0..iterations {
-        let mut work = Work::default();
+    measure(&invocation, operation.name(), Some(&budget), || {
+        let mut work = Totals::default();
         read(std::hint::black_box(&file), &budget, &operation, &mut work)?;
-        total.accumulate(&work);
-        if budget.used() != retained {
-            return Err("font operation retained charged storage".into());
-        }
-    }
-    let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
-    if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
-    }
-    writeln!(
-        out,
-        "{{\"schema\":1,\"operation\":\"{}\",\"iterations\":{iterations},\"packets\":{},\"bytes\":{},\"digest\":{},\"elapsed_ns\":{elapsed},\"eof\":true}}",
-        operation.name(),
-        total.packets,
-        total.bytes,
-        total.digest,
-    )?;
-    Ok(out.flush()?)
+        Ok(work)
+    })
 }
 
 #[cfg_attr(test, allow(dead_code))]
 fn worker_main() -> ExitCode {
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    match run(&args) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(error) => {
-            eprintln!("font-worker: {error}");
-            ExitCode::FAILURE
-        }
-    }
+    triergon_harness_runner::command(Some("font-worker"), 1, run)
 }
 
 /// C's entry point, the one exception to the worker's `deny(unsafe_code)`

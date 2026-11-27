@@ -17,5 +17,8 @@
     "implementation": "xtask/src/harness/memory.rs"
   },
   "parity": "full selected-feature parity on every required case and profile; equal measured work",
-  "qualification_target": "aarch64-unknown-linux-gnu"
+  "qualification_targets": [
+    "thumbv7neon-unknown-linux-gnueabihf",
+    "aarch64-unknown-linux-gnu"
+  ]
 }

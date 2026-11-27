@@ -1,5 +1,6 @@
 //! The packet fold shared by the per-input playback profile runners (`mkv-audio-`,
-//! `mp4-forward-`, `ts-program-` and `raw-video-`).
+//! `mp4-forward-`, `ts-program-` and `raw-video-`) and the views worker's packet
+//! operations.
 //!
 //! Each runner opens one preloaded input per operation, produces every selected
 //! packet through the playback engine and folds it with [`Work::packet`]. The FFmpeg
@@ -32,7 +33,8 @@ pub struct Packet<I> {
 }
 
 impl Work {
-    pub(crate) fn location(&mut self, offset: u64, clock: TimeBase) {
+    /// Fold the source offset and clock a packet row of the views worker reports.
+    pub fn location(&mut self, offset: u64, clock: TimeBase) {
         fold(&mut self.digest, offset);
         fold(&mut self.digest, clock.numerator());
         fold(&mut self.digest, clock.denominator());
@@ -45,7 +47,8 @@ impl Work {
         }
     }
 
-    pub(crate) fn skip_samples(&mut self, bytes: Option<[u8; 10]>) {
+    /// Fold a packet's skip-samples side data, or its absence.
+    pub fn skip_samples(&mut self, bytes: Option<[u8; 10]>) {
         fold(&mut self.digest, u64::from(bytes.is_some()));
         let Some(bytes) = bytes else {
             if self.trace {
@@ -126,7 +129,7 @@ pub fn drive(
         return Err("input must be a bounded non-empty file".into());
     }
     let pool = Budget::new(256 * 1024 * 1024)?;
-    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error())?;
+    let raw = Bytes::try_from_vec(&pool, raw).map_err(|error| error.error)?;
     let trace = invocation.mode == Mode::Trace;
     measure(&invocation, operation_name, Some(&pool), || {
         let start = Work {

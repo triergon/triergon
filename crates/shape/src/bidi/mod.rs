@@ -36,6 +36,7 @@ pub use line::{reorder_line, reorder_line_with_limits};
 
 use crate::Direction;
 use crate::unicode::bidi as data;
+use crate::work;
 use triergon_core::{Budget, Error, Result, WorkBudget};
 
 /// Limits of resolving one paragraph or reordering one line: its work is
@@ -71,23 +72,13 @@ impl Default for Limits {
 impl Limits {
     /// The work allowed for `chars` characters.
     fn work(self, chars: usize) -> WorkBudget {
-        let chars = u64::try_from(chars).unwrap_or(u64::MAX);
-        WorkBudget::new(
-            self.work_per_char
-                .saturating_mul(chars)
-                .max(self.minimum_work),
-        )
+        work::per_char(self.work_per_char, self.minimum_work, chars)
     }
 }
 
 /// Charges `units` before the work is done; running out is `Error::Policy`.
 fn charge(work: &mut WorkBudget, units: usize) -> Result<()> {
-    let units = u64::try_from(units).unwrap_or(u64::MAX);
-    if work.try_charge(units) {
-        Ok(())
-    } else {
-        Err(Error::Policy("bidi work"))
-    }
+    work::charge_for(work, units, "bidi work")
 }
 
 /// The Bidi_Mirroring_Glyph of `c`, if it has one (BidiMirroring.txt).
@@ -138,12 +129,6 @@ impl Resolver {
             limits,
             work: WorkBudget::new(0),
         }
-    }
-
-    /// The work units the last paragraph spent of the [`Limits`].
-    #[must_use]
-    pub fn work_spent(&self) -> u64 {
-        self.work.spent()
     }
 
     /// Resolves the embedding level of every character of one paragraph and

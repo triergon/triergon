@@ -3,14 +3,17 @@
 //! and Rust never contracts, so expressions are written in the C source's order
 //! and grouping; these helpers cover the macros and library calls whose
 //! semantics differ from Rust's own.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
-/// `a > b ? a : b`, the C `FFMAX` macro, including its NaN behaviour.
+/// The larger value as C's `a > b ? a : b`: `b` when they are equal or
+/// either is NaN, where [`f64::max`] gives the other operand for a NaN.
 #[inline(always)]
-pub(crate) fn max(a: f64, b: f64) -> f64 {
+pub fn max(a: f64, b: f64) -> f64 {
     if a > b { a } else { b }
 }
 
-/// `a > b ? b : a`, the C `FFMIN` macro, including its NaN behaviour.
+/// The smaller value as C's `a > b ? b : a`: `a` when they are equal or
+/// either is NaN.
 #[inline(always)]
 pub(crate) fn min(a: f64, b: f64) -> f64 {
     if a > b { b } else { a }

@@ -26,11 +26,11 @@ fn every_line_kind_is_recognised() {
             Ok(Line::Setting(b"size: 720x480")),
             Ok(Line::LanguageIndex(b"0")),
             Ok(Line::Track {
-                language: b"en",
+                language: Some(b"en"),
                 index: Some(3)
             }),
             Ok(Line::Track {
-                language: b"de",
+                language: Some(b"de"),
                 index: None
             }),
             Ok(Line::Delay(-1500)),
@@ -233,4 +233,23 @@ fn reading_from_inside_a_packet_starts_at_the_next_start_code() {
         Some([vec![1; 100], vec![2; 50]].concat())
     );
     assert_eq!(read(entry(None), &file[200..]), Some(vec![2; 50]));
+}
+
+#[test]
+fn an_id_that_is_not_an_iso_639_code_names_no_language() {
+    // Matroska writes the id as the track's Language element, an ISO 639 code.
+    for (text, language) in [
+        (&b"id: invalid, index: 0\n"[..], None),
+        (b"id: , index: 0\n", None),
+        (b"id: e1, index: 0\n", None),
+        (b"id: fre, index: 0\n", Some(&b"fre"[..])),
+    ] {
+        assert_eq!(
+            lines(text),
+            [Ok(Line::Track {
+                language,
+                index: Some(0)
+            })]
+        );
+    }
 }

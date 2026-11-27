@@ -1,0 +1,108 @@
+//! Original explicit DVB-signalled finite-PES admission. No inner decoder/AU
+//! parsing or source namespace inference. The demux packet keeps the complete
+//! PES data field, including identifier/stream ID/tail bytes and opaque faults.
+use super::{DemuxObserver, DemuxScope};
+use crate::pes::stream_id;
+use crate::psi::{DescriptorNamespace, Descriptors, descriptor_tag, stream_type};
+use crate::{ParseLimits, checked_pid, limit};
+use triergon_core::{Budget, Error, Result};
+
+/// The PMT descriptor loops of a DVB subtitle stream.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DvbSubtitlesDescriptors<'a> {
+    /// The program info descriptor loop bytes; must be empty.
+    pub program: &'a [u8],
+    /// The elementary stream descriptor loop bytes: exactly one single-service DVB subtitling
+    /// descriptor.
+    pub elementary: &'a [u8],
+}
+
+fn preflight(
+    scope: DemuxScope,
+    namespace: DescriptorNamespace,
+    source: DvbSubtitlesDescriptors<'_>,
+    limits: ParseLimits,
+) -> Result<()> {
+    if scope.program == 0 {
+        return Err(Error::Invalid(
+            "PES observer requires a nonzero program number",
+        ));
+    }
+    checked_pid(scope.pid)?;
+    limits.validate()?;
+    if scope.stream_type != stream_type::PES_PRIVATE_DATA
+        || scope.stream_id != stream_id::PRIVATE_STREAM_1
+    {
+        return Err(Error::Unsupported(
+            "DVB subtitles require PMT stream type 0x06 and PES stream ID 0xbd",
+        ));
+    }
+    if !matches!(namespace, DescriptorNamespace::Dvb(_)) {
+        return Err(Error::Unsupported(
+            "DVB subtitle PES requires an explicit DVB namespace",
+        ));
+    }
+    let bytes = source
+        .program
+        .len()
+        .checked_add(source.elementary.len())
+        .ok_or(Error::Overflow)?;
+    if bytes > limits.section_bytes {
+        return Err(limit(bytes, limits.section_bytes));
+    }
+    // Allocation-free bounded syntax actions, <=4096 bytes / configured entries.
+    // No stream body is scanned, copied or retained by this preflight.
+    let mut count = 0_usize;
+    let mut subtitle_entries = 0;
+    let mut subtitle_descriptors = 0;
+    for (program, raw) in [(true, source.program), (false, source.elementary)] {
+        for entry in Descriptors::new(raw) {
+            let descriptor = entry?;
+            count = count.checked_add(1).ok_or(Error::Overflow)?;
+            if count > limits.descriptors {
+                return Err(limit(count, limits.descriptors));
+            }
+            descriptor.validate_selected_syntax()?;
+            if descriptor.tag == descriptor_tag::DVB_SUBTITLING {
+                let view = descriptor.dvb_subtitling()?;
+                if !program {
+                    subtitle_descriptors += 1;
+                    subtitle_entries += view.service_count();
+                }
+            }
+        }
+    }
+    if !source.program.is_empty()
+        || source.elementary.len() != 10
+        || subtitle_descriptors != 1
+        || subtitle_entries != 1
+    {
+        return Err(Error::Unsupported(
+            "DVB subtitle PES requires one single-service descriptor and no program descriptors",
+        ));
+    }
+    // The exact ordered TLV remains the caller's source. No service/language
+    // selection, codec mapping, namespace backfill or inner segment validation.
+    Ok(())
+}
+
+impl DemuxObserver {
+    /// An observer of DVB subtitles on the scope's PID: stream type 0x06 with stream ID 0xBD.
+    ///
+    /// Fails with `Invalid` for program 0, a PID above 0x1FFE, invalid `limits` or malformed
+    /// descriptors, with `Limit` beyond the descriptor or section limits, and with `Unsupported`
+    /// without a DVB namespace or unless `descriptors` hold exactly one single-service subtitling
+    /// descriptor.
+    pub fn new_dvb_subtitles(
+        scope: DemuxScope,
+        namespace: DescriptorNamespace,
+        descriptors: DvbSubtitlesDescriptors<'_>,
+        budget: Budget,
+        limits: ParseLimits,
+    ) -> Result<Self> {
+        preflight(scope, namespace, descriptors, limits)?;
+        let mut observer = Self::admitted(scope, budget, limits)?;
+        observer.payload_format = super::PayloadFormat::Dvb;
+        Ok(observer)
+    }
+}

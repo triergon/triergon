@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "ts188",
+      "profile": "ts188",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-one.ts",
+      "sha256": "5625b4f5fed464d370996e25725ae2e152398dd0e02b8ea22ab3d1df0a76a83f",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188"
+      ],
+      "expected": {
+        "trace_sha256": "a18957d43234c652ebedcb74e66bb51af4c9f775f30ec068eb68d619c0f2aa74"
+      }
+    },
+    {
+      "id": "m2ts192",
+      "profile": "m2ts192",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-m2ts192.m2ts",
+      "sha256": "73b448e1d49eaf8709e24b1521c3732e4bf07ebf0f796d547ddca538d1030433",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "192"
+      ],
+      "expected": {
+        "trace_sha256": "131281ec01c7a1175a047a9907c5fdb3d0c2f495ccbdf157a3d13bda4955d7b4"
+      }
+    },
+    {
+      "id": "pts-dts",
+      "profile": "ts188",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-pts-dts.ts",
+      "sha256": "63bfd0f9918800645681123aef3efdca799d5fcc34818568f9e3cb3eda584ef8",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188"
+      ],
+      "expected": {
+        "trace_sha256": "8b70d3e141167c9a370f012a2ac9cfc25b46a6fda2197c3401afef41454dfb3a"
+      }
+    },
+    {
+      "id": "pes-boundary",
+      "profile": "ts188",
+      "file": ".research/fixtures-mpegts-access-units/au-adts-aac-lc-body-across-pes.ts",
+      "sha256": "4a17f752469e50f149a1d7664221b8adcaed0ac8976d7c073cac7f7390d2707b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188"
+      ],
+      "expected": {
+        "trace_sha256": "321346f47b9c260f50616a945592cccc5a1c9228d5df54a814e3b08a2bdf6245"
+      }
+    },
+    {
+      "id": "pmt-retype",
+      "profile": "ts188",
+      "file": "crates/mpegts/tests/data/pmt-version-wrap-retypes-pid.ts",
+      "sha256": "fa37cb365078ead09193f8ff28d46eb31a4d3091cfb68a0f2e5751315b8a9900",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188"
+      ],
+      "expected": {
+        "trace_sha256": "a1f0f845ef753fb6a60d509a9c79af9487e9a43fbdc8912a96f760b95c678560"
+      }
+    },
+    {
+      "id": "clock-interrupted-adts",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/clock-interrupted-adts.ts",
+      "sha256": "3f8c51347acbc3eb58d07867f182a807d619432c9b9a9ab0b371bce691f7df88",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "122a34abc638aced3c4866dc56ed5b03734c0e6412015406d82f00ea059e96f1"
+      }
+    },
+    {
+      "id": "hevc-headers-only",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/hevc-headers-only.ts",
+      "sha256": "d86c0cfb67729c12bc52a6def6f3a3a7dabae7e7723b82e95ba784683130fc62",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "86ce2190151ea1e0853c91d175c26252515da736e99117415a257ec82dc14d21"
+      }
+    },
+    {
+      "id": "loss-interrupted-adts",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/loss-interrupted-adts.ts",
+      "sha256": "01e83cb87c30737fc7df16bd8efc9cab5d050efed611885d3a42a68d1240a14a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "8373491ccf9cf7eb600fae90862d330724a7158bdc47d6df4e496307f379b76f"
+      }
+    },
+    {
+      "id": "opaque-transport-stream-type",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/opaque-transport-stream-type.ts",
+      "sha256": "df6c5e368ec2b4d1dc6239414b67220d5fe88fdddecbdb421e195502ba9ad71d",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "fb92cbde5e02ff271292635eaada3f6411d74eb15c36d3463f8bdf7a4bdd4bdc"
+      }
+    },
+    {
+      "id": "pcr-rebind-crossing-pes",
+      "profile": "ts188",
+      "file": "harness/features/facade-mpegts-controls/inputs/pcr-rebind-crossing-pes.ts",
+      "sha256": "6a5f37ebe824c2cddc4e5e51737cb316de18ecec5034a7db863e49085b9f646c",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "188",
+        "boundary"
+      ],
+      "expected": {
+        "trace_sha256": "8acbf680cb7a3421b3b0b3e2418e2dbcc8455ad66ecd1ee70de877d0c5a96ce6"
+      }
+    }
+  ]
+}

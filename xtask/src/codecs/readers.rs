@@ -29,7 +29,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use super::correctness::file_sha;
 use crate::json::{self, Value};
 use crate::process::{Stop, run_text};
 use crate::{python, sha256};
@@ -55,7 +54,23 @@ const RULES: &str = "harness/codecs/reader-rules.json";
 const DIFFERENCES: &str = "harness/codecs/reader-differences.json";
 pub const SEEKS_SCHEMA: &str = "triergon.codecs.reader-seeks.v1";
 /// The lane of seek case rows.
-const SEEK_LANE: &str = "reader-ogg-seek";
+const STREAM_LANE: &str = "reader-ogg-stream";
+
+pub fn base_lane(lane: &str) -> &str {
+    lane.strip_suffix("-push")
+        .or_else(|| lane.strip_suffix("-seek"))
+        .or_else(|| (lane == STREAM_LANE).then_some("reader-ogg"))
+        .unwrap_or(lane)
+}
+
+const PUSH_LANES: &[(&str, &str)] = &[
+    ("reader-ogg", "reader-ogg-push"),
+    ("reader-flac", "reader-flac-push"),
+    ("reader-mp3", "reader-mp3-push"),
+    ("reader-aac", "reader-aac-push"),
+    ("reader-ac3", "reader-ac3-push"),
+    ("reader-eac3", "reader-eac3-push"),
+];
 pub const DIFFERENCES_SCHEMA: &str = "triergon.codecs.reader-differences.v1";
 /// The columns of one recorded difference.
 pub(super) const COLUMNS: [&str; 7] = [
@@ -70,7 +85,7 @@ pub(super) const COLUMNS: [&str; 7] = [
 
 /// The demuxer a reader lane forces on both sides.
 pub fn format(lane: &str) -> Option<&'static str> {
-    Some(match lane {
+    Some(match base_lane(lane) {
         "reader-ogg" => "ogg",
         "reader-flac" => "flac",
         "reader-mp3" => "mp3",
@@ -147,6 +162,8 @@ struct FormatRules {
     align_by: usize,
     /// Packets that differ in both the aligned field and the size never pair.
     apart: bool,
+    /// Check that the reader leaves DTS absent and compare its PTS to synthesized DTS.
+    native_dts_from_pts: bool,
     native: ViewRules,
     compat: Option<ViewRules>,
 }
@@ -347,11 +364,8 @@ impl Rules {
     pub fn load(root: &Path) -> Result<Rules, String> {
         let rules = root.join(RULES);
         let differences = root.join(DIFFERENCES);
-        Rules::parse(
-            &crate::checks::read_json(&rules)?,
-            &crate::checks::read_json(&differences)?,
-        )
-        .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
+        Rules::parse(&json::read(&rules)?, &json::read(&differences)?)
+            .map_err(|e| format!("{} / {}: {e}", rules.display(), differences.display()))
     }
 
     fn parse(document: &Value, differences: &Value) -> Result<Rules, String> {
@@ -397,6 +411,9 @@ impl Rules {
                         media,
                         align_by,
                         apart: false,
+                        native_dts_from_pts: rules
+                            .get("native_dts_from_pts")
+                            .is_some_and(Value::truthy),
                         native,
                         compat,
                     },
@@ -419,6 +436,13 @@ impl Rules {
                 .is_none_or(str::is_empty)
             {
                 return Err(format!("disposition {id} has no reason"));
+            }
+            if item
+                .get("clause")
+                .and_then(Value::as_str)
+                .is_none_or(|clause| clause.trim().is_empty() || clause.contains('\n'))
+            {
+                return Err(format!("disposition {id} needs a one-line clause"));
             }
             dispositions.push(Disposition {
                 id: id.to_owned(),
@@ -508,6 +532,7 @@ pub struct Options {
     pub root: PathBuf,
     pub ffprobe: String,
     pub codec_worker: PathBuf,
+    pub views_worker: Option<PathBuf>,
     pub out: PathBuf,
     pub only: Option<String>,
     pub rules: Rules,
@@ -527,6 +552,15 @@ pub struct SeekCase {
     policy: String,
     /// Where FFmpeg is asked to seek: `seconds` less the preroll the reader applies.
     reference_seconds: String,
+    /// The exact observable differences of a reviewed open seek.
+    open: Option<OpenSeek>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct OpenSeek {
+    reason: String,
+    expected: Value,
+    declared: bool,
 }
 
 /// A decimal number of seconds as `codec-worker seek` and `ffprobe` take it.
@@ -540,8 +574,7 @@ fn decimal(text: &str) -> bool {
 impl SeekCase {
     /// The cases of a seek manifest.
     pub fn load(path: &Path) -> Result<Vec<SeekCase>, String> {
-        SeekCase::parse(&crate::checks::read_json(path)?)
-            .map_err(|e| format!("{}: {e}", path.display()))
+        SeekCase::parse(&json::read(path)?).map_err(|e| format!("{}: {e}", path.display()))
     }
 
     fn parse(document: &Value) -> Result<Vec<SeekCase>, String> {
@@ -576,6 +609,7 @@ impl SeekCase {
                 seconds: text("seconds")?,
                 policy: text("policy")?,
                 reference_seconds: text("reference_seconds")?,
+                open: None,
             };
             if !decimal(&case.seconds) || !decimal(&case.reference_seconds) {
                 return Err(format!("{}: seconds are not decimal", case.name));
@@ -593,6 +627,100 @@ impl SeekCase {
                 return Err(format!("{}: listed twice", case.name));
             }
             cases.push(case);
+        }
+        let mut attach = |name: &str, reason: &str, expected: Option<&Value>, declared| {
+            let case = cases
+                .iter_mut()
+                .find(|case| case.name == name)
+                .ok_or_else(|| format!("open seek {name}: no such case"))?;
+            let expected = expected
+                .filter(|expected| {
+                    expected
+                        .get("difference_sha256")
+                        .and_then(Value::as_str)
+                        .is_some_and(|sha| {
+                            sha.len() == 64 && sha.bytes().all(|byte| byte.is_ascii_hexdigit())
+                        })
+                })
+                .ok_or_else(|| format!("open seek {name}: no pinned difference"))?;
+            if case.open.is_some() {
+                return Err(format!("open seek {name}: listed twice"));
+            }
+            case.open = Some(OpenSeek {
+                reason: reason.to_owned(),
+                expected: expected.clone(),
+                declared,
+            });
+            Ok(())
+        };
+        if let Some(open) = document.get("open_cases") {
+            for row in open.as_array().ok_or("open_cases is not an array")? {
+                let name = row
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .ok_or("open seek without name")?;
+                let reason = row
+                    .get("reason")
+                    .and_then(Value::as_str)
+                    .filter(|reason| !reason.trim().is_empty())
+                    .ok_or_else(|| format!("open seek {name}: missing reason"))?;
+                attach(name, reason, row.get("expected"), false)?;
+            }
+        }
+        // A declared deviation and a policy difference pin their seeks alike; each
+        // form states the same four things under its own field names.
+        for (list, [title, clause, candidate, reference]) in [
+            (
+                "open_deviations",
+                ["reading", "clause", "candidate", "reference"],
+            ),
+            (
+                "open_policies",
+                ["policy", "undecided", "rule", "reference_rule"],
+            ),
+        ] {
+            let Some(deviations) = document.get(list) else {
+                continue;
+            };
+            for row in deviations
+                .as_array()
+                .ok_or_else(|| format!("{list} is not an array"))?
+            {
+                if row.get("targets").is_some() {
+                    return Err("seek deviations apply to all gate targets".into());
+                }
+                let line = |key| {
+                    row.get(key)
+                        .and_then(Value::as_str)
+                        .filter(|text| !text.trim().is_empty() && !text.contains('\n'))
+                        .ok_or_else(|| format!("seek deviation needs a one-line {key}"))
+                };
+                let reason = format!(
+                    "{} ({}). Candidate: {}. Reference: {}.",
+                    line(title)?,
+                    line(clause)?,
+                    line(candidate)?,
+                    line(reference)?
+                );
+                if row.get("compat").is_some() {
+                    line("compat")?;
+                }
+                let ids = row
+                    .get("cases")
+                    .and_then(Value::as_array)
+                    .ok_or("missing seek case IDs")?;
+                let Some(expected @ Value::Object(observations)) = row.get("expected_by_case")
+                else {
+                    return Err("missing seek deviation observations".into());
+                };
+                if ids.is_empty() || ids.len() != observations.len() {
+                    return Err("seek deviation needs one observation per case".into());
+                }
+                for id in ids {
+                    let name = id.as_str().ok_or("invalid seek case ID")?;
+                    attach(name, &reason, expected.get(name), true)?;
+                }
+            }
         }
         Ok(cases)
     }
@@ -685,6 +813,7 @@ fn reference(
     path: &str,
     media: &[String],
     seek: Option<&str>,
+    sequential: bool,
 ) -> Result<Reference, Stop> {
     let mut argv: Vec<String> = [ffprobe, "-v", "error", "-f", format]
         .map(String::from)
@@ -698,10 +827,18 @@ fn reference(
             "stream=index,codec_type,time_base:packet=stream_index,pts,dts,duration,size,pos:packet_side_data=skip_samples,discard_padding",
             "-of",
             "json",
-            path,
+            if sequential { "pipe:0" } else { path },
         ]
         .map(String::from),
     );
+    // Give ffprobe a pipe protocol input backed by standard input. The file path
+    // is a positional argument, independent of the fixed shell program.
+    if sequential {
+        argv.splice(
+            0..0,
+            ["/bin/sh", "-c", "exec \"$@\" < \"$0\"", path].map(String::from),
+        );
+    }
     let done = run_text(&argv, RUN_TIMEOUT)?;
     let document = python::loads(&done.stdout).unwrap_or(Value::Null);
     let mut reference = Reference {
@@ -765,40 +902,145 @@ fn reference(
     Ok(reference)
 }
 
-fn candidate(
+#[derive(Clone, Copy)]
+enum Mode<'a> {
+    Blocking,
+    Push,
+    Stream,
+    Seek(&'a SeekCase),
+}
+
+impl<'a> Mode<'a> {
+    fn seek(self) -> Option<&'a SeekCase> {
+        match self {
+            Self::Seek(seek) => Some(seek),
+            _ => None,
+        }
+    }
+
+    fn uses_views(self, format: &str) -> bool {
+        match self {
+            Self::Blocking => false,
+            Self::Seek(_) => format != "ogg",
+            Self::Push | Self::Stream => true,
+        }
+    }
+}
+
+fn packet_output(
     worker: &Path,
+    command: &str,
     format: &str,
     path: &str,
-    seek: Option<&SeekCase>,
-    streams: Streams,
-    audio: &[i128],
-) -> Result<Result<Candidate, String>, Stop> {
+    arguments: &[String],
+) -> Result<Result<String, String>, Stop> {
     let mut argv = vec![
         python::path(worker),
-        if seek.is_some() { "seek" } else { "packets" }.to_owned(),
+        command.to_owned(),
         format.to_owned(),
         path.to_owned(),
     ];
-    if let Some(seek) = seek {
-        argv.extend([
-            seek.track.to_string(),
-            seek.seconds.clone(),
-            seek.policy.clone(),
-        ]);
-    }
-    let done = run_text(&argv, RUN_TIMEOUT)?;
-    if done.code != 0 {
-        return Ok(Err(format!(
-            "codec-worker exited {}: {}",
+    argv.extend_from_slice(arguments);
+    let os_args: Vec<std::ffi::OsString> = argv.iter().map(std::ffi::OsString::from).collect();
+    let done =
+        crate::harness::worker::run(&os_args, &[], RUN_TIMEOUT)?.ok_or(Stop::Timeout(argv))?;
+    Ok(if done.code == 0 {
+        String::from_utf8(done.stdout).map_err(|error| format!("{}: {error}", worker.display()))
+    } else {
+        Err(format!(
+            "{} exited {}: {}",
+            worker.display(),
             done.code,
-            python::tail(&done.stderr, 300)
-        )));
+            python::tail(&python::text(&done.stderr), 300)
+        ))
+    })
+}
+
+fn candidate(
+    options: &Options,
+    format: &str,
+    path: &str,
+    mode: Mode<'_>,
+    rules: &FormatRules,
+    audio: &[i128],
+    fields: &mut Vec<(String, Value)>,
+) -> Result<Result<Candidate, String>, Stop> {
+    let worker = if mode.uses_views(format) {
+        options
+            .views_worker
+            .as_ref()
+            .ok_or_else(|| Stop::Fatal("this reader lane requires --views-worker".into()))?
+    } else {
+        &options.codec_worker
+    };
+    let (worker_for_rows, command, args) = match mode {
+        Mode::Seek(seek) => (
+            worker,
+            "seek",
+            vec![
+                seek.track.to_string(),
+                seek.seconds.clone(),
+                seek.policy.clone(),
+            ],
+        ),
+        Mode::Stream => (worker, "packets-stream", Vec::new()),
+        Mode::Blocking | Mode::Push => (&options.codec_worker, "packets", Vec::new()),
+    };
+    let stdout = match packet_output(worker_for_rows, command, format, path, &args)? {
+        Ok(stdout) => stdout,
+        Err(error) => return Ok(Err(error)),
+    };
+    if matches!(mode, Mode::Push) {
+        let mut receipts = Vec::new();
+        let mut differences = Vec::new();
+        for window in [1, 7, 4096] {
+            for pool in ["small", "default"] {
+                let args = [window.to_string(), pool.to_owned()];
+                let output = match packet_output(worker, "packets-push", format, path, &args)? {
+                    Ok(output) => output,
+                    Err(error) => {
+                        differences.push(Value::str(format!("{window}/{pool}: {error}")));
+                        continue;
+                    }
+                };
+                let (header, rows) = output.split_once('\n').unwrap_or(("", &output));
+                let stats = python::loads(header).unwrap_or(Value::Null);
+                if int(stats.get("window")) != Some(window) || int(stats.get("pool")).is_none() {
+                    differences.push(Value::str(format!("{window}/{pool}: invalid push receipt")));
+                } else if rows != stdout {
+                    let line = rows
+                        .lines()
+                        .zip(stdout.lines())
+                        .take_while(|(a, b)| a == b)
+                        .count();
+                    differences.push(Value::object([
+                        ("window", Value::int(window)),
+                        ("pool", Value::str(pool)),
+                        ("first_differing_row", Value::int(line as i128 + 1)),
+                        (
+                            "push",
+                            rows.lines().nth(line).map_or(Value::Null, Value::str),
+                        ),
+                        (
+                            "blocking",
+                            stdout.lines().nth(line).map_or(Value::Null, Value::str),
+                        ),
+                    ]));
+                }
+                receipts.push(stats);
+            }
+        }
+        fields.push(("push_receipts".into(), Value::Array(receipts)));
+        if !differences.is_empty() {
+            fields.push(("push_differences".into(), Value::Array(differences)));
+            return Ok(Err("push rows differ from blocking rows".into()));
+        }
     }
-    Ok(parse_candidate(&done.stdout, streams, audio))
+    Ok(parse_candidate(&stdout, rules, audio))
 }
 
 /// Read `codec-worker packets` output; an error describes output that breaks its format.
-fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Candidate, String> {
+fn parse_candidate(stdout: &str, rules: &FormatRules, audio: &[i128]) -> Result<Candidate, String> {
     let lines = python::splitlines(stdout);
     let (last, lines) = lines.split_last().ok_or("codec-worker printed nothing")?;
     let end = python::loads(last).ok_or("codec-worker: the last line is not JSON")?;
@@ -815,7 +1057,7 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
     // FFmpeg replaces a link's streams in place: the n-th track of every chain link is
     // stream n. An elementary stream's one track is FFmpeg's first audio stream.
     let stream_of = |index: i128| -> Option<i128> {
-        match streams {
+        match rules.streams {
             Streams::FirstAudio => Some(audio.first().copied().unwrap_or(0)),
             Streams::PositionInLink => {
                 let link = link(index);
@@ -871,6 +1113,11 @@ fn parse_candidate(stdout: &str, streams: Streams, audio: &[i128]) -> Result<Can
             None => {}
         }
         let track = int(packet.get("track")).ok_or("codec-worker: packet without track")?;
+        if rules.native_dts_from_pts && packet.get("dts") != Some(&Value::Null) {
+            return Err(format!(
+                "codec-worker: expected null native DTS on track {track}"
+            ));
+        }
         let time_base = packet
             .get("time_base")
             .and_then(Value::as_array)
@@ -1044,6 +1291,7 @@ impl Difference {
 struct Comparison<'a> {
     candidate: &'a Candidate,
     reference: &'a Reference,
+    native_dts_from_pts: bool,
     streams: Vec<Aligned>,
 }
 
@@ -1075,15 +1323,24 @@ impl<'a> Comparison<'a> {
                     .iter()
                     .find(|(s, _)| *s == stream)
                     .map(|(_, b)| *b);
-                let projected = |view: fn(&Emitted) -> Option<Fields>| {
-                    let mut fields: Vec<Fields> = ours.iter().filter_map(view).collect();
+                let projected = |mut fields: Vec<Fields>| {
                     if let (Some(first), Some(to)) = (ours.first(), to) {
                         project(&mut fields, first.time_base, to);
                     }
                     fields
                 };
-                let native = projected(|p| Some(p.native));
-                let compat = projected(|p| p.compat);
+                let native = projected(
+                    ours.iter()
+                        .map(|p| {
+                            let mut fields = p.native;
+                            if rules.native_dts_from_pts {
+                                fields[DTS] = fields[PTS];
+                            }
+                            fields
+                        })
+                        .collect(),
+                );
+                let compat = projected(ours.iter().filter_map(|p| p.compat).collect());
                 let keys = |packets: &[Fields]| -> Vec<Key> {
                     packets
                         .iter()
@@ -1102,6 +1359,7 @@ impl<'a> Comparison<'a> {
         Comparison {
             candidate,
             reference,
+            native_dts_from_pts: rules.native_dts_from_pts,
             streams,
         }
     }
@@ -1277,9 +1535,15 @@ impl<'a> Comparison<'a> {
                         })
             }
             Relation::Unprojected => d.stream.zip(d.candidate).is_some_and(|(stream, c)| {
+                let field = if view == View::Native && self.native_dts_from_pts && d.field == "dts"
+                {
+                    Some(PTS)
+                } else {
+                    field_index(d.field)
+                };
                 let raw = packets_of(&self.candidate.streams, stream)
                     .get(c)
-                    .and_then(|p| field_index(d.field).and_then(|f| p.native[f]));
+                    .and_then(|p| field.and_then(|f| p.native[f]));
                 raw.is_some() && raw == theirs_value
             }),
             Relation::PlusUnmatchedDurations => {
@@ -1576,8 +1840,9 @@ fn grade_case(
     format: &str,
     path: &str,
     case: (&str, &str),
-    seek: Option<&SeekCase>,
+    mode: Mode<'_>,
 ) -> Result<CaseGrade, Stop> {
+    let seek = mode.seek();
     let rules = options.rules.format(format)?;
     let mut theirs = reference(
         &options.ffprobe,
@@ -1585,6 +1850,7 @@ fn grade_case(
         path,
         &rules.media,
         seek.map(|s| s.reference_seconds.as_str()),
+        matches!(mode, Mode::Stream),
     )?;
     let mut fields = vec![
         ("ffprobe_rc".to_owned(), Value::int(theirs.code)),
@@ -1598,12 +1864,13 @@ fn grade_case(
         ),
     ];
     let mut ours = match candidate(
-        &options.codec_worker,
+        options,
         format,
         path,
-        seek,
-        rules.streams,
+        mode,
+        rules,
         &theirs.tracks,
+        &mut fields,
     )? {
         Ok(reading) => reading,
         Err(error) => {
@@ -1650,6 +1917,7 @@ fn grade_case(
         "candidate_end".into(),
         ours.error.clone().map_or(Value::str("eof"), Value::str),
     ));
+    let mut landing_difference = None;
     if seek.is_some() {
         fields.push((
             "receipt".into(),
@@ -1657,7 +1925,11 @@ fn grade_case(
         ));
         fields.push((
             "reference_before_landing".into(),
-            count(before_landing(&ours, &mut theirs)),
+            count(if format == "ogg" {
+                before_landing(&ours, &mut theirs)
+            } else {
+                elementary_before_landing(&ours, &mut theirs, &mut landing_difference)
+            }),
         ));
     }
     // After a seek the two sides may deliver different links of the same sizes, so
@@ -1730,6 +2002,35 @@ fn grade_case(
     {
         fields.push(("landing_error".into(), Value::str(error)));
         status = "fail".into();
+    }
+    if let Some(error) = landing_difference {
+        fields.push(("landing_frame_difference".into(), error));
+        status = "fail".into();
+    }
+    if seek.is_some() && format != "ogg" && ours.receipt.is_some() {
+        let expected = match format {
+            "flac" => 0,
+            "mp3" => 2,
+            "aac" | "ac3" => 1,
+            _ => {
+                return Err(Stop::Fatal(format!(
+                    "no elementary preroll rule for {format}"
+                )));
+            }
+        };
+        let actual = int(ours
+            .receipt
+            .as_ref()
+            .and_then(|receipt| receipt.get("preroll_frames")));
+        if actual != Some(expected) {
+            fields.push((
+                "preroll_frames_error".into(),
+                Value::str(format!(
+                    "expected {expected} preroll frames, got {actual:?}"
+                )),
+            ));
+            status = "fail".into();
+        }
     }
     let proposals = views
         .iter()
@@ -1852,6 +2153,49 @@ fn before_landing(ours: &Candidate, theirs: &mut Reference) -> Vec<(i128, usize)
     dropped
 }
 
+/// For exact elementary landings, count reference frames before the
+/// candidate position. For estimates, the start itself is compared.
+fn elementary_before_landing(
+    ours: &Candidate,
+    theirs: &mut Reference,
+    difference: &mut Option<Value>,
+) -> Vec<(i128, usize)> {
+    let Some((stream, rows)) = ours.streams.first() else {
+        return Vec::new();
+    };
+    let Some(position) = rows.first().and_then(|row| row.native[POSITION]) else {
+        return Vec::new();
+    };
+    let Some((_, reference)) = theirs.streams.iter_mut().find(|(index, _)| index == stream) else {
+        return Vec::new();
+    };
+    let basis = ours
+        .receipt
+        .as_ref()
+        .and_then(|receipt| receipt.get("basis"))
+        .and_then(Value::as_str);
+    if basis.is_some_and(|basis| basis != "Exact") {
+        let first = reference.first().and_then(|row| row[POSITION]);
+        if first != Some(position) {
+            *difference = Some(Value::object([
+                ("candidate", Value::int(position)),
+                ("reference", first.map_or(Value::Null, Value::int)),
+            ]));
+        }
+        return Vec::new();
+    }
+    let count = reference
+        .iter()
+        .take_while(|row| row[POSITION].is_some_and(|at| at < position))
+        .count();
+    reference.drain(..count);
+    if count == 0 {
+        Vec::new()
+    } else {
+        vec![(*stream, count)]
+    }
+}
+
 fn view_status(row: &Value, view: &str) -> Option<String> {
     row.get("views")
         .and_then(|v| v.get(view))
@@ -1860,11 +2204,33 @@ fn view_status(row: &Value, view: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+fn seek_observation(row: &Value) -> Value {
+    let field = |name| row.get(name).cloned().unwrap_or(Value::Null);
+    Value::object([
+        ("candidate_end", field("candidate_end")),
+        ("candidate_packets", field("candidate_packets")),
+        ("reference_packets", field("reference_packets")),
+        (
+            "landing_frame_difference",
+            field("landing_frame_difference"),
+        ),
+        ("landing_error", field("landing_error")),
+        (
+            "difference_sha256",
+            row.get("views")
+                .and_then(|v| v.get("native"))
+                .and_then(|v| v.get("difference_sha256"))
+                .cloned()
+                .unwrap_or(Value::Null),
+        ),
+    ])
+}
+
 /// Compare every reader row of the manifest (or those `--only` selects), appending one
 /// JSON row per input to `--out` and printing one line each, then the status counts
 /// per lane and view; the unexplained differences go to `OUT.differences.json`.
 pub fn run(options: &Options) -> Result<(), String> {
-    let manifest = crate::checks::read_json(&options.manifest)?;
+    let manifest = json::read(&options.manifest)?;
     let vectors = manifest
         .get("vectors")
         .and_then(Value::as_array)
@@ -1878,32 +2244,61 @@ pub fn run(options: &Options) -> Result<(), String> {
     let mut counts: Vec<(String, usize)> = Vec::new();
     let mut proposals = Vec::new();
     let mut failed = 0;
+    let mut known_open = 0;
+    let mut declared_deviations = 0;
     let text = |v: &Value, key: &str| -> Result<String, String> {
         v.get(key)
             .and_then(Value::as_str)
             .map(str::to_owned)
             .ok_or_else(|| format!("vector without {key}"))
     };
-    // Every vector once, then every seek case on its vector.
-    let mut jobs: Vec<(&Value, Option<&SeekCase>)> = vectors.iter().map(|v| (v, None)).collect();
+    let selected = |lane: &str| only.as_ref().is_some_and(|only| only.contains(&lane));
+    let enable_views = |lane: &str| match &only {
+        Some(_) => selected(lane),
+        None => options.views_worker.is_some(),
+    };
+    // Variants reuse the original vector and its pin. Push uses the original
+    // disposition name only after every byte-for-byte window comparison.
+    let mut jobs = Vec::new();
+    for vector in vectors {
+        if vector.get("seek_only").is_some_and(Value::truthy) {
+            continue;
+        }
+        let lane = text(vector, "lane")?;
+        jobs.push((vector, lane.clone(), Mode::Blocking));
+        if let Some((_, push)) = PUSH_LANES.iter().find(|(base, _)| *base == lane)
+            && enable_views(push)
+        {
+            jobs.push((vector, (*push).to_owned(), Mode::Push));
+        }
+        if lane == "reader-ogg" && enable_views(STREAM_LANE) {
+            jobs.push((vector, STREAM_LANE.to_owned(), Mode::Stream));
+        }
+    }
     for seek in &options.seeks {
         let vector = vectors
             .iter()
             .find(|v| v.get("name").and_then(Value::as_str) == Some(seek.input.as_str()))
             .ok_or_else(|| format!("seek {}: no vector {}", seek.name, seek.input))?;
-        jobs.push((vector, Some(seek)));
+        let base = text(vector, "lane")?;
+        let lane = format!("{base}-seek");
+        if !matches!(
+            base.as_str(),
+            "reader-ogg" | "reader-flac" | "reader-mp3" | "reader-aac" | "reader-ac3"
+        ) {
+            return Err(format!("seek {}: {base} has no seeking lane", seek.name));
+        }
+        if base != "reader-ogg" && options.views_worker.is_none() && !selected(&lane) {
+            continue;
+        }
+        jobs.push((vector, lane, Mode::Seek(seek)));
     }
-    for (v, seek) in jobs {
-        let mut lane = text(v, "lane")?;
+    for (v, lane, mode) in jobs {
         let Some(format) = format(&lane) else {
             continue;
         };
         let (mut name, relative, sha) = (text(v, "name")?, text(v, "path")?, text(v, "sha256")?);
-        if let Some(seek) = seek {
-            if lane != "reader-ogg" {
-                return Err(format!("seek {}: {lane} has no seeking reader", seek.name));
-            }
-            SEEK_LANE.clone_into(&mut lane);
+        if let Some(seek) = mode.seek() {
             name.clone_from(&seek.name);
         }
         if let Some(only) = &only
@@ -1920,10 +2315,10 @@ pub fn run(options: &Options) -> Result<(), String> {
         ];
         let status = if !Path::new(&path).is_file() {
             "input-missing".to_owned()
-        } else if file_sha(Path::new(&path))? != sha {
+        } else if crate::files::sha256(Path::new(&path))? != sha {
             "input-hash-mismatch".to_owned()
         } else {
-            match grade_case(options, format, &path, (&name, &sha), seek) {
+            match grade_case(options, format, &path, (&name, &sha), mode) {
                 Ok(graded) => {
                     row.extend(graded.fields);
                     proposals.extend(graded.proposals);
@@ -1936,14 +2331,30 @@ pub fn run(options: &Options) -> Result<(), String> {
                 Err(Stop::Fatal(message)) => return Err(message),
             }
         };
-        if ![
+        let accepted = [
             "pass",
             "reproduced-by-compat",
             "disposition",
             "refused-by-both",
         ]
-        .contains(&status.as_str())
-        {
+        .contains(&status.as_str());
+        if let Some(open) = mode.seek().and_then(|seek| seek.open.as_ref()) {
+            if status == "fail"
+                && !row.iter().any(|(key, _)| key == "preroll_frames_error")
+                && seek_observation(&Value::Object(row.clone())) == open.expected
+            {
+                if open.declared {
+                    declared_deviations += 1;
+                    row.push(("declared_deviation".into(), Value::str(&open.reason)));
+                } else {
+                    known_open += 1;
+                    row.push(("open_case_reason".into(), Value::str(&open.reason)));
+                }
+            } else {
+                failed += 1;
+                row.push(("open_case_changed".into(), Value::Bool(true)));
+            }
+        } else if !accepted {
             failed += 1;
         }
         row.push(("status".into(), Value::str(status.as_str())));
@@ -1993,6 +2404,14 @@ pub fn run(options: &Options) -> Result<(), String> {
     counts.sort();
     for (key, n) in &counts {
         println!("COUNT {key} {n}");
+    }
+    if known_open > 0 {
+        println!("{known_open} open seek cases reproduced their pinned differences");
+    }
+    if declared_deviations > 0 {
+        println!(
+            "{declared_deviations} declared seek deviations reproduced their pinned differences"
+        );
     }
     println!("DONE");
     if failed > 0 {
@@ -2048,459 +2467,4 @@ pub fn differences_text(document: &Value) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn packet(pts: i128) -> Fields {
-        [None, None, Some(pts), Some(pts), Some(1536), None, None]
-    }
-
-    #[test]
-    fn projection_accumulates_rounded_durations_where_inexact() {
-        // AC-3 at 44.1 kHz: 1536 samples are 3134.69 ticks of 1/90000.
-        let mut packets = vec![packet(0), packet(1536), packet(3072)];
-        project(&mut packets, (1, 44100), (1, 90000));
-        let times: Vec<_> = packets.iter().map(|p| (p[PTS], p[DURATION])).collect();
-        assert_eq!(
-            times,
-            [
-                (Some(0), Some(3134)),
-                (Some(3134), Some(3134)),
-                (Some(6268), Some(3134))
-            ]
-        );
-        // 1152 and 1536 samples at 44.1 kHz are exactly 368640 and 491520 ticks of 1/14112000.
-        let mut packets = vec![packet(-1152), packet(0)];
-        project(&mut packets, (1, 44100), (1, 14_112_000));
-        assert_eq!(packets[0][PTS], Some(-368_640));
-        assert_eq!(packets[1][DURATION], Some(491_520));
-    }
-
-    #[test]
-    fn alignment_pairs_unequal_keys_before_leaving_packets_unpaired() {
-        let k = |v: &[i128]| v.iter().map(|&x| [Some(x), Some(1)]).collect::<Vec<_>>();
-        // A leading reference packet, then equal positions.
-        assert_eq!(
-            align(&k(&[46, 880]), &k(&[0, 46, 880]), false),
-            [(None, Some(0)), (Some(0), Some(1)), (Some(1), Some(2))]
-        );
-        // Shifted positions pair in order.
-        assert_eq!(
-            align(&k(&[10, 20]), &k(&[5, 15]), false),
-            [(Some(0), Some(0)), (Some(1), Some(1))]
-        );
-        // Four reader packets one reference packet holds.
-        assert_eq!(
-            align(&k(&[0, 9, 10, 11, 12, 20]), &k(&[0, 9, 20]), false),
-            [
-                (Some(0), Some(0)),
-                (Some(1), Some(1)),
-                (Some(2), None),
-                (Some(3), None),
-                (Some(4), None),
-                (Some(5), Some(2))
-            ]
-        );
-    }
-
-    fn reading(fields: Vec<Fields>, compat: Option<Vec<Fields>>) -> Candidate {
-        let packets = fields
-            .iter()
-            .enumerate()
-            .map(|(i, f)| Emitted {
-                native: *f,
-                compat: compat.as_ref().map(|c| c[i]),
-                time_base: (1, 48000),
-                first_of_track: i == 0,
-                ..Emitted::default()
-            })
-            .collect();
-        Candidate {
-            tracks: vec![0],
-            stream_of_track: vec![(0, 0)],
-            streams: vec![(0, packets)],
-            error: None,
-            receipt: None,
-        }
-    }
-
-    fn reference_of(fields: Vec<Fields>) -> Reference {
-        Reference {
-            tracks: vec![0],
-            streams: vec![(0, fields)],
-            time_bases: vec![(0, (1, 48000))],
-            ..Reference::default()
-        }
-    }
-
-    fn format_rules() -> FormatRules {
-        let all = vec![SIZE, PTS, DTS, DURATION, TRIM_START, TRIM_END];
-        FormatRules {
-            streams: Streams::PositionInLink,
-            media: vec!["audio".to_owned()],
-            align_by: SIZE,
-            apart: false,
-            native: ViewRules {
-                compare: all.clone(),
-                duration_excludes_padding: true,
-            },
-            compat: Some(ViewRules {
-                compare: all,
-                duration_excludes_padding: false,
-            }),
-        }
-    }
-
-    #[test]
-    fn native_differences_the_compat_view_reproduces_are_set_apart() {
-        // The last Opus packet: 960 samples, 936 of them padding; FFmpeg reports 24.
-        let ffmpeg = vec![[
-            Some(9),
-            None,
-            Some(0),
-            Some(0),
-            Some(24),
-            Some(0),
-            Some(936),
-        ]];
-        let native = vec![[Some(9), None, Some(0), Some(0), Some(960), None, Some(936)]];
-        let ours = reading(native, Some(ffmpeg.clone()));
-        let theirs = reference_of(ffmpeg);
-        let rules = format_rules();
-        let comparison = Comparison::new(&ours, &theirs, &rules);
-        assert!(
-            comparison
-                .differences(View::Native, &rules.native)
-                .is_empty()
-        );
-        assert!(
-            comparison
-                .differences(View::Compat, rules.compat.as_ref().unwrap())
-                .is_empty()
-        );
-        // A late native time the compat view gets right.
-        let late = vec![[Some(9), None, Some(5), Some(5), Some(960), None, Some(936)]];
-        let ffmpeg = vec![[
-            Some(9),
-            None,
-            Some(0),
-            Some(0),
-            Some(24),
-            Some(0),
-            Some(936),
-        ]];
-        let ours = reading(late, Some(ffmpeg.clone()));
-        let theirs = reference_of(ffmpeg);
-        let comparison = Comparison::new(&ours, &theirs, &rules);
-        let native = comparison.differences(View::Native, &rules.native);
-        assert_eq!(
-            json::canonical(&Value::Array(native.iter().map(Difference::row).collect())),
-            r#"[[0,0,0,"pts",5,0],[0,0,0,"dts",5,0]]"#
-        );
-        assert!(
-            comparison
-                .differences(View::Compat, rules.compat.as_ref().unwrap())
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn scopes_cover_only_their_fields_packets_and_values() {
-        let rules = format_rules();
-        let ours = reading(
-            vec![
-                [Some(1), None, Some(0), Some(0), Some(10), None, None],
-                [Some(2), None, Some(10), Some(10), Some(-4), None, None],
-            ],
-            None,
-        );
-        let theirs = reference_of(vec![
-            [Some(1), None, Some(0), Some(0), Some(10), None, None],
-            [
-                Some(2),
-                None,
-                Some(10),
-                Some(10),
-                Some((1 << 32) - 4),
-                None,
-                None,
-            ],
-        ]);
-        let comparison = Comparison::new(&ours, &theirs, &rules);
-        let found = comparison.differences(View::Native, &rules.native);
-        assert_eq!(found.len(), 1);
-        let scope = |fields: &[&str], packets, reference| Scope {
-            views: vec![View::Native],
-            fields: fields.iter().map(|f| (*f).to_owned()).collect(),
-            packets,
-            reference,
-        };
-        let covers = |s: &Scope| comparison.covers(s, View::Native, &found[0], &found);
-        assert!(covers(&scope(
-            &["duration"],
-            Packets::LastOfStream,
-            Relation::Unsigned32
-        )));
-        assert!(!covers(&scope(
-            &["pts"],
-            Packets::LastOfStream,
-            Relation::Unsigned32
-        )));
-        assert!(!covers(&scope(
-            &["duration"],
-            Packets::FirstOfTrack,
-            Relation::Any
-        )));
-        assert!(!covers(&scope(
-            &["duration"],
-            Packets::Any,
-            Relation::ReferenceAbsent
-        )));
-        let mut compat_only = scope(&["duration"], Packets::Any, Relation::Any);
-        compat_only.views = vec![View::Compat];
-        assert!(!covers(&compat_only));
-    }
-
-    #[test]
-    fn resplit_and_shifted_times_cover_one_source_cut_differently() {
-        // Bytes 0..30 are one reader packet and two reference packets of 10 samples
-        // each; the next frame is paired, timed one reference packet later.
-        let packet = |position, size, pts| -> Fields {
-            [
-                Some(size),
-                Some(position),
-                Some(pts),
-                Some(pts),
-                Some(10),
-                None,
-                None,
-            ]
-        };
-        let mut rules = format_rules();
-        rules.align_by = POSITION;
-        rules.native.compare = vec![SIZE, POSITION, PTS];
-        let ours = reading(vec![packet(0, 30, 0), packet(30, 5, 10)], None);
-        let theirs = reference_of(vec![
-            packet(0, 12, 0),
-            packet(12, 18, 10),
-            packet(30, 5, 20),
-        ]);
-        let comparison = Comparison::new(&ours, &theirs, &rules);
-        let found = comparison.differences(View::Native, &rules.native);
-        let rows: Vec<Value> = found.iter().map(Difference::row).collect();
-        assert_eq!(
-            json::canonical(&Value::Array(rows)),
-            r#"[[0,0,0,"size",30,12],[0,null,1,"unmatched",null,18],[0,1,2,"pts",10,20]]"#
-        );
-        let scope = |fields: &[&str], packets, reference| Scope {
-            views: vec![View::Native],
-            fields: fields.iter().map(|f| (*f).to_owned()).collect(),
-            packets,
-            reference,
-        };
-        let resplit = scope(&["size", "unmatched"], Packets::Resplit, Relation::Any);
-        let shifted = scope(&["pts"], Packets::Any, Relation::PlusUnmatchedDurations);
-        let covered = |s: &Scope| {
-            found
-                .iter()
-                .map(|d| comparison.covers(s, View::Native, d, &found))
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(covered(&resplit), [true, true, false]);
-        assert_eq!(covered(&shifted), [false, false, true]);
-    }
-
-    #[test]
-    fn reviewed_lists_must_hash_to_their_digest_and_name_known_dispositions() {
-        let rules = r#"{"formats": {"ogg": {"streams": "position-in-link", "align_by": "size",
-            "views": {"native": {"compare": ["pts"]}}}},
-            "dispositions": [{"id": "a", "reason": "why", "scope": {"views": ["native"],
-            "fields": ["pts"], "packets": "any"}}]}"#;
-        let rows = r#"[[0, 0, 0, "pts", 1, 2]]"#;
-        let digest = list_sha256(json::parse(rows).unwrap().as_array().unwrap());
-        let differences = |id: &str, digest: &str| {
-            format!(
-                r#"{{"schema": "{DIFFERENCES_SCHEMA}", "cases": [{{"name": "n", "sha256": "s",
-                "view": "native", "dispositions": ["{id}"], "difference_sha256": "{digest}",
-                "differences": [[0, 0, 0, "pts", 1, 2, "{id}"]]}}]}}"#
-            )
-        };
-        let parse =
-            |d: String| Rules::parse(&json::parse(rules).unwrap(), &json::parse(&d).unwrap());
-        assert!(parse(differences("a", &digest)).is_ok());
-        assert!(parse(differences("a", "0")).is_err());
-        assert!(parse(differences("b", &digest)).is_err());
-        assert!(
-            Rules::parse(
-                &json::parse(&rules.replace(r#""packets": "any""#, r#""packets": "some""#))
-                    .unwrap(),
-                &json::parse(&differences("a", &digest)).unwrap()
-            )
-            .is_err()
-        );
-    }
-
-    #[test]
-    fn the_repository_rules_load() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let rules = Rules::load(&root).unwrap();
-        for lane in [
-            "reader-ogg",
-            "reader-flac",
-            "reader-mp3",
-            "reader-aac",
-            "reader-ac3",
-            "reader-eac3",
-        ] {
-            rules.format(format(lane).unwrap()).unwrap();
-            assert!(suffixes(lane).is_some());
-        }
-        let ogg = rules.format("ogg").unwrap();
-        assert!(ogg.compat.is_some());
-        assert_eq!(ogg.media, ["audio", "video"]);
-        assert_eq!(rules.format("flac").unwrap().media, ["audio"]);
-        let seeks = SeekCase::load(&root.join(SEEKS)).unwrap();
-        assert_eq!(seeks.len(), SEEK_CASES);
-        let manifest = crate::checks::read_json(&root.join(MANIFEST)).unwrap();
-        let vectors = manifest.get("vectors").and_then(Value::as_array).unwrap();
-        let ogg_vectors = vectors
-            .iter()
-            .filter(|v| v.get("lane").and_then(Value::as_str) == Some("reader-ogg"))
-            .count();
-        assert_eq!(ogg_vectors, OGG_CASES);
-        assert_eq!(vectors.len(), READER_CASES);
-        for seek in &seeks {
-            assert!(
-                vectors.iter().any(|v| {
-                    v.get("name").and_then(Value::as_str) == Some(seek.input.as_str())
-                        && v.get("lane").and_then(Value::as_str) == Some("reader-ogg")
-                }),
-                "{}",
-                seek.name
-            );
-        }
-    }
-
-    /// The committed manifests' case counts, raised with every case added.
-    const READER_CASES: usize = 316;
-    const OGG_CASES: usize = 45;
-    const SEEK_CASES: usize = 26;
-    const MANIFEST: &str = "harness/codecs/reader-manifest.json";
-    const SEEKS: &str = "harness/codecs/reader-seeks.json";
-
-    #[test]
-    fn seek_cases_name_decimal_targets_and_their_reference_target() {
-        let case = |policy: &str, seconds: &str, reference: &str| {
-            json::parse(&format!(
-                r#"{{"schema": "{SEEKS_SCHEMA}", "contract": "c", "cases": [{{"name": "n",
-                "input": "a.opus", "track": 0, "seconds": "{seconds}", "policy": "{policy}",
-                "reference_seconds": "{reference}"}}]}}"#
-            ))
-            .unwrap()
-        };
-        assert!(SeekCase::parse(&case("exact", "1.5", "1.5")).is_ok());
-        assert!(SeekCase::parse(&case("preroll", "1.5", "1.42")).is_ok());
-        assert!(SeekCase::parse(&case("exact", "1.5", "1.42")).is_err());
-        assert!(SeekCase::parse(&case("exact", "-1", "-1")).is_err());
-        assert!(SeekCase::parse(&case("nearest", "1", "1")).is_err());
-    }
-
-    #[test]
-    fn a_seek_must_land_at_or_before_its_target() {
-        let seek = SeekCase {
-            name: "n".into(),
-            input: "a.opus".into(),
-            track: 0,
-            seconds: "1.5".into(),
-            policy: "exact".into(),
-            reference_seconds: "1.5".into(),
-        };
-        // Packets of 48 kHz ticks; the receipt in seconds.
-        let landed = |landing: &str, first: i128| {
-            let mut ours = reading(
-                vec![[Some(9), Some(0), Some(first), None, None, None, None]],
-                None,
-            );
-            ours.receipt = Some(
-                json::parse(&format!(
-                    r#"{{"event":"seek","requested":[3,2],"landing":{landing}}}"#
-                ))
-                .unwrap(),
-            );
-            landing_check(&ours, &seek)
-        };
-        assert!(landed("[1,1]", 48_000).is_ok());
-        assert!(landed("[3,2]", 72_000).is_ok());
-        // The receipt or the first packet past the target.
-        assert!(landed("[2,1]", 48_000).is_err());
-        assert!(landed("[1,1]", 72_001).is_err());
-        assert!(landed("[1,0]", 48_000).is_err());
-        // A chain: the seek to track 0 delivers track 1, the same stream in the second
-        // link, timed from the start of the file.
-        let chained = |first: i128| {
-            let mut ours = reading(
-                vec![[Some(9), Some(0), Some(first), None, None, None, None]],
-                None,
-            );
-            ours.stream_of_track = vec![(0, 0), (1, 0)];
-            ours.receipt = Some(json::parse(r#"{"requested":[3,2],"landing":[1,1]}"#).unwrap());
-            ours
-        };
-        assert!(landing_check(&chained(48_000), &seek).is_ok());
-        assert!(landing_check(&chained(72_001), &seek).is_err());
-        // A track of no compared stream, and a stream that delivers nothing.
-        let mut unmapped = chained(48_000);
-        unmapped.stream_of_track = vec![(1, 0)];
-        assert!(landing_check(&unmapped, &seek).is_err());
-        let mut silent = chained(48_000);
-        silent.streams.clear();
-        assert!(landing_check(&silent, &seek).is_err());
-    }
-
-    #[test]
-    fn ffmpeg_packets_before_the_reader_landing_are_counted_not_compared() {
-        let packet = |position: i128, size: i128| {
-            [
-                Some(size),
-                Some(position),
-                Some(0),
-                Some(0),
-                Some(960),
-                None,
-                None,
-            ]
-        };
-        let ours = reading(vec![packet(300, 7), packet(300, 8)], None);
-        let mut theirs = reference_of(vec![
-            packet(100, 5),
-            packet(300, 6),
-            packet(300, 7),
-            packet(300, 8),
-        ]);
-        assert_eq!(before_landing(&ours, &mut theirs), [(0, 2)]);
-        assert_eq!(theirs.streams[0].1.len(), 2);
-        // FFmpeg landing later leaves the reader's extra packets to compare.
-        let mut later = reference_of(vec![packet(300, 8)]);
-        assert!(before_landing(&ours, &mut later).is_empty());
-        // Packets starting after the reader's landing are not FFmpeg's earlier landing.
-        let mut after = reference_of(vec![packet(400, 7), packet(400, 8)]);
-        assert!(before_landing(&ours, &mut after).is_empty());
-        // Packets apart in every key never pair.
-        let k = |v: &[i128]| v.iter().map(|&x| [Some(x), Some(x)]).collect::<Vec<Key>>();
-        assert_eq!(
-            align(&k(&[1]), &k(&[2]), true),
-            [(Some(0), None), (None, Some(0))]
-        );
-        assert_eq!(align(&k(&[1]), &k(&[2]), false), [(Some(0), Some(0))]);
-        // Of equal sizes, the run that keeps as many packets as the reader's.
-        let same = reading(vec![packet(300, 7), packet(300, 7)], None);
-        let mut runs = reference_of(vec![packet(300, 7), packet(300, 7), packet(300, 7)]);
-        assert_eq!(before_landing(&same, &mut runs), [(0, 1)]);
-        // FFmpeg stopping early still lands on the reader's first packet.
-        let mut short = reference_of(vec![packet(100, 5), packet(300, 7)]);
-        assert_eq!(before_landing(&ours, &mut short), [(0, 1)]);
-    }
-}
+mod tests;

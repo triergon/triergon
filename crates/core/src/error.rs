@@ -1,43 +1,75 @@
+use crate::{Backpressure, Step};
 use std::{fmt, io};
 
-/// The one error type of every format, playback and core operation. Variants
-/// keep their typed detail; nothing converts it away.
+/// The error of every format, codec, playback and core operation.
+///
+/// It is `Copy` and small: a class, with the numbers or the `&'static str` that
+/// tell one cause from another. Building one allocates and formats nothing.
+///
+/// Use [`Limit`](Self::Limit) for a permanent byte bound, including configured
+/// byte limits, with the requested and maximum byte counts. Use
+/// [`Policy`](Self::Policy) to name a configured bound measured in other units,
+/// such as a count, depth or amount of work. Use [`Backpressure`](Self::Backpressure)
+/// only when the caller can release capacity and retry the same operation.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Error {
+    /// The input breaks its format's syntax or a caller broke a precondition;
+    /// the text names what.
     Invalid(&'static str),
-    /// Live capacity request above the budget policy.
+    /// A byte request above the applicable capacity.
     Limit {
+        /// Bytes asked for.
         requested: usize,
+        /// The most a single request may take.
         maximum: usize,
     },
-    /// A named format policy limit (element count, depth, scan bytes, ...).
+    /// A named limit measured in units other than bytes.
     Policy(&'static str),
-    Backpressure {
-        requested: usize,
-        available: usize,
-    },
+    /// The requested bytes and the space currently available for them.
+    Backpressure(Backpressure),
+    /// The allocator refused memory the pool had granted.
     Allocation,
+    /// A size, offset or time does not fit its integer type.
     Overflow,
+    /// The source ended inside a structure, or before its declared length.
     Truncated,
+    /// The caller reported a failed source ([`SourceFailure::Transport`](crate::SourceFailure)).
     Transport,
+    /// The cancellation flag was set, or the caller reported
+    /// [`SourceFailure::Cancelled`](crate::SourceFailure).
     Cancelled,
+    /// An input response carries the token of an earlier
+    /// [`InputCursor::reset`](crate::InputCursor::reset) or of another cursor of
+    /// the same pool.
     StaleGeneration {
+        /// The cursor's generation.
         expected: u64,
+        /// The response's generation.
         received: u64,
     },
+    /// An input response answers a range request the cursor has since replaced.
     StaleRequest {
+        /// The cursor's request number.
         expected: u64,
+        /// The response's request number.
         received: u64,
     },
+    /// An input response's token or bytes belong to another [`Budget`](crate::Budget).
     ForeignPool,
+    /// An input response names another [`SourceId`](crate::SourceId) than the
+    /// cursor reads.
     SourceMismatch,
+    /// Valid input that uses a feature this implementation does not have; the
+    /// text names it.
     Unsupported(&'static str),
-    /// A blocking adapter's reader failed; end of file is [`Error::Truncated`].
+    /// A [`blocking`](crate::blocking) adapter's source failed. An unexpected
+    /// end of file is [`Error::Truncated`] instead.
     Io(io::ErrorKind),
-    /// The owner was closed or poisoned by an earlier failure.
+    /// The owner was closed, or an earlier failure left it unusable.
     Closed,
 }
 
+/// A result whose error is [`Error`].
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl fmt::Display for Error {
@@ -47,10 +79,10 @@ impl fmt::Display for Error {
             Self::Limit { requested, maximum } => {
                 write!(f, "capacity request {requested} exceeds policy {maximum}")
             }
-            Self::Backpressure {
+            Self::Backpressure(Backpressure {
                 requested,
                 available,
-            } => {
+            }) => {
                 write!(
                     f,
                     "capacity request {requested} needs released output; {available} available"
@@ -77,51 +109,100 @@ impl fmt::Display for Error {
     }
 }
 
-// The derived format, written out: a derived `fmt` is compiled into every
-// crate that formats an error, this one once.
+// Debug prints what a derive would print for `Backpressure` as a struct variant,
+// `Backpressure { requested, available }`, the text error traces carry: formatted
+// through a derived twin of the enum.
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Invalid(reason) => f.debug_tuple("Invalid").field(reason).finish(),
-            Self::Limit { requested, maximum } => f
-                .debug_struct("Limit")
-                .field("requested", requested)
-                .field("maximum", maximum)
-                .finish(),
-            Self::Policy(limit) => f.debug_tuple("Policy").field(limit).finish(),
-            Self::Backpressure {
+        Shown::from(*self).fmt(f)
+    }
+}
+
+/// [`Error`] as its `Debug` shows it.
+#[derive(Debug)]
+#[expect(dead_code, reason = "read only through the derived Debug")]
+enum Shown {
+    Invalid(&'static str),
+    Limit { requested: usize, maximum: usize },
+    Policy(&'static str),
+    Backpressure { requested: usize, available: usize },
+    Allocation,
+    Overflow,
+    Truncated,
+    Transport,
+    Cancelled,
+    StaleGeneration { expected: u64, received: u64 },
+    StaleRequest { expected: u64, received: u64 },
+    ForeignPool,
+    SourceMismatch,
+    Unsupported(&'static str),
+    Io(io::ErrorKind),
+    Closed,
+}
+
+impl From<Error> for Shown {
+    fn from(error: Error) -> Self {
+        match error {
+            Error::Invalid(reason) => Self::Invalid(reason),
+            Error::Limit { requested, maximum } => Self::Limit { requested, maximum },
+            Error::Policy(limit) => Self::Policy(limit),
+            Error::Backpressure(Backpressure {
                 requested,
                 available,
-            } => f
-                .debug_struct("Backpressure")
-                .field("requested", requested)
-                .field("available", available)
-                .finish(),
-            Self::Allocation => f.write_str("Allocation"),
-            Self::Overflow => f.write_str("Overflow"),
-            Self::Truncated => f.write_str("Truncated"),
-            Self::Transport => f.write_str("Transport"),
-            Self::Cancelled => f.write_str("Cancelled"),
-            Self::StaleGeneration { expected, received } => f
-                .debug_struct("StaleGeneration")
-                .field("expected", expected)
-                .field("received", received)
-                .finish(),
-            Self::StaleRequest { expected, received } => f
-                .debug_struct("StaleRequest")
-                .field("expected", expected)
-                .field("received", received)
-                .finish(),
-            Self::ForeignPool => f.write_str("ForeignPool"),
-            Self::SourceMismatch => f.write_str("SourceMismatch"),
-            Self::Unsupported(feature) => f.debug_tuple("Unsupported").field(feature).finish(),
-            Self::Io(kind) => f.debug_tuple("Io").field(kind).finish(),
-            Self::Closed => f.write_str("Closed"),
+            }) => Self::Backpressure {
+                requested,
+                available,
+            },
+            Error::Allocation => Self::Allocation,
+            Error::Overflow => Self::Overflow,
+            Error::Truncated => Self::Truncated,
+            Error::Transport => Self::Transport,
+            Error::Cancelled => Self::Cancelled,
+            Error::StaleGeneration { expected, received } => {
+                Self::StaleGeneration { expected, received }
+            }
+            Error::StaleRequest { expected, received } => Self::StaleRequest { expected, received },
+            Error::ForeignPool => Self::ForeignPool,
+            Error::SourceMismatch => Self::SourceMismatch,
+            Error::Unsupported(feature) => Self::Unsupported(feature),
+            Error::Io(kind) => Self::Io(kind),
+            Error::Closed => Self::Closed,
         }
     }
 }
 
 impl std::error::Error for Error {}
+
+impl Error {
+    /// The step a reader returns for this error: backpressure becomes
+    /// [`Step::Backpressure`], which the caller lifts by releasing output;
+    /// every other error stays an error.
+    #[inline]
+    pub fn into_step<T>(self) -> Result<Step<T, Backpressure>> {
+        match self {
+            Self::Backpressure(pressure) => Ok(Step::Backpressure(pressure)),
+            error => Err(error),
+        }
+    }
+}
+
+impl From<Backpressure> for Error {
+    #[inline]
+    fn from(pressure: Backpressure) -> Self {
+        Self::Backpressure(pressure)
+    }
+}
+
+impl From<crate::SourceFailure> for Error {
+    /// The error every later read of a failed input returns.
+    #[inline]
+    fn from(failure: crate::SourceFailure) -> Self {
+        match failure {
+            crate::SourceFailure::Transport => Self::Transport,
+            crate::SourceFailure::Cancelled => Self::Cancelled,
+        }
+    }
+}
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
@@ -135,98 +216,37 @@ impl From<io::Error> for Error {
 #[cfg(test)]
 mod tests {
     use super::Error;
-    use std::io::ErrorKind;
+    use crate::{Backpressure, Step};
 
-    /// The variants as `#[derive(Debug)]` formats them.
-    #[derive(Debug)]
-    #[expect(dead_code, reason = "read only through the derived Debug")]
-    enum Derived {
-        Invalid(&'static str),
-        Limit { requested: usize, maximum: usize },
-        Policy(&'static str),
-        Backpressure { requested: usize, available: usize },
-        Allocation,
-        Overflow,
-        Truncated,
-        Transport,
-        Cancelled,
-        StaleGeneration { expected: u64, received: u64 },
-        StaleRequest { expected: u64, received: u64 },
-        ForeignPool,
-        SourceMismatch,
-        Unsupported(&'static str),
-        Io(ErrorKind),
-        Closed,
-    }
-
-    /// The derived twin of `error`. The match is exhaustive, so a variant added
-    /// to [`Error`] fails to compile here until its twin is added.
-    fn twin(error: Error) -> Derived {
-        match error {
-            Error::Invalid(reason) => Derived::Invalid(reason),
-            Error::Limit { requested, maximum } => Derived::Limit { requested, maximum },
-            Error::Policy(limit) => Derived::Policy(limit),
-            Error::Backpressure {
-                requested,
-                available,
-            } => Derived::Backpressure {
-                requested,
-                available,
-            },
-            Error::Allocation => Derived::Allocation,
-            Error::Overflow => Derived::Overflow,
-            Error::Truncated => Derived::Truncated,
-            Error::Transport => Derived::Transport,
-            Error::Cancelled => Derived::Cancelled,
-            Error::StaleGeneration { expected, received } => {
-                Derived::StaleGeneration { expected, received }
-            }
-            Error::StaleRequest { expected, received } => {
-                Derived::StaleRequest { expected, received }
-            }
-            Error::ForeignPool => Derived::ForeignPool,
-            Error::SourceMismatch => Derived::SourceMismatch,
-            Error::Unsupported(feature) => Derived::Unsupported(feature),
-            Error::Io(kind) => Derived::Io(kind),
-            Error::Closed => Derived::Closed,
-        }
+    #[test]
+    fn backpressure_keeps_its_text_and_becomes_a_step() {
+        let pressure = Backpressure {
+            requested: 3,
+            available: 4,
+        };
+        let error = Error::from(pressure);
+        assert_eq!(
+            format!("{error:?}"),
+            "Backpressure { requested: 3, available: 4 }"
+        );
+        assert_eq!(
+            error.to_string(),
+            "capacity request 3 needs released output; 4 available"
+        );
+        assert!(matches!(
+            error.into_step::<()>(),
+            Ok(Step::Backpressure(step)) if step == pressure
+        ));
+        assert_eq!(
+            Error::Truncated.into_step::<()>().err(),
+            Some(Error::Truncated)
+        );
     }
 
     #[test]
-    fn debug_is_the_derived_format() {
-        let errors = [
-            Error::Invalid("a \"b\""),
-            Error::Limit {
-                requested: 1,
-                maximum: 2,
-            },
-            Error::Policy("depth"),
-            Error::Backpressure {
-                requested: 3,
-                available: 4,
-            },
-            Error::Allocation,
-            Error::Overflow,
-            Error::Truncated,
-            Error::Transport,
-            Error::Cancelled,
-            Error::StaleGeneration {
-                expected: 5,
-                received: 6,
-            },
-            Error::StaleRequest {
-                expected: 7,
-                received: u64::MAX,
-            },
-            Error::ForeignPool,
-            Error::SourceMismatch,
-            Error::Unsupported("x"),
-            Error::Io(ErrorKind::UnexpectedEof),
-            Error::Closed,
-        ];
-        for error in errors {
-            assert_eq!(format!("{error:?}"), format!("{:?}", twin(error)));
-            assert_eq!(format!("{error:#?}"), format!("{:#?}", twin(error)));
-        }
+    fn an_error_is_24_bytes_at_most_and_adds_none_to_a_result() {
+        assert!(size_of::<Error>() <= 24);
+        assert_eq!(size_of::<crate::Result<()>>(), size_of::<Error>());
+        assert_eq!(size_of::<crate::Result<usize>>(), size_of::<Error>());
     }
 }

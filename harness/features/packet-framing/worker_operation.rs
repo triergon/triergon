@@ -5,7 +5,12 @@ use triergon_core::{
     Budget, BudgetVec, Bytes, Error, Result, SourceId, SourceLocation, WorkBudget,
 };
 use triergon_framing::compat::nal::*;
-use triergon_framing::*;
+use triergon_framing::{
+    BuildStep, SlotProgress,
+    avc::{AvcConfigLimits, AvcConfigSource},
+    hevc::{HvcConfigLimits, HvcConfigSource},
+    nal::Codec,
+};
 
 const QUANTUM: u64 = 4096;
 static CANCEL: AtomicBool = AtomicBool::new(false);
@@ -15,7 +20,7 @@ fn avc_into(
     raw: Bytes,
     offset: u64,
     update: bool,
-    ready: &mut Option<ReceiverAvcConfiguration>,
+    ready: &mut Option<AvcRecord>,
 ) -> std::result::Result<(), (Error, Option<i32>)> {
     let source = AvcConfigSource {
         source: SourceId(1),
@@ -28,16 +33,16 @@ fn avc_into(
         maximum_nal_bytes: 65535,
     };
     let mut parser = if update {
-        ReceiverAvcConfigParser::new_update(pool, source, raw, limits)
+        AvcRecordParser::new_update(pool, source, raw, limits)
     } else {
-        ReceiverAvcConfigParser::new(pool, source, raw, limits)
+        AvcRecordParser::new(pool, source, raw, limits)
     }
     .map_err(|e| (e, None))?;
     loop {
         match parser.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, ready) {
-            Ok(ConfigProgress::Ready) => return Ok(()),
-            Ok(ConfigProgress::Yield) => (),
-            Ok(ConfigProgress::Complete) => {
+            Ok(SlotProgress::Ready) => return Ok(()),
+            Ok(SlotProgress::Yield) => (),
+            Ok(SlotProgress::Complete) => {
                 return Err((Error::Invalid("configuration missing"), None));
             }
             Err(e) => {
@@ -45,7 +50,7 @@ fn avc_into(
                     e,
                     parser
                         .take_update_rejection()
-                        .map(|r| r.native_receive_result()),
+                        .map(|r| r.filter_result_code()),
                 ));
             }
         }
@@ -72,13 +77,13 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
                 &mut record,
             )
             .map_err(|(e, _)| e)?;
-            *ready = Some(NalPacketConfiguration::ReceiverAvc(
+            *ready = Some(NalPacketConfiguration::AvcRecord(
                 record.ok_or(Error::Invalid("configuration missing"))?,
             ));
             Ok(())
         }
         Codec::Hevc => {
-            let mut parser = ReceiverHevcConfigParser::new(
+            let mut parser = HevcRecordParser::new(
                 &case.pool,
                 HvcConfigSource {
                     source: SourceId(1),
@@ -96,14 +101,14 @@ fn configuration_into(case: &Case, ready: &mut Option<NalPacketConfiguration>) -
             let mut record = None;
             loop {
                 match parser.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, &mut record)? {
-                    ConfigProgress::Ready => {
-                        *ready = Some(NalPacketConfiguration::ReceiverHevc(
+                    SlotProgress::Ready => {
+                        *ready = Some(NalPacketConfiguration::HevcRecord(
                             record.ok_or(Error::Invalid("configuration missing"))?,
                         ));
                         return Ok(());
                     }
-                    ConfigProgress::Yield => (),
-                    ConfigProgress::Complete => {
+                    SlotProgress::Yield => (),
+                    SlotProgress::Complete => {
                         return Err(Error::Invalid("configuration missing"));
                     }
                 }
@@ -266,7 +271,7 @@ fn operation(case: &Case) -> Result<Outcome> {
                     return Err(Error::Invalid("configuration publication missing"));
                 }
                 Err(error) => {
-                    if let Some(rejection) = writer.take_receiver_rejection() {
+                    if let Some(rejection) = writer.take_rejection() {
                         outcome.digest.word(4);
                         outcome
                             .digest
@@ -333,7 +338,7 @@ fn operation(case: &Case) -> Result<Outcome> {
             generation: 1,
             new_extradata: extra.clone(),
         };
-        let mut job = match session.receiver_packet(packet, update) {
+        let mut job = match session.packet_with_filter_acceptance(packet, update) {
             Ok(job) => job,
             Err(Error::Invalid("packet after drain requires flush")) if drained => continue,
             Err(error) => return Err(error),
@@ -341,11 +346,11 @@ fn operation(case: &Case) -> Result<Outcome> {
         let slot = kept.slot();
         loop {
             match job.step_into(&mut WorkBudget::new(QUANTUM), &CANCEL, slot) {
-                Ok(NalPacketProgress::Yield) => (),
-                Ok(NalPacketProgress::Complete) => {
+                Ok(SlotProgress::Yield) => (),
+                Ok(SlotProgress::Complete) => {
                     return Err(Error::Invalid("packet publication missing"));
                 }
-                Ok(NalPacketProgress::Ready) => {
+                Ok(SlotProgress::Ready) => {
                     let packet = kept.keep(&case.pool, &case.events[index + 1..])?;
                     packet_digest(
                         &mut outcome.digest,
@@ -362,8 +367,8 @@ fn operation(case: &Case) -> Result<Outcome> {
                     break;
                 }
                 Err(error) => {
-                    if let Some(rejection) = job.take_receiver_rejection() {
-                        let words = receive_failure_words(index, rejection.native_receive_result());
+                    if let Some(rejection) = job.take_rejection() {
+                        let words = receive_failure_words(index, rejection.filter_result_code());
                         outcome.digest.fold(&words, &[]);
                         break;
                     }

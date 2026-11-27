@@ -6,7 +6,11 @@ decoders, letterbox video with [`triergon_pixel::letterbox`](../pixel/README.md)
 downmix audio with `triergon_session::mix::Downmix`, performing the same operations as the
 FFmpeg reference decode worker in `harness/`. `codec-worker` serves every operation below;
 `codec-aac-worker` serves the AAC decode operations alone (`audio-aac`,
-`audio-aac-access-units` and `audio-aac-access-units-compat`).
+`audio-aac-access-units` and `audio-aac-access-units-compat`), and with the `hevc-simd`
+feature `codec-hevc-worker` the HEVC ones. Two further binaries are the candidates of
+the prefix-operation features: `codec-views-worker` (feature `views`) of the codec,
+bitstream, framing and render views such as `dsp-imdct` and `picture-properties`, and
+`play-views-worker` (feature `play`) of the facade features such as `facade-probe`.
 
 ## Command line
 
@@ -22,9 +26,11 @@ codec-worker seek ogg FILE TRACK SECONDS exact|preroll
 
 `KIND-CODEC` is one of `video-h264`, `video-hevc`, `audio-ac3`, `audio-eac3`,
 `audio-aac`, `audio-aac-access-units`, `audio-aac-access-units-compat`, `audio-dts`,
-`audio-flac`, `audio-mp3`, `audio-vorbis` or `audio-opus`. The nightly-only `simd` and
-`aac-simd` features enable the HEVC and AAC decoders' SIMD kernels; output is identical.
-Decode errors are printed to stderr and decoding continues.
+`audio-flac`, `audio-mp3`, `audio-vorbis` or `audio-opus`. The nightly-only `hevc-simd`
+and `aac-simd` features enable the HEVC and AAC decoders' SIMD kernels; HEVC output is
+identical. Decode errors are printed to stderr and decoding continues.
+The `audio-aac-raw` command accepts `--extensions reference` after the output path
+to reproduce reference SBR and PS recovery.
 
 The `audio-aac-access-units` inputs, made by `cargo xtask codecs aac-access-units --out
 DIR`, start with four little-endian 32-bit words (sample rate, channel count, packet
@@ -35,7 +41,7 @@ mapping, `-compat` the conventional surround mapping.
 
 ## Outputs
 
-The output is 1920×1080 RGBA per picture, interleaved stereo s16le per mixed audio frame,
+The output is 1920×1080 RGBA (the default canvas) per picture, interleaved stereo s16le per mixed audio frame,
 or all native PCM planes per configured AAC frame. `packets` counts pictures or audio
 frames.
 

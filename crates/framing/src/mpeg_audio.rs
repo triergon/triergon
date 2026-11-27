@@ -2,9 +2,8 @@
 //!
 //! [`MpegAudioHeader`] reads the 32-bit header of ISO/IEC 11172-3 section 2.4.2.3 and its
 //! ISO/IEC 13818-3 low sampling frequency extension, including the unofficial MPEG-2.5
-//! rates. [`MpegAudioInfoFrame`] reads a Xing or Info frame (with its LAME tag) or a VBRI
+//! rates. [`info_frame`] reads a Xing or Info frame (with its LAME tag) or a VBRI
 //! frame: a valid frame whose payload describes the stream instead of carrying audio.
-use triergon_core::{Error, Result};
 
 /// The MPEG audio version a header names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -20,23 +19,32 @@ pub enum MpegVersion {
 /// The coding layer a header names.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MpegLayer {
+    /// Layer I: 384 samples per frame, in slots of four bytes.
     I,
+    /// Layer II: 1152 samples per frame.
     II,
+    /// Layer III: 1152 samples per frame in MPEG-1, 576 in MPEG-2 and 2.5.
     III,
 }
 
 /// Channel mode of a frame header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MpegChannelMode {
+    /// Two channels of one programme.
     Stereo,
+    /// Stereo that may share information between the channels, as
+    /// `mode_extension` says.
     JointStereo,
+    /// Two independent channels.
     DualChannel,
+    /// One channel.
     Mono,
 }
 
 /// De-emphasis a frame header asks for. It does not change decoding.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MpegEmphasis {
+    /// No de-emphasis.
     None,
     /// 50/15 microseconds.
     FiftyFifteen,
@@ -50,18 +58,31 @@ pub enum MpegEmphasis {
 /// A decoded MPEG audio frame header.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MpegAudioHeader {
+    /// The MPEG audio version, which scales the sample rate and selects the
+    /// bit rate table.
     pub version: MpegVersion,
+    /// The coding layer.
     pub layer: MpegLayer,
     /// A 16-bit CRC follows the header.
     pub crc: bool,
     /// Kilobits per second; 0 for a free-format frame.
     pub bitrate_kbps: u16,
+    /// Sampling frequency in Hz: 44100, 48000 or 32000 in MPEG-1, half of
+    /// those in MPEG-2 and a quarter in MPEG-2.5.
     pub sample_rate: u32,
+    /// `padding_bit`: the frame is one slot longer, four bytes in Layer I and
+    /// one byte in the others.
     pub padding: bool,
+    /// Stereo, joint stereo, dual channel or single channel, as coded in `mode`.
     pub channel_mode: MpegChannelMode,
+    /// `mode_extension`, 0 to 3, as coded; it has a meaning in joint stereo
+    /// only.
     pub mode_extension: u8,
+    /// Whether the bitstream marks its audio as copyright protected.
     pub copyright: bool,
+    /// The original bit: set for an original, clear for a copy.
     pub original: bool,
+    /// The de-emphasis the decoder may apply to the reconstructed audio.
     pub emphasis: MpegEmphasis,
 }
 
@@ -89,7 +110,7 @@ const BITRATES: [[[u16; 15]; 3]; 2] = [
 ];
 
 impl MpegAudioHeader {
-    /// Parse a big-endian header word. `None` for a word that is not a valid header:
+    /// Parses a big-endian header word. `None` for a word that is not a valid header:
     /// no 11-bit sync, a reserved version, layer, bit rate or sample rate.
     pub fn parse(word: u32) -> Option<MpegAudioHeader> {
         if word >> 21 != 0x7ff {
@@ -144,13 +165,13 @@ impl MpegAudioHeader {
         })
     }
 
-    /// Parse the header at the start of `bytes`.
+    /// Parses the header at the start of `bytes`.
     pub fn from_bytes(bytes: &[u8]) -> Option<MpegAudioHeader> {
         let word = bytes.get(..4)?;
         Self::parse(u32::from_be_bytes([word[0], word[1], word[2], word[3]]))
     }
 
-    /// Output channels.
+    /// One channel for mono, two for stereo, joint stereo or dual channel.
     pub fn channels(&self) -> u8 {
         if self.channel_mode == MpegChannelMode::Mono {
             1
@@ -229,18 +250,25 @@ pub enum MpegInfoKind {
 /// The stream description of a Xing, Info or VBRI frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct MpegInfoFrame {
+    /// The tag the frame carries.
     pub kind: MpegInfoKind,
-    /// Audio frames in the stream, not counting this one.
+    /// Coded count of audio frames in the stream. Absent when no count is read.
     pub frames: Option<u32>,
-    /// Bytes of the stream, this frame included for Xing and Info.
+    /// Coded stream size in bytes, including this frame for Xing and Info.
+    /// Absent when no size is read.
     pub bytes: Option<u32>,
-    /// The 100-entry seek table of a Xing or Info frame.
+    /// The 100-byte seek table, present only when signalled in Xing or Info.
     pub toc: Option<[u8; 100]>,
+    /// The LAME extension of a Xing or Info frame; `None` when the frame ends
+    /// before it or its encoder string holds anything but printable ASCII and
+    /// zero bytes, and for VBRI.
     pub lame: Option<LameTag>,
 }
 
-/// The information frame carried by `frame`, one whole frame with header `header`.
-pub fn mpeg_info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFrame> {
+/// Reads Xing, Info or version 1 VBRI metadata from a Layer III frame with
+/// the given header. Returns `None` for other layers, missing or unknown
+/// tags, and truncated required fields.
+pub fn info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInfoFrame> {
     if header.layer != MpegLayer::III {
         return None;
     }
@@ -319,16 +347,6 @@ pub fn mpeg_info_frame(frame: &[u8], header: &MpegAudioHeader) -> Option<MpegInf
     None
 }
 
-/// Check the CRC of a frame whose header says it carries one (ISO/IEC 11172-3 2.4.3.1):
-/// the CRC covers the last two header bytes and the first `protected` bytes after it.
-pub fn mpeg_audio_crc_ok(frame: &[u8], protected: usize) -> Result<bool> {
-    let stored = frame.get(4..6).ok_or(Error::Truncated)?;
-    let body = frame.get(6..6 + protected).ok_or(Error::Truncated)?;
-    let crc = triergon_bitstream::crc::crc16_a52(0xffff, &frame[2..4]);
-    let crc = triergon_bitstream::crc::crc16_a52(crc, body);
-    Ok(crc == u16::from_be_bytes([stored[0], stored[1]]))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,11 +391,11 @@ mod tests {
         let lame = at + 16 + 100 + 4;
         frame[lame..lame + 9].copy_from_slice(b"LAME3.100");
         frame[lame + 21..lame + 24].copy_from_slice(&[0x24, 0x01, 0x23]);
-        let info = mpeg_info_frame(&frame, &header).unwrap();
+        let info = info_frame(&frame, &header).unwrap();
         assert_eq!(info.kind, MpegInfoKind::Info);
         assert_eq!((info.frames, info.bytes), (Some(100), Some(41700)));
         let tag = info.lame.unwrap();
         assert_eq!((tag.encoder_delay, tag.encoder_padding), (576, 291));
-        assert!(mpeg_info_frame(&frame[..30], &header).is_none());
+        assert!(info_frame(&frame[..30], &header).is_none());
     }
 }

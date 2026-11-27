@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::{child, roots};
 use std::{
     ops::Range,
@@ -6,20 +6,21 @@ use std::{
 };
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
-    BoxView, BuildStatus, Limits, SampleStep,
+    BuildStatus, CursorStatus, Limits, Next,
+    boxes::BoxView,
     compat::mov::{
-        packets::{CursorStatus, PacketLimits},
+        packets::PacketLimits,
         recovery::{
             DescriptionAssociation, DescriptionContext, DescriptionEmission, DescriptionEvent,
-            DescriptionRead, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
-            DescriptionRecoveryTable, RecoveryTrackHeader, RunRecoveryBuilder, RunRecoveryProfile,
+            DescriptionRead, DescriptionRecoveryBuilder, DescriptionRecoveryTable,
+            RecoveryTrackHeader, RunRecoveryBuilder,
         },
         seek::IndexLimits,
     },
 };
 
-const ZERO: &[u8] = include_bytes!("fixtures/recovery-v3/desc-0,0,0.mov");
-const POSITIVE: &[u8] = include_bytes!("fixtures/recovery-v3/desc-2,1,1.mov");
+const ZERO: &[u8] = include_bytes!("fixtures/description-recovery/desc-0,0,0.mov");
+const POSITIVE: &[u8] = include_bytes!("fixtures/description-recovery/desc-2,1,1.mov");
 
 fn parts(bytes: &[u8], p: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Range<u64>>) {
     let top = roots(p, bytes).unwrap();
@@ -30,7 +31,6 @@ fn parts(bytes: &[u8], p: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Range<u
         &child(&track, b"tkhd").unwrap(),
         &child(&media, b"mdhd").unwrap(),
         &child(&media, b"hdlr").unwrap(),
-        RunRecoveryProfile,
     )
     .unwrap();
     (
@@ -43,12 +43,7 @@ fn parts(bytes: &[u8], p: &Budget) -> (BoxView, RecoveryTrackHeader, Vec<Range<u
     )
 }
 fn build(raw: BoxView, p: &Budget, q: u64) -> Result<DescriptionRecoveryTable, Error> {
-    let mut job = DescriptionRecoveryBuilder::new(
-        raw,
-        p.clone(),
-        Limits::default(),
-        DescriptionRecoveryProfile,
-    )?;
+    let mut job = DescriptionRecoveryBuilder::new(raw, p.clone(), Limits::default())?;
     for _ in 0..100_000 {
         if job.poll(&mut WorkBudget::new(q), &AtomicBool::new(false))? == BuildStatus::Ready {
             return job.finish();
@@ -70,7 +65,6 @@ fn events(bytes: &[u8], q: u64) -> Vec<DescriptionEvent> {
                 physical_length: bytes.len() as u64,
                 custom_read_maximum: 65536,
             },
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     assert_eq!(
@@ -107,7 +101,7 @@ fn strict_and_run_description_errors_remain_exact() {
         common::table(raw.clone(), &p, 1).unwrap_err(),
         Error::Invalid("stsc order/count/description")
     );
-    let mut old = RunRecoveryBuilder::new(raw, p, Limits::default(), RunRecoveryProfile).unwrap();
+    let mut old = RunRecoveryBuilder::new(raw, p, Limits::default()).unwrap();
     assert_eq!(
         old.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Invalid("stsc order/count/description"))
@@ -130,9 +124,9 @@ fn all_zero_rows_retain_raw_configuration_and_all_source_ordinals() {
     let mut raw_rows = Vec::new();
     loop {
         match cursor.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Yield => {}
-            SampleStep::Sample(s) => raw_rows.push(s),
-            SampleStep::End => break,
+            Next::Yield => {}
+            Next::Item(s) => raw_rows.push(s),
+            Next::End => break,
         }
     }
     assert_eq!(raw_rows.len(), 6);
@@ -150,24 +144,24 @@ fn all_zero_rows_retain_raw_configuration_and_all_source_ordinals() {
 fn multiple_and_noninitial_zero_rows_use_observed_successor_counts_without_source_repair() {
     for (bytes, expected) in [
         (
-            include_bytes!("fixtures/recovery-v3/desc-1,0,1.mov").as_slice(),
+            include_bytes!("fixtures/description-recovery/desc-1,0,1.mov").as_slice(),
             vec![675, 687, 699, 711, 723, 711],
         ),
         (
-            include_bytes!("fixtures/recovery-v3/desc-1,1,0.mov"),
+            include_bytes!("fixtures/description-recovery/desc-1,1,0.mov"),
             vec![675, 687, 699, 711, 723, 735],
         ),
         (ZERO, vec![675, 687, 699, 699, 711, 723]),
         (
-            include_bytes!("fixtures/recovery-v3/desc-0,1,0.mov"),
+            include_bytes!("fixtures/description-recovery/desc-0,1,0.mov"),
             vec![675, 699, 711, 723, 735],
         ),
         (
-            include_bytes!("fixtures/recovery-v3/desc-1,0,0.mov"),
+            include_bytes!("fixtures/description-recovery/desc-1,0,0.mov"),
             vec![675, 687, 699, 711, 723, 711],
         ),
         (
-            include_bytes!("fixtures/recovery-v3/desc-0,0,1.mov"),
+            include_bytes!("fixtures/description-recovery/desc-0,0,1.mov"),
             vec![675, 687, 699, 699, 711, 723],
         ),
     ] {
@@ -176,7 +170,7 @@ fn multiple_and_noninitial_zero_rows_use_observed_successor_counts_without_sourc
 }
 #[test]
 fn unsigned_all_ones_is_only_a_labelled_observation_not_a_source_description_fix() {
-    let bytes = include_bytes!("fixtures/recovery-v3/desc-4294967295,1,1.mov");
+    let bytes = include_bytes!("fixtures/description-recovery/desc-4294967295,1,1.mov");
     let rows = events(bytes, 1);
     assert_eq!(rows[0].declaration.description_index, u32::MAX);
     assert_eq!(rows[0].raw_chunk_description, u32::MAX);
@@ -222,7 +216,6 @@ fn demux_index_compacts_only_its_ordinals_and_carries_suppressed_sync_distance()
                 physical_length: POSITIVE.len() as u64,
                 custom_read_maximum: 65536,
             },
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     let (mut suppressed, mut entries) = (0, Vec::new());
@@ -337,12 +330,7 @@ fn builder_and_cursors_refuse_foreign_pool_before_allocation() {
     let (raw, header, media) = parts(ZERO, &p);
     let before = other.used();
     assert!(matches!(
-        DescriptionRecoveryBuilder::new(
-            raw.clone(),
-            other.clone(),
-            Limits::default(),
-            DescriptionRecoveryProfile
-        ),
+        DescriptionRecoveryBuilder::new(raw.clone(), other.clone(), Limits::default()),
         Err(Error::ForeignPool)
     ));
     let table = build(raw, &p, 1).unwrap();
@@ -355,8 +343,7 @@ fn builder_and_cursors_refuse_foreign_pool_before_allocation() {
             DescriptionContext {
                 physical_length: ZERO.len() as u64,
                 custom_read_maximum: 65536
-            },
-            DescriptionRecoveryProfile
+            }
         ),
         Err(Error::ForeignPool)
     ));
@@ -369,8 +356,7 @@ fn builder_and_cursors_refuse_foreign_pool_before_allocation() {
             DescriptionContext {
                 physical_length: ZERO.len() as u64,
                 custom_read_maximum: 65536
-            },
-            DescriptionRecoveryProfile
+            }
         ),
         Err(Error::ForeignPool)
     ));
@@ -380,9 +366,7 @@ fn builder_and_cursors_refuse_foreign_pool_before_allocation() {
 fn builder_zero_work_and_cancel_are_sticky_without_ready_escape() {
     let p = Budget::new(1 << 20).unwrap();
     let (raw, _, _) = parts(ZERO, &p);
-    let mut builder =
-        DescriptionRecoveryBuilder::new(raw, p, Limits::default(), DescriptionRecoveryProfile)
-            .unwrap();
+    let mut builder = DescriptionRecoveryBuilder::new(raw, p, Limits::default()).unwrap();
     let cancel = AtomicBool::new(false);
     assert_eq!(
         builder.poll(&mut WorkBudget::new(0), &cancel).unwrap(),
@@ -410,24 +394,10 @@ fn cancellation_clears_ready_packet_and_index_outputs_and_stays_sticky() {
         custom_read_maximum: 65536,
     };
     let mut packet = t
-        .description_packet_cursor(
-            &p,
-            &h,
-            &m,
-            PacketLimits::default(),
-            context,
-            DescriptionRecoveryProfile,
-        )
+        .description_packet_cursor(&p, &h, &m, PacketLimits::default(), context)
         .unwrap();
     let mut index = t
-        .description_index_cursor(
-            &p,
-            &h,
-            &m,
-            IndexLimits::default(),
-            context,
-            DescriptionRecoveryProfile,
-        )
+        .description_index_cursor(&p, &h, &m, IndexLimits::default(), context)
         .unwrap();
     let cancel = AtomicBool::new(false);
     assert_eq!(
@@ -470,7 +440,6 @@ fn metadata_source_sample_and_index_limits_are_not_waived() {
             max_records: 0,
             ..Limits::default()
         },
-        DescriptionRecoveryProfile,
     )
     .unwrap();
     assert!(
@@ -492,8 +461,7 @@ fn metadata_source_sample_and_index_limits_are_not_waived() {
                 max_source_samples: 5,
                 ..PacketLimits::default()
             },
-            context,
-            DescriptionRecoveryProfile
+            context
         ),
         Err(Error::Limit { .. })
     ));
@@ -507,7 +475,6 @@ fn metadata_source_sample_and_index_limits_are_not_waived() {
                 ..IndexLimits::default()
             },
             context,
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     assert!(matches!(
@@ -525,13 +492,7 @@ fn backpressure_can_resume_builder_without_mutating_source_bytes() {
     let (raw, _, _) = parts(ZERO, &p);
     let original = raw.bytes().clone();
     let held = p.reserve(p.available()).unwrap();
-    let mut job = DescriptionRecoveryBuilder::new(
-        raw,
-        p.clone(),
-        Limits::default(),
-        DescriptionRecoveryProfile,
-    )
-    .unwrap();
+    let mut job = DescriptionRecoveryBuilder::new(raw, p.clone(), Limits::default()).unwrap();
     assert!(matches!(
         job.poll(&mut WorkBudget::new(4096), &AtomicBool::new(false)),
         Err(Error::Backpressure { .. })
@@ -590,7 +551,6 @@ fn yielded_schedules_do_not_change_events_or_allocate_per_sample_storage() {
                 physical_length: ZERO.len() as u64,
                 custom_read_maximum: 65536,
             },
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     for _ in 0..1000 {
@@ -629,7 +589,6 @@ fn retained_source_raw_and_actual_reader_payload_survive_table_and_input_close()
                     physical_length: data.len() as u64,
                     custom_read_maximum: 65536,
                 },
-                DescriptionRecoveryProfile,
             )
             .unwrap();
         let event = loop {
@@ -669,14 +628,8 @@ fn retained_source_raw_and_actual_reader_payload_survive_table_and_input_close()
             4,
         )
         .unwrap();
-        let mut reader = PartialSampleReader::new(
-            &mut input,
-            physical,
-            media[0].clone(),
-            12,
-            RunRecoveryProfile,
-        )
-        .unwrap();
+        let mut reader =
+            PartialSampleReader::new(&mut input, physical, media[0].clone(), 12).unwrap();
         let packet = loop {
             match reader
                 .poll(&mut input, &mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -732,7 +685,6 @@ fn source_zero_scale_stays_invalid_while_only_demux_projection_has_fallback() {
                 physical_length: bytes.len() as u64,
                 custom_read_maximum: 65536,
             },
-            DescriptionRecoveryProfile,
         )
         .unwrap();
     for _ in 0..100_000 {

@@ -1,6 +1,6 @@
 """Numerical model pieces for the PS table fits: this repository's 64-band QMF synthesis
-(crates/codec-aac/src/sbr/qmf.rs, written out in float64) and the PS input dump of
-crates/codec-aac/examples/ps_input.rs."""
+(crates/codec-aac/src/sbr/qmf.rs, written out in float64) and the PS input captured by
+the decoder's unit test."""
 import os
 import subprocess
 
@@ -8,14 +8,15 @@ import numpy as np
 
 import psana
 
-ROOT = psana.ROOT
-PS_INPUT = os.environ.get('PS_INPUT', os.path.join(ROOT, 'target', 'release', 'examples', 'ps_input'))
-
 
 def ps_input(path):
     """(frames, 38, 64) complex: the QMF slots this decoder hands to PS per frame."""
     out = path + '.x.f32'
-    subprocess.run([PS_INPUT, path, out], check=True)
+    subprocess.run(
+        [os.environ['PS_INPUT'], 'inspect::write_ps_input', '--exact', '--ignored'],
+        env=dict(os.environ, AAC_PS_INPUT=path, AAC_PS_OUTPUT=out),
+        check=True,
+    )
     a = np.fromfile(out, dtype='<f4').astype(np.float64)
     a = a[0::2] + 1j * a[1::2]
     return a.reshape(-1, 38, 64)

@@ -8,10 +8,10 @@ use triergon_core::{
     Budget, Bytes, Error, InputRequest, InputWindow, SourceCapabilities, SourceId, Step, Time,
     WorkBudget,
 };
-use triergon_framing::{VorbisHeaders, flac_stream_info};
-use triergon_ogg::compat::clock::{ReferenceTiming, packet_timing};
+use triergon_framing::{flac, vorbis::VorbisHeaders};
+use triergon_ogg::compat::clock::{self, ReferenceTiming, packet_timing};
 use triergon_ogg::page::{BEGIN_OF_STREAM, CONTINUED, END_OF_STREAM, write_page};
-use triergon_ogg::{Limits, Packet, Reader, ReaderEvent};
+use triergon_ogg::{Limits, Packet, PageHeader, Reader, ReaderEvent};
 
 /// Lays out packets on pages the way an Ogg muxer does.
 struct Muxer {
@@ -141,7 +141,7 @@ fn read_with(
         length: random_access.then_some(file.len() as u64),
         random_access,
     };
-    let mut reader = Reader::new(&pool, SourceId(1), capabilities, limits, window).unwrap();
+    let mut reader = clock::reader(&pool, SourceId(1), capabilities, limits, window).unwrap();
     let mut events = Vec::new();
     let error = drive(&mut reader, &pool, file, work, &mut events, None).err();
     (reader, events, error)
@@ -225,7 +225,7 @@ fn summary(events: &[Event<Packet, ReaderEvent>]) -> Vec<Summary> {
                 p.pts(),
                 p.duration(),
                 p.trim(),
-                packet_timing(p),
+                packet_timing(p).unwrap(),
             )
         })
         .collect()
@@ -254,7 +254,7 @@ fn opus_packets_are_timed_from_granules_with_pre_skip_and_end_trim() {
     assert_eq!(packets.len(), 23);
     for (n, packet) in packets.iter().enumerate() {
         assert_eq!(packet.pts(), Some(960 * n as i64 - 312), "packet {n}");
-        assert_eq!(packet.dts(), packet.pts());
+        assert_eq!(packet.dts(), None);
         assert_eq!(packet.duration(), Some(960));
         assert_eq!(packet.payload(), opus_packet(n, 20 + n % 7));
     }
@@ -272,9 +272,9 @@ fn opus_packets_are_timed_from_granules_with_pre_skip_and_end_trim() {
             end: Some(100)
         }
     );
-    assert_eq!(packet_timing(packets[0]).skip_samples, 312);
-    assert_eq!(packet_timing(packets[22]).discard_padding, 100);
-    assert_eq!(packet_timing(packets[22]).duration, Some(860));
+    assert_eq!(packet_timing(packets[0]).unwrap().skip_samples, 312);
+    assert_eq!(packet_timing(packets[22]).unwrap().discard_padding, 100);
+    assert_eq!(packet_timing(packets[22]).unwrap().duration, Some(860));
 }
 
 #[test]
@@ -320,13 +320,60 @@ fn truncation_at_every_byte_ends_cleanly_with_a_prefix_of_the_packets() {
 fn corrupt_bytes_never_panic() {
     let mut file = Vec::new();
     opus_stream(5, 5, 2, 30, &mut file);
+    let pages = page_offsets(&file);
     for at in 0..file.len() {
         for flip in [0x01, 0x80, 0xff] {
             let mut bad = file.clone();
             bad[at] ^= flip;
-            // Rewrite the CRC sometimes so the damage reaches the parsers.
             let _ = read_with(&bad, 13, 1 << 20, false, Limits::default());
+            // The same damage under a valid CRC reaches the parsers and the clocks.
+            let start = pages[pages.partition_point(|&page| page <= at) - 1];
+            if let Some(fixed) = with_crc(&bad, start) {
+                let _ = read_with(&fixed, 13, 1 << 20, false, Limits::default());
+            }
         }
+    }
+}
+
+/// `file` with the page at `start` written again under its own CRC, when it still
+/// parses as a page.
+fn with_crc(file: &[u8], start: usize) -> Option<Vec<u8>> {
+    let page = &file[start..];
+    let header = PageHeader::parse(page).ok()?;
+    let end = start + header.page_len();
+    let body = file.get(start + header.header_len()..end)?;
+    let mut fixed = file[..start].to_vec();
+    let lacing = header.lacing(page);
+    write_page(
+        header.flags,
+        header.granule,
+        header.serial,
+        header.sequence,
+        lacing,
+        body,
+        &mut fixed,
+    );
+    fixed.extend_from_slice(&file[end..]);
+    Some(fixed)
+}
+
+#[test]
+fn extreme_granule_positions_leave_times_unknown_without_panicking() {
+    for granule in [i64::MIN, i64::MIN + 1, i64::MAX - 1, i64::MAX] {
+        let mut file = Vec::new();
+        let mut muxer = Muxer::new(3);
+        muxer.packet(&opus_head(312), 0, &mut file);
+        muxer.flush(false, &mut file);
+        muxer.packet(b"OpusTags\0\0\0\0\0\0\0\0", 0, &mut file);
+        muxer.flush(false, &mut file);
+        for (n, page_granule) in [granule, granule, granule].into_iter().enumerate() {
+            muxer.packet(&opus_packet(2 * n, 20), page_granule, &mut file);
+            muxer.packet(&opus_packet(2 * n + 1, 20), page_granule, &mut file);
+            muxer.flush(n == 2, &mut file);
+        }
+        let (_, events, error) = read_with(&file, 1 << 16, 1 << 20, false, Limits::default());
+        assert_eq!(error, None, "granule {granule}");
+        assert_eq!(packets(&events).len(), 6, "granule {granule}");
     }
 }
 
@@ -353,7 +400,10 @@ fn long_empty_and_255_multiple_packets_survive_the_lacing() {
         let (reader, events, error) = read_with(&file, window, 1 << 20, false, Limits::default());
         assert_eq!(error, None);
         let track = &reader.tracks()[0];
-        assert_eq!(track.codec(), CodecId::Other(b"\x00unknown"));
+        assert_eq!(
+            (track.codec(), track.codec_tag()),
+            (CodecId::Other, &b"\x00unknown"[..])
+        );
         assert_eq!(track.configuration(), b"\x00unknown mapping head");
         let got: Vec<Vec<u8>> = packets(&events)
             .iter()
@@ -413,9 +463,7 @@ fn page_offsets(file: &[u8]) -> Vec<usize> {
     let mut at = 0;
     while at < file.len() {
         offsets.push(at);
-        at += triergon_ogg::PageHeader::parse(&file[at..])
-            .unwrap()
-            .page_len();
+        at += PageHeader::parse(&file[at..]).unwrap().page_len();
     }
     offsets.push(at);
     offsets
@@ -480,7 +528,7 @@ fn chained_links_follow_each_other() {
     assert_eq!(link[0].pts(), Some(end - 312));
     assert_eq!(link[0].trim().start, Some(312));
     // FFmpeg continues at the previous link's last packet end, ignoring pre-skip.
-    assert_eq!(packet_timing(link[0]).pts, Some(9600 - 312 - 200));
+    assert_eq!(packet_timing(link[0]).unwrap().pts, Some(9600 - 312 - 200));
 }
 
 /// A Vorbis setup header with two modes, short (0) and long (1).
@@ -558,10 +606,10 @@ fn vorbis_durations_follow_the_block_sizes() {
     // FFmpeg's clock: the first packet states 128, the short block after a long one 128.
     let reference: Vec<_> = packets
         .iter()
-        .map(|p| packet_timing(p).duration.unwrap())
+        .map(|p| packet_timing(p).unwrap().duration.unwrap())
         .collect();
     assert_eq!(reference, [128, 576, 1024, 128, 128, 576]);
-    assert_eq!(packet_timing(packets[0]).pts, Some(-128));
+    assert_eq!(packet_timing(packets[0]).unwrap().pts, Some(-128));
 }
 
 /// A FLAC frame header for `block` samples at frame number `n`.
@@ -605,7 +653,7 @@ fn ogg_flac_rebuilds_the_native_stream_header() {
     let configuration = track.configuration();
     assert!(configuration.starts_with(b"fLaC\x00\x00\x00\x22"));
     assert!(configuration.ends_with(&comment));
-    assert_eq!(flac_stream_info(configuration).unwrap().sample_rate, 44100);
+    assert_eq!(flac::stream_info(configuration).unwrap().sample_rate, 44100);
     assert_eq!(track.comments(), Some(&comment[4..]));
     let delivered = packets(&events);
     let times: Vec<_> = delivered
@@ -637,7 +685,7 @@ fn seeks_land_before_the_target_and_resume_the_linear_packets() {
                 random_access,
             };
             let mut reader =
-                Reader::new(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
+                clock::reader(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
             let mut events = Vec::new();
             drive(&mut reader, &pool, &file, 1 << 20, &mut events, Some(30)).unwrap();
             let track = reader.tracks()[0].id();
@@ -662,6 +710,7 @@ fn seeks_land_before_the_target_and_resume_the_linear_packets() {
                 SeekMethod::Restart
             };
             assert_eq!(receipt.method, method);
+            assert_eq!(receipt.replays_from_start, target <= 1);
             let packets = summary(&after);
             if target >= 48_000 * 100 {
                 assert!(packets.is_empty());
@@ -727,7 +776,8 @@ fn a_vorbis_seek_lands_on_the_block_before_the_target() {
     }
     muxer.flush(true, &mut file);
     let mut blocking =
-        triergon_ogg::BlockingReader::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+        triergon_ogg::BlockingReader::open_seekable(std::io::Cursor::new(file), Limits::default())
+            .unwrap();
     let cancel = AtomicBool::new(false);
     let track = blocking.tracks()[0].id();
     let target = Time::new(1_000_000, 44_100).unwrap();
@@ -779,7 +829,7 @@ fn budgets_and_limits_refuse_without_panicking() {
         "{error:?}"
     );
     let limits = Limits {
-        header_bytes: 10,
+        opening_bytes: 10,
         ..Limits::default()
     };
     let (reader, events, error) = read_with(&file, 1 << 16, 1 << 20, false, limits);
@@ -857,7 +907,7 @@ fn seek_after(
         random_access,
     };
     let mut reader =
-        Reader::new(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
+        clock::reader(&pool, SourceId(1), capabilities, Limits::default(), 4096).unwrap();
     let mut events = Vec::new();
     drive(&mut reader, &pool, file, 1 << 20, &mut events, prefix).unwrap();
     let track = reader.tracks()[track].id();
@@ -1068,4 +1118,141 @@ fn speex_packets_are_timed_from_the_header_frames_with_granule_trims() {
     }
     assert_eq!(packets[0].trim().start, Some(100));
     assert_eq!(packets[19].trim().end, Some(70));
+}
+
+#[test]
+fn request_names_the_current_input_after_a_short_window() {
+    let pool = Budget::new(1 << 20).unwrap();
+    let mut reader = Reader::new(
+        &pool,
+        SourceId(1),
+        SourceCapabilities {
+            length: None,
+            random_access: false,
+        },
+        Limits::default(),
+        64,
+    )
+    .unwrap();
+    let cancel = AtomicBool::new(false);
+    for (offset, byte) in b"Og".iter().enumerate() {
+        let Step::NeedInput(needed) = reader.step(&mut WorkBudget::new(100), &cancel).unwrap()
+        else {
+            panic!("expected a byte request");
+        };
+        let request = reader.request();
+        assert_eq!(
+            (
+                request.source,
+                &request.token,
+                request.offset,
+                request.maximum
+            ),
+            (needed.source, &needed.token, offset as u64, needed.maximum)
+        );
+        let bytes = Bytes::copy_from_slice(&pool, std::slice::from_ref(byte)).unwrap();
+        reader
+            .provide(
+                &InputWindow::new(request.source, request.token, request.offset, bytes).unwrap(),
+            )
+            .unwrap();
+    }
+}
+
+#[test]
+fn open_keeps_the_first_link_end_after_scanning_a_chain() {
+    for second_serial in [5, 6] {
+        let mut source = Vec::new();
+        opus_stream(5, 5, 2, 100, &mut source);
+        opus_stream(second_serial, 3, 2, 0, &mut source);
+        let reader = triergon_ogg::BlockingReader::open_seekable(
+            std::io::Cursor::new(source),
+            Limits::default(),
+        )
+        .unwrap();
+        assert_eq!(reader.tracks()[0].end(), Some(5 * 960 - 100 - 312));
+    }
+}
+
+#[test]
+fn sequential_open_configures_opus_without_an_end_scan() {
+    let mut source = Vec::new();
+    opus_stream(5, 4, 2, 0, &mut source);
+    let mut reader =
+        triergon_ogg::BlockingReader::open(source.as_slice(), Limits::default()).unwrap();
+    let track = &reader.tracks()[0];
+    assert!(track.is_configured());
+    assert!(track.header_error().is_none());
+    assert_eq!(track.configuration(), opus_head(312));
+    assert_eq!(track.end(), None);
+    let cancel = AtomicBool::new(false);
+    let mut count = 0;
+    while let Some(packet) = reader.next_packet(&cancel).unwrap() {
+        assert_eq!(packet_timing(&packet), None);
+        count += 1;
+    }
+    assert_eq!(count, 4);
+}
+
+#[test]
+fn a_packet_that_is_not_the_opus_comment_header_makes_the_stream_invalid() {
+    // A second packet without the OpusTags magic, and one too short for its vendor string.
+    for comment in [&b"not-a-tag"[..], b"OpusTags\x64\0\0\0abcd"] {
+        let mut file = Vec::new();
+        let mut muxer = Muxer::new(5);
+        muxer.packet(&opus_head(312), 0, &mut file);
+        muxer.flush(false, &mut file);
+        muxer.packet(comment, 0, &mut file);
+        muxer.flush(false, &mut file);
+        for n in 0..4 {
+            muxer.packet(&opus_packet(n, 20), 960 * (n as i64 + 1), &mut file);
+        }
+        muxer.flush(true, &mut file);
+        let (reader, events, error) = read_with(&file, 1 << 16, 1 << 20, true, Limits::default());
+        assert_eq!(error, None);
+        let track = &reader.tracks()[0];
+        assert_eq!(
+            track.header_error(),
+            Some(Error::Invalid("Opus comment header"))
+        );
+        assert!(!track.is_configured());
+        assert_eq!(track.configuration(), opus_head(312));
+        assert!(packets(&events).is_empty());
+    }
+}
+
+#[test]
+fn open_reads_the_headers_of_every_stream_of_the_first_link() {
+    // A Skeleton stream whose packets come before the Speex comment header, as Ogg
+    // Skeleton lays them out: fishead, Speex header, fisbone, Speex comment, Skeleton EOS.
+    let page = |flags, granule, serial, sequence, packet: &[u8], out: &mut Vec<u8>| {
+        write_page(
+            flags,
+            granule,
+            serial,
+            sequence,
+            &[packet.len() as u8],
+            packet,
+            out,
+        );
+    };
+    let mut file = Vec::new();
+    let mut fishead = b"fishead\0".to_vec();
+    fishead.resize(64, 0);
+    page(BEGIN_OF_STREAM, 0, 1, 0, &fishead, &mut file);
+    page(BEGIN_OF_STREAM, 0, 2, 0, &speex_header(), &mut file);
+    let mut fisbone = b"fisbone\0".to_vec();
+    fisbone.resize(52, 0);
+    page(0, 0, 1, 1, &fisbone, &mut file);
+    page(0, 0, 2, 1, b"\x04\0\0\0test\0\0\0\0", &mut file);
+    page(END_OF_STREAM, 0, 1, 2, b"", &mut file);
+    page(END_OF_STREAM, 640, 2, 2, &[7; 30], &mut file);
+    let reader =
+        triergon_ogg::BlockingReader::open_seekable(std::io::Cursor::new(file), Limits::default())
+            .unwrap();
+    let tracks = reader.tracks();
+    assert_eq!(tracks.len(), 2);
+    assert!(tracks.iter().all(triergon_ogg::Track::is_configured));
+    assert_eq!(tracks[1].codec(), CodecId::Speex);
+    assert_eq!(tracks[1].end(), Some(640));
 }

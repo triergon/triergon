@@ -1,20 +1,22 @@
-//! Source-confirmed opaque AVC recovery for one TS188 entity.
+//! The unframed AVC byte run the demuxer cuts from one TS188 entity across a fault the source
+//! view refuses: replay the entity through [`OpaqueRecovery`] on a fresh cursor, and the run
+//! is reported once the source reaches its physical and logical end.
 //!
-//! A caller can replay a strict source refusal through a fresh sequential
-//! cursor. The proof retains the original transport observations and admits
-//! one unframed byte run only after the source reaches physical End and
-//! Finished. The reference is FFmpeg revision `d32b387f` on the 9.0 branch.
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
 
 use super::pes::{
-    DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxProfile, DemuxScope,
-    DemuxSpan, PesFaultPolicy, RegisteredCarriage, SourceContext, TransportFaultRecovery,
-    TransportObservation,
+    DemuxBoundary, DemuxObserver, DemuxPacket, DemuxPayloadKind, DemuxScope, DemuxSpan,
+    PesFaultPolicy, RecoveredPes, RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
-use crate::psi::{DescriptorNamespace, ProgramMap};
-use crate::{
-    AssemblyStep, FaultKind, MediaEntityEnd, ObservedTrace, PacketFormat, ParseLimits, TraceEvent,
-    TraceFault, TransportStream,
+use crate::pes::{FINITE_SURPLUS, FORBIDDEN_TIME_FLAGS, TIMESTAMP_MARKERS, stream_id};
+use crate::psi::{DescriptorNamespace, ProgramMap, stream_type};
+use crate::stream::{
+    FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TraceFault, TransportStream,
 };
+use crate::transport::{
+    OPCR_WITHOUT_PCR, PCR_ENCODING, SCRAMBLED_PAYLOAD, SYNC_BYTE, TRANSPORT_ERROR_INDICATOR,
+};
+use crate::{AssemblyStep, PacketFormat, ParseLimits};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{
     Budget, BudgetVec, Error, InputCursor, InputToken, Result, SourceLocation, Step, WorkBudget,
@@ -45,22 +47,17 @@ impl RecoveryTrigger {
         let proof = match (fault.kind, fault.error) {
             (
                 FaultKind::Transport,
-                Error::Invalid(
-                    "TS transport error indicator"
-                    | "PCR reserved bits/extension"
-                    | "OPCR without PCR",
-                )
-                | Error::Unsupported("scrambled TS payload"),
+                Error::Invalid(TRANSPORT_ERROR_INDICATOR | PCR_ENCODING | OPCR_WITHOUT_PCR)
+                | Error::Unsupported(SCRAMBLED_PAYLOAD),
             )
-            | (
-                FaultKind::Pes,
-                Error::Invalid("PES timestamp markers" | "forbidden PES time flags"),
-            ) => Proof::PacketFault,
-            (FaultKind::Transport, Error::Truncated | Error::Invalid("TS sync byte")) => {
+            | (FaultKind::Pes, Error::Invalid(TIMESTAMP_MARKERS | FORBIDDEN_TIME_FLAGS)) => {
+                Proof::PacketFault
+            }
+            (FaultKind::Transport, Error::Truncated | Error::Invalid(SYNC_BYTE)) => {
                 Proof::FinalCarrier
             }
             (FaultKind::Pes, Error::Truncated) => Proof::FiniteEof,
-            (FaultKind::Pes, Error::Invalid("bytes beyond finite PES")) => Proof::FiniteOverrun,
+            (FaultKind::Pes, FINITE_SURPLUS) => Proof::FiniteOverrun,
             _ => return None,
         };
         Some(Self {
@@ -73,42 +70,42 @@ impl RecoveryTrigger {
     }
 }
 
-/// A proved opaque byte run with its original source and PES observations.
-/// The charged spans remain valid after the recovery and cursor are dropped.
+/// The unframed byte run an [`OpaqueRecovery`] reports, with the fault it was cut across and
+/// the source observations; its charged spans outlive the recovery and the cursor.
 #[derive(Debug)]
 pub struct RecoveredOpaque {
     fault: TraceFault,
     diagnostic: SourceContext,
     end: MediaEntityEnd,
     finished: SourceContext,
-    observations: BudgetVec<TransportObservation>,
+    observations: BudgetVec<RecoveredPes>,
     bytes: usize,
 }
 
 impl RecoveredOpaque {
-    /// The source diagnostic reproduced by the recovery.
+    /// The original fault, including its physical source location and parser error.
     pub fn source_fault(&self) -> &TraceFault {
         &self.fault
     }
 
-    /// Context of the reproduced diagnostic.
+    /// Event ordinal and clock and configuration epochs of the matching fault.
     pub fn diagnostic_context(&self) -> SourceContext {
         self.diagnostic
     }
 
-    /// The issuing source's drained physical End.
+    /// The matching physical end witness, with the source entity and ending byte offset.
     pub fn physical_end(&self) -> &MediaEntityEnd {
         &self.end
     }
 
-    /// Context of the issuing source's Finished event.
+    /// Event ordinal and epochs at the logical EOF that certified the run.
     pub fn source_finished(&self) -> SourceContext {
         self.finished
     }
 
     /// Original typed observations in demux order. The first supplies the
     /// compatibility position and clock for this unframed run.
-    pub fn observations(&self) -> &[TransportObservation] {
+    pub fn observations(&self) -> &[RecoveredPes] {
         self.observations.as_slice()
     }
 
@@ -120,23 +117,23 @@ impl RecoveredOpaque {
             .map(AsRef::as_ref)
     }
 
-    /// Length of the opaque byte run.
+    /// Total original payload bytes across the run’s carrier-backed spans.
     pub fn payload_len(&self) -> usize {
         self.bytes
     }
 }
 
-fn spans(packet: &TransportObservation) -> &[DemuxSpan] {
+fn spans(packet: &RecoveredPes) -> &[DemuxSpan] {
     match packet {
-        TransportObservation::Accepted(packet) => packet.spans.as_slice(),
-        TransportObservation::Faulted(packet) => packet.spans.as_slice(),
-        TransportObservation::PesFault(packet) => packet.spans.as_slice(),
+        RecoveredPes::Accepted(packet) => packet.spans.as_slice(),
+        RecoveredPes::Faulted(packet) => packet.spans.as_slice(),
+        RecoveredPes::PesFault(packet) => packet.spans.as_slice(),
     }
 }
 
 #[derive(Debug)]
 struct Scan {
-    packet: TransportObservation,
+    packet: RecoveredPes,
     span: usize,
     offset: usize,
     retain_work: u64,
@@ -177,7 +174,7 @@ impl Scan {
 }
 
 #[derive(Debug)]
-#[allow(
+#[expect(
     clippy::large_enum_variant,
     reason = "one original event or observation stays inline"
 )]
@@ -193,7 +190,8 @@ enum Phase {
     Done(SourceLocation),
 }
 
-/// A cooperative proof bound to one fresh sequential TS188 cursor.
+/// Replays one TS188 entity on a fresh sequential cursor and reports the unframed run the
+/// demuxer cuts across a named source fault ([`RecoveredOpaque`]).
 ///
 /// Supply requested windows and real EOF on that cursor. Polling advances the
 /// cursor and preserves the current event or span across short work grants.
@@ -216,7 +214,7 @@ pub struct OpaqueRecovery {
     fault_count: usize,
     end: Option<MediaEntityEnd>,
     finished: Option<SourceContext>,
-    observations: BudgetVec<TransportObservation>,
+    observations: BudgetVec<RecoveredPes>,
     bytes: usize,
     zeros: u8,
 }
@@ -271,7 +269,9 @@ impl OpaqueRecovery {
     }
 
     /// Advance the issuing source and its recovery observer. `Ready` publishes
-    /// the retained run once. Subsequent calls return its confirmed `End`.
+    /// the retained run once. Subsequent calls return its confirmed `End`. A foreign
+    /// pool, unrelated source or altered cursor is refused. Source and recovery errors
+    /// stop the operation, while `Cancelled` can be retried.
     pub fn poll(
         &mut self,
         input: &mut InputCursor,
@@ -349,12 +349,10 @@ impl OpaqueRecovery {
                     if !work.try_charge(1) {
                         return Ok(Step::Yield);
                     }
-                    let Phase::Route(event, context) =
-                        std::mem::replace(&mut self.phase, Phase::Read)
-                    else {
-                        unreachable!()
+                    self.phase = match std::mem::replace(&mut self.phase, Phase::Read) {
+                        Phase::Route(event, context) => self.route(event, context, input)?,
+                        other => other,
                     };
-                    self.phase = self.route(event, context, input)?;
                 }
                 Phase::Drain => {
                     let Some(observer) = self.observer.as_mut() else {
@@ -367,7 +365,7 @@ impl OpaqueRecovery {
                             let len = self.observations.len();
                             // Pay for retained records that move if this append grows storage.
                             let copy_bytes = if len == self.observations.capacity() {
-                                len.checked_mul(size_of::<TransportObservation>())
+                                len.checked_mul(size_of::<RecoveredPes>())
                                     .ok_or(Error::Overflow)?
                             } else {
                                 0
@@ -401,12 +399,13 @@ impl OpaqueRecovery {
                         return Ok(Step::Yield);
                     }
                     check_cancel(cancel)?;
-                    let Phase::Scan(scan) = std::mem::replace(&mut self.phase, Phase::Drain) else {
-                        unreachable!()
-                    };
-                    self.observations
-                        .try_push(scan.packet)
-                        .map_err(|failure| failure.error)?;
+                    match std::mem::replace(&mut self.phase, Phase::Drain) {
+                        Phase::Scan(scan) => self
+                            .observations
+                            .try_push(scan.packet)
+                            .map_err(|failure| failure.error)?,
+                        other => self.phase = other,
+                    }
                 }
                 Phase::SealEnd => {
                     let Some(end) = self.source.media_entity_end(input, work, cancel)? else {
@@ -531,19 +530,18 @@ impl OpaqueRecovery {
                 "opaque recovery requires one AVC stream",
             ));
         };
-        if map.header.extension != self.program || stream.stream_type != 0x1b {
+        if map.header.extension != self.program || stream.stream_type != stream_type::H264 {
             return Err(Error::Unsupported("opaque recovery requires selected AVC"));
         }
         let scope = DemuxScope {
             program: self.program,
             pid: stream.pid,
             stream_type: stream.stream_type,
-            stream_id: 0xe0,
+            stream_id: stream_id::VIDEO_FIRST,
             entity: input.source(),
             epochs: context.epochs,
         };
         let observer = DemuxObserver::new_registered(
-            DemuxProfile::PesPackets,
             scope,
             RegisteredCarriage::Avc,
             self.budget.clone(),
@@ -588,10 +586,7 @@ impl OpaqueRecovery {
         if observer.awaiting_source_fault() {
             observer.confirm_source_fault(&fault, context)?;
         } else if fault.rejected.is_some()
-            && matches!(
-                fault.error,
-                Error::Invalid("PCR reserved bits/extension" | "OPCR without PCR")
-            )
+            && matches!(fault.error, Error::Invalid(PCR_ENCODING | OPCR_WITHOUT_PCR))
         {
             observer
                 .push_rejected_fault(fault.clone(), context)
@@ -614,11 +609,11 @@ impl OpaqueRecovery {
         Ok(())
     }
 
-    fn check_observation(&self, packet: &TransportObservation) -> Result<()> {
+    fn check_observation(&self, packet: &RecoveredPes) -> Result<()> {
         let fault = match packet {
-            TransportObservation::Faulted(packet) => Some(&packet.source_fault),
-            TransportObservation::PesFault(packet) => Some(&packet.source_fault),
-            TransportObservation::Accepted(_) => None,
+            RecoveredPes::Faulted(packet) => Some(&packet.source_fault),
+            RecoveredPes::PesFault(packet) => Some(&packet.source_fault),
+            RecoveredPes::Accepted(_) => None,
         };
         let admitted = match (self.trigger.proof, fault) {
             (Proof::PacketFault, Some(fault)) if self.observations.is_empty() => {
@@ -649,7 +644,7 @@ impl OpaqueRecovery {
             Proof::FinalCarrier => true,
             Proof::FiniteEof => matches!(
                 packets,
-                [TransportObservation::Accepted(DemuxPacket {
+                [RecoveredPes::Accepted(DemuxPacket {
                     boundary: DemuxBoundary::LogicalEof,
                     payload_kind: DemuxPayloadKind::DeclaredIncomplete,
                     ..
@@ -657,17 +652,17 @@ impl OpaqueRecovery {
             ),
             Proof::FiniteOverrun => matches!(
                 packets,
-                [TransportObservation::Accepted(DemuxPacket {
+                [RecoveredPes::Accepted(DemuxPacket {
                     boundary: DemuxBoundary::FiniteLength,
                     payload_kind: DemuxPayloadKind::DeclaredComplete,
                     ..
                 })] | [
-                    TransportObservation::Accepted(DemuxPacket {
+                    RecoveredPes::Accepted(DemuxPacket {
                         boundary: DemuxBoundary::FiniteOverrun,
                         payload_kind: DemuxPayloadKind::DeclaredIncomplete,
                         ..
                     }),
-                    TransportObservation::Accepted(DemuxPacket {
+                    RecoveredPes::Accepted(DemuxPacket {
                         payload_kind: DemuxPayloadKind::HeaderlessContinuation,
                         ..
                     })
@@ -725,7 +720,10 @@ fn check_cancel(cancel: &AtomicBool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{OpaqueRecovery, RecoveryTrigger};
-    use crate::{FaultKind, ParseLimits, TraceFault, psi::DescriptorNamespace};
+    use crate::ParseLimits;
+    use crate::psi::DescriptorNamespace;
+    use crate::stream::{FaultKind, TraceFault};
+    use crate::transport::SYNC_BYTE;
     use std::sync::atomic::AtomicBool;
     use triergon_core::{
         Budget, Bytes, Error, InputCursor, InputWindow, SourceCapabilities, SourceFailure,
@@ -758,7 +756,7 @@ mod tests {
                 source,
                 offset: 564,
             },
-            error: Error::Invalid("TS sync byte"),
+            error: Error::Invalid(SYNC_BYTE),
             rejected: None,
         })
         .unwrap();

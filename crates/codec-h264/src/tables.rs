@@ -300,7 +300,7 @@ mod tests {
     fn scans_are_permutations() {
         for t in [&ZIGZAG4[..], &FIELD4[..], &ZIGZAG8[..], &FIELD8[..]] {
             let mut v: Vec<u8> = t.to_vec();
-            v.sort();
+            v.sort_unstable();
             assert!(v.iter().enumerate().all(|(i, &x)| i == x as usize));
         }
         let mut seen = [false; 48];

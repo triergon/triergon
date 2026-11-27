@@ -1,10 +1,14 @@
 //! Minimal DTS core frame *writer* for tests and oracle experiments (not production code).
 //! It emits exactly the syntax of ETSI TS 102 114 Tables 5-1, 5-21, 5-28, 5-29 and 6-17..6-20
 //! from explicit field values; it does no analysis or psychoacoustics.
-#![allow(dead_code, clippy::needless_range_loop, clippy::too_many_arguments)]
+#![allow(
+    dead_code,
+    clippy::too_many_arguments,
+    reason = "a test writer that spells out every syntax field; not every scenario uses all of it"
+)]
 
+use crate::tables::{self, HuffBook};
 use std::collections::HashMap;
-use triergon_codec_dca::tables::{self, HuffBook};
 
 pub struct BitWriter {
     pub bytes: Vec<u8>,
@@ -601,8 +605,8 @@ pub fn write_set_header(w: &mut BitWriter, chans: &[ChanCfg], cpf: bool) {
 }
 
 /// Convert a 16-bit big-endian stream into another packing.
-pub fn repack(be16: &[u8], to: triergon_codec_dca::Packing) -> Vec<u8> {
-    use triergon_codec_dca::Packing;
+pub fn repack(be16: &[u8], to: crate::Packing) -> Vec<u8> {
+    use crate::Packing;
     match to {
         Packing::Be16 => be16.to_vec(),
         Packing::Le16 => be16

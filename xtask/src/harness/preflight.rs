@@ -16,14 +16,13 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use super::{gate_build, linux, validation};
-use crate::checks::read_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 pub const USAGE: &str = "usage: cargo xtask preflight [--feature ID]... [--corpus ID=DIR]...
        [--manifest ID=FILE]... [--isobmff] [--isobmff-seek] [--isobmff-reader]
        [--codecs WORKLOADS]...
-       [--readers LANE,...] [--correctness LANE,...]
+       [--readers LANE,...] [--correctness LANE,...] [--aac-access-units]
        [--external-vector] [--capture CASES] [--reference NAME]...
        [--review FILE | --standard-memory] [--kernel]
 
@@ -65,6 +64,7 @@ struct Options {
     readers: Vec<String>,
     /// Correctness lanes.
     correctness: Vec<String>,
+    aac_access_units: bool,
     external_vector: bool,
     capture: Option<PathBuf>,
     references: Vec<String>,
@@ -88,9 +88,11 @@ impl Options {
                     .split_once('=')
                     .filter(|(id, path)| !id.is_empty() && !path.is_empty())
                     .ok_or_else(|| format!("{flag} needs ID=PATH"))?;
-                if map.insert(id.to_owned(), root.join(path)).is_some() {
-                    return Err(format!("{flag} given twice for {id}"));
+                let path = root.join(path);
+                if map.get(id).is_some_and(|existing| existing != &path) {
+                    return Err(format!("{flag} gives conflicting paths for {id}"));
                 }
+                map.insert(id.to_owned(), path);
                 Ok(())
             };
             match flag.as_str() {
@@ -107,6 +109,7 @@ impl Options {
                 "--correctness" => options
                     .correctness
                     .extend(value()?.split(',').map(str::to_owned)),
+                "--aac-access-units" => options.aac_access_units = true,
                 "--external-vector" => options.external_vector = true,
                 "--capture" => options.capture = Some(root.join(value()?)),
                 "--reference" => options.references.push(value()?),
@@ -165,7 +168,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     }
     let options = Options::parse(root, args)?;
     let mut checks = Checks::default();
-    let identity = read_json(&root.join("target/harness/identity.json"));
+    let identity = json::read(&root.join("target/harness/identity.json"));
     checks.check(
         "build identity",
         identity
@@ -211,6 +214,12 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
         checks.check(
             format!("correctness inputs {}", options.correctness.join(",")),
             correctness_files(root, &options.correctness).and_then(|files| pinned_inputs(&files)),
+        );
+    }
+    if options.aac_access_units {
+        checks.check(
+            "configured AAC sources",
+            aac_access_unit_files(root).and_then(|files| pinned_inputs(&files)),
         );
     }
     if options.external_vector {
@@ -301,7 +310,11 @@ impl Options {
         if self.isobmff || self.isobmff_seek {
             names.push(crate::isobmff_bench::REFERENCE.to_owned());
         }
-        if !self.codecs.is_empty() || !self.readers.is_empty() || !self.correctness.is_empty() {
+        if !self.codecs.is_empty()
+            || !self.readers.is_empty()
+            || !self.correctness.is_empty()
+            || self.aac_access_units
+        {
             names.push("ffmpeg-decode-native".to_owned());
         }
         if self.capture.is_some() {
@@ -323,7 +336,7 @@ fn built_reference(root: &Path, identity: &Value, name: &str) -> R<String> {
     let record = validation::field(validation::field(identity, "comparison_references")?, name)
         .map_err(|_| "not built: prepare its reference and rebuild the workers".to_owned())?;
     let path = root.join(validation::text(record, "path")?);
-    if linux::file_sha(&path)? != validation::hash(record, "sha256")? {
+    if crate::files::sha256(&path)? != validation::hash(record, "sha256")? {
         return Err(format!(
             "{} changed since the build identity",
             path.display()
@@ -355,7 +368,7 @@ fn workers(root: &Path, identity: &Value) -> R<String> {
 /// Every case of a feature names references the identity holds and has every
 /// input it reads with its pinned hash.
 fn feature(root: &Path, identity: &Value, id: &str, options: &Options) -> R<String> {
-    let contract = read_json(&root.join("harness/features").join(id).join("contract.json"))?;
+    let contract = json::read(&root.join("harness/features").join(id).join("contract.json"))?;
     let manifest_path = options.manifest(root, id);
     let (manifest, _) = super::manifest::read(root, &manifest_path)?;
     let corpus = options.corpus(root, id, &manifest);
@@ -412,7 +425,7 @@ fn workloads(list: &Value) -> Vec<(&str, Option<(&str, &str)>)> {
 
 /// Every workload's input exists with its pinned hash.
 fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
-    let list = read_json(workloads)?;
+    let list = json::read(workloads)?;
     let entries = self::workloads(&list);
     let mut problems = Vec::new();
     for (id, input) in &entries {
@@ -438,40 +451,132 @@ fn codec_inputs(root: &Path, workloads: &Path) -> R<String> {
 /// The reader comparison's manifest and seek cases.
 const READER_MANIFEST: &str = "harness/codecs/reader-manifest.json";
 const READER_SEEKS: &str = "harness/codecs/reader-seeks.json";
-/// The lane of the seek cases, which read reader-ogg's vectors.
-const SEEK_LANE: &str = "reader-ogg-seek";
-
-/// The reader comparison's vectors of `lanes`, as paths with their pins, after the
-/// manifests that list them.
+/// Resolve derived reader lanes to their pinned input vectors.
 fn reader_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
-    let mut wanted: Vec<&str> = lanes
-        .iter()
-        .map(String::as_str)
-        .filter(|lane| *lane != SEEK_LANE)
-        .collect();
-    let mut seeks = Vec::new();
-    if lanes.iter().any(|lane| lane == SEEK_LANE) {
-        seeks.push((root.join(READER_SEEKS), None));
-        if !wanted.contains(&"reader-ogg") {
-            wanted.push("reader-ogg");
-        }
-    }
+    use crate::codecs::readers::base_lane;
+    let mut wanted: Vec<_> = lanes.iter().map(|lane| base_lane(lane)).collect();
+    wanted.sort_unstable();
+    wanted.dedup();
     let mut files = lane_files(root, READER_MANIFEST, &wanted)?;
-    files.splice(1..1, seeks);
+    if lanes.iter().any(|lane| lane.ends_with("-seek")) {
+        files.insert(1, (root.join(READER_SEEKS), None));
+    }
     Ok(files)
 }
 
 /// The correctness manifest's vectors of `lanes`, after the manifest.
 fn correctness_files(root: &Path, lanes: &[String]) -> R<Vec<(PathBuf, Option<String>)>> {
-    let wanted: Vec<&str> = lanes.iter().map(String::as_str).collect();
-    lane_files(root, crate::codecs::derived::MANIFEST, &wanted)
+    use crate::codecs::correctness::{session_vector_lanes, variant_manifest, vector_lane};
+
+    let mut regular = std::collections::BTreeSet::new();
+    let mut files = Vec::new();
+    for lane in lanes {
+        regular.extend(session_vector_lanes(lane));
+        if let Some(manifest) = variant_manifest(lane) {
+            files.extend(variant_files(root, manifest, lane)?);
+        } else {
+            regular.insert(vector_lane(lane));
+        }
+    }
+    let mov = regular.remove("aac-mov");
+    let regular = regular.into_iter().collect::<Vec<_>>();
+    if !regular.is_empty() {
+        files.extend(lane_files(
+            root,
+            crate::codecs::derived::MANIFEST,
+            &regular,
+        )?);
+    }
+    if mov {
+        files.extend(lane_files(root, AAC_MOV_MANIFEST, &["aac-mov"])?);
+    }
+    Ok(files)
+}
+
+fn variant_files(root: &Path, manifest: &str, lane: &str) -> R<Vec<(PathBuf, Option<String>)>> {
+    let mut files = vec![(root.join(manifest), None)];
+    let doc = json::read(&root.join(manifest))?;
+    let vectors = doc
+        .get("vectors")
+        .and_then(Value::as_array)
+        .ok_or("variant manifest needs vectors")?;
+    for vector in vectors
+        .iter()
+        .filter(|v| v.get("lane").and_then(Value::as_str) == Some(lane))
+    {
+        vector_files(root, manifest, lane, vector, &mut files)?;
+    }
+    if files.len() == 1 && crate::codecs::correctness::session_vector_lanes(lane).is_empty() {
+        return Err(format!("{manifest}: no {lane} vectors"));
+    }
+    Ok(files)
+}
+
+fn vector_files(
+    root: &Path,
+    manifest: &str,
+    lane: &str,
+    vector: &Value,
+    files: &mut Vec<(PathBuf, Option<String>)>,
+) -> R<()> {
+    let field = |key| {
+        vector
+            .get(key)
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("{manifest}: {lane} vector without {key}"))
+    };
+    let (path, pin) = if vector.get("source").is_some() {
+        ("source", "source_sha256")
+    } else {
+        ("path", "sha256")
+    };
+    files.push((root.join(field(path)?), Some(field(pin)?.to_owned())));
+    if vector.get("tail_source").is_some() {
+        files.push((
+            root.join(field("tail_source")?),
+            Some(field("tail_source_sha256")?.to_owned()),
+        ));
+    }
+    Ok(())
+}
+
+const AAC_MOV_MANIFEST: &str = "harness/codecs/aac/mov-manifest.json";
+const AAC_FEATURE: &str = "harness/features/aac-access-units";
+
+fn aac_access_unit_files(root: &Path) -> R<Vec<(PathBuf, Option<String>)>> {
+    let mut files = lane_files(root, AAC_MOV_MANIFEST, &["aac-mov"])?;
+    let feature = root.join(AAC_FEATURE);
+    let sources = feature.join("sources.json");
+    let manifest = json::read(&sources)?;
+    files.extend([
+        (feature.join("contract.json"), None),
+        (feature.join("corpus.json"), None),
+        (sources, None),
+    ]);
+    for source in manifest
+        .get("vectors")
+        .and_then(Value::as_array)
+        .ok_or("no AAC sources")?
+    {
+        let field = |key| {
+            source
+                .get(key)
+                .and_then(Value::as_str)
+                .ok_or("AAC source lacks name or SHA-256")
+        };
+        files.push((
+            feature.join("inputs").join(field("name")?),
+            Some(field("sha256")?.to_owned()),
+        ));
+    }
+    Ok(files)
 }
 
 /// `manifest` and every vector of `lanes` it lists, with its pin. A lane without
 /// vectors fails.
 fn lane_files(root: &Path, manifest: &str, lanes: &[&str]) -> R<Vec<(PathBuf, Option<String>)>> {
     let mut files = vec![(root.join(manifest), None)];
-    let listed = read_json(&root.join(manifest))?;
+    let listed = json::read(&root.join(manifest))?;
     let vectors = listed
         .get("vectors")
         .and_then(Value::as_array)
@@ -483,11 +588,7 @@ fn lane_files(root: &Path, manifest: &str, lanes: &[&str]) -> R<Vec<(PathBuf, Op
             if text("lane") != Some(*lane) {
                 continue;
             }
-            let path =
-                text("path").ok_or_else(|| format!("{manifest}: a vector without a path"))?;
-            let pin =
-                text("sha256").ok_or_else(|| format!("{manifest}: a vector without a hash"))?;
-            files.push((root.join(path), Some(pin.to_owned())));
+            vector_files(root, manifest, lane, vector, &mut files)?;
         }
         if files.len() == before {
             return Err(format!("{manifest}: no vectors of {lane}"));
@@ -521,7 +622,7 @@ const VECTOR_CONTRACT: &str = "harness/features/matroska-segment-metadata/contra
 
 /// The mandatory external vectors: each path in the sample cache with its pin.
 fn external_vectors(root: &Path) -> R<Vec<(PathBuf, String)>> {
-    let contract = read_json(&root.join(VECTOR_CONTRACT))?;
+    let contract = json::read(&root.join(VECTOR_CONTRACT))?;
     let specs = contract
         .get("required_additional_vectors")
         .and_then(Value::as_array)
@@ -619,7 +720,7 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
     }
     for list in &options.codecs {
         add(list.clone(), None);
-        for (id, input) in workloads(&read_json(list)?) {
+        for (id, input) in workloads(&json::read(list)?) {
             let (path, pin) =
                 input.ok_or_else(|| format!("{}: {id}: no path or hash", list.display()))?;
             add(root.join(path), Some(pin));
@@ -632,6 +733,11 @@ pub fn inputs(root: &Path, args: &[String], manifest: &dyn Fn(&Path) -> R<Value>
     }
     if !options.correctness.is_empty() {
         for (path, pin) in correctness_files(root, &options.correctness)? {
+            add(path, pin.as_deref());
+        }
+    }
+    if options.aac_access_units {
+        for (path, pin) in aac_access_unit_files(root)? {
             add(path, pin.as_deref());
         }
     }
@@ -653,7 +759,7 @@ const CAPTURE_GENERATOR: &str = "harness/capture/generate_inputs.py";
 
 /// The capture cases exist, and the Python that generates their inputs has numpy.
 fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
-    let listed = read_json(cases)?;
+    let listed = json::read(cases)?;
     let count = listed
         .get("cases")
         .and_then(Value::as_array)
@@ -679,7 +785,7 @@ fn capture_inputs(root: &Path, cases: &Path) -> R<String> {
 /// `harness/rss-bound/reviews/SOURCE-RELEASE.json`, by the first 12 hexadecimal
 /// digits of the source's SHA-256 and the kernel release. `prove.sh` takes the same.
 pub fn committed_review(root: &Path) -> PathBuf {
-    let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))
+    let source = crate::files::sha256(&root.join("harness/rss-bound/triergon_rss_bound.c"))
         .unwrap_or_else(|_| "unreadable-module".into());
     let prefix = source.get(..12).unwrap_or(&source);
     root.join(format!(
@@ -696,8 +802,8 @@ fn module_review(root: &Path, review: &Path) -> R<String> {
             review.display()
         ));
     }
-    let document = read_json(review)?;
-    let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c"))?;
+    let document = json::read(review)?;
+    let source = crate::files::sha256(&root.join("harness/rss-bound/triergon_rss_bound.c"))?;
     let text = |key: &str| document.get(key).and_then(Value::as_str);
     if text("module_source_sha256") != Some(source.as_str()) {
         return Err(format!("does not cover module source {}", &source[..12]));
@@ -726,7 +832,7 @@ fn module_absent() -> R<String> {
 
 /// Kernel-bound memory needs the module loaded under a current proof.
 fn kernel_proof(root: &Path) -> R<String> {
-    let identity = read_json(&root.join("target/harness/identity.json"))?;
+    let identity = json::read(&root.join("target/harness/identity.json"))?;
     let instrumentation = validation::field(&identity, "instrumentation")?;
     let profile = linux::load_kernel_profile(
         root,
@@ -778,6 +884,23 @@ mod tests {
     }
 
     #[test]
+    fn a_shard_can_share_a_corpus_path_between_items() {
+        let root = Path::new("/repo");
+        let mut all = args(&[
+            "--feature",
+            "seek",
+            "--corpus",
+            "seek=fixtures",
+            "--corpus",
+            "seek=fixtures",
+        ]);
+        let options = Options::parse(root, &all).unwrap();
+        assert_eq!(options.corpora.get("seek"), Some(&root.join("fixtures")));
+        *all.last_mut().unwrap() = "seek=elsewhere".to_owned();
+        assert!(Options::parse(root, &all).is_err());
+    }
+
+    #[test]
     fn a_run_names_its_rss_review_or_its_standard_bounds() {
         let root = Path::new("/repo");
         let committed = Options::parse(root, &args(&["--feature", "a"])).unwrap();
@@ -792,10 +915,11 @@ mod tests {
     #[test]
     fn the_module_source_in_the_tree_has_a_committed_review() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let source = linux::file_sha(&root.join("harness/rss-bound/triergon_rss_bound.c")).unwrap();
+        let source =
+            crate::files::sha256(&root.join("harness/rss-bound/triergon_rss_bound.c")).unwrap();
         let reviews = std::fs::read_dir(root.join("harness/rss-bound/reviews")).unwrap();
         let reviewed = reviews.flatten().any(|entry| {
-            let review = read_json(&entry.path()).unwrap();
+            let review = json::read(&entry.path()).unwrap();
             entry
                 .file_name()
                 .to_string_lossy()
@@ -812,7 +936,7 @@ mod tests {
 
     #[test]
     fn a_reference_preflight_names_must_have_been_built() {
-        let root = crate::walk::scratch("preflight-references");
+        let root = crate::files::scratch("preflight-references");
         std::fs::create_dir_all(root.join("target/harness")).unwrap();
         std::fs::write(root.join("target/harness/ffmpeg-decode-worker"), b"decode").unwrap();
         let identity = Value::object([(

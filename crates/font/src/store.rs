@@ -10,6 +10,7 @@ use triergon_core::{Budget, Reservation, Result};
 /// A key of the [`Store`]: an identity that is never a reusable address, and the
 /// type of value it names. Keys of different types never collide.
 pub trait StoreKey: Hash + Eq + Send + Sync + 'static {
+    /// What the key names.
     type Value: Send + Sync + 'static;
 }
 
@@ -17,7 +18,9 @@ pub trait StoreKey: Hash + Eq + Send + Sync + 'static {
 /// budget already charges, such as the bytes of a parsed face's input.
 #[derive(Debug)]
 pub struct Built<V> {
+    /// The value to share.
     pub value: V,
+    /// The bytes it retains beyond its own budget's charges.
     pub bytes: usize,
 }
 
@@ -66,6 +69,7 @@ impl std::fmt::Debug for Entry {
 const ENTRY_OVERHEAD: usize = 2 * size_of::<Entry>();
 
 impl Store {
+    /// An empty store whose values are reserved from `budget`.
     pub fn new(budget: &Budget) -> Self {
         Self {
             budget: budget.clone(),

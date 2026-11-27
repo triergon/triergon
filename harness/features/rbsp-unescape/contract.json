@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "id": "rbsp-unescape",
+  "candidate": "codec-views-worker",
+  "operation": "rbsp",
+  "gate": "required",
+  "contract": [
+    "Read every authored NAL payload through both strict and lenient RBSP readers. Compare all bytes before end or refusal and the documented emulation-prevention error class.",
+    "Compare the bytes and boundaries of every run, including an empty run after a trailing prevention byte. Each run is determined by the original escaped payload.",
+    "The corpus covers every following byte, escape placement and seeded payloads, plus NAL payloads extracted from the Annex B fixtures."
+  ],
+  "required_profiles": [
+    "placement",
+    "seeded",
+    "annex-b"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "parity_timeout_seconds": 45,
+  "iterations": 1,
+  "worker_operation": "rbsp-",
+  "oracle": "rbsp",
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["emulation-prevention", "seeded-payloads", "avc-aud0", "avc-aud1", "hevc-aud0", "hevc-aud1", "hevc-eos", "mixed-prefixes"], "cause": "No public reference exposes its emulation prevention removal."},
+    {"bound": "heap", "cases": ["emulation-prevention", "seeded-payloads", "avc-aud0", "avc-aud1", "hevc-aud0", "hevc-aud1", "hevc-eos", "mixed-prefixes"], "cause": "No public reference exposes its emulation prevention removal."},
+    {"bound": "total_rss", "cases": ["emulation-prevention", "seeded-payloads", "avc-aud0", "avc-aud1", "hevc-aud0", "hevc-aud1", "hevc-eos", "mixed-prefixes"], "cause": "No public reference exposes its emulation prevention removal."}
+  ]
+}

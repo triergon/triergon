@@ -25,8 +25,6 @@ pub struct Limits {
     /// Bytes searched for a frame sync before the first frame, after a seek and
     /// between damaged frames.
     pub sync_scan_bytes: u64,
-    /// Largest input window requested.
-    pub input_window: usize,
     /// FLAC seek points kept from a SEEKTABLE; a longer table is ignored.
     pub seek_points: usize,
     /// Jumps a bisecting seek may make.
@@ -40,7 +38,6 @@ impl Default for Limits {
             frame_bytes: 4 << 20,
             retained_metadata_bytes: 4 << 20,
             sync_scan_bytes: 1 << 20,
-            input_window: 64 << 10,
             seek_points: 1 << 16,
             seek_probes: 64,
         }
@@ -69,6 +66,7 @@ impl Track {
     pub fn duration(&self) -> Option<u64> {
         self.facts.duration
     }
+    /// The tick of the track's packet times: one sample.
     pub fn time_base(&self) -> TimeBase {
         self.time_base
     }
@@ -86,7 +84,7 @@ impl TrackInfo for Track {
     fn codec_tag(&self) -> &[u8] {
         self.facts.codec_tag
     }
-    fn codec(&self) -> CodecId<'_> {
+    fn codec(&self) -> CodecId {
         self.facts.codec
     }
     /// FLAC: `fLaC`, STREAMINFO and the VORBIS_COMMENT block when the stream has one
@@ -118,6 +116,7 @@ impl Packet {
     pub fn offset(&self) -> u64 {
         self.offset
     }
+    /// Shared payload storage, without copying.
     pub fn bytes(&self) -> &Bytes {
         &self.data
     }
@@ -147,7 +146,7 @@ impl PacketInfo for Packet {
     }
     #[inline]
     fn dts(&self) -> Option<i64> {
-        Some(self.pts)
+        None
     }
     #[inline]
     fn duration(&self) -> Option<i64> {
@@ -174,6 +173,7 @@ pub enum ReaderEvent {
 /// What the last seek did, beyond the neutral receipt.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SeekDetail {
+    /// The receipt the seek delivered.
     pub receipt: SeekReceipt,
     /// Whether the landing time is exact or estimated, and from what.
     pub basis: SeekBasis,

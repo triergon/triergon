@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "avc-fixed",
+      "profile": "raw-avc",
+      "file": "harness/features/raw-video-configuration/inputs/avc-fixed.h264",
+      "sha256": "eef5545e1642d61bbdc3fc2253e5b3e534fdd77c5133fb037fda9e79793eddbb",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-avc",
+        "configuration"
+      ],
+      "expected": {
+        "trace_sha256": "a73ca65f2f1caf2648f111f3ebb311a5d395cc52556780318260fbc9b408421b"
+      }
+    },
+    {
+      "id": "avc-no-timing",
+      "profile": "raw-avc",
+      "file": "harness/features/raw-video-configuration/inputs/avc-no-timing.h264",
+      "sha256": "b3c347201adce489e5e1d55a86b2dd0fc51d6744f929b7380c75ddeef0d0815a",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-avc",
+        "configuration"
+      ],
+      "expected": {
+        "trace_sha256": "1be4083699d0700d826885971c7eef8d99c072054d51315a3d24d1b809e31005"
+      }
+    },
+    {
+      "id": "avc-reconfigure",
+      "profile": "raw-avc",
+      "file": "harness/features/raw-video-configuration/inputs/avc-reconfigure.h264",
+      "sha256": "365f6354e4863461202d3b170381ebb66f2b49d7f63147140c1245e2f64571fd",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-avc",
+        "configuration"
+      ],
+      "expected": {
+        "trace_sha256": "971bafa68954b0404573a0e8b1dd04fb231414d120f761393af5c1a60a5aa715"
+      }
+    },
+    {
+      "id": "hevc-no-timing",
+      "profile": "raw-hevc",
+      "file": "harness/features/raw-video-configuration/inputs/hevc-no-timing.hevc",
+      "sha256": "15abb6a28ea760f9d0653d9aa14987ad836373dc1eb2a7f0c44d7c6cff971cc9",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-hevc",
+        "configuration"
+      ],
+      "expected": {
+        "trace_sha256": "79840d869961adc1da182527b2bde65308eca12f7293ae2bf7c134e3f22ff10a"
+      }
+    },
+    {
+      "id": "hevc-proportional",
+      "profile": "raw-hevc",
+      "file": "harness/features/raw-video-configuration/inputs/hevc-proportional.hevc",
+      "sha256": "c8173e384e3d8af629a99b26d5904efcc90105ba7d3b294536030ee6f5425506",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-hevc",
+        "configuration"
+      ],
+      "expected": {
+        "trace_sha256": "02a406e8b236d79ee9c76393204b153e147dc180cbea64ede2e566af7c8ece48"
+      }
+    },
+    {
+      "id": "hevc-ordinary",
+      "profile": "raw-hevc",
+      "file": "crates/framing/fixtures/raw-annex-b/hevc-aud0.hevc",
+      "sha256": "7c076acbe5c6cf3db1939534527b1d52fd7f4c31a2063f537440f51c75b08f70",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "raw-hevc",
+        "configuration"
+      ],
+      "expected": {
+        "trace_sha256": "9a3e83f9092f7389476c514b74f364677d49f2063b0e88f3f71f5aabeddad438"
+      }
+    }
+  ]
+}

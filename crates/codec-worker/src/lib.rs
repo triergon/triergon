@@ -1,41 +1,69 @@
-//! Decoder measurement workers for the harness: the same operations as
-//! the decode build of `harness/reference.c`, through the session decoders.
-//! `codec-worker` serves every operation; `codec-aac-worker` serves the AAC decode
-//! operations alone, so that a build of the AAC decoder with other features or another
-//! compiler measures nothing else.
-//!
-//! usage: `codec-worker KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE |
-//! KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE | packets FORMAT FILE [SEEK] |
-//! seek ogg FILE TRACK SECONDS POLICY`, KIND-CODEC
-//! one of video-h264, video-hevc, audio-ac3, audio-eac3, audio-aac, audio-dts, audio-flac,
-//! audio-mp3, audio-vorbis, audio-opus, audio-aac-access-units. Bench prints {iterations,
-//! elapsed_ns, packets, bytes, digest} where
-//! packets counts output pictures/audio blocks and the digest
-//! ([`triergon_harness_protocol::interleaved`]) covers the exact converted output (RGBA or
-//! interleaved stereo s16le). Configured AAC instead folds every native f32 plane.
-//! File loading and process start are outside the timed
-//! interval.
-//!
-//! The elementary-stream splitting below mirrors the reference worker's own parser
-//! (the decode build of `harness/reference.c`) so both decode the same
-//! units. It is measurement framing, not product framing:
-//! playback frames access units through `triergon-framing`. FLAC, MPEG audio, Vorbis
-//! and Opus lanes read their file format as a player does, through `AnyReader` and the
-//! session's track decoder, as the reference reads them through its demuxer.
-//! `packets` prints what a container reader emits per packet.
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
+#![warn(
+    missing_docs,
+    missing_debug_implementations,
+    unreachable_pub,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
+#![expect(
+    clippy::expect_used,
+    reason = "a missing argument, an unreadable input or a failed write ends the worker with status 101, which the fuzz campaigns read as a crash"
+)]
+#![expect(
+    clippy::print_stdout,
+    reason = "the decoder worker speaks the harness protocol on stdout"
+)]
+#![expect(
+    clippy::print_stderr,
+    reason = "decoder refusals and the memory-mode digest are reported on stderr"
+)]
+
+// The elementary-stream splitting follows the harness parser so both decode the
+// same units. Consumers frame access units with triergon-framing.
 mod aac_access_units;
 mod isobmff_packets;
-mod packets;
+pub mod packets;
 
 use std::io::Write;
-use std::time::Instant;
 use triergon::{Budget, ContainerReader, MediaKind, PacketInfo, open_sequential};
-use triergon_codec::{AudioCodec, AudioFrame, VideoCodec};
+use triergon_codec::{AudioDecoder, AudioFrame, DownmixLevels, VideoDecoder};
 use triergon_harness_protocol::interleaved::InterleavedDigest;
-use triergon_pixel::letterbox::{CANVAS_BYTES, Scaler};
+use triergon_harness_runner::{BenchLine, Boundary, Timer};
+use triergon_pixel::letterbox::{Canvas, Scaler};
 use triergon_session::mix::Downmix;
-use triergon_session::{TrackDecoder, audio_decoder, video_decoder};
+use triergon_session::{AudioCodec, TrackDecoder, VideoCodec};
+
+/// A refused access unit as a `decode error` line prints it: the `Debug` form of the
+/// decoder's own error. It has no `Debug` of its own, which lets every such error
+/// convert to it.
+struct Refusal(String);
+
+impl<E: std::fmt::Debug> From<E> for Refusal {
+    fn from(error: E) -> Self {
+        Refusal(format!("{error:?}"))
+    }
+}
+
+/// A refused H.264 or HEVC access unit as a `decode error` line prints it. The video
+/// lanes' recorded diagnostics name the invalid-data and limit classes `InvalidData` and
+/// `ResourceLimit`; every other error, like every audio refusal, prints its `Debug` form.
+struct VideoRefusal(String);
+
+impl From<triergon_codec::DecodeError> for VideoRefusal {
+    fn from(error: triergon_codec::DecodeError) -> Self {
+        use triergon_codec::DecodeError;
+
+        Self(match error {
+            DecodeError::Invalid(detail) => format!("InvalidData({detail:?})"),
+            DecodeError::Policy(detail) => format!("ResourceLimit({detail:?})"),
+            _ => format!("{error:?}"),
+        })
+    }
+}
 
 #[derive(Default)]
 struct Output {
@@ -110,9 +138,12 @@ fn access_units<'a>(data: &'a [u8], hevc: bool, mut each: impl FnMut(&'a [u8])) 
 }
 
 fn video(codec: VideoCodec, data: &[u8], out: &mut Output) {
-    let mut decoder = video_decoder(codec);
+    let mut decoder: Box<dyn VideoDecoder<Error = VideoRefusal>> = match codec {
+        VideoCodec::H264 => triergon_codec_h264::Decoder::new().boxed(),
+        VideoCodec::Hevc => triergon_codec_hevc::Decoder::new().boxed(),
+    };
     let mut scaler = Scaler::default();
-    let mut rgba = vec![0_u8; CANVAS_BYTES];
+    let mut rgba = vec![0_u8; Canvas::default().bytes()];
     let mut n = 0;
     access_units(data, codec == VideoCodec::Hevc, |unit| {
         if let Err(error) = decoder.send(unit, Some(n)) {
@@ -173,11 +204,30 @@ fn audio_units<'a>(codec: AudioCodec, data: &'a [u8], mut each: impl FnMut(&'a [
 }
 
 fn audio(codec: AudioCodec, data: &[u8], out: &mut Output) {
-    let mut decoder = audio_decoder(codec, &[]).expect("decoder");
+    let decoder: Box<dyn AudioDecoder<Error = Refusal>> = match codec {
+        AudioCodec::Ac3 | AudioCodec::Eac3 => triergon_codec_ac3::Decoder::new().boxed(),
+        AudioCodec::Aac => triergon_codec_aac::Decoder::new().boxed(),
+        AudioCodec::Dts => triergon_codec_dca::Decoder::new().boxed(),
+        AudioCodec::Flac | AudioCodec::Opus | AudioCodec::Vorbis | AudioCodec::MpegAudio => {
+            unreachable!("file-format lanes read through their container")
+        }
+    };
+    decode_audio_units(codec, data, out, decoder);
+}
+
+#[inline(always)]
+fn decode_audio_units(
+    codec: AudioCodec,
+    data: &[u8],
+    out: &mut Output,
+    mut decoder: Box<dyn AudioDecoder<Error = Refusal>>,
+) {
     let mut frame = AudioFrame::default();
     let mut downmix = Downmix::default();
     let mut pcm = Vec::new();
     let mut bytes = Vec::new();
+    // The mix is written out here rather than through `emit_mixed`: the call cost 30%
+    // more instructions on a DTS core with an XLL extension.
     audio_units(codec, data, |unit| match decoder.decode(unit, &mut frame) {
         Ok(_) if frame.samples_per_channel == 0 => {}
         Ok(levels) => {
@@ -213,18 +263,25 @@ fn file_audio(data: &[u8], out: &mut Output) {
         if packet.track() != *track {
             continue;
         }
-        let decoded = decoder.decode(&packet, &mut frame);
+        let decoded = decoder.decode(&packet, &mut frame).map_err(Refusal::from);
         emit_mixed(decoded, &frame, &mut downmix, &mut pcm, &mut bytes, out);
     }
     if let Some((_, decoder)) = decoder.as_mut() {
         let flushed = decoder.flush(&mut frame).map(|()| None);
-        emit_mixed(flushed, &frame, &mut downmix, &mut pcm, &mut bytes, out);
+        emit_mixed(
+            flushed.map_err(Refusal::from),
+            &frame,
+            &mut downmix,
+            &mut pcm,
+            &mut bytes,
+            out,
+        );
     }
 }
 
 /// Mix one decode result to stereo s16 and emit it.
 fn emit_mixed(
-    decoded: Result<Option<triergon_codec::DownmixLevels>, triergon_codec::DecodeFailure>,
+    decoded: Result<Option<DownmixLevels>, Refusal>,
     frame: &AudioFrame,
     downmix: &mut Downmix,
     pcm: &mut Vec<i16>,
@@ -293,31 +350,49 @@ fn run(op: &str, data: &[u8], out: &mut Output) {
 
 /// Run the worker binary `name`, which serves `operations`, on the process arguments.
 pub fn main(name: &str, operations: Operations) {
-    // <lane>-<codec>-bench FILE ITERATIONS | <lane>-<codec>-memory FILE | <lane>-<codec>-raw FILE OUT
     let args: Vec<String> = std::env::args().collect();
-    if let [_, command, format, path, seek @ ..] = args.as_slice()
-        && command == "packets"
-        && seek.len() <= 1
-        && operations == Operations::All
+    if operations == Operations::All
+        && let Some(result) = reader_command(&args)
     {
-        if let Err(error) = packets::run(format, path, seek.first().map(String::as_str)) {
+        if let Err(error) = result {
             eprintln!("{error}");
             std::process::exit(2);
         }
         return;
     }
-    if let [_, command, format, path, track, seconds, policy] = args.as_slice()
-        && command == "seek"
-        && operations == Operations::All
-    {
-        if let Err(error) = packets::Seek::parse(track, seconds, policy)
-            .and_then(|seek| packets::seek(format, path, &seek))
-        {
-            eprintln!("{error}");
+
+    let (op, kind, input) = decode_arguments(&args, name, operations);
+    let data = decode_input(op, input);
+    match DecodeMode::parse(kind) {
+        Some(DecodeMode::Bench) => bench(op, &data, args.get(3)),
+        Some(DecodeMode::Memory) => memory(op, &data),
+        Some(DecodeMode::Fold) => fold(op, &data),
+        Some(DecodeMode::Raw) => raw(op, &data, args.get(3), args.get(4..).unwrap_or_default()),
+        None => {
+            eprintln!("unknown mode {kind}");
             std::process::exit(2);
         }
-        return;
     }
+}
+
+fn reader_command(args: &[String]) -> Option<Result<(), String>> {
+    match args {
+        [_, command, format, path, seek @ ..] if command == "packets" && seek.len() <= 1 => {
+            Some(packets::run(format, path, seek.first().map(String::as_str)))
+        }
+        [_, command, format, path, track, seconds, policy] if command == "seek" => Some(
+            packets::Seek::parse(track, seconds, policy)
+                .and_then(|seek| packets::seek(format, path, &seek)),
+        ),
+        _ => None,
+    }
+}
+
+fn decode_arguments<'a>(
+    args: &'a [String],
+    name: &str,
+    operations: Operations,
+) -> (&'a str, &'a str, &'a str) {
     let Some((op, kind)) = args.get(1).and_then(|a| a.rsplit_once('-')) else {
         eprintln!(
             "usage: {name} KIND-CODEC-bench FILE ITERATIONS | KIND-CODEC-memory FILE | KIND-CODEC-raw FILE OUT | KIND-CODEC-fold FILE{}",
@@ -333,8 +408,11 @@ pub fn main(name: &str, operations: Operations) {
         eprintln!("{name}: unknown operation {op}");
         std::process::exit(2);
     }
-    let input = args.get(2).expect("input");
-    let data = if matches!(
+    (op, kind, args.get(2).expect("input"))
+}
+
+fn decode_input(op: &str, input: &str) -> Vec<u8> {
+    if matches!(
         op,
         aac_access_units::OPERATION | aac_access_units::COMPAT_OPERATION
     ) {
@@ -344,76 +422,132 @@ pub fn main(name: &str, operations: Operations) {
         })
     } else {
         std::fs::read(input).expect("input")
-    };
+    }
+}
+
+fn bench(op: &str, data: &[u8], iterations: Option<&String>) {
+    let iterations: u32 = iterations.expect("iterations").parse().expect("iterations");
+    // One streaming digest spans all iterations, including blocks that straddle a decode boundary.
     let mut out = Output::default();
-    match kind {
-        "bench" => {
-            let iterations: u32 = args
-                .get(3)
-                .expect("iterations")
-                .parse()
-                .expect("iterations");
-            let start = Instant::now();
-            for _ in 0..iterations {
-                run(op, &data, &mut out);
-            }
-            let elapsed = start.elapsed().as_nanos();
-            println!(
-                "{{\"schema\":1,\"iterations\":{iterations},\"elapsed_ns\":{elapsed},\"packets\":{},\"bytes\":{},\"digest\":{}}}",
-                out.frames,
-                out.bytes,
-                out.digest.finish()
-            );
-        }
-        "memory" => {
-            // Same observer protocol as the container workers: one whole operation between markers.
-            let mut stdout = std::io::stdout().lock();
-            stdout.write_all(b"TRIERGON_BEGIN_V1\n").expect("stdout");
-            stdout.flush().expect("stdout");
-            run(op, &data, &mut out);
-            stdout.write_all(b"TRIERGON_END_V1\n").expect("stdout");
-            stdout.flush().expect("stdout");
-            // Equal memory work is equal units and bytes; the digest goes to stderr
-            // because audio may differ within the graded 1 LSB.
-            writeln!(
-                stdout,
-                "{{\"packets\":{},\"bytes\":{}}}",
-                out.frames, out.bytes
-            )
-            .expect("stdout");
-            eprintln!("{{\"digest\":{}}}", out.digest.finish());
-        }
-        "fold" => {
-            // One decode and its output identity, without timing: what a fuzz campaign
-            // compares between builds.
-            run(op, &data, &mut out);
-            println!(
-                "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
-                out.frames,
-                out.bytes,
-                out.digest.finish()
-            );
-        }
-        "raw" => {
-            out.raw = Some(std::io::BufWriter::new(
-                std::fs::File::create(args.get(3).expect("output")).expect("raw output"),
-            ));
-            run(op, &data, &mut out);
-            out.raw.take().expect("raw").flush().expect("raw flush");
-            print!(
-                "{{\"packets\":{},\"bytes\":{},\"digest\":{}",
-                out.frames,
-                out.bytes,
-                out.digest.finish()
-            );
-            if let Some((speakers, channels)) = out.aac_speakers {
-                print!(",\"speakers\":{:?}", &speakers[..channels]);
-            }
-            println!("}}");
+    let start = Timer::start(true);
+    for _ in 0..iterations {
+        run(op, data, &mut out);
+    }
+    let line = BenchLine::with_schema(
+        u64::from(iterations),
+        start.elapsed().as_nanos(),
+        (out.frames, out.bytes, out.digest.finish()),
+    );
+    println!("{line}");
+}
+
+fn memory(op: &str, data: &[u8]) {
+    let mut out = Output::default();
+    let mut stdout = std::io::stdout().lock();
+    Boundary::Begin.mark(&mut stdout).expect("stdout");
+    run(op, data, &mut out);
+    Boundary::End.mark(&mut stdout).expect("stdout");
+    // The memory line carries counts, while the separately graded digest goes to stderr.
+    writeln!(
+        stdout,
+        "{{\"packets\":{},\"bytes\":{}}}",
+        out.frames, out.bytes
+    )
+    .expect("stdout");
+    eprintln!("{{\"digest\":{}}}", out.digest.finish());
+}
+
+fn fold(op: &str, data: &[u8]) {
+    let mut out = Output::default();
+    run(op, data, &mut out);
+    println!(
+        "{{\"packets\":{},\"bytes\":{},\"digest\":{}}}",
+        out.frames,
+        out.bytes,
+        out.digest.finish()
+    );
+}
+
+fn raw(op: &str, data: &[u8], path: Option<&String>, options: &[String]) {
+    let mut out = Output {
+        raw: Some(std::io::BufWriter::new(
+            std::fs::File::create(path.expect("output")).expect("raw output"),
+        )),
+        ..Output::default()
+    };
+    match options {
+        [] => run(op, data, &mut out),
+        [flag, policy] if op == "audio-aac" && flag == "--extensions" && policy == "reference" => {
+            use triergon_codec_aac::compat::ffmpeg::extensions::Policy;
+            let decoder = triergon_codec_aac::Decoder::new()
+                .with_extension_policy(Policy::Reference)
+                .boxed();
+            decode_audio_units(AudioCodec::Aac, data, &mut out, decoder);
         }
         _ => {
-            eprintln!("unknown mode {kind}");
+            eprintln!("unknown raw output options");
             std::process::exit(2);
+        }
+    }
+    out.raw.take().expect("raw").flush().expect("raw flush");
+    print!(
+        "{{\"packets\":{},\"bytes\":{},\"digest\":{}",
+        out.frames,
+        out.bytes,
+        out.digest.finish()
+    );
+    if let Some((speakers, channels)) = out.aac_speakers {
+        print!(",\"speakers\":{:?}", &speakers[..channels]);
+    }
+    println!("}}");
+}
+
+enum DecodeMode {
+    Bench,
+    Memory,
+    Fold,
+    Raw,
+}
+
+impl DecodeMode {
+    fn parse(kind: &str) -> Option<Self> {
+        Some(match kind {
+            "bench" => Self::Bench,
+            "memory" => Self::Memory,
+            "fold" => Self::Fold,
+            "raw" => Self::Raw,
+            _ => return None,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VideoRefusal;
+    use triergon_codec_h264::DecodeError as H264;
+    use triergon_codec_hevc::DecodeError as Hevc;
+
+    #[test]
+    fn video_refusals_use_the_trace_error_names() {
+        for (error, expected) in [
+            (
+                VideoRefusal::from(H264::Invalid("ref_idx beyond reference list")),
+                r#"InvalidData("ref_idx beyond reference list")"#,
+            ),
+            (
+                VideoRefusal::from(Hevc::Invalid("bitstream overrun")),
+                r#"InvalidData("bitstream overrun")"#,
+            ),
+            (
+                VideoRefusal::from(H264::Policy("too many slices")),
+                r#"ResourceLimit("too many slices")"#,
+            ),
+            (
+                VideoRefusal::from(Hevc::Policy("picture size")),
+                r#"ResourceLimit("picture size")"#,
+            ),
+        ] {
+            assert_eq!(error.0, expected);
         }
     }
 }

@@ -1,34 +1,33 @@
-//! Native range playback over borrowed MP4 sample tables and charged track heads.
+//! Range playback of a complete MP4 source in the MOV demux view, planned from the
+//! borrowed sample tables with one head per track.
 
 use super::{
-    ClockChoice, Mp4NativeSeekRequest, Output, Player, PlayerPolicy, Progress, Selection, TrackKey,
-    mp4_native_seek::native_global_seek,
+    ClockChoice, Mp4DemuxSeekRequest, Output, Player, PlayerPolicy, Progress, Selection, TrackKey,
+    mp4_demux_seek::demux_global_seek,
 };
 use crate::{
-    Engine, Result,
-    engines::Mp4RangeLanding,
-    input::Source,
-    io::SourceOwner,
-    mp4_open::Movie,
-    mp4_plan::{Mp4IndexJob, PlanLimits},
+    Engine, Result, Source, SourceOwner,
+    engine::Mp4RangeLanding,
+    mp4::open::Movie,
+    mp4::plan::{Mp4IndexJob, PlanLimits},
 };
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, InputCursor, Time, WorkBudget};
 use triergon_isobmff::{
-    BuildStatus,
+    BuildStatus, CursorStatus,
     compat::mov::{
         clock::MediaClock,
         edits::EncodedEditPlan,
-        packets::{CursorStatus, PacketCursor},
+        packets::PacketCursor,
         seek::{GlobalSeekJob, RangeSeekJob, SeekLanding},
     },
 };
 
 type Edits<'a> = &'a [Option<EncodedEditPlan>];
 
-/// Prepare range playback from a complete, checked MP4 open transaction.
-/// The native cursor checks every source extent and projected occurrence
-/// before publishing data.
+/// Prepares range playback of a completely opened movie: checks every sample
+/// extent and every packet the demux view projects before any data is delivered.
+#[derive(Debug)]
 pub struct Mp4RangeOpen<'a> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
@@ -37,6 +36,8 @@ pub struct Mp4RangeOpen<'a> {
 }
 
 impl<'a> Mp4RangeOpen<'a> {
+    /// Range playback of every track of `movie`, with `edits` the encoded edit plans in
+    /// source track order.
     pub fn new(movie: &'a Movie, edits: Option<Edits<'a>>, limits: PlanLimits) -> Result<Self> {
         Self::open(movie, edits, limits, false)
     }
@@ -62,10 +63,11 @@ impl<'a> Mp4RangeOpen<'a> {
             movie,
             edits,
             media_tracks_only,
-            index: Mp4IndexJob::new_native_range(movie, edits, limits, media_tracks_only)?,
+            index: Mp4IndexJob::for_range(movie, edits, limits, media_tracks_only)?,
         })
     }
 
+    /// Indexes within `work`, and returns whether the index is complete.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         self.index.poll(work, cancel)
     }
@@ -80,21 +82,19 @@ impl<'a> Mp4RangeOpen<'a> {
         policy: PlayerPolicy,
     ) -> Result<Mp4RangePlayer<'a, S>> {
         if !input.capabilities().random_access {
-            return Err(Error::Unsupported(
-                "native range playback needs random access",
-            ));
+            return Err(Error::Unsupported("MP4 range playback needs random access"));
         }
-        let (plan, mut cursor, duration_us) = self.index.finish_native_range()?;
+        let (plan, mut cursor, duration_us) = self.index.finish_demux_range()?;
         // Leave space for packet/input staging and selection validation.
-        // The fact vector grows over at most 64 tracks, including its old
-        // allocation during a growth step.
-        let fact_bytes = 128 * size_of::<crate::engines::TrackFact>();
+        // The fact vector grows over at most `MAXIMUM_TRACKS` tracks, including its
+        // old allocation during a growth step.
+        let fact_bytes = 2 * crate::MAXIMUM_TRACKS * size_of::<crate::engine::TrackFact>();
         if input.budget().available() < maximum_packet.saturating_mul(2).max(fact_bytes) {
             cursor.discard_seek_checkpoints();
         }
         let engine = Engine::mp4(input, plan, maximum_packet)?;
         let mut player = Player::new_direct(engine, source, selection, policy)?;
-        player.set_clock_view(ClockChoice::ExplicitNativeProjection)?;
+        player.set_clock_view(ClockChoice::Demux)?;
         Ok(Mp4RangePlayer {
             movie: self.movie,
             edits: self.edits,
@@ -106,9 +106,10 @@ impl<'a> Mp4RangeOpen<'a> {
     }
 }
 
-/// Direct-output range player. Sample geometry and clocks are produced in
-/// native occurrence order from the checked tables, with one head per track.
-/// Payload reads and output generations use the ordinary player and MP4 engine.
+/// Plays a complete MP4 source by byte ranges into one caller-owned output slot.
+/// Packets come in the demux view's order with its clocks, computed from the
+/// checked tables; payload reads, generations and delivery are the [`Player`]'s.
+#[derive(Debug)]
 pub struct Mp4RangePlayer<'a, S: Source> {
     movie: &'a Movie,
     edits: Option<Edits<'a>>,
@@ -119,14 +120,17 @@ pub struct Mp4RangePlayer<'a, S: Source> {
 }
 
 impl<'a, S: Source> Mp4RangePlayer<'a, S> {
+    /// The presentation duration in microseconds.
     pub fn duration_us(&self) -> i64 {
         self.duration_us
     }
 
+    /// Pauses or resumes delivery.
     pub fn pause(&mut self, paused: bool) -> Result<()> {
         self.player.pause(paused)
     }
 
+    /// Whether `output` belongs to the current generation.
     pub fn current(&self, output: &Output) -> bool {
         self.player.current(output)
     }
@@ -137,6 +141,9 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
         self.cursor.discard_seek_checkpoints()
     }
 
+    /// Reads the next output into `output`, the caller's one slot, within `work`. After
+    /// backpressure with an empty slot, it drops the seek checkpoints and tries once
+    /// more.
     pub fn read_output(
         &mut self,
         output: &mut Option<Output>,
@@ -159,7 +166,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
 
     /// Plan a seek from the same checked tables. This reads no payload and
     /// leaves the active generation and any pending input usable until apply.
-    pub fn prepare_seek(&self, request: Mp4NativeSeekRequest) -> Result<Mp4RangeSeekJob<'a>> {
+    pub fn prepare_seek(&self, request: Mp4DemuxSeekRequest) -> Result<Mp4RangeSeekJob<'a>> {
         self.prepare_range_seek(request, None)
     }
 
@@ -168,7 +175,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
     /// discard PCM before the video presentation landing.
     pub fn prepare_seek_with_opus_recovery(
         &self,
-        request: Mp4NativeSeekRequest,
+        request: Mp4DemuxSeekRequest,
         audio: u32,
     ) -> Result<Mp4RangeSeekJob<'a>> {
         if !self.player.selection.includes(TrackKey::Mp4(audio)) {
@@ -179,7 +186,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
 
     fn prepare_range_seek(
         &self,
-        request: Mp4NativeSeekRequest,
+        request: Mp4DemuxSeekRequest,
         opus_audio: Option<u32>,
     ) -> Result<Mp4RangeSeekJob<'a>> {
         let Some(Engine::Mp4(engine)) = self.player.engine.as_ref() else {
@@ -190,7 +197,9 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             || !selected.snapshot.enabled
             || !self.player.selection.includes(TrackKey::Mp4(request.video))
         {
-            return Err(Error::Invalid("native seek requires selected MP4 video"));
+            return Err(Error::Invalid(
+                "demux seek requires a selected MP4 video track",
+            ));
         }
         let base = MediaClock::from_source(selected.snapshot.base.require()?)?.demux_base;
         let checked = self.cursor.prepare_checked_range_seek(
@@ -206,7 +215,7 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             (Some(checked), None, None)
         } else {
             let global =
-                native_global_seek(self.movie, self.edits, request, self.media_tracks_only)?;
+                demux_global_seek(self.movie, self.edits, request, self.media_tracks_only)?;
             let global = match opus_audio {
                 Some(audio) => global.with_opus_recovery(audio)?,
                 None => global,
@@ -253,13 +262,13 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
         let replacement = command
             .cursor
             .as_mut()
-            .ok_or(Error::Invalid("native range seek command already applied"))?;
+            .ok_or(Error::Invalid("MP4 range seek command already applied"))?;
         let mut apply = |work: &mut WorkBudget| {
             self.player.apply_seek(
                 TrackKey::Mp4(scope.video),
                 scope.target,
                 self.player.selection,
-                Some(Mp4RangeLanding::NativeCursor(command.offset)),
+                Some(Mp4RangeLanding::DemuxCursor(command.offset)),
                 work,
                 cancel,
             )
@@ -278,12 +287,16 @@ impl<'a, S: Source> Mp4RangePlayer<'a, S> {
             result => result?,
         };
         if applied {
-            self.cursor = command.cursor.take().expect("checked range seek cursor");
+            self.cursor = command
+                .cursor
+                .take()
+                .ok_or(Error::Invalid("checked range seek cursor"))?;
         }
         Ok(applied)
     }
 }
 
+#[derive(Debug)]
 struct SeekScope {
     pool: Budget,
     session: u64,
@@ -292,6 +305,8 @@ struct SeekScope {
     target: Time,
 }
 
+/// Plans a range seek from the checked tables, within work budgets.
+#[derive(Debug)]
 pub struct Mp4RangeSeekJob<'a> {
     scope: SeekScope,
     checked: Option<RangeSeekJob<'a>>,
@@ -303,6 +318,9 @@ pub struct Mp4RangeSeekJob<'a> {
 }
 
 impl<'a> Mp4RangeSeekJob<'a> {
+    /// Plans within `work`, and returns whether the plan is complete. A failure is
+    /// final; it is `Limit` when the seek would replay more samples than its limits
+    /// allow.
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
         if let Some(error) = self.failure {
             return Err(error);
@@ -319,13 +337,22 @@ impl<'a> Mp4RangeSeekJob<'a> {
             if checked.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                 return Ok(false);
             }
-            self.replay = Some(self.checked.take().expect("polled checked seek").finish()?);
+            self.replay = Some(
+                self.checked
+                    .take()
+                    .ok_or(Error::Invalid("polled checked seek"))?
+                    .finish()?,
+            );
         }
         if let Some(global) = &mut self.global {
             if global.poll(work, cancel)? == BuildStatus::Yield || !work.try_charge(1) {
                 return Ok(false);
             }
-            let plan = self.global.take().expect("polled global seek").finish()?;
+            let plan = self
+                .global
+                .take()
+                .ok_or(Error::Invalid("polled global seek"))?
+                .finish()?;
             let skipped = plan.anchors().iter().try_fold(0u64, |count, anchor| {
                 count.checked_add(anchor.occurrence).ok_or(Error::Overflow)
             })?;
@@ -338,31 +365,33 @@ impl<'a> Mp4RangeSeekJob<'a> {
             let cursor = self
                 .replay_seed
                 .take()
-                .ok_or(Error::Invalid("native range replay seed missing"))?
+                .ok_or(Error::Invalid("MP4 range replay seed missing"))?
                 .resume_checked_replay(plan.anchors())?;
             self.replay = Some((cursor, plan.landing().clone()));
         }
         let (cursor, _) = self
             .replay
             .as_mut()
-            .ok_or(Error::Invalid("native range replay missing"))?;
+            .ok_or(Error::Invalid("MP4 range replay missing"))?;
         match cursor.poll(work, cancel)? {
             CursorStatus::Ready => Ok(true),
             CursorStatus::Yield => Ok(false),
-            CursorStatus::End => Err(Error::Invalid("native range seek landed at end")),
+            CursorStatus::End => Err(Error::Invalid("MP4 range seek landed at end")),
         }
     }
 
+    /// The planned seek. Fails with the job's failure, or with `Invalid` before the plan
+    /// is complete.
     pub fn finish(self) -> Result<Mp4RangeSeek<'a>> {
         if let Some(error) = self.failure {
             return Err(error);
         }
         let (cursor, landing) = self
             .replay
-            .ok_or(Error::Invalid("native range seek still pending"))?;
+            .ok_or(Error::Invalid("MP4 range seek still pending"))?;
         let offset = cursor
             .occurrence()
-            .ok_or(Error::Invalid("native range seek still pending"))?
+            .ok_or(Error::Invalid("MP4 range seek still pending"))?
             .source
             .range
             .start;
@@ -375,6 +404,8 @@ impl<'a> Mp4RangeSeekJob<'a> {
     }
 }
 
+/// A planned range seek for [`Mp4RangePlayer::apply_seek`].
+#[derive(Debug)]
 pub struct Mp4RangeSeek<'a> {
     scope: SeekScope,
     cursor: Option<PacketCursor<'a>>,
@@ -383,14 +414,17 @@ pub struct Mp4RangeSeek<'a> {
 }
 
 impl Mp4RangeSeek<'_> {
+    /// The index entry the seek lands on; the same as `landing`.
     pub fn receipt(&self) -> &SeekLanding {
         self.landing()
     }
 
+    /// The index entry the seek lands on.
     pub fn landing(&self) -> &SeekLanding {
         &self.landing
     }
 
+    /// The byte offset of the first sample the seek reads.
     pub fn start_offset(&self) -> u64 {
         self.offset
     }

@@ -1,7 +1,9 @@
 //! The `Banner` and `Scroll` transition effects of the event effect field.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
+
+use triergon_raster::compat::libass::float_max;
 
 use crate::c_long::atoi;
-use crate::number::ffmax;
 
 /// Which way a transition moves the text.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -34,10 +36,10 @@ impl Scroll {
     }
 }
 
-/// libass's `ass_apply_transition_effects`: `Banner;delay[;left_to_right]`,
-/// `Scroll up;y0;y1;delay` and `Scroll down;...`, `elapsed` milliseconds
-/// into the event. The delay per pixel is rescaled as VSFilter truncates it
-/// in storage pixels, which needs the play and layout resolutions.
+/// The transition `effect` at `elapsed` milliseconds into the event:
+/// `Banner;delay[;left_to_right]`, `Scroll up;y0;y1;delay` or `Scroll down;...`.
+/// The delay per pixel is rescaled as VSFilter truncates it in storage
+/// pixels, which needs the play and layout resolutions.
 pub(crate) fn transition(
     effect: &[u8],
     elapsed: i64,
@@ -59,7 +61,7 @@ pub(crate) fn transition(
     // truncating in storage pixels.
     let shift = |delay: i32, layout: i32, play: i32| {
         let scale = f64::from(layout) / f64::from(play);
-        let delay = f64::from(ffmax(f64::from(delay) / scale, 1.0) as i32) * scale;
+        let delay = f64::from(float_max(f64::from(delay) / scale, 1.0) as i32) * scale;
         elapsed as f64 / delay
     };
     if effect.starts_with(b"Banner;") {

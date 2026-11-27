@@ -16,6 +16,8 @@ pub enum PageSelection {
 }
 
 impl PageSelection {
+    /// Reads a `txt_page` value: `*`, `subtitle`, or any other text as a list
+    /// of page numbers.
     #[must_use]
     pub fn parse(text: &str) -> Self {
         match text {

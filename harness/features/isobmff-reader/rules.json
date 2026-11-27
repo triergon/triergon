@@ -84,11 +84,10 @@
   },
   {
    "id": "inconsistent-sample-table",
-   "reason": "the sample tables contradict ISO/IEC 14496-12: an stsc sample description index of zero or past stsd, or first chunks out of order (8.7.4), stts or ctts runs that do not add up to the stsz sample count (8.6.1.2, 8.6.1.3), stss entries out of order or past the last sample (8.6.2): the reader refuses the track's index; FFmpeg delivers packets from what it can use, in the reviewed cases repeating byte ranges or timing samples it has no time for",
+   "reason": "the sample tables contradict ISO/IEC 14496-12: an stsc sample description index of zero or past stsd, or first chunks out of order (8.7.4), stts or ctts runs that leave a sample without a time or count no sample (8.6.1.1, 8.6.1.2, 8.6.1.3), stss entries out of order or past the last sample (8.6.2): the reader refuses the track's index; FFmpeg delivers packets from what it can use, in the reviewed cases repeating byte ranges or timing samples it has no time for",
    "scope": [
     {"fields": ["end"], "packets": "file", "candidate": [
      "error: invalid data: stsc order/count/description",
-     "error: invalid data: time run exceeds sample count",
      "error: invalid data: time table sample count mismatch",
      "error: invalid data: zero sample count in time run",
      "error: invalid data: sync sample order/range"
@@ -134,13 +133,6 @@
    "reason": "the reader delivers samples in ascending byte order across tracks (README); FFmpeg delivers a sample of another track first when it is timed earlier, though it lies later in the file (r-multitrack: the subtitle sample at 3 s before the video sample at 5 s stored ahead of it), so the same packets interleave differently; every packet still pairs within its track",
    "scope": [
     {"fields": ["order"], "packets": "order"}
-   ]
-  },
-  {
-   "id": "fragment-without-tfdt",
-   "reason": "a track fragment without tfdt states no decode time: the reader keeps its times unknown (README: a fragment without tfdt has None times); FFmpeg times its samples from the end of the previous fragment, or from zero",
-   "scope": [
-    {"fields": ["pts", "dts"], "packets": "any", "reference": "candidate-absent"}
    ]
   },
   {

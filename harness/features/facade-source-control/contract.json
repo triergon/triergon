@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "id": "facade-source-control",
+  "gate": "required",
+  "operation": "facade-source-control",
+  "candidate": "play-views-worker",
+  "worker_operation": "any-source-control-",
+  "oracle": "facade-source-control",
+  "contract": [
+    "Drive the Matroska, ISO BMFF, TS188 and M2TS192 AnyReader source lifecycle under the ContainerReader and InputRequest API contracts. Test known and unknown source length with both random-access and sequential capabilities.",
+    "Compare the exposed capabilities before and after restart. Require every reset to issue an offset-zero request with the source and token used by the next step. The parser may ask for a shorter first window. Reject a failure from the wrong source or old generation and check persistent Transport and Cancelled outcomes before resetting.",
+    "Fold the Transport and Cancelled cycles as kinds 1 and 2. Every row records the source length (zero when unknown) and the random-access flag."
+  ],
+  "required_profiles": ["mkv", "mp4", "ts188", "m2ts192"],
+  "required_targets": ["aarch64-unknown-linux-gnu", "thumbv7neon-unknown-linux-gnueabihf"],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {"bound": "runtime", "cases": ["mkv", "mp4", "ts188", "m2ts192"], "cause": "The source lifecycle oracle has no native timing counterpart."},
+    {"bound": "heap", "cases": ["mkv", "mp4", "ts188", "m2ts192"], "cause": "The source lifecycle oracle has no native heap counterpart."},
+    {"bound": "total_rss", "cases": ["mkv", "mp4", "ts188", "m2ts192"], "cause": "The source lifecycle oracle has no native resident-memory counterpart."}
+  ]
+}

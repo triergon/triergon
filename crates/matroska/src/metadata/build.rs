@@ -1,0 +1,1393 @@
+//! Intended child of metadata. Builds the existing twelve-byte Node arena and
+//! opaque SharedDocument; every source/node/validation pass really resumes.
+use super::{
+    ATTACHMENTS, CHAPTERS, Catalogue, Document, INFO, Node, SharedDocument, TAGS, ascii, boolean,
+    default_uint, master, unsigned, utf8,
+};
+use crate::ebml::ChildCursor;
+use crate::step::check;
+use crate::{
+    Error, Result, ebml,
+    step::ParseStep,
+    storage::{SharedBytes, StorageVec, text::TextCheck},
+};
+use std::{
+    mem::size_of,
+    ops::Range,
+    sync::{Arc, atomic::AtomicBool},
+};
+use triergon_core::{Budget, BudgetVec, Reservation, WorkBudget};
+
+/// One level of the stack the parse and the validation share: a master being
+/// parsed (its node and the cursor over its children), then an Edition or chapter
+/// being validated (`end` is the node after its last descendant). The frame at
+/// stack index `d` is at nesting depth `d`.
+#[derive(Debug)]
+enum Frame {
+    Parse { node: u16, cursor: ChildCursor },
+    Validate { end: u16, context: Context },
+}
+/// The bounds a chapter's start must lie in: the chapter ancestors up to the
+/// nearest Edition, and whether that Edition is ordered.
+#[derive(Clone, Copy, Debug)]
+struct Context {
+    lower: u64,
+    upper: u64,
+    ordered: bool,
+}
+const NO_CONTEXT: Context = Context {
+    lower: 0,
+    upper: u64::MAX,
+    ordered: false,
+};
+#[derive(Debug, Clone, Copy, Default)]
+struct Fields {
+    presence: u64,
+    start: Option<u64>,
+    end: Option<u64>,
+    ordered: Option<u64>,
+}
+
+#[inline]
+const fn bit(id: u64) -> u64 {
+    let index = match id {
+        0x61a7 => 0,
+        0x45b9 => 1,
+        0x7373 => 2,
+        0x46ae => 3,
+        0x466e => 4,
+        0x4660 => 5,
+        0x465c => 6,
+        0xb6 => 7,
+        0x73c4 => 8,
+        0x91 => 9,
+        0x92 => 10,
+        0x6ebc => 11,
+        0x6e67 => 12,
+        0x85 => 13,
+        0x67c8 => 14,
+        0x45a3 => 15,
+        0x4487 => 16,
+        0x4485 => 17,
+        0x6922 => 18,
+        0x6933 => 19,
+        0x2ad7b1 => 20,
+        0x4489 => 21,
+        0x4461 => 22,
+        0x7ba9 => 23,
+        0x4d80 => 24,
+        0x5741 => 25,
+        0x73a4 => 26,
+        0x3cb923 => 27,
+        0x3eb923 => 28,
+        0x467e => 29,
+        0x45bc => 30,
+        0x45bd => 31,
+        0x45db => 32,
+        0x45dd => 33,
+        0x5654 => 34,
+        0x98 => 35,
+        0x4598 => 36,
+        0x63c3 => 37,
+        0x8f => 38,
+        0x63c0 => 39,
+        0x68ca => 40,
+        0x63ca => 41,
+        0x447a => 42,
+        0x447b => 43,
+        0x4484 => 44,
+        0x6955 => 45,
+        0x450d => 46,
+        _ => return 0,
+    };
+    1 << index
+}
+
+const fn field_mask(mut ids: &[u64]) -> u64 {
+    let mut mask = 0;
+    while let [id, rest @ ..] = ids {
+        let field = bit(*id);
+        assert!(field != 0 && mask & field == 0);
+        mask |= field;
+        ids = rest;
+    }
+    mask
+}
+
+fn singleton_mask(id: u64) -> u64 {
+    match id {
+        INFO => {
+            const {
+                field_mask(&[
+                    0x2ad7b1, 0x4489, 0x4461, 0x7ba9, 0x4d80, 0x5741, 0x73a4, 0x3cb923, 0x3eb923,
+                ])
+            }
+        }
+        0x61a7 => const { field_mask(&[0x46ae, 0x466e, 0x4660, 0x467e, 0x465c]) },
+        0x45b9 => const { field_mask(&[0x45bc, 0x45bd, 0x45db, 0x45dd]) },
+        0xb6 => {
+            const {
+                field_mask(&[
+                    0x73c4, 0x5654, 0x91, 0x92, 0x98, 0x4598, 0x6e67, 0x6ebc, 0x63c3, 0x8f,
+                ])
+            }
+        }
+        0x80 => const { field_mask(&[0x85]) },
+        0x7373 => const { field_mask(&[0x63c0]) },
+        0x63c0 => const { field_mask(&[0x68ca, 0x63ca]) },
+        0x67c8 => const { field_mask(&[0x45a3, 0x447a, 0x447b, 0x4484, 0x4487, 0x4485]) },
+        0x6944 => const { field_mask(&[0x6955, 0x450d]) },
+        0x6911 => const { field_mask(&[0x6922, 0x6933]) },
+        _ => 0,
+    }
+}
+fn require(fields: Fields, ids: &[u64]) -> Result<()> {
+    if ids.iter().any(|id| fields.presence & bit(*id) == 0) {
+        Err(Error::Invalid("missing metadata field"))
+    } else {
+        Ok(())
+    }
+}
+#[derive(Debug, Clone, Copy)]
+enum Phase {
+    Owner,
+    NodeReserve,
+    NodeAppend,
+    NodeKind,
+    Text,
+    Parse,
+    ValidateStart,
+    ValidateChildren,
+    ValidateRules,
+    ValidateContext,
+    UidReserve,
+    UidFill,
+    UidSort,
+    UidCheck,
+    Finish,
+    Done,
+}
+#[derive(Debug)]
+pub(crate) struct DocumentJob {
+    raw: SharedBytes,
+    pool: Budget,
+    node_limit: usize,
+    depth_limit: usize,
+    storage_limit: usize,
+    attachment_limit: usize,
+    source_offset: Option<u64>,
+    nodes: BudgetVec<Node>,
+    owner: Reservation,
+    /// The larger node arena and how many nodes it holds so far; the copy finishes
+    /// before the phase goes on.
+    growth: Option<(BudgetVec<Node>, usize)>,
+    // The node being admitted, its payload and its index once appended.
+    pending: Node,
+    pending_range: Range<usize>,
+    pending_index: u16,
+    // Matching the top of a sliced live stack costs up to 1.007% more instructions.
+    stack: [Option<Frame>; 65],
+    stack_len: usize,
+    attachment_bytes: usize,
+    text: TextCheck,
+    // The context the Edition or chapter that ValidateRules passed opens.
+    opened: Context,
+    phase: Phase,
+    validate: usize,
+    child: usize,
+    child_end: usize,
+    fields: Fields,
+    uid_count: usize,
+    uid_kinds: u8,
+    uids: BudgetVec<u64>,
+    uid_kind: usize,
+    uid_at: usize,
+    heap: Heap,
+    timestamp_scale: Option<u64>,
+    failed: bool,
+}
+/// The four existing document resource policies travel as one explicit record.
+/// Source identity/location and retained storage still use the caller's pool.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct DocumentLimits {
+    pub node_limit: usize,
+    pub depth_limit: usize,
+    pub storage_limit: usize,
+    pub attachment_limit: usize,
+}
+impl DocumentJob {
+    pub(crate) fn new(
+        kind: u64,
+        raw: SharedBytes,
+        limits: DocumentLimits,
+        source_offset: Option<u64>,
+        pool: &Budget,
+    ) -> Result<Self> {
+        let DocumentLimits {
+            node_limit,
+            depth_limit,
+            storage_limit,
+            attachment_limit,
+        } = limits;
+        if !matches!(kind, INFO | ATTACHMENTS | CHAPTERS | TAGS) {
+            return Err(Error::Invalid("metadata document type"));
+        }
+        if !raw.belongs_to(pool) {
+            return Err(Error::ForeignPool);
+        }
+        u32::try_from(raw.len()).map_err(|_| Error::Policy("metadata offset space"))?;
+        let end = raw.len();
+        Ok(Self {
+            raw,
+            pool: pool.clone(),
+            node_limit: node_limit.min(u16::MAX as usize),
+            depth_limit: depth_limit.min(64),
+            storage_limit,
+            attachment_limit,
+            source_offset,
+            nodes: BudgetVec::new(pool),
+            owner: Reservation::empty(pool),
+            growth: None,
+            pending: Node {
+                id: kind as u32,
+                header: 0,
+                next: 1,
+                parent: u16::MAX,
+            },
+            pending_range: 0..end,
+            pending_index: 0,
+            stack: std::array::from_fn(|_| None),
+            stack_len: 0,
+            attachment_bytes: 0,
+            text: TextCheck::default(),
+            opened: NO_CONTEXT,
+            phase: Phase::Owner,
+            validate: 0,
+            child: 0,
+            child_end: 0,
+            fields: Fields::default(),
+            uid_count: 0,
+            uid_kinds: 0,
+            uids: BudgetVec::new(pool),
+            uid_kind: 0,
+            uid_at: 0,
+            heap: Heap::new(0),
+            timestamp_scale: None,
+            failed: false,
+        })
+    }
+    pub(crate) fn timestamp_scale(&self) -> Option<u64> {
+        self.timestamp_scale
+    }
+    fn retained_with_capacity(&self, capacity: usize) -> Result<usize> {
+        capacity
+            .checked_mul(size_of::<Node>())
+            .and_then(|n| n.checked_add(self.raw.retained_capacity()))
+            .and_then(|n| n.checked_add(size_of::<Document>() + 2 * size_of::<usize>()))
+            .and_then(|n| n.checked_add(self.raw.owner_overhead_bound()))
+            .ok_or(Error::Overflow)
+    }
+    /// The payload of node `index` in `raw`, this job's source.
+    fn range(&self, raw: &[u8], index: usize) -> Result<Range<usize>> {
+        if index == 0 {
+            return Ok(0..raw.len());
+        }
+        let at = self.nodes.as_slice()[index].header as usize;
+        let head = ebml::header(&raw[at..])?;
+        let Some(size) = head.size else {
+            return Err(Error::Invalid("unknown metadata child size"));
+        };
+        let start = at.checked_add(head.len).ok_or(Error::Overflow)?;
+        let end = start
+            .checked_add(usize::try_from(size).map_err(|_| Error::Overflow)?)
+            .ok_or(Error::Overflow)?;
+        if end > raw.len() {
+            return Err(Error::Truncated);
+        }
+        Ok(start..end)
+    }
+    fn uint(&self, raw: &[u8], index: usize) -> Result<u64> {
+        let value = &raw[self.range(raw, index)?];
+        if value.is_empty() {
+            Ok(default_uint(u64::from(self.nodes.as_slice()[index].id)))
+        } else {
+            ebml::uint(value)
+        }
+    }
+    fn collect(
+        &self,
+        raw: &[u8],
+        singletons: u64,
+        child: usize,
+        fields: &mut Fields,
+    ) -> Result<()> {
+        let id = u64::from(self.nodes.as_slice()[child].id);
+        let field = bit(id);
+        // A child that may occur once counts at its first occurrence (RFC 8794 §12).
+        if fields.presence & singletons & field != 0 {
+            return Ok(());
+        }
+        fields.presence |= field;
+        match id {
+            0x91 => fields.start = Some(self.uint(raw, child)?),
+            0x92 => fields.end = Some(self.uint(raw, child)?),
+            0x45dd => fields.ordered = Some(self.uint(raw, child)?),
+            _ => (),
+        }
+        Ok(())
+    }
+    /// The context of the innermost Edition or chapter being validated.
+    fn validation_context(&self) -> Result<Context> {
+        if self.stack_len == 0 {
+            return Ok(NO_CONTEXT);
+        }
+        let Some(Frame::Validate { context, .. }) = &self.stack[self.stack_len - 1] else {
+            return Err(Error::Invalid("missing metadata validation context"));
+        };
+        Ok(*context)
+    }
+    pub(crate) fn step(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<SharedDocument>> {
+        if self.failed {
+            return Err(Error::Invalid(
+                "metadata job requires replacement after error",
+            ));
+        }
+        let result = self.advance(work, cancel);
+        match result {
+            Err(Error::Backpressure(triergon_core::Backpressure {
+                requested,
+                available,
+            })) => Ok(ParseStep::Backpressure {
+                requested,
+                available,
+            }),
+            Err(error) => {
+                self.failed = true;
+                Err(error)
+            }
+            other => other,
+        }
+    }
+    /// Runs the phases from a local copy of the phase, so that one node's
+    /// transitions dispatch from a register, and stores it on every return.
+    fn advance(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<SharedDocument>> {
+        let mut phase = self.phase;
+        let result = self.run(&mut phase, work, cancel);
+        self.phase = phase;
+        result
+    }
+    // Extracting the node-kind and rule phases into inline functions costs up to 15.064% more instructions.
+    fn run(
+        &mut self,
+        phase: &mut Phase,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<SharedDocument>> {
+        let raw: &[u8] = &self.raw;
+        'document: loop {
+            if let Some((replacement, copied)) = &mut self.growth {
+                check(cancel)?;
+                if *copied < self.nodes.len() {
+                    let count = work.take((self.nodes.len() - *copied).min(64) as u64) as usize;
+                    if count == 0 {
+                        return Ok(ParseStep::Yield);
+                    }
+                    replacement
+                        .try_extend_from_slice(&self.nodes.as_slice()[*copied..*copied + count])?;
+                    *copied += count;
+                    continue;
+                }
+                if let Some((replacement, _)) = self.growth.take() {
+                    self.nodes = replacement;
+                }
+            }
+            loop {
+                check(cancel)?;
+                match *phase {
+                    Phase::Owner => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        self.owner
+                            .resize_to(size_of::<Document>() + 2 * size_of::<usize>())?;
+                        *phase = Phase::NodeReserve;
+                    }
+                    Phase::NodeReserve => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        if self.nodes.len() >= self.node_limit {
+                            return Err(Error::Policy("metadata nodes"));
+                        }
+                        if self.nodes.len() < self.nodes.capacity() {
+                            *phase = Phase::NodeAppend;
+                            continue;
+                        }
+                        let initial = (raw.len() / 2 + 1).min(8);
+                        let target = self
+                            .nodes
+                            .len()
+                            .saturating_mul(2)
+                            .max(initial)
+                            .min(self.node_limit);
+                        let lower = target
+                            .checked_mul(size_of::<Node>())
+                            .and_then(|n| n.checked_add(self.raw.retained_capacity()))
+                            .and_then(|n| {
+                                n.checked_add(size_of::<Document>() + 2 * size_of::<usize>())
+                            })
+                            .ok_or(Error::Overflow)?;
+                        if lower > self.storage_limit {
+                            return Err(Error::Policy("metadata retained storage"));
+                        }
+                        let mut replacement = BudgetVec::new(&self.pool);
+                        replacement.try_reserve_exact(target)?;
+                        if self.retained_with_capacity(replacement.capacity())? > self.storage_limit
+                        {
+                            return Err(Error::Policy("metadata retained storage"));
+                        }
+                        self.growth = Some((replacement, 0));
+                        *phase = Phase::NodeAppend;
+                        continue 'document;
+                    }
+                    Phase::NodeAppend => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        self.pending_index = u16::try_from(self.nodes.len())
+                            .map_err(|_| Error::Policy("metadata index space"))?;
+                        self.nodes
+                            .try_push(self.pending)
+                            .map_err(|error| error.error)?;
+                        *phase = Phase::NodeKind;
+                    }
+                    Phase::NodeKind => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let index = usize::from(self.pending_index);
+                        let id = u64::from(self.nodes.as_slice()[index].id);
+                        if master(id) {
+                            // The new frame's depth is its stack index.
+                            if self.stack_len > self.depth_limit {
+                                return Err(Error::Policy("metadata nesting"));
+                            }
+                            self.stack[self.stack_len] = Some(Frame::Parse {
+                                node: self.pending_index,
+                                cursor: ChildCursor::new(self.pending_range.clone()),
+                            });
+                            self.stack_len += 1;
+                            *phase = Phase::Parse;
+                            continue;
+                        }
+                        let payload = &raw[self.pending_range.clone()];
+                        if unsigned(id) {
+                            let value = if payload.is_empty() {
+                                default_uint(id)
+                            } else {
+                                ebml::uint(payload)?
+                            };
+                            if id == 0x2ad7b1
+                                && self.timestamp_scale.is_none()
+                                && self.nodes.as_slice()[index].parent == 0
+                                && u64::from(self.nodes.as_slice()[0].id) == INFO
+                            {
+                                self.timestamp_scale = Some(value);
+                            }
+                            if boolean(id) && value > 1 {
+                                return Err(Error::Invalid("metadata boolean"));
+                            }
+                            if matches!(id, 0x46ae | 0x73c4 | 0x45bc | 0x6ebc | 0x68ca)
+                                && value == 0
+                            {
+                                return Err(Error::Invalid("zero metadata UID/type"));
+                            }
+                            if id == 0x6922 && value > 2 {
+                                return Err(Error::Invalid("chapter process time"));
+                            }
+                        }
+                        // Every scalar is visited here once. Count UID namespaces
+                        // now, while retaining the original post-validation
+                        // workspace admission and complete duplicate checks.
+                        let uid_kind = match id {
+                            0x46ae => 1,
+                            0x73c4 => 2,
+                            0x45bc => 4,
+                            _ => 0,
+                        };
+                        if uid_kind != 0 {
+                            self.uid_count =
+                                self.uid_count.checked_add(1).ok_or(Error::Overflow)?;
+                            self.uid_kinds |= uid_kind;
+                        }
+                        if id == 0x4489 {
+                            let value = match payload.len() {
+                                0 => 0.,
+                                4 => f64::from(f32::from_be_bytes(
+                                    payload
+                                        .try_into()
+                                        .map_err(|_| Error::Invalid("metadata float width"))?,
+                                )),
+                                8 => f64::from_be_bytes(
+                                    payload
+                                        .try_into()
+                                        .map_err(|_| Error::Invalid("metadata float width"))?,
+                                ),
+                                _ => return Err(Error::Invalid("metadata float width")),
+                            };
+                            if !value.is_finite() || value <= 0. {
+                                return Err(Error::Invalid("Segment duration range"));
+                            }
+                        }
+                        if id == 0x4461 && !matches!(payload.len(), 0 | 8) {
+                            return Err(Error::Invalid("DateUTC width"));
+                        }
+                        if id == 0x6e67 && payload.len() != 16 {
+                            return Err(Error::Invalid("chapter SegmentUUID length"));
+                        }
+                        if id == 0x465c {
+                            self.attachment_bytes = self
+                                .attachment_bytes
+                                .checked_add(payload.len())
+                                .ok_or(Error::Overflow)?;
+                            if self.attachment_bytes > self.attachment_limit {
+                                return Err(Error::Policy("attachment payload bytes"));
+                            }
+                        }
+                        if utf8(id) || ascii(id) {
+                            self.text = TextCheck::new(raw, self.pending_range.clone(), ascii(id))?;
+                            *phase = Phase::Text;
+                        } else {
+                            let next =
+                                u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
+                            self.nodes.as_mut_slice()[index].next = next;
+                            *phase = Phase::Parse;
+                        }
+                    }
+                    Phase::Text => match self.text.step(raw, work, cancel)? {
+                        ParseStep::Event(_) => {
+                            let next =
+                                u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
+                            self.nodes.as_mut_slice()[usize::from(self.pending_index)].next = next;
+                            *phase = Phase::Parse;
+                        }
+                        other => return crate::step::pending(other),
+                    },
+                    Phase::Parse => {
+                        let Some(Frame::Parse { node, cursor }) =
+                            &mut self.stack[self.stack_len - 1]
+                        else {
+                            return Err(Error::Invalid("missing metadata parse frame"));
+                        };
+                        match cursor.step(raw, work, cancel) {
+                            Err(Error::Invalid("unknown size inside metadata")) => {
+                                return Err(Error::Invalid("unknown metadata child size"));
+                            }
+                            Err(error) => return Err(error),
+                            Ok(ParseStep::Yield) => return Ok(ParseStep::Yield),
+                            Ok(ParseStep::Event(None)) => {
+                                if !work.try_charge(1) {
+                                    return Ok(ParseStep::Yield);
+                                }
+                                let node = *node;
+                                let next =
+                                    u16::try_from(self.nodes.len()).map_err(|_| Error::Overflow)?;
+                                self.nodes.as_mut_slice()[usize::from(node)].next = next;
+                                self.stack_len -= 1;
+                                self.stack[self.stack_len] = None;
+                                if self.stack_len == 0 {
+                                    *phase = Phase::ValidateStart;
+                                }
+                            }
+                            Ok(ParseStep::Event(Some(child))) => {
+                                self.pending = Node {
+                                    id: child.id as u32,
+                                    header: child.header as u32,
+                                    next: 0,
+                                    parent: *node,
+                                };
+                                self.pending_range = child.payload;
+                                *phase = Phase::NodeReserve;
+                            }
+                            _ => return Err(Error::Invalid("invalid metadata parse transition")),
+                        }
+                    }
+                    Phase::ValidateStart => {
+                        if self.validate == self.nodes.len() {
+                            self.uid_at = 0;
+                            *phase = if self.uid_count == 0 {
+                                Phase::Finish
+                            } else {
+                                Phase::UidReserve
+                            };
+                            continue;
+                        }
+                        if self.stack_len != 0 {
+                            let Some(Frame::Validate { end, .. }) = &self.stack[self.stack_len - 1]
+                            else {
+                                return Err(Error::Invalid("missing metadata validation context"));
+                            };
+                            if usize::from(*end) <= self.validate {
+                                if !work.try_charge(1) {
+                                    return Ok(ParseStep::Yield);
+                                }
+                                self.stack_len -= 1;
+                                self.stack[self.stack_len] = None;
+                                continue;
+                            }
+                        }
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        // Scalar and opaque nodes have no parsed children or
+                        // parent-field rules. NodeKind has already checked every
+                        // scalar value. Keep one charged visit, the context-pop
+                        // order above and the later complete UID validation.
+                        if !master(u64::from(self.nodes.as_slice()[self.validate].id)) {
+                            self.validate += 1;
+                            continue;
+                        }
+                        self.fields = Fields::default();
+                        self.child = self.validate + 1;
+                        self.child_end = usize::from(self.nodes.as_slice()[self.validate].next);
+                        *phase = Phase::ValidateChildren;
+                    }
+                    Phase::ValidateChildren => {
+                        // One charged visit and one cancellation check per child, as
+                        // one outer iteration per child would do, without re-dispatch.
+                        let mut fields = self.fields;
+                        let singletons =
+                            singleton_mask(u64::from(self.nodes.as_slice()[self.validate].id));
+                        let mut first = true;
+                        while self.child < self.child_end {
+                            if !first {
+                                check(cancel)?;
+                            }
+                            first = false;
+                            if !work.try_charge(1) {
+                                self.fields = fields;
+                                return Ok(ParseStep::Yield);
+                            }
+                            let result = self.collect(raw, singletons, self.child, &mut fields);
+                            self.fields = fields;
+                            result?;
+                            self.child = usize::from(self.nodes.as_slice()[self.child].next);
+                        }
+                        if !first {
+                            check(cancel)?;
+                        }
+                        *phase = Phase::ValidateRules;
+                    }
+                    Phase::ValidateRules => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let id = u64::from(self.nodes.as_slice()[self.validate].id);
+                        let fields = self.fields;
+                        match id {
+                            ATTACHMENTS => require(fields, &[0x61a7])?,
+                            CHAPTERS => require(fields, &[0x45b9])?,
+                            TAGS => require(fields, &[0x7373])?,
+                            0x61a7 => require(fields, &[0x46ae, 0x466e, 0x4660, 0x465c])?,
+                            0x45b9 => {
+                                require(fields, &[0xb6])?;
+                                self.opened = Context {
+                                    ordered: fields.ordered == Some(1),
+                                    ..NO_CONTEXT
+                                };
+                            }
+                            0xb6 => {
+                                require(fields, &[0x73c4])?;
+                                let Some(start) = fields.start else {
+                                    return Err(Error::Invalid("missing metadata field"));
+                                };
+                                if fields.end.is_some_and(|end| end < start) {
+                                    return Err(Error::Invalid("chapter time range"));
+                                }
+                                if fields.presence & bit(0x6ebc) != 0 {
+                                    require(fields, &[0x6e67])?;
+                                }
+                                let context = self.validation_context()?;
+                                if start < context.lower || start > context.upper {
+                                    return Err(Error::Invalid("nested chapter time range"));
+                                }
+                                if context.ordered && fields.presence & bit(0xb6) == 0 {
+                                    require(fields, &[0x92])?;
+                                }
+                                self.opened = Context {
+                                    lower: context.lower.max(start),
+                                    upper: context.upper.min(fields.end.unwrap_or(u64::MAX)),
+                                    ordered: context.ordered,
+                                };
+                            }
+                            0x80 => require(fields, &[0x85])?,
+                            0x7373 => require(fields, &[0x67c8])?,
+                            0x67c8 => {
+                                require(fields, &[0x45a3])?;
+                                if fields.presence & bit(0x4487) != 0
+                                    && fields.presence & bit(0x4485) != 0
+                                {
+                                    return Err(Error::Invalid("text and binary tag"));
+                                }
+                            }
+                            0x6911 => require(fields, &[0x6922, 0x6933])?,
+                            _ => (),
+                        }
+                        if matches!(id, 0x45b9 | 0xb6)
+                            && usize::from(self.nodes.as_slice()[self.validate].next)
+                                > self.validate + 1
+                        {
+                            *phase = Phase::ValidateContext;
+                        } else {
+                            self.validate += 1;
+                            *phase = Phase::ValidateStart;
+                        }
+                    }
+                    Phase::ValidateContext => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let node = self.nodes.as_slice()[self.validate];
+                        if self.stack_len == self.stack.len() {
+                            return Err(Error::Policy("metadata nesting"));
+                        }
+                        self.stack[self.stack_len] = Some(Frame::Validate {
+                            end: node.next,
+                            context: self.opened,
+                        });
+                        self.stack_len += 1;
+                        self.validate += 1;
+                        *phase = Phase::ValidateStart;
+                    }
+                    Phase::UidReserve => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let workspace = self
+                            .uid_count
+                            .checked_mul(size_of::<u64>())
+                            .ok_or(Error::Overflow)?;
+                        if self
+                            .retained_with_capacity(self.nodes.capacity())?
+                            .checked_add(workspace)
+                            .ok_or(Error::Overflow)?
+                            > self.storage_limit
+                        {
+                            return Err(Error::Policy("metadata validation storage"));
+                        }
+                        self.uids.try_reserve_exact(self.uid_count)?;
+                        // The completed count proves which independent UID namespaces
+                        // are populated. Keep the original full-u64 arena and kind
+                        // order; absent kinds need no second walk of every node.
+                        self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
+                        self.uid_at = 0;
+                        *phase = Phase::UidFill;
+                    }
+                    Phase::UidFill => {
+                        // One charged visit and one cancellation check per node, as
+                        // one outer iteration per node would do, without re-dispatch.
+                        let kind = [0x46ae, 0x73c4, 0x45bc][self.uid_kind];
+                        let mut first = true;
+                        while self.uid_at < self.nodes.len() {
+                            if !first {
+                                check(cancel)?;
+                            }
+                            first = false;
+                            if !work.try_charge(1) {
+                                return Ok(ParseStep::Yield);
+                            }
+                            if u64::from(self.nodes.as_slice()[self.uid_at].id) == kind {
+                                let value = self.uint(raw, self.uid_at)?;
+                                self.uids.try_push(value).map_err(|e| e.error)?;
+                            }
+                            self.uid_at += 1;
+                        }
+                        if !first {
+                            check(cancel)?;
+                        }
+                        self.heap = Heap::new(self.uids.len());
+                        *phase = Phase::UidSort;
+                    }
+                    Phase::UidSort => {
+                        if !self.heap.step(self.uids.as_mut_slice(), work, cancel)? {
+                            return Ok(ParseStep::Yield);
+                        }
+                        self.uid_at = 0;
+                        *phase = Phase::UidCheck;
+                    }
+                    Phase::UidCheck => {
+                        if self.uid_at + 1 >= self.uids.len() {
+                            self.uid_kinds &= !(1_u8 << self.uid_kind);
+                            if self.uid_kinds == 0 {
+                                self.uids = BudgetVec::new(&self.pool);
+                                *phase = Phase::Finish;
+                            } else {
+                                self.uid_kind = self.uid_kinds.trailing_zeros() as usize;
+                                self.uid_at = 0;
+                                self.uids.clear();
+                                *phase = Phase::UidFill;
+                            }
+                            continue;
+                        }
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        if self.uids.as_slice()[self.uid_at]
+                            == self.uids.as_slice()[self.uid_at + 1]
+                        {
+                            return Err(Error::Invalid("duplicate metadata UID"));
+                        }
+                        self.uid_at += 1;
+                    }
+                    Phase::Finish => {
+                        if !work.try_charge(1) {
+                            return Ok(ParseStep::Yield);
+                        }
+                        let nodes = std::mem::replace(&mut self.nodes, BudgetVec::new(&self.pool));
+                        let charge =
+                            std::mem::replace(&mut self.owner, Reservation::empty(&self.pool));
+                        let document = Document {
+                            raw: self.raw.clone(),
+                            nodes: StorageVec(nodes),
+                            attachment_bytes: self.attachment_bytes,
+                            source_offset: self.source_offset,
+                            _pool: self.pool.clone(),
+                            owner_charge: charge,
+                        };
+                        *phase = Phase::Done;
+                        return Ok(ParseStep::Event(SharedDocument(Arc::new(document))));
+                    }
+                    Phase::Done => return Ok(ParseStep::Finished),
+                }
+            }
+        }
+    }
+}
+
+/// Own specification-level heapsort of scalar UID workspace. No sorted order is
+/// exported: it proves duplicate rejection only. At most one bounded heap move
+/// and two comparisons occur per work unit; no std whole-vector sort is hidden.
+#[derive(Debug, Clone, Copy)]
+enum HeapPhase {
+    Build,
+    Sift {
+        root: usize,
+        end: usize,
+        building: bool,
+    },
+    Extract,
+    Done,
+}
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Heap {
+    build: usize,
+    end: usize,
+    phase: HeapPhase,
+}
+impl Heap {
+    pub(crate) fn new(len: usize) -> Self {
+        Self {
+            build: len / 2,
+            end: len,
+            phase: HeapPhase::Build,
+        }
+    }
+    pub(crate) fn step(
+        &mut self,
+        values: &mut [u64],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        // The phase stays local while the sort runs and is stored on every return.
+        let mut phase = self.phase;
+        let result = self.run(&mut phase, values, work, cancel);
+        self.phase = phase;
+        result
+    }
+    fn run(
+        &mut self,
+        phase: &mut HeapPhase,
+        values: &mut [u64],
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        loop {
+            check(cancel)?;
+            match *phase {
+                HeapPhase::Build => {
+                    if self.build == 0 {
+                        *phase = HeapPhase::Extract;
+                        continue;
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(false);
+                    }
+                    self.build -= 1;
+                    *phase = HeapPhase::Sift {
+                        root: self.build,
+                        end: values.len(),
+                        building: true,
+                    };
+                }
+                HeapPhase::Sift {
+                    root,
+                    end,
+                    building,
+                } => {
+                    let left = root
+                        .checked_mul(2)
+                        .and_then(|n| n.checked_add(1))
+                        .ok_or(Error::Overflow)?;
+                    if left >= end {
+                        *phase = if building {
+                            HeapPhase::Build
+                        } else {
+                            HeapPhase::Extract
+                        };
+                        continue;
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(false);
+                    }
+                    let child = if left + 1 < end && values[left + 1] > values[left] {
+                        left + 1
+                    } else {
+                        left
+                    };
+                    if values[child] > values[root] {
+                        values.swap(root, child);
+                        *phase = HeapPhase::Sift {
+                            root: child,
+                            end,
+                            building,
+                        };
+                    } else {
+                        *phase = if building {
+                            HeapPhase::Build
+                        } else {
+                            HeapPhase::Extract
+                        };
+                    }
+                }
+                HeapPhase::Extract => {
+                    if self.end <= 1 {
+                        *phase = HeapPhase::Done;
+                        continue;
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(false);
+                    }
+                    self.end -= 1;
+                    values.swap(0, self.end);
+                    *phase = HeapPhase::Sift {
+                        root: 0,
+                        end: self.end,
+                        building: false,
+                    };
+                }
+                HeapPhase::Done => return Ok(true),
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CatalogueCommit {
+    pub document: SharedDocument,
+    pub structural_bytes: usize,
+    pub timestamp_scale: Option<u64>,
+}
+
+#[derive(Debug)]
+pub(crate) struct CataloguePrepareJob {
+    replacement: Option<BudgetVec<SharedDocument>>,
+    at: usize,
+    ready: bool,
+}
+impl CataloguePrepareJob {
+    pub(crate) fn new() -> Self {
+        Self {
+            replacement: None,
+            at: 0,
+            ready: false,
+        }
+    }
+    pub(crate) fn step(
+        &mut self,
+        catalogue: &mut Catalogue,
+        limits: crate::Limits,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<usize>> {
+        loop {
+            check(cancel)?;
+            if self.ready {
+                return Ok(ParseStep::Event(
+                    limits
+                        .metadata_storage_bytes
+                        .checked_sub(catalogue.retained_bytes())
+                        .ok_or(Error::Policy("metadata retained storage"))?,
+                ));
+            }
+            let copied = self.at == catalogue.documents.len();
+            if let Some(replacement) = self.replacement.take_if(|_| copied) {
+                catalogue.documents = StorageVec(replacement);
+                self.ready = true;
+                continue;
+            }
+            if let Some(replacement) = &mut self.replacement {
+                if !work.try_charge(1) {
+                    return Ok(ParseStep::Yield);
+                }
+                replacement
+                    .try_push(catalogue.documents[self.at].clone())
+                    .map_err(|e| e.error)?;
+                self.at += 1;
+                continue;
+            }
+            if !work.try_charge(1) {
+                return Ok(ParseStep::Yield);
+            }
+            if catalogue.documents.len() >= 256 {
+                return Err(Error::Policy("metadata documents"));
+            }
+            if catalogue.documents.len() < catalogue.documents.capacity() {
+                self.ready = true;
+                continue;
+            }
+            let target = catalogue
+                .documents
+                .len()
+                .checked_add(1)
+                .ok_or(Error::Overflow)?;
+            let pointers = target
+                .checked_mul(size_of::<SharedDocument>())
+                .ok_or(Error::Overflow)?;
+            if catalogue
+                .retained
+                .checked_add(pointers)
+                .ok_or(Error::Overflow)?
+                > limits.metadata_storage_bytes
+            {
+                return Err(Error::Policy("metadata retained storage"));
+            }
+            let mut replacement = BudgetVec::new(&catalogue.pool);
+            replacement.try_reserve_exact(target)?;
+            self.replacement = Some(replacement);
+        }
+    }
+}
+/// Where the commit of a document to the catalogue stands. The document job
+/// runs in `CatalogueJob::job` between Copy and Commit.
+#[derive(Debug)]
+enum CommitPhase {
+    /// Refusing a second Attachments document.
+    Duplicate,
+    /// Making room in the catalogue for one more document.
+    Prepare,
+    /// Copying the catalogue into the larger `replacement`.
+    Copy,
+    /// Adding the validated document to the catalogue.
+    Commit(SharedDocument),
+    Done,
+}
+#[derive(Debug)]
+pub(crate) struct CatalogueJob {
+    kind: u64,
+    raw: SharedBytes,
+    structural_limit: usize,
+    source_offset: Option<u64>,
+    limits: crate::Limits,
+    pool: Budget,
+    phase: CommitPhase,
+    at: usize,
+    replacement: BudgetVec<SharedDocument>,
+    /// The document job; it finishes before the phase goes on.
+    job: Option<DocumentJob>,
+    timestamp_scale: Option<u64>,
+    failed: bool,
+}
+impl CatalogueJob {
+    pub(crate) fn new(
+        kind: u64,
+        raw: SharedBytes,
+        structural_limit: usize,
+        source_offset: Option<u64>,
+        limits: crate::Limits,
+        pool: &Budget,
+    ) -> Result<Self> {
+        if !raw.belongs_to(pool) {
+            return Err(Error::ForeignPool);
+        }
+        Ok(Self {
+            kind,
+            raw,
+            structural_limit,
+            source_offset,
+            limits,
+            pool: pool.clone(),
+            phase: CommitPhase::Duplicate,
+            at: 0,
+            replacement: BudgetVec::new(pool),
+            job: None,
+            timestamp_scale: None,
+            failed: false,
+        })
+    }
+    pub(crate) fn step(
+        &mut self,
+        catalogue: &mut Catalogue,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<CatalogueCommit>> {
+        if self.failed {
+            return Err(Error::Invalid(
+                "catalogue job requires replacement after error",
+            ));
+        }
+        if !catalogue.pool.same_pool(&self.pool) {
+            return Err(Error::ForeignPool);
+        }
+        let result = self.advance(catalogue, work, cancel);
+        match result {
+            Err(Error::Backpressure(triergon_core::Backpressure {
+                requested,
+                available,
+            })) => Ok(ParseStep::Backpressure {
+                requested,
+                available,
+            }),
+            Err(error) => {
+                self.failed = true;
+                Err(error)
+            }
+            other => other,
+        }
+    }
+    fn advance(
+        &mut self,
+        catalogue: &mut Catalogue,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<ParseStep<CatalogueCommit>> {
+        loop {
+            check(cancel)?;
+            if let Some(job) = &mut self.job {
+                match job.step(work, cancel)? {
+                    ParseStep::Event(document) => {
+                        self.timestamp_scale = job.timestamp_scale();
+                        self.job = None;
+                        self.phase = CommitPhase::Commit(document);
+                        continue;
+                    }
+                    other => return crate::step::pending(other),
+                }
+            }
+            match &mut self.phase {
+                CommitPhase::Duplicate => {
+                    if self.at == catalogue.documents.len() {
+                        self.phase = CommitPhase::Prepare;
+                        continue;
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(ParseStep::Yield);
+                    }
+                    if self.kind == ATTACHMENTS
+                        && catalogue.documents[self.at].kind() == ATTACHMENTS
+                    {
+                        return Err(Error::Invalid("duplicate Attachments"));
+                    }
+                    self.at += 1;
+                }
+                CommitPhase::Prepare => {
+                    if !work.try_charge(1) {
+                        return Ok(ParseStep::Yield);
+                    }
+                    if catalogue.documents.len() >= 256 {
+                        return Err(Error::Policy("metadata documents"));
+                    }
+                    if catalogue.documents.len() == catalogue.documents.capacity() {
+                        let target = catalogue
+                            .documents
+                            .len()
+                            .checked_add(1)
+                            .ok_or(Error::Overflow)?;
+                        let pointers = target
+                            .checked_mul(size_of::<SharedDocument>())
+                            .ok_or(Error::Overflow)?;
+                        if catalogue
+                            .retained
+                            .checked_add(pointers)
+                            .ok_or(Error::Overflow)?
+                            > self.limits.metadata_storage_bytes
+                        {
+                            return Err(Error::Policy("metadata retained storage"));
+                        }
+                        self.replacement.try_reserve_exact(target)?;
+                        self.at = 0;
+                        self.phase = CommitPhase::Copy;
+                        continue;
+                    }
+                    self.start_document(catalogue)?;
+                }
+                CommitPhase::Copy => {
+                    if self.at == catalogue.documents.len() {
+                        // Old shared handles have fixed-size drop; document/data
+                        // owners stay retained by the copied handles. At most the
+                        // explicit 256-document policy can be present here.
+                        let replacement =
+                            std::mem::replace(&mut self.replacement, BudgetVec::new(&self.pool));
+                        catalogue.documents = StorageVec(replacement);
+                        self.start_document(catalogue)?;
+                        continue;
+                    }
+                    if !work.try_charge(1) {
+                        return Ok(ParseStep::Yield);
+                    }
+                    self.replacement
+                        .try_push(catalogue.documents[self.at].clone())
+                        .map_err(|e| e.error)?;
+                    self.at += 1;
+                }
+                CommitPhase::Commit(document) => {
+                    if !work.try_charge(1) {
+                        return Ok(ParseStep::Yield);
+                    }
+                    let structural_bytes = document
+                        .raw
+                        .len()
+                        .checked_sub(document.attachment_bytes)
+                        .ok_or(Error::Overflow)?;
+                    if structural_bytes > self.structural_limit {
+                        return Err(Error::Policy("metadata"));
+                    }
+                    let nodes = catalogue
+                        .nodes
+                        .checked_add(document.node_count())
+                        .ok_or(Error::Overflow)?;
+                    let attachments = catalogue
+                        .attachments
+                        .checked_add(document.attachment_bytes)
+                        .ok_or(Error::Overflow)?;
+                    let retained = catalogue
+                        .retained
+                        .checked_add(document.retained_bytes())
+                        .ok_or(Error::Overflow)?;
+                    catalogue.documents.push(document.clone())?;
+                    catalogue.nodes = nodes;
+                    catalogue.attachments = attachments;
+                    catalogue.retained = retained;
+                    let result = CatalogueCommit {
+                        document: document.clone(),
+                        structural_bytes,
+                        timestamp_scale: self.timestamp_scale,
+                    };
+                    self.phase = CommitPhase::Done;
+                    return Ok(ParseStep::Event(result));
+                }
+                CommitPhase::Done => return Ok(ParseStep::Finished),
+            }
+        }
+    }
+    fn start_document(&mut self, catalogue: &Catalogue) -> Result<()> {
+        let storage = self
+            .limits
+            .metadata_storage_bytes
+            .checked_sub(catalogue.retained_bytes())
+            .ok_or(Error::Policy("metadata retained storage"))?;
+        let nodes = self
+            .limits
+            .metadata_nodes
+            .checked_sub(catalogue.nodes)
+            .ok_or(Error::Policy("metadata nodes"))?;
+        let attachments = self
+            .limits
+            .attachment_bytes
+            .checked_sub(catalogue.attachments)
+            .ok_or(Error::Policy("attachment payload bytes"))?;
+        self.job = Some(DocumentJob::new(
+            self.kind,
+            self.raw.clone(),
+            DocumentLimits {
+                node_limit: nodes,
+                depth_limit: self.limits.metadata_depth,
+                storage_limit: storage,
+                attachment_limit: attachments,
+            },
+            self.source_offset,
+            &self.pool,
+        )?);
+        Ok(())
+    }
+}
+
+impl SharedDocument {
+    pub(crate) fn shares_owner_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+    pub(crate) fn structure_storage_bytes(&self) -> Result<usize> {
+        self.nodes
+            .capacity()
+            .checked_mul(size_of::<Node>())
+            .and_then(|bytes| bytes.checked_add(self.owner_charge.bytes()))
+            .ok_or(Error::Overflow)
+    }
+}
+impl crate::storage::usage::Storage for SharedDocument {
+    fn storage_slots(&self) -> Result<usize> {
+        Ok(2)
+    }
+    fn storage_owner(&self, index: usize) -> Result<Option<crate::storage::usage::Owner>> {
+        match index {
+            0 => Ok(Some(crate::storage::usage::Owner::Document(self.clone()))),
+            1 => crate::storage::usage::Storage::storage_owner(&self.raw, 0),
+            _ => Ok(None),
+        }
+    }
+}
+crate::storage::usage::storage!(Catalogue, |s| [
+    s.documents.0,
+    crate::storage::usage::Documents(&s.documents)
+]);
+crate::storage::usage::storage!(DocumentJob, |s| [
+    s.raw,
+    s.nodes,
+    s.owner,
+    s.growth.as_ref().map(|(buffer, _)| buffer),
+    s.uids
+]);
+crate::storage::usage::storage!(CataloguePrepareJob, |s| [
+    s.replacement,
+    crate::storage::usage::Documents(s.replacement.as_ref().map_or(&[][..], BudgetVec::as_slice))
+]);
+crate::storage::usage::storage!(CatalogueCommit, |s| [s.document]);
+crate::storage::usage::storage!(CatalogueJob, |s| [
+    s.raw,
+    s.replacement,
+    crate::storage::usage::Documents(s.replacement.as_slice()),
+    s.job,
+    s.phase
+]);
+/// The validated document waiting for its commit.
+impl crate::storage::usage::Storage for CommitPhase {
+    fn storage_slots(&self) -> Result<usize> {
+        match self {
+            Self::Commit(document) => document.storage_slots(),
+            _ => Ok(0),
+        }
+    }
+    fn storage_owner(&self, index: usize) -> Result<Option<crate::storage::usage::Owner>> {
+        match self {
+            Self::Commit(document) => document.storage_owner(index),
+            _ => Ok(None),
+        }
+    }
+}

@@ -1,9 +1,9 @@
-//! The second stage: an event's text shaped as libass's complex shaper does
-//! (`ass_shaper_find_runs`, `ass_shaper_shape`): each character's script and
-//! face, runs of one face, script and style, bidi levels per paragraph, and
-//! OpenType shaping of each run at the drawn size, which gives each
-//! character a cluster of glyphs. The bidi levels give the visual order of
-//! each line once lines are known (`ass_shaper_reorder`).
+//! The second stage: an event's text shaped as libass's complex shaper
+//! does: each character's script and face, runs of one face, script and
+//! style, bidi levels per paragraph, and OpenType shaping of each run at the
+//! drawn size, which gives each character a cluster of glyphs. The bidi
+//! levels give the visual order of each line once lines are known.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -13,26 +13,25 @@ use triergon_core::{
     Budget, BudgetVec, Error, Reservation, Result, WorkBudget, round_ties_even_i32,
 };
 use triergon_font::GlyphId;
+use triergon_font::compat::libass;
 use triergon_raster::{Vector, pixels_26_6};
 use triergon_shape::bidi::{BaseDirection, BidiClass, Level, Resolver, reorder_line};
+use triergon_shape::compat::libass::{FaceRotations, GlyphRotations, SizedMetrics};
 use triergon_shape::{
-    Buffer, Direction, Face, FaceRotations, Feature, GlyphRotations, Language, Plan,
-    Script as WritingScript, SizedMetrics, Tag,
+    Buffer, Direction, Face, Feature, Language, Plan, Script as WritingScript, Tag,
 };
 
 use super::fonts::Library;
 use super::text::{Char, Text};
 use super::wrap::Line;
-use crate::{Info, charge};
+use crate::{Encoding, Info, charge};
 
 /// How an event's text is shaped and reordered.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Shaping<'a> {
-    /// The paragraph direction: left to right, or found from the text for
-    /// `\fe-1` (`ass_resolve_base_direction`).
-    pub(super) base: BaseDirection,
-    /// The text is shaped and reordered as a whole rather than run by run:
-    /// implicitly for `\fe-1`.
+    /// The text is shaped and reordered as a whole, each paragraph in the
+    /// direction found from its text, rather than run by run from left to
+    /// right: for `\fe-1`.
     pub(super) whole_text: bool,
     /// The `Kerning` header.
     pub(super) kerning: bool,
@@ -42,17 +41,20 @@ pub(super) struct Shaping<'a> {
 
 impl<'a> Shaping<'a> {
     /// The settings for an event of `info` whose last `\fe` is `encoding`.
-    pub(super) fn new(encoding: i32, info: &'a Info) -> Self {
-        let (base, whole_text) = if encoding == -1 {
-            (BaseDirection::Auto, true)
-        } else {
-            (BaseDirection::LeftToRight, false)
-        };
+    pub(super) fn new(encoding: Encoding, info: &'a Info) -> Self {
         Self {
-            base,
-            whole_text,
+            whole_text: encoding.charset().is_none(),
             kerning: info.kerning,
             language: info.language(),
+        }
+    }
+
+    /// The direction paragraphs are resolved in.
+    fn base(&self) -> BaseDirection {
+        if self.whole_text {
+            BaseDirection::Auto
+        } else {
+            BaseDirection::LeftToRight
         }
     }
 }
@@ -78,8 +80,7 @@ pub(super) struct Cluster {
     /// The face of the character's font its glyphs come from.
     pub(super) face: u16,
     /// Shaping gave the character a glyph; a drawing always has one. A
-    /// character a ligature took or HarfBuzz hid is not shown (libass's
-    /// `skip`).
+    /// character a ligature took or HarfBuzz hid is not shown.
     pub(super) visible: bool,
 }
 
@@ -123,18 +124,46 @@ pub(super) struct Bidi {
 }
 
 /// What one shaping plan is built for: a face, a direction, a script, a
-/// language code and libass's three feature switches.
+/// language code and the features switched on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 struct PlanKey {
     face: u32,
     direction: Direction,
     script: WritingScript,
     language: [u8; 4],
-    features: [bool; 3],
+    features: Features,
 }
 
-/// The characters of context a shaping call reads on either side of its item
-/// (HarfBuzz's `HB_BUFFER_CONTEXT_LENGTH`, as `triergon-shape` keeps it).
+/// The features libass switches for a run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+struct Features {
+    /// `vert` and `vkna`, for `@` fonts.
+    vertical: bool,
+    /// `kern`, by the `Kerning` header.
+    kerning: bool,
+    /// `liga` and `clig`, without letter spacing.
+    ligatures: bool,
+}
+
+impl Features {
+    /// The features a plan is built with.
+    fn plan(self) -> [Feature; 5] {
+        let feature = |tag: &[u8; 4], on: bool| Feature {
+            tag: Tag::new(tag),
+            value: u32::from(on),
+        };
+        [
+            feature(b"vert", self.vertical),
+            feature(b"vkna", self.vertical),
+            feature(b"kern", self.kerning),
+            feature(b"liga", self.ligatures),
+            feature(b"clig", self.ligatures),
+        ]
+    }
+}
+
+/// The characters of context a shaping call reads on either side of its item:
+/// the five HarfBuzz reads, as `triergon-shape` keeps them.
 const CONTEXT: usize = 5;
 /// Work units charged per shaping call beyond its characters: sizing the
 /// face and finding the plan.
@@ -231,7 +260,7 @@ impl VerticalFonts {
     }
 }
 
-/// What finding runs gives a character (`ass_shaper_find_runs`).
+/// What finding runs gives a character.
 #[derive(Clone, Copy, Debug)]
 struct Itemised {
     script: WritingScript,
@@ -249,8 +278,8 @@ const fn is_shaping_control(symbol: u32) -> bool {
     matches!(symbol, 0x200c | 0x200d)
 }
 
-/// Code points HarfBuzz replaces by an empty glyph whatever the font maps them
-/// to (libass's `is_harfbuzz_ignorable`).
+/// Code points HarfBuzz replaces by an empty glyph whatever the font maps
+/// them to.
 const fn is_ignorable(symbol: u32) -> bool {
     match symbol >> 8 {
         0x00 => symbol == 0x00ad,
@@ -266,8 +295,8 @@ const fn is_ignorable(symbol: u32) -> bool {
     }
 }
 
-/// The language libass shapes a script in when the script names none
-/// (`script_to_language`); `c` for the rest, the C locale's default.
+/// The language libass shapes a script in when the script names none; `c`
+/// for the rest, the C locale's default.
 fn script_language(script: WritingScript) -> &'static str {
     match &script.to_bytes() {
         b"Arab" => "ar",
@@ -401,7 +430,7 @@ impl Shaper {
         super::fit(&mut self.counts)
     }
 
-    /// `ass_shaper_find_runs`: scripts, faces and shape runs.
+    /// Each character's script, face and shape run.
     fn find_runs(
         &mut self,
         text: &Text,
@@ -489,7 +518,7 @@ impl Shaper {
                 let direction = self.resolver.resolve(
                     &bidi.classes[start..=i],
                     None,
-                    shaping.base,
+                    shaping.base(),
                     &mut bidi.levels.as_mut_slice()[start..=i],
                 )?;
                 if shaping.whole_text {
@@ -502,7 +531,7 @@ impl Shaper {
     }
 
     /// The item starting at character `start`: the characters after it of
-    /// its shape run and bidi level, up to a drawing (`shape_harfbuzz`).
+    /// its shape run and bidi level, up to a drawing.
     fn item(&self, chars: &[Char], levels: &[Level], start: usize) -> Range<usize> {
         let (run, level) = (self.items[start].run, levels[start]);
         let mut end = start + 1;
@@ -532,13 +561,11 @@ impl Shaper {
         let face_font = &font.faces()[usize::from(itemised.face)];
         let script = itemised.script;
         let language = language_code(shaping.language, script);
-        // Ligatures only without letter spacing, vertical forms for `@`
-        // fonts.
-        let features = [
-            font.vertical(),
-            shaping.kerning,
-            text.style(first).spacing == 0.0,
-        ];
+        let features = Features {
+            vertical: font.vertical(),
+            kerning: shaping.kerning,
+            ligatures: text.style(first).spacing == 0.0,
+        };
         let context = if shaping.whole_text {
             0..len
         } else {
@@ -562,9 +589,7 @@ impl Shaper {
         charge(work, read.saturating_add(RUN_UNITS))?;
         // The run's glyphs share the size their outlines load at, and the
         // face reads them through the charmap it has selected.
-        let sized = face_font
-            .font
-            .at_size(pixels_26_6(text.style(first).size))?;
+        let sized = libass::at_size(&face_font.font, pixels_26_6(text.style(first).size))?;
         let mut metrics = SizedMetrics::with_charmap(sized, face_font.charmap(), work)?;
         let rotations;
         if font.vertical() {
@@ -594,7 +619,7 @@ impl Shaper {
                 direction,
                 script,
                 &Language::new(language),
-                &plan_features(features),
+                &features.plan(),
                 &self.budget,
             )?;
             self.plans.insert(key, plan);
@@ -688,24 +713,8 @@ impl Shaper {
     }
 }
 
-/// libass's features: `vert` and `vkna` for `@` fonts, `kern` by the
-/// header, `liga` and `clig` without letter spacing.
-fn plan_features([vertical, kerning, ligatures]: [bool; 3]) -> [Feature; 5] {
-    let feature = |tag: &[u8; 4], on: bool| Feature {
-        tag: Tag::new(tag),
-        value: u32::from(on),
-    };
-    [
-        feature(b"vert", vertical),
-        feature(b"vkna", vertical),
-        feature(b"kern", kerning),
-        feature(b"liga", ligatures),
-        feature(b"clig", ligatures),
-    ]
-}
-
-/// `ass_shaper_determine_script`: Common and Inherited scripts take the
-/// script before them, or after them at the start.
+/// Common and Inherited scripts take the script before them, or after them
+/// at the start.
 fn inherit_scripts(items: &mut [Itemised]) {
     let inherits = |s: WritingScript| s == WritingScript::COMMON || s == WritingScript::INHERITED;
     let mut last = WritingScript::UNKNOWN;
@@ -737,11 +746,11 @@ fn inherit_scripts(items: &mut [Itemised]) {
 }
 
 impl Bidi {
-    /// `ass_shaper_reorder`: the character shown at each position into
-    /// `order`, each line reordered on its own and, without whole-text
-    /// layout, each run and letter-spaced character within it; `starts_run`
-    /// tells where runs start once lines are trimmed. The levels are
-    /// reordered in `levels`, a copy.
+    /// The character shown at each position into `order`, each line
+    /// reordered on its own and, without whole-text layout, each run and
+    /// letter-spaced character within it; `starts_run` tells where runs
+    /// start once lines are trimmed. The levels are reordered in `levels`, a
+    /// copy.
     pub(super) fn visual_order(
         &self,
         text: &Text,
@@ -776,10 +785,7 @@ impl Bidi {
                         .copied()
                         .unwrap_or(Direction::LeftToRight)
                 } else {
-                    match shaping.base {
-                        BaseDirection::RightToLeft => Direction::RightToLeft,
-                        _ => Direction::LeftToRight,
-                    }
+                    Direction::LeftToRight
                 };
                 reorder_line(
                     &self.classes[start..=i],

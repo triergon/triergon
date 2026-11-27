@@ -2,72 +2,108 @@
 
 use crate::DecodeError;
 use crate::tables::*;
+use std::sync::Arc;
 use triergon_bitstream::BitReader;
 
 pub(crate) type R<T> = Result<T, DecodeError>;
 
 fn inval(what: &'static str) -> DecodeError {
-    DecodeError::InvalidData(what)
+    DecodeError::Invalid(what)
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Vui {
-    pub sar: (u32, u32),
-    pub video_full_range: bool,
-    pub colour_description_present: bool,
-    pub colour_primaries: u8,
-    pub transfer_characteristics: u8,
-    pub matrix_coefficients: u8,
-    pub timing: Option<(u32, u32, bool)>,
-    pub bitstream_restriction: bool,
-    pub max_num_reorder_frames: u32,
-    pub max_dec_frame_buffering: u32,
-    pub pic_struct_present: bool,
-    pub nal_hrd: bool,
-    pub vcl_hrd: bool,
-    pub cpb_removal_delay_len: u8,
-    pub dpb_output_delay_len: u8,
-    pub time_offset_len: u8,
+/// The VUI fields the decoder uses (Annex E.1.1).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub(crate) struct Vui {
+    pub(crate) sar: (u32, u32),
+    pub(crate) video_full_range: bool,
+    pub(crate) colour_primaries: u8,
+    pub(crate) transfer_characteristics: u8,
+    pub(crate) matrix_coefficients: u8,
+    /// bitstream_restriction_flag set and its fields read in full.
+    pub(crate) restriction: Option<Restriction>,
+}
+
+/// The bitstream restriction fields of the VUI that bound output delay.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Restriction {
+    pub(crate) max_num_reorder_frames: u32,
+    pub(crate) max_dec_frame_buffering: u32,
+}
+
+impl Vui {
+    pub(crate) fn inferred() -> Self {
+        Self {
+            colour_primaries: 2,
+            transfer_characteristics: 2,
+            matrix_coefficients: 2,
+            ..Self::default()
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Sps {
-    pub profile_idc: u8,
-    pub constraint_flags: u8,
-    pub level_idc: u8,
-    pub id: u32,
-    pub chroma_format_idc: u32,
-    pub separate_colour_plane: bool,
-    pub bit_depth_luma: u32,
-    pub bit_depth_chroma: u32,
-    pub qpprime_y_zero_transform_bypass: bool,
-    pub seq_scaling_matrix_present: bool,
+pub(crate) struct Sps {
+    pub(crate) profile_idc: u8,
+    pub(crate) constraint_flags: u8,
+    pub(crate) level_idc: u8,
+    pub(crate) id: u32,
+    pub(crate) chroma_format_idc: u32,
+    pub(crate) separate_colour_plane: bool,
+    pub(crate) bit_depth_luma: u32,
+    pub(crate) bit_depth_chroma: u32,
+    pub(crate) qpprime_y_zero_transform_bypass: bool,
+    pub(crate) seq_scaling_matrix_present: bool,
     /// Scaling lists in zig-zag (scan) order: 6 4x4 and 6 8x8 (only 2 used for 4:2:0).
-    pub scaling4: [[u8; 16]; 6],
-    pub scaling8: [[u8; 64]; 6],
-    pub log2_max_frame_num: u32,
-    pub poc_type: u32,
-    pub log2_max_poc_lsb: u32,
-    pub delta_pic_order_always_zero: bool,
-    pub offset_for_non_ref_pic: i32,
-    pub offset_for_top_to_bottom_field: i32,
-    pub offset_for_ref_frame: Vec<i32>,
-    pub max_num_ref_frames: u32,
-    pub gaps_in_frame_num_allowed: bool,
-    pub pic_width_in_mbs: u32,
-    pub pic_height_in_map_units: u32,
-    pub frame_mbs_only: bool,
-    pub mb_adaptive_frame_field: bool,
-    pub direct_8x8_inference: bool,
-    pub crop: [u32; 4], // left, right, top, bottom in frame_crop_*_offset units
-    pub vui: Option<Vui>,
+    pub(crate) scaling4: [[u8; 16]; 6],
+    pub(crate) scaling8: [[u8; 64]; 6],
+    pub(crate) log2_max_frame_num: u32,
+    pub(crate) poc: PocType,
+    pub(crate) max_num_ref_frames: u32,
+    pub(crate) gaps_in_frame_num_allowed: bool,
+    pub(crate) pic_width_in_mbs: u32,
+    pub(crate) pic_height_in_map_units: u32,
+    pub(crate) frame_mbs_only: bool,
+    pub(crate) mb_adaptive_frame_field: bool,
+    pub(crate) direct_8x8_inference: bool,
+    pub(crate) crop: [u32; 4], // left, right, top, bottom in frame_crop_*_offset units
+    pub(crate) vui: Option<Vui>,
+}
+
+/// How the slices of a sequence code picture order counts: pic_order_cnt_type and the
+/// fields that go with it (7.4.2.1.1, 8.2.1).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PocType {
+    /// 0: each slice header carries pic_order_cnt_lsb of `log2_max_lsb` bits.
+    Lsb { log2_max_lsb: u32 },
+    /// 1: an expected count from the cycle of reference frame offsets, adjusted by the
+    /// slice header's delta_pic_order_cnt unless `delta_always_zero`.
+    Cycle {
+        delta_always_zero: bool,
+        offset_for_non_ref_pic: i32,
+        offset_for_top_to_bottom_field: i32,
+        offset_for_ref_frame: Vec<i32>,
+    },
+    /// 2: the count follows frame_num.
+    FrameNum,
+}
+
+impl PocType {
+    /// pic_order_cnt_type.
+    #[cfg(feature = "inspect")]
+    pub(crate) fn code(&self) -> u32 {
+        match self {
+            PocType::Lsb { .. } => 0,
+            PocType::Cycle { .. } => 1,
+            PocType::FrameNum => 2,
+        }
+    }
 }
 
 impl Sps {
-    pub fn frame_height_in_mbs(&self) -> u32 {
+    pub(crate) fn frame_height_in_mbs(&self) -> u32 {
         (2 - self.frame_mbs_only as u32).wrapping_mul(self.pic_height_in_map_units)
     }
-    pub fn chroma_array_type(&self) -> u32 {
+    pub(crate) fn chroma_array_type(&self) -> u32 {
         if self.separate_colour_plane {
             0
         } else {
@@ -75,7 +111,7 @@ impl Sps {
         }
     }
     /// Cropped output rectangle (x, y, w, h) in luma samples, equations 7-19 .. 7-22.
-    pub fn crop_rect(&self) -> (u32, u32, u32, u32) {
+    pub(crate) fn crop_rect(&self) -> (u32, u32, u32, u32) {
         let (sub_w, sub_h) = match self.chroma_array_type() {
             0 => (1, 1),
             1 => (2, 2),
@@ -95,39 +131,37 @@ impl Sps {
         }
         (x0, y0, x1 - x0, y1 - y0)
     }
-    pub fn max_frame_num(&self) -> u32 {
+    pub(crate) fn max_frame_num(&self) -> u32 {
         1 << self.log2_max_frame_num
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Pps {
-    pub id: u32,
-    pub sps_id: u32,
-    pub entropy_coding_mode: bool,
-    pub bottom_field_pic_order_in_frame_present: bool,
-    pub num_slice_groups: u32,
-    pub num_ref_idx_default: [u32; 2],
-    pub weighted_pred: bool,
-    pub weighted_bipred_idc: u32,
-    pub pic_init_qp: i32,
-    pub pic_init_qs: i32,
-    pub chroma_qp_index_offset: i32,
-    pub second_chroma_qp_index_offset: i32,
-    pub deblocking_filter_control_present: bool,
-    pub constrained_intra_pred: bool,
-    pub redundant_pic_cnt_present: bool,
-    pub transform_8x8_mode: bool,
-    pub pic_scaling_matrix_present: bool,
-    pub scaling4: [[u8; 16]; 6],
-    pub scaling8: [[u8; 64]; 6],
+pub(crate) struct Pps {
+    pub(crate) id: u32,
+    pub(crate) sps_id: u32,
+    pub(crate) entropy_coding_mode: bool,
+    pub(crate) bottom_field_pic_order_in_frame_present: bool,
+    pub(crate) num_slice_groups: u32,
+    pub(crate) num_ref_idx_default: [u32; 2],
+    pub(crate) weighted_pred: bool,
+    pub(crate) weighted_bipred_idc: u32,
+    pub(crate) pic_init_qp: i32,
+    pub(crate) chroma_qp_index_offset: i32,
+    pub(crate) second_chroma_qp_index_offset: i32,
+    pub(crate) deblocking_filter_control_present: bool,
+    pub(crate) constrained_intra_pred: bool,
+    pub(crate) redundant_pic_cnt_present: bool,
+    pub(crate) transform_8x8_mode: bool,
+    pub(crate) pic_scaling_matrix_present: bool,
+    pub(crate) scaling4: [[u8; 16]; 6],
+    pub(crate) scaling8: [[u8; 64]; 6],
 }
 
 /// Sequence-level 4x4 and 8x8 lists used by fall-back rule B.
 type ScalingFallback<'a> = (&'a [[u8; 16]; 6], &'a [[u8; 64]; 6]);
 
 /// scaling_list() syntax, clause 7.3.2.1.1.1. Returns true when useDefaultScalingMatrixFlag.
-#[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
 fn scaling_list(r: &mut BitReader<'_>, list: &mut [u8]) -> R<bool> {
     let mut last = 8i32;
     let mut next = 8i32;
@@ -175,7 +209,7 @@ fn parse_scaling_matrix(
                 s4[i] = match (i, fallback) {
                     (0, None) => DEFAULT_4X4_INTRA,
                     (3, None) => DEFAULT_4X4_INTER,
-                    (0, Some((f4, _))) | (3, Some((f4, _))) => f4[i],
+                    (0 | 3, Some((f4, _))) => f4[i],
                     _ => s4[i - 1],
                 };
             }
@@ -196,7 +230,7 @@ fn parse_scaling_matrix(
                 s8[k] = match (k, fallback) {
                     (0, None) => DEFAULT_8X8_INTRA,
                     (1, None) => DEFAULT_8X8_INTER,
-                    (0, Some((_, f8))) | (1, Some((_, f8))) => f8[k],
+                    (0 | 1, Some((_, f8))) => f8[k],
                     _ => s8[k - 2],
                 };
             }
@@ -205,7 +239,8 @@ fn parse_scaling_matrix(
     Ok(())
 }
 
-fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
+/// hrd_parameters() (E.1.2), which the decoder skips.
+fn hrd(r: &mut BitReader<'_>) -> R<()> {
     let cpb_cnt = r.ue().wrapping_add(1);
     if cpb_cnt > 32 {
         return Err(inval("cpb_cnt_minus1"));
@@ -217,15 +252,14 @@ fn hrd(r: &mut BitReader<'_>, v: &mut Vui) -> R<()> {
         r.ue();
         r.bit();
     }
-    r.read(5);
-    v.cpb_removal_delay_len = r.read(5) as u8 + 1;
-    v.dpb_output_delay_len = r.read(5) as u8 + 1;
-    v.time_offset_len = r.read(5) as u8;
+    // initial_cpb_removal_delay_length_minus1, cpb_removal_delay_length_minus1,
+    // dpb_output_delay_length_minus1 and time_offset_length, 5 bits each.
+    r.skip(20);
     Ok(())
 }
 
 fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
-    let mut v = Vui::default();
+    let mut v = Vui::inferred();
     if r.bit() {
         let idc = r.read(8);
         if idc == 255 {
@@ -239,14 +273,10 @@ fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
     if r.bit() {
         r.bit(); // overscan_appropriate_flag
     }
-    v.colour_primaries = 2;
-    v.transfer_characteristics = 2;
-    v.matrix_coefficients = 2;
     if r.bit() {
         r.read(3); // video_format
         v.video_full_range = r.bit();
         if r.bit() {
-            v.colour_description_present = true;
             v.colour_primaries = r.read(8) as u8;
             v.transfer_characteristics = r.read(8) as u8;
             v.matrix_coefficients = r.read(8) as u8;
@@ -257,41 +287,38 @@ fn parse_vui(r: &mut BitReader<'_>) -> R<Vui> {
         r.ue();
     }
     if r.bit() {
-        let a = r.read(32);
-        let b = r.read(32);
-        let f = r.bit();
-        v.timing = Some((a, b, f));
+        // num_units_in_tick, time_scale and fixed_frame_rate_flag.
+        r.skip(65);
     }
-    v.nal_hrd = r.bit();
-    if v.nal_hrd {
-        hrd(r, &mut v)?;
+    let nal_hrd = r.bit();
+    if nal_hrd {
+        hrd(r)?;
     }
-    v.vcl_hrd = r.bit();
-    if v.vcl_hrd {
-        hrd(r, &mut v)?;
+    let vcl_hrd = r.bit();
+    if vcl_hrd {
+        hrd(r)?;
     }
-    if v.nal_hrd || v.vcl_hrd {
+    if nal_hrd || vcl_hrd {
         r.bit(); // low_delay_hrd_flag
     }
-    v.pic_struct_present = r.bit();
+    r.bit(); // pic_struct_present_flag
     // Truncated VUIs exist in the wild; stop before reading past the end.
     if r.left() <= 0 {
         return Ok(v);
     }
-    v.bitstream_restriction = r.bit();
-    if v.bitstream_restriction {
+    if r.bit() {
+        // motion_vectors_over_pic_boundaries_flag, max_bytes_per_pic_denom,
+        // max_bits_per_mb_denom and the two log2_max_mv_length fields.
         r.bit();
         r.ue();
         r.ue();
         r.ue();
         r.ue();
-        v.max_num_reorder_frames = r.ue();
-        v.max_dec_frame_buffering = r.ue();
-        if r.overrun() {
-            v.bitstream_restriction = false;
-            v.max_num_reorder_frames = 0;
-            v.max_dec_frame_buffering = 0;
-        }
+        let restriction = Restriction {
+            max_num_reorder_frames: r.ue(),
+            max_dec_frame_buffering: r.ue(),
+        };
+        v.restriction = (!r.overrun()).then_some(restriction);
     }
     Ok(v)
 }
@@ -318,12 +345,7 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
         scaling4: [[16; 16]; 6],
         scaling8: [[16; 64]; 6],
         log2_max_frame_num: 4,
-        poc_type: 0,
-        log2_max_poc_lsb: 4,
-        delta_pic_order_always_zero: false,
-        offset_for_non_ref_pic: 0,
-        offset_for_top_to_bottom_field: 0,
-        offset_for_ref_frame: Vec::new(),
+        poc: PocType::FrameNum,
         max_num_ref_frames: 0,
         gaps_in_frame_num_allowed: false,
         pic_width_in_mbs: 0,
@@ -365,29 +387,32 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
     if sps.log2_max_frame_num > 16 {
         return Err(inval("log2_max_frame_num_minus4"));
     }
-    sps.poc_type = r.ue();
-    match sps.poc_type {
+    sps.poc = match r.ue() {
         0 => {
-            sps.log2_max_poc_lsb = r.ue().wrapping_add(4);
-            if sps.log2_max_poc_lsb > 16 {
+            let log2_max_lsb = r.ue().wrapping_add(4);
+            if log2_max_lsb > 16 {
                 return Err(inval("log2_max_pic_order_cnt_lsb_minus4"));
             }
+            PocType::Lsb { log2_max_lsb }
         }
         1 => {
-            sps.delta_pic_order_always_zero = r.bit();
-            sps.offset_for_non_ref_pic = r.se();
-            sps.offset_for_top_to_bottom_field = r.se();
+            let delta_always_zero = r.bit();
+            let offset_for_non_ref_pic = r.se();
+            let offset_for_top_to_bottom_field = r.se();
             let n = r.ue();
             if n > 255 {
                 return Err(inval("num_ref_frames_in_pic_order_cnt_cycle"));
             }
-            for _ in 0..n {
-                sps.offset_for_ref_frame.push(r.se());
+            PocType::Cycle {
+                delta_always_zero,
+                offset_for_non_ref_pic,
+                offset_for_top_to_bottom_field,
+                offset_for_ref_frame: (0..n).map(|_| r.se()).collect(),
             }
         }
-        2 => {}
+        2 => PocType::FrameNum,
         _ => return Err(inval("pic_order_cnt_type")),
-    }
+    };
     sps.max_num_ref_frames = r.ue();
     if sps.max_num_ref_frames > 16 {
         return Err(inval("max_num_ref_frames"));
@@ -409,12 +434,12 @@ pub(crate) fn parse_sps(r: &mut BitReader<'_>) -> R<Sps> {
         sps.vui = Some(parse_vui(r)?);
     }
     if sps.pic_width_in_mbs > 1024 || sps.frame_height_in_mbs() > 1024 {
-        return Err(DecodeError::ResourceLimit("picture dimensions"));
+        return Err(DecodeError::Policy("picture dimensions"));
     }
     Ok(sps)
 }
 
-pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<Pps> {
+pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Arc<Sps>>]) -> R<Pps> {
     let id = r.ue();
     if id > 255 {
         return Err(inval("pic_parameter_set_id"));
@@ -465,8 +490,9 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
     }
     let weighted_pred = r.bit();
     let weighted_bipred_idc = r.read(2);
-    let pic_init_qp = 26 + r.se();
-    let pic_init_qs = 26 + r.se();
+    // Unchecked here: the slice header checks SliceQPY.
+    let pic_init_qp = r.se().wrapping_add(26);
+    r.se(); // pic_init_qs_minus26
     let chroma_qp_index_offset = r.se();
     if !(-12..=12).contains(&chroma_qp_index_offset) {
         return Err(inval("chroma_qp_index_offset"));
@@ -486,7 +512,7 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
         transform_8x8_mode = r.bit();
         pic_scaling_matrix_present = r.bit();
         if pic_scaling_matrix_present {
-            let chroma_format_idc = sps.map(|s| s.chroma_format_idc).unwrap_or(1);
+            let chroma_format_idc = sps.map_or(1, |s| s.chroma_format_idc);
             let n = 6 + if chroma_format_idc != 3 { 2 } else { 6 } * transform_8x8_mode as usize;
             let (f4, f8) = (s4, s8);
             parse_scaling_matrix(r, n, &mut s4, &mut s8, Some((&f4, &f8)))?;
@@ -506,7 +532,6 @@ pub(crate) fn parse_pps(r: &mut BitReader<'_>, spss: &[Option<Box<Sps>>]) -> R<P
         weighted_pred,
         weighted_bipred_idc,
         pic_init_qp,
-        pic_init_qs,
         chroma_qp_index_offset,
         second_chroma_qp_index_offset: second,
         deblocking_filter_control_present,

@@ -2,14 +2,16 @@
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, InputCursor, SourceCapabilities, SourceId, WorkBudget};
 use triergon_mpegts::{
-    PacketFormat, ParseLimits, TraceEvent, clock::SourceTimePolicy,
-    compat::pes::RegisteredCarriage, psi::DescriptorNamespace,
+    PacketFormat, ParseLimits, clock::SourceTimePolicy, compat::pes::RegisteredCarriage,
+    psi::DescriptorNamespace, stream::TraceEvent,
 };
 use triergon_playback::{
-    ByteSource, ClockChoice, Format, Player, PlayerPolicy, Progress, RawEvent, TsNativeCarriage,
-    TsNativeTrackSelection,
-    io::{SelectedInput, SourceOwner},
-    native_startup::{NativeStartup, StartupStep},
+    ByteSource, ClockChoice, Event, Format, Player, PlayerPolicy, Progress, SourceOwner,
+    compat::pes::{
+        Carriage, PidSelection,
+        startup::{Startup, StartupStep},
+    },
+    probe::SelectedInput,
 };
 
 const RAW: &[u8] = include_bytes!("../../../harness/fixtures/ts-program/replay-avc-aac-00.m2ts");
@@ -29,7 +31,7 @@ fn open_program(pool: &Budget, raw: &[u8], length: usize, quantum: usize) -> Pla
     .unwrap();
     let source =
         ByteSource::new(SOURCE, Bytes::copy_from_slice(pool, raw).unwrap(), quantum).unwrap();
-    let mut startup = NativeStartup::new_m2ts_prefix_v2(SelectedInput {
+    let mut startup = Startup::new_m2ts_prefix(SelectedInput {
         input,
         source: SourceOwner::new(source),
         format: Format::Ts(PacketFormat::M2ts192),
@@ -50,21 +52,19 @@ fn open_program(pool: &Budget, raw: &[u8], length: usize, quantum: usize) -> Pla
                     SourceTimePolicy::Unanchored,
                     DescriptorNamespace::Unspecified,
                     &[
-                        TsNativeTrackSelection {
+                        PidSelection {
                             pid: 257,
-                            carriage: TsNativeCarriage::Registered(RegisteredCarriage::AacAdts),
+                            carriage: Carriage::Registered(RegisteredCarriage::AacAdts),
                         },
-                        TsNativeTrackSelection {
+                        PidSelection {
                             pid: 256,
-                            carriage: TsNativeCarriage::Registered(RegisteredCarriage::Avc),
+                            carriage: Carriage::Registered(RegisteredCarriage::Avc),
                         },
                     ],
                     PlayerPolicy::default(),
                 )
                 .unwrap();
-            player
-                .set_clock_view(ClockChoice::ExplicitNativeProjection)
-                .unwrap();
+            player.set_clock_view(ClockChoice::Demux).unwrap();
             return player;
         }
     }
@@ -86,7 +86,7 @@ fn combined_program_keeps_carriers_clocks_and_order_through_physical_eof() {
             let progress = player.advance(&mut WorkBudget::new(1), &cancel).unwrap();
             while let Some(output) = player.pop() {
                 match output.event() {
-                    RawEvent::Ts(event) => match &event.source {
+                    Event::Ts(event) => match &event.source {
                         TraceEvent::Transport(packet) => {
                             let offset = carriers * 192;
                             assert_eq!(packet.source_offset, offset as u64);
@@ -101,7 +101,7 @@ fn combined_program_keeps_carriers_clocks_and_order_through_physical_eof() {
                         TraceEvent::Finished => finished = true,
                         _ => {}
                     },
-                    RawEvent::NativeTs { packet, clock } => {
+                    Event::DemuxPes { packet, clock } => {
                         assert_eq!(packet.source_origin.source, id);
                         assert_eq!(packet.source_origin.offset % 192, 0);
                         assert_eq!(packet.position, packet.source_origin.offset as i64);
@@ -114,7 +114,7 @@ fn combined_program_keeps_carriers_clocks_and_order_through_physical_eof() {
                         }
                         packets.push((packet.pid, clock.pts90, clock.dts90, packet.payload_len));
                     }
-                    RawEvent::NativeRefusal { error, .. } => panic!("{error:?}"),
+                    Event::PesRefusal { error, .. } => panic!("{error:?}"),
                     _ => {}
                 }
             }
@@ -184,7 +184,7 @@ fn combined_program_retries_pressure_and_cancels_with_retained_packets() {
         let progress = player.advance(&mut WorkBudget::new(8), &cancel).unwrap();
         assert!(!matches!(progress, Progress::Ended));
         while let Some(output) = player.pop() {
-            if let RawEvent::NativeTs { packet, .. } = output.event() {
+            if let Event::DemuxPes { packet, .. } = output.event() {
                 match packet.pid {
                     256 if video.is_none() => video = Some(output),
                     257 if audio.is_none() => audio = Some(output),

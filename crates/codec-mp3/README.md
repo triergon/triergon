@@ -10,7 +10,7 @@ ISO/IEC 13818-3 (low sampling frequencies), with the MPEG-2.5 extension to 8, 11
 ## Usage
 
 ```rust
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::AudioFrame;
 use triergon_codec_mp3::{DecodeError, Decoder};
 
 fn decode(frames: &[&[u8]]) -> Result<(), DecodeError> {
@@ -26,8 +26,9 @@ fn decode(frames: &[&[u8]]) -> Result<(), DecodeError> {
 }
 ```
 
-An access unit is one whole frame, header included. `Decoder::new_in` charges a
-caller's `Budget`; `frame_header` reads a frame header as the decoder does.
+An access unit is one whole frame, header included. `Decoder::with_limits` gives the
+decoder its own pool and `Decoder::new_in` charges a caller's `Budget`; framing's
+`MpegAudioHeader` reads a frame header as the decoder does.
 `examples/decode_mp3` decodes the first MPEG audio track of a file (a raw stream or a
 container), read through the `triergon` facade, to interleaved f32le: the decoder's whole
 output, without container trims. `--reset-at N` resets the decoder before access unit N.
@@ -53,6 +54,8 @@ Not supported: free-format frames (bit rate index 0), refused as
 `DecodeError::Unsupported`.
 
 ## Behaviour and limits
+
+- `decode` replaces `out`; a refusal leaves `samples_per_channel == 0`.
 
 - Output is FFmpeg's float decoders' (`mp1float`, `mp2float`, `mp3float`): every
   frame decodes to its full 384, 1152 or 576 samples per channel, with no delay
@@ -83,7 +86,7 @@ Not supported: free-format frames (bit rate index 0), refused as
   normally. `reset` drops the reservoir, overlap and synthesis history, and keeps the
   scalefactors a following granule may reuse (`scfsi`), as FFmpeg's flush does.
 
-## Tables
+## Conformance
 
 The Huffman code tables (11172-3 Table B.7), scalefactor bands (Table B.8 and 13818-3
 Table B.2), pre-emphasis (Table B.6), alias-reduction coefficients (Table B.9),
@@ -91,10 +94,8 @@ synthesis window (Table B.3), Layer I/II scalefactors (Table B.1) and allocation
 (Table B.2 a to d and 13818-3 Table B.1) are written in the source from the standards.
 The Huffman tables are checked to be complete prefix codes.
 
-## Verification
-
 `harness/codecs/mp3/make_vectors.sh FFMPEG OUT` generates the test streams (libmp3lame,
 mp2 and mp2fixed encodes at MPEG-1, 2 and 2.5 rates, and random Layer I/II frames from
-`harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given. Comparison:
-[harness/codecs](../../harness/codecs/STATUS.md); results in
-[docs/status.md](../../docs/status.md).
+`harness/codecs/mp3/random_frames.py`) with the FFmpeg it is given; they are compared with
+FFmpeg's float decoders in [harness/codecs](../../harness/codecs/STATUS.md). Results are
+in [docs/status.md](../../docs/status.md).

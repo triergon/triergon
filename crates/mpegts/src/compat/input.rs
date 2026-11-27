@@ -1,0 +1,467 @@
+//! Initial carrier-grid discovery for demux packet positions.
+//!
+//! FFmpeg's demuxer reports packet positions against the carrier grid it finds at
+//! the start of the input. [`InputBootstrap`] inspects the initial window for that
+//! grid without consuming input. The [`InputContext`] it produces binds a
+//! [`DemuxObserver`](super::pes::DemuxObserver) to the same positions through
+//! [`bind_input`](super::pes::DemuxObserver::bind_input).
+//!
+//! The discovered grid determines compatibility byte positions. Each carrier
+//! still undergoes transport validation when the source reader consumes it.
+//!
+//! Reference: FFmpeg git revision `d32b387f` on the 9.0 branch.
+use crate::PacketFormat;
+use crate::transport::SYNC;
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{
+    Bytes, Error, InputCursor, InputToken, InputWindow, Result, SourceId, WorkBudget,
+};
+
+/// Which byte of a carrier the demuxer's packet positions point at.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PositionBasis {
+    /// The sync byte, after the four-byte M2TS prefix.
+    SyncStart,
+    /// The carrier's first byte, the M2TS prefix included.
+    CarrierStart,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum Extent {
+    Finite(u64),
+    Prefix(Option<u64>),
+}
+impl Extent {
+    fn permits(self, end: u64) -> bool {
+        match self {
+            Self::Finite(limit) | Self::Prefix(Some(limit)) => end <= limit,
+            Self::Prefix(None) => true,
+        }
+    }
+}
+
+/// The carrier grid and position basis found at the start of one input, bound to its request.
+#[derive(Clone, Debug)]
+pub struct InputContext {
+    source: SourceId,
+    token: InputToken,
+    format: PacketFormat,
+    backing: Bytes,
+    extent: Extent,
+    basis: PositionBasis,
+    inspected_bytes: usize,
+}
+impl InputContext {
+    /// Which byte of each carrier the demuxer's positions for this input point at:
+    /// `SyncStart` for a finite M2TS input with fewer than seven sync bytes on its
+    /// 192-byte grid, `CarrierStart` otherwise.
+    pub fn basis(&self) -> PositionBasis {
+        self.basis
+    }
+    /// True when the context came from an M2TS prefix window rather than a whole finite
+    /// input, so reads may continue past the inspected bytes.
+    pub fn is_prefix(&self) -> bool {
+        matches!(self.extent, Extent::Prefix(_))
+    }
+    /// Bytes of the initial window inspected to find the grid.
+    pub fn inspected_bytes(&self) -> usize {
+        self.inspected_bytes
+    }
+    /// The charged initial window the grid was found in: a prefix or the whole entity.
+    pub fn backing_bytes(&self) -> &Bytes {
+        &self.backing
+    }
+    /// Checks that `input` still reads the request this context was found for.
+    ///
+    /// Fails with `SourceMismatch` for another source, `Invalid` for another request token
+    /// (a range request, reset or entity change makes a new one) or a position past a finite
+    /// input's end, and `ForeignPool` when the window belongs to another byte pool.
+    pub fn validate_cursor(&self, input: &InputCursor) -> Result<()> {
+        if input.source() != self.source {
+            return Err(Error::SourceMismatch);
+        }
+        if input.token() != self.token {
+            return Err(Error::Invalid("stale PES startup request"));
+        }
+        if !self.backing.belongs_to(input.budget()) {
+            return Err(Error::ForeignPool);
+        }
+        if !self.extent.permits(input.position()) {
+            return Err(Error::Invalid(
+                "PES input position is beyond the observed entity end",
+            ));
+        }
+        Ok(())
+    }
+    pub(crate) fn binding(&self) -> InputBinding {
+        InputBinding {
+            source: self.source,
+            token: self.token.clone(),
+            format: self.format,
+            extent: self.extent,
+            basis: self.basis,
+        }
+    }
+}
+
+/// The request, grid and basis an observer computes positions against, without the
+/// inspected window.
+#[derive(Clone, Debug)]
+pub(crate) struct InputBinding {
+    source: SourceId,
+    token: InputToken,
+    format: PacketFormat,
+    extent: Extent,
+    basis: PositionBasis,
+}
+impl InputBinding {
+    pub(crate) fn continued_media_entity(
+        &self,
+        end: &crate::stream::MediaEntityEnd,
+        input: &InputCursor,
+    ) -> Result<Self> {
+        if self.source != end.location.source
+            || self.token != end.token
+            || self.format != end.format
+            || !matches!(self.extent, Extent::Finite(bytes) if bytes == end.location.offset)
+        {
+            return Err(Error::Invalid(
+                "media entity end does not match the PES input binding",
+            ));
+        }
+        let bytes = input.capabilities().length.ok_or(Error::Unsupported(
+            "input-bound PES continuation requires a known entity length",
+        ))?;
+        usize::try_from(bytes).map_err(|_| Error::Overflow)?;
+        Ok(Self {
+            source: input.source(),
+            token: input.token(),
+            format: self.format,
+            extent: Extent::Finite(bytes),
+            basis: self.basis,
+        })
+    }
+    pub(crate) fn validate_cursor(&self, input: &InputCursor) -> Result<()> {
+        if input.source() != self.source {
+            return Err(Error::SourceMismatch);
+        }
+        if input.token() != self.token {
+            return Err(Error::Invalid("stale PES startup request"));
+        }
+        if !self.extent.permits(input.position()) {
+            return Err(Error::Invalid(
+                "PES input position is beyond the observed entity end",
+            ));
+        }
+        Ok(())
+    }
+    pub(crate) fn position(
+        &self,
+        entity: SourceId,
+        offset: u64,
+        carrier_bytes: usize,
+        prefix_bytes: usize,
+    ) -> Result<i64> {
+        if entity != self.source {
+            return Err(Error::SourceMismatch);
+        }
+        let end = offset
+            .checked_add(carrier_bytes as u64)
+            .ok_or(Error::Overflow)?;
+        if !self.extent.permits(end) || carrier_bytes != self.format.bytes() {
+            return Err(Error::Invalid(
+                "PES carrier size or range does not match the input binding",
+            ));
+        }
+        let prefix = if self.basis == PositionBasis::SyncStart {
+            prefix_bytes
+        } else {
+            0
+        };
+        i64::try_from(offset.checked_add(prefix as u64).ok_or(Error::Overflow)?)
+            .map_err(|_| Error::Overflow)
+    }
+}
+
+/// One step of [`InputBootstrap::poll`].
+#[derive(Debug)]
+pub enum InputStep {
+    /// A finite input needs [`InputBootstrap::observe_entity_eof`] before its grid can be decided.
+    NeedEntityEof,
+    /// The work budget ran out; poll again.
+    Yield,
+    /// The grid was found.
+    Ready(InputContext),
+}
+
+/// Finds the carrier grid in the window an [`InputCursor`] holds at offset 0, without
+/// consuming it: the whole of a finite input ([`Self::new`]) or an 8192-byte M2TS prefix
+/// ([`Self::new_m2ts_prefix`]).
+#[derive(Debug)]
+pub struct InputBootstrap {
+    source: SourceId,
+    token: InputToken,
+    format: PacketFormat,
+    backing: Bytes,
+    eof: bool,
+    extent: Extent,
+    inspected: usize,
+    scores188: [u16; 188],
+    scores192: [u16; 192],
+    scores204: [u16; 204],
+    bad_sync: bool,
+    ready: Option<InputContext>,
+}
+impl InputBootstrap {
+    /// Largest initial window, in bytes, that a bootstrap inspects.
+    pub const MAX_BORROWED_BYTES: usize = 16 * 1024;
+    /// Exact size, in bytes, of the initial window for [`InputBootstrap::new_m2ts_prefix`].
+    pub const M2TS_PREFIX_BYTES: usize = 8192;
+
+    /// A bootstrap over the whole finite input in `window`, which `input` has buffered at offset 0.
+    ///
+    /// Fails with `Invalid` when the window is not the cursor's initial buffered window for the
+    /// current request, `SourceMismatch` for another source, `ForeignPool` for another byte pool,
+    /// and `Limit` when the window exceeds [`MAX_BORROWED_BYTES`](Self::MAX_BORROWED_BYTES).
+    pub fn new(input: &InputCursor, window: &InputWindow, format: PacketFormat) -> Result<Self> {
+        Self::with_extent(
+            input,
+            window,
+            format,
+            Extent::Finite(window.bytes().len() as u64),
+        )
+    }
+
+    /// A bootstrap over the first [`M2TS_PREFIX_BYTES`](Self::M2TS_PREFIX_BYTES) of an M2TS
+    /// input, which `input` has buffered at offset 0; the grid must be decided within them.
+    ///
+    /// Fails with `Invalid` for a window of another size, and as [`Self::new`] otherwise.
+    pub fn new_m2ts_prefix(input: &InputCursor, window: &InputWindow) -> Result<Self> {
+        if window.bytes().len() != Self::M2TS_PREFIX_BYTES {
+            return Err(Error::Invalid("M2TS prefix requires an 8192-byte window"));
+        }
+        Self::with_extent(
+            input,
+            window,
+            PacketFormat::M2ts192,
+            Extent::Prefix(input.capabilities().length),
+        )
+    }
+
+    fn with_extent(
+        input: &InputCursor,
+        window: &InputWindow,
+        format: PacketFormat,
+        extent: Extent,
+    ) -> Result<Self> {
+        if input.position() != 0 || window.offset != 0 {
+            return Err(Error::Invalid("PES startup requires input at offset zero"));
+        }
+        if window.source != input.source() {
+            return Err(Error::SourceMismatch);
+        }
+        if window.token != input.token() {
+            return Err(Error::Invalid("stale PES startup request"));
+        }
+        if !window.bytes().belongs_to(input.budget()) {
+            return Err(Error::ForeignPool);
+        }
+        let retained = input.buffered_owner().cloned().ok_or(Error::Invalid(
+            "PES startup requires the window buffered by the input cursor",
+        ))?;
+        if !retained.shares_storage_with(window.bytes())
+            || (retained.len() != window.bytes().len()
+                || retained.as_ref().as_ptr() != window.bytes().as_ref().as_ptr())
+        {
+            return Err(Error::Invalid(
+                "PES startup requires the window buffered by the input cursor",
+            ));
+        }
+        if window.bytes().len() > Self::MAX_BORROWED_BYTES {
+            return Err(Error::Limit {
+                requested: window.bytes().len(),
+                maximum: Self::MAX_BORROWED_BYTES,
+            });
+        }
+        Ok(Self {
+            source: window.source,
+            token: window.token.clone(),
+            format,
+            backing: window.bytes().clone(),
+            eof: false,
+            extent,
+            inspected: 0,
+            scores188: [0; 188],
+            scores192: [0; 192],
+            scores204: [0; 204],
+            bad_sync: false,
+            ready: None,
+        })
+    }
+    fn validate(&self, input: &InputCursor) -> Result<()> {
+        if input.source() != self.source {
+            return Err(Error::SourceMismatch);
+        }
+        if input.token() != self.token {
+            return Err(Error::Invalid("stale PES startup request"));
+        }
+        Ok(())
+    }
+    /// Records that a read past the window found the end of the finite input at `end`.
+    /// Report a read that returned end of input, not a declared length; finish the cursor
+    /// only once the window's bytes have been read.
+    ///
+    /// Fails with `SourceMismatch` for another source, `Invalid` for another request token, a
+    /// prefix bootstrap or an `end` other than the window's length, and `Unsupported` when
+    /// `end` contradicts the declared source length.
+    pub fn observe_entity_eof(
+        &mut self,
+        input: &InputCursor,
+        source: SourceId,
+        token: &InputToken,
+        end: u64,
+    ) -> Result<()> {
+        self.validate(input)?;
+        if source != self.source {
+            return Err(Error::SourceMismatch);
+        }
+        if *token != self.token || !matches!(self.extent, Extent::Finite(bytes) if bytes == end) {
+            return Err(Error::Invalid(
+                "PES startup EOF does not match the request or initial window",
+            ));
+        }
+        if input.capabilities().length.is_some_and(|n| n != end) {
+            return Err(Error::Unsupported(
+                "PES startup EOF disagrees with the declared source length",
+            ));
+        }
+        self.eof = true;
+        Ok(())
+    }
+    /// Bytes of the window inspected so far.
+    pub fn inspected_bytes(&self) -> usize {
+        self.inspected
+    }
+    /// Scores sync bytes within `work` until the grid is decided.
+    ///
+    /// Returns `NeedEntityEof` until a finite input's EOF is observed, `Yield` when `work` is
+    /// spent, and the context once found, again on every later poll. Fails with `Unsupported` when the
+    /// input is not a whole number of packets, a sync byte is missing or another packet size
+    /// competes with the format's grid; with `Cancelled` when `cancel` is set; and when `input` is
+    /// not the bootstrap's source and request.
+    pub fn poll(
+        &mut self,
+        input: &InputCursor,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<InputStep> {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        self.validate(input)?;
+        if let Some(context) = &self.ready {
+            return Ok(InputStep::Ready(context.clone()));
+        }
+        let finite = matches!(self.extent, Extent::Finite(_));
+        if finite && !self.eof {
+            return Ok(InputStep::NeedEntityEof);
+        }
+        let width = self.format.bytes();
+        if finite && (self.backing.is_empty() || !self.backing.len().is_multiple_of(width)) {
+            return Err(Error::Unsupported(
+                "finite PES startup needs a nonempty entity with whole transport packets",
+            ));
+        }
+        let sync = width - 188;
+        let bytes = self.backing.as_ref();
+        let header_end = bytes.len().saturating_sub(3);
+        let mut next_sync = self.inspected + (sync + width - self.inspected % width) % width;
+        let mut score = |index: usize| {
+            self.scores188[index % 188] += 1;
+            self.scores192[index % 192] += 1;
+            self.scores204[index % 204] += 1;
+        };
+        while self.inspected < bytes.len() {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Error::Cancelled);
+            }
+            let count = work.take((bytes.len() - self.inspected).min(64) as u64) as usize;
+            if count == 0 {
+                return Ok(InputStep::Yield);
+            }
+            let start = self.inspected;
+            let end = start + count;
+            // A work chunk is shorter than a carrier, so it has at most one
+            // expected sync byte. Score competing grids only at complete headers.
+            if next_sync < end {
+                self.bad_sync |= bytes[next_sync] != SYNC;
+                next_sync += width;
+            }
+            let (words, tail) = bytes[start..end.min(header_end).max(start)].as_chunks::<8>();
+            for (offset, word) in words.iter().enumerate() {
+                const LOW_BITS: u64 = 0x7f7f_7f7f_7f7f_7f7f;
+                const SYNC_BYTES: u64 = u64::from_le_bytes([SYNC; 8]);
+                let difference = u64::from_le_bytes(*word) ^ SYNC_BYTES;
+                // Each nonzero byte sets its high bit without a carry into
+                // neighbouring bytes. Only exact matches remain in the mask.
+                let mut matches =
+                    !((difference & LOW_BITS).wrapping_add(LOW_BITS) | difference) & !LOW_BITS;
+                while matches != 0 {
+                    score(start + offset * 8 + matches.trailing_zeros() as usize / 8);
+                    matches &= matches - 1;
+                }
+            }
+            let tail_start = start + words.len() * 8;
+            for (offset, &byte) in tail.iter().enumerate() {
+                if byte == SYNC {
+                    score(tail_start + offset);
+                }
+            }
+            self.inspected = end;
+        }
+        if self.bad_sync {
+            return Err(Error::Unsupported(
+                "PES startup found missing sync bytes on the expected packet grid",
+            ));
+        }
+        let s188 = self.scores188.iter().copied().max().unwrap_or(0);
+        let s192 = self.scores192.iter().copied().max().unwrap_or(0);
+        let s204 = self.scores204.iter().copied().max().unwrap_or(0);
+        let basis = if finite {
+            match self.format {
+                PacketFormat::Ts188 if s192 < 7 && s204 < 7 => PositionBasis::CarrierStart,
+                PacketFormat::M2ts192 if s188 < 7 && s204 < 7 => {
+                    if s192 >= 7 {
+                        PositionBasis::CarrierStart
+                    } else {
+                        PositionBasis::SyncStart
+                    }
+                }
+                _ => {
+                    return Err(Error::Unsupported(
+                        "PES startup found a competing packet sync grid",
+                    ));
+                }
+            }
+        } else {
+            // Require an unambiguous 192-byte prefix. Cap competing markers
+            // and reject enough off-grid noise to obscure the selected chain.
+            let markers: u32 = self.scores192.iter().map(|&n| u32::from(n)).sum();
+            if s192 < 7 || s188 >= 6 || s204 >= 6 || markers > 10 * u32::from(s192) {
+                return Err(Error::Unsupported("M2TS prefix grid is ambiguous"));
+            }
+            PositionBasis::CarrierStart
+        };
+        let context = InputContext {
+            source: self.source,
+            token: self.token.clone(),
+            format: self.format,
+            backing: self.backing.clone(),
+            extent: self.extent,
+            basis,
+            inspected_bytes: self.inspected,
+        };
+        self.ready = Some(context.clone());
+        Ok(InputStep::Ready(context))
+    }
+}

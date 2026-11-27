@@ -2,9 +2,9 @@
 //!
 //! [`SourceConfiguration`] reads a service's configuration from Matroska
 //! `CodecPrivate` or an MPEG-TS subtitling descriptor and binds each packet to
-//! it ([`DvbPacket`]) with its original clock values. The receiver that decodes
+//! it ([`DvbPacket`]) with its raw clock values. The receiver that decodes
 //! the packets as the reference does is
-//! [`compat::dvb::ReceiverDecoder`](crate::compat::dvb::ReceiverDecoder).
+//! [`compat::dvb::Decoder`](crate::compat::dvb::Decoder).
 mod boundary;
 mod model;
 pub(crate) mod pes_parser;
@@ -12,7 +12,7 @@ pub(crate) mod receiver_decoder;
 
 pub use boundary::{
     ClockOrigin, ClockValue, ConfigurationSource, PacketIdentity, PacketSourceFacts, PacketTiming,
-    SourceClock, SourceConfiguration,
+    SourceConfiguration,
 };
 pub use boundary::{DvbPacket, PacketEnvelope, Service};
 pub use model::{Depth, Size};

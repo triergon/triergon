@@ -48,6 +48,22 @@ fn row(r: &Value) -> Result<String, String> {
     let c = get(r, "correctness_summary")?;
     let rt = get(r, "runtime")?;
     let m = get(r, "memory")?;
+    let id = python::str(get(get(r, "case")?, "id")?);
+    if c.get("outcome").and_then(Value::as_str) == Some("refusal") {
+        let conversion = if c.get("conversion") == Some(&Value::Bool(true)) {
+            "pass"
+        } else {
+            "FAIL"
+        };
+        let refusal = if c.get("matching_refusal") == Some(&Value::Bool(true)) {
+            "matching refusal"
+        } else {
+            "FAIL (refusal mismatch)"
+        };
+        return Ok(format!(
+            "| {id} | {conversion} | n/a | {refusal} | n/a | n/a | n/a | n/a | n/a | not measured |"
+        ));
+    }
     let heap = m.get("heap_peak_bytes").filter(|h| h.truthy());
     let heap_cell = match (m.get("heap_ratio_upper_95"), heap) {
         (Some(ratio), _) => format!("{}×", fixed(float(ratio)?, 3)),
@@ -108,6 +124,9 @@ fn row(r: &Value) -> Result<String, String> {
                 ""
             },
         ),
+        None if rt.get("status").and_then(Value::as_str) == Some("not-measured") => {
+            "not measured".into()
+        }
         None => format!(
             "FAIL ({})",
             rt.get("status")
@@ -126,7 +145,7 @@ fn row(r: &Value) -> Result<String, String> {
     };
     Ok(format!(
         "| {} | {} (±{}, {}% exact) | {} | {} ({}, {}×, {}/{} dB) | {runtime} | {} | {} | {} | {} | {} |",
-        python::str(get(get(r, "case")?, "id")?),
+        id,
         conversion,
         python::str(optional(c, "conversion_max_abs")),
         fixed(100.0 * exact, 2),

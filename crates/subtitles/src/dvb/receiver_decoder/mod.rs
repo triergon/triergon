@@ -55,6 +55,7 @@ pub struct Options {
     /// Present each display set at the next page composition, ending where
     /// that one starts (`compute_edt`).
     pub end_from_next: bool,
+    /// When regions take the automatic palette (`compute_clut`).
     pub automatic_palette: AutomaticPalette,
     /// Decode only the composition and ancillary pages of this service of the
     /// stream configuration, or of its first service when it has fewer
@@ -62,33 +63,33 @@ pub struct Options {
     pub service: Option<usize>,
 }
 
-/// What a [`ReceiverDecoder::decode`] call did.
+/// What a [`Decoder::decode`] call did.
 #[derive(Clone, Copy, Debug)]
 pub enum Status<'a> {
     /// The packet is decoded and presented this subtitle.
-    Subtitle(Subtitle<'a>),
+    Ready(Subtitle<'a>),
     /// The packet is decoded and presented nothing.
     Nothing,
     /// The work budget ran out before the packet's next segment, which is
     /// not decoded yet. The decoder keeps the packet, and the work left over
     /// counts towards its next segment:
-    /// [`resume`](ReceiverDecoder::resume) or
-    /// [`abandon`](ReceiverDecoder::abandon) it.
+    /// [`resume`](Decoder::resume) or
+    /// [`abandon`](Decoder::abandon) it.
     Yield,
     /// The pool refused memory a segment needed after the packet's check
     /// admitted it: another user of the pool took it in between. The segments
     /// before it stay decoded and the decoder keeps the packet from that
     /// segment on, as for [`Yield`](Self::Yield): resume it once the pool has
     /// room, or abandon it.
-    Stalled(Error),
+    NeedOutput(Error),
 }
 
 impl<'a> Status<'a> {
     /// The presented subtitle, if any.
     pub fn subtitle(self) -> Option<Subtitle<'a>> {
         match self {
-            Self::Subtitle(subtitle) => Some(subtitle),
-            Self::Nothing | Self::Yield | Self::Stalled(_) => None,
+            Self::Ready(subtitle) => Some(subtitle),
+            Self::Nothing | Self::Yield | Self::NeedOutput(_) => None,
         }
     }
 }
@@ -98,10 +99,12 @@ impl<'a> Status<'a> {
 pub struct Subtitle<'a> {
     /// Microseconds; `None` when unknown.
     pub pts: Option<i64>,
-    /// Milliseconds after `pts`. With [`Options::end_from_next`] the end is
-    /// one millisecond before the next display set, `u32::MAX` when that
-    /// starts within the same millisecond.
+    /// Milliseconds after `pts` the subtitle shows; always 0.
     pub start_display_ms: u32,
+    /// Milliseconds after `pts` the subtitle ends: the page's time-out, a
+    /// whole number of seconds, or with [`Options::end_from_next`] one
+    /// millisecond before the next display set, `u32::MAX` when that starts
+    /// within the same millisecond.
     pub end_display_ms: u32,
     /// The display size rectangle positions refer to, as the receiver keeps
     /// it: the first display definition's, or 720 × 576 once a packet held a
@@ -133,9 +136,15 @@ impl<'a> Subtitle<'a> {
 /// One region's bitmap on the page.
 #[derive(Clone, Copy, Debug)]
 pub struct Rect<'a> {
+    /// Left edge in display pixels: the region's place on the page plus the
+    /// display window's horizontal offset.
     pub x: i32,
+    /// Top edge in display pixels: the region's place on the page plus the
+    /// display window's vertical offset.
     pub y: i32,
+    /// Width in pixels.
     pub width: u16,
+    /// Height in pixels.
     pub height: u16,
     /// ARGB words, alpha in the top byte; `1 << depth` of them.
     pub palette: &'a [u32],
@@ -207,7 +216,7 @@ impl Pages {
 }
 
 /// A packet whose decoding stopped before a segment, to continue there. Its
-/// bytes are in [`ReceiverDecoder::held_packet`].
+/// bytes are in [`Decoder::held_packet`].
 #[derive(Clone, Copy, Debug)]
 struct Suspended {
     pts: Option<i64>,
@@ -258,7 +267,7 @@ impl<'a> Parsed<'a> {
             Kind::PageComposition => Self::Page(PageComposition::parse(segment)),
             Kind::RegionComposition => Self::Region(RegionComposition::parse(segment.body)),
             Kind::ClutDefinition => Self::Clut(ClutDefinition::parse(segment)),
-            Kind::ObjectData => Self::Object(ObjectData::parse(segment.body).ok()),
+            Kind::ObjectData => Self::Object(ObjectData::parse(segment.body)),
             Kind::DisplayDefinition => Self::Display(DisplayDefinition::parse(segment.body)),
             Kind::EndOfDisplaySet => Self::End,
             Kind::Other => Self::Other,
@@ -321,7 +330,7 @@ impl Held {
 
 /// The decoder. Memory is charged to the budget it was created with.
 #[derive(Debug)]
-pub struct ReceiverDecoder {
+pub struct Decoder {
     options: Options,
     pages: Pages,
     epoch: Epoch,
@@ -350,35 +359,35 @@ pub struct ReceiverDecoder {
     budget: Budget,
 }
 
-impl ReceiverDecoder {
+impl Decoder {
     /// `configuration` is the stream's codec configuration (the services'
     /// page ids), read when [`Options::service`] selects one.
-    pub fn new(budget: &Budget, configuration: &[u8], options: Options) -> Self {
+    pub fn new(pool: &Budget, configuration: &[u8], options: Options) -> Self {
         Self {
             options,
             pages: Pages::select(configuration, options.service),
             epoch: Epoch::new(
-                budget,
+                pool,
                 options.automatic_palette == AutomaticPalette::WithoutClutOnce,
             ),
             page: Page {
                 version: None,
                 timeout: 0,
-                placements: BudgetVec::new(budget),
+                placements: BudgetVec::new(pool),
                 display: None,
             },
             previous_pts: None,
             display_size: None,
             held: Held::default(),
-            census: Census::new(budget),
-            slots: BudgetVec::new(budget),
+            census: Census::new(pool),
+            slots: BudgetVec::new(pool),
             presented: None,
             suspended: None,
-            held_packet: BudgetVec::new(budget),
-            planned: BudgetVec::new(budget),
+            held_packet: BudgetVec::new(pool),
+            planned: BudgetVec::new(pool),
             credit: 0,
             owed: 0,
-            budget: budget.clone(),
+            budget: pool.clone(),
         }
     }
 
@@ -400,7 +409,7 @@ impl ReceiverDecoder {
     /// over counts towards the next segment, or [`abandon`](Self::abandon) it.
     /// Cancellation is checked before each segment and each object placement,
     /// and a cancelled packet is kept the same way, as is one whose memory
-    /// another user of the pool took after the check ([`Status::Stalled`]).
+    /// another user of the pool took after the check ([`Status::NeedOutput`]).
     /// `decode` refuses another packet while one is kept.
     ///
     /// The leftover work of a yielded call is banked whole, and a segment is
@@ -441,10 +450,10 @@ impl ReceiverDecoder {
             Some(if requested > maximum {
                 Error::Limit { requested, maximum }
             } else {
-                Error::Backpressure {
+                Error::Backpressure(triergon_core::Backpressure {
                     requested,
                     available,
-                }
+                })
             })
         } else {
             self.held_packet.clear();
@@ -527,7 +536,7 @@ impl ReceiverDecoder {
         match why {
             Halt::Yield => Ok(Status::Yield),
             Halt::Cancelled => Err(Error::Cancelled),
-            Halt::Refused(error) => Ok(Status::Stalled(error)),
+            Halt::Refused(error) => Ok(Status::NeedOutput(error)),
         }
     }
 
@@ -550,7 +559,7 @@ impl ReceiverDecoder {
     /// What the packet presented, once it is decoded.
     fn status(&self) -> Status<'_> {
         match self.presented {
-            Some(p) if p.output => Status::Subtitle(Subtitle {
+            Some(p) if p.output => Status::Ready(Subtitle {
                 pts: p.pts,
                 start_display_ms: 0,
                 end_display_ms: p.end_display_ms,
@@ -721,7 +730,7 @@ impl ReceiverDecoder {
         if self.options.end_from_next {
             let previous = self.previous_pts;
             let end = previous.map_or(-1, |previous| {
-                millis(pts.unwrap_or(i64::MIN).wrapping_sub(previous)) - 1
+                crate::milliseconds(pts.unwrap_or(i64::MIN).wrapping_sub(previous)) - 1
             });
             // The receiver's display time is 32 bits: a negative end wraps.
             self.present(previous, end as u32, previous.is_some())?;
@@ -879,13 +888,6 @@ fn push_exact<T>(vec: &mut BudgetVec<T>, value: T) -> Result<()> {
     push(vec, value)
 }
 
-/// Microseconds to milliseconds, rounded to nearest with ties away from zero.
-fn millis(us: i64) -> i64 {
-    let us = i128::from(us);
-    // Within 64 bits: a thousandth of a 64-bit value.
-    ((us + if us < 0 { -500 } else { 500 }) / 1000) as i64
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -983,7 +985,7 @@ mod tests {
         ] {
             let pool = Budget::new(1 << 22).unwrap();
             let cancel = AtomicBool::new(false);
-            let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+            let mut decoder = Decoder::new(&pool, &[], options);
             for (i, packet) in packets.iter().enumerate() {
                 let mut work = WorkBudget::new(u64::MAX);
                 decoder
@@ -1000,7 +1002,7 @@ mod tests {
     fn palettes(options: Options, packets: &[Vec<u8>]) -> Vec<Vec<u32>> {
         let pool = Budget::new(1 << 22).unwrap();
         let cancel = AtomicBool::new(false);
-        let mut decoder = ReceiverDecoder::new(&pool, &[], options);
+        let mut decoder = Decoder::new(&pool, &[], options);
         packets
             .iter()
             .enumerate()

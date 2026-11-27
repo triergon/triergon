@@ -1,0 +1,1511 @@
+//! The playback plan of an MP4 movie: [`Mp4IndexJob`] borrows the opened movie's
+//! sample tables and builds a [`PreparedMp4`] that owns its rows, charged to the pool.
+use crate::{
+    Result,
+    mp4::open::{CachedMedia, Movie, RETAINED_MEDIA_BYTES},
+};
+use std::{
+    alloc::Layout,
+    ops::{Deref, Range},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+};
+use triergon_core::container::{CodecId, MediaKind, TrackId, TrackInfo};
+use triergon_core::{
+    Budget, BudgetVec, Bytes, Charged, Error, Reservation, Rounding, Time, TimeBase, WorkBudget,
+};
+use triergon_isobmff::{
+    self as iso, BuildStatus, CursorStatus, Next, Sample,
+    boxes::BoxView,
+    compat::mov::{
+        clock::{MediaClock, SourceTimeBase},
+        edits::FragmentAacTrimJob,
+        packets::{
+            DemuxProfile, DemuxTrack, PacketCursor, PacketLimits, PacketOccurrence, StreamView,
+        },
+    },
+    config::{ConfigurationLimits, EntryConfiguration, codec_id},
+    interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
+    movie::{EditList, SampleDescription},
+    table::SampleCursor,
+};
+fn push<T>(v: &mut BudgetVec<T>, x: T) -> Result<()> {
+    v.try_push(x).map_err(|e| e.error)
+}
+/// Which packets a plan delivers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum PlanView {
+    /// Source samples: each track in decode order, the tracks merged by where their
+    /// next sample lies.
+    Source,
+    /// The MOV demux packet view.
+    Demux,
+}
+/// Bounds of an MP4 index.
+#[derive(Clone, Copy, Debug)]
+pub struct PlanLimits {
+    /// The most tracks, 1 to [`MAXIMUM_TRACKS`](crate::MAXIMUM_TRACKS) (that many by
+    /// default).
+    pub tracks: usize,
+    /// The most source samples (1,000,000 by default).
+    pub samples: u64,
+    /// The most demux occurrences (1,000,000 by default).
+    pub occurrences: u64,
+    /// The most media extents (4,096 by default).
+    pub media_extents: usize,
+}
+impl Default for PlanLimits {
+    fn default() -> Self {
+        Self {
+            tracks: crate::MAXIMUM_TRACKS,
+            samples: 1_000_000,
+            occurrences: 1_000_000,
+            media_extents: 4096,
+        }
+    }
+}
+
+impl PlanLimits {
+    fn packet_limits(self) -> PacketLimits {
+        PacketLimits {
+            max_tracks: self.tracks,
+            max_media_extents: self.media_extents,
+            max_source_samples: self.samples,
+            max_occurrences: self.occurrences,
+            ..PacketLimits::default()
+        }
+    }
+}
+/// Immutable track metadata shared by the plan and its emitted packets.
+#[derive(Clone, Debug)]
+pub struct TrackSnapshot(Arc<TrackMetadata>);
+
+/// The metadata of one track, shared by the plan and its packets.
+#[derive(Debug)]
+pub struct TrackMetadata {
+    /// The `track_ID` of the track header, nonzero.
+    pub track_id: u32,
+    /// The media time base, when the media header states a usable one.
+    pub base: SourceTimeBase,
+    /// The handler type, such as `vide` or `soun`.
+    pub handler: [u8; 4],
+    pub(crate) enabled: bool,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_tkhd: BoxView,
+    /// The media header box.
+    pub raw_mdhd: BoxView,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_hdlr: BoxView,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_table: BoxView,
+    raw_edits: Option<BoxView>,
+    #[expect(dead_code, reason = "preserve the charged box and its debug view")]
+    raw_dref: BoxView,
+    /// The track as the demux view reads it, or why the demux view leaves it out.
+    pub demux_stream: std::result::Result<StreamView, Error>,
+    _charge: Reservation,
+}
+
+impl TrackSnapshot {
+    fn reserve(pool: &Budget) -> Result<Reservation> {
+        let (layout, _) = Layout::new::<[AtomicUsize; 2]>()
+            .extend(Layout::new::<TrackMetadata>())
+            .map_err(|_| Error::Overflow)?;
+        pool.reserve(layout.pad_to_align().size())
+    }
+}
+
+impl Deref for TrackSnapshot {
+    type Target = TrackMetadata;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+/// The configuration of one track's sample description.
+#[derive(Clone, Debug)]
+pub struct Mp4Configuration {
+    /// The track's metadata.
+    pub track: TrackSnapshot,
+    /// The sample entry the packets are coded with: its format, fields and boxes.
+    pub description: SampleDescription,
+    /// The configuration revision; each change the engine publishes increases it.
+    pub revision: u64,
+}
+/// One track of a plan.
+#[derive(Debug)]
+// The compiler's order, held by `repr(C)`; the decode end takes the bytes the boxed
+// identity leaves, so that no other field moves.
+#[repr(C)]
+pub struct PlanTrack {
+    edits: Option<EditList>,
+    pub(crate) descriptions: BudgetVec<SampleDescription>,
+    pub(crate) trex: Option<iso::fragment::Trex>,
+    /// The track's metadata.
+    pub snapshot: TrackSnapshot,
+    pub(crate) next_ordinal: u64,
+    /// What [`PreparedMp4::identify_tracks`] read of the first sample entry.
+    identity: Option<Box<Charged<EntryConfiguration>>>,
+    /// The decode time just after the last indexed sample, in media ticks, where a
+    /// later fragment of a forward source without `tfdt` starts; `None` when unknown,
+    /// beyond `i64`, or for a track without fragment defaults or a source read whole.
+    pub(crate) decode_end: Option<i64>,
+    pub(crate) fragment_aac_trim: u32,
+}
+
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(size_of::<PlanTrack>() <= 176);
+
+impl PlanTrack {
+    fn first_description(&self) -> Option<&SampleDescription> {
+        self.descriptions.as_slice().first()
+    }
+    pub(crate) fn configuration(
+        &self,
+        description_index: u32,
+        revision: u64,
+    ) -> Result<Mp4Configuration> {
+        let description = self
+            .descriptions
+            .as_slice()
+            .iter()
+            .find(|d| d.index == description_index)
+            .ok_or(Error::Invalid("sample description absent"))?;
+        Ok(Mp4Configuration {
+            track: self.snapshot.clone(),
+            description: description.clone(),
+            revision,
+        })
+    }
+}
+/// The track as its first sample entry describes it, as [`triergon_isobmff::Track`]
+/// reports it. Until [`PreparedMp4::identify_tracks`] has read the entry, the codec is
+/// the one its code alone names (an `mp4a` entry is [`CodecId::Other`]) and the
+/// configuration is empty.
+impl TrackInfo for PlanTrack {
+    fn id(&self) -> TrackId {
+        TrackId(u64::from(self.snapshot.track_id))
+    }
+    fn kind(&self) -> MediaKind {
+        iso::media_kind(&self.snapshot.handler)
+    }
+    fn codec_tag(&self) -> &[u8] {
+        self.first_description()
+            .map_or(&[], |entry| entry.format.as_slice())
+    }
+    fn codec(&self) -> CodecId {
+        match (&self.identity, self.first_description()) {
+            (Some(identity), _) => identity.codec(),
+            (None, Some(entry)) => codec_id(&self.snapshot.handler, &entry.format, None),
+            (None, None) => CodecId::Other,
+        }
+    }
+    fn configuration(&self) -> &[u8] {
+        match (&self.identity, self.first_description()) {
+            (Some(identity), Some(entry)) => identity.bytes(entry),
+            _ => &[],
+        }
+    }
+}
+/// One sample of a track, in the plan's order.
+#[derive(Clone, Debug)]
+pub struct SourceRow {
+    /// The `track_ID` of the sample's track.
+    pub track_id: u32,
+    /// The sample's table facts: byte range, clocks and flags.
+    pub sample: Sample,
+}
+impl SourceRow {
+    pub(crate) fn physical_key(&self) -> (u64, u32, u64) {
+        (self.sample.range.start, self.track_id, self.sample.ordinal)
+    }
+}
+/// An indexed movie, bound to the source and pool it was opened over. Only an
+/// [`Mp4IndexJob`] makes one, and its rows cannot be changed afterwards:
+/// ```compile_fail
+/// fn corrupt(plan: &mut triergon_playback::mp4::PreparedMp4) {
+///     plan.source_rows.clear();
+/// }
+/// ```
+#[derive(Debug)]
+// Fields in the order the compiler chose for them, held by `repr(C)`.
+#[repr(C)]
+pub struct PreparedMp4 {
+    /// A single track's first sample declared at or beyond the end of the media
+    /// read while indexing. Only the physical end of the source shows whether it
+    /// lies outside the source.
+    pub(crate) unavailable_first: Option<SourceRow>,
+    pub(crate) source_length: Option<u64>,
+    pub(crate) front_boundary: Option<iso::compat::mov::front::FrontReadBoundary>,
+    pub(crate) empty_duration: Option<i64>,
+    pub(crate) forward_regular_extents: Option<usize>,
+    pub(crate) read_scope: crate::mp4::open::MetadataReadScope,
+    pub(crate) movie_base: TimeBase,
+    pub(crate) terminal_mdat: Option<iso::payload::TerminalMdat>,
+    pub(crate) front_tracks: BudgetVec<iso::compat::mov::front::FrontTrack>,
+    pub(crate) source_rows: BudgetVec<SourceRow>,
+    pub(crate) demux_rows: BudgetVec<PacketOccurrence>,
+    pub(crate) tracks: BudgetVec<PlanTrack>,
+    pub(crate) media: BudgetVec<Range<u64>>,
+    pub(crate) media_cache: BudgetVec<CachedMedia>,
+    pub(crate) raw_roots: BudgetVec<BoxView>,
+    pub(crate) encoded_edits: Option<BudgetVec<Option<iso::compat::mov::edits::EncodedEditPlan>>>,
+    pub(crate) pool: Budget,
+    pub(crate) source: triergon_core::SourceId,
+    pub(crate) opening_generation: u64,
+    /// Whether the demux view recovers truncated and out-of-source media.
+    pub(crate) demux_recovery: bool,
+    // Keep separate mode bytes: typing them with a cached row list raised one MP4 run by 0.082%.
+    pub(crate) view: PlanView,
+    /// Whether the demux view is of metadata read before its media, continued forward.
+    pub(crate) demux_front: bool,
+    /// Whether rows are delivered in the demux view's order from cached media; set
+    /// while a forward source is read, so not part of the view.
+    pub(crate) demux_order_replay: bool,
+}
+
+#[cfg(target_arch = "aarch64")]
+const _: () = assert!(size_of::<PreparedMp4>() <= 672);
+
+impl PreparedMp4 {
+    pub(crate) fn cached_payload(&self, range: &Range<u64>) -> Result<Option<Bytes>> {
+        let cache = self.media_cache.as_slice();
+        let Some(index) = cache
+            .partition_point(|extent| extent.start() <= range.start)
+            .checked_sub(1)
+        else {
+            return Ok(None);
+        };
+        let extent = &cache[index];
+        let end = range
+            .end
+            .checked_sub(extent.start())
+            .ok_or(Error::Overflow)?;
+        if end > extent.bytes().len() as u64 {
+            return Ok(None);
+        }
+        let start = (range.start - extent.start()) as usize;
+        Ok(Some(extent.bytes().slice(start..end as usize)?))
+    }
+
+    /// Reads each track's first sample entry for its [`TrackInfo`]: the object type an
+    /// `mp4a` or `mp4s` entry's `esds` states, and the codec configuration record, within
+    /// `limits`. True once every track is read; false when `work` is spent. Reads no
+    /// input. Fails with `Backpressure` when the pool refuses the result's storage.
+    pub fn identify_tracks(
+        &mut self,
+        limits: ConfigurationLimits,
+        work: &mut WorkBudget,
+    ) -> Result<bool> {
+        for track in self.tracks.as_mut_slice() {
+            let Some(entry) = track.descriptions.as_slice().first() else {
+                continue;
+            };
+            let identity = if let Some(identity) = &mut track.identity {
+                identity
+            } else {
+                if !work.try_charge(1) {
+                    return Ok(false);
+                }
+                let identity = EntryConfiguration::new(
+                    track.snapshot.handler,
+                    entry,
+                    limits,
+                    iso::Limits::default(),
+                );
+                track.identity.insert(Box::new(Charged::try_new(
+                    &self.pool,
+                    size_of::<EntryConfiguration>(),
+                    || identity,
+                )?))
+            };
+            if identity.poll(work)? == BuildStatus::Yield {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+    /// What the opener read before the media.
+    pub fn read_scope(&self) -> crate::mp4::open::MetadataReadScope {
+        self.read_scope
+    }
+    /// The size-zero `mdat` that runs to the end of the source, if any.
+    pub fn terminal_mdat(&self) -> Option<iso::payload::TerminalMdat> {
+        self.terminal_mdat
+    }
+    /// The samples the tables declare: each track in decode order, the tracks merged
+    /// by where their next sample starts, which is ascending byte order unless a track's
+    /// samples go backwards in the file. A forward plan checks a row against the `mdat`
+    /// that follows before it reads or delivers its payload.
+    pub fn source_rows(&self) -> &[SourceRow] {
+        self.source_rows.as_slice()
+    }
+    /// The demux view's occurrences, in delivery order.
+    pub fn demux_rows(&self) -> &[PacketOccurrence] {
+        self.demux_rows.as_slice()
+    }
+    /// The plan's tracks.
+    pub fn tracks(&self) -> &[PlanTrack] {
+        self.tracks.as_slice()
+    }
+    /// Where a front demux plan stops reading, if it does. Source rows continue
+    /// past it; only the demux occurrences end there.
+    pub(crate) fn front_read_boundary(&self) -> Option<iso::compat::mov::front::FrontReadBoundary> {
+        self.front_boundary
+    }
+    pub(crate) fn next_demux_empty_duration(
+        &self,
+        packet: &PacketOccurrence,
+        completed_run: bool,
+    ) -> Option<i64> {
+        let previous = self.empty_duration?;
+        if packet.source.composition_offset.is_some() {
+            return None;
+        }
+        if !completed_run {
+            return Some(previous);
+        }
+        let end = packet
+            .demux
+            .dts?
+            .checked_add(i64::from(packet.source.duration_ticks))?;
+        Some(previous.max(end))
+    }
+    /// The number of rows the engine reads in its view.
+    pub fn rows(&self) -> usize {
+        if self.demux_front && !self.demux_order_replay && self.encoded_edits.is_none() {
+            return self.source_rows.len();
+        }
+        match self.view {
+            PlanView::Source => self.source_rows.len(),
+            PlanView::Demux => self.demux_rows.len(),
+        }
+    }
+    pub(crate) fn row(&self, at: usize) -> Option<SourceRow> {
+        if self.demux_front && !self.demux_order_replay && self.encoded_edits.is_none() {
+            return self.source_rows.as_slice().get(at).cloned();
+        }
+        match self.view {
+            PlanView::Source => self.source_rows.as_slice().get(at).cloned(),
+            PlanView::Demux => self.demux_rows.as_slice().get(at).map(|n| SourceRow {
+                track_id: n.track_id,
+                sample: n.source.clone(),
+            }),
+        }
+    }
+    /// The plan track with ID `id`. Fails with `Invalid` for an unknown ID.
+    pub fn track(&self, id: u32) -> Result<&PlanTrack> {
+        self.tracks
+            .as_slice()
+            .iter()
+            .find(|t| t.snapshot.track_id == id)
+            .ok_or(Error::Invalid("unknown plan track"))
+    }
+    pub(crate) fn demux_row(&self, at: usize) -> Option<&PacketOccurrence> {
+        if self.view == PlanView::Demux {
+            self.demux_rows.as_slice().get(at)
+        } else {
+            None
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(u8)]
+enum IndexPhase {
+    Tracks = 0,
+    Roots = 1,
+    Media = 2,
+    SourceRows = 3,
+    RangeCheck = 4,
+    FragmentTrim = 5,
+    FrontTracks = 6,
+    Ready = 7,
+    /// Reading the encoded edits of a demux index before its tracks; ordered after
+    /// `Ready`, so the indexing phases dispatch as without it.
+    Edits = 8,
+}
+
+/// Indexes an opened movie into a [`PreparedMp4`], within work budgets.
+pub struct Mp4IndexJob<'a> {
+    movie: &'a Movie,
+    plan: Option<PreparedMp4>,
+    source: Option<PhysicalSampleCursor<'a>>,
+    demux: Option<PacketCursor<'a>>,
+    range_duration: Option<RangeDuration>,
+    limits: PlanLimits,
+    phase: IndexPhase,
+    track: usize,
+    description: usize,
+    fragment_aac_trim: Option<FragmentAacTrimJob>,
+    root: usize,
+    extent: usize,
+    pending_source: Option<SourceRow>,
+    pending_demux: Option<PacketOccurrence>,
+    zero_scale_clock: Option<MediaClock>,
+    first_sample_probe: Option<(SampleCursor<'a>, Error)>,
+    edits: Option<Box<iso::compat::mov::edits::DemuxEditsJob<'a>>>,
+}
+impl std::fmt::Debug for Mp4IndexJob<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Mp4IndexJob")
+            .field("phase", &self.phase)
+            .field("track", &self.track)
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+const OUTSIDE_MEDIA: &str = "sample outside media extent";
+const BACKWARD_LAYOUT: &str = "physical merge needs nondecreasing per-track source offsets";
+/// The strict view's refusal of a first sample that the source continues past.
+pub(crate) const BACKWARD_LAYOUT_REFUSAL: Error = Error::Unsupported(BACKWARD_LAYOUT);
+
+#[derive(Debug)]
+struct RangeDuration {
+    micros: i64,
+    scan: bool,
+    media_tracks_only: bool,
+}
+
+pub(crate) fn include_media_track(movie: &Movie, ordinal: usize) -> bool {
+    iso::media_kind(&movie.tracks()[ordinal].header().handler) != MediaKind::Data
+}
+
+impl<'a> Mp4IndexJob<'a> {
+    /// The demux view of metadata read before its media; see
+    /// [`compat::mov::index_front`](crate::compat::mov::index_front). The source ends
+    /// only where its `SourceReply::End` says.
+    pub(crate) fn front(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
+        if !matches!(
+            movie.read_scope(),
+            crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+        ) {
+            return Err(Error::Invalid(
+                "front demux indexing requires metadata read before mdat",
+            ));
+        }
+        Self::new_inner(movie, PlanView::Demux, limits, true, None, None)
+    }
+    /// Index `movie` for playback of its source samples, each track in decode order and
+    /// the tracks merged by byte position.
+    pub fn new(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
+        Self::new_inner(movie, PlanView::Source, limits, false, None, None)
+    }
+
+    /// Index `movie` in the MOV demux packet view. A complete source opened without
+    /// recovery first reads the encoded edits of its edited tracks, which then govern
+    /// their packets and seeks as on [`Self::encoded_range`].
+    pub(crate) fn demux(movie: &'a Movie, limits: PlanLimits) -> Result<Self> {
+        let mut job = Self::new_inner(movie, PlanView::Demux, limits, false, None, None)?;
+        if !movie.recovery()
+            && movie.read_scope() == crate::mp4::open::MetadataReadScope::CompleteEntity
+            && movie
+                .tracks()
+                .iter()
+                .any(|track| track.edits().is_some() && track.fragments().is_empty())
+        {
+            job.edits = Some(Box::new(iso::compat::mov::edits::DemuxEditsJob::new(
+                movie,
+            )?));
+            job.phase = IndexPhase::Edits;
+        }
+        Ok(job)
+    }
+    pub(crate) fn for_forward_encoded_edits(
+        movie: &'a Movie,
+        plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
+        limits: PlanLimits,
+    ) -> Result<Self> {
+        if plans.len() != movie.tracks().len() {
+            return Err(Error::Invalid("encoded edit track coverage"));
+        }
+        if movie.recovery()
+            || !matches!(
+                movie.read_scope(),
+                crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+            )
+            || movie.media().len() != 1
+            || movie.terminal_mdat().is_some()
+            || !movie.trex().is_empty()
+            || !plans.iter().any(Option::is_some)
+        {
+            return Err(Error::Unsupported(
+                "forward encoded edits require regular front media",
+            ));
+        }
+        Self::new_inner(movie, PlanView::Demux, limits, true, Some(plans), None)
+    }
+
+    /// The demux view of a complete source with encoded edit plans, which also
+    /// govern seeks on this index; see
+    /// [`compat::mov::index_encoded_range`](crate::compat::mov::index_encoded_range).
+    pub(crate) fn encoded_range(
+        movie: &'a Movie,
+        plans: &'a [Option<iso::compat::mov::edits::EncodedEditPlan>],
+        limits: PlanLimits,
+    ) -> Result<Self> {
+        if movie.recovery()
+            || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
+        {
+            return Err(Error::Unsupported(
+                "encoded edits require metadata from a complete MP4 source opened without recovery",
+            ));
+        }
+        Self::new_inner(movie, PlanView::Demux, limits, false, Some(plans), None)
+    }
+
+    pub(crate) fn for_range(
+        movie: &'a Movie,
+        plans: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
+        limits: PlanLimits,
+        media_tracks_only: bool,
+    ) -> Result<Self> {
+        if movie.recovery()
+            || movie.read_scope() != crate::mp4::open::MetadataReadScope::CompleteEntity
+        {
+            return Err(Error::Unsupported(
+                "MP4 range playback requires metadata from a complete source opened without recovery",
+            ));
+        }
+        let header = movie.header();
+        let ticks = header.declared_duration_ticks().unwrap_or(0);
+        let duration = Time::from_ticks(i128::from(ticks), header.time_base()?)?;
+        let micros = match duration.to_i64_ticks(TimeBase::MICROSECONDS, Rounding::NearestAway) {
+            Ok(value) => value,
+            Err(Error::Overflow) => 0,
+            Err(error) => return Err(error),
+        };
+        Self::new_inner(
+            movie,
+            PlanView::Demux,
+            limits,
+            false,
+            plans,
+            Some(RangeDuration {
+                micros,
+                scan: micros == 0,
+                media_tracks_only,
+            }),
+        )
+    }
+
+    fn new_inner(
+        movie: &'a Movie,
+        view: PlanView,
+        limits: PlanLimits,
+        demux_front: bool,
+        encoded_edits: Option<&'a [Option<iso::compat::mov::edits::EncodedEditPlan>]>,
+        range_duration: Option<RangeDuration>,
+    ) -> Result<Self> {
+        if movie.recovery() && view == PlanView::Source {
+            return Err(Error::Invalid(
+                "MP4 opened with recovery requires a demux packet plan",
+            ));
+        }
+        if limits.tracks == 0
+            || limits.tracks > crate::MAXIMUM_TRACKS
+            || movie.tracks().len() > limits.tracks
+        {
+            return Err(Error::Limit {
+                requested: movie.tracks().len(),
+                maximum: limits.tracks.min(crate::MAXIMUM_TRACKS),
+            });
+        }
+        if movie.terminal_mdat().is_some() && view != PlanView::Source && !demux_front {
+            return Err(Error::Unsupported(
+                "demux playback of an open-ended mdat requires a front plan",
+            ));
+        }
+        let media_count = movie
+            .media()
+            .len()
+            .checked_add(usize::from(movie.terminal_mdat().is_some()))
+            .ok_or(Error::Overflow)?;
+        if media_count > limits.media_extents {
+            return Err(Error::Limit {
+                requested: media_count,
+                maximum: limits.media_extents,
+            });
+        }
+        let b = movie.pool();
+        let mut sources = BudgetVec::new(b);
+        let mut demux_tracks = BudgetVec::new(b);
+        let mut zero_scale_clock = None;
+        for t in movie.tracks() {
+            let media_base = if t.header().timescale == 0 && movie.recovery() {
+                if !movie.trex().is_empty()
+                    || !t.fragments().is_empty()
+                    || t.edits().is_some()
+                    || t.table().sample_count() == 0
+                    || t.header().handler != *b"vide"
+                    || !matches!(t.table().descriptions(), [entry] if entry.format == *b"raw ")
+                {
+                    return Err(Error::Unsupported(
+                        "zero-timescale recovery requires regular raw video with samples, one description and no edits",
+                    ));
+                }
+                let clock = MediaClock::for_zero_scale()?;
+                zero_scale_clock = Some(clock);
+                clock.demux_base
+            } else {
+                t.header().time_base()?
+            };
+            if range_duration.is_none() {
+                push(
+                    &mut sources,
+                    SourceTrack::new(t.header().track_id, Some(t.table()), t.fragments())?,
+                )?;
+            }
+            push(
+                &mut demux_tracks,
+                DemuxTrack {
+                    track_id: t.header().track_id,
+                    table: t.table(),
+                    fragments: t.fragments(),
+                    media_base,
+                    edits: t
+                        .edits()
+                        .map(|e| Ok::<_, Error>((e, movie.header().time_base()?)))
+                        .transpose()?,
+                },
+            )?;
+        }
+        let interleave_limits = PhysicalInterleaveLimits {
+            max_tracks: limits.tracks,
+            max_samples: limits.samples,
+        };
+        let timing_policy = iso::table::TimingRunPolicy::default();
+        let forward_regular = match movie.read_scope() {
+            crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(h)
+                if movie.terminal_mdat().is_none()
+                    && movie.media().len() == 1
+                    && (!movie.recovery()
+                        || movie
+                            .source_length()
+                            .is_none_or(|length| movie.media()[0].end <= length))
+                    && (view == PlanView::Source || demux_front)
+                    && movie.trex().is_empty()
+                    && movie
+                        .tracks()
+                        .iter()
+                        .all(|track| track.edits().is_none() && track.fragments().is_empty()) =>
+            {
+                Some(iso::interleave::ForwardRegularMdat::new(
+                    h,
+                    movie.source_length(),
+                )?)
+            }
+            _ => None,
+        };
+        let source = if range_duration.is_some() {
+            None
+        } else if let Some(bounds) = forward_regular {
+            Some(
+                PhysicalSampleCursor::new_forward_regular_with_timing_policy(
+                    b,
+                    sources.as_slice(),
+                    movie.media(),
+                    bounds,
+                    interleave_limits,
+                    timing_policy,
+                )?,
+            )
+        } else if movie.terminal_mdat().is_some() {
+            // Metadata traversal preserves declared source coordinates. Each row
+            // is checked against the terminal declaration, then read physically.
+            Some(PhysicalSampleCursor::with_timing_policy(
+                b,
+                sources.as_slice(),
+                None,
+                interleave_limits,
+                timing_policy,
+            )?)
+        } else {
+            Some(PhysicalSampleCursor::with_timing_policy(
+                b,
+                sources.as_slice(),
+                Some(movie.media()),
+                interleave_limits,
+                timing_policy,
+            )?)
+        };
+        let demux = if view == PlanView::Demux {
+            let packet_limits = limits.packet_limits();
+            let media_tracks_only = range_duration
+                .as_ref()
+                .is_some_and(|range| range.media_tracks_only);
+            Some(if media_tracks_only {
+                PacketCursor::new_projected(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    packet_limits,
+                    encoded_edits,
+                    |index| include_media_track(movie, index),
+                )?
+            } else if let Some(plans) = encoded_edits.filter(|_| demux_front) {
+                PacketCursor::new_front_with_encoded_edits(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    packet_limits,
+                    plans,
+                )?
+            } else if let Some(plans) = encoded_edits {
+                PacketCursor::new_encoded_regular(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    packet_limits,
+                    plans,
+                )?
+            } else if let Some(bounds) = forward_regular {
+                PacketCursor::new_front_regular(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    bounds,
+                    packet_limits,
+                    DemuxProfile::NoParseNoFillin,
+                )?
+            } else if demux_front && !movie.trex().is_empty() {
+                PacketCursor::new_front_fragmented(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    movie.terminal_mdat(),
+                    movie.trex(),
+                    packet_limits,
+                )?
+            } else if demux_front {
+                PacketCursor::new_front_source(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    movie.terminal_mdat(),
+                    packet_limits,
+                    DemuxProfile::NoParseNoFillin,
+                )?
+            } else if movie.read_scope() == crate::mp4::open::MetadataReadScope::CompleteEntity {
+                PacketCursor::new_complete_source(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    packet_limits,
+                    DemuxProfile::NoParseNoFillin,
+                )?
+            } else {
+                PacketCursor::new(
+                    b,
+                    demux_tracks.as_slice(),
+                    movie.media(),
+                    packet_limits,
+                    DemuxProfile::NoParseNoFillin,
+                )?
+            })
+        } else {
+            None
+        };
+        let encoded_edits = if let Some(plans) = encoded_edits {
+            let mut retained = BudgetVec::new(b);
+            retained.try_reserve_exact(plans.len())?;
+            for plan in plans {
+                push(&mut retained, plan.clone())?;
+            }
+            Some(retained)
+        } else {
+            None
+        };
+        let empty_duration = if demux_front
+            && let [track] = movie.tracks()
+            && track.edits().is_none()
+            && track.table().sample_count() == 0
+            && track.header().handler == *b"vide"
+            && matches!(track.table().descriptions(), [entry] if entry.format == *b"raw ")
+        {
+            i64::try_from(track.header().duration).ok()
+        } else {
+            None
+        };
+        Ok(Self {
+            movie,
+            plan: Some(PreparedMp4 {
+                read_scope: movie.read_scope(),
+                demux_recovery: movie.recovery(),
+                unavailable_first: None,
+                source: movie.source(),
+                opening_generation: movie.generation(),
+                source_length: movie.source_length(),
+                view,
+                demux_front,
+                demux_order_replay: false,
+                front_boundary: None,
+                empty_duration,
+                front_tracks: BudgetVec::new(b),
+                source_rows: BudgetVec::new(b),
+                demux_rows: BudgetVec::new(b),
+                encoded_edits,
+                tracks: BudgetVec::new(b),
+                media: BudgetVec::new(b),
+                media_cache: BudgetVec::new(b),
+                forward_regular_extents: None,
+                terminal_mdat: movie.terminal_mdat(),
+                raw_roots: BudgetVec::new(b),
+                movie_base: movie.header().time_base()?,
+                pool: b.clone(),
+            }),
+            source,
+            demux,
+            range_duration,
+            limits,
+            phase: IndexPhase::Tracks,
+            track: 0,
+            description: 0,
+            fragment_aac_trim: None,
+            root: 0,
+            extent: 0,
+            pending_source: None,
+            pending_demux: None,
+            zero_scale_clock,
+            first_sample_probe: None,
+            edits: None,
+        })
+    }
+    /// Indexes within `w`, and returns whether the plan is complete.
+    pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        if c.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if self.phase >= IndexPhase::Ready {
+            return if self.phase == IndexPhase::Ready {
+                Ok(true)
+            } else {
+                self.read_edits(w, c)
+            };
+        }
+        if w.remaining() == 0 {
+            return Ok(false);
+        }
+        match self.phase {
+            IndexPhase::Tracks => self.index_tracks(w),
+            IndexPhase::Roots => self.copy_roots(w),
+            IndexPhase::Media => self.copy_media(w),
+            IndexPhase::SourceRows => self.merge_source_rows(w, c),
+            IndexPhase::RangeCheck => self.check_range(w, c),
+            IndexPhase::FragmentTrim => self.read_fragment_trim(w, c),
+            IndexPhase::FrontTracks => self.project_front_tracks(w),
+            IndexPhase::Ready => Ok(true),
+            IndexPhase::Edits => self.read_edits(w, c),
+        }
+    }
+
+    /// Reads the encoded edits; where any track has one, indexes the packets through
+    /// them instead of the plain edit cursor.
+    #[cold]
+    #[inline(never)]
+    fn read_edits(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let job = self
+            .edits
+            .as_mut()
+            .ok_or(Error::Invalid("encoded edit job missing"))?;
+        if job.poll(w, c)? == BuildStatus::Yield {
+            return Ok(false);
+        }
+        let plans = self
+            .edits
+            .take()
+            .ok_or(Error::Invalid("encoded edit job missing"))?
+            .finish()?;
+        if plans.iter().any(Option::is_some) {
+            let movie = self.movie;
+            let b = movie.pool();
+            let mut tracks = BudgetVec::new(b);
+            tracks.try_reserve_exact(movie.tracks().len())?;
+            for t in movie.tracks() {
+                push(
+                    &mut tracks,
+                    DemuxTrack {
+                        track_id: t.header().track_id,
+                        table: t.table(),
+                        fragments: t.fragments(),
+                        media_base: t.header().time_base()?,
+                        edits: t
+                            .edits()
+                            .map(|e| Ok::<_, Error>((e, movie.header().time_base()?)))
+                            .transpose()?,
+                    },
+                )?;
+            }
+            let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+            let mut retained = BudgetVec::new(b);
+            retained.try_reserve_exact(plans.len())?;
+            for plan in plans {
+                push(&mut retained, plan.clone())?;
+            }
+            self.demux = Some(PacketCursor::new_encoded_regular(
+                b,
+                tracks.as_slice(),
+                movie.media(),
+                self.limits.packet_limits(),
+                plans,
+            )?);
+            p.encoded_edits = Some(retained);
+        }
+        self.phase = IndexPhase::Tracks;
+        Ok(false)
+    }
+
+    fn index_tracks(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(t) = self.movie.tracks().get(self.track) {
+            if self.description == 0 {
+                if !w.try_charge(1) {
+                    return Ok(false);
+                }
+                let h = t.header();
+                let (base, demux_stream) = if h.timescale == 0 {
+                    (
+                        SourceTimeBase::UNAVAILABLE,
+                        StreamView::for_zero_scale_source(h, t.table(), self.movie.major_brand()),
+                    )
+                } else {
+                    (
+                        h.time_base()?.into(),
+                        StreamView::for_source(
+                            h,
+                            t.table(),
+                            !t.fragments().is_empty(),
+                            self.movie.major_brand(),
+                        ),
+                    )
+                };
+                let trex = self
+                    .movie
+                    .trex()
+                    .iter()
+                    .find(|x| x.track_id == t.header().track_id)
+                    .copied();
+                push(
+                    &mut p.tracks,
+                    PlanTrack {
+                        trex,
+                        next_ordinal: t.next_ordinal(),
+                        decode_end: if trex.is_some()
+                            && matches!(
+                                self.movie.read_scope(),
+                                crate::mp4::open::MetadataReadScope::FrontMetadataBeforeMdat(_)
+                            ) {
+                            t.decode_end()?.and_then(|end| i64::try_from(end).ok())
+                        } else {
+                            None
+                        },
+                        fragment_aac_trim: 0,
+                        snapshot: TrackSnapshot(Arc::new(TrackMetadata {
+                            track_id: h.track_id,
+                            base,
+                            handler: h.handler,
+                            enabled: h.enabled,
+                            raw_tkhd: h.raw_tkhd.clone(),
+                            raw_mdhd: h.raw_mdhd.clone(),
+                            raw_hdlr: h.raw_hdlr.clone(),
+                            raw_table: t.table().raw().clone(),
+                            raw_edits: t.edits().map(|e| e.raw().clone()),
+                            raw_dref: t.raw_dref().clone(),
+                            demux_stream,
+                            _charge: TrackSnapshot::reserve(&p.pool)?,
+                        })),
+                        descriptions: BudgetVec::new(&p.pool),
+                        edits: t
+                            .edits()
+                            .map(|e| EditList::parse(e.raw().clone(), iso::Limits::default()))
+                            .transpose()?,
+                        identity: None,
+                    },
+                )?;
+                self.description = 1;
+                return Ok(false);
+            }
+            if let Some(d) = t.table().descriptions().get(self.description - 1) {
+                if !w.try_charge(1) {
+                    return Ok(false);
+                }
+                push(
+                    &mut p.tracks.as_mut_slice()[self.track].descriptions,
+                    d.clone(),
+                )?;
+                self.description += 1;
+                return Ok(false);
+            }
+            self.track += 1;
+            self.description = 0;
+        } else {
+            self.phase = IndexPhase::Roots;
+        }
+        Ok(false)
+    }
+
+    fn copy_roots(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(raw) = self.movie.raw_roots().get(self.root) {
+            if !w.try_charge(1) {
+                return Ok(false);
+            }
+            push(&mut p.raw_roots, raw.clone())?;
+            self.root += 1;
+        } else {
+            self.phase = IndexPhase::Media;
+        }
+        Ok(false)
+    }
+
+    fn copy_media(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(range) = self.movie.media().get(self.extent) {
+            if !w.try_charge(1) {
+                return Ok(false);
+            }
+            push(&mut p.media, range.clone())?;
+            self.extent += 1;
+        } else if let Some(extent) = self.movie.media_cache().get(p.media_cache.len()) {
+            if !w.try_charge(1) {
+                return Ok(false);
+            }
+            push(&mut p.media_cache, extent.clone())?;
+        } else {
+            self.phase = if let Some(duration) = &self.range_duration {
+                if let Some(cursor) = &mut self.demux {
+                    if duration.scan {
+                        cursor.check_duration_before_replay()?;
+                    } else {
+                        cursor.check_projections_before_replay()?;
+                    }
+                    cursor.enable_range_seek_checkpoints();
+                }
+                IndexPhase::RangeCheck
+            } else {
+                IndexPhase::SourceRows
+            };
+        }
+        Ok(false)
+    }
+
+    /// Merges the next source sample into the physical rows.
+    #[inline(always)]
+    fn merge_source_rows(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        let source = self
+            .source
+            .as_mut()
+            .ok_or(Error::Invalid("missing physical sample cursor"))?;
+        if let Some((probe, refusal)) = self.first_sample_probe.as_mut() {
+            let media_end = p
+                .media
+                .as_slice()
+                .last()
+                .ok_or(Error::Invalid("first sample media extent missing"))?
+                .end;
+            match probe.poll(w)? {
+                Next::Yield => return Ok(false),
+                Next::Item(sample)
+                    if !sample.range.is_empty()
+                        && sample.range.start >= p.source_length.unwrap_or(media_end) =>
+                {
+                    p.unavailable_first = Some(SourceRow {
+                        track_id: p.tracks.as_slice()[0].snapshot.track_id,
+                        sample,
+                    });
+                    self.phase = IndexPhase::Ready;
+                    return Ok(true);
+                }
+                _ => return Err(*refusal),
+            }
+        }
+        if self.pending_source.is_some() && !w.try_charge(1) {
+            return Ok(false);
+        }
+        if let Some(row) = self.pending_source.take() {
+            if let Some(terminal) = p.terminal_mdat {
+                terminal.require_sample(&row.sample)?;
+            }
+            if p.source_rows.len() as u64 >= self.limits.samples {
+                return Err(Error::Limit {
+                    requested: p.source_rows.len() + 1,
+                    maximum: self.limits.samples as usize,
+                });
+            }
+            match p.source_rows.try_push(row) {
+                Ok(()) => {}
+                Err(e) => {
+                    self.pending_source = Some(e.value);
+                    return Err(e.error);
+                }
+            }
+            return Ok(false);
+        }
+        let step = match source.poll(w, c) {
+            Err(_)
+                if p.read_scope == crate::mp4::open::MetadataReadScope::CompleteEntity
+                    && source.resume_in_decode_order() =>
+            {
+                // A track whose samples go backwards in the file keeps its decode
+                // order; a complete source reads its ranges wherever they lie.
+                return Ok(false);
+            }
+            Err(error)
+                if match error {
+                    Error::Invalid(OUTSIDE_MEDIA) => p.demux_recovery,
+                    // Without a source length the strict view cannot yet
+                    // tell a first sample in a later mdat from one beyond
+                    // the source end; the physical end decides.
+                    Error::Unsupported(BACKWARD_LAYOUT) => {
+                        p.demux_recovery || p.source_length.is_none()
+                    }
+                    _ => false,
+                } && p.source_rows.is_empty()
+                    && p.terminal_mdat.is_none()
+                    && !p.media.is_empty()
+                    && self.movie.trex().is_empty() =>
+            {
+                let [track] = self.movie.tracks() else {
+                    return Err(error);
+                };
+                if !track.fragments().is_empty() || track.edits().is_some() {
+                    return Err(error);
+                }
+                // Probe the first decode occurrence only after a layout refusal.
+                // The engine still needs the actual physical end before reporting it.
+                self.first_sample_probe = Some((track.table().cursor(), error));
+                return Ok(false);
+            }
+            result => result?,
+        };
+        match step {
+            CursorStatus::Yield => {}
+            CursorStatus::Ready => {
+                let r = source.take_sample()?;
+                self.pending_source = Some(SourceRow {
+                    track_id: r.track_id,
+                    sample: r.sample,
+                });
+            }
+            CursorStatus::End => {
+                p.forward_regular_extents =
+                    source.deferred_media().then_some(self.limits.media_extents);
+                self.phase = IndexPhase::RangeCheck;
+            }
+        }
+        Ok(false)
+    }
+
+    #[inline(always)]
+    fn check_range(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if let Some(duration) = &mut self.range_duration {
+            let cursor = self
+                .demux
+                .as_mut()
+                .ok_or(Error::Invalid("demux range cursor missing"))?;
+            match cursor.poll(w, c)? {
+                CursorStatus::Yield => return Ok(false),
+                CursorStatus::Ready => {
+                    return Err(Error::Invalid("range check yielded a packet"));
+                }
+                CursorStatus::End => {
+                    if duration.scan {
+                        duration.micros = cursor
+                            .checked_duration_us()
+                            .ok_or(Error::Invalid("range duration scan incomplete"))?;
+                    }
+                    cursor.rewind_at_end()?;
+                    self.track = 0;
+                    self.phase = IndexPhase::FragmentTrim;
+                    return Ok(false);
+                }
+            }
+        }
+        if self.pending_demux.is_some() && !w.try_charge(1) {
+            return Ok(false);
+        }
+        if let Some(mut row) = self.pending_demux.take() {
+            if let Some(clock) = self.zero_scale_clock
+                && p.track(row.track_id)?.snapshot.base.get().is_none()
+            {
+                row.media_clock = clock;
+            }
+            let mut demux_order_replay = p.demux_order_replay;
+            if p.demux_front && p.encoded_edits.is_none() && !demux_order_replay {
+                let source = p.source_rows.as_slice().get(p.demux_rows.len());
+                if source.is_none_or(|s| s.track_id != row.track_id || s.sample != row.source) {
+                    // Only a complete retained extent can serve a repeated occurrence.
+                    demux_order_replay = matches!(
+                        p.media.as_slice(),
+                        [extent] if (1..=RETAINED_MEDIA_BYTES as u64)
+                            .contains(&(extent.end - extent.start))
+                    ) && p.terminal_mdat.is_none()
+                        && self.movie.trex().is_empty()
+                        && p.tracks
+                            .as_slice()
+                            .iter()
+                            .any(|track| track.edits.is_some());
+                    if !demux_order_replay {
+                        let reason = if source.is_none() {
+                            "repeated demux occurrence needs a seekable source or retained media"
+                        } else {
+                            "demux occurrences are outside source order and media cannot be retained"
+                        };
+                        return Err(Error::Unsupported(reason));
+                    }
+                }
+            }
+            if p.demux_rows.len() as u64 >= self.limits.occurrences {
+                return Err(Error::Limit {
+                    requested: p.demux_rows.len() + 1,
+                    maximum: self.limits.occurrences as usize,
+                });
+            }
+            let duration = if row.source.range.is_empty() {
+                None
+            } else {
+                p.next_demux_empty_duration(&row, true)
+            };
+            match p.demux_rows.try_push(row) {
+                Ok(()) => {
+                    p.demux_order_replay = demux_order_replay;
+                    p.empty_duration = duration;
+                }
+                Err(e) => {
+                    self.pending_demux = Some(e.value);
+                    return Err(e.error);
+                }
+            }
+            return Ok(false);
+        }
+        if let Some(cursor) = self.demux.as_mut() {
+            match cursor.poll(w, c)? {
+                CursorStatus::Yield => {}
+                CursorStatus::Ready => {
+                    self.pending_demux = Some(cursor.take_occurrence()?);
+                }
+                CursorStatus::End => {
+                    self.track = 0;
+                    self.phase = IndexPhase::FragmentTrim;
+                }
+            }
+        } else {
+            self.phase = IndexPhase::FragmentTrim;
+        }
+        Ok(false)
+    }
+
+    /// Reads the leading trim of the next track's first fragment AAC packets.
+    fn read_fragment_trim(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if p.view == PlanView::Demux && self.track < p.tracks.len() {
+            if self.fragment_aac_trim.is_none() {
+                if !w.try_charge(1) {
+                    return Ok(false);
+                }
+                self.fragment_aac_trim = FragmentAacTrimJob::new(self.movie, self.track)?;
+            }
+            if let Some(job) = &mut self.fragment_aac_trim {
+                let samples = match job.poll(w, c) {
+                    Ok(Some(samples)) => samples,
+                    Ok(None) => return Ok(false),
+                    Err(Error::Backpressure { .. })
+                        if self.range_duration.is_some()
+                            && self
+                                .demux
+                                .as_mut()
+                                .is_some_and(PacketCursor::discard_seek_checkpoints) =>
+                    {
+                        // The configuration is required. Resume its parser on
+                        // the next poll after releasing optional seek state.
+                        return Ok(false);
+                    }
+                    Err(error) => return Err(error),
+                };
+                p.tracks.as_mut_slice()[self.track].fragment_aac_trim = samples;
+                self.fragment_aac_trim = None;
+            }
+            self.track += 1;
+        } else {
+            self.track = 0;
+            self.phase = IndexPhase::FrontTracks;
+        }
+        Ok(false)
+    }
+
+    fn project_front_tracks(&mut self, w: &mut WorkBudget) -> Result<bool> {
+        let p = self.plan.as_mut().ok_or(Error::Invalid("plan consumed"))?;
+        if !(p.demux_front && self.track < p.tracks.len()) {
+            self.phase = IndexPhase::Ready;
+            return Ok(true);
+        }
+        if !w.try_charge(1) {
+            return Ok(false);
+        }
+        let state = self
+            .demux
+            .as_ref()
+            .ok_or(Error::Invalid("front demux cursor missing"))?
+            .front_track(self.track)?;
+        push(&mut p.front_tracks, state)?;
+        self.track += 1;
+        Ok(false)
+    }
+    /// The plan. Fails with `Invalid` before it is complete.
+    pub fn finish(mut self) -> Result<PreparedMp4> {
+        if self.phase != IndexPhase::Ready {
+            return Err(Error::Invalid("playback plan not ready"));
+        }
+        self.plan.take().ok_or(Error::Invalid("plan consumed"))
+    }
+
+    pub(crate) fn finish_demux_range(mut self) -> Result<(PreparedMp4, PacketCursor<'a>, i64)> {
+        let duration = self
+            .range_duration
+            .take()
+            .ok_or(Error::Invalid("missing range duration"))?;
+        let cursor = self
+            .demux
+            .take()
+            .ok_or(Error::Invalid("demux range cursor missing"))?;
+        Ok((self.finish()?, cursor, duration.micros))
+    }
+}
+/// Maps a movie time through one track's edit list, within work budgets.
+#[derive(Debug)]
+pub struct MovieSeekJob<'a> {
+    locator: iso::seek::MovieEditLocator<'a>,
+    track: u32,
+    demux_base: TimeBase,
+    raw_media_clock: BoxView,
+    raw_edits: Option<BoxView>,
+}
+/// Where a movie time falls on a track: the point its edit list maps it to, and the
+/// seek requests that land there.
+#[derive(Debug)]
+pub struct MovieSeekCommand {
+    point: iso::seek::MoviePoint,
+    track: u32,
+    demux_base: TimeBase,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        expect(dead_code, reason = "read only by the comparison accessor")
+    )]
+    raw_media_clock: BoxView,
+    #[cfg_attr(
+        not(feature = "reference-trace"),
+        expect(dead_code, reason = "read only by the comparison accessor")
+    )]
+    raw_edits: Option<BoxView>,
+}
+impl MovieSeekCommand {
+    /// The point the movie time maps to: a media time, an empty edit, or outside the
+    /// edits.
+    pub fn point(&self) -> &iso::seek::MoviePoint {
+        &self.point
+    }
+    /// The demux-clock seek to the movie time, for
+    /// [`Player::prepare_mp4_demux_seek`](crate::Player::prepare_mp4_demux_seek): the
+    /// demux clock is the movie's presentation clock, so each track lands where that
+    /// seek lands it for the movie time in the track's ticks, rounded down. `None`
+    /// when the movie time falls in an empty edit or outside the edits, where the
+    /// track presents nothing. Fails with `Overflow` when the time does not fit the
+    /// track's clock.
+    pub fn demux_seek(
+        &self,
+        limits: iso::compat::mov::seek::SeekLimits,
+    ) -> Result<Option<crate::mp4::Mp4DemuxSeekRequest>> {
+        let iso::seek::MoviePoint::Media(point) = &self.point else {
+            return Ok(None);
+        };
+        let ticks = point
+            .requested_movie_time
+            .to_ticks(self.demux_base, Rounding::Floor)?;
+        Ok(Some(crate::mp4::Mp4DemuxSeekRequest {
+            video: self.track,
+            timestamp: i64::try_from(ticks).map_err(|_| Error::Overflow)?,
+            limits,
+        }))
+    }
+    /// The source-clock seek to the media time the movie time maps to, for
+    /// [`Player::prepare_mp4_sync_seek`](crate::Player::prepare_mp4_sync_seek), keeping
+    /// `audio_preroll` of audio before the sync sample and inspecting at most
+    /// `maximum_scanned_rows` rows. `None` when the movie time falls in an empty edit
+    /// or outside the edits.
+    pub fn sync_seek(
+        &self,
+        audio_preroll: Time,
+        maximum_scanned_rows: usize,
+    ) -> Option<crate::mp4::Mp4SyncSeekRequest> {
+        let iso::seek::MoviePoint::Media(point) = &self.point else {
+            return None;
+        };
+        Some(crate::mp4::Mp4SyncSeekRequest {
+            video: self.track,
+            source_time: point.source_time,
+            audio_preroll,
+            maximum_scanned_rows,
+        })
+    }
+    /// The track's media header box the mapping used.
+    #[cfg(feature = "reference-trace")]
+    pub fn raw_media_clock(&self) -> &BoxView {
+        &self.raw_media_clock
+    }
+    /// The track's edit box the mapping used, if any.
+    #[cfg(feature = "reference-trace")]
+    pub fn raw_edits(&self) -> Option<&BoxView> {
+        self.raw_edits.as_ref()
+    }
+}
+impl PreparedMp4 {
+    /// Maps `requested_movie_time` through the edit list of `track`, reading at most
+    /// `maximum_edits` edits. Fails with `Invalid` for an unknown track and when the
+    /// track has no media time base.
+    pub fn movie_seek(
+        &self,
+        track: u32,
+        requested_movie_time: Time,
+        maximum_edits: u32,
+    ) -> Result<MovieSeekJob<'_>> {
+        let t = self.track(track)?;
+        let media_base = t.snapshot.base.require()?;
+        let locator = iso::seek::MovieEditLocator::new(
+            t.edits.as_ref(),
+            iso::seek::MovieSeekClocks {
+                movie_base: self.movie_base,
+                media_base,
+                media_duration: None,
+            },
+            requested_movie_time,
+            maximum_edits,
+        )?;
+        Ok(MovieSeekJob {
+            locator,
+            track,
+            demux_base: MediaClock::from_source(media_base)?.demux_base,
+            raw_media_clock: t.snapshot.raw_mdhd.clone(),
+            raw_edits: t.snapshot.raw_edits.clone(),
+        })
+    }
+}
+impl MovieSeekJob<'_> {
+    /// Maps within `w`, and returns whether the mapping is complete.
+    pub fn poll(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<bool> {
+        Ok(self.locator.poll(w, c)? == BuildStatus::Ready)
+    }
+    /// The command. Fails as the edit search does before it is complete.
+    pub fn finish(self) -> Result<MovieSeekCommand> {
+        Ok(MovieSeekCommand {
+            point: self.locator.finish()?,
+            track: self.track,
+            demux_base: self.demux_base,
+            raw_media_clock: self.raw_media_clock,
+            raw_edits: self.raw_edits,
+        })
+    }
+}

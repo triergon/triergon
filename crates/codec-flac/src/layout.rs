@@ -1,6 +1,6 @@
 //! Output channel layouts: FFmpeg's FLAC defaults and the WAVEFORMATEXTENSIBLE channel
 //! mask a VORBIS_COMMENT block may carry.
-use triergon_codec::{ChannelLayout, Speaker};
+use triergon_codec::{ChannelLayout, Speaker, flac_order};
 
 /// The layout of `channels` coded channels without a channel mask.
 ///
@@ -9,15 +9,8 @@ use triergon_codec::{ChannelLayout, Speaker};
 /// "back/surround", and so does this decoder. Every order is already ascending, so
 /// coded channel `i` is plane `i`.
 pub(crate) fn default_layout(channels: u8) -> ChannelLayout {
-    use Speaker::{
-        BackCenter, BackLeft, BackRight, FrontCenter, FrontLeft, FrontRight, LowFrequency,
-        SideLeft, SideRight,
-    };
+    use Speaker::{FrontCenter, FrontLeft, FrontRight, LowFrequency, SideLeft, SideRight};
     let speakers: &[Speaker] = match channels {
-        1 => &[FrontCenter],
-        2 => &[FrontLeft, FrontRight],
-        3 => &[FrontLeft, FrontRight, FrontCenter],
-        4 => &[FrontLeft, FrontRight, BackLeft, BackRight],
         5 => &[FrontLeft, FrontRight, FrontCenter, SideLeft, SideRight],
         6 => &[
             FrontLeft,
@@ -27,25 +20,7 @@ pub(crate) fn default_layout(channels: u8) -> ChannelLayout {
             SideLeft,
             SideRight,
         ],
-        7 => &[
-            FrontLeft,
-            FrontRight,
-            FrontCenter,
-            LowFrequency,
-            BackCenter,
-            SideLeft,
-            SideRight,
-        ],
-        _ => &[
-            FrontLeft,
-            FrontRight,
-            FrontCenter,
-            LowFrequency,
-            BackLeft,
-            BackRight,
-            SideLeft,
-            SideRight,
-        ],
+        _ => flac_order(usize::from(channels)).unwrap_or_default(),
     };
     ChannelLayout::new(speakers.iter().copied()).unwrap_or_default()
 }

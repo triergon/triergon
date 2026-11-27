@@ -1,5 +1,5 @@
 //! PGS display sets through the FFmpeg-compatible receiver
-//! (`triergon_subtitles::compat::pgs::ReceiverDecoder`), the same operation as the
+//! (`triergon_subtitles::compat::pgs::Decoder`), the same operation as the
 //! reference worker's `pgssub` modes.
 //!
 //! The input is a case capsule (`SMBMO001`): the packet time base, the forced-only
@@ -10,14 +10,14 @@
 //! index plane, the 256-entry ARGB palette and the ARGB value of every pixel. A
 //! decoder refusal ends the case with a refusal marker. The digest is the ordered
 //! fold of the byte transcript that the recorded cases under
-//! `crates/subtitles/tests/native-compatibility-gold/` store as `expected.bin`.
+//! `crates/subtitles/tests/pgs-receiver-recorded/` store as `expected.bin`.
 
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, TimeBase, WorkBudget};
 use triergon_harness_protocol::digest::fold_bytes;
 use triergon_harness_runner::{Invocation, Result, Totals, measure};
-use triergon_subtitles::compat::pgs::ReceiverDecoder;
-use triergon_subtitles::pgs::{DisplayConfig, DisplayLimits, PacketClock, RecoveryStatus};
+use triergon_subtitles::compat::pgs::{Decoder, Limits, Options, Status};
+use triergon_subtitles::pgs::Clock;
 
 pub const PREFIX: &str = "pgs-";
 const OPERATION: &str = "pgs-receiver-display";
@@ -41,7 +41,7 @@ struct Record {
 
 struct Case {
     header: Vec<u8>,
-    config: DisplayConfig,
+    config: Options,
     timebase: Option<TimeBase>,
     records: Vec<Record>,
 }
@@ -143,8 +143,8 @@ fn parse(pool: &Budget, raw: &[u8]) -> Result<Case> {
     }
     Ok(Case {
         header,
-        config: DisplayConfig {
-            receiver_forced_only: flags & 1 != 0,
+        config: Options {
+            forced_only: flags & 1 != 0,
         },
         timebase: TimeBase::new(u64::from(numerator), u64::from(denominator)).ok(),
         records,
@@ -212,8 +212,8 @@ impl Work {
     }
 }
 
-fn open(pool: &Budget, case: &Case) -> std::result::Result<ReceiverDecoder, ()> {
-    ReceiverDecoder::new(pool, DisplayLimits::default(), case.config).map_err(drop)
+fn open(pool: &Budget, case: &Case) -> std::result::Result<Decoder, ()> {
+    Decoder::new(pool, case.config, Limits::default()).map_err(drop)
 }
 
 /// Decode every record, folding each published subtitle. `Err` is a refusal.
@@ -232,19 +232,20 @@ fn decode(
             decoder = open(pool, case)?;
             continue;
         }
-        let clock = PacketClock {
+        let clock = Clock {
             pts: record.pts,
             dts: record.dts,
             timebase,
         };
-        let mut owned = Some(record.payload.clone());
-        decoder.push(&mut owned, clock, cancel).map_err(drop)?;
+        decoder
+            .push(record.payload.clone(), &clock, cancel)
+            .map_err(drop)?;
         let mut output = None;
         for _ in 0..MAX_POLLS {
             let status = decoder
                 .poll(&mut WorkBudget::new(quantum), cancel)
                 .map_err(drop)?;
-            if status == RecoveryStatus::OutputReady {
+            if status == Status::Ready {
                 output = Some(decoder.take_output(cancel).map_err(drop)?);
                 break;
             }
@@ -253,7 +254,7 @@ fn decode(
         if output.refusal().is_some() {
             return Err(());
         }
-        let Some(event) = output.receiver_output() else {
+        let Some(event) = output.subtitle() else {
             continue;
         };
         let size = i32::try_from(record.payload.len()).map_err(drop)?;
@@ -266,8 +267,8 @@ fn decode(
         work.data(&event.pts_microseconds.unwrap_or(0).to_le_bytes());
         work.u32(0);
         work.u32(u32::MAX);
-        work.i32(i32::from(output.context_canvas[0]));
-        work.i32(i32::from(output.context_canvas[1]));
+        work.i32(i32::from(output.canvas[0]));
+        work.i32(i32::from(output.canvas[1]));
         work.u32(event.rectangles().len() as u32);
         work.events += 1;
         for (order, r) in event.rectangles().iter().enumerate() {
@@ -291,7 +292,7 @@ fn decode(
         if decoder
             .poll(&mut WorkBudget::new(quantum), cancel)
             .map_err(drop)?
-            == RecoveryStatus::Ended
+            == Status::End
         {
             return Ok(());
         }
@@ -344,8 +345,8 @@ mod tests {
     /// the recorded cases end in a refusal.
     #[test]
     fn fold_equals_the_digest_of_every_recorded_transcript() {
-        let gold = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../subtitles/tests/native-compatibility-gold");
+        let gold =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../subtitles/tests/pgs-receiver-recorded");
         let mut cases = 0;
         let mut refusals = 0;
         for entry in std::fs::read_dir(&gold).unwrap() {

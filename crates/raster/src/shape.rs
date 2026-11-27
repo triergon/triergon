@@ -1,5 +1,6 @@
 //! A shape: one or two outlines drawn together as the union of their nonzero
 //! fills, with the control box of both.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Budget, Result};
 
@@ -32,9 +33,9 @@ impl Shape {
         shape
     }
 
-    /// The unit square (0, 0)–(64, 64), which the transform of
-    /// [`PlacedBorder::Box`](crate::PlacedBorder::Box) scales into the opaque
-    /// box of `\bord` style 3.
+    /// The unit square (0, 0)–(64, 64), which an opaque box's transform
+    /// scales into the box of `\bord` style 3
+    /// ([`GlyphSource::opaque_box`](crate::compat::libass::GlyphSource::opaque_box)).
     ///
     /// # Errors
     ///
@@ -51,9 +52,9 @@ impl Shape {
         &self.outlines
     }
 
-    /// The control box of both outlines, as libass keeps it with an outline:
-    /// the bounds of all their points, on- and off-curve, and all zero when
-    /// both are empty. A renderer lays glyphs out by it.
+    /// The control box of both outlines: the bounds of all their points, on-
+    /// and off-curve, and all zero when both are empty. A renderer lays
+    /// glyphs out by it.
     pub fn cbox(&self) -> &Rect {
         &self.cbox
     }
@@ -106,22 +107,5 @@ impl Shape {
             outlines: [first.try_clone()?, second.try_clone()?],
             cbox: self.cbox,
         })
-    }
-
-    /// Gives back the storage beyond what its outlines hold, for a shape
-    /// kept once built.
-    ///
-    /// # Errors
-    ///
-    /// The budget's errors.
-    pub fn shrink_to_fit(&mut self) -> Result<()> {
-        self.outlines
-            .iter_mut()
-            .try_for_each(Outline::shrink_to_fit)
-    }
-
-    /// Bytes of outline storage currently charged.
-    pub fn retained_bytes(&self) -> usize {
-        self.outlines.iter().map(Outline::retained_bytes).sum()
     }
 }

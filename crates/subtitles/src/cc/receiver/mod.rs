@@ -68,6 +68,7 @@ mod tests;
 use crate::cc::cc_data::{constructs, is_field_pair};
 use crate::cc::line21::odd_parity;
 use crate::cc::text::Text;
+use crate::decimal::decimal;
 use memory::{Effect, Memory};
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
@@ -97,7 +98,9 @@ pub enum DataField {
     /// The field of the first construct of the first packet.
     #[default]
     Auto,
+    /// Field 1 (`cc_type` 0).
     First,
+    /// Field 2 (`cc_type` 1).
     Second,
 }
 
@@ -137,6 +140,8 @@ pub struct Subtitle {
 }
 
 impl Subtitle {
+    /// An empty subtitle whose lines are charged to `pool`, for
+    /// [`Decoder::decode`] to fill.
     #[must_use]
     pub fn new(pool: &Budget) -> Self {
         Self {
@@ -157,6 +162,7 @@ impl Subtitle {
         })
     }
 
+    /// Whether the packet produced no event line.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.ends.is_empty()
@@ -170,7 +176,7 @@ impl Subtitle {
     }
 
     fn push(&mut self, read_order: u32, text: &[u8]) -> Result<()> {
-        self.lines.put(itoa(read_order).as_slice())?;
+        decimal(read_order, |digits| self.lines.put(digits))?;
         self.lines.put(b",0,Default,,0,0,0,,")?;
         self.lines.put(text)?;
         if self.ends.len() == self.ends.capacity() {
@@ -179,33 +185,6 @@ impl Subtitle {
         self.ends
             .try_push(self.lines.len())
             .map_err(|rejected| rejected.error)
-    }
-}
-
-/// Decimal digits of `value`, without allocation.
-fn itoa(mut value: u32) -> Digits {
-    let mut digits = Digits {
-        bytes: [0; 10],
-        start: 10,
-    };
-    loop {
-        digits.start -= 1;
-        digits.bytes[digits.start] = b'0' + (value % 10) as u8;
-        value /= 10;
-        if value == 0 {
-            return digits;
-        }
-    }
-}
-
-struct Digits {
-    bytes: [u8; 10],
-    start: usize,
-}
-
-impl Digits {
-    fn as_slice(&self) -> &[u8] {
-        &self.bytes[self.start..]
     }
 }
 
@@ -255,6 +234,8 @@ pub struct Decoder {
 }
 
 impl Decoder {
+    /// A decoder with the screen empty and `options` applied; its text is
+    /// charged to `pool`.
     #[must_use]
     pub fn new(pool: &Budget, options: Options) -> Self {
         Self {
@@ -310,10 +291,10 @@ impl Decoder {
     ) -> Result<bool> {
         let needed = Self::packet_work(packet.len());
         if work.remaining() < needed {
-            return Err(Error::Backpressure {
+            return Err(Error::Backpressure(triergon_core::Backpressure {
                 requested: usize::try_from(needed).unwrap_or(usize::MAX),
                 available: usize::try_from(work.remaining()).unwrap_or(usize::MAX),
-            });
+            }));
         }
         let reported = self.receive(packet, clock, out)?;
         let constructs = (packet.len() / 3) as u64;
@@ -462,10 +443,5 @@ fn known(time: i64) -> Option<i64> {
 /// snapshot at 934 267 µs lasts 2 783 137 874 ms, and one starting at 0
 /// lasts 1 511 828 488 ms.
 fn milliseconds(us: i64) -> u32 {
-    let ms = if us >= 0 {
-        (i128::from(us) + 500) / 1000
-    } else {
-        (i128::from(us) - 500) / 1000
-    };
-    ms as u32
+    crate::milliseconds(us) as u32
 }

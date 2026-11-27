@@ -117,7 +117,7 @@ impl Prepared for Teletext {
             };
             let mut work = WorkBudget::new(Decoder::MAX_PACKET_WORK);
             let subtitle = match decoder.decode(data, pts, &mut work).at(index)? {
-                Decoded::Subtitle(subtitle) => subtitle,
+                Decoded::Ready(subtitle) => subtitle,
                 Decoded::Refused(refusal) => {
                     sink.refused(index, error_code(refusal))?;
                     continue;

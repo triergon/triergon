@@ -1,17 +1,19 @@
-//! Outlines as libass's outline cache builds them (`ass_outline_construct`):
-//! a glyph loaded at its drawn size without hinting, with libass's
-//! synthetic styles and decoration lines, or a drawing parsed, with its
-//! advance and the face's ascent and descent; and a glyph's border
-//! stroked.
+//! Outlines as libass's outline cache builds them: a glyph loaded at its
+//! drawn size without hinting, with libass's synthetic styles and
+//! decoration lines, or a drawing parsed, with its advance and the face's
+//! ascent and descent; and a glyph's border stroked.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
+use triergon_font::compat::libass;
 use triergon_font::{Font, GlyphId, Orientation};
-use triergon_raster::{BorderStroke, OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
+use triergon_raster::compat::libass::BorderStroke;
+use triergon_raster::{OUTLINE_MAX, Outline, Raster, Shape, Vector, pixels_26_6};
 
-use super::cache::{Cache, CacheKey, Kept};
+use super::cache::{Cache, CacheKey, Found, Kept};
 use super::fonts::{FontId, RequestedFont};
 use super::text::{Decorations, DrawingText};
 use crate::{Bold, Drawing, Italic, Limits, charge};
@@ -20,35 +22,26 @@ use crate::{Bold, Drawing, Italic, Limits, charge};
 #[derive(Debug)]
 pub(super) struct OutlineValue {
     /// The glyph or drawing, 26.6, y down.
-    pub shape: Shape,
+    pub(super) shape: Shape,
     /// The advance, 26.6.
-    pub advance: i32,
-    /// The ascent and descent, 26.6.
-    pub asc: i32,
-    pub desc: i32,
+    pub(super) advance: i32,
+    /// The ascent above the baseline, 26.6.
+    pub(super) asc: i32,
+    /// The descent below the baseline, 26.6.
+    pub(super) desc: i32,
 }
 
 /// A built outline the cache keeps. It is identified as libass's caches
 /// identify an outline, by the value, which a key holds while it is kept,
 /// as libass's keys hold theirs: two are equal when they are the same.
 #[derive(Clone, Debug)]
-pub(super) struct KeptOutline(Kept<Option<OutlineValue>>);
-
-impl KeptOutline {
-    /// The outline kept, `None` for one that cannot be built.
-    fn built(kept: Kept<Option<OutlineValue>>) -> Option<Self> {
-        kept.is_some().then_some(Self(kept))
-    }
-}
+pub(super) struct KeptOutline(Kept<OutlineValue>);
 
 impl Deref for KeptOutline {
     type Target = OutlineValue;
 
     fn deref(&self) -> &OutlineValue {
-        match &*self.0 {
-            Some(value) => value,
-            None => unreachable!("a kept outline is built"),
-        }
+        &self.0
     }
 }
 
@@ -66,7 +59,7 @@ impl Hash for KeptOutline {
     }
 }
 
-/// A border outline (libass's `BorderHashKey`): a glyph's outline stroked.
+/// A border outline: a glyph's outline stroked.
 #[derive(Debug)]
 struct BorderKey {
     glyph: KeptOutline,
@@ -103,7 +96,7 @@ pub(super) struct GlyphKey {
 /// the face and loading the glyph.
 const OUTLINE_UNITS: usize = 64;
 
-/// An outline's key in the cache (libass's `OutlineHashKey`).
+/// An outline's key in the cache.
 #[derive(Debug)]
 enum OutlineKey {
     Glyph(GlyphKey),
@@ -149,9 +142,9 @@ impl CacheKey for OutlineKey {
 #[derive(Debug)]
 pub(super) struct Outlines {
     budget: Budget,
-    /// `None` for a key whose outline cannot be built, which libass also
-    /// keeps.
-    cache: Cache<OutlineKey, Option<OutlineValue>>,
+    /// A key whose outline cannot be built is kept without one, as libass
+    /// keeps it.
+    cache: Cache<OutlineKey, OutlineValue>,
     scratch: triergon_font::Outline,
 }
 
@@ -164,7 +157,7 @@ impl Outlines {
         }
     }
 
-    /// Cuts the cache to `limit` outlines (`ass_cache_cut`).
+    /// Cuts the cache to `limit` outlines.
     pub(super) fn cut(&mut self, limit: usize) {
         self.cache.cut(limit);
     }
@@ -182,7 +175,13 @@ impl Outlines {
         key: OutlineKey,
         value: Option<OutlineValue>,
     ) -> Result<Option<KeptOutline>> {
-        self.cache.insert(key, value, 1).map(KeptOutline::built)
+        match value {
+            Some(value) => self
+                .cache
+                .insert(key, value, 1)
+                .map(|kept| Some(KeptOutline(kept))),
+            None => self.cache.insert_absent(key, 1).map(|()| None),
+        }
     }
 
     /// The outline of a glyph of `font`, `None` when its face cannot load it.
@@ -193,7 +192,7 @@ impl Outlines {
         work: &mut WorkBudget,
     ) -> Result<Option<KeptOutline>> {
         if let Some(found) = self.cache.get(KeyRef::Glyph(&glyph)) {
-            return Ok(KeptOutline::built(found));
+            return Ok(found.value().map(KeptOutline));
         }
         charge(work, OUTLINE_UNITS)?;
         let source = &font.faces()[glyph.face].font;
@@ -216,11 +215,11 @@ impl Outlines {
         work: &mut WorkBudget,
     ) -> Result<Option<KeptOutline>> {
         if let Some(found) = self.cache.get(KeyRef::Border(glyph, stroke)) {
-            return Ok(KeptOutline::built(found));
+            return Ok(found.value().map(KeptOutline));
         }
         // A stroked border holds only what it needs, as a kept outline should.
-        let value = raster
-            .stroke_border(&glyph.shape, &stroke, work)?
+        let value = stroke
+            .stroke(raster, &glyph.shape, work)?
             .map(OutlineValue::of_shape);
         let key = BorderKey {
             glyph: glyph.clone(),
@@ -230,13 +229,13 @@ impl Outlines {
     }
 
     /// The unit square opaque boxes are drawn from, which libass keeps as
-    /// an outline (`ass_render.c:1294-1309`, `1423`).
+    /// an outline.
     pub(super) fn unit_box(&mut self) -> Result<KeptOutline> {
-        if let Some(found) = self.cache.get(KeyRef::UnitBox).and_then(KeptOutline::built) {
-            return Ok(found);
+        if let Some(Found::Value(found)) = self.cache.get(KeyRef::UnitBox) {
+            return Ok(KeptOutline(found));
         }
         let value = OutlineValue::of_shape(Shape::unit_box(&self.budget)?);
-        let kept = self.cache.insert(OutlineKey::UnitBox, Some(value), 1)?;
+        let kept = self.cache.insert(OutlineKey::UnitBox, value, 1)?;
         Ok(KeptOutline(kept))
     }
 
@@ -248,7 +247,7 @@ impl Outlines {
         work: &mut WorkBudget,
     ) -> Result<Option<KeptOutline>> {
         if let Some(found) = self.cache.get(KeyRef::Drawing(drawing.text)) {
-            return Ok(KeptOutline::built(found));
+            return Ok(found.value().map(KeptOutline));
         }
         // The parser passes over the text once.
         charge(work, OUTLINE_UNITS.saturating_add(drawing.text.len()))?;
@@ -275,24 +274,25 @@ impl Outlines {
         decorations: Decorations,
         work: &mut WorkBudget,
     ) -> Result<OutlineValue> {
-        let sized = source.at_size(pixels_26_6(size))?;
+        let sized = libass::at_size(source, pixels_26_6(size))?;
         let scratch = &mut self.scratch;
         let metrics = sized.outline_into(glyph, scratch)?;
         // Synthesis, decoration and the conversion pass over its points.
         charge(work, scratch.points().len())?;
         // An outline FreeType refuses to embolden is drawn as it is
         // (`decorations-orientation.ass`).
-        sized.synthesize(scratch, source.synthesis(font.weight(), font.slant()))?;
+        let synthesis = libass::synthesis(source, font.weight(), font.slant());
+        libass::synthesize(&sized, scratch, synthesis)?;
         // A glyph an `@` font draws rotated advances by its linear vertical
-        // advance (`d16_to_d6`, in `int`).
+        // advance, 16.16 rounded to 26.6 in `int`.
         let advance = if decorations.rotate {
             (metrics.linear_vertical_advance as i32).wrapping_add(512) >> 10
         } else {
             metrics.advance
         };
         let lines = [
-            (decorations.underline, sized.underline()),
-            (decorations.strike_out, sized.strikeout()),
+            (decorations.underline, libass::underline(&sized)),
+            (decorations.strike_out, libass::strikeout(&sized)),
         ]
         .map(|(on, band)| band.filter(|_| on && advance > 0));
         let mut outline = Outline::new(&self.budget);
@@ -302,10 +302,9 @@ impl Outlines {
         // before it checks the range.
         let empty = scratch.points().is_empty() && lines.iter().all(Option::is_none);
         if decorations.rotate && !empty {
-            let y_scale = sized.metrics().y_scale;
-            let desc = source.os2().map_or(0, |os2| {
-                (i64::from(os2.typo_descender) * y_scale + 0x8000) >> 16
-            });
+            let desc = source
+                .os2()
+                .map_or(0, |os2| libass::scale_y(&sized, os2.typo_descender));
             let dv = i64::from(metrics.vertical_advance) + desc;
             let limit = 2 * i64::from(OUTLINE_MAX);
             if desc.abs() > limit || dv.abs() > limit {
@@ -328,7 +327,7 @@ impl Outlines {
                 outline.push_rect(Vector::new(0, from), Vector::new(advance, to))?;
             }
         }
-        let (asc, desc) = sized.ascent_descent();
+        let (asc, desc) = libass::ascent_descent(&sized);
         Ok(OutlineValue {
             shape: Shape::from_outlines(outline, Outline::new(&self.budget)),
             advance,

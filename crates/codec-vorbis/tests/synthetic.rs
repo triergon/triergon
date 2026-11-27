@@ -1,6 +1,6 @@
 //! Decoder behaviour on authored streams: budgets, malformed packets, recovery.
 
-use triergon_codec::{AudioDecoder, AudioFrame, Budget};
+use triergon_codec::{AudioFrame, Budget};
 use triergon_codec_vorbis::{DecodeError, Decoder, Limits};
 
 /// LSB-first bit packing (Vorbis I section 2).
@@ -208,7 +208,11 @@ fn malformed_packets_fail_without_disturbing_the_decoder() {
     let mut frame = AudioFrame::default();
     let good = audio(2, 1, 180, &[1, 0, 1, 1]);
     decoder.decode(&good, &mut frame).unwrap();
+    decoder.decode(&good, &mut frame).unwrap();
+    assert!(frame.samples_per_channel > 0);
     assert!(decoder.decode(&[], &mut frame).is_err(), "empty packet");
+    assert_eq!(frame.samples_per_channel, 0);
+    assert!(frame.planes.iter().all(Vec::is_empty));
     assert!(
         decoder.decode(&[1], &mut frame).is_err(),
         "header packet type"

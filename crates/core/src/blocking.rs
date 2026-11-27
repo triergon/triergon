@@ -1,6 +1,11 @@
 //! Driving any [`ContainerReader`], or a parser's [`InputCursor`], from a [`std::io`]
 //! source.
-use crate::container::{ContainerReader, Event, SeekRequest};
+//!
+//! These adapters read inside the call and may block, which suits a reader on a
+//! thread of its own. A `triergon-playback` player is not driven through them: it
+//! takes a [`Source`](crate::source::Source), whose `poll` answers at once with a
+//! pending reply instead of waiting, so that a player can run on an event loop.
+use crate::container::{ContainerReader, Event, SeekReceipt, SeekRequest};
 use crate::{
     Budget, BudgetVec, Bytes, Error, InputCursor, InputRequest, InputWindow, Result,
     SourceCapabilities, SourceFailure, Step, WorkBudget,
@@ -59,14 +64,12 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         }
     }
 
+    /// The reader, for its tracks and format detail.
     pub fn reader(&self) -> &R {
         &self.reader
     }
 
-    pub fn reader_mut(&mut self) -> &mut R {
-        &mut self.reader
-    }
-
+    /// The source at its current position, dropping the reader.
     pub fn into_inner(self) -> S {
         self.source
     }
@@ -86,12 +89,7 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
                 Step::Ready(event) => return Ok(Some(event)),
                 Step::Yield => {}
                 Step::NeedInput(request) => self.serve(request)?,
-                Step::Backpressure(pressure) => {
-                    return Err(Error::Backpressure {
-                        requested: pressure.requested,
-                        available: pressure.available,
-                    });
-                }
+                Step::Backpressure(pressure) => return Err(pressure.into()),
                 Step::End(_) => return Ok(None),
             }
         }
@@ -107,8 +105,24 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
         Ok(None)
     }
 
-    /// Start a seek; its receipt arrives as an [`Event::Seek`].
-    pub fn seek(&mut self, request: SeekRequest) -> Result<()> {
+    /// Seek and return the landing receipt, skipping format-specific events until
+    /// it arrives. Packets from the landing point follow. An end before the receipt
+    /// is [`Error::Truncated`]; a packet before it violates the reader contract.
+    pub fn seek(&mut self, request: SeekRequest) -> Result<SeekReceipt> {
+        self.begin_seek(request)?;
+        loop {
+            match self.next_event()? {
+                Some(Event::Seek(receipt)) => return Ok(receipt),
+                Some(Event::Other(_)) => {}
+                Some(Event::Packet(_)) => return Err(Error::Invalid("packet before seek receipt")),
+                None => return Err(Error::Truncated),
+            }
+        }
+    }
+
+    /// Start a seek and leave all events, including the receipt, for
+    /// [`Self::next_event`] to deliver.
+    pub fn begin_seek(&mut self, request: SeekRequest) -> Result<()> {
         let request = self.reader.request_seek(request)?;
         self.serve(request)
     }
@@ -150,7 +164,7 @@ impl<R: ContainerReader, S: Read> Blocking<R, S> {
             }
             self.window = None;
             let buffer = BudgetVec::try_filled(&self.pool, 0, maximum)?;
-            self.window = Some(buffer.freeze().map_err(|refused| refused.error)?);
+            self.window = Some(buffer.freeze()?);
         }
     }
 
@@ -208,12 +222,10 @@ impl<S: Read + Seek> Feed<S> {
         })
     }
 
+    /// The source. The feed seeks only when a request does not continue its
+    /// last answer, so a caller that moves the source moves it back.
     pub fn source_mut(&mut self) -> &mut S {
         &mut self.source
-    }
-
-    pub fn into_inner(self) -> S {
-        self.source
     }
 
     /// Answer `request` on `input`: with the bytes read, or with the end of the source

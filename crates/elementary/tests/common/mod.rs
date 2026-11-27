@@ -54,6 +54,7 @@ pub fn open<F: Format>(pool: &Budget, file: &[u8], known: bool) -> Reader<F> {
         SourceId(1),
         capabilities(file, known),
         Limits::default(),
+        64 << 10,
     )
     .unwrap()
 }
@@ -181,9 +182,10 @@ pub fn mp3_info(frames: u32, bytes: u32, delay: u16, padding: u16) -> Vec<u8> {
     frame
 }
 
-/// A FLAC frame header for fixed blocking: 4096 samples, 44.1 kHz, mono, 16 bits.
-fn flac_header(number: u32, variable: bool) -> Vec<u8> {
-    let mut header = vec![0xff, 0xf8 | u8::from(variable), 0xc9, 0x08];
+/// A FLAC frame header with the blocking strategy bit clear: 256 << (`size_code` - 8)
+/// samples, 44.1 kHz, mono, 16 bits.
+fn flac_header(number: u32, size_code: u8) -> Vec<u8> {
+    let mut header = vec![0xff, 0xf8, (size_code << 4) | 9, 0x08];
     // UTF-8-like coded number.
     match number {
         0..=0x7f => header.push(number as u8),
@@ -198,9 +200,15 @@ fn flac_header(number: u32, variable: bool) -> Vec<u8> {
     header
 }
 
-/// A FLAC frame with a valid CRC-16 over `len` body bytes.
+/// A FLAC frame of 4096 samples with a valid CRC-16 over `len` body bytes.
 pub fn flac_frame(number: u32, len: usize) -> Vec<u8> {
-    let mut frame = flac_header(number, false);
+    flac_frame_coded(number, 12, len)
+}
+
+/// A FLAC frame of the block size `size_code` codes (8 to 15) with a valid CRC-16 over
+/// `len` body bytes.
+pub fn flac_frame_coded(number: u32, size_code: u8, len: usize) -> Vec<u8> {
+    let mut frame = flac_header(number, size_code);
     frame.extend(noise(number + 11, len));
     let crc = crc16_a52(0, &frame);
     frame.extend(crc.to_be_bytes());

@@ -1,0 +1,187 @@
+md5	flac-generated/ff_s16_block16.flac
+md5	flac-generated/ff_s16_block16384.flac
+md5	flac-generated/ff_s16_block192.flac
+md5	flac-generated/ff_s16_block32768.flac
+md5	flac-generated/ff_s16_block4608.flac
+md5	flac-generated/ff_s16_block576.flac
+md5	flac-generated/ff_s16_ch1.flac
+md5	flac-generated/ff_s16_ch2.flac
+md5	flac-generated/ff_s16_ch3.flac
+md5	flac-generated/ff_s16_ch4.flac
+md5	flac-generated/ff_s16_ch5.flac
+md5	flac-generated/ff_s16_ch6.flac
+md5	flac-generated/ff_s16_ch7.flac
+md5	flac-generated/ff_s16_ch8.flac
+md5	flac-generated/ff_s16_exact_rice.flac
+md5	flac-generated/ff_s16_indep.flac
+md5	flac-generated/ff_s16_left_side.flac
+md5	flac-generated/ff_s16_level0.flac
+md5	flac-generated/ff_s16_level1.flac
+md5	flac-generated/ff_s16_level10.flac
+md5	flac-generated/ff_s16_level11.flac
+md5	flac-generated/ff_s16_level12.flac
+md5	flac-generated/ff_s16_level2.flac
+md5	flac-generated/ff_s16_level3.flac
+md5	flac-generated/ff_s16_level4.flac
+md5	flac-generated/ff_s16_level5.flac
+md5	flac-generated/ff_s16_level6.flac
+md5	flac-generated/ff_s16_level7.flac
+md5	flac-generated/ff_s16_level8.flac
+md5	flac-generated/ff_s16_level9.flac
+md5	flac-generated/ff_s16_lpc_cholesky.flac
+md5	flac-generated/ff_s16_lpc_fixed.flac
+md5	flac-generated/ff_s16_lpc_levinson.flac
+md5	flac-generated/ff_s16_lpc_none.flac
+md5	flac-generated/ff_s16_mid_side.flac
+md5	flac-generated/ff_s16_multi_dim_quant.flac
+md5	flac-generated/ff_s16_order_2level.flac
+md5	flac-generated/ff_s16_order_estimation.flac
+md5	flac-generated/ff_s16_order_log.flac
+md5	flac-generated/ff_s16_order_search.flac
+md5	flac-generated/ff_s16_partitions_0_0.flac
+md5	flac-generated/ff_s16_partitions_0_8.flac
+md5	flac-generated/ff_s16_partitions_8_8.flac
+md5	flac-generated/ff_s16_rate11025.flac
+md5	flac-generated/ff_s16_rate176400.flac
+md5	flac-generated/ff_s16_rate192000.flac
+md5	flac-generated/ff_s16_rate22050.flac
+md5	flac-generated/ff_s16_rate32000.flac
+md5	flac-generated/ff_s16_rate37800.flac
+md5	flac-generated/ff_s16_rate8000.flac
+md5	flac-generated/ff_s16_rate88200.flac
+md5	flac-generated/ff_s16_right_side.flac
+md5	flac-generated/ff_s16_wasted2.flac
+md5	flac-generated/ff_s24_ch1.flac
+md5	flac-generated/ff_s24_ch6.flac
+md5	flac-generated/ff_s24_ch8.flac
+md5	flac-generated/ff_s24_indep.flac
+md5	flac-generated/ff_s24_left_side.flac
+md5	flac-generated/ff_s24_mid_side.flac
+md5	flac-generated/ff_s24_order1.flac
+md5	flac-generated/ff_s24_order12.flac
+md5	flac-generated/ff_s24_order32.flac
+md5	flac-generated/ff_s24_right_side.flac
+md5	flac-generated/ff_s24_wasted8.flac
+md5	flac-generated/ff_s32_ch1.flac
+md5	flac-generated/ff_s32_ch6.flac
+md5	flac-generated/ff_s32_ch8.flac
+md5	flac-generated/ff_s32_indep.flac
+md5	flac-generated/ff_s32_left_side.flac
+md5	flac-generated/ff_s32_mid_side.flac
+md5	flac-generated/ff_s32_order32.flac
+md5	flac-generated/ff_s32_right_side.flac
+md5	flac-generated/flac_3ch_odd_mask.flac
+md5	flac-generated/flac_5ch_back_mask.flac
+md5	flac-generated/flac_b12_ch7.flac
+md5	flac-generated/flac_b12_stereo.flac
+md5	flac-generated/flac_b15_stereo.flac
+md5	flac-generated/flac_b16_stereo.flac
+md5	flac-generated/flac_b20_ch7.flac
+md5	flac-generated/flac_b20_stereo.flac
+md5	flac-generated/flac_b24_stereo.flac
+md5	flac-generated/flac_b28_stereo.flac
+md5	flac-generated/flac_b31_stereo.flac
+md5	flac-generated/flac_b32_stereo.flac
+md5	flac-generated/flac_b4_stereo.flac
+md5	flac-generated/flac_b5_stereo.flac
+md5	flac-generated/flac_b8_ch7.flac
+md5	flac-generated/flac_b8_stereo.flac
+md5	flac-generated/flac_quad_side_mask.flac
+md5	flac-generated/flac_s16_adaptive_mid_side.flac
+md5	flac-generated/flac_s16_block16.flac
+md5	flac-generated/flac_s16_block65535.flac
+md5	flac-generated/flac_s16_ch1.flac
+md5	flac-generated/flac_s16_ch2.flac
+md5	flac-generated/flac_s16_ch3.flac
+md5	flac-generated/flac_s16_ch4.flac
+md5	flac-generated/flac_s16_ch5.flac
+md5	flac-generated/flac_s16_ch6.flac
+md5	flac-generated/flac_s16_ch7.flac
+md5	flac-generated/flac_s16_ch8.flac
+md5	flac-generated/flac_s16_exhaustive.flac
+md5	flac-generated/flac_s16_level0.flac
+md5	flac-generated/flac_s16_level3.flac
+md5	flac-generated/flac_s16_level5.flac
+md5	flac-generated/flac_s16_no_mid_side.flac
+md5	flac-generated/flac_s16_partition15.flac
+md5	flac-generated/flac_s16_precision5.flac
+md5	flac-generated/flac_s16_rate1.flac
+md5	flac-generated/flac_s16_wasted3.flac
+md5	flac-generated/flac_s20_rate768k.flac
+md5	flac-generated/flac_s24_lax_order32.flac
+md5	flac-generated/flac_s32_lax_order32.flac
+md5	flac-test-files/subset/01 - blocksize 4096.flac
+md5	flac-test-files/subset/02 - blocksize 4608.flac
+md5	flac-test-files/subset/03 - blocksize 16.flac
+md5	flac-test-files/subset/04 - blocksize 192.flac
+md5	flac-test-files/subset/05 - blocksize 254.flac
+md5	flac-test-files/subset/06 - blocksize 512.flac
+md5	flac-test-files/subset/07 - blocksize 725.flac
+md5	flac-test-files/subset/08 - blocksize 1000.flac
+md5	flac-test-files/subset/09 - blocksize 1937.flac
+md5	flac-test-files/subset/10 - blocksize 2304.flac
+md5	flac-test-files/subset/11 - partition order 8.flac
+md5	flac-test-files/subset/12 - qlp precision 15 bit.flac
+md5	flac-test-files/subset/13 - qlp precision 2 bit.flac
+md5	flac-test-files/subset/14 - wasted bits.flac
+md5	flac-test-files/subset/15 - only verbatim subframes.flac
+md5	flac-test-files/subset/16 - partition order 8 containing escaped partitions.flac
+md5	flac-test-files/subset/17 - all fixed orders.flac
+md5	flac-test-files/subset/18 - precision search.flac
+md5	flac-test-files/subset/19 - samplerate 35467Hz.flac
+md5	flac-test-files/subset/20 - samplerate 39kHz.flac
+md5	flac-test-files/subset/21 - samplerate 22050Hz.flac
+md5	flac-test-files/subset/22 - 12 bit per sample.flac
+md5	flac-test-files/subset/23 - 8 bit per sample.flac
+md5	flac-test-files/subset/24 - variable blocksize file created with flake revision 264.flac
+md5	flac-test-files/subset/25 - variable blocksize file created with flake revision 264, modified to create smaller blocks.flac
+md5	flac-test-files/subset/26 - variable blocksize file created with CUETools.Flake 2.1.6.flac
+md5	flac-test-files/subset/27 - old format variable blocksize file created with Flake 0.11.flac
+md5	flac-test-files/subset/28 - high resolution audio, default settings.flac
+md5	flac-test-files/subset/29 - high resolution audio, blocksize 16384.flac
+md5	flac-test-files/subset/30 - high resolution audio, blocksize 13456.flac
+md5	flac-test-files/subset/31 - high resolution audio, using only 32nd order predictors.flac
+md5	flac-test-files/subset/32 - high resolution audio, partition order 8 containing escaped partitions.flac
+md5	flac-test-files/subset/33 - samplerate 192kHz.flac
+md5	flac-test-files/subset/34 - samplerate 192kHz, using only 32nd order predictors.flac
+md5	flac-test-files/subset/35 - samplerate 134560Hz.flac
+md5	flac-test-files/subset/36 - samplerate 384kHz.flac
+md5	flac-test-files/subset/37 - 20 bit per sample.flac
+md5	flac-test-files/subset/38 - 3 channels (3.0).flac
+md5	flac-test-files/subset/39 - 4 channels (4.0).flac
+md5	flac-test-files/subset/40 - 5 channels (5.0).flac
+md5	flac-test-files/subset/41 - 6 channels (5.1).flac
+md5	flac-test-files/subset/42 - 7 channels (6.1).flac
+md5	flac-test-files/subset/43 - 8 channels (7.1).flac
+md5	flac-test-files/subset/44 - 8-channel surround, 192kHz, 24 bit, using only 32nd order predictors.flac
+md5	flac-test-files/subset/45 - no total number of samples set.flac
+md5	flac-test-files/subset/46 - no min-max framesize set.flac
+md5	flac-test-files/subset/47 - only STREAMINFO.flac
+md5	flac-test-files/subset/48 - Extremely large SEEKTABLE.flac
+md5	flac-test-files/subset/49 - Extremely large PADDING.flac
+md5	flac-test-files/subset/50 - Extremely large PICTURE.flac
+md5	flac-test-files/subset/51 - Extremely large VORBISCOMMENT.flac
+md5	flac-test-files/subset/52 - Extremely large APPLICATION.flac
+md5	flac-test-files/subset/53 - CUESHEET with very many indexes.flac
+md5	flac-test-files/subset/54 - 1000x repeating VORBISCOMMENT.flac
+md5	flac-test-files/subset/55 - file 48-53 combined.flac
+md5	flac-test-files/subset/56 - JPG PICTURE.flac
+md5	flac-test-files/subset/57 - PNG PICTURE.flac
+md5	flac-test-files/subset/58 - GIF PICTURE.flac
+md5	flac-test-files/subset/59 - AVIF PICTURE.flac
+md5	flac-test-files/subset/60 - mono audio.flac
+md5	flac-test-files/subset/61 - predictor overflow check, 16-bit.flac
+md5	flac-test-files/subset/62 - predictor overflow check, 20-bit.flac
+md5	flac-test-files/subset/63 - predictor overflow check, 24-bit.flac
+md5	flac-test-files/subset/64 - rice partitions with escape code zero.flac
+variable-format	flac-test-files/uncommon/01 - changing samplerate.flac
+variable-format	flac-test-files/uncommon/02 - increasing number of channels.flac
+variable-format	flac-test-files/uncommon/03 - decreasing number of channels.flac
+variable-format	flac-test-files/uncommon/04 - changing bitdepth.flac
+md5	flac-test-files/uncommon/05 - 32bps audio.flac
+md5	flac-test-files/uncommon/06 - samplerate 768kHz.flac
+md5	flac-test-files/uncommon/07 - 15 bit per sample.flac
+md5	flac-test-files/uncommon/08 - blocksize 65535.flac
+md5	flac-test-files/uncommon/09 - Rice partition order 15.flac
+no-streaminfo	flac-test-files/uncommon/10 - file starting at frame header.flac
+no-streaminfo	flac-test-files/uncommon/11 - file starting with unparsable data.flac

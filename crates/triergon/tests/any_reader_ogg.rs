@@ -3,7 +3,7 @@
 mod common;
 
 use triergon::{
-    CodecId, ContainerReader, MediaKind, PacketInfo, Probe,
+    CodecId, ContainerReader, MediaKind, PacketInfo, Probed, SourceFormat,
     ogg::page::{BEGIN_OF_STREAM, END_OF_STREAM, write_page},
     probe,
 };
@@ -34,7 +34,7 @@ fn opus_file() -> Vec<u8> {
 #[test]
 fn any_reader_reads_ogg_opus_with_its_trims() {
     let file = opus_file();
-    assert_eq!(probe(&file), Probe::Ogg);
+    assert_eq!(probe(&file), Probed::Format(SourceFormat::Ogg));
     let (reader, packets) = common::read(&file);
     assert_eq!(reader.track_count(), 1);
     let track = reader.track(0).unwrap();

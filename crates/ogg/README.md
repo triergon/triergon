@@ -16,7 +16,7 @@ use triergon_ogg::{BlockingReader, Limits};
 # let mut file = Vec::new();
 # triergon_ogg::page::write_page(2, 0, 1, 0, &[4], b"head", &mut file);
 let cancel = AtomicBool::new(false);
-let mut reader = BlockingReader::open(std::io::Cursor::new(file), Limits::default())?;
+let mut reader = BlockingReader::open(file.as_slice(), Limits::default())?;
 for track in reader.tracks() {
     let _ = (track.codec(), track.configuration(), track.sample_rate());
 }
@@ -27,16 +27,21 @@ while let Some(packet) = reader.next_packet(&cancel)? {
 # }
 ```
 
-`BlockingReader::open` takes `Read + Seek` (seeking bisects); `open_stream` takes a
-sequential `Read`. `Reader` is the push reader: it performs no I/O, accepts windows of
-any size down to one byte, steps under a `WorkBudget` and a cancellation flag, and
-charges its storage to the caller's `Budget`.
+`BlockingReader::open` takes a sequential `Read`. Use `open_seekable` with
+`Read + Seek` to enable seeking. Both read through the first packet after the first
+link's headers, or through the packet that takes the queued payload above
+`Limits::opening_bytes`.
+`Reader` is the push reader: it performs no I/O, accepts windows of any size down to one
+byte, steps under a `WorkBudget` and a cancellation flag, and charges its storage to the
+caller's `Budget`. `read_packets` reads every packet of a whole file in memory,
+headers included, with a caller-supplied packet size limit.
 
-## What it reads
+## Supported
 
 - **Pages**: capture-pattern search, CRC check, resynchronisation. A page with a bad
   CRC, garbage between pages and a trailing partial page are skipped and reported as
   `ReaderEvent::Resync`; a sequence gap drops the packet it broke (`ReaderEvent::Lost`).
+  `page::write_page` writes a page.
 - **Packets**: any length across any number of pages, empty packets and 255-multiple
   lengths. A packet inside one page shares the input window; only a packet split
   across pages is gathered.
@@ -56,8 +61,11 @@ charges its storage to the caller's `Budget`.
   | anything else | its known magic (Daala, VP8, Skeleton, ...) or first 8 bytes | the first packet |
 
   Header packets are never delivered as packets (Speex: the header, the comment header
-  and as many more as its `extra_headers` says). Other mappings are `CodecId::Other`;
-  their packets carry no time.
+  and as many more as its `extra_headers` says). A packet that is not the header its
+  mapping requires there (an Opus comment header too short for its comment list, RFC
+  7845 section 5.2) makes the stream invalid: its track keeps the identification and
+  `Track::header_error`, stays unconfigured and delivers no packets. Other mappings are
+  `CodecId::Other`; their packets carry no time.
 
 ## Timing
 
@@ -72,12 +80,14 @@ frames since (Theora I appendix A.2.3; bitstreams before 3.2.1 count from 0). Th
 page is timed forwards; for Vorbis, Opus and Speex the samples its granule position
 leaves out are the last packets' `Trim::end`, and samples before time zero (Opus
 pre-skip, a start offset) are `Trim::start`. Every audio packet is a random-access
-point; of Theora, the intra frames. DTS equals PTS.
+point; of Theora, the intra frames. The native view leaves DTS absent.
 `Track::end` holds the last granule position, found by reading at most
 `Limits::end_scan_bytes` at the end of a seekable source of known length.
 
-`compat::clock::packet_timing` reports FFmpeg's clock instead (skip samples, discard
-padding and FFmpeg's Vorbis durations); its documentation lists the differences.
+`compat::clock::reader`, `open` and `open_seekable` also compute FFmpeg's clock
+(skip samples, discard padding and FFmpeg's Vorbis durations).
+`compat::clock::packet_timing` reads that clock from their packets. The standard
+constructors compute the granule clock alone.
 
 ## Seeking
 
@@ -90,21 +100,25 @@ that link, following into links reading has not reached yet. Seekable sources of
 length are bisected by granule position within that link, each probe reading at most
 `Limits::seek_probe_bytes` (a Theora target that is not a keyframe is bisected again
 for the keyframe its granule positions name); other sources are read again from the
-start (`SeekMethod::Restart`).
+start (`SeekMethod::Restart`). The receipt sets `replays_from_start` when delivery
+starts at the first media packet.
 
-## Limits
+## Behaviour and limits
 
 `Limits::default()`: packets of up to 16 MiB gathered across pages, 16 MiB of headers per
-track (cover art in a comment header), 64 logical streams per link, 1024 tracks, and
+track (cover art in a comment header), a 16 MiB queued-payload threshold during
+blocking open, 64 logical streams per link, 1024 tracks, and
 two maximum pages (`page::MAX_PAGE`, 65,307 bytes) of skipped bytes in a row, four per
 seek probe and two for the end scan, in a 64 MiB pool. Charged to the budget: gathered
 packets and split pages, track configurations, and the track, stream and link tables.
 The scratch lists of one page are fixed at its 255 lacing values. A limit violation is an
 error; a full pool is `Step::Backpressure`, and the step resumes once output is released.
 
-## Differences from FFmpeg
+## Conformance
 
-The reader's own timing differs from FFmpeg 9.0.2 where FFmpeg starts the first Vorbis
+Packets, clocks and seeks are compared with FFmpeg 9.0.2 (`ffprobe`) by the reader
+comparison of [harness/codecs](../../harness/codecs/STATUS.md). The reader's own timing
+differs from FFmpeg 9.0.2 where FFmpeg starts the first Vorbis
 packet as many samples before zero as it states alone (this reader times the overlap it
 primes as no output), starts a short Vorbis block after a long one late by the
 difference of their quarter blocks, times chained links' starts and packets after a lost
@@ -122,8 +136,10 @@ where FFmpeg:
 - seeks in a chained file within one link only.
 
 The reviewed differences are in
-[reader-differences.json](../../harness/codecs/reader-differences.json); results in
-[docs/status.md](../../docs/status.md).
-
-The `read_packets` helper reads every packet of a whole file in memory, headers
-included, for tests and tools.
+[reader-differences.json](../../harness/codecs/reader-differences.json). The
+[page comparison](../../harness/features/ogg-pages/contract.json) compares parsed
+headers and the exact bytes of `write_page` with an independent RFC 3533 page reader,
+and the [track properties comparison](../../harness/features/ogg-tracks/contract.json)
+checks retained comment bytes against the original page lacing, along with
+configuration, channel counts, frame rates, end clocks and typed header errors. Results
+are in [docs/status.md](../../docs/status.md).

@@ -5,18 +5,32 @@ use super::charge;
 use super::class::{BidiClass, Level};
 use triergon_core::{BudgetVec, Result, WorkBudget};
 
-/// The partner of a character that has none.
-pub(super) const NONE: u32 = u32::MAX;
+/// A character's partner under the isolate matching rule (BD9).
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct Partner(u32);
+
+impl Partner {
+    pub(super) const NONE: Self = Self(u32::MAX);
+
+    pub(super) const fn of(index: usize) -> Self {
+        Self(index as u32)
+    }
+
+    pub(super) const fn index(self) -> usize {
+        self.0 as usize
+    }
+}
 
 /// The deepest explicit embedding level (BD2).
 const MAX_DEPTH: u8 = 125;
 
 /// Rule BD9: for every isolate initiator its matching PDI, and for every PDI
-/// that matches one its initiator; [`NONE`] for every other character, and
+/// that matches one its initiator; [`Partner::NONE`] for every other character, and
 /// nothing at all for text without isolate initiators.
 pub(super) fn match_isolates(
     classes: &[BidiClass],
-    partner: &mut BudgetVec<u32>,
+    partner: &mut BudgetVec<Partner>,
     work: &mut WorkBudget,
 ) -> Result<()> {
     charge(work, classes.len())?;
@@ -25,26 +39,25 @@ pub(super) fn match_isolates(
     if !classes.iter().any(|c| c.is_isolate_initiator()) {
         return Ok(());
     }
-    partner.try_resize(classes.len(), NONE)?;
+    partner.try_resize(classes.len(), Partner::NONE)?;
     // The open initiators are chained through their own entries, which hold
     // the initiator opened before them until their PDI is found.
-    let mut open = NONE;
+    let mut open = Partner::NONE;
     for (i, &class) in classes.iter().enumerate() {
-        let i = i as u32;
         if class.is_isolate_initiator() {
-            partner[i as usize] = open;
-            open = i;
-        } else if class == BidiClass::Pdi && open != NONE {
+            partner[i] = open;
+            open = Partner::of(i);
+        } else if class == BidiClass::Pdi && open != Partner::NONE {
             let initiator = open;
-            open = partner[initiator as usize];
-            partner[initiator as usize] = i;
-            partner[i as usize] = initiator;
+            open = partner[initiator.index()];
+            partner[initiator.index()] = Partner::of(i);
+            partner[i] = initiator;
         }
     }
     // Initiators left open have no matching PDI.
-    while open != NONE {
-        let next = partner[open as usize];
-        partner[open as usize] = NONE;
+    while open != Partner::NONE {
+        let next = partner[open.index()];
+        partner[open.index()] = Partner::NONE;
         open = next;
     }
     Ok(())
@@ -55,7 +68,7 @@ pub(super) fn match_isolates(
 /// a matching PDI isolates the rest of the text.
 pub(super) fn first_strong(
     classes: &[BidiClass],
-    partner: &[u32],
+    partner: &[Partner],
     mut at: usize,
     end: usize,
     work: &mut WorkBudget,
@@ -68,8 +81,8 @@ pub(super) fn first_strong(
             BidiClass::L => found = Some(false),
             BidiClass::R | BidiClass::Al => found = Some(true),
             class if class.is_isolate_initiator() => match partner[at] {
-                NONE => break,
-                pdi => at = pdi as usize,
+                Partner::NONE => break,
+                pdi => at = pdi.index(),
             },
             _ => {}
         }
@@ -125,11 +138,14 @@ pub(super) const MAX_ISOLATE_DEPTH: u8 = 124;
 ///   leaves the depth as it is.
 /// - A PDI keeps its class inside an override.
 /// - A PDI that closes no isolate becomes ON.
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the pass fills distinct output slices"
+)]
 pub(super) fn levels(
     classes: &[BidiClass],
     end: usize,
-    partner: &[u32],
+    partner: &[Partner],
     paragraph_level: u8,
     types: &mut [BidiClass],
     levels: &mut [Level],
@@ -181,8 +197,8 @@ pub(super) fn levels(
                     BidiClass::Lri => false,
                     _ => {
                         let end = match partner[i] {
-                            NONE => classes.len(),
-                            pdi => pdi as usize,
+                            Partner::NONE => classes.len(),
+                            pdi => pdi.index(),
                         };
                         first_strong(classes, partner, i + 1, end, work)? == Some(true)
                     }
@@ -281,9 +297,15 @@ mod tests {
         let mut work = WorkBudget::new(1000);
         let classes = [Lri, Rli, Pdi, L, Fsi, Pdi, Pdi, Pdi];
         match_isolates(&classes, &mut partner, &mut work).unwrap();
-        assert_eq!(partner.as_slice(), [6, 2, 1, NONE, 5, 4, 0, NONE]);
+        assert_eq!(
+            partner.as_slice(),
+            [6, 2, 1, u32::MAX, 5, 4, 0, u32::MAX].map(Partner)
+        );
         match_isolates(&[Lri, Lri, Pdi], &mut partner, &mut work).unwrap();
-        assert_eq!(partner.as_slice(), [NONE, 2, 1]);
+        assert_eq!(
+            partner.as_slice(),
+            [Partner::NONE, Partner::of(2), Partner::of(1)]
+        );
     }
 
     #[test]

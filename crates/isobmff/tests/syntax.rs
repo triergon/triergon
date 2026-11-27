@@ -1,6 +1,9 @@
-mod common;
+use crate::common;
 use triergon_core::{Budget, Error, WorkBudget};
-use triergon_isobmff::{BoxHeader, BoxStep, BoxView, HeaderRead, Limits};
+use triergon_isobmff::{
+    Limits, Next,
+    boxes::{BoxHeader, BoxView, HeaderRead},
+};
 
 #[test]
 fn composition_wire_bits_and_versioned_sign_are_both_preserved() {
@@ -67,15 +70,15 @@ fn child_work_yield_does_not_skip_a_box() {
     let mut children = parent.children(0, Limits::default()).unwrap();
     assert!(matches!(
         children.poll(&mut WorkBudget::new(0)).unwrap(),
-        BoxStep::Yield
+        Next::Yield
     ));
     match children.poll(&mut WorkBudget::new(1)).unwrap() {
-        BoxStep::Box(b) => assert_eq!(b.header().start, 108),
+        Next::Item(b) => assert_eq!(b.header().start, 108),
         _ => panic!(),
     }
     assert!(matches!(
         children.poll(&mut WorkBudget::new(1)).unwrap(),
-        BoxStep::End
+        Next::End
     ));
 }
 
@@ -99,14 +102,17 @@ fn retained_sample_entry_keeps_the_shared_core_charge_alive() {
         let table = common::table(stbl, &budget, 1).unwrap();
         let entry = table.descriptions()[0].raw().clone();
         let mut children = table.descriptions()[0]
-            .extensions(triergon_isobmff::EntryLayout::Visual, Limits::default())
+            .extensions(
+                triergon_isobmff::movie::EntryLayout::Visual,
+                Limits::default(),
+            )
             .unwrap();
         let mut count = 0;
         loop {
             match children.poll(&mut WorkBudget::new(1)).unwrap() {
-                BoxStep::Box(_) => count += 1,
-                BoxStep::Yield => {}
-                BoxStep::End => break,
+                Next::Item(_) => count += 1,
+                Next::Yield => {}
+                Next::End => break,
             }
         }
         assert_eq!(count, 11);

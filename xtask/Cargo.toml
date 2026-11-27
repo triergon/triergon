@@ -8,5 +8,8 @@ edition.workspace = true
 rust-version = "1.89"
 publish = false
 
+[dependencies]
+triergon-harness-test-support = { path = "../crates/harness-protocol/test-support" }
+
 [lints]
 workspace = true

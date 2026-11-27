@@ -1,5 +1,6 @@
-//! Container signatures observed in a source prefix. Callers choose which
-//! opening boxes they accept and how to resolve simultaneous signatures.
+//! Container signatures observed in a source prefix, and [`select`], the one walk
+//! over them. A caller states in a [`Policy`] which opening boxes it accepts and how
+//! a prefix that fits both transport spacings is resolved.
 
 /// An EBML header element ID at the start of the source.
 pub fn ebml(prefix: &[u8]) -> bool {
@@ -47,5 +48,344 @@ impl TransportSync {
             }
         }
         Some(true)
+    }
+
+    /// Whether `source`, which no more bytes follow, reaches at least two of this
+    /// spacing's sync offsets and holds a sync byte at every one it reaches.
+    fn fits_whole(self, source: &[u8]) -> bool {
+        let [_, second, _] = self.offsets();
+        second < source.len()
+            && self
+                .offsets()
+                .iter()
+                .all(|&at| source.get(at).is_none_or(|&byte| byte == 0x47))
+    }
+}
+
+/// A container selected from a source prefix.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Container {
+    /// An EBML header: Matroska or WebM.
+    Matroska,
+    /// A first box of a type the policy accepts: ISO BMFF, MP4 or QuickTime.
+    Isobmff,
+    /// An Ogg page.
+    Ogg,
+    /// MPEG transport packets at this spacing.
+    Transport(TransportSync),
+}
+
+/// How [`select`] resolves a prefix whose sync bytes fit both transport spacings.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TransportTie {
+    /// The 188-byte spacing wins, and is selected as soon as its three sync bytes
+    /// are seen.
+    Ts188,
+    /// Neither wins. Both spacings are tested on a prefix through the last sync
+    /// byte of either (389 bytes), and one that fits both is
+    /// [`Selection::Ambiguous`].
+    Refuse,
+}
+
+/// What a caller of [`select`] accepts where the signatures leave a choice.
+#[derive(Clone, Copy, Debug)]
+pub struct Policy {
+    /// Types of a first box that select [`Container::Isobmff`].
+    pub opening_boxes: &'static [[u8; 4]],
+    /// Whether an Ogg page selects [`Container::Ogg`].
+    pub ogg: bool,
+    /// Whether a four-byte `fLaC` or enabled `OggS` marker asks for one more
+    /// byte before testing box signatures. FLAC selection stays with the caller.
+    pub short_audio_prefix: bool,
+    /// How a prefix that fits both transport spacings is resolved.
+    pub transport_tie: TransportTie,
+}
+
+/// What [`select`] makes of a prefix.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Selection {
+    /// The prefix starts this container.
+    Container(Container),
+    /// Undecided: a prefix of this length says more.
+    Need(usize),
+    /// Both transport spacings fit, under [`TransportTie::Refuse`].
+    Ambiguous,
+    /// No container signature the policy accepts.
+    Unrecognised,
+}
+
+/// Selects the container `prefix` starts under `policy`, testing in this order: an
+/// EBML header, an accepted opening box, an Ogg page, transport sync bytes. An opening
+/// box is one whose size can hold its header (ISO/IEC 14496-12 4.2): 0 (to the end of
+/// the file), at least 8, or 1 with a 64-bit size of at least 16, for which the prefix
+/// must reach byte 16.
+// Inline, so that a caller's constant policy compiles to its own tests: a probe
+// calls this for every window it reads.
+#[inline]
+pub fn select(prefix: &[u8], policy: &Policy) -> Selection {
+    if ebml(prefix) {
+        return Selection::Container(Container::Matroska);
+    }
+    if prefix.len() == 4
+        && policy.short_audio_prefix
+        && ((policy.ogg && prefix == b"OggS") || prefix == b"fLaC")
+    {
+        return Selection::Need(5);
+    }
+    if opening_box(prefix).is_some_and(|kind| policy.opening_boxes.contains(kind)) {
+        match u32::from_be_bytes([prefix[0], prefix[1], prefix[2], prefix[3]]) {
+            0 | 8.. => return Selection::Container(Container::Isobmff),
+            1 => match prefix
+                .get(8..16)
+                .and_then(|large| <[u8; 8]>::try_from(large).ok())
+            {
+                None => return Selection::Need(16),
+                Some(large) if u64::from_be_bytes(large) >= 16 => {
+                    return Selection::Container(Container::Isobmff);
+                }
+                Some(_) => {}
+            },
+            _ => {}
+        }
+    }
+    if policy.ogg && ogg(prefix) {
+        return Selection::Container(Container::Ogg);
+    }
+    if prefix.len() < 4 {
+        return Selection::Need(4);
+    }
+    if prefix.len() < 8
+        && policy
+            .opening_boxes
+            .iter()
+            .any(|kind| kind.starts_with(&prefix[4..]))
+    {
+        return Selection::Need(8);
+    }
+    let [ts188, m2ts192] = [TransportSync::Ts188, TransportSync::M2ts192];
+    match policy.transport_tie {
+        TransportTie::Ts188 => {
+            for sync in [ts188, m2ts192] {
+                match sync.observed(prefix) {
+                    Some(true) => return Selection::Container(Container::Transport(sync)),
+                    Some(false) => {}
+                    None => return Selection::Need(sync.prefix_len()),
+                }
+            }
+            Selection::Unrecognised
+        }
+        TransportTie::Refuse if prefix.len() < m2ts192.prefix_len() => {
+            Selection::Need(m2ts192.prefix_len())
+        }
+        TransportTie::Refuse => match (ts188.observed(prefix), m2ts192.observed(prefix)) {
+            (Some(true), Some(false)) => Selection::Container(Container::Transport(ts188)),
+            (Some(false), Some(true)) => Selection::Container(Container::Transport(m2ts192)),
+            (Some(true), Some(true)) => Selection::Ambiguous,
+            _ => Selection::Unrecognised,
+        },
+    }
+}
+
+/// [`select`] for a whole source, which no more bytes follow: never
+/// [`Selection::Need`]. Every other signature needs the bytes it needs in a prefix, but
+/// a transport spacing is decided by the sync bytes the source holds: it fits when the
+/// source reaches at least two of its sync offsets (one packet and all or part of a
+/// second; one sync byte is no evidence) and holds a sync byte at every one it reaches.
+/// A source both spacings fit is resolved by the policy's [`TransportTie`].
+pub fn select_whole(source: &[u8], policy: &Policy) -> Selection {
+    match select(source, policy) {
+        Selection::Need(_) => {
+            let [ts188, m2ts192] =
+                [TransportSync::Ts188, TransportSync::M2ts192].map(|sync| sync.fits_whole(source));
+            match (ts188, m2ts192) {
+                (true, true) if policy.transport_tie == TransportTie::Refuse => {
+                    Selection::Ambiguous
+                }
+                (true, _) => Selection::Container(Container::Transport(TransportSync::Ts188)),
+                (false, true) => Selection::Container(Container::Transport(TransportSync::M2ts192)),
+                (false, false) => Selection::Unrecognised,
+            }
+        }
+        decided => decided,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIRST: Policy = Policy {
+        opening_boxes: &[*b"ftyp", *b"moof"],
+        ogg: true,
+        short_audio_prefix: true,
+        transport_tie: TransportTie::Ts188,
+    };
+    const REFUSING: Policy = Policy {
+        opening_boxes: &[*b"ftyp", *b"wide"],
+        ogg: false,
+        short_audio_prefix: false,
+        transport_tie: TransportTie::Refuse,
+    };
+
+    #[test]
+    fn a_policy_decides_boxes_ogg_and_a_prefix_both_transport_spacings_fit() {
+        let isobmff = Selection::Container(Container::Isobmff);
+        assert_eq!(select(b"OggS", &FIRST), Selection::Need(5));
+        assert_eq!(select(b"fLaC", &FIRST), Selection::Need(5));
+        let no_hint = Policy {
+            short_audio_prefix: false,
+            ..FIRST
+        };
+        assert_eq!(select(b"OggS", &no_hint), Selection::Need(8));
+        assert_eq!(
+            select(b"OggS\0", &no_hint),
+            Selection::Container(Container::Ogg)
+        );
+        assert_eq!(select(b"\0\0\0\x10moof", &FIRST), isobmff);
+        assert_eq!(select(b"\0\0\0\x10wide", &REFUSING), isobmff);
+        assert_eq!(select(b"\0\0\0\x10wide", &FIRST), Selection::Unrecognised);
+        assert_eq!(select(b"\0\0\0\x10moof", &REFUSING), Selection::Need(389));
+        assert_eq!(
+            select(b"OggS\0", &FIRST),
+            Selection::Container(Container::Ogg)
+        );
+        assert_eq!(select(b"OggS\0", &REFUSING), Selection::Need(389));
+        for policy in [&FIRST, &REFUSING] {
+            assert_eq!(
+                select(&[0x1a, 0x45, 0xdf, 0xa3], policy),
+                Selection::Container(Container::Matroska)
+            );
+            assert_eq!(select(b"\0\0", policy), Selection::Need(4));
+            assert_eq!(select(b"\0\0\0\x10ft", policy), Selection::Need(8));
+        }
+
+        let mut both = [0; 389];
+        for at in [0, 188, 376, 4, 196, 388] {
+            both[at] = 0x47;
+        }
+        let ts188 = Selection::Container(Container::Transport(TransportSync::Ts188));
+        let m2ts192 = Selection::Container(Container::Transport(TransportSync::M2ts192));
+        assert_eq!(select(&both[..377], &FIRST), ts188);
+        assert_eq!(select(&both[..377], &REFUSING), Selection::Need(389));
+        assert_eq!(select(&both, &REFUSING), Selection::Ambiguous);
+        both[188] = 0;
+        assert_eq!(select(&both[..189], &FIRST), Selection::Need(389));
+        assert_eq!(select(&both, &FIRST), m2ts192);
+        assert_eq!(select(&both, &REFUSING), m2ts192);
+        both[196] = 0;
+        assert_eq!(select(&both, &FIRST), Selection::Unrecognised);
+        assert_eq!(select(&both, &REFUSING), Selection::Unrecognised);
+        both[188] = 0x47;
+        assert_eq!(select(&both, &REFUSING), ts188);
+    }
+
+    #[test]
+    fn an_opening_box_too_small_for_its_header_is_not_one() {
+        let isobmff = Selection::Container(Container::Isobmff);
+        assert_eq!(select(b"\0\0\0\x07ftyp", &FIRST), Selection::Unrecognised);
+        assert_eq!(select(b"\0\0\0\x08ftyp", &FIRST), isobmff);
+        assert_eq!(select(b"\0\0\0\0ftyp", &FIRST), isobmff);
+        let mut large = *b"\0\0\0\x01ftyp\0\0\0\0\0\0\0\x10";
+        assert_eq!(select(&large[..15], &FIRST), Selection::Need(16));
+        assert_eq!(select(&large, &FIRST), isobmff);
+        large[15] = 8;
+        assert_eq!(select(&large, &FIRST), Selection::Unrecognised);
+        assert_eq!(select_whole(&large, &FIRST), Selection::Unrecognised);
+    }
+
+    #[test]
+    fn a_whole_source_is_decided_with_the_bytes_it_has() {
+        let ts188 = Selection::Container(Container::Transport(TransportSync::Ts188));
+        let m2ts192 = Selection::Container(Container::Transport(TransportSync::M2ts192));
+        let mut two = [0; 384];
+        two[0] = 0x47;
+        two[188] = 0x47;
+        assert_eq!(select(&two[..376], &FIRST), Selection::Need(377));
+        assert_eq!(select_whole(&two[..376], &FIRST), ts188);
+        assert_eq!(select_whole(&two[..189], &REFUSING), ts188);
+        assert_eq!(select_whole(&two[..188], &FIRST), Selection::Unrecognised);
+        let mut m2ts = [0; 384];
+        m2ts[4] = 0x47;
+        m2ts[196] = 0x47;
+        assert_eq!(select_whole(&m2ts, &FIRST), m2ts192);
+        assert_eq!(select_whole(&m2ts[..377], &REFUSING), m2ts192);
+        two[4] = 0x47;
+        two[196] = 0x47;
+        assert_eq!(
+            select_whole(&two, &FIRST),
+            m2ts192,
+            "the third TS188 sync is missing"
+        );
+        assert_eq!(select_whole(&two[..376], &FIRST), ts188);
+        assert_eq!(select_whole(&two[..376], &REFUSING), Selection::Ambiguous);
+        for policy in [&FIRST, &REFUSING] {
+            assert_eq!(select_whole(b"\0\0", policy), Selection::Unrecognised);
+            assert_eq!(
+                select_whole(b"\0\0\0\x10ft", policy),
+                Selection::Unrecognised
+            );
+            assert_eq!(
+                select_whole(&[0x1a, 0x45, 0xdf, 0xa3], policy),
+                Selection::Container(Container::Matroska)
+            );
+        }
+        assert_eq!(select_whole(b"OggS", &FIRST), Selection::Unrecognised);
+    }
+
+    #[test]
+    fn every_length_of_a_transport_stream_asks_for_more_as_a_prefix_and_decides_as_a_source() {
+        use Selection::{Ambiguous, Need, Unrecognised};
+        let ts188 = Selection::Container(Container::Transport(TransportSync::Ts188));
+        let m2ts192 = Selection::Container(Container::Transport(TransportSync::M2ts192));
+        let [mut ts, mut m2ts, mut both] = [[0; 600]; 3];
+        for at in (0..600).step_by(188) {
+            ts[at] = 0x47;
+            both[at] = 0x47;
+        }
+        for at in (4..600).step_by(192) {
+            m2ts[at] = 0x47;
+            both[at] = 0x47;
+        }
+        let mut cut = ts;
+        cut[376] = 0;
+        for len in 188..=600 {
+            let from = |first: usize, decided: Selection| {
+                if len < first { Unrecognised } else { decided }
+            };
+            let until = |end: usize, decided: Selection| {
+                if len < end { Need(end) } else { decided }
+            };
+            // Under the refusing tie, two TS188 sync bytes and one M2TS192 sync byte
+            // select TS188; once both spacings have two, neither wins.
+            let tie = match len {
+                ..189 => Unrecognised,
+                189..197 => ts188,
+                _ => Ambiguous,
+            };
+            // Without its third sync byte a TS188 stream fits only while it ends first.
+            let cut_whole = match len {
+                189..377 => ts188,
+                _ => Unrecognised,
+            };
+            // Each stream under each policy: its answer as a prefix, then as a whole source.
+            let cases = [
+                (&ts, &FIRST, until(377, ts188), from(189, ts188)),
+                (&ts, &REFUSING, until(389, ts188), from(189, ts188)),
+                (&m2ts, &FIRST, until(389, m2ts192), from(197, m2ts192)),
+                (&m2ts, &REFUSING, until(389, m2ts192), from(197, m2ts192)),
+                (&both, &FIRST, until(377, ts188), from(189, ts188)),
+                (&both, &REFUSING, until(389, Ambiguous), tie),
+                (&cut, &FIRST, until(377, Unrecognised), cut_whole),
+                (&cut, &REFUSING, until(389, Unrecognised), cut_whole),
+            ];
+            for (stream, policy, prefix, whole) in cases {
+                assert_eq!(select(&stream[..len], policy), prefix, "{len}-byte prefix");
+                assert_eq!(
+                    select_whole(&stream[..len], policy),
+                    whole,
+                    "{len}-byte source"
+                );
+            }
+        }
     }
 }

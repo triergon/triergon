@@ -1,229 +1,84 @@
-mod common;
-use common::{child, children, roots, table};
-use std::{ops::Range, sync::atomic::AtomicBool};
+use std::sync::atomic::AtomicBool;
 use triergon_core::{
-    Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, TimeBase, WorkBudget,
+    Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    ConfigurationLimits, EditList, Limits, RecoveryKind, RecoveryLimits, RecoveryLookup,
-    SampleTable, TrackHeader,
+    CursorStatus,
     compat::mov::{
-        edits::{
-            EncodedEditContext, EncodedEditJob, EncodedEditLimits, EncodedEditPlan,
-            EncodedEditProfile,
-        },
-        encoded::{
-            DependedOn, DependencyCause, DependencyObservation, EncodedMetadataProfile,
-            EncodedRecoveryProfile, EncodedSelection, EncodedStream, EncodedStreamJob,
-        },
-        packets::{CursorStatus, DemuxTrack, PacketCursor, PacketLimits},
+        edits::{EncodedEditJob, EncodedEditLimits, EncodedEditPlan},
+        encoded::EncodedStream,
+        packets::{PacketCursor, PacketLimits},
         seek::{IndexCursor, IndexLimits},
     },
+    sample_groups::{RecoveryKind, RecoveryLimits, RecoveryLookup},
 };
-const BASE: &[u8] = include_bytes!("fixtures/encoded-recovery-v5/roll-negative-v0.mp4");
-struct Source {
-    pool: Budget,
-    header: TrackHeader,
-    table: SampleTable,
-    edits: EditList,
-    media: Vec<Range<u64>>,
-    length: u64,
-}
+const BASE: &[u8] = include_bytes!("fixtures/encoded-recovery/roll-negative-v0.mp4");
+use crate::common::encoded_track;
+use encoded_track::{Source, finish, rows};
+
 impl Source {
-    fn new(b: &[u8]) -> Self {
-        let pool = Budget::new(1 << 22).unwrap();
-        let top = roots(&pool, b).unwrap();
-        let movie = top.iter().find(|b| b.header().kind == *b"moov").unwrap();
-        let track = children(movie, 0)
-            .unwrap()
-            .into_iter()
-            .find(|b| b.header().kind == *b"trak")
-            .unwrap();
-        let mdia = child(&track, b"mdia").unwrap();
-        let header = TrackHeader::parse(
-            &child(&track, b"tkhd").unwrap(),
-            &child(&mdia, b"mdhd").unwrap(),
-            &child(&mdia, b"hdlr").unwrap(),
-        )
-        .unwrap();
-        let table = table(
-            child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap(),
-            &pool,
-            1,
-        )
-        .unwrap();
-        let edits = EditList::parse(
-            child(&child(&track, b"edts").unwrap(), b"elst").unwrap(),
-            Limits::default(),
-        )
-        .unwrap();
-        let media = top
-            .iter()
-            .filter(|b| b.header().kind == *b"mdat")
-            .map(|b| b.header().payload_range().unwrap())
-            .collect();
-        Self {
-            pool,
-            header,
-            table,
-            edits,
-            media,
-            length: b.len() as u64,
-        }
-    }
-    fn input(&self) -> InputCursor {
-        InputCursor::new(
-            &self.pool,
-            SourceId(1997),
-            SourceCapabilities {
-                length: Some(self.length),
-                random_access: true,
-            },
-            64,
-        )
-        .unwrap()
-    }
-    fn configs(&self, i: &mut InputCursor) -> Vec<EncodedStream> {
-        let mut j = EncodedStreamJob::new_description_with_metadata(
-            &self.header,
-            &self.table,
-            i,
-            EncodedSelection {
-                major_brand: Some(*b"isom"),
-                description: 1,
-                limits: ConfigurationLimits::default(),
-            },
-            EncodedMetadataProfile,
-        )
-        .unwrap();
-        for _ in 0..20000 {
-            if j.poll(i, &mut WorkBudget::new(1), &AtomicBool::new(false))
-                .unwrap()
-                == CursorStatus::Ready
-            {
-                return vec![j.take(i, &AtomicBool::new(false)).unwrap()];
-            }
-        }
-        panic!("config progress");
-    }
-    fn context<'a>(&'a self, s: &'a EncodedStream) -> EncodedEditContext<'a> {
-        EncodedEditContext {
-            table: &self.table,
-            edits: &self.edits,
-            stream: s,
-            media_base: self.header.time_base().unwrap(),
-            movie_base: TimeBase::new(1, 1000).unwrap(),
-        }
-    }
-    fn job<'a>(&'a self, configs: &'a [EncodedStream], i: &InputCursor) -> EncodedEditJob<'a> {
+    fn recovery_job<'a>(
+        &'a self,
+        configs: &'a [EncodedStream],
+        i: &InputCursor,
+    ) -> EncodedEditJob<'a> {
         EncodedEditJob::new_with_recovery_groups(
             self.context(&configs[0]),
             configs,
             i,
             EncodedEditLimits::default(),
-            EncodedRecoveryProfile,
         )
         .unwrap()
     }
-    fn plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
+    fn recovery_plan(&self, q: u64) -> Result<EncodedEditPlan, Error> {
         let mut i = self.input();
         let configs = self.configs(&mut i);
-        finish(&mut self.job(&configs, &i), &mut i, q)
+        finish(&mut self.recovery_job(&configs, &i), &mut i, q)
     }
-    fn track(&self) -> DemuxTrack<'_> {
-        DemuxTrack {
-            track_id: self.header.track_id,
-            table: &self.table,
-            fragments: &[],
-            media_base: self.header.time_base().unwrap(),
-            edits: Some((&self.edits, TimeBase::new(1, 1000).unwrap())),
-        }
-    }
-}
-fn finish(
-    j: &mut EncodedEditJob<'_>,
-    i: &mut InputCursor,
-    q: u64,
-) -> Result<EncodedEditPlan, Error> {
-    for _ in 0..20000 {
-        let mut w = WorkBudget::new(q);
-        let state = j.poll(i, &mut w, &AtomicBool::new(false))?;
-        assert!(w.spent() <= q);
-        if state == CursorStatus::Ready {
-            return j.take(i, &AtomicBool::new(false));
-        }
-    }
-    panic!("group/sample actual-work progress");
-}
-fn rows(
-    s: &Source,
-    plan: EncodedEditPlan,
-) -> Vec<triergon_isobmff::compat::mov::packets::PacketOccurrence> {
-    let plans = [Some(plan)];
-    let mut c = PacketCursor::new_encoded_regular(
-        &s.pool,
-        &[s.track()],
-        &s.media,
-        PacketLimits::default(),
-        &plans,
-        EncodedEditProfile,
-    )
-    .unwrap();
-    let mut rows = Vec::new();
-    for _ in 0..20000 {
-        let mut w = WorkBudget::new(1);
-        match c.poll(&mut w, &AtomicBool::new(false)).unwrap() {
-            CursorStatus::Yield => {}
-            CursorStatus::End => return rows,
-            CursorStatus::Ready => rows.push(c.take_occurrence().unwrap()),
-        }
-        assert!(w.spent() <= 1);
-    }
-    panic!("packet work1 progress");
 }
 fn fixture(name: &str) -> &'static [u8] {
     match name {
-        "coverage-under" => include_bytes!("fixtures/encoded-recovery-v5/coverage-under.mp4"),
-        "empty-run" => include_bytes!("fixtures/encoded-recovery-v5/empty-run.mp4"),
+        "coverage-under" => include_bytes!("fixtures/encoded-recovery/coverage-under.mp4"),
+        "empty-run" => include_bytes!("fixtures/encoded-recovery/empty-run.mp4"),
         "mapping-before-description" => {
-            include_bytes!("fixtures/encoded-recovery-v5/mapping-before-description.mp4")
+            include_bytes!("fixtures/encoded-recovery/mapping-before-description.mp4")
         }
         "description-without-map" => {
-            include_bytes!("fixtures/encoded-recovery-v5/description-without-map.mp4")
+            include_bytes!("fixtures/encoded-recovery/description-without-map.mp4")
         }
         "roll-zero-association" => {
-            include_bytes!("fixtures/encoded-recovery-v5/roll-zero-association.mp4")
+            include_bytes!("fixtures/encoded-recovery/roll-zero-association.mp4")
         }
         "duplicate-description" => {
-            include_bytes!("fixtures/encoded-recovery-v5/duplicate-description.mp4")
+            include_bytes!("fixtures/encoded-recovery/duplicate-description.mp4")
         }
-        "prol-negative-v1" => include_bytes!("fixtures/encoded-recovery-v5/prol-negative-v1.mp4"),
-        "roll-negative-v0" => include_bytes!("fixtures/encoded-recovery-v5/roll-negative-v0.mp4"),
-        "roll-positive-v1" => include_bytes!("fixtures/encoded-recovery-v5/roll-positive-v1.mp4"),
+        "prol-negative-v1" => include_bytes!("fixtures/encoded-recovery/prol-negative-v1.mp4"),
+        "roll-negative-v0" => include_bytes!("fixtures/encoded-recovery/roll-negative-v0.mp4"),
+        "roll-positive-v1" => include_bytes!("fixtures/encoded-recovery/roll-positive-v1.mp4"),
         "grouping-parameter" => {
-            include_bytes!("fixtures/encoded-recovery-v5/grouping-parameter.mp4")
+            include_bytes!("fixtures/encoded-recovery/grouping-parameter.mp4")
         }
         "dangling-description" => {
-            include_bytes!("fixtures/encoded-recovery-v5/dangling-description.mp4")
+            include_bytes!("fixtures/encoded-recovery/dangling-description.mp4")
         }
         "fragment-namespace" => {
-            include_bytes!("fixtures/encoded-recovery-v5/fragment-namespace.mp4")
+            include_bytes!("fixtures/encoded-recovery/fragment-namespace.mp4")
         }
         "roll-prol-independent" => {
-            include_bytes!("fixtures/encoded-recovery-v5/roll-prol-independent.mp4")
+            include_bytes!("fixtures/encoded-recovery/roll-prol-independent.mp4")
         }
-        "coverage-over" => include_bytes!("fixtures/encoded-recovery-v5/coverage-over.mp4"),
+        "coverage-over" => include_bytes!("fixtures/encoded-recovery/coverage-over.mp4"),
         "roll-multiple-descriptions" => {
-            include_bytes!("fixtures/encoded-recovery-v5/roll-multiple-descriptions.mp4")
+            include_bytes!("fixtures/encoded-recovery/roll-multiple-descriptions.mp4")
         }
         "variable-length-unadmitted" => {
-            include_bytes!("fixtures/encoded-recovery-v5/variable-length-unadmitted.mp4")
+            include_bytes!("fixtures/encoded-recovery/variable-length-unadmitted.mp4")
         }
         "unknown-group-unadmitted" => {
-            include_bytes!("fixtures/encoded-recovery-v5/unknown-group-unadmitted.mp4")
+            include_bytes!("fixtures/encoded-recovery/unknown-group-unadmitted.mp4")
         }
         "reserved-source-retained" => {
-            include_bytes!("fixtures/encoded-recovery-v5/reserved-source-retained.mp4")
+            include_bytes!("fixtures/encoded-recovery/reserved-source-retained.mp4")
         }
         _ => panic!("unknown authored fixture"),
     }
@@ -232,7 +87,7 @@ fn selection(
     plan: &EncodedEditPlan,
     kind: RecoveryKind,
     ordinal: u64,
-) -> triergon_isobmff::RecoverySelection {
+) -> triergon_isobmff::sample_groups::RecoverySelection {
     let facts = plan
         .recovery_facts()
         .expect("validated owned source group facts");
@@ -253,7 +108,7 @@ fn selection(
 #[test]
 fn actual_roll_keeps_signed_source_range_and_literal_packet_clocks() {
     let s = Source::new(BASE);
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     let source = selection(&plan, RecoveryKind::Roll, 2);
     assert_eq!(source.raw_mapping_index, Some(1));
     let d = source.description.unwrap();
@@ -291,23 +146,15 @@ fn actual_roll_keeps_signed_source_range_and_literal_packet_clocks() {
 #[test]
 fn reserved_dependency_stays_reserved_while_receiver_adds_no_hint() {
     let s = Source::new(fixture("reserved-source-retained"));
-    let result = rows(&s, s.plan(1).unwrap());
+    let result = rows(&s, s.recovery_plan(1).unwrap());
     assert_eq!(result.len(), 2);
     assert_eq!(result[0].source.dependency, Some(0x2e));
     assert_eq!((result[0].demux.flags, result[1].demux.flags), (1, 16));
-    let observation = DependencyObservation::from_source(0x2e, EncodedRecoveryProfile);
-    assert_eq!(observation.source.raw, 0x2e);
-    assert_eq!(observation.source.depended_on, DependedOn::Reserved);
-    assert_eq!(
-        observation.cause,
-        DependencyCause::SourceReservedNotAppliedByReceiver
-    );
-    assert!(!observation.demux_disposable_hint());
 }
 #[test]
 fn prol_and_roll_have_separate_owned_namespaces() {
     let s = Source::new(fixture("roll-prol-independent"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 2)
             .description
@@ -327,7 +174,7 @@ fn prol_and_roll_have_separate_owned_namespaces() {
 #[test]
 fn mapping_before_description_resolves_against_real_later_box() {
     let s = Source::new(fixture("mapping-before-description"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 2)
             .description
@@ -340,7 +187,7 @@ fn mapping_before_description_resolves_against_real_later_box() {
 #[test]
 fn positive_roll_stays_positive_without_invented_decoder_preroll() {
     let s = Source::new(fixture("roll-positive-v1"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     let source = selection(&plan, RecoveryKind::Roll, 1);
     assert_eq!(source.description.as_ref().unwrap().distance, 1);
     assert_eq!(
@@ -354,7 +201,7 @@ fn positive_roll_stays_positive_without_invented_decoder_preroll() {
 #[test]
 fn zero_mapping_is_absent_not_description_one() {
     let s = Source::new(fixture("roll-zero-association"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 1).raw_mapping_index,
         Some(0)
@@ -375,7 +222,7 @@ fn zero_mapping_is_absent_not_description_one() {
 #[test]
 fn multiple_descriptions_are_read_in_source_order() {
     let s = Source::new(fixture("roll-multiple-descriptions"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         selection(&plan, RecoveryKind::Roll, 1)
             .description
@@ -394,7 +241,7 @@ fn multiple_descriptions_are_read_in_source_order() {
 #[test]
 fn description_without_map_is_retained_but_unassociated() {
     let s = Source::new(fixture("description-without-map"));
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     assert_eq!(
         plan.recovery_facts()
             .unwrap()
@@ -414,78 +261,87 @@ fn description_without_map_is_retained_but_unassociated() {
 fn dangling_index_is_rejected_before_any_packet() {
     let s = Source::new(fixture("dangling-description"));
     assert_eq!(
-        s.plan(1).unwrap_err(),
-        Error::Invalid("encoded V5 unresolved recovery description")
+        s.recovery_plan(1).unwrap_err(),
+        Error::Invalid("encoded unresolved recovery description")
     );
 }
 #[test]
-fn zero_count_run_is_rejected_before_any_packet() {
-    assert_eq!(
-        Source::new(fixture("empty-run")).plan(1).unwrap_err(),
-        Error::Invalid("encoded V5 empty recovery run")
-    );
+fn zero_count_run_leaves_packet_coverage_unchanged() {
+    let source = Source::new(fixture("empty-run"));
+    let plan = source.recovery_plan(1).unwrap();
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn too_many_source_samples_in_map_is_rejected() {
     assert_eq!(
-        Source::new(fixture("coverage-over")).plan(1).unwrap_err(),
-        Error::Invalid("encoded V5 recovery exceeds samples")
+        Source::new(fixture("coverage-over"))
+            .recovery_plan(1)
+            .unwrap_err(),
+        Error::Invalid("encoded recovery exceeds samples")
     );
 }
 #[test]
-fn incomplete_source_coverage_remains_explicitly_unadmitted() {
-    assert_eq!(
-        Source::new(fixture("coverage-under")).plan(1).unwrap_err(),
-        Error::Unsupported("encoded V5 incomplete recovery coverage")
-    );
+fn samples_after_the_last_group_run_have_no_association() {
+    let s = Source::new(fixture("coverage-under"));
+    let plan = s.recovery_plan(1).unwrap();
+    let tail = selection(&plan, RecoveryKind::Roll, 2);
+    assert_eq!(tail.raw_mapping_index, None);
+    assert!(tail.description.is_none());
+    assert_eq!(rows(&s, plan).len(), 2);
 }
 #[test]
 fn fragment_namespace_cannot_resolve_as_regular_track_description() {
     assert_eq!(
         Source::new(fixture("fragment-namespace"))
-            .plan(1)
+            .recovery_plan(1)
             .unwrap_err(),
-        Error::Unsupported("encoded V5 fragment recovery namespace")
+        Error::Unsupported("encoded fragment recovery namespace")
     );
 }
 #[test]
-fn unknown_grouping_parameter_stays_visible_and_unadmitted() {
-    assert_eq!(
-        Source::new(fixture("grouping-parameter"))
-            .plan(1)
-            .unwrap_err(),
-        Error::Unsupported("encoded V5 recovery grouping parameter")
-    );
+fn version_one_grouping_parameter_is_kept_with_its_mapping() {
+    let source = Source::new(fixture("grouping-parameter"));
+    let plan = source.recovery_plan(1).unwrap();
+    let facts = plan.recovery_facts().unwrap();
+    let mappings = facts.source_scope(RecoveryKind::Roll).mappings.unwrap();
+    assert_eq!(mappings.grouping_parameter(), Some(7));
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn variable_lengths_do_not_trigger_repeated_prefix_parsing() {
+    let source = Source::new(fixture("variable-length-unadmitted"));
+    let plan = source.recovery_plan(1).unwrap();
     assert_eq!(
-        Source::new(fixture("variable-length-unadmitted"))
-            .plan(1)
-            .unwrap_err(),
-        Error::Unsupported("encoded V5 variable or extended recovery entries")
+        selection(&plan, RecoveryKind::Roll, 2)
+            .description
+            .unwrap()
+            .distance,
+        -1
     );
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
 fn duplicate_context_does_not_silently_replace_prior_backing() {
     assert_eq!(
         Source::new(fixture("duplicate-description"))
-            .plan(1)
+            .recovery_plan(1)
             .unwrap_err(),
-        Error::Invalid("encoded V5 duplicate recovery context")
+        Error::Invalid("encoded duplicate recovery context")
     );
 }
 #[test]
 fn unknown_group_semantics_do_not_get_roll_fallback() {
-    assert_eq!(
-        Source::new(fixture("unknown-group-unadmitted"))
-            .plan(1)
-            .unwrap_err(),
-        Error::Unsupported("encoded V5 other sample-group semantics")
+    let source = Source::new(fixture("unknown-group-unadmitted"));
+    let plan = source.recovery_plan(1).unwrap();
+    assert!(
+        selection(&plan, RecoveryKind::Roll, 2)
+            .description
+            .is_none()
     );
+    assert_eq!(rows(&source, plan).len(), 2);
 }
 #[test]
-fn old_actual_membership_refusal_is_unchanged() {
+fn dependency_view_retains_the_roll_description() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
@@ -494,19 +350,22 @@ fn old_actual_membership_refusal_is_unchanged() {
         &configs,
         &i,
         EncodedEditLimits::default(),
-        EncodedMetadataProfile,
     )
     .unwrap();
+    let plan = finish(&mut old, &mut i, 1).unwrap();
     assert_eq!(
-        finish(&mut old, &mut i, 1).unwrap_err(),
-        Error::Unsupported("encoded V4 nonempty recovery descriptions")
+        selection(&plan, RecoveryKind::Roll, 2)
+            .description
+            .unwrap()
+            .distance,
+        -1,
     );
 }
 #[test]
 fn source_group_backing_survives_producer_and_pool_handles() {
     let (pool, plan, before) = {
         let s = Source::new(BASE);
-        let plan = s.plan(1).unwrap();
+        let plan = s.recovery_plan(1).unwrap();
         let before = s.pool.used();
         (s.pool.clone(), plan, before)
     };
@@ -533,7 +392,7 @@ fn zero_work_does_not_charge_allocate_or_read_group_bytes() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut job = s.job(&configs, &i);
+    let mut job = s.recovery_job(&configs, &i);
     let used = s.pool.used();
     let position = i.position();
     let mut w = WorkBudget::new(0);
@@ -549,8 +408,8 @@ fn zero_work_does_not_charge_allocate_or_read_group_bytes() {
 #[test]
 fn work_one_and_bulk_preserve_all_source_fields_and_receiver_rows() {
     let s = Source::new(fixture("roll-prol-independent"));
-    let a = rows(&s, s.plan(1).unwrap());
-    let b = rows(&s, s.plan(4096).unwrap());
+    let a = rows(&s, s.recovery_plan(1).unwrap());
+    let b = rows(&s, s.recovery_plan(4096).unwrap());
     assert_eq!(a.len(), b.len());
     for (a, b) in a.iter().zip(&b) {
         assert_eq!(a.source, b.source);
@@ -562,7 +421,7 @@ fn cancel_during_group_scan_is_sticky_and_publishes_nothing() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     assert_eq!(
         j.poll(&mut i, &mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap(),
@@ -588,7 +447,7 @@ fn failed_transport_precedes_zero_group_work() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     i.fail(i.source(), i.token(), SourceFailure::Transport)
         .unwrap();
     assert_eq!(
@@ -602,7 +461,7 @@ fn reset_invalidates_group_scan_and_ready_backing() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     assert_eq!(
         j.poll(&mut i, &mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap(),
@@ -621,7 +480,7 @@ fn foreign_pool_is_rejected_before_group_work() {
     let mut other = Source::new(BASE).input();
     let mut owned = s.input();
     let configs = s.configs(&mut owned);
-    let mut job = s.job(&configs, &i);
+    let mut job = s.recovery_job(&configs, &i);
     assert_eq!(
         job.poll(&mut other, &mut WorkBudget::new(0), &AtomicBool::new(false))
             .unwrap_err(),
@@ -631,7 +490,7 @@ fn foreign_pool_is_rejected_before_group_work() {
 #[test]
 fn validated_source_plan_survives_output_pressure_without_extra_group_allocation() {
     let s = Source::new(BASE);
-    let plan = s.plan(1).unwrap();
+    let plan = s.recovery_plan(1).unwrap();
     let group_backing = plan
         .recovery_facts()
         .unwrap()
@@ -649,8 +508,7 @@ fn validated_source_plan_survives_output_pressure_without_extra_group_allocation
             &[s.track()],
             &s.media,
             PacketLimits::default(),
-            &plans,
-            EncodedEditProfile
+            &plans
         ),
         Err(Error::Backpressure { .. })
     ));
@@ -661,14 +519,13 @@ fn validated_source_plan_survives_output_pressure_without_extra_group_allocation
 #[test]
 fn packet_hint_does_not_become_public_index_key() {
     let s = Source::new(fixture("reserved-source-retained"));
-    let plans = [Some(s.plan(1).unwrap())];
+    let plans = [Some(s.recovery_plan(1).unwrap())];
     let mut c = IndexCursor::new_encoded_regular(
         &s.pool,
         s.track(),
         &s.media,
         IndexLimits::default(),
         &plans,
-        EncodedEditProfile,
     )
     .unwrap();
     let mut flags = Vec::new();
@@ -697,9 +554,9 @@ fn packet_hint_does_not_become_public_index_key() {
 #[test]
 fn original_reserved_without_membership_keeps_raw_and_packet_hint_absent() {
     let s = Source::new(include_bytes!(
-        "fixtures/encoded-dependency-v4/dep-reserved-referenced-field.mp4"
+        "fixtures/encoded-dependency/dep-reserved-referenced-field.mp4"
     ));
-    let result = rows(&s, s.plan(1).unwrap());
+    let result = rows(&s, s.recovery_plan(1).unwrap());
     assert_eq!(result.len(), 2);
     assert_eq!(
         (result[0].source.dependency, result[1].source.dependency),
@@ -712,7 +569,7 @@ fn same_pool_other_source_is_rejected_before_inspection() {
     let s = Source::new(BASE);
     let mut i = s.input();
     let configs = s.configs(&mut i);
-    let mut j = s.job(&configs, &i);
+    let mut j = s.recovery_job(&configs, &i);
     let mut other = InputCursor::new(
         &s.pool,
         SourceId(1998),
@@ -739,7 +596,6 @@ fn configured_sample_limit_still_bounds_source_scan() {
         &configs,
         &i,
         EncodedEditLimits { max_samples: 1 },
-        EncodedRecoveryProfile,
     )
     .unwrap();
     assert_eq!(

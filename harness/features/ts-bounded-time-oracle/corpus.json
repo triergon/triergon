@@ -1,0 +1,195 @@
+{
+  "schema": 1,
+  "directory": ".",
+  "cases": [
+    {
+      "id": "legacy-absent-dts",
+      "profile": "legacy-absent-dts",
+      "file": "crates/playback/tests/fixtures/ts/pts-wrap-forward.ts",
+      "sha256": "150adc340bb4659189f7a817653196dda5d78592bb6f46e4e98879455a387258",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "pes",
+        "256",
+        "1",
+        "1",
+        "256",
+        "0",
+        "pts90",
+        "0",
+        "2700"
+      ],
+      "expected": {
+        "trace_sha256": "82b4c9e1129388678658288762a7bb5c5f3d7f3df375b9f40193410eca6d9154"
+      }
+    },
+    {
+      "id": "negative-wrap",
+      "profile": "negative-wrap",
+      "file": ".research/fixtures-transport-views/clock-crossing.ts",
+      "sha256": "e25445135db5928edda75b7d7272307f518befee510694bb27ee1a71da459f7b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pts90",
+        "0",
+        "2700"
+      ],
+      "expected": {
+        "trace_sha256": "0f6730d093538947e3221896085f915a60c2e67b9899f3bed6f569e3b57680d7"
+      }
+    },
+    {
+      "id": "positive-wrap",
+      "profile": "positive-wrap",
+      "file": ".research/fixtures-transport-views/clock-crossing.ts",
+      "sha256": "e25445135db5928edda75b7d7272307f518befee510694bb27ee1a71da459f7b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pts90",
+        "8589934592",
+        "2700"
+      ],
+      "expected": {
+        "trace_sha256": "229bacff6c67e92050a4b173f3355d58b086cc48f23e9051d7ec7f3f8fcf7330"
+      }
+    },
+    {
+      "id": "inclusive-bound",
+      "profile": "inclusive-bound",
+      "file": ".research/fixtures-transport-views/clock-linear.ts",
+      "sha256": "bf962f4487e92d24eaed9f56b18f7c6152e492b46b8995acd0aa1ee09215c29e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pts90",
+        "90000",
+        "600"
+      ],
+      "expected": {
+        "trace_sha256": "c2befaf6d5d6bbfe3b4e83820b17101b85cb65f97be8727433d9d74d6e1d0fe1"
+      }
+    },
+    {
+      "id": "outside-one-pcr-tick",
+      "profile": "outside-one-pcr-tick",
+      "file": ".research/fixtures-transport-views/clock-linear.ts",
+      "sha256": "bf962f4487e92d24eaed9f56b18f7c6152e492b46b8995acd0aa1ee09215c29e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pcr27",
+        "27000001",
+        "598"
+      ],
+      "expected": {
+        "trace_sha256": "4b4b582279971d7d1bfe8a7e759be296756220b51270d59edb7bbe61a93421ef"
+      }
+    },
+    {
+      "id": "fractional-anchor-boundary",
+      "profile": "fractional-anchor-boundary",
+      "file": ".research/fixtures-transport-views/clock-linear.ts",
+      "sha256": "bf962f4487e92d24eaed9f56b18f7c6152e492b46b8995acd0aa1ee09215c29e",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pcr27",
+        "27000001",
+        "599"
+      ],
+      "expected": {
+        "trace_sha256": "c2befaf6d5d6bbfe3b4e83820b17101b85cb65f97be8727433d9d74d6e1d0fe1"
+      }
+    },
+    {
+      "id": "half-period",
+      "profile": "half-period",
+      "file": ".research/fixtures-transport-views/clock-half-period.ts",
+      "sha256": "b568734599407a4033153b148ca14416819bc2c4275e52325c874ebf483067bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pts90",
+        "0",
+        "300"
+      ],
+      "expected": {
+        "trace_sha256": "f1e8a56440202b3a3e211347da33092bfcec822b2fb65a860d1828c4ac01d171"
+      }
+    },
+    {
+      "id": "half-period-fraction",
+      "profile": "half-period-fraction",
+      "file": ".research/fixtures-transport-views/clock-half-period.ts",
+      "sha256": "b568734599407a4033153b148ca14416819bc2c4275e52325c874ebf483067bc",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "0",
+        "pcr27",
+        "1",
+        "1288490188799"
+      ],
+      "expected": {
+        "trace_sha256": "28832d139fd7521ea00ff1d3b7ea3c818f8b678cf943230e99e2018127057513"
+      }
+    },
+    {
+      "id": "wrong-clock-epoch",
+      "profile": "wrong-clock-epoch",
+      "file": ".research/fixtures-transport-views/clock-crossing.ts",
+      "sha256": "e25445135db5928edda75b7d7272307f518befee510694bb27ee1a71da459f7b",
+      "rights": "authored-synthetic",
+      "arguments": [
+        "au",
+        "257",
+        "1",
+        "1",
+        "257",
+        "1",
+        "pts90",
+        "0",
+        "2700"
+      ],
+      "expected": {
+        "trace_sha256": "7385ba422d0b9c1f0889aea97eebf6e3e42dc4c78bb2c635cb2b5693eb247c63"
+      }
+    }
+  ]
+}

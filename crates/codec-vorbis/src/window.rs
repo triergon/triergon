@@ -1,6 +1,6 @@
 //! Block sizes, window slopes and overlap-add (Vorbis I sections 1.3.2, 4.3.1, 4.3.8).
 
-use triergon_codec::{Budget, BudgetVec, StorageError, vorbis_window};
+use triergon_codec::{Budget, BudgetVec, Error, vorbis_window};
 
 /// Which of the stream's two block sizes a packet uses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -18,7 +18,7 @@ pub(crate) struct Slope {
 }
 
 impl Slope {
-    fn new(blocksize: usize, budget: &Budget) -> Result<Slope, StorageError> {
+    fn new(blocksize: usize, budget: &Budget) -> Result<Slope, Error> {
         let m = blocksize / 2;
         let mut rising = BudgetVec::try_filled(budget, 0.0, m)?;
         vorbis_window(&mut rising);
@@ -40,7 +40,7 @@ impl Slope {
 pub(crate) struct Slopes([Slope; 2]);
 
 impl Slopes {
-    pub(crate) fn new(blocksizes: [usize; 2], budget: &Budget) -> Result<Slopes, StorageError> {
+    pub(crate) fn new(blocksizes: [usize; 2], budget: &Budget) -> Result<Slopes, Error> {
         Ok(Slopes([
             Slope::new(blocksizes[0], budget)?,
             Slope::new(blocksizes[1], budget)?,

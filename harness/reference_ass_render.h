@@ -9,10 +9,10 @@
  * values.
  *
  * Usage:
- *   reference ass-render-fold   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
- *   reference ass-render-bench  FILE ITERATIONS MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
- *   reference ass-render-memory FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
- *   reference ass-render-dump   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H
+ *   reference ass-render-fold   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H [KEY=VALUE ...]
+ *   reference ass-render-bench  FILE ITERATIONS MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H [KEY=VALUE ...]
+ *   reference ass-render-memory FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H [KEY=VALUE ...]
+ *   reference ass-render-dump   FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H [KEY=VALUE ...]
  *
  * MODE is `script` (FILE is a whole script, read with ass_read_memory) or
  * `chunks` (FILE is a stream fixture whose commands run on a track from
@@ -52,7 +52,11 @@
  */
 
 #include <inttypes.h>
+#include <limits.h>
+#include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #define ASSR_MAX_FONTS 64
@@ -69,6 +73,15 @@ typedef struct {
     size_t size;
 } AssFontFile;
 
+enum {
+    ASSR_MARGINS = 1 << 0,
+    ASSR_USE_MARGINS = 1 << 1,
+    ASSR_PIXEL_ASPECT = 1 << 2,
+    ASSR_FONT_SCALE = 1 << 3,
+    ASSR_LINE_SPACING = 1 << 4,
+    ASSR_LINE_POSITION = 1 << 5,
+};
+
 typedef struct {
     AssFontFile fonts[ASSR_MAX_FONTS];
     size_t n_fonts;
@@ -77,6 +90,9 @@ typedef struct {
     AssFrames frames[ASSR_MAX_FRAMES];
     size_t n_frames;
     int frame_w, frame_h, storage_w, storage_h;
+    unsigned settings;
+    int margins[4], use_margins;
+    double pixel_aspect, font_scale, line_spacing, line_position;
 } AssRenderCase;
 
 typedef struct {
@@ -204,6 +220,13 @@ static int assr_render(AssImages *w, const AssRenderCase *c, const char *data, s
     if (!ass_rasterizer_init(&r->engine, &r->state.rasterizer, RASTERIZER_PRECISION)) goto done;
     ass_set_frame_size(r, c->frame_w, c->frame_h);
     ass_set_storage_size(r, c->storage_w, c->storage_h);
+    if (c->settings & ASSR_MARGINS)
+        ass_set_margins(r, c->margins[0], c->margins[1], c->margins[2], c->margins[3]);
+    if (c->settings & ASSR_USE_MARGINS) ass_set_use_margins(r, c->use_margins);
+    if (c->settings & ASSR_PIXEL_ASPECT) ass_set_pixel_aspect(r, c->pixel_aspect);
+    if (c->settings & ASSR_FONT_SCALE) ass_set_font_scale(r, c->font_scale);
+    if (c->settings & ASSR_LINE_SPACING) ass_set_line_spacing(r, c->line_spacing);
+    if (c->settings & ASSR_LINE_POSITION) ass_set_line_position(r, c->line_position);
     ass_set_hinting(r, ASS_HINTING_NONE);
     /* A player's cache limits: 1000 outlines, 24 MiB of bitmaps and
      * composites. */
@@ -351,15 +374,61 @@ static int assr_size(const char *text, int *out) {
     return 1;
 }
 
+static int assr_margins(const char *text, int margins[4]) {
+    for (size_t i = 0; i < 4; i++) {
+        char *end;
+        if (!*text || !strchr("+-0123456789", *text)) return 0;
+        long long value = strtoll(text, &end, 10);
+        if (text == end || value < INT_MIN || value > INT_MAX || *end != (i < 3 ? ',' : '\0'))
+            return 0;
+        margins[i] = (int)value;
+        if (i < 3) text = end + 1;
+    }
+    return 1;
+}
+
+static int assr_setting(AssRenderCase *c, const char *arg) {
+    if (!strncmp(arg, "margins=", 8)) {
+        c->settings |= ASSR_MARGINS;
+        return assr_margins(arg + 8, c->margins);
+    }
+    if (!strncmp(arg, "use-margins=", 12)) {
+        const char *value = arg + 12;
+        if (strcmp(value, "0") && strcmp(value, "1")) return 0;
+        c->settings |= ASSR_USE_MARGINS;
+        c->use_margins = *value == '1';
+        return 1;
+    }
+    const struct { const char *key; unsigned setting; double *field; } numbers[] = {
+        {"pixel-aspect=", ASSR_PIXEL_ASPECT, &c->pixel_aspect},
+        {"font-scale=", ASSR_FONT_SCALE, &c->font_scale},
+        {"line-spacing=", ASSR_LINE_SPACING, &c->line_spacing},
+        {"line-position=", ASSR_LINE_POSITION, &c->line_position},
+    };
+    for (size_t i = 0; i < sizeof numbers / sizeof *numbers; i++) {
+        size_t len = strlen(numbers[i].key);
+        if (strncmp(arg, numbers[i].key, len)) continue;
+        const char *text = arg + len;
+        if (text[strspn(text, "+-.0123456789eE")]) return 0;
+        char *end;
+        double value = strtod(text, &end);
+        if (text == end || *end || !isfinite(value)) return 0;
+        *numbers[i].field = value;
+        c->settings |= numbers[i].setting;
+        return 1;
+    }
+    return 0;
+}
+
 static int assr_render_main(int argc, char **argv) {
-    const char *usage = "usage: reference ass-render-fold FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H\n"
+    const char *usage = "usage: reference ass-render-fold FILE MODE FONTS FRAME-W FRAME-H STORAGE-W STORAGE-H [KEY=VALUE ...]\n"
                         "       | ass-render-bench FILE N MODE ... | ass-render-memory FILE MODE ...\n"
                         "       | ass-render-dump FILE MODE ...\n"
                         "  MODE: script | chunks\n";
     const char *action = argv[1];
     int bench = !strcmp(action, "ass-render-bench"), memory = !strcmp(action, "ass-render-memory");
     int dump = !strcmp(action, "ass-render-dump"), fold = !strcmp(action, "ass-render-fold");
-    if (!(bench || memory || dump || fold) || argc != 9 + bench) {
+    if (!(bench || memory || dump || fold) || argc < 9 + bench) {
         fputs(usage, stderr);
         return 2;
     }
@@ -374,6 +443,12 @@ static int assr_render_main(int argc, char **argv) {
         !assr_size(args[5], &c.storage_h)) {
         fputs(usage, stderr);
         return 2;
+    }
+    for (int i = 9 + bench; i < argc; i++) {
+        if (!assr_setting(&c, argv[i])) {
+            fputs(usage, stderr);
+            return 2;
+        }
     }
     size_t size = 0;
     char *data = assr_read_file(argv[2], ASSR_MAX_INPUT, &size);
@@ -395,6 +470,9 @@ static int assr_render_main(int argc, char **argv) {
     if (dump) {
         AssImages work = {0, 0, 0, stdout, 0};
         if (!assr_render(&work, &c, data, size, stream, &fixture, &elapsed) || work.unknown) status = 2;
+#ifdef TRIERGON_ASS_REFERENCE
+        if (c.settings && assr_host_dependent) fprintf(stderr, "%s: host-dependent\n", argv[2]);
+#endif
     } else {
         if (memory && write(STDOUT_FILENO, "TRIERGON_BEGIN_V1\n", 18) != 18) status = 2;
         uint64_t packets = 0, bytes = 0, digest = 0;
@@ -407,10 +485,14 @@ static int assr_render_main(int argc, char **argv) {
         }
         if (!bench) elapsed = 0;
         if (memory && !status && write(STDOUT_FILENO, "TRIERGON_END_V1\n", 16) != 16) status = 2;
+        const char *host = "";
+#ifdef TRIERGON_ASS_REFERENCE
+        if (c.settings && assr_host_dependent) host = ",\"host_dependent\":true";
+#endif
         if (!status)
             printf("{\"schema\":1,\"operation\":\"ass-render\",\"iterations\":%lu,\"packets\":%" PRIu64
-                   ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 ",\"eof\":true}\n",
-                   iterations, packets, bytes, digest, elapsed);
+                   ",\"bytes\":%" PRIu64 ",\"digest\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 "%s,\"eof\":true}\n",
+                   iterations, packets, bytes, digest, elapsed, host);
     }
     fflush(stdout);
     if (status) fprintf(stderr, "%s: libass could not be set up, or an image's kind could not be told\n", argv[2]);

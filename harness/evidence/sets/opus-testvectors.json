@@ -1,0 +1,60 @@
+{
+ "name": "opus-testvectors",
+ "path": "opus-testvectors",
+ "retention": "retained",
+ "reason": "The twelve RFC 8251 section 11 Opus input bitstreams, including the final range recorded for every packet, unpacked at the repository root for opus-final-range.",
+ "key": "evidence/opus-testvectors/08c8e1e90b87caf526d100242f371d3b957cf33fb322601689f866830e8875e5.tar.zst",
+ "sha256": "08c8e1e90b87caf526d100242f371d3b957cf33fb322601689f866830e8875e5",
+ "bytes": 3266642,
+ "unpacked_at": "repository",
+ "files": [
+  {
+   "path": ".research/opus-testvectors/testvector01.bit",
+   "sha256": "00a4d34e12a2a32a047bfcaf762f663430b2232bc76a1c21e3b598f060f99b7e"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector02.bit",
+   "sha256": "285deaf78e6b1ebdde7dc6a76af279a08bf0fa7a13e3a84e87ac3f76213626a6"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector03.bit",
+   "sha256": "811b3d28483c781e4d1a0f8008bf73c3882c6c9cf8dedc65c0c14fa4239bb9d9"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector04.bit",
+   "sha256": "874b838699a471acd97bd13e11224a3ef71c95b018b85a9c93a41459a7185565"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector05.bit",
+   "sha256": "9b13f677c61cfad9a94460f986401b843e07e3245265067580539d9d8f1ec230"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector06.bit",
+   "sha256": "65a779507949842232cfb6119db3ec8c056c05b80d65abb7a3ae9b06b443e33f"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector07.bit",
+   "sha256": "ae7ae8f569807d4d964c574d7b1556e8b930307adfa9928942fe44f5e2bcc5f1"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector08.bit",
+   "sha256": "4de258de02ccc08c805b3d41414c3a0f2f607e57ea3a7a5cb9bef26c2f01eb01"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector09.bit",
+   "sha256": "91a798186cd2483e47a6b3db44eb3f8fb7f5584c3ed2f2c8158ae8f9172a6b31"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector10.bit",
+   "sha256": "7288deb8d0e9e49f7f8ae50d6b4f2221294faa222b9db69161951b928e62435a"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector11.bit",
+   "sha256": "ee3cd3c6f420d803f563af6518851316696fd121932a191045349a615df7a249"
+  },
+  {
+   "path": ".research/opus-testvectors/testvector12.bit",
+   "sha256": "48df85083178e8fc9c31af3fa6d5b38377f0eb84da4931a8886af503b17a0218"
+  }
+ ]
+}

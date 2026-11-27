@@ -11,5 +11,13 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Comparison-only API: the charstring operators a corpus exercises.
+reference-trace = []
+
+[[example]]
+name = "font-coverage"
+required-features = ["reference-trace"]
+
 [dependencies]
 triergon-core = { path = "../core" }

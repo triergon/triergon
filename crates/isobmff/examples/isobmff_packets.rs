@@ -20,9 +20,12 @@ use triergon_core::{
     WorkBudget,
 };
 use triergon_isobmff::{
-    BoxEvent, BoxReader, BoxStep, BoxView, BuildStatus, InterleaveStatus, Limits,
-    PhysicalInterleaveLimits, PhysicalSampleCursor, SampleReader, SampleTableBuilder, SourceTrack,
-    TrackHeader,
+    BuildStatus, CursorStatus, Limits, Next,
+    boxes::{BoxEvent, BoxReader, BoxView},
+    interleave::{PhysicalInterleaveLimits, PhysicalSampleCursor, SourceTrack},
+    movie::TrackHeader,
+    payload::SampleReader,
+    table::SampleTableBuilder,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -59,9 +62,9 @@ fn children(parent: &BoxView) -> Result<Vec<BoxView>> {
     let mut out = Vec::new();
     loop {
         match walk.poll(&mut WorkBudget::new(WORK))? {
-            BoxStep::Box(child) => out.push(child),
-            BoxStep::Yield => {}
-            BoxStep::End => return Ok(out),
+            Next::Item(child) => out.push(child),
+            Next::Yield => {}
+            Next::End => return Ok(out),
         }
     }
 }
@@ -158,9 +161,9 @@ fn main() -> Result<()> {
     )?;
     loop {
         match cursor.poll(&mut WorkBudget::new(WORK), &cancel)? {
-            InterleaveStatus::Yield => {}
-            InterleaveStatus::End => break,
-            InterleaveStatus::Ready => {
+            CursorStatus::Yield => {}
+            CursorStatus::End => break,
+            CursorStatus::Ready => {
                 let next = cursor.take_sample()?;
                 let extent = media
                     .iter()

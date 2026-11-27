@@ -4,12 +4,21 @@
 mod freq;
 pub(crate) mod ps;
 mod qmf;
+#[cfg(any(test, not(feature = "simd")))]
+mod scalar;
 #[cfg(feature = "simd")]
 mod simd;
+// The QMF, HF generation and hybrid filter passes: the `std::simd` forms with the `simd`
+// feature, else the scalar ones.
+#[cfg(not(feature = "simd"))]
+use scalar as kernels;
+#[cfg(feature = "simd")]
+use simd as kernels;
 pub(crate) mod tables;
 
 pub(crate) use qmf::Modulation;
 
+use crate::compat::ffmpeg::extensions::Policy;
 use crate::error::{DecodeError, Result};
 use crate::fft::Cpx;
 use crate::huffman::{Vlc, books};
@@ -18,9 +27,26 @@ use tables::NOISE;
 use triergon_bitstream::CachedBitReader;
 use triergon_codec::{Budget, BudgetVec};
 
-const FIXFIX: u8 = 0;
-const FIXVAR: u8 = 1;
-const VARFIX: u8 = 2;
+/// SBR envelope border classes (Table 4.69).
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum FrameClass {
+    FixFix = 0,
+    FixVar = 1,
+    VarFix = 2,
+    VarVar = 3,
+}
+
+impl FrameClass {
+    fn read(br: &mut CachedBitReader<'_>) -> Self {
+        match br.read(2) {
+            0 => Self::FixFix,
+            1 => Self::FixVar,
+            2 => Self::VarFix,
+            _ => Self::VarVar,
+        }
+    }
+}
 
 const NUM_TIME_SLOTS: usize = 16;
 /// t_HFAdj (4.6.18.2): offset of the HF signals in QMF subsamples.
@@ -33,7 +59,10 @@ const XL_LEN: usize = T_HFGEN + 2 * NUM_TIME_SLOTS;
 /// limGain (4.6.18.7.5).
 const LIM_GAIN: [f32; 4] = [0.70795, 1.0, 1.41254, 10_000_000_000.0];
 /// Smoothing window h_smooth (4.6.18.7.6).
-#[allow(clippy::excessive_precision)] // printed precision of the source
+#[expect(
+    clippy::excessive_precision,
+    reason = "the digits the specification prints"
+)]
 const H_SMOOTH: [f32; 5] = [
     0.33333333333333,
     0.30150283239582,
@@ -43,7 +72,10 @@ const H_SMOOTH: [f32; 5] = [
 ];
 const EPS0: f32 = 1e-12;
 /// Maximum boost factor G_boost,max = 10^(2/10) (1.584893192, 4.6.18.7.5).
-#[allow(clippy::excessive_precision)] // printed precision of the source
+#[expect(
+    clippy::excessive_precision,
+    reason = "the digits the specification prints"
+)]
 const BOOST_MAX: f32 = 1.584893192;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +91,17 @@ pub(crate) struct Header {
     pub limiter_gains: u8,
     pub interpol_freq: bool,
     pub smoothing_mode: bool,
+}
+
+impl Header {
+    fn changes_bands(self, previous: Self) -> bool {
+        self.start_freq != previous.start_freq
+            || self.stop_freq != previous.stop_freq
+            || self.xover_band != previous.xover_band
+            || self.freq_scale != previous.freq_scale
+            || self.alter_scale != previous.alter_scale
+            || self.noise_bands != previous.noise_bands
+    }
 }
 
 impl Default for Header {
@@ -79,48 +122,57 @@ impl Default for Header {
     }
 }
 
-/// Per-channel SBR data and state.
-#[derive(Debug)]
-pub(crate) struct Chan {
-    // grid of the current frame
-    frame_class: u8,
+/// Time grid and quantizer resolution of one SBR channel.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Grid {
     num_env: usize,
     t_env: [usize; 6],
-    freq_res: [bool; 6],
     num_noise: usize,
     t_q: [usize; 3],
-    /// transient envelope index l_A (-1 = none)
+    /// Transient envelope index l_A (-1 when absent).
     l_a: i32,
+    freq_res: [bool; 6],
     amp_res: bool,
-    df_env: [bool; 5],
-    df_noise: [bool; 2],
-    invf: [u8; 5],
-    invf_prev: [u8; 5],
-    bw_prev: [f32; 5],
-    /// quantised envelopes; [0] = last envelope of the previous frame
-    env_q: [[i32; 49]; 6],
-    /// frequency resolution of env_q[0]
-    env_prev_res: bool,
-    noise_q: [[i32; 5]; 3],
-    add_harmonic_flag: bool,
-    add_harmonic: [bool; 49],
-    /// sinusoid mapping of the last envelope of the previous frame (per subband - kx)
-    s_index_prev: [bool; 64],
-    // dequantised
-    e_orig: [[f32; 49]; 5],
-    q_orig: [[f32; 5]; 2],
-    // previous frame state
-    prev_num_env: usize,
-    prev_t_env_last: usize,
-    /// l_A of the previous frame expressed relative to the current frame (0 or -1)
-    l_a_prev: i32,
-    // signal state
+}
+
+impl Default for Grid {
+    fn default() -> Self {
+        Self {
+            num_env: 0,
+            t_env: [0; 6],
+            num_noise: 0,
+            t_q: [0; 3],
+            l_a: -1,
+            freq_res: [false; 6],
+            amp_res: false,
+        }
+    }
+}
+
+/// Per-channel SBR data and state.
+#[derive(Debug)]
+#[repr(C)]
+pub(crate) struct Chan {
     analysis: qmf::Analysis,
     synthesis: qmf::Synthesis,
     /// low band history: xl[k][t], t < T_HFGEN valid
     xl: BudgetVec<[Cpx; XL_LEN]>,
     /// Y of the previous frame, slots 32..38 (high band contribution reaching into this frame)
     y_prev: BudgetVec<[Cpx; 64]>,
+    xh: BudgetVec<[Cpx; 40]>,
+    y: BudgetVec<[Cpx; 64]>,
+    /// sinusoid mapping of the last envelope of the previous frame (per subband - kx)
+    s_index_prev: [bool; 64],
+    // Grouping the live fields in a Grid adds 0.251% instructions on HE-AAC stereo.
+    num_env: usize,
+    t_env: [usize; 6],
+    num_noise: usize,
+    t_q: [usize; 3],
+    /// quantised envelopes; [0] = last envelope of the previous frame
+    env_q: [[i32; 49]; 6],
+    q_orig: [[f32; 5]; 2],
+    prev_num_env: usize,
+    prev_t_env_last: usize,
     /// gain / noise smoothing history (4 slots) per subband
     g_hist: [[f32; 64]; 4],
     q_hist: [[f32; 64]; 4],
@@ -129,10 +181,26 @@ pub(crate) struct Chan {
     /// kx / M used for the previous frame's high band
     kx_prev: usize,
     m_prev: usize,
-    xh: BudgetVec<[Cpx; 40]>,
-    y: BudgetVec<[Cpx; 64]>,
     /// Scratch: the prediction coefficients of this frame's source bands, by band.
     alpha: [(Cpx, Cpx); 32],
+    // An Option<u8> envelope and a boolean border add 0.097% instructions on HE-AAC stereo.
+    /// transient envelope index l_A (-1 = none)
+    l_a: i32,
+    bw_prev: [f32; 5],
+    noise_q: [[i32; 5]; 3],
+    e_orig: [[f32; 49]; 5],
+    /// l_A of the previous frame expressed relative to the current frame (0 or -1)
+    l_a_prev: i32,
+    freq_res: [bool; 6],
+    df_noise: [bool; 2],
+    amp_res: bool,
+    df_env: [bool; 5],
+    /// frequency resolution of env_q[0]
+    env_prev_res: bool,
+    add_harmonic_flag: bool,
+    add_harmonic: [bool; 49],
+    invf: [u8; 5],
+    invf_prev: [u8; 5],
 }
 
 impl Chan {
@@ -141,7 +209,6 @@ impl Chan {
     fn new(budget: &Budget, analysed: bool) -> Result<Chan> {
         let rows = |n: usize| if analysed { n } else { 0 };
         Ok(Chan {
-            frame_class: 0,
             num_env: 0,
             t_env: [0; 6],
             freq_res: [false; 6],
@@ -181,6 +248,28 @@ impl Chan {
         })
     }
 
+    fn grid(&self) -> Grid {
+        Grid {
+            num_env: self.num_env,
+            t_env: self.t_env,
+            num_noise: self.num_noise,
+            t_q: self.t_q,
+            l_a: self.l_a,
+            freq_res: self.freq_res,
+            amp_res: self.amp_res,
+        }
+    }
+
+    fn set_grid(&mut self, grid: Grid) {
+        self.num_env = grid.num_env;
+        self.t_env = grid.t_env;
+        self.num_noise = grid.num_noise;
+        self.t_q = grid.t_q;
+        self.l_a = grid.l_a;
+        self.freq_res = grid.freq_res;
+        self.amp_res = grid.amp_res;
+    }
+
     fn reset_signal(&mut self) {
         self.analysis.reset();
         self.synthesis.reset();
@@ -205,7 +294,6 @@ impl Chan {
     fn renew(&mut self) {
         self.reset_signal();
         let Chan {
-            frame_class,
             num_env,
             t_env,
             freq_res,
@@ -243,7 +331,6 @@ impl Chan {
             y,
             alpha: _,
         } = self; // the fields set to `_` are reset_signal's, and scratch
-        *frame_class = 0;
         *num_env = 0;
         *t_env = [0; 6];
         *freq_res = [false; 6];
@@ -280,12 +367,11 @@ pub(crate) struct Sbr {
     data_ok: bool,
     pub(crate) ps: ps::Ps,
     ps_seen: bool,
+    /// The Parametric Stereo output of a single channel element.
+    stereo: Option<ps::Stereo>,
     // scratch
     x: BudgetVec<[Cpx; 64]>,
-    x_r: BudgetVec<[Cpx; 64]>,
-    /// Development aid: the 38 QMF slots handed to Parametric Stereo in the last frame
-    /// (re, im interleaved; empty when PS did not run).
-    #[cfg(feature = "inspect")]
+    #[cfg(feature = "reference-trace")]
     pub(crate) ps_input: Vec<f32>,
 }
 
@@ -302,11 +388,11 @@ impl Sbr {
             coupling: false,
             ch: [Chan::new(budget, true)?, Chan::new(budget, pair)?],
             data_ok: false,
-            ps: ps::Ps::new(budget, !pair)?,
+            ps: ps::Ps::new(),
             ps_seen: false,
+            stereo: (!pair).then(|| ps::Stereo::new(budget)).transpose()?,
             x: BudgetVec::try_filled(budget, [Cpx::default(); 64], 38)?,
-            x_r: BudgetVec::try_filled(budget, [Cpx::default(); 64], if pair { 0 } else { 38 })?,
-            #[cfg(feature = "inspect")]
+            #[cfg(feature = "reference-trace")]
             ps_input: Vec::new(),
         })
     }
@@ -316,6 +402,9 @@ impl Sbr {
             c.reset_signal();
         }
         self.ps.reset();
+        if let Some(stereo) = &mut self.stereo {
+            stereo.reset();
+        }
     }
 
     /// Return to the state of `new` in place, header and frequency tables included.
@@ -331,9 +420,9 @@ impl Sbr {
             data_ok,
             ps,
             ps_seen,
+            stereo,
             x,
-            x_r,
-            #[cfg(feature = "inspect")]
+            #[cfg(feature = "reference-trace")]
                 ps_input: _,
         } = self; // the core rate, and so fs, is the same for every element of a layout
         *hdr = Header::default();
@@ -347,8 +436,10 @@ impl Sbr {
         *data_ok = false;
         ps.renew();
         *ps_seen = false;
+        if let Some(stereo) = stereo {
+            stereo.renew();
+        }
         x.fill([Cpx::default(); 64]);
-        x_r.fill([Cpx::default(); 64]);
     }
 
     /// sbr_extension_data(): returns true when a PS extension was found.
@@ -359,40 +450,105 @@ impl Sbr {
         bits: usize,
         is_cpe: bool,
     ) -> Result<bool> {
-        let start = br.position();
+        let end = br.position() + bits;
         self.data_ok = false;
         if crc {
-            br.skip(10); // bs_sbr_crc_bits (not verified, like the reference decoder)
+            br.skip(10); // bs_sbr_crc_bits
         }
         if br.bit() {
-            self.parse_header(br)?;
+            return self.parse_with_header(br, end, is_cpe);
         }
         if !self.have_header {
-            // data without a preceding header cannot be decoded: skip it
-            let used = br.position() - start;
-            if used < bits {
-                br.skip(bits - used);
+            if br.position() > end {
+                return Err(DecodeError::Invalid("SBR data overrun"));
             }
+            br.seek(end);
             return Ok(false);
         }
-        let r = if is_cpe {
-            self.parse_cpe(br, start + bits)
-        } else {
-            self.parse_sce(br, start + bits)
-        };
-        match r {
-            Ok(ps) => {
-                if br.position() > start + bits {
-                    return Err(DecodeError::InvalidData("SBR data overrun"));
-                }
-                self.data_ok = true;
-                Ok(ps)
-            }
-            Err(e) => Err(e),
-        }
+        self.parse_body(br, end, is_cpe)
     }
 
-    fn parse_header(&mut self, br: &mut CachedBitReader<'_>) -> Result<()> {
+    // Keeps the frequency table update's stack frame out of headerless payloads.
+    #[inline(never)]
+    fn parse_with_header(
+        &mut self,
+        br: &mut CachedBitReader<'_>,
+        end: usize,
+        is_cpe: bool,
+    ) -> Result<bool> {
+        let hdr = Self::read_header(br);
+        let needs_reset = !self.have_header || hdr.changes_bands(self.hdr);
+        let mut saved_bands = None;
+        let mut saved_limiter = None;
+        if needs_reset {
+            let bands = freq::compute(&hdr, self.fs)?;
+            saved_bands = Some(core::mem::replace(&mut self.ft, bands));
+        } else if hdr.limiter_bands != self.hdr.limiter_bands {
+            let limiter = freq::limiter_table(
+                hdr.limiter_bands,
+                &self.ft.low,
+                self.ft.kx,
+                &self.ft.patch_num,
+            )?;
+            saved_limiter = Some(core::mem::replace(&mut self.ft.lim, limiter));
+            self.ft.n_lim = self.ft.lim.len() - 1;
+        }
+        let previous = core::mem::replace(&mut self.hdr, hdr);
+        let result = self.parse_body(br, end, is_cpe);
+        if result.is_ok() {
+            self.have_header = true;
+            self.reset |= needs_reset;
+        } else {
+            self.hdr = previous;
+            if let Some(bands) = saved_bands {
+                self.ft = bands;
+            } else if let Some(limiter) = saved_limiter {
+                self.ft.n_lim = limiter.len() - 1;
+                self.ft.lim = limiter;
+            }
+        }
+        result
+    }
+
+    fn parse_body(
+        &mut self,
+        br: &mut CachedBitReader<'_>,
+        end: usize,
+        is_cpe: bool,
+    ) -> Result<bool> {
+        let previous = self.ch.each_ref().map(Chan::grid);
+        let coupling = self.coupling;
+        let result = if is_cpe {
+            self.parse_cpe(br, end)
+        } else {
+            self.parse_sce(br, end)
+        };
+        let result = result.and_then(|ps| {
+            if br.position() > end {
+                Err(DecodeError::Invalid("SBR data overrun"))
+            } else {
+                Ok(ps)
+            }
+        });
+        if result.is_ok() {
+            self.data_ok = true;
+            for (channel, grid) in self.ch[..1 + usize::from(is_cpe)].iter_mut().zip(previous) {
+                channel.l_a_prev = if grid.l_a >= 0 && grid.l_a as usize == grid.num_env {
+                    0
+                } else {
+                    -1
+                };
+            }
+        } else {
+            self.coupling = coupling;
+            for (channel, grid) in self.ch[..1 + usize::from(is_cpe)].iter_mut().zip(previous) {
+                channel.set_grid(grid);
+            }
+        }
+        result
+    }
+
+    fn read_header(br: &mut CachedBitReader<'_>) -> Header {
         let mut h = Header {
             amp_res: br.bit(),
             start_freq: br.read(4) as u8,
@@ -414,37 +570,7 @@ impl Sbr {
             h.interpol_freq = br.bit();
             h.smoothing_mode = br.bit();
         }
-        let old = self.hdr;
-        let need_reset = !self.have_header
-            || h.start_freq != old.start_freq
-            || h.stop_freq != old.stop_freq
-            || h.xover_band != old.xover_band
-            || h.freq_scale != old.freq_scale
-            || h.alter_scale != old.alter_scale
-            || h.noise_bands != old.noise_bands;
-        self.hdr = h;
-        if need_reset {
-            match freq::compute(&h, self.fs) {
-                Ok(ft) => {
-                    self.ft = ft;
-                    self.have_header = true;
-                    self.reset = true;
-                }
-                Err(e) => {
-                    self.have_header = false;
-                    return Err(e);
-                }
-            }
-        } else if h.limiter_bands != old.limiter_bands {
-            self.ft.lim = freq::limiter_table(
-                h.limiter_bands,
-                &self.ft.low,
-                self.ft.kx,
-                &self.ft.patch_num,
-            )?;
-            self.ft.n_lim = self.ft.lim.len() - 1;
-        }
-        Ok(())
+        h
     }
 
     fn parse_sce(&mut self, br: &mut CachedBitReader<'_>, end: usize) -> Result<bool> {
@@ -454,16 +580,16 @@ impl Sbr {
         self.coupling = false;
         let ft = &self.ft;
         let c = &mut self.ch[0];
-        parse_grid(br, c)?;
+        c.set_grid(parse_grid(br)?);
         parse_dtdf(br, c);
         parse_invf(br, c, ft.n_q);
         parse_envelope(br, c, ft, self.hdr.amp_res, false)?;
         parse_noise(br, c, ft, false)?;
         c.add_harmonic_flag = br.bit();
         if c.add_harmonic_flag {
-            c.add_harmonic[..ft.n_high]
-                .iter_mut()
-                .for_each(|h| *h = br.bit());
+            for h in &mut c.add_harmonic[..ft.n_high] {
+                *h = br.bit();
+            }
         } else {
             c.add_harmonic = [false; 49];
         }
@@ -480,8 +606,9 @@ impl Sbr {
         let (a, b) = self.ch.split_at_mut(1);
         let (c0, c1) = (&mut a[0], &mut b[0]);
         if self.coupling {
-            parse_grid(br, c0)?;
-            copy_grid(c0, c1);
+            let grid = parse_grid(br)?;
+            c0.set_grid(grid);
+            c1.set_grid(grid);
             parse_dtdf(br, c0);
             parse_dtdf(br, c1);
             parse_invf(br, c0, ft.n_q);
@@ -491,8 +618,8 @@ impl Sbr {
             parse_envelope(br, c1, ft, amp, true)?;
             parse_noise(br, c1, ft, true)?;
         } else {
-            parse_grid(br, c0)?;
-            parse_grid(br, c1)?;
+            c0.set_grid(parse_grid(br)?);
+            c1.set_grid(parse_grid(br)?);
             parse_dtdf(br, c0);
             parse_dtdf(br, c1);
             parse_invf(br, c0, ft.n_q);
@@ -505,9 +632,9 @@ impl Sbr {
         for c in [c0, c1] {
             c.add_harmonic_flag = br.bit();
             if c.add_harmonic_flag {
-                c.add_harmonic[..ft.n_high]
-                    .iter_mut()
-                    .for_each(|h| *h = br.bit());
+                for h in &mut c.add_harmonic[..ft.n_high] {
+                    *h = br.bit();
+                }
             } else {
                 c.add_harmonic = [false; 49];
             }
@@ -525,7 +652,7 @@ impl Sbr {
             }
             let mut left = 8 * cnt as isize;
             if br.position() as isize + left > end as isize {
-                return Err(DecodeError::InvalidData("SBR extended data length"));
+                return Err(DecodeError::Invalid("SBR extended data length"));
             }
             while left > 7 {
                 let id = br.read(2);
@@ -560,6 +687,7 @@ impl Sbr {
     ) {
         let ready = self.have_header && self.data_ok;
         let reset = self.reset && ready;
+        let conceal_missing = !ready && self.ps.policy == Policy::Conceal;
         if ready {
             for c in 0..nch {
                 dequant(&mut self.ch[..], c, &self.ft, self.coupling, nch);
@@ -568,82 +696,23 @@ impl Sbr {
         for c in 0..nch {
             let buf: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
             let ch = &mut self.ch[c];
-            // QMF analysis of the core output (float scale -> 16-bit domain)
-            let mut bands = [Cpx::default(); 32];
-            for (t, input) in buf[..1024].chunks_exact(32).enumerate() {
-                ch.analysis.run(qmf, input, 32768.0, &mut bands);
-                for (xl, band) in ch.xl.iter_mut().zip(bands) {
-                    xl[T_HFGEN + t] = band;
-                }
+            if conceal_missing {
+                ch.prev_t_env_last = NUM_TIME_SLOTS;
+                ch.kx_prev = 32;
+                ch.m_prev = 0;
             }
             let (kx, m) = if ready {
                 (self.ft.kx, self.ft.m)
             } else {
                 (32, 0)
             };
-            // low band buffer: history (previous frame, k < kx_prev) + current (k < kx)
-            for (k, xl) in ch.xl.iter_mut().enumerate() {
-                if k >= ch.kx_prev {
-                    xl[..T_HFGEN].fill(Cpx::default());
-                }
-                if k >= kx {
-                    xl[T_HFGEN..T_HFGEN + 32].fill(Cpx::default());
-                }
-            }
+            analyse_core(ch, buf, kx, qmf);
             if ready {
                 hf_generate(ch, &self.ft);
                 hf_adjust(ch, &self.ft, &self.hdr, reset);
             }
-            // assemble the synthesis input X(k, i), i < 32
-            let i_temp = (2 * ch.prev_t_env_last).saturating_sub(32).min(8);
-            for i in 0..32 {
-                let row = &mut self.x[i];
-                let (kxi, mi) = if i < i_temp {
-                    (ch.kx_prev, ch.m_prev)
-                } else {
-                    (kx, m)
-                };
-                let low = kxi.min(32);
-                for (r, xl) in row.iter_mut().zip(&ch.xl[..low]) {
-                    *r = xl[i + T_HFADJ];
-                }
-                let hf = kxi.min(64)..(kxi + mi).min(64);
-                row[low..hf.start].fill(Cpx::default());
-                // slots before i_temp take the previous frame's high band, whose last
-                // envelope ended after the frame border; a frame without its SBR element
-                // has no high band, that one included (observed behaviour, HE-AAC v1 and v2
-                // alike: probe o31 in harness/codecs/aac/ps/signal/open, kx = 32 in both
-                // frames)
-                if ready {
-                    let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
-                    row[hf.clone()].copy_from_slice(&high[hf.clone()]);
-                } else {
-                    row[hf.clone()].fill(Cpx::default());
-                }
-                row[hf.end..].fill(Cpx::default());
-            }
-            // keep state for the next frame
-            for xl in ch.xl.iter_mut() {
-                xl.copy_within(32..32 + T_HFGEN, 0);
-            }
-            if ready {
-                let last = ch.t_env[ch.num_env];
-                for i in 0..8 {
-                    ch.y_prev[i] = if 32 + i < 2 * last {
-                        ch.y[32 + i]
-                    } else {
-                        [Cpx::default(); 64]
-                    };
-                }
-                ch.prev_t_env_last = last;
-                ch.kx_prev = kx;
-                ch.m_prev = m;
-            } else {
-                ch.prev_t_env_last = NUM_TIME_SLOTS;
-                ch.kx_prev = kx;
-                ch.m_prev = 0;
-            }
-            if c == 0 && ps {
+            prepare_synthesis(ch, &mut self.x, (kx, m), ready);
+            if let (0, true, Some(stereo)) = (c, ps, &mut self.stereo) {
                 // look-ahead slots (low band only) for the PS hybrid filters
                 for i in 32..38 {
                     let row = &mut self.x[i];
@@ -652,44 +721,41 @@ impl Sbr {
                         row[k] = ch.xl[k][i + T_HFADJ];
                     }
                 }
-                #[cfg(feature = "inspect")]
+                #[cfg(feature = "reference-trace")]
                 {
                     self.ps_input.clear();
-                    for row in self.x.iter() {
-                        for v in row {
-                            self.ps_input.extend([v.re, v.im]);
-                        }
-                    }
+                    self.ps_input
+                        .extend(self.x.iter().flatten().flat_map(|v| [v.re, v.im]));
                 }
                 // Parametric Stereo: the mono QMF matrix becomes the left and right matrices (ps.rs)
                 if self.ps_seen {
-                    self.ps.apply(&mut self.x, &mut self.x_r);
+                    self.ps.apply(stereo, &mut self.x);
                     if !ready {
                         // without its SBR element the frame's PS output above kx is zero,
                         // the decorrelated signal of earlier frames included (observed
                         // behaviour: probes o00, o31, o32 in
                         // harness/codecs/aac/ps/signal/open, all with kx = 32)
-                        for row in self.x[..32].iter_mut().chain(self.x_r[..32].iter_mut()) {
+                        for row in self.x[..32].iter_mut().chain(stereo.right[..32].iter_mut()) {
                             row[kx..].fill(Cpx::default());
                         }
                     }
                 } else {
                     // no PS data yet: both outputs carry the mono signal
                     for i in 0..32 {
-                        self.x_r[i] = self.x[i];
+                        stereo.right[i] = self.x[i];
                     }
                 }
-                for (x, out) in self.x[..32].iter().zip(l.chunks_exact_mut(64)) {
+                for (x, out) in self.x[..32].iter().zip(l.as_chunks_mut::<64>().0) {
                     self.ch[0].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
-                for (x, out) in self.x_r[..32].iter().zip(r.chunks_exact_mut(64)) {
+                for (x, out) in stereo.right[..32].iter().zip(r.as_chunks_mut::<64>().0) {
                     self.ch[1].synthesis.run(qmf, x, 1.0 / 32768.0, out);
                 }
                 continue;
             }
             let chn = &mut self.ch[c];
             let out: &mut [f32] = if c == 0 { &mut l[..] } else { &mut r[..] };
-            for (x, out) in self.x[..32].iter().zip(out.chunks_exact_mut(64)) {
+            for (x, out) in self.x[..32].iter().zip(out.as_chunks_mut::<64>().0) {
                 chn.synthesis.run(qmf, x, 1.0 / 32768.0, out);
             }
         }
@@ -700,32 +766,81 @@ impl Sbr {
     }
 }
 
-fn copy_grid(a: &Chan, b: &mut Chan) {
-    // like parse_grid: the transient position of the previous frame, before num_env changes
-    b.l_a_prev = if b.l_a >= 0 && b.l_a as usize == b.num_env {
-        0
+/// Analyzes the core PCM into the QMF low bands and bounds the available history.
+#[inline]
+fn analyse_core(ch: &mut Chan, input: &[f32], kx: usize, qmf: &mut Modulation) {
+    // QMF analysis of the core output (float scale -> 16-bit domain)
+    let mut bands = [Cpx::default(); 32];
+    for (t, input) in input[..1024].as_chunks::<32>().0.iter().enumerate() {
+        ch.analysis.run(qmf, input, 32768.0, &mut bands);
+        for (xl, band) in ch.xl.iter_mut().zip(bands) {
+            xl[T_HFGEN + t] = band;
+        }
+    }
+    // low band buffer: history (previous frame, k < kx_prev) + current (k < kx)
+    for (k, xl) in ch.xl.iter_mut().enumerate() {
+        if k >= ch.kx_prev {
+            xl[..T_HFGEN].fill(Cpx::default());
+        }
+        if k >= kx {
+            xl[T_HFGEN..T_HFGEN + 32].fill(Cpx::default());
+        }
+    }
+}
+
+/// Assembles the synthesis input and advances its low- and high-band carry.
+#[inline]
+fn prepare_synthesis(ch: &mut Chan, x: &mut [[Cpx; 64]], (kx, m): (usize, usize), ready: bool) {
+    // assemble the synthesis input X(k, i), i < 32
+    let i_temp = (2 * ch.prev_t_env_last).saturating_sub(32).min(8);
+    for i in 0..32 {
+        let row = &mut x[i];
+        let (kxi, mi) = if i < i_temp {
+            (ch.kx_prev, ch.m_prev)
+        } else {
+            (kx, m)
+        };
+        let low = kxi.min(32);
+        for (r, xl) in row.iter_mut().zip(&ch.xl[..low]) {
+            *r = xl[i + T_HFADJ];
+        }
+        let hf = kxi.min(64)..(kxi + mi).min(64);
+        row[low..hf.start].fill(Cpx::default());
+        // Early slots take the previous high band only when this frame has SBR data.
+        if ready {
+            let high = if i < i_temp { &ch.y_prev[i] } else { &ch.y[i] };
+            row[hf.clone()].copy_from_slice(&high[hf.clone()]);
+        } else {
+            row[hf.clone()].fill(Cpx::default());
+        }
+        row[hf.end..].fill(Cpx::default());
+    }
+    // keep state for the next frame
+    for xl in ch.xl.iter_mut() {
+        xl.copy_within(32..32 + T_HFGEN, 0);
+    }
+    if ready {
+        let last = ch.t_env[ch.num_env];
+        for i in 0..8 {
+            ch.y_prev[i] = if 32 + i < 2 * last {
+                ch.y[32 + i]
+            } else {
+                [Cpx::default(); 64]
+            };
+        }
+        ch.prev_t_env_last = last;
+        ch.kx_prev = kx;
+        ch.m_prev = m;
     } else {
-        -1
-    };
-    b.frame_class = a.frame_class;
-    b.num_env = a.num_env;
-    b.t_env = a.t_env;
-    b.freq_res = a.freq_res;
-    b.num_noise = a.num_noise;
-    b.t_q = a.t_q;
-    b.l_a = a.l_a;
-    b.amp_res = a.amp_res;
+        // The reference policy retains the previous border and band limits with a zero high band.
+        ch.y_prev[..i_temp].fill([Cpx::default(); 64]);
+    }
 }
 
 /// sbr_grid() and the derived time borders (4.6.18.3.3).
-fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
-    // a transient at the end of the previous frame affects this frame's first envelope
-    c.l_a_prev = if c.l_a >= 0 && c.l_a as usize == c.num_env {
-        0
-    } else {
-        -1
-    };
-    let class = br.read(2) as u8;
+fn parse_grid(br: &mut CachedBitReader<'_>) -> Result<Grid> {
+    let mut grid = Grid::default();
+    let class = FrameClass::read(br);
     let mut rel0 = [0usize; 4];
     let mut rel1 = [0usize; 4];
     let (mut nrel0, mut nrel1) = (0usize, 0usize);
@@ -733,14 +848,14 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
     let mut pointer = 0usize;
     let num_env;
     match class {
-        FIXFIX => {
+        FrameClass::FixFix => {
             let tmp = br.read(2);
             num_env = 1usize << tmp;
             if num_env > 4 {
-                return Err(DecodeError::InvalidData("SBR FIXFIX envelopes"));
+                return Err(DecodeError::Invalid("SBR FIXFIX envelopes"));
             }
             let fr = br.bit();
-            c.freq_res[..num_env].fill(fr);
+            grid.freq_res[..num_env].fill(fr);
             abs0 = 0;
             abs1 = NUM_TIME_SLOTS;
             nrel0 = num_env - 1;
@@ -749,7 +864,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                 *r = rel;
             }
         }
-        FIXVAR => {
+        FrameClass::FixVar => {
             abs1 = br.read(2) as usize + NUM_TIME_SLOTS;
             nrel1 = br.read(2) as usize;
             num_env = nrel1 + 1;
@@ -758,11 +873,11 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
             }
             pointer = br.read(ptr_bits(num_env)) as usize;
             for e in 0..num_env {
-                c.freq_res[num_env - 1 - e] = br.bit();
+                grid.freq_res[num_env - 1 - e] = br.bit();
             }
             abs0 = 0;
         }
-        VARFIX => {
+        FrameClass::VarFix => {
             abs0 = br.read(2) as usize;
             nrel0 = br.read(2) as usize;
             num_env = nrel0 + 1;
@@ -770,18 +885,19 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                 *r = 2 * br.read(2) as usize + 2;
             }
             pointer = br.read(ptr_bits(num_env)) as usize;
-            c.freq_res[..num_env].iter_mut().for_each(|f| *f = br.bit());
+            for f in &mut grid.freq_res[..num_env] {
+                *f = br.bit();
+            }
             abs1 = NUM_TIME_SLOTS;
         }
-        _ => {
-            // VARVAR
+        FrameClass::VarVar => {
             abs0 = br.read(2) as usize;
             abs1 = br.read(2) as usize + NUM_TIME_SLOTS;
             nrel0 = br.read(2) as usize;
             nrel1 = br.read(2) as usize;
             num_env = nrel0 + nrel1 + 1;
             if num_env > 5 {
-                return Err(DecodeError::InvalidData("SBR VARVAR envelopes"));
+                return Err(DecodeError::Invalid("SBR VARVAR envelopes"));
             }
             for r in rel0.iter_mut().take(nrel0) {
                 *r = 2 * br.read(2) as usize + 2;
@@ -790,40 +906,41 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                 *r = 2 * br.read(2) as usize + 2;
             }
             pointer = br.read(ptr_bits(num_env)) as usize;
-            c.freq_res[..num_env].iter_mut().for_each(|f| *f = br.bit());
+            for f in &mut grid.freq_res[..num_env] {
+                *f = br.bit();
+            }
         }
     }
     if pointer > num_env {
-        return Err(DecodeError::InvalidData("SBR bs_pointer"));
+        return Err(DecodeError::Invalid("SBR bs_pointer"));
     }
-    c.frame_class = class;
-    c.num_env = num_env;
-    c.t_env[0] = abs0;
-    c.t_env[num_env] = abs1;
+    grid.num_env = num_env;
+    grid.t_env[0] = abs0;
+    grid.t_env[num_env] = abs1;
     for l in 1..=nrel0 {
-        c.t_env[l] = c.t_env[l - 1] + rel0[l - 1];
+        grid.t_env[l] = grid.t_env[l - 1] + rel0[l - 1];
     }
     let mut l = num_env;
     for &r in &rel1[..nrel1] {
         l -= 1;
-        c.t_env[l] = c.t_env[l + 1] - r.min(c.t_env[l + 1]);
+        grid.t_env[l] = grid.t_env[l + 1] - r.min(grid.t_env[l + 1]);
     }
     for l in 0..num_env {
-        if c.t_env[l] >= c.t_env[l + 1] {
-            return Err(DecodeError::InvalidData("SBR time borders"));
+        if grid.t_env[l] >= grid.t_env[l + 1] {
+            return Err(DecodeError::Invalid("SBR time borders"));
         }
     }
-    if c.t_env[num_env] > NUM_TIME_SLOTS + 3 {
-        return Err(DecodeError::InvalidData("SBR time borders"));
+    if grid.t_env[num_env] > NUM_TIME_SLOTS + 3 {
+        return Err(DecodeError::Invalid("SBR time borders"));
     }
-    c.num_noise = if num_env > 1 { 2 } else { 1 };
-    c.t_q[0] = c.t_env[0];
+    grid.num_noise = if num_env > 1 { 2 } else { 1 };
+    grid.t_q[0] = grid.t_env[0];
     if num_env == 1 {
-        c.t_q[1] = c.t_env[1];
+        grid.t_q[1] = grid.t_env[1];
     } else {
         let mid = match class {
-            FIXFIX => num_env / 2,
-            VARFIX => {
+            FrameClass::FixFix => num_env / 2,
+            FrameClass::VarFix => {
                 if pointer == 0 {
                     1
                 } else if pointer == 1 {
@@ -832,7 +949,7 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                     pointer - 1
                 }
             }
-            _ => {
+            FrameClass::FixVar | FrameClass::VarVar => {
                 if pointer > 1 {
                     num_env + 1 - pointer
                 } else {
@@ -840,19 +957,19 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
                 }
             }
         };
-        c.t_q[1] = c.t_env[mid];
-        c.t_q[2] = c.t_env[num_env];
+        grid.t_q[1] = grid.t_env[mid];
+        grid.t_q[2] = grid.t_env[num_env];
     }
-    c.l_a = match class {
-        FIXFIX => -1,
-        VARFIX => {
+    grid.l_a = match class {
+        FrameClass::FixFix => -1,
+        FrameClass::VarFix => {
             if pointer > 1 {
                 pointer as i32 - 1
             } else {
                 -1
             }
         }
-        _ => {
+        FrameClass::FixVar | FrameClass::VarVar => {
             if pointer > 0 {
                 num_env as i32 + 1 - pointer as i32
             } else {
@@ -861,8 +978,8 @@ fn parse_grid(br: &mut CachedBitReader<'_>, c: &mut Chan) -> Result<()> {
         }
     };
     // FIXFIX with a single envelope uses 1.5 dB resolution regardless of bs_amp_res
-    c.amp_res = !(class == FIXFIX && num_env == 1);
-    Ok(())
+    grid.amp_res = !(class == FrameClass::FixFix && num_env == 1);
+    Ok(grid)
 }
 
 fn ptr_bits(num_env: usize) -> u32 {
@@ -884,13 +1001,15 @@ fn parse_dtdf(br: &mut CachedBitReader<'_>, c: &mut Chan) {
 }
 
 fn parse_invf(br: &mut CachedBitReader<'_>, c: &mut Chan, n_q: usize) {
-    c.invf[..n_q].iter_mut().for_each(|v| *v = br.read(2) as u8);
+    for v in &mut c.invf[..n_q] {
+        *v = br.read(2) as u8;
+    }
 }
 
 fn huff(br: &mut CachedBitReader<'_>, v: &Vlc) -> Result<i32> {
     v.decode(br)
         .map(|s| s as i32)
-        .ok_or(DecodeError::InvalidData("SBR Huffman code"))
+        .ok_or(DecodeError::Invalid("SBR Huffman code"))
 }
 
 /// sbr_envelope() with delta decoding (4.6.18.3.4).
@@ -1080,7 +1199,7 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
         .max()
         .unwrap_or(0);
     let alpha = &mut c.alpha;
-    predictors(&c.xl[first..end], &mut alpha[first..end]);
+    kernels::predictors(&c.xl[first..end], &mut alpha[first..end]);
     let mut k = ft.kx;
     for (p, &num) in ft.patch_num.iter().enumerate() {
         for x in 0..num {
@@ -1115,24 +1234,6 @@ fn hf_generate(c: &mut Chan, ft: &FreqTables) {
     }
 }
 
-/// The prediction coefficients ([`predictor`]) of each band of `xl`, into `alpha`.
-fn predictors(xl: &[[Cpx; XL_LEN]], alpha: &mut [(Cpx, Cpx)]) {
-    #[cfg(feature = "simd")]
-    {
-        for (rows, alpha) in xl.chunks(4).zip(alpha.chunks_mut(4)) {
-            // a short last group repeats its last band in the spare lanes
-            let lanes: [&[Cpx; XL_LEN]; 4] = std::array::from_fn(|j| &rows[j.min(rows.len() - 1)]);
-            for (a, sums) in alpha.iter_mut().zip(simd::covariance4(lanes)) {
-                *a = predictor(&sums);
-            }
-        }
-    }
-    #[cfg(not(feature = "simd"))]
-    for (x, a) in xl.iter().zip(alpha) {
-        *a = predictor(&covariance(x));
-    }
-}
-
 /// The covariances phi(i, j) = sum_{n=0}^{37} x\[n + 2 - i\] conj(x\[n + 2 - j\]) of one
 /// band that the predictor needs (4.6.18.6.2).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -1142,40 +1243,6 @@ struct Covariance {
     r11: f32,
     r12: Cpx,
     r22: f32,
-}
-
-/// The covariances of one band, each summed in time order from zero.
-#[cfg_attr(
-    feature = "simd",
-    allow(dead_code, reason = "the scalar form, tested against the kernel")
-)]
-fn covariance(x: &[Cpx; XL_LEN]) -> Covariance {
-    let mut r01 = Cpx::default();
-    let mut r02 = Cpx::default();
-    let mut r11 = 0f32;
-    let mut r12 = Cpx::default();
-    let mut r22 = 0f32;
-    for n in 0..(2 * NUM_TIME_SLOTS + 6) {
-        let a = x[n + 2];
-        let b = x[n + 1];
-        let cc = x[n];
-        // phi(0,1) = sum a conj(b)
-        r01.re += a.re * b.re + a.im * b.im;
-        r01.im += a.im * b.re - a.re * b.im;
-        r02.re += a.re * cc.re + a.im * cc.im;
-        r02.im += a.im * cc.re - a.re * cc.im;
-        r11 += b.re * b.re + b.im * b.im;
-        r12.re += b.re * cc.re + b.im * cc.im;
-        r12.im += b.im * cc.re - b.re * cc.im;
-        r22 += cc.re * cc.re + cc.im * cc.im;
-    }
-    Covariance {
-        r01,
-        r02,
-        r11,
-        r12,
-        r22,
-    }
 }
 
 /// Covariance-method second order prediction coefficients (4.6.18.6.2).
@@ -1206,17 +1273,18 @@ fn predictor(sums: &Covariance) -> (Cpx, Cpx) {
     (a0, a1)
 }
 
-/// HF adjustment (4.6.18.7): mapping, gains, limiter, smoothing, noise and sinusoids.
-fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
+/// Maps envelope energy, noise and sinusoids to QMF bands (4.6.18.7.2).
+#[inline]
+fn map_envelopes(
+    c: &Chan,
+    ft: &FreqTables,
+    e_orig_m: &mut [[f32; 64]; 5],
+    q_m: &mut [[f32; 64]; 5],
+    s_idx: &mut [[bool; 64]; 5],
+    s_map: &mut [[bool; 64]; 5],
+) {
     let kx = ft.kx;
-    let m = ft.m;
     let ne = c.num_env;
-    let mut e_orig_m = [[0f32; 64]; 5];
-    let mut q_m = [[0f32; 64]; 5];
-    let mut s_idx = [[false; 64]; 5];
-    let mut s_map = [[false; 64]; 5];
-    let mut e_curr = [[0f32; 64]; 5];
-    // mapping (4.6.18.7.2)
     for e in 0..ne {
         let table: &[usize] = if c.freq_res[e] { &ft.high } else { &ft.low };
         let n = table.len() - 1;
@@ -1225,11 +1293,7 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
                 e_orig_m[e][mm - kx] = c.e_orig[e][i];
             }
         }
-        let nf = if c.num_noise > 1 && c.t_env[e] >= c.t_q[1] {
-            1
-        } else {
-            0
-        };
+        let nf = usize::from(c.num_noise > 1 && c.t_env[e] >= c.t_q[1]);
         for i in 0..ft.n_q {
             for mm in ft.noise[i]..ft.noise[i + 1] {
                 q_m[e][mm - kx] = c.q_orig[nf][i];
@@ -1249,11 +1313,23 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
             }
         }
     }
-    // current energies (4.6.18.7.3)
+}
+
+/// Estimates the energy of the generated HF bands (4.6.18.7.3).
+#[inline]
+fn estimate_envelope_energies(
+    c: &Chan,
+    ft: &FreqTables,
+    interpolate: bool,
+    e_curr: &mut [[f32; 64]; 5],
+) {
+    let kx = ft.kx;
+    let m = ft.m;
+    let ne = c.num_env;
     for e in 0..ne {
         let lb = 2 * c.t_env[e] + T_HFADJ;
         let ub = 2 * c.t_env[e + 1] + T_HFADJ;
-        if hdr.interpol_freq {
+        if interpolate {
             let inv = 1.0 / (ub - lb) as f32;
             for mm in 0..m {
                 let s: f32 = c.xh[mm + kx][lb..ub]
@@ -1278,6 +1354,20 @@ fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
             }
         }
     }
+}
+
+/// HF adjustment (4.6.18.7): mapping, gains, limiter, smoothing, noise and sinusoids.
+fn hf_adjust(c: &mut Chan, ft: &FreqTables, hdr: &Header, reset: bool) {
+    let kx = ft.kx;
+    let m = ft.m;
+    let ne = c.num_env;
+    let mut e_orig_m = [[0f32; 64]; 5];
+    let mut q_m = [[0f32; 64]; 5];
+    let mut s_idx = [[false; 64]; 5];
+    let mut s_map = [[false; 64]; 5];
+    let mut e_curr = [[0f32; 64]; 5];
+    map_envelopes(c, ft, &mut e_orig_m, &mut q_m, &mut s_idx, &mut s_map);
+    estimate_envelope_energies(c, ft, hdr.interpol_freq, &mut e_curr);
     // gains (4.6.18.7.4) and limiter (4.6.18.7.5)
     let mut gain = [[0f32; 64]; 5];
     let mut qm = [[0f32; 64]; 5];
@@ -1416,6 +1506,52 @@ mod tests {
     use super::*;
 
     #[test]
+    fn refused_payload_preserves_the_last_header_and_grid() {
+        let budget = Budget::new(1 << 20).unwrap();
+        let mut sbr = Sbr::new(24_000, false, &budget).unwrap();
+        let previous = Header {
+            start_freq: 2,
+            stop_freq: 14,
+            freq_scale: 0,
+            alter_scale: false,
+            noise_bands: 1,
+            ..Header::default()
+        };
+        sbr.ft = freq::compute(&previous, 48_000).unwrap();
+        sbr.hdr = previous;
+        sbr.have_header = true;
+        let grid = Grid {
+            num_env: 1,
+            t_env: [0, 19, 0, 0, 0, 0],
+            l_a: 1,
+            ..Grid::default()
+        };
+        sbr.ch[0].set_grid(grid);
+        let expected_bands = (sbr.ft.kx, sbr.ft.m);
+        let no_header = [0; 8]; // FIXFIX, one envelope, absolute deltas
+        let new_header = [0x8b, 0x81, 0x04, 0, 0, 0, 0, 0]; // new start frequency
+        for (data, bits) in [
+            (&no_header, 5),
+            (&no_header, 8),
+            (&no_header, 15),
+            (&new_header, 23),
+        ] {
+            let mut reader = CachedBitReader::with_end(data, bits);
+            assert!(matches!(
+                sbr.parse(&mut reader, false, bits, false),
+                Err(DecodeError::Invalid(_))
+            ));
+            assert_eq!(sbr.ch[0].grid(), grid);
+            assert_eq!(sbr.ch[0].l_a_prev, -1);
+            assert_eq!(sbr.hdr, previous);
+            assert_eq!((sbr.ft.kx, sbr.ft.m), expected_bands);
+            assert!(sbr.have_header);
+            assert!(!sbr.data_ok);
+            assert!(!sbr.reset);
+        }
+    }
+
+    #[test]
     fn renew_returns_an_sbr_to_its_new_state() {
         let budget = Budget::new(1 << 30).unwrap();
         for pair in [false, true] {
@@ -1478,5 +1614,40 @@ mod tests {
                 .iter()
                 .all(|slot| !slot[18..20].iter().any(has_noise))
         );
+    }
+
+    #[test]
+    fn a_frame_without_sbr_data_retains_the_border_only_in_reference_mode() {
+        let budget = Budget::new(1 << 30).unwrap();
+        for kx in [20, 32] {
+            for policy in [Policy::Conceal, Policy::Reference] {
+                let mut sbr = Sbr::new(24_000, false, &budget).unwrap();
+                sbr.ps.policy = policy;
+                let ch = &mut sbr.ch[0];
+                let previous = (NUM_TIME_SLOTS + 3, kx, 12);
+                (ch.prev_t_env_last, ch.kx_prev, ch.m_prev) = previous;
+                ch.y_prev[0][kx].re = 1.0;
+                ch.xl[24][T_HFADJ].re = 1.0;
+                let (mut left, mut right) = ([0f32; 2048], [0f32; 2048]);
+                sbr.process(
+                    &mut left,
+                    &mut right,
+                    1,
+                    false,
+                    false,
+                    &mut Modulation::new(),
+                );
+                assert_eq!(
+                    left.iter().any(|&sample| sample != 0.0),
+                    kx == 32 || policy == Policy::Conceal
+                );
+                let ch = &sbr.ch[0];
+                let expected = match policy {
+                    Policy::Conceal => (NUM_TIME_SLOTS, 32, 0),
+                    Policy::Reference => previous,
+                };
+                assert_eq!((ch.prev_t_env_last, ch.kx_prev, ch.m_prev), expected);
+            }
+        }
     }
 }

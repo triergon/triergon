@@ -1,0 +1,764 @@
+use super::*;
+use triergon_mpegts::psi::stream_type;
+use triergon_mpegts::transport::parse_transport;
+use triergon_mpegts::{
+    AssemblyStep, PacketFormat, ParseLimits, SourceEpochs,
+    compat::pes::{DemuxClock, DemuxObserver, DemuxScope, SourceContext},
+};
+
+const DELIMITER: &[u8] = &[0, 0, 0, 1, 9, 0xf0];
+// RBSP prefixes from the authored bframes-multislice fixture.
+const SPS: &[u8] = &[
+    0x67, 0x64, 0, 0x0a, 0xac, 0xd9, 0x46, 0x27, 0xe5, 0xc0, 0x44, 0, 0, 3, 0, 4, 0, 0, 3, 0, 0xc8,
+    0x3c, 0x48, 0x96, 0x58,
+];
+const PPS: &[u8] = &[0x68, 0xeb, 0xe3, 0xcb, 0x22, 0xc0];
+const IDR: &[u8] = &[0, 0, 1, 0x65, 0x88, 0x84];
+
+fn fixture() -> (Budget, AvcTsReader) {
+    let pool = Budget::new(64 * 1024).unwrap();
+    let config = AdmittedCarriage {
+        track: TrackKey::Ts {
+            program: 31,
+            pid: 256,
+        },
+        configuration_epoch: 1,
+        carriage: Carriage::Registered(RegisteredCarriage::Avc),
+    };
+    let reader = AvcTsReader::new(&pool, config, AvcTsLimits::default()).unwrap();
+    (pool, reader)
+}
+
+fn clock(pts: u64) -> AvcTsClock {
+    AvcTsClock {
+        source_pts_raw33: Some(pts),
+        source_dts_raw33: None,
+        pts90: Some(pts as i64),
+        dts90: Some(pts as i64),
+    }
+}
+
+const SOURCE: SourceId = SourceId(9);
+const EPOCHS: SourceEpochs = SourceEpochs {
+    clock: 0,
+    configuration: 1,
+};
+
+/// Carries `bytes` to the reader as the payload of one PES, in as many TS packets
+/// as it needs, through a transport observer and `push`. The PES header applies no
+/// timestamps, so the reader's clock anchors stay as the test sets them.
+fn push_span(reader: &mut AvcTsReader, bytes: &[u8]) {
+    let mut observer = DemuxObserver::new_registered(
+        DemuxScope {
+            program: 31,
+            pid: 256,
+            stream_type: stream_type::H264,
+            stream_id: stream_id::VIDEO_FIRST,
+            entity: SOURCE,
+            epochs: EPOCHS,
+        },
+        RegisteredCarriage::Avc,
+        reader.pool.clone(),
+        ParseLimits::default(),
+    )
+    .unwrap();
+    let length = u16::try_from(3 + bytes.len()).unwrap().to_be_bytes();
+    let pes = [&[0, 0, 1, 0xe0, length[0], length[1], 0x80, 0, 0], bytes].concat();
+    let cancel = AtomicBool::new(false);
+    let mut work = WorkBudget::new(1 << 20);
+    for (index, payload) in pes.chunks(184).enumerate() {
+        let mut raw = [0xff; 188];
+        raw[..4].copy_from_slice(&[
+            0x47,
+            if index == 0 { 0x41 } else { 1 },
+            0,
+            0x10 | (index as u8 & 15),
+        ]);
+        if payload.len() < 184 {
+            raw[3] |= 0x20;
+            raw[4] = (183 - payload.len()) as u8;
+            raw[5] = 0;
+        }
+        raw[188 - payload.len()..].copy_from_slice(payload);
+        let mut carrier = parse_transport(
+            Bytes::copy_from_slice(&reader.pool, &raw).unwrap(),
+            PacketFormat::Ts188,
+            index as u64 * 188,
+        )
+        .unwrap();
+        carrier.source_id = Some(SOURCE);
+        observer
+            .push(
+                carrier,
+                SourceContext {
+                    source_event_ordinal: index as u64,
+                    epochs: EPOCHS,
+                    byte_run_epoch: None,
+                },
+            )
+            .unwrap();
+        if let AssemblyStep::Output(mut packet) = observer.poll(&mut work, &cancel).unwrap() {
+            packet.time_header_applies = false;
+            let clock = DemuxClock::new(31)
+                .unwrap()
+                .project_header(256, EPOCHS, None, &mut work, &cancel)
+                .unwrap()
+                .unwrap();
+            assert!(reader.push(&mut Some(packet), clock).unwrap());
+            return;
+        }
+    }
+    panic!("the fixture PES did not complete");
+}
+
+fn drain(reader: &mut AvcTsReader, out: &mut Vec<AvcTsAccessUnit>) {
+    loop {
+        match reader
+            .step(&mut WorkBudget::new(1), &AtomicBool::new(false))
+            .unwrap()
+        {
+            AvcTsStep::Yield => {}
+            AvcTsStep::Ready(unit) => out.push(unit),
+            AvcTsStep::End | AvcTsStep::NeedInput => return,
+        }
+    }
+}
+
+#[test]
+fn progressive_keeps_startup_sei_and_requires_the_delimiter_in_that_pes() {
+    let (pool, mut strict) = fixture();
+    let leading_sei = [
+        0, 0, 1, SEI, 5, 16, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0x80,
+    ];
+    let delimited_idr = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    let first = [leading_sei.as_slice(), &delimited_idr].concat();
+    let anchor = Anchor {
+        serial: 1,
+        clock: clock(9000),
+    };
+    let mut progressive =
+        AvcTsReader::new_progressive(&pool, strict.config, strict.limits).unwrap();
+    strict.remember_clock(anchor.clock).unwrap();
+    push_span(&mut strict, &first);
+    assert!(matches!(
+        strict.step(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
+        Err(Error::Unsupported(
+            "AVC TS access unit has no initial delimiter"
+        ))
+    ));
+
+    progressive.remember_clock(anchor.clock).unwrap();
+    let mut units = Vec::new();
+    for bytes in first.chunks(3) {
+        push_span(&mut progressive, bytes);
+        drain(&mut progressive, &mut units);
+    }
+    assert!(units.is_empty());
+    progressive.finish();
+    drain(&mut progressive, &mut units);
+    assert_eq!(units.len(), 1);
+    assert_eq!(units[0].clock, Some(anchor.clock));
+    assert_eq!(units[0].source_bytes().as_ref(), first);
+
+    let mut split = AvcTsReader::new_progressive(&pool, strict.config, strict.limits).unwrap();
+    split.remember_clock(anchor.clock).unwrap();
+    push_span(&mut split, &leading_sei);
+    drain(&mut split, &mut Vec::new());
+    split.remember_clock(clock(12000)).unwrap();
+    push_span(&mut split, &delimited_idr);
+    assert!(matches!(
+        split.step(&mut WorkBudget::new(1024), &AtomicBool::new(false)),
+        Err(Error::Invalid(
+            "AVC TS startup SEI without a delimiter in its PES"
+        ))
+    ));
+}
+
+#[test]
+fn split_delimiter_keeps_first_byte_clock_and_cached_parameter_sets() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    let next = [DELIMITER, IDR].concat();
+    let raw = [first.as_slice(), &next, &next].concat();
+    let mut units = Vec::new();
+    for (offset, byte) in raw.iter().enumerate() {
+        if offset == 0 {
+            reader.remember_clock(clock(9000)).unwrap();
+        } else if offset == first.len() + 2 {
+            reader.remember_clock(clock(12000)).unwrap();
+        }
+        push_span(&mut reader, std::slice::from_ref(byte));
+        drain(&mut reader, &mut units);
+    }
+    reader.finish();
+    drain(&mut reader, &mut units);
+    assert_eq!(units.len(), 3);
+    assert_eq!(units[0].clock, Some(clock(9000)));
+    assert_eq!(units[1].clock, None);
+    assert_eq!(units[2].clock, Some(clock(12000)));
+    assert_eq!(units[0].source_bytes().as_ref(), first);
+    assert_eq!(units[1].source_bytes().as_ref(), next);
+    assert_eq!(units[2].source_bytes().as_ref(), next);
+    let retained = pool.used();
+    let contiguous = units[0].contiguous_feed(&pool).unwrap();
+    assert!(contiguous.shares_storage_with(units[0].source_bytes()));
+    assert_eq!(pool.used(), retained);
+    for unit in &units[1..] {
+        assert_eq!(
+            unit.feed_spans().collect::<Vec<_>>(),
+            [PREFIX, SPS, PREFIX, PPS, next.as_slice()]
+        );
+        let contiguous = unit.contiguous_feed(&pool).unwrap();
+        assert_eq!(
+            contiguous.as_ref(),
+            [PREFIX, SPS, PREFIX, PPS, next.as_slice()].concat()
+        );
+    }
+}
+
+#[test]
+fn identical_parameter_sets_reuse_parsing_and_storage_under_pressure() {
+    let pool = Budget::new(8192).unwrap();
+    let mut sets = BudgetVec::new(&pool);
+    let parses = std::cell::Cell::new(0);
+    let parse = |raw: &[u8]| {
+        parses.set(parses.get() + 1);
+        avc::read_sps_raster(raw)
+    };
+    remember(&mut sets, 1, SPS, parse).unwrap();
+    let original = sets.as_slice()[0].bytes.storage_address();
+    let used = pool.used();
+    let pressure = pool.reserve(pool.available()).unwrap();
+    remember(&mut sets, 2, SPS, parse).unwrap();
+    assert_eq!(parses.get(), 1);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 2);
+    assert_eq!(sets.as_slice()[0].bytes.storage_address(), original);
+
+    let mut changed = SPS.to_vec();
+    *changed.last_mut().unwrap() ^= 1;
+    assert_eq!(
+        avc::read_sps_raster(&changed[1..]),
+        avc::read_sps_raster(&SPS[1..])
+    );
+    assert!(matches!(
+        remember(&mut sets, 3, &changed, parse),
+        Err(Error::Backpressure { .. })
+    ));
+    assert_eq!(parses.get(), 2);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 2);
+    assert_eq!(sets.as_slice()[0].bytes.storage_address(), original);
+    drop(pressure);
+    assert_eq!(pool.used(), used);
+    remember(&mut sets, 3, &changed, parse).unwrap();
+    assert_eq!(parses.get(), 3);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 3);
+    assert_eq!(sets.as_slice()[0].bytes.as_ref(), changed);
+
+    let invalid = &[0x67];
+    let expected = avc::read_sps_raster(&invalid[1..]).unwrap_err();
+    assert_eq!(remember(&mut sets, 4, invalid, parse), Err(expected));
+    assert_eq!(parses.get(), 4);
+    assert_eq!(sets.as_slice()[0].seen_in_unit, 3);
+    assert_eq!(sets.as_slice()[0].bytes.as_ref(), changed);
+
+    let mut pps = BudgetVec::new(&pool);
+    remember(&mut pps, 1, PPS, avc::read_pps_ids).unwrap();
+    remember(&mut pps, 1, &[0x68, 0x50], avc::read_pps_ids).unwrap();
+    let first = pps.as_slice()[0].bytes.storage_address();
+    remember(&mut pps, 2, PPS, avc::read_pps_ids).unwrap();
+    assert_eq!(pps.len(), 2);
+    assert_eq!(pps.as_slice()[0].bytes.storage_address(), first);
+    assert_eq!(pps.as_slice()[0].seen_in_unit, 2);
+    remember(&mut pps, 3, &[0x68, 0x50], |_| {
+        panic!("an identical cached PPS needs no new parse")
+    })
+    .unwrap();
+    assert_eq!(pps.as_slice()[1].seen_in_unit, 3);
+}
+
+#[test]
+fn repeated_in_band_sets_keep_complete_units_clocks_and_work() {
+    fn send_sync<T: Send + Sync>() {}
+    send_sync::<AvcTsReader>();
+    let unit = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    let raw = unit.repeat(3);
+    for quantum in [1, 4096] {
+        let (_pool, mut reader) = fixture();
+        reader.remember_clock(clock(9000)).unwrap();
+        push_span(&mut reader, &raw);
+        reader.finish();
+        let mut units = Vec::new();
+        let mut storage = None;
+        let mut spent = 0;
+        loop {
+            let mut work = WorkBudget::new(quantum);
+            let step = reader.step(&mut work, &AtomicBool::new(false)).unwrap();
+            spent += work.spent();
+            match step {
+                AvcTsStep::Yield => {}
+                AvcTsStep::Ready(output) => {
+                    let current = (
+                        reader.sps.as_slice()[0].bytes.storage_address(),
+                        reader.pps.as_slice()[0].bytes.storage_address(),
+                    );
+                    if let Some(expected) = storage {
+                        assert_eq!(current, expected);
+                    } else {
+                        storage = Some(current);
+                    }
+                    units.push(output);
+                }
+                AvcTsStep::End => break,
+                AvcTsStep::NeedInput => panic!("the complete segment was provided"),
+            }
+        }
+        assert_eq!(units.len(), 3);
+        // One unit admits the PES's span, one reads each byte, four start each
+        // unit's NALs and one publishes the last unit.
+        assert_eq!(spent, 1 + raw.len() as u64 + 3 * 4 + 1);
+        assert_eq!(reader.sps.as_slice()[0].seen_in_unit, 3);
+        assert_eq!(reader.pps.as_slice()[0].seen_in_unit, 3);
+        for (index, output) in units.iter().enumerate() {
+            assert_eq!(output.source_bytes().as_ref(), unit);
+            assert_eq!(output.clock, (index == 0).then(|| clock(9000)));
+            assert!(output.sps.is_none() && output.pps.is_none());
+            assert_eq!(
+                output.feed_spans().collect::<Vec<_>>(),
+                vec![unit.as_slice()]
+            );
+        }
+    }
+}
+
+#[test]
+fn prefix_anchor_ring_keeps_full_clocks_across_pes_and_wraps() {
+    for origin in 0..3 {
+        for length in 2..=9 {
+            for missing in 0..=length {
+                let (_pool, mut reader) = fixture();
+                reader.next_zero_anchor = origin;
+                let anchors: Vec<_> = (0..length)
+                    .map(|index| {
+                        let pts = -10 - index as i64;
+                        let dts = if index % 2 == 0 { pts - 7 } else { pts };
+                        (index != missing).then_some(Anchor {
+                            serial: index as u64 + 1,
+                            clock: AvcTsClock {
+                                source_pts_raw33: Some(pts.rem_euclid(1 << 33) as u64),
+                                source_dts_raw33: (index % 2 == 0)
+                                    .then_some(dts.rem_euclid(1 << 33) as u64),
+                                pts90: Some(pts),
+                                dts90: Some(dts),
+                            },
+                        })
+                    })
+                    .collect();
+                for anchor in &anchors {
+                    if let Some(anchor) = anchor {
+                        reader.pes_serial = anchor.serial - 1;
+                        reader.remember_clock(anchor.clock).unwrap();
+                    } else {
+                        reader.pes_anchor = None;
+                    }
+                    reader.bytes.try_push(0).unwrap();
+                    reader.accept(0).unwrap();
+                }
+                reader.bytes.try_push(1).unwrap();
+                reader.accept(1).unwrap();
+                let prefix = reader.prefix.unwrap();
+                let start = length - length.min(3);
+                assert_eq!(prefix.start, start);
+                assert_eq!(
+                    prefix.anchor.map(|anchor| (anchor.serial, anchor.clock)),
+                    anchors[start].map(|anchor| (anchor.serial, anchor.clock)),
+                    "origin {origin}, zeroes {length}, missing {missing}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn published_units_own_their_assembly_buffers() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let next = [DELIMITER, IDR, &[0x66; 100]].concat();
+    let mut units = Vec::new();
+    push_span(&mut reader, &first);
+    drain(&mut reader, &mut units);
+    push_span(&mut reader, &next);
+    drain(&mut reader, &mut units);
+    assert_eq!(units.len(), 1);
+    assert!(units[0].source_bytes().retained_capacity() >= first.len());
+    for _ in 0..3 {
+        let used = pool.used();
+        let storage = reader.bytes.as_slice().as_ptr();
+        let capacity = reader.bytes.capacity();
+        push_span(&mut reader, &next);
+        drain(&mut reader, &mut units);
+        let unit = units.last().unwrap().source_bytes();
+        assert_eq!(unit.as_ref().as_ptr(), storage);
+        assert_eq!(unit.retained_capacity(), capacity);
+        assert_eq!(
+            pool.used() - used,
+            reader.bytes.capacity() + Bytes::owner_overhead_bytes()
+        );
+    }
+    reader.finish();
+    drain(&mut reader, &mut units);
+    assert_eq!(reader.bytes.capacity(), 0);
+    assert_eq!(units.len(), 5);
+    for (index, unit) in units.iter().enumerate() {
+        let expected = if index == 0 { &first } else { &next };
+        assert_eq!(unit.source_bytes().as_ref(), expected.as_slice());
+    }
+}
+
+#[test]
+fn final_publication_leaves_room_to_record_the_unit() {
+    let (pool, mut reader) = fixture();
+    let data = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    push_span(&mut reader, &data);
+    let mut units = Vec::new();
+    drain(&mut reader, &mut units);
+    assert!(units.is_empty());
+    reader.finish();
+
+    let available = data.len() + Bytes::owner_overhead_bytes();
+    let _pressure = pool.reserve(pool.available() - available).unwrap();
+    let AvcTsStep::Ready(unit) = reader
+        .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
+        .unwrap()
+    else {
+        panic!("expected the final access unit");
+    };
+    assert_eq!(unit.source_bytes().as_ref(), data);
+    let _record = pool
+        .reserve(size_of::<AvcTsAccessUnit>())
+        .expect("the segment builder can record the unit while it is held");
+}
+
+#[test]
+fn a_one_unit_budget_publishes_by_transferring_the_buffer() {
+    let (_pool, mut reader) = fixture();
+    let data = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    push_span(&mut reader, &data);
+    let mut units = Vec::new();
+    drain(&mut reader, &mut units);
+    assert!(units.is_empty());
+
+    let next_header = &DELIMITER[..LOOKAHEAD];
+    push_span(&mut reader, next_header);
+    let cancel = AtomicBool::new(false);
+    // One unit admits the span and one reads each lookahead byte.
+    assert!(matches!(
+        reader
+            .step(&mut WorkBudget::new(1 + LOOKAHEAD as u64), &cancel)
+            .unwrap(),
+        AvcTsStep::Yield
+    ));
+    let storage = reader.bytes.as_slice().as_ptr();
+    let mut publication_work = WorkBudget::new(1);
+    let AvcTsStep::Ready(unit) = reader.step(&mut publication_work, &cancel).unwrap() else {
+        panic!("expected the pending access unit");
+    };
+    assert_eq!(publication_work.spent(), 1);
+    assert_eq!(unit.source_bytes().as_ref(), data);
+    assert_eq!(unit.source_bytes().as_ref().as_ptr(), storage);
+}
+
+#[test]
+fn eof_publication_retries_after_pressure_and_a_partial_next_nal_fails() {
+    let (pool, mut reader) = fixture();
+    let data = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    push_span(&mut reader, &data);
+    let mut units = Vec::new();
+    drain(&mut reader, &mut units);
+    assert!(units.is_empty());
+    reader.finish();
+    let pressure = pool.reserve(pool.available()).unwrap();
+    assert!(matches!(
+        reader.step(&mut WorkBudget::new(64), &AtomicBool::new(false)),
+        Err(Error::Backpressure { .. })
+    ));
+    drop(pressure);
+    drain(&mut reader, &mut units);
+    assert_eq!(units.len(), 1);
+    assert_eq!(units[0].source_bytes().as_ref(), data);
+
+    let (_pool, mut reader) = fixture();
+    push_span(&mut reader, &[data.as_slice(), PREFIX].concat());
+    drain(&mut reader, &mut Vec::new());
+    reader.finish();
+    assert!(matches!(
+        reader.step(&mut WorkBudget::new(64), &AtomicBool::new(false)),
+        Err(Error::Truncated)
+    ));
+}
+
+#[test]
+fn prefix_anchor_ring_preserves_clocks_for_short_and_long_zero_runs() {
+    for zeroes in 2_usize..=9 {
+        for switch in 0..=zeroes {
+            let (_pool, mut reader) = fixture();
+            let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+            let delimiter = [vec![0; zeroes], vec![1, 9, 0xf0]].concat();
+            let next = [delimiter.as_slice(), IDR].concat();
+            let last = [DELIMITER, IDR].concat();
+            let raw = [first.as_slice(), &next, &last].concat();
+            let mut units = Vec::new();
+            reader.remember_clock(clock(9000)).unwrap();
+            for (offset, byte) in raw.iter().enumerate() {
+                if offset == first.len() + switch {
+                    reader.remember_clock(clock(12000)).unwrap();
+                }
+                push_span(&mut reader, std::slice::from_ref(byte));
+                drain(&mut reader, &mut units);
+            }
+            reader.finish();
+            drain(&mut reader, &mut units);
+            let second_has_new_anchor = switch <= zeroes.saturating_sub(3);
+            assert_eq!(units.len(), 3);
+            assert_eq!(units[0].clock, Some(clock(9000)));
+            assert_eq!(units[1].clock, second_has_new_anchor.then(|| clock(12000)));
+            assert_eq!(
+                units[2].clock,
+                (!second_has_new_anchor).then(|| clock(12000))
+            );
+        }
+    }
+}
+
+#[test]
+fn prefix_clock_history_survives_a_new_pes_on_every_byte() {
+    for zeroes in 2_usize..=9 {
+        let (_pool, mut reader) = fixture();
+        let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+        let delimiter = [vec![0; zeroes], vec![1, 9, 0xf0]].concat();
+        let next = [delimiter.as_slice(), IDR].concat();
+        let last = [DELIMITER, IDR].concat();
+        let raw = [first.as_slice(), &next, &last].concat();
+        let mut units = Vec::new();
+        reader.remember_clock(clock(9000)).unwrap();
+        for (offset, byte) in raw.iter().enumerate() {
+            if offset >= first.len() {
+                let pts = 12_000 + (offset - first.len()) as u64 * 3000;
+                reader.remember_clock(clock(pts)).unwrap();
+            }
+            push_span(&mut reader, std::slice::from_ref(byte));
+            drain(&mut reader, &mut units);
+        }
+        reader.finish();
+        drain(&mut reader, &mut units);
+        assert_eq!(units.len(), 3);
+        assert_eq!(units[0].clock, Some(clock(9000)));
+        assert_eq!(
+            units[1].clock,
+            Some(clock(12_000 + zeroes.saturating_sub(3) as u64 * 3000))
+        );
+        assert_eq!(
+            units[2].clock,
+            Some(clock(12_000 + next.len() as u64 * 3000))
+        );
+    }
+}
+
+#[test]
+fn pes_extent_hint_preserves_packed_and_split_units_under_pressure() {
+    let headers = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR].concat();
+    let first = [headers.as_slice(), &[0x55; 40]].concat();
+    let second = [DELIMITER, IDR, &[0x66; 70]].concat();
+    let (start, tail) = second.split_at(second.len() / 2);
+    let packed = [first.as_slice(), start].concat();
+    let cancel = AtomicBool::new(false);
+    let ordinary_growth = 128;
+    let publication = LOOKAHEAD + Bytes::owner_overhead_bytes();
+
+    for headroom in [None, Some(ordinary_growth + publication), Some(0)] {
+        let (pool, mut reader) = fixture();
+        reader.remember_clock(clock(9000)).unwrap();
+        push_span(&mut reader, &packed);
+        // Stop after the first slice header. The IDR fixture ends with two
+        // payload bytes, admitting the span and the four NAL transitions cost
+        // one unit each.
+        let mut prefix_work = WorkBudget::new((1 + headers.len() - 2 + 4) as u64);
+        assert!(matches!(
+            reader.step(&mut prefix_work, &cancel).unwrap(),
+            AvcTsStep::Yield
+        ));
+        let mut pressure = headroom.map(|free| pool.reserve(pool.available() - free).unwrap());
+        if headroom == Some(0) {
+            let mut retry_work = WorkBudget::new(4096);
+            assert!(matches!(
+                reader.step(&mut retry_work, &cancel),
+                Err(Error::Backpressure { .. })
+            ));
+            assert_eq!(retry_work.spent(), 0);
+            drop(pressure.take());
+        }
+        let AvcTsStep::Ready(unit) = reader.step(&mut WorkBudget::new(4096), &cancel).unwrap()
+        else {
+            panic!("the first picture should be ready");
+        };
+        assert_eq!(unit.source_bytes().as_ref(), first);
+        assert_eq!(unit.clock, Some(clock(9000)));
+        let capacity = headroom.map_or(packed.len() + LOOKAHEAD, |_| ordinary_growth);
+        assert_eq!(unit.source_bytes().retained_capacity(), capacity);
+        drop(pressure);
+
+        let mut units = vec![unit];
+        drain(&mut reader, &mut units);
+        push_span(&mut reader, tail);
+        reader.finish();
+        drain(&mut reader, &mut units);
+        assert_eq!(units.len(), 2);
+        assert_eq!(units[0].source_bytes().as_ref(), first);
+        assert_eq!(units[1].source_bytes().as_ref(), second);
+        assert_eq!(units[1].clock, None);
+    }
+}
+
+#[test]
+fn nal_body_scan_keeps_possible_prefixes_at_every_input_boundary() {
+    for len in 0..=34 {
+        for first in 0..=len {
+            for second in first..=len {
+                let mut bytes = [1; 35];
+                bytes[first] = 0;
+                bytes[second] = 0;
+                let input = &bytes[..len];
+                let expected = input
+                    .windows(2)
+                    .position(|pair| pair == [0, 0])
+                    .unwrap_or_else(|| len - usize::from(input.last() == Some(&0)));
+                assert_eq!(
+                    nal_body_prefix_len(input),
+                    expected,
+                    "{len}, {first}, {second}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn nal_body_scan_matches_scalar_search_for_mixed_bytes() {
+    let mut state = 0x6f24_b381_08da_75c9_u64;
+    for len in 0..=257 {
+        for sample in 0..16 {
+            let mut bytes = vec![0; len];
+            for byte in &mut bytes {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                *byte = (state >> 32) as u8;
+            }
+            if len != 0 {
+                let at = sample * len / 16;
+                bytes[at] = 0;
+                if sample % 2 == 0 && at + 1 < len {
+                    bytes[at + 1] = 0;
+                }
+            }
+            let expected = bytes
+                .windows(2)
+                .position(|pair| pair == [0, 0])
+                .unwrap_or_else(|| len - usize::from(bytes.last() == Some(&0)));
+            assert_eq!(nal_body_prefix_len(&bytes), expected, "{len}, {sample}");
+        }
+    }
+}
+
+/// Assembles `unit` and publishes it once the next delimiter's lookahead
+/// arrives, as a progressive reader does, leaving that lookahead in the
+/// builder. Publication costs one work unit.
+fn publish_before_next(reader: &mut AvcTsReader, unit: &[u8]) -> AvcTsAccessUnit {
+    push_span(reader, unit);
+    let mut units = Vec::new();
+    drain(reader, &mut units);
+    assert!(units.is_empty());
+    push_span(reader, &DELIMITER[..LOOKAHEAD]);
+    let cancel = AtomicBool::new(false);
+    assert!(matches!(
+        reader
+            .step(&mut WorkBudget::new(1 + LOOKAHEAD as u64), &cancel)
+            .unwrap(),
+        AvcTsStep::Yield
+    ));
+    let mut publication_work = WorkBudget::new(1);
+    let AvcTsStep::Ready(published) = reader.step(&mut publication_work, &cancel).unwrap() else {
+        panic!("expected the pending access unit");
+    };
+    assert_eq!(publication_work.spent(), 1);
+    assert_eq!(reader.bytes.as_slice(), &DELIMITER[..LOOKAHEAD]);
+    // Release the consumed PES, as the reader's owner does before offering another.
+    drain(reader, &mut units);
+    assert!(units.is_empty());
+    published
+}
+
+#[test]
+fn a_reused_unit_becomes_the_buffer_the_next_one_is_published_from() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let unit = publish_before_next(&mut reader, &first);
+    assert_eq!(unit.source_bytes().as_ref(), first);
+    let storage = unit.source_bytes().as_ref().as_ptr();
+    let capacity = unit.source_bytes().retained_capacity();
+    let used = pool.used();
+    reader.reuse_unit(unit);
+    assert_eq!(reader.bytes.as_slice(), &DELIMITER[..LOOKAHEAD]);
+    assert_eq!(reader.bytes.as_slice().as_ptr(), storage);
+    assert_eq!(reader.bytes.capacity(), capacity);
+    assert!(
+        pool.used() < used,
+        "the unit's storage replaces the builder"
+    );
+
+    let second = [DELIMITER, IDR, &[0x66; 200]].concat();
+    let unit = publish_before_next(&mut reader, &second[LOOKAHEAD..]);
+    assert_eq!(unit.source_bytes().as_ref(), second);
+    assert_eq!(unit.source_bytes().as_ref().as_ptr(), storage);
+}
+
+#[test]
+fn a_unit_held_elsewhere_stays_intact_and_the_builder_is_kept() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let unit = publish_before_next(&mut reader, &first);
+    let held = unit.source_bytes().clone();
+    let builder = reader.bytes.as_slice().as_ptr();
+    let used = pool.used();
+    reader.reuse_unit(unit);
+    assert_eq!(reader.bytes.as_slice().as_ptr(), builder);
+    assert_eq!(pool.used(), used);
+    assert_eq!(held.as_ref(), first);
+}
+
+#[test]
+fn a_reused_buffer_leaves_room_to_record_the_final_unit() {
+    let (pool, mut reader) = fixture();
+    let first = [DELIMITER, PREFIX, SPS, PREFIX, PPS, IDR, &[0x55; 300]].concat();
+    let unit = publish_before_next(&mut reader, &first);
+    reader.reuse_unit(unit);
+    let second = [DELIMITER, IDR, &[0x66; 200]].concat();
+    push_span(&mut reader, &second[LOOKAHEAD..]);
+    let mut units = Vec::new();
+    drain(&mut reader, &mut units);
+    assert!(units.is_empty());
+    reader.finish();
+
+    // Publication adds only the shared-owner header to the buffer's charge.
+    let available = Bytes::owner_overhead_bytes() + size_of::<AvcTsAccessUnit>();
+    let _pressure = pool.reserve(pool.available() - available).unwrap();
+    let AvcTsStep::Ready(unit) = reader
+        .step(&mut WorkBudget::new(4096), &AtomicBool::new(false))
+        .unwrap()
+    else {
+        panic!("expected the final access unit");
+    };
+    assert_eq!(unit.source_bytes().as_ref(), second);
+    let _record = pool
+        .reserve(size_of::<AvcTsAccessUnit>())
+        .expect("the segment builder can record the unit while it is held");
+}

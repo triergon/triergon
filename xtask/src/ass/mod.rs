@@ -46,10 +46,6 @@ pub const USAGE: &str = "usage: cargo xtask ass prepare [--jobs N]
 
 pub fn main(root: &Path, args: &[String]) -> Result<(), String> {
     match args {
-        [help] if help == "--help" || help == "-h" => {
-            println!("{USAGE}");
-            Ok(())
-        }
         [command, rest @ ..] if command == "prepare" => {
             let jobs = match rest {
                 [] => 4,

@@ -30,23 +30,23 @@ use triergon_core::{
     Budget, Bytes, Error, InputCursor, InputRequest, InputWindow, SourceId, Step, WorkBudget,
 };
 use triergon_harness_protocol::digest::{fold, fold_bytes, signed};
+use triergon_harness_runner::RefusalCause;
 use triergon_mpegts::compat::pes::{
-    DemuxClock, DemuxObserver, DemuxPacket, DemuxProfile, DemuxScope, DvbSubtitlesDescriptors,
+    DemuxClock, DemuxObserver, DemuxPacket, DemuxScope, DvbSubtitlesDescriptors,
     MalformedInputCompletion, MalformedSourceDisposition, NoMediaConfirmation, PacketCompletion,
-    PesFaultPolicy, PrivateAudioCarriage, PrivateAudioDescriptors, RegisteredCarriage,
-    SourceContext, TransportFaultRecovery, TransportObservation,
+    PesFaultPolicy, PrivateAudioCarriage, PrivateAudioDescriptors, RecoveredPes,
+    RegisteredCarriage, SourceContext, TransportFaultRecovery,
 };
 use triergon_mpegts::psi::{DescriptorNamespace, Descriptors, ProgramMap};
-use triergon_mpegts::{
-    AssemblyStep, FaultKind, MediaEntityEnd, ObservedTrace, ParseLimits, SourceEpochs, SourceRange,
-    TraceEvent, TransportStream,
+use triergon_mpegts::stream::{
+    FaultKind, MediaEntityEnd, ObservedTrace, TraceEvent, TransportStream,
 };
+use triergon_mpegts::{AssemblyStep, ParseLimits, SourceEpochs, SourceRange};
 
 pub(crate) mod au_recovery;
 
 pub const PREFIX: &str = "ts-";
 const OPERATION: &str = "mpegts-pes-packets";
-const PROFILE: DemuxProfile = DemuxProfile::PesPackets;
 const WINDOW: usize = 64 * 1024;
 const WORK: u64 = 4096;
 /// FFmpeg's `AV_NOPTS_VALUE`, folded for an absent timestamp on both sides.
@@ -192,7 +192,7 @@ impl Cause {
         let null = |value: Option<u64>| value.map_or("null".into(), |value| value.to_string());
         Refusal {
             reason: error.to_string(),
-            cause: format!(
+            cause: RefusalCause::from_json(format!(
                 "{{\"phase\":\"{}\",\"source_event_ordinal\":{},\"source\":{},\"offset\":{},\"clock_epoch\":{},\"configuration_epoch\":{}}}",
                 self.phase,
                 null(self.ordinal),
@@ -200,7 +200,7 @@ impl Cause {
                 null(self.offset),
                 self.epochs.clock,
                 self.epochs.configuration,
-            ),
+            )),
         }
     }
 }
@@ -258,10 +258,9 @@ fn observer(
     };
     let (budget, limits) = (pool.clone(), ParseLimits::default());
     let observer = if let Some(carriage) = registered {
-        DemuxObserver::new_registered(PROFILE, scope, carriage, budget, limits)
+        DemuxObserver::new_registered(scope, carriage, budget, limits)
     } else if dvb_subtitles {
         DemuxObserver::new_dvb_subtitles(
-            PROFILE,
             scope,
             map.descriptor_namespace,
             DvbSubtitlesDescriptors {
@@ -274,7 +273,7 @@ fn observer(
     } else if private_audio {
         let carriage =
             PrivateAudioCarriage::from_observed_pmt(stream.stream_type, descriptors, limits)?;
-        DemuxObserver::new_private_audio(PROFILE, scope, carriage, descriptors, budget, limits)
+        DemuxObserver::new_private_audio(scope, carriage, descriptors, budget, limits)
     } else {
         Err(unrouted)
     }?;
@@ -326,6 +325,7 @@ impl Session {
     /// Route one source event: the first active PMT binds the observer, the
     /// selected PID's transport packets feed it, and every context the observer
     /// alone cannot take is refused.
+    // One function on purpose: the step of each source event inside the timed loop; a split is a hot-path change not yet measured.
     fn observe(
         &mut self,
         input: &InputCursor,
@@ -476,7 +476,7 @@ impl Session {
         let position = |offset| base.checked_add(offset).ok_or(Error::Overflow);
         loop {
             match observer.poll(&mut WorkBudget::new(WORK), cancel)? {
-                AssemblyStep::Output(TransportObservation::Accepted(packet)) => {
+                AssemblyStep::Output(RecoveredPes::Accepted(packet)) => {
                     let time = self
                         .clock
                         .project_header(
@@ -495,7 +495,7 @@ impl Session {
                         position(packet.position)?,
                     )?;
                 }
-                AssemblyStep::Output(TransportObservation::Faulted(packet)) => {
+                AssemblyStep::Output(RecoveredPes::Faulted(packet)) => {
                     let time = self
                         .clock
                         .project_transport_fault(&packet, &mut WorkBudget::new(1), cancel)?
@@ -516,7 +516,7 @@ impl Session {
                         packet.payload(),
                     )?;
                 }
-                AssemblyStep::Output(TransportObservation::PesFault(packet)) => {
+                AssemblyStep::Output(RecoveredPes::PesFault(packet)) => {
                     let time = self
                         .clock
                         .project_pes_fault(&packet, &mut WorkBudget::new(1), cancel)?
@@ -666,6 +666,7 @@ fn operation(pool: &Budget, request: &Request, cancel: &AtomicBool) -> Result<To
 }
 
 /// One packet attempt: its fold, or the typed refusal that ended it.
+// One function on purpose: the timed loop of the PES workloads; a split is a hot-path change not yet measured.
 fn packet_operation(
     pool: &Budget,
     request: &Request,

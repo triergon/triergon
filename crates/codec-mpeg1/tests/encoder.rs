@@ -1,8 +1,9 @@
-use triergon_codec_mpeg1::{Budget, Encoder, EncoderConfig, Error, Limits, StorageError};
-use triergon_pixel::{Geometry, Picture};
+use triergon_codec_mpeg1::{Budget, EncodeError, Encoder, EncoderConfig, FrameRate, Limits};
+use triergon_pixel::{CodedPicture, MacroblockGeometry};
 fn cfg() -> EncoderConfig {
     EncoderConfig {
-        geometry: Geometry::new(16, 16).unwrap(),
+        frame_rate: FrameRate::Fps30,
+        geometry: MacroblockGeometry::new(16, 16).unwrap(),
         bit_rate: 1_000_000,
         max_rate: 1_400_000,
         vbv_bits: 142_857,
@@ -13,21 +14,66 @@ fn cfg() -> EncoderConfig {
 fn direct_zero_gop_is_rejected_before_allocation() {
     assert!(matches!(
         Encoder::new(EncoderConfig { gop: 0, ..cfg() }),
-        Err(Error::Gop(0))
+        Err(EncodeError::Gop(0))
     ));
+}
+#[test]
+fn a_max_rate_the_header_would_code_as_variable_bit_rate_is_refused() {
+    // bit_rate 0x3FFFF identifies variable bit rate (ISO/IEC 11172-2 §2.4.3.2).
+    for max_rate in [104_856_801, 104_857_200] {
+        assert!(matches!(
+            Encoder::new(EncoderConfig { max_rate, ..cfg() }),
+            Err(EncodeError::BitRate(rate)) if rate == max_rate
+        ));
+    }
+    let mut e = Encoder::new(EncoderConfig {
+        max_rate: 104_856_800,
+        ..cfg()
+    })
+    .unwrap();
+    let mut out = Vec::new();
+    e.encode(
+        &CodedPicture::new(MacroblockGeometry::new(16, 16).unwrap()),
+        &mut out,
+    )
+    .unwrap();
+    assert_eq!(out[..4], [0, 0, 1, 0xB3]);
+    let bit_rate = u32::from_be_bytes([0, out[8], out[9], out[10]]) >> 6;
+    assert_eq!(bit_rate, 0x3FFFE);
+}
+#[test]
+fn a_vbv_buffer_below_one_picture_at_the_average_rate_is_refused() {
+    // 2,500,000 bit/s at 30 Hz: pictures average 83,333⅓ bits.
+    let rate = |vbv_bits| {
+        Encoder::new(EncoderConfig {
+            bit_rate: 2_500_000,
+            max_rate: 3_500_000,
+            vbv_bits,
+            ..cfg()
+        })
+    };
+    for vbv_bits in [0, 1, 83_333] {
+        assert!(matches!(rate(vbv_bits), Err(EncodeError::VbvBuffer(bits)) if bits == vbv_bits));
+    }
+    assert!(rate(83_334).is_ok());
 }
 #[test]
 fn mismatched_picture_returns_owner_unchanged_before_encoder_mutation() {
     let mut e = Encoder::new(cfg()).unwrap();
-    let p = Picture::new(Geometry::new(32, 16).unwrap());
+    let p = CodedPicture::new(MacroblockGeometry::new(32, 16).unwrap());
     let mut out = vec![1, 2, 3];
     assert!(matches!(
         e.encode(&p, &mut out),
-        Err(Error::PictureGeometry { .. })
+        Err(EncodeError::PictureGeometry { .. })
     ));
     assert_eq!(out, [1, 2, 3]);
-    let p = Picture::new(Geometry::new(16, 16).unwrap());
-    assert_eq!(e.encode(&p, &mut out).unwrap().index, 0);
+    let p = CodedPicture::new(MacroblockGeometry::new(16, 16).unwrap());
+    let first = e.encode(&p, &mut out).unwrap();
+    assert!(first.key && first.index == 0);
+    assert_eq!(first.bits, out.len() * 8);
+    let next = e.encode(&p, &mut out).unwrap();
+    assert!(!next.key && next.index == 1);
+    assert_eq!(next.bits, out.len() * 8);
 }
 #[test]
 fn a_budget_too_small_for_the_pictures_is_a_typed_error() {
@@ -36,7 +82,7 @@ fn a_budget_too_small_for_the_pictures_is_a_typed_error() {
     };
     assert!(matches!(
         Encoder::with_limits(cfg(), limits),
-        Err(Error::Budget(StorageError::Limit { .. }))
+        Err(EncodeError::Budget(triergon_core::Error::Limit { .. }))
     ));
 }
 #[test]
@@ -44,12 +90,14 @@ fn a_refused_output_charge_changes_no_state_and_the_pool_drains_on_drop() {
     let budget = Budget::new(1 << 20).unwrap();
     let idle = budget.used();
     let mut e = Encoder::new_in(cfg(), &budget).unwrap();
-    let p = Picture::new(Geometry::new(16, 16).unwrap());
+    let p = CodedPicture::new(MacroblockGeometry::new(16, 16).unwrap());
     let mut out = Vec::new();
     let held = budget.reserve(budget.available()).unwrap();
     assert!(matches!(
         e.encode(&p, &mut out),
-        Err(Error::Budget(StorageError::Backpressure { .. }))
+        Err(EncodeError::Budget(
+            triergon_core::Error::Backpressure { .. }
+        ))
     ));
     drop(held);
     let first = e.encode(&p, &mut out).unwrap();
@@ -64,7 +112,7 @@ fn motion_scratch_backpressure_retries_the_same_picture_exactly() {
     let budget = Budget::new(1 << 20).unwrap();
     let mut retry = Encoder::new_in(cfg(), &budget).unwrap();
     let mut control = Encoder::new(cfg()).unwrap();
-    let mut input = Picture::new(cfg().geometry);
+    let mut input = CodedPicture::new(cfg().geometry);
     for (index, sample) in input.y_mut().iter_mut().enumerate() {
         *sample = (index % 197) as u8;
     }
@@ -82,7 +130,9 @@ fn motion_scratch_backpressure_retries_the_same_picture_exactly() {
     for _ in 0..2 {
         assert!(matches!(
             retry.encode(&input, &mut out),
-            Err(Error::Budget(StorageError::Backpressure { .. }))
+            Err(EncodeError::Budget(
+                triergon_core::Error::Backpressure { .. }
+            ))
         ));
         assert_eq!(out, expected);
     }
@@ -113,7 +163,7 @@ fn motion_scratch_backpressure_retries_the_same_picture_exactly() {
 fn repeated_luma_needs_no_motion_scratch_even_when_chroma_changes() {
     let budget = Budget::new(1 << 20).unwrap();
     let mut encoder = Encoder::new_in(cfg(), &budget).unwrap();
-    let mut input = Picture::new(cfg().geometry);
+    let mut input = CodedPicture::new(cfg().geometry);
     let mut out = Vec::new();
     encoder.encode(&input, &mut out).unwrap();
     input.cb_mut().fill(97);
@@ -121,4 +171,50 @@ fn repeated_luma_needs_no_motion_scratch_even_when_chroma_changes() {
     let picture = encoder.encode(&input, &mut out).unwrap();
     assert_eq!(picture.index, 1);
     assert!(!picture.key);
+}
+
+#[test]
+fn configured_picture_rate_sets_sequence_and_gop_timing() {
+    let config = EncoderConfig {
+        frame_rate: FrameRate::Fps25,
+        gop: 1,
+        ..cfg()
+    };
+    let mut encoder = Encoder::new(config).unwrap();
+    let input = CodedPicture::new(config.geometry);
+    let mut bytes = Vec::new();
+    for _ in 0..=25 {
+        encoder.encode(&input, &mut bytes).unwrap();
+    }
+
+    assert_eq!(&bytes[..4], &[0, 0, 1, 0xb3]);
+    assert_eq!(bytes[7] & 15, 3);
+    let gop = bytes
+        .windows(4)
+        .position(|window| window == [0, 0, 1, 0xb8])
+        .unwrap();
+    let time_code = u32::from_be_bytes(bytes[gop + 4..gop + 8].try_into().unwrap());
+    assert_eq!((time_code >> 13) & 63, 1); // second
+    assert_eq!((time_code >> 7) & 63, 0); // picture within the second
+}
+
+#[test]
+fn fractional_picture_rate_validates_the_exact_vbv_boundary() {
+    let config = EncoderConfig {
+        frame_rate: FrameRate::Fps30Ntsc,
+        bit_rate: 30_000,
+        vbv_bits: 1_000,
+        ..cfg()
+    };
+    assert!(matches!(
+        Encoder::new(config),
+        Err(EncodeError::VbvBuffer(1_000))
+    ));
+    assert!(
+        Encoder::new(EncoderConfig {
+            vbv_bits: 1_001,
+            ..config
+        })
+        .is_ok()
+    );
 }

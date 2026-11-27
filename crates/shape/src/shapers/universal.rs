@@ -3,6 +3,7 @@
 //! fonts made for their `*3` OpenType tags. Syllables follow one grammar over
 //! the USE categories; reph moves to the end and pre-base vowels to the start of
 //! their cluster after the basic forms.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::Pause;
 use super::arabic;

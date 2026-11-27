@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 use common::{child, roots};
 use std::{
     ops::Range,
@@ -8,12 +8,13 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxHeader, BoxView, BuildStatus, Limits,
+    BuildStatus, Limits,
+    boxes::{BoxHeader, BoxView},
     compat::mov::{
         packets::PacketLimits,
         recovery::{
-            DescriptionContext, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
-            DescriptionRecoveryTable, RecoveryTrackHeader, RunRecoveryProfile,
+            DescriptionContext, DescriptionRecoveryBuilder, DescriptionRecoveryTable,
+            RecoveryTrackHeader,
         },
     },
     reference_trace::mov::{
@@ -21,7 +22,7 @@ use triergon_isobmff::{
         transport::{RootWalkTransportBuilder, RootWalkTransportModel, RootWalkTransportProfile},
     },
 };
-const BASE: &[u8] = include_bytes!("fixtures/transport-v3/geometry-00.mov");
+const BASE: &[u8] = include_bytes!("fixtures/transport/geometry-00.mov");
 struct Source {
     pool: Budget,
     ftyp: BoxView,
@@ -52,17 +53,11 @@ impl Source {
             &child(&trak, b"tkhd").unwrap(),
             &child(&mdia, b"mdhd").unwrap(),
             &child(&mdia, b"hdlr").unwrap(),
-            RunRecoveryProfile,
         )
         .unwrap();
         let raw = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-        let mut build = DescriptionRecoveryBuilder::new(
-            raw,
-            pool.clone(),
-            Limits::default(),
-            DescriptionRecoveryProfile,
-        )
-        .unwrap();
+        let mut build =
+            DescriptionRecoveryBuilder::new(raw, pool.clone(), Limits::default()).unwrap();
         while build
             .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
             .unwrap()

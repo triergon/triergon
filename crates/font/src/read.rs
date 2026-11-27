@@ -1,13 +1,22 @@
-//! Big-endian reads over font tables.
+//! Big-endian reads over font tables: the primitives this crate's table
+//! readers are built from. The reads at an offset ([`u16_at`], [`u32_at`])
+//! and the binary search ([`bsearch`]) are public, for readers of the tables
+//! this crate leaves to others ([`Font::table`](crate::Font::table) gives
+//! their bytes).
 //!
-//! Every read is bounds-checked. Data that ends early is malformed, so it is
-//! `Error::Invalid`; `Error::Truncated` is kept for a transport that ends early.
+//! Every read is bounds-checked. The crate's `Reader` is a cursor for
+//! structures read in order, whose reads past the end are errors: data that
+//! ends early is malformed, so it is `Error::Invalid`; `Error::Truncated` is
+//! kept for a transport that ends early. The reads at an offset give `None`
+//! past the end, for lookups that treat missing data as an absent entry.
 
 use triergon_core::{Error, Result};
 
 pub(crate) const TRUNCATED: Error = Error::Invalid("truncated font table");
 
-/// A cursor over a byte slice.
+/// A cursor over a byte slice. Each read returns the big-endian value at the
+/// cursor and moves past it, or fails with `Invalid("truncated font table")`
+/// when the data ends first.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Reader<'a> {
     data: &'a [u8],
@@ -15,11 +24,12 @@ pub(crate) struct Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
+    /// A reader at the start of `data`.
     pub(crate) const fn new(data: &'a [u8]) -> Self {
         Self { data, at: 0 }
     }
 
-    /// A reader over `data[offset..]`.
+    /// A reader over `data` at `offset`, which may be its end but not beyond.
     pub(crate) fn at(data: &'a [u8], offset: usize) -> Result<Self> {
         if offset > data.len() {
             return Err(TRUNCATED);
@@ -32,18 +42,22 @@ impl<'a> Reader<'a> {
         Self::at(self.data, offset)
     }
 
+    /// The cursor's offset in the data.
     pub(crate) const fn offset(&self) -> usize {
         self.at
     }
 
+    /// Whether every byte has been read.
     pub(crate) const fn at_end(&self) -> bool {
         self.at == self.data.len()
     }
 
+    /// Moves past `count` bytes.
     pub(crate) fn skip(&mut self, count: usize) -> Result<()> {
         self.take(count).map(|_| ())
     }
 
+    /// The next `count` bytes.
     pub(crate) fn take(&mut self, count: usize) -> Result<&'a [u8]> {
         let end = self.at.checked_add(count).ok_or(TRUNCATED)?;
         let bytes = self.data.get(self.at..end).ok_or(TRUNCATED)?;
@@ -58,35 +72,42 @@ impl<'a> Reader<'a> {
         Ok(bytes)
     }
 
+    /// The next byte.
     pub(crate) fn u8(&mut self) -> Result<u8> {
         Ok(self.array::<1>()?[0])
     }
 
+    /// The next byte, signed.
     pub(crate) fn i8(&mut self) -> Result<i8> {
         Ok(i8::from_be_bytes(self.array()?))
     }
 
+    /// The next two bytes: `uint16`, `UFWORD` or `Offset16`.
     pub(crate) fn u16(&mut self) -> Result<u16> {
         Ok(u16::from_be_bytes(self.array()?))
     }
 
+    /// The next two bytes, signed: `int16` or `FWORD`.
     pub(crate) fn i16(&mut self) -> Result<i16> {
         Ok(i16::from_be_bytes(self.array()?))
     }
 
+    /// The next four bytes: `uint32` or `Offset32`.
     pub(crate) fn u32(&mut self) -> Result<u32> {
         Ok(u32::from_be_bytes(self.array()?))
     }
 
+    /// The next four bytes, signed: `int32` or `Fixed`.
     pub(crate) fn i32(&mut self) -> Result<i32> {
         Ok(i32::from_be_bytes(self.array()?))
     }
 
+    /// The next four bytes as a table or feature tag.
     pub(crate) fn tag(&mut self) -> Result<[u8; 4]> {
         self.array()
     }
 
-    /// An unsigned integer of `size` bytes, 1 to 4.
+    /// An unsigned integer of `size` bytes, at most 4; zero for none.
     pub(crate) fn uint(&mut self, size: u8) -> Result<u32> {
         let mut value = 0_u32;
         for _ in 0..size {
@@ -96,8 +117,9 @@ impl<'a> Reader<'a> {
     }
 }
 
-/// The big-endian `u16` at `at`, if `data` holds it.
-pub(crate) fn u16_at(data: &[u8], at: usize) -> Option<u16> {
+/// Reads two bytes at byte offset `at` as an unsigned big-endian integer.
+/// Returns `None` if either byte lies outside `data`.
+pub fn u16_at(data: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
 
@@ -107,23 +129,24 @@ pub(crate) fn u24_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes([0, a, b, c]))
 }
 
-/// The big-endian `u32` at `at`, if `data` holds it.
-pub(crate) fn u32_at(data: &[u8], at: usize) -> Option<u32> {
+/// Reads four bytes at byte offset `at` as an unsigned big-endian integer.
+/// Returns `None` if any byte lies outside `data`.
+pub fn u32_at(data: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(*data.get(at..)?.first_chunk()?))
 }
 
-/// HarfBuzz's binary search (`hb_bsearch_impl`) over `count` items, where
-/// `compare` orders an item against the key: an index whose item compares
-/// equal. On unsorted items its probes decide which is found; on sorted ones
-/// it agrees with any binary search.
-pub(crate) fn bsearch(
-    count: usize,
-    compare: impl Fn(usize) -> std::cmp::Ordering,
-) -> Option<usize> {
+/// A binary search over `count` items, where `compare(i)` orders item `i`
+/// against the key (`Greater` for an item after it): an index whose item
+/// compares `Equal`. It probes the middle `(min + max) / 2` of the closed
+/// range still open. This probe order also defines the result for unsorted
+/// items. Returns `None` if no probe matches or `count` exceeds
+/// [`isize::MAX`].
+pub fn bsearch(count: usize, compare: impl Fn(usize) -> std::cmp::Ordering) -> Option<usize> {
     use std::cmp::Ordering;
     let (mut min, mut max) = (0_isize, isize::try_from(count).ok()? - 1);
     while min <= max {
-        let mid = (min + max) / 2;
+        // Both ends lie in `0..count`, so the sum halves as unsigned.
+        let mid = ((min as usize + max as usize) / 2) as isize;
         match compare(mid as usize) {
             Ordering::Greater => max = mid - 1,
             Ordering::Less => min = mid + 1,

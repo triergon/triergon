@@ -1,24 +1,24 @@
 //! The fourth stage: a laid-out event placed in the frame. Its position by
 //! `\pos` or `\move`, a scroll, or its alignment and margins; its rotation
-//! origin (`calculate_rotation_params`); the runs its drawn glyphs are
-//! composited in; and each glyph's placement and effects as it is drawn
-//! (`render_and_combine_glyphs` up to drawing). Drawing them is the
-//! painter's.
+//! origin; the runs its drawn glyphs are composited in; and each glyph's
+//! placement and effects as it is drawn. Drawing them is the painter's.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use std::ops::Range;
 
 use triergon_core::{Budget, BudgetVec, Result};
-use triergon_raster::{
-    Border, Effects, FrameScale, GlyphRequest, Placement, Shadow, Vector, pixels_26_6,
+use triergon_raster::compat::libass::{
+    Border, Effects, FrameScale, GlyphRequest, Placement, Shadow,
 };
+use triergon_raster::{Vector, pixels_26_6};
 
 use super::collisions;
+use super::from_26_6;
 use super::geometry::{Geometry, Scales};
-use super::layout::{LaidChar, Layout, TextBox, Timing};
+use super::layout::{LaidChar, Layout, Shows, TextBox, Timing};
 use super::outlines::KeptOutline;
 use super::shaping::Shaped;
 use super::text::{Char, GlyphStyle, Text};
-use super::units::d6_to_double;
 use crate::{
     EventState, HAlign, Karaoke, Margins, Placement as EventPlacement, Rgba, ScrollDirection,
     VAlign,
@@ -32,19 +32,35 @@ pub(super) struct PlacedGlyph {
     glyph: usize,
 }
 
-/// A run of glyphs composited together (libass's `CombinedBitmapInfo`
-/// before drawing), as the glyph that starts it sets it.
+/// A run of glyphs composited together, before drawing, as the glyph that
+/// starts it sets it.
 #[derive(Debug)]
 pub(super) struct PlacedRun {
     /// The colours, faded.
     pub(super) colours: [Rgba; 4],
     pub(super) effect: Option<Karaoke>,
-    /// For `\kf`, the boundary from the first glyph's pen, pre-aspect 26.6.
-    pub(super) effect_timing: i32,
+    /// For a syllable, its boundary from the first glyph's pen, pre-aspect
+    /// 26.6.
+    effect_timing: i32,
     /// The effects the run is composited with.
     pub(super) effects: Effects,
     /// Its glyphs in [`Runs`].
     glyphs: Range<usize>,
+}
+
+impl PlacedRun {
+    /// The run's karaoke timing as it is drawn: for `\kf`, the frame column
+    /// the fill gives way at, its boundary stretched by `pixel_aspect` from
+    /// `leftmost_x`, the least x of its `\kf` glyphs' outlines in the frame
+    /// ([`GlyphDrawing::leftmost_x`]), 26.6; for the other kinds the
+    /// boundary.
+    pub(super) fn effect_timing(&self, leftmost_x: i32, pixel_aspect: f64) -> i32 {
+        if self.effect == Some(Karaoke::Fill) {
+            (from_26_6(leftmost_x) + from_26_6(self.effect_timing) * pixel_aspect).round() as i32
+        } else {
+            self.effect_timing
+        }
+    }
 }
 
 /// An event's drawn glyphs in the runs that are composited together, in
@@ -85,7 +101,7 @@ impl Runs {
             .zip(&*layout.chars);
         for (char, ((c, cluster), laid)) in chars.enumerate() {
             new_run |= laid.starts_run;
-            if !laid.drawn {
+            if laid.shows != Shows::Drawn {
                 continue;
             }
             if new_run {
@@ -158,8 +174,8 @@ impl Anchor {
     /// The event's box for collision handling, in frame pixels: its lines
     /// and their borders, with VSFilter's biased roundings. The border on
     /// both sides is doubled in wrapping `int` arithmetic, as libass doubles
-    /// it (`ass_render.c:3001-3003`), so a border beyond 2^30 pixels gives
-    /// the box libass gives where `int` overflow wraps.
+    /// it, so a border beyond 2^30 pixels gives the box libass gives where
+    /// `int` overflow wraps.
     pub(super) fn event_box(&self, layout: &Layout, par: f64) -> collisions::Rect {
         let (lines, text_box) = (&layout.lines, &layout.text_box);
         let top = (self.y - lines.first().asc - f64::from(lines.border_top)) as i32;
@@ -172,7 +188,7 @@ impl Anchor {
     }
 }
 
-/// `get_base_point`: the point of the box the alignment anchors.
+/// The point of the box the alignment anchors.
 fn base_point(bbox: &TextBox, halign: HAlign, valign: VAlign) -> (f64, f64) {
     let x = match halign {
         HAlign::Left => bbox.x_min,
@@ -256,7 +272,7 @@ fn position(
     (x, y)
 }
 
-/// `ass_apply_fade`: a positive fade raises the alpha towards transparent.
+/// `colour` faded: a positive fade raises its alpha towards transparent.
 pub(super) fn apply_fade(colour: Rgba, fade: i32) -> Rgba {
     if fade <= 0 {
         return colour;
@@ -319,16 +335,29 @@ pub(super) struct GlyphDrawing<'a> {
 }
 
 impl GlyphDrawing<'_> {
-    /// What [`Run::place`](triergon_raster::Run::place) places.
-    pub(super) fn request(&self, frame: &FrameScale) -> GlyphRequest<'_> {
-        GlyphRequest {
-            shape: &self.outline.shape,
-            placement: self.placement,
-            frame: *frame,
-            effects: &self.effects,
-            karaoke: self.karaoke,
+    /// What [`Run::render_with`](triergon_raster::compat::libass::Run::render_with)
+    /// draws.
+    pub(super) fn request<'s>(&'s self, frame: &'s FrameScale) -> GlyphRequest<'s> {
+        GlyphRequest::new(&self.outline.shape, &self.placement, frame, &self.effects)
+    }
+
+    /// The least of `leftmost_x` and, for a `\kf` glyph, the x of its
+    /// outline under `request`'s transform, 26.6: what its run's `\kf` fill
+    /// is timed from.
+    pub(super) fn leftmost_x(&self, request: &GlyphRequest<'_>, leftmost_x: i32) -> i32 {
+        if self.karaoke {
+            karaoke_leftmost_x(request, leftmost_x)
+        } else {
+            leftmost_x
         }
     }
+}
+
+/// [`GlyphDrawing::leftmost_x`] of a `\kf` glyph. Cold, so the scan of its
+/// points stays out of the per-glyph drawing loop (measured).
+#[cold]
+fn karaoke_leftmost_x(request: &GlyphRequest<'_>, leftmost_x: i32) -> i32 {
+    request.shape().outlines()[0].min_transformed_x(request.matrix(), leftmost_x)
 }
 
 /// What places an event's glyphs in the frame as they are drawn.
@@ -370,8 +399,8 @@ impl<'a> Placer<'a> {
     }
 
     /// What `placed` is drawn with: its outline, its position in the frame
-    /// and offset from the rotation origin displaced by its shadow
-    /// (`calculate_rotation_params`), and the effects its state gives it.
+    /// and offset from the rotation origin displaced by its shadow, and the
+    /// effects its state gives it.
     pub(super) fn glyph(&self, placed: &PlacedGlyph) -> Option<GlyphDrawing<'a>> {
         let c = &self.text.chars()[placed.char];
         let style = self.text.style(c);
@@ -400,7 +429,7 @@ impl<'a> Placer<'a> {
             advance: style.spacing_scaled.wrapping_add(glyph.advance.x),
             scale_fix: style.scale_fix,
             position: Vector::new(
-                pixels_26_6(self.x + d6_to_double(glyph.pos.x) * par),
+                pixels_26_6(self.x + from_26_6(glyph.pos.x) * par),
                 self.y.wrapping_add(glyph.pos.y),
             ),
             outline_scale: outline.scale,

@@ -18,13 +18,13 @@ use triergon_core::{
 };
 use triergon_isobmff::compat::mov::edits::EncodedEditPlan;
 use triergon_playback::{
-    ByteSource, Engine, Format, Mp4Event, Mp4RangeOpen, Output, Player, PlayerPolicy, Progress,
-    RawEvent, Selection,
+    ByteSource, Event, Format, Output, Player, PlayerPolicy, Progress, Selection, SourceOwner,
     compat::mov,
-    io::{SelectedInput, SourceOwner},
-    mp4_open::{Movie, Mp4Open, OpenLimits, OpenProgress, OpenedMp4},
-    mp4_plan::{Mp4IndexJob, PlanLimits},
-    progressive::ProgressiveLimits,
+    mp4::{
+        Movie, Mp4Event, Mp4Open, Mp4RangeOpen, OpenLimits, OpenProgress, OpenedMp4, PlanLimits,
+        ProgressiveLimits,
+    },
+    probe::SelectedInput,
 };
 
 pub const PREFIX: &str = "mp4-forward-";
@@ -79,22 +79,22 @@ fn fold<const INCLUDE_TRIM: bool>(work: &mut Work, event: &Mp4Event) -> Result<(
     let (native, payload, skip) = match event {
         Mp4Event::Packet(packet) => {
             let native = packet
-                .native
+                .occurrence
                 .as_ref()
-                .ok_or("source packet without a native occurrence")?;
+                .ok_or("source packet without a demux occurrence")?;
             (
                 native,
                 packet.source.payload.as_ref(),
                 packet.encoded_skip_samples,
             )
         }
-        Mp4Event::NativeShortPacket(short) => (
-            &short.native,
+        Mp4Event::ShortPacket(short) => (
+            &short.occurrence,
             short.prefix.payload.as_ref(),
             short.encoded_skip_samples,
         ),
-        Mp4Event::NativeEmptyPacket(_) | Mp4Event::NativeMissingSample(_) => {
-            return Err("native packet without a track".into());
+        Mp4Event::EmptyPacket(_) | Mp4Event::MissingSample(_) => {
+            return Err("demux packet without a track".into());
         }
         Mp4Event::Configuration(_) => return Ok(()),
     };
@@ -123,7 +123,7 @@ fn collect<const INCLUDE_TRIM: bool>(
     loop {
         let progress = read(&mut pending)?;
         if let Some(output) = pending.take()
-            && let RawEvent::Mp4(event) = output.event()
+            && let Event::Mp4(event) = output.event()
         {
             fold::<INCLUDE_TRIM>(&mut work, event)?;
         }
@@ -214,10 +214,10 @@ fn progressive(
     };
     let mut index = match &plans {
         Some(plans) => mov::forward_encoded_edits(&movie, plans.as_slice(), limits)?,
-        None => Mp4IndexJob::new_native_terminal_v1(&movie, limits)?,
+        None => mov::index_front(&movie, limits)?,
     };
     while !index.poll(&mut WorkBudget::new(WORK), cancel)? {}
-    let engine = Engine::mp4_native_terminal_v1(
+    let engine = mov::open_front(
         input,
         index.finish()?,
         MAX_PACKET,

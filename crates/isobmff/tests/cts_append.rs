@@ -1,17 +1,17 @@
 //! Source assertions precede the demux-index seam. Demux tuples are
 //! literal demux observations.
-mod common;
-#[path = "support/demux.rs"]
-mod support;
+
+use crate::common::demux as support;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, WorkBudget};
 use triergon_isobmff::{
-    SampleStep, SourceTrack, TrackSampleCursor,
+    CursorStatus, Next,
     compat::mov::{
         clock::ClockOrigin,
-        packets::{CursorStatus, DemuxProfile},
+        packets::DemuxProfile,
         seek::{IndexCursor, IndexLimits},
     },
+    interleave::{SourceTrack, TrackSampleCursor},
 };
 
 fn check(bytes: &[u8], positions: [i64; 6], distances: [i32; 6]) {
@@ -24,9 +24,9 @@ fn check(bytes: &[u8], positions: [i64; 6], distances: [i32; 6]) {
         let mut source_ended = false;
         for _ in 0..4096 {
             match canonical.poll(&mut WorkBudget::new(1)).unwrap() {
-                SampleStep::Yield => {}
-                SampleStep::Sample(sample) => samples.push(sample),
-                SampleStep::End => {
+                Next::Yield => {}
+                Next::Item(sample) => samples.push(sample),
+                Next::End => {
                     source_ended = true;
                     break;
                 }
@@ -134,7 +134,7 @@ fn original_signed_cts_append_keeps_absent_first_field_and_negative_raw_bits() {
 fn selected_split_cts_append_preserves_each_source_sample_and_demux_distance() {
     // Actual demux-index/184-{ordinary,tiny}-reference.stdout.
     check(
-        include_bytes!("fixtures/native-append36/trun18-original-split-runs.mp4"),
+        include_bytes!("fixtures/cts-append/trun18-original-split-runs.mp4"),
         [771, 783, 795, 975, 987, 999],
         [0, 0, 1, 0, 0, 1],
     );
@@ -144,7 +144,7 @@ fn selected_split_cts_append_preserves_each_source_sample_and_demux_distance() {
 fn single_sample_cts_runs_carry_the_last_distance_once_per_real_append() {
     // Actual demux-index/185-{ordinary,tiny}-reference.stdout.
     check(
-        include_bytes!("fixtures/native-append36/trun18-original-single-sample-runs.mp4"),
+        include_bytes!("fixtures/cts-append/trun18-original-single-sample-runs.mp4"),
         [791, 803, 815, 1015, 1027, 1039],
         [0, 0, 0, 0, 0, 0],
     );

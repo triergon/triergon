@@ -2,7 +2,7 @@
 //! lossless integer samples.
 use crate::{DecodeError, FrameInfo};
 use triergon_codec::{
-    AudioFrame, Budget, BudgetVec, ChannelLayout, Reservation, SampleFormat, StorageError,
+    AudioFrame, Budget, BudgetVec, ChannelLayout, Error, Reservation, SampleFormat,
 };
 
 /// A destination for one frame, plane by plane.
@@ -108,10 +108,13 @@ fn fill(plane: &mut [f32], samples: impl Iterator<Item = i32>, convert: impl Fn(
 /// [`Decoder::integer_frame`]: crate::Decoder::integer_frame
 #[derive(Debug)]
 pub struct IntegerFrame {
+    /// Samples per second.
     pub sample_rate: u32,
+    /// The planes, one per channel.
     pub layout: ChannelLayout,
     /// The value range of every sample: `-2^(bits - 1)` to `2^(bits - 1) - 1`.
     pub bits_per_sample: u8,
+    /// Samples in each plane; 0 after a failed frame.
     pub samples_per_channel: usize,
     /// Plane after plane, `samples_per_channel` each.
     samples: BudgetVec<i32>,
@@ -169,7 +172,7 @@ impl Output for IntegerOutput<'_> {
             .layout
             .channels()
             .checked_mul(len)
-            .ok_or(StorageError::Overflow)?;
+            .ok_or(Error::Overflow)?;
         self.frame.samples.try_resize(total, 0)?;
         self.frame.sample_rate = frame.sample_rate;
         self.frame.layout = frame.layout;

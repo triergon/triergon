@@ -379,7 +379,7 @@ mod tests {
 
     #[test]
     fn downloads_are_verified_before_they_are_cached() {
-        let root = crate::walk::scratch("ucd");
+        let root = crate::files::scratch("ucd");
         let wrong = Fake {
             body: b"y".to_vec(),
             calls: RefCell::default(),

@@ -9,14 +9,9 @@ use std::process::Command;
 use super::gate_build;
 use super::linux;
 use super::provenance::{cargo_metadata, selected_graph, shared_inputs};
-use crate::checks::read_json;
-use crate::corpus::write_json;
-use crate::json::Value;
+use crate::json::{self, Value};
 
 type R<T> = Result<T, String>;
-
-const USAGE: &str =
-    "usage: cargo xtask build-workers [--comparison-build] [--only WORKER] [--all-references]";
 
 fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
     let mut comparison_build = false;
@@ -27,10 +22,14 @@ fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
         match flag.as_str() {
             "--comparison-build" if !comparison_build => comparison_build = true,
             "--only" if only.is_none() => {
-                only = Some(args.next().ok_or(USAGE)?.as_str());
+                only = Some(
+                    args.next()
+                        .ok_or_else(|| crate::usage_of("build-workers"))?
+                        .as_str(),
+                );
             }
             "--all-references" if !all_references => all_references = true,
-            _ => return Err(USAGE.into()),
+            _ => return Err(crate::usage_of("build-workers")),
         }
     }
     Ok((comparison_build, only, all_references))
@@ -39,10 +38,6 @@ fn options(args: &[String]) -> R<(bool, Option<&str>, bool)> {
 pub fn main(root: &Path, args: &[String]) -> R<PathBuf> {
     let (comparison_build, only, all_references) = options(args)?;
     build_selected(root, comparison_build, only, all_references)
-}
-
-fn sha(path: &Path) -> R<String> {
-    linux::file_sha(path)
 }
 
 fn output(program: &str, args: &[&str], env: &[(&str, String)]) -> R<String> {
@@ -353,7 +348,7 @@ const MEDIA_WORKER: Candidate = Candidate {
 
 /// Measurement workers a contract may name as its candidate besides
 /// `media-worker`.
-const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
+const ADDITIONAL_CANDIDATES: [Candidate; 23] = [
     Candidate {
         name: "playback-worker",
         package: "playback-worker",
@@ -378,6 +373,27 @@ const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
         nightly: false,
     },
     Candidate {
+        name: "transport-views-worker",
+        package: "transport-worker",
+        example: None,
+        features: &["views"],
+        nightly: false,
+    },
+    Candidate {
+        name: "playback-views-worker",
+        package: "playback-worker",
+        example: None,
+        features: &["views"],
+        nightly: false,
+    },
+    Candidate {
+        name: "play-views-worker",
+        package: "codec-worker",
+        example: None,
+        features: &["play"],
+        nightly: false,
+    },
+    Candidate {
         name: "codec-worker",
         package: "codec-worker",
         example: None,
@@ -393,6 +409,20 @@ const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
         example: None,
         features: &["aac-simd"],
         nightly: true,
+    },
+    Candidate {
+        name: "codec-hevc-worker",
+        package: "codec-worker",
+        example: None,
+        features: &["hevc-simd"],
+        nightly: true,
+    },
+    Candidate {
+        name: "codec-views-worker",
+        package: "codec-worker",
+        example: None,
+        features: &["views"],
+        nightly: false,
     },
     Candidate {
         name: "capture-worker",
@@ -445,6 +475,20 @@ const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
         nightly: false,
     },
     Candidate {
+        name: "subtitle-views-worker",
+        package: "subtitle-worker",
+        example: None,
+        features: &["triergon-subtitles/reference-trace"],
+        nightly: false,
+    },
+    Candidate {
+        name: "matroska-views-worker",
+        package: "triergon-matroska",
+        example: Some("matroska_views_worker"),
+        features: &["reference-trace"],
+        nightly: false,
+    },
+    Candidate {
         name: "isobmff-worker",
         package: "triergon-isobmff",
         example: Some("isobmff_consumer_worker"),
@@ -455,6 +499,20 @@ const ADDITIONAL_CANDIDATES: [Candidate; 14] = [
         name: "framing-worker",
         package: "triergon-framing",
         example: Some("framing_worker"),
+        features: &["reference-trace"],
+        nightly: false,
+    },
+    Candidate {
+        name: "framing-views-worker",
+        package: "triergon-framing",
+        example: Some("framing_views_worker"),
+        features: &["reference-trace"],
+        nightly: false,
+    },
+    Candidate {
+        name: "isobmff-views-worker",
+        package: "triergon-isobmff",
+        example: Some("isobmff_views_worker"),
         features: &["reference-trace"],
         nightly: false,
     },
@@ -501,7 +559,13 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
     let features: Vec<String> = spec
         .features
         .iter()
-        .map(|feature| format!("{}/{feature}", spec.package))
+        .map(|feature| {
+            if feature.contains('/') {
+                (*feature).to_owned()
+            } else {
+                format!("{}/{feature}", spec.package)
+            }
+        })
         .collect();
     let metadata = super::provenance::cargo_metadata_with_features(root, &features)?;
     let mut inputs = shared_inputs(root)?;
@@ -537,6 +601,119 @@ pub(super) fn candidate_graph(root: &Path, name: &str) -> R<Value> {
             inputs.push(format!("harness/features/packet-framing/{file}"));
         }
     }
+    let view_headers: &[&str] = match name {
+        "transport-views-worker" => &[
+            "harness/reference_transport_views.c",
+            "harness/reference_transport_catalogue.h",
+            "harness/reference_transport_packets.h",
+            "harness/reference_transport_source.h",
+            "harness/reference_transport_facts.h",
+            "harness/reference_transport_reader.h",
+            "harness/reference_transport_mux.h",
+            "harness/reference_ts.h",
+            "harness/reference_ts_input.h",
+            "harness/reference_ts_sequence.h",
+            "harness/features/ts-mux-readback/capture-pictures.hex",
+            "harness/ts_descriptor_oracle.py",
+            "harness/ts_packet_oracle.py",
+            "harness/ts_time_oracle.py",
+            "xtask/src/transport_views/catalogue.rs",
+            "xtask/src/transport_views/mux.rs",
+            "xtask/src/transport_views/packets.rs",
+            "xtask/src/transport_views/time.rs",
+            "xtask/src/transport_views/mod.rs",
+        ],
+        "playback-views-worker" => &[
+            "harness/reference_playback_views.c",
+            "harness/reference_playback_probe.h",
+            "harness/reference_playback_source_view.h",
+            "harness/reference_playback_player.h",
+            "harness/reference_playback_hls.h",
+            "harness/reference_playback_bridge.h",
+            "harness/av1_bridge_oracle.py",
+            "harness/codec_stream_oracle.py",
+            "harness/spec_oracle.py",
+            "harness/reference_playback_subtitles.h",
+            "harness/reference_subtitles.h",
+            "harness/reference_packet_fold.h",
+            "harness/reference_subtitles_host.h",
+            "harness/reference_views_protocol.h",
+            "xtask/src/playback_views/mod.rs",
+            "xtask/src/playback_views/probe.rs",
+            "harness/mp4_source_clock_oracle.py",
+        ],
+        "play-views-worker" => &[
+            "harness/reference_play_views.c",
+            "harness/reference_play_raw.h",
+            "harness/reference_playback_probe.h",
+            "harness/reference_decode.h",
+            "xtask/src/play_views/mod.rs",
+            "xtask/src/play_views/seek.rs",
+            "harness/features/facade-seek/container-pins.json",
+            "harness/codecs/play-manifest.json",
+            "harness/codecs/play-workloads.json",
+            "xtask/src/codecs/correctness/play.rs",
+        ],
+        "codec-views-worker" => &[
+            "harness/reference_codec_views.c",
+            "harness/reference_codec_readers.h",
+            "harness/reference_codec_video.h",
+            "harness/reference_codec_audio.h",
+            "harness/reference_codec_blocks.h",
+            "harness/cabac_oracle.py",
+            "harness/palette_oracle.py",
+            "harness/reference_codec_rotations.c",
+        ],
+        "matroska-views-worker" => &[
+            "harness/reference_matroska_views.c",
+            "harness/reference_matroska_side_data.h",
+            "harness/reference_matroska_metadata.h",
+        ],
+        "subtitle-views-worker" => &[
+            "harness/reference_subtitle_views.c",
+            "harness/reference_subtitle_views_text.h",
+            "harness/reference_subtitle_views_source.h",
+        ],
+        "framing-views-worker" => &[
+            "harness/reference_framing_views.c",
+            "harness/reference_views_protocol.h",
+            "harness/reference_framing.h",
+            "harness/reference_nal_units.h",
+            "harness/reference_obu.h",
+            "harness/reference_adts.h",
+            "harness/reference_config_views.h",
+            "harness/reference_dts_frames.h",
+            "harness/dts_oracle.py",
+            "harness/codec_stream_oracle.py",
+            "harness/codec_config_oracle.py",
+            "xtask/src/framing_views/obu.rs",
+            "xtask/src/framing_views/adts.rs",
+            "xtask/src/framing_views/config.rs",
+            "xtask/src/framing_views/dts.rs",
+            "xtask/src/framing_views/nal.rs",
+        ],
+        "isobmff-views-worker" => &[
+            "harness/reference_isobmff_views.c",
+            "harness/reference_views_protocol.h",
+            "harness/reference_isobmff_packets.h",
+            "harness/reference_isobmff_index.h",
+            "harness/reference_isobmff_trace.h",
+            "harness/isobmff_index_oracle.py",
+            "xtask/src/isobmff_views/index.rs",
+        ],
+        _ => &[],
+    };
+    inputs.extend(view_headers.iter().map(ToString::to_string));
+    if matches!(
+        name,
+        "codec-views-worker"
+            | "matroska-views-worker"
+            | "subtitle-views-worker"
+            | "transport-views-worker"
+            | "play-views-worker"
+    ) {
+        inputs.push("harness/reference_views_protocol.h".to_owned());
+    }
     inputs.sort();
     inputs.dedup();
     selected_graph(root, &metadata, spec.package, &inputs)
@@ -549,7 +726,7 @@ pub(crate) fn candidate_worker(root: &Path, identity: &Value, name: &str) -> R<P
         .and_then(|workers| workers.get(name))
         .ok_or_else(|| format!("{name} is not in the build identity; rebuild"))?;
     let path = root.join(gate_build::release_dir()?).join(name);
-    if record.get("sha256").and_then(Value::as_str) != Some(sha(&path)?.as_str()) {
+    if record.get("sha256").and_then(Value::as_str) != Some(crate::files::sha256(&path)?.as_str()) {
         return Err(format!("{name} changed since build identity; rebuild"));
     }
     let current = candidate_graph(root, name)?;
@@ -721,7 +898,10 @@ fn candidate_records(root: &Path, built: &[Built]) -> R<Value> {
             *name,
             Value::object([
                 ("path", Value::str(&path)),
-                ("sha256", Value::str(sha(&root.join(&path))?)),
+                (
+                    "sha256",
+                    Value::str(crate::files::sha256(&root.join(&path))?),
+                ),
                 (
                     "rustc",
                     Value::str(gate_build::toolchain_compiler(root, &toolchain)?),
@@ -775,6 +955,27 @@ struct ProfileReference {
 
 const CONTAINER_PACKAGES: &[&str] = &["libavformat", "libavcodec", "libavutil"];
 const CONTAINER_OPTIONS: &[&str] = &["-O3", "-Wall", "-Wextra", "-Werror"];
+const DECODE_PACKAGES: &[&str] = &[
+    "libavformat",
+    "libavfilter",
+    "libswscale",
+    "libswresample",
+    "libavcodec",
+    "libavutil",
+];
+// These conversions can differ between targets (reference_subtitles_host.h).
+const SUBTITLE_WRAPS: &[&str] = &[
+    "strtol",
+    "strtoul",
+    "__isoc23_strtol",
+    "__isoc23_strtoul",
+    "__isoc99_sscanf",
+    "lrint",
+    "lrintf",
+    "lround",
+    "llrint",
+    "llrintf",
+];
 /// The options the decoder and capture comparisons were measured with.
 const RELEASE_OPTIONS: &[&str] = &["-std=c11", "-O2", "-Wall", "-Wextra", "-Werror"];
 /// The shaping reference is compiled like its libraries, without contraction.
@@ -943,21 +1144,7 @@ const PROFILE_REFERENCES: &[ProfileReference] = &[
         libraries: "subtitles_reference",
         packages: CONTAINER_PACKAGES,
         options: CONTAINER_OPTIONS,
-        // The calls whose result can differ between the targets, so that the
-        // worker flags the folds that reach such a result
-        // (`harness/reference_subtitles_host.h`).
-        wrapped: &[
-            "strtol",
-            "strtoul",
-            "__isoc23_strtol",
-            "__isoc23_strtoul",
-            "__isoc99_sscanf",
-            "lrint",
-            "lrintf",
-            "lround",
-            "llrint",
-            "llrintf",
-        ],
+        wrapped: SUBTITLE_WRAPS,
         identity: true,
         // Its wrappers run inside the timed operation, so it is never timed or
         // measured; `ffmpeg-subtitles-plain-native` is.
@@ -983,14 +1170,7 @@ const PROFILE_REFERENCES: &[ProfileReference] = &[
         record: "ffmpeg-decode-native",
         kind: "FFmpeg 9.0.2 decoders with the letterbox and downmix filter chains; codec operations",
         libraries: "decode_reference",
-        packages: &[
-            "libavformat",
-            "libavfilter",
-            "libswscale",
-            "libswresample",
-            "libavcodec",
-            "libavutil",
-        ],
+        packages: DECODE_PACKAGES,
         options: RELEASE_OPTIONS,
         ..REFERENCE
     },
@@ -1051,6 +1231,148 @@ const PROFILE_REFERENCES: &[ProfileReference] = &[
         ..REFERENCE
     },
     ProfileReference {
+        profile: ".research/reference-framing-views",
+        binary: "ffmpeg-framing-views-worker",
+        source: "harness/reference_framing_views.c",
+        record: "ffmpeg-framing-views-native",
+        kind: "pinned FFmpeg framing public-API views",
+        libraries: "framing_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-isobmff-views-worker",
+        source: "harness/reference_isobmff_views.c",
+        record: "ffmpeg-isobmff-views-native",
+        kind: "pinned FFmpeg isobmff public-API views",
+        libraries: "isobmff_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-codec-views-worker",
+        source: "harness/reference_codec_views.c",
+        record: "ffmpeg-codec-views-native",
+        kind: "FFmpeg 9.0.2 codec public-API views",
+        libraries: "codec_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference",
+        binary: "ffmpeg-matroska-views-worker",
+        source: "harness/reference_matroska_views.c",
+        record: "ffmpeg-matroska-views-native",
+        kind: "pinned FFmpeg Matroska public-API views",
+        libraries: "matroska_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-subtitle-views-worker",
+        source: "harness/reference_subtitle_views.c",
+        record: "ffmpeg-subtitle-views-native",
+        kind: "pinned FFmpeg subtitle public-API views",
+        libraries: "subtitle_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-transport-views-worker",
+        source: "harness/reference_transport_views.c",
+        record: "ffmpeg-transport-views-native",
+        kind: "pinned FFmpeg MPEG-TS public-API views",
+        libraries: "transport_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-transport-views-raw-worker",
+        source: "harness/reference_transport_views.c",
+        record: "ffmpeg-transport-views-raw-native",
+        kind: "FFmpeg 9.0.2 raw MPEG-TS packet views",
+        libraries: "transport_views_raw_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-formats",
+        binary: "ffmpeg-playback-views-worker",
+        source: "harness/reference_playback_views.c",
+        record: "ffmpeg-playback-views-native",
+        kind: "pinned FFmpeg playback public-API views",
+        libraries: "playback_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-bridge-views-worker",
+        source: "harness/reference_playback_views.c",
+        record: "ffmpeg-bridge-views-native",
+        kind: "FFmpeg 9.0.2 bitstream filter and muxer views",
+        libraries: "bridge_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        binary: "ffmpeg-playback-subtitle-views-worker",
+        source: "harness/reference_playback_views.c",
+        define: Some("-DTRIERGON_PLAYBACK_SUBTITLE_WRAP=1"),
+        record: "ffmpeg-playback-subtitle-views-native",
+        kind: "pinned FFmpeg subtitle playback views with host-dependent conversion detection",
+        libraries: "playback_subtitle_views_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        wrapped: SUBTITLE_WRAPS,
+        identity: true,
+        instrumented: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-subtitles",
+        binary: "ffmpeg-playback-subtitle-views-plain-worker",
+        source: "harness/reference_playback_views.c",
+        record: "ffmpeg-playback-subtitle-views-plain-native",
+        kind: "pinned FFmpeg subtitle playback views for timing and memory",
+        libraries: "playback_subtitle_views_plain_reference",
+        packages: CONTAINER_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
+        profile: ".research/reference-decode",
+        binary: "ffmpeg-play-views-worker",
+        source: "harness/reference_play_views.c",
+        record: "ffmpeg-play-views-native",
+        kind: "FFmpeg 9.0.2 demux, decode and presentation output",
+        libraries: "play_views_reference",
+        packages: DECODE_PACKAGES,
+        options: CONTAINER_OPTIONS,
+        identity: true,
+        ..REFERENCE
+    },
+    ProfileReference {
         profile: ".research/freetype",
         binary: "freetype-font-worker",
         define: Some("-DTRIERGON_FONT_REFERENCE=1"),
@@ -1089,6 +1411,16 @@ const PROFILE_REFERENCES: &[ProfileReference] = &[
         libraries: "libass_ass_reference",
         generated: Some(crate::ass::observed_sources),
         instrumented: true,
+        ..LIBASS
+    },
+    ProfileReference {
+        binary: "libass-rotations-worker",
+        source: "harness/reference_codec_rotations.c",
+        record: "libass-rotations-native",
+        kind: "libass rendered rotation controls and FreeType glyph metrics",
+        libraries: "libass_rotations_reference",
+        packages: &["libass", "freetype2"],
+        options: RELEASE_OPTIONS,
         ..LIBASS
     },
     ProfileReference {
@@ -1151,12 +1483,33 @@ fn build_selected(
     let linux = cfg!(target_os = "linux");
     let mut candidate_command = cargo_rustc(&MEDIA_WORKER, &root.join("target"), true)?;
     candidate_command.extend(gate_build::worker_link_arguments()?);
-    let candidate_order = build_in_link_order(
-        root,
-        &mut candidate_command,
-        &root.join(gate_build::release_dir()?).join("media-worker"),
-        "media-worker",
-    )?;
+    // The views use the media worker only to share the report's build identity.
+    // Its trained layout does not qualify a comparison-only build of these workers.
+    let candidate_order = if comparison_build
+        && matches!(
+            only,
+            Some(
+                "framing-views-worker"
+                    | "isobmff-views-worker"
+                    | "codec-views-worker"
+                    | "matroska-views-worker"
+                    | "subtitle-views-worker"
+                    | "transport-views-worker"
+                    | "playback-views-worker"
+                    | "play-views-worker"
+                    | "codec-hevc-worker"
+            )
+        ) {
+        run(&candidate_command)?;
+        None
+    } else {
+        build_in_link_order(
+            root,
+            &mut candidate_command,
+            &root.join(gate_build::release_dir()?).join("media-worker"),
+            "media-worker",
+        )?
+    };
     if selected.iter().any(|spec| spec.nightly) {
         crate::simd_toolchain()?;
     }
@@ -1227,7 +1580,7 @@ fn build_selected(
             continue;
         }
         if let Some(prepared) = reference.prepared {
-            prepared(&read_json(&build)?)?;
+            prepared(&json::read(&build)?)?;
         }
         let pkgconfig = std::env::join_paths(
             profiles().map(|profile| root.join(profile).join("install/lib/pkgconfig")),
@@ -1285,8 +1638,14 @@ fn build_selected(
     });
     let probe = out.join("memory-check");
     let mut instrumentation = vec![
-        ("observer_sha256".to_owned(), Value::str(sha(&observer)?)),
-        ("probe_sha256".to_owned(), Value::str(sha(&probe)?)),
+        (
+            "observer_sha256".to_owned(),
+            Value::str(crate::files::sha256(&observer)?),
+        ),
+        (
+            "probe_sha256".to_owned(),
+            Value::str(crate::files::sha256(&probe)?),
+        ),
     ];
     let candidate = root.join(gate_build::release_dir()?).join("media-worker");
     let mut libraries: Vec<(String, Value)> = Vec::new();
@@ -1326,7 +1685,12 @@ fn build_selected(
                 "harness/allocations-linux.c",
                 "harness/portable-memory-check.c",
             ]
-            .map(|n| (n, Value::str(sha(&root.join(n)).unwrap_or_default()))),
+            .map(|n| {
+                (
+                    n,
+                    Value::str(crate::files::sha256(&root.join(n)).unwrap_or_default()),
+                )
+            }),
         );
         instrumentation.extend([
             ("platform".into(), Value::str("Linux")),
@@ -1358,8 +1722,11 @@ fn build_selected(
             let proof_file = root.join(&proof_path);
             let profile = Value::object([
                 ("proof_path", Value::str(&proof_path)),
-                ("proof_sha256", Value::str(sha(&proof_file)?)),
-                ("proof", read_json(&proof_file)?),
+                (
+                    "proof_sha256",
+                    Value::str(crate::files::sha256(&proof_file)?),
+                ),
+                ("proof", json::read(&proof_file)?),
             ]);
             let (observer_sha, probe_sha) = (
                 instrumentation[0].1.as_str().map(str::to_owned),
@@ -1396,7 +1763,7 @@ fn build_selected(
         }
     };
     let worker_identity = |path: &Path| -> R<Value> {
-        crate::json::parse(&output(
+        json::parse(&output(
             &path.display().to_string(),
             &["identity", "-"],
             &[],
@@ -1410,7 +1777,7 @@ fn build_selected(
     let graph = selected_graph(root, &metadata, "media-worker", &shared_inputs(root)?)?;
     let candidates = candidate_records(root, &additional)?;
     let pinned_build = if pinned.exists() {
-        Some(read_json(&pinned)?)
+        Some(json::read(&pinned)?)
     } else {
         None
     };
@@ -1444,7 +1811,7 @@ fn build_selected(
                 .map(|p| {
                     Ok((
                         p.file_name().unwrap().to_string_lossy().into_owned(),
-                        Value::str(sha(p)?),
+                        Value::str(crate::files::sha256(p)?),
                     ))
                 })
                 .collect::<R<_>>()?,
@@ -1454,7 +1821,7 @@ fn build_selected(
     };
     let combined_record = Value::object([
         ("path", Value::str("target/harness/ffmpeg-combined-worker")),
-        ("sha256", Value::str(sha(&combined)?)),
+        ("sha256", Value::str(crate::files::sha256(&combined)?)),
         (
             "kind",
             Value::str("pinned FFmpeg plus native scope-1 combined-encoding restoration"),
@@ -1475,16 +1842,16 @@ fn build_selected(
                     "path",
                     Value::str(format!("target/harness/{}", reference.binary)),
                 ),
-                ("sha256", Value::str(sha(path)?)),
+                ("sha256", Value::str(crate::files::sha256(path)?)),
                 ("kind", Value::str(reference.kind)),
                 ("instrumented", Value::Bool(reference.instrumented)),
                 ("compiler_command", strings(command)),
                 ("source", Value::str(reference.source)),
                 (
                     "source_sha256",
-                    Value::str(sha(&root.join(reference.source))?),
+                    Value::str(crate::files::sha256(&root.join(reference.source))?),
                 ),
-                ("reference_build", read_json(build)?),
+                ("reference_build", json::read(build)?),
                 (
                     "linked_builds",
                     Value::Object(
@@ -1493,7 +1860,7 @@ fn build_selected(
                             .iter()
                             .map(|profile| {
                                 let build = root.join(profile).join("build.json");
-                                Ok(((*profile).to_owned(), read_json(&build)?))
+                                Ok(((*profile).to_owned(), json::read(&build)?))
                             })
                             .collect::<R<_>>()?,
                     ),
@@ -1545,7 +1912,7 @@ fn build_selected(
         ("compiler_command", strings(&command)),
         (
             "comparison_rules",
-            read_json(&root.join("harness/comparison-rules.json"))?,
+            json::read(&root.join("harness/comparison-rules.json"))?,
         ),
         (
             "comparison_references",
@@ -1555,7 +1922,7 @@ fn build_selected(
                         "ffmpeg-native",
                         Value::object([
                             ("path", Value::str("target/harness/ffmpeg-worker")),
-                            ("sha256", Value::str(sha(&worker)?)),
+                            ("sha256", Value::str(crate::files::sha256(&worker)?)),
                             ("kind", Value::str("pinned native FFmpeg")),
                         ]),
                     ),
@@ -1579,8 +1946,8 @@ fn build_selected(
         (
             "binaries",
             Value::object([
-                ("candidate", Value::str(sha(&candidate)?)),
-                ("reference", Value::str(sha(&worker)?)),
+                ("candidate", Value::str(crate::files::sha256(&candidate)?)),
+                ("reference", Value::str(crate::files::sha256(&worker)?)),
             ]),
         ),
         ("source_hashes", files_of("source_hashes")),
@@ -1593,21 +1960,29 @@ fn build_selected(
             Value::object([
                 (
                     "manifest_sha256",
-                    Value::str(sha(&root.join("Cargo.toml"))?),
+                    Value::str(crate::files::sha256(&root.join("Cargo.toml"))?),
                 ),
-                ("lock_sha256", Value::str(sha(&root.join("Cargo.lock"))?)),
+                (
+                    "lock_sha256",
+                    Value::str(crate::files::sha256(&root.join("Cargo.lock"))?),
+                ),
             ]),
         ),
         ("reference_archives", archives),
         ("reference_build", pinned_build.unwrap_or(Value::Null)),
         (
             "reference_source_sha256",
-            Value::str(sha(&root.join("harness/reference.c"))?),
+            Value::str(crate::files::sha256(&root.join("harness/reference.c"))?),
         ),
-        ("lock_sha256", Value::str(sha(&root.join("Cargo.lock"))?)),
+        (
+            "lock_sha256",
+            Value::str(crate::files::sha256(&root.join("Cargo.lock"))?),
+        ),
         (
             "ffprobe_sha256",
-            which("ffprobe").map_or(Ok(Value::Null), |p| sha(&p).map(Value::str))?,
+            which("ffprobe").map_or(Ok(Value::Null), |p| {
+                crate::files::sha256(&p).map(Value::str)
+            })?,
         ),
     ];
     for (key, value) in updates {
@@ -1626,7 +2001,9 @@ fn build_selected(
         let tool_hashes = Value::object(["nm", "readelf", "ps"].map(|n| {
             (
                 n,
-                which(n).map_or(Value::Null, |p| sha(&p).map_or(Value::Null, Value::str)),
+                which(n).map_or(Value::Null, |p| {
+                    crate::files::sha256(&p).map_or(Value::Null, Value::str)
+                }),
             )
         }));
         let platform = Value::object([
@@ -1692,221 +2069,16 @@ fn build_selected(
     }
     identity.extend(gate_build::current(root)?);
     let path = out.join("identity.json");
-    write_json(&path, &Value::Object(identity))?;
+    json::write(&path, &Value::Object(identity))?;
     if linux {
         let observations = Value::object([
-            ("identity_sha256", Value::str(sha(&path)?)),
+            ("identity_sha256", Value::str(crate::files::sha256(&path)?)),
             ("raw_loader_observations", Value::Object(libraries)),
         ]);
-        write_json(&out.join("linux-loader-observations.json"), &observations)?;
+        json::write(&out.join("linux-loader-observations.json"), &observations)?;
     }
     Ok(path)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn args(values: &[&str]) -> Vec<String> {
-        values.iter().map(|value| (*value).to_owned()).collect()
-    }
-
-    #[test]
-    fn only_an_uninstrumented_build_of_the_same_libraries_measures_for_a_reference() {
-        let contract = |reference: &str, measurement: &str| {
-            crate::json::parse(&format!(
-                r#"{{"reference":"{reference}","measurement_reference":"{measurement}"}}"#
-            ))
-            .unwrap()
-        };
-        let error =
-            |reference, measurement| measurement_reference_error(&contract(reference, measurement));
-        assert_eq!(error("libass-ass-native", "libass-player-native"), None);
-        assert_eq!(
-            error("ffmpeg-subtitles-native", "ffmpeg-subtitles-plain-native"),
-            None
-        );
-        assert!(error("ffmpeg-subtitles-plain-native", "ffmpeg-subtitles-native").is_some());
-        assert!(error("libass-ass-native", "libass-ass-native").is_some());
-        assert!(error("libass-native", "libass-player-native").is_some());
-        assert!(error("libass-ass-native", "freetype-native").is_some());
-        assert!(error("libass-ass-native", "unbuilt").is_some());
-        let plain = crate::json::parse(r#"{"reference":"libass-ass-native"}"#).unwrap();
-        assert_eq!(measurement_reference_error(&plain), None);
-    }
-
-    #[test]
-    fn worker_options_preserve_defaults_and_accept_either_flag_order() {
-        assert_eq!(options(&[]).unwrap(), (false, None, false));
-        assert_eq!(
-            options(&args(&["--comparison-build"])).unwrap(),
-            (true, None, false)
-        );
-        assert_eq!(
-            options(&args(&["--all-references"])).unwrap(),
-            (false, None, true)
-        );
-        assert!(options(&args(&["--all-references", "--all-references"])).is_err());
-        for name in std::iter::once("media-worker")
-            .chain(ADDITIONAL_CANDIDATES.iter().map(|spec| spec.name))
-        {
-            assert_eq!(
-                options(&args(&["--only", name])).unwrap(),
-                (false, Some(name), false)
-            );
-            for arguments in [
-                args(&["--only", name, "--comparison-build"]),
-                args(&["--comparison-build", "--only", name]),
-            ] {
-                assert_eq!(options(&arguments).unwrap(), (true, Some(name), false));
-            }
-            assert_eq!(
-                options(&args(&["--all-references", "--only", name])).unwrap(),
-                (false, Some(name), true)
-            );
-        }
-    }
-
-    #[test]
-    fn worker_selection_uses_the_registry_and_keeps_default_order() {
-        let all = selected_candidates(None).unwrap();
-        assert_eq!(all.len(), ADDITIONAL_CANDIDATES.len());
-        for (actual, registered) in all.iter().zip(&ADDITIONAL_CANDIDATES) {
-            assert_eq!(*actual, registered);
-            let selected = selected_candidates(Some(registered.name)).unwrap();
-            assert_eq!(selected.len(), 1);
-            assert_eq!(selected[0], registered);
-        }
-        assert!(
-            selected_candidates(Some("media-worker"))
-                .unwrap()
-                .is_empty()
-        );
-    }
-
-    #[test]
-    fn invalid_worker_options_are_refused_before_build_admission() {
-        let root = Path::new("/nonexistent-worker-build-root");
-        for arguments in [
-            args(&["--only"]),
-            args(&["--only", "framing-worker", "--only", "framing-worker"]),
-            args(&["--only", "framing-worker", "--only", "codec-worker"]),
-            args(&["--comparison-build", "--comparison-build"]),
-            args(&["--unknown"]),
-            args(&["framing-worker"]),
-        ] {
-            assert_eq!(main(root, &arguments).unwrap_err(), USAGE);
-        }
-        for name in ["unknown-worker", "--comparison-build", ""] {
-            let error = main(root, &args(&["--only", name])).unwrap_err();
-            assert_eq!(error, format!("unknown measurement worker {name}"));
-        }
-    }
-
-    #[test]
-    fn selected_workers_still_require_the_gate_build() {
-        let root = std::env::temp_dir().join(format!("worker-build-gate-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(root.join(".cargo")).unwrap();
-        fs::write(
-            root.join("rust-toolchain.toml"),
-            "[toolchain]\nchannel = \"1.99.1\"\n",
-        )
-        .unwrap();
-        fs::write(
-            root.join(".cargo/config.toml"),
-            "[build]\nrustflags = [\"--cfg=worker_selection_guard\"]\n",
-        )
-        .unwrap();
-        for arguments in [
-            Vec::new(),
-            args(&["--only", "media-worker"]),
-            args(&["--only", "framing-worker"]),
-        ] {
-            let error = main(&root, &arguments).unwrap_err();
-            assert!(error.contains("not the gate build"), "{error}");
-            assert!(error.contains("build.rustflags"), "{error}");
-            assert!(!root.join("target").exists());
-        }
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn primary_only_identity_does_not_adopt_stale_additional_binaries() {
-        let root = std::env::temp_dir().join(format!("worker-build-stale-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&root);
-        let release = root.join(gate_build::release_dir().unwrap());
-        fs::create_dir_all(&release).unwrap();
-        for spec in &ADDITIONAL_CANDIDATES {
-            fs::write(release.join(spec.name), b"stale").unwrap();
-        }
-        let candidates = candidate_records(&root, &[]).unwrap();
-        assert!(matches!(&candidates, Value::Object(records) if records.is_empty()));
-        let identity = Value::object([("additional_candidates", candidates)]);
-        for spec in &ADDITIONAL_CANDIDATES {
-            let error = candidate_worker(&root, &identity, spec.name).unwrap_err();
-            assert_eq!(
-                error,
-                format!("{} is not in the build identity; rebuild", spec.name)
-            );
-        }
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn isobmff_comparison_graph_enables_trace_without_changing_defaults() {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
-        let comparison = candidate_graph(root, "isobmff-worker").unwrap();
-        let production = selected_graph(
-            root,
-            &cargo_metadata(root).unwrap(),
-            "triergon-isobmff",
-            &[],
-        )
-        .unwrap();
-        for (graph, enabled) in [(&comparison, true), (&production, false)] {
-            let package = graph
-                .get("packages")
-                .and_then(Value::as_array)
-                .unwrap()
-                .iter()
-                .find(|package| {
-                    package.get("name").and_then(Value::as_str) == Some("triergon-isobmff")
-                })
-                .unwrap();
-            let features = package.get("features").and_then(Value::as_array).unwrap();
-            assert_eq!(
-                features
-                    .iter()
-                    .any(|f| f.as_str() == Some("reference-trace")),
-                enabled
-            );
-        }
-    }
-
-    #[test]
-    fn splits_pkg_config_output_like_a_shell() {
-        assert_eq!(
-            shell_words("-I/x/include  -L'/a b/lib' -lz \"-DX=\\\"1\\\"\" a\\ b\n").unwrap(),
-            ["-I/x/include", "-L/a b/lib", "-lz", "-DX=\"1\"", "a b"]
-        );
-        assert!(shell_words("'open").is_err());
-    }
-
-    #[test]
-    fn instrumentation_commands_follow_the_platform() {
-        let (root, out) = (Path::new("/r"), Path::new("/r/target/harness"));
-        let darwin = instrumentation_commands("cc", root, out, false);
-        assert!(
-            darwin[0].contains(&"-dynamiclib".to_owned())
-                && darwin[0].contains(&"/r/harness/allocations.c".to_owned())
-        );
-        assert!(darwin[1].contains(&"/r/harness/memory-check.c".to_owned()));
-        let linux = instrumentation_commands("cc", root, out, true);
-        assert!(
-            linux[0].contains(&"-Wl,-z,now".to_owned())
-                && linux[0].ends_with(&["-ldl".to_owned(), "-pthread".to_owned()])
-        );
-        assert!(linux[1].contains(&"/r/harness/portable-memory-check.c".to_owned()));
-    }
-}
+mod tests;

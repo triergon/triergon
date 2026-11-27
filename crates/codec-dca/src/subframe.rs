@@ -8,7 +8,7 @@ use crate::books;
 use crate::header::{MAX_SET_CH, SetHeader};
 use crate::tables::{JOINT_SCALE, SCALE_6BIT, SCALE_7BIT, STEP_LOSSLESS, STEP_LOSSY};
 use crate::vq::{ADPCM_VQ, HF_VQ};
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// ADPCM history length (NumADPCMCoeff).
 pub(crate) const HIST: usize = 4;
@@ -46,7 +46,7 @@ impl SubBuf {
     /// changes the row layout, which is only valid before any row of the frame is
     /// written (the first `start_frame` of a frame); more slots only append rows.
     /// A refused charge changes nothing.
-    fn reserve(&mut self, slots: usize, samples: usize) -> Result<(), StorageError> {
+    fn reserve(&mut self, slots: usize, samples: usize) -> Result<(), Error> {
         if self.saved.is_empty() {
             self.saved.try_resize(self.slots * self.bands * HIST, 0.0)?;
         }
@@ -97,7 +97,7 @@ impl SubBuf {
         slots: core::ops::Range<usize>,
         samples: usize,
         keep: bool,
-    ) -> Result<(), StorageError> {
+    ) -> Result<(), Error> {
         self.reserve(slots.end, samples)?;
         let (rows, stride) = (
             slots.start * self.bands..slots.end * self.bands,
@@ -166,13 +166,13 @@ impl SideInfo {
 /// Per-frame parameters that apply to every subframe of a channel set.
 pub(crate) struct SubframeParams {
     pub nssc: usize,
-    pub aspf: bool,
-    pub cpf: bool,
+    pub sync_each_subsubframe: bool,
+    pub crc_present: bool,
     pub lossless: bool,
     /// Core only: DYNF present (RANGE read after the joint scale factors).
-    pub dynf: bool,
+    pub dynamic_range_present: bool,
     /// Core only: LFF (decimated LFE samples read after the high-frequency VQ).
-    pub lff: u8,
+    pub lfe_mode: u8,
 }
 
 #[inline]
@@ -191,12 +191,12 @@ fn read_scale_index(br: &mut BitReader<'_>, shuff: u8, sum: &mut i32) -> i32 {
 fn scale_value(shuff: u8, idx: i32) -> Result<f32, DecodeError> {
     let v = if shuff == 6 {
         if !(0..125).contains(&idx) {
-            return Err(DecodeError::InvalidData("7-bit scale factor index"));
+            return Err(DecodeError::Invalid("7-bit scale factor index"));
         }
         SCALE_7BIT[idx as usize]
     } else {
         if !(0..63).contains(&idx) {
-            return Err(DecodeError::InvalidData("6-bit scale factor index"));
+            return Err(DecodeError::Invalid("6-bit scale factor index"));
         }
         SCALE_6BIT[idx as usize]
     };
@@ -205,7 +205,10 @@ fn scale_value(shuff: u8, idx: i32) -> Result<f32, DecodeError> {
 
 /// Decode one subframe of a channel set into `buf` rows `slot0 + ch`, samples
 /// `t0 .. t0 + nssc * 8` (relative to the row's sample area).
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the channel set's header, side information and state, borrowed field by field"
+)]
 pub(crate) fn decode_subframe(
     br: &mut BitReader<'_>,
     hdr: &SetHeader,
@@ -223,7 +226,7 @@ pub(crate) fn decode_subframe(
     for ch in 0..nch {
         let j = hdr.joinx[ch] as usize;
         if j > slot0 + ch {
-            return Err(DecodeError::InvalidData("JOINX source channel"));
+            return Err(DecodeError::Invalid("JOINX source channel"));
         }
     }
     let nssc = p.nssc;
@@ -255,7 +258,7 @@ pub(crate) fn decode_subframe(
                 _ => br.read(5),
             };
             if a > 26 {
-                return Err(DecodeError::InvalidData("ABITS above 26"));
+                return Err(DecodeError::Invalid("ABITS above 26"));
             }
             side.abits[ch][n] = a as u8;
         }
@@ -299,7 +302,7 @@ pub(crate) fn decode_subframe(
         if hdr.joinx[ch] > 0 {
             join_shuff[ch] = br.read(3) as u8;
             if join_shuff[ch] == 7 {
-                return Err(DecodeError::InvalidData("JOIN_SHUFF = 7"));
+                return Err(DecodeError::Invalid("JOIN_SHUFF = 7"));
             }
         }
     }
@@ -310,7 +313,7 @@ pub(crate) fn decode_subframe(
                 let mut s = 0;
                 let v = read_scale_index(br, join_shuff[ch], &mut s) + 64;
                 if !(0..=128).contains(&v) {
-                    return Err(DecodeError::InvalidData("joint scale index"));
+                    return Err(DecodeError::Invalid("joint scale index"));
                 }
                 side.jscale[ch][n] = JOINT_SCALE[v as usize];
             }
@@ -318,14 +321,14 @@ pub(crate) fn decode_subframe(
     }
     // RANGE (dynamic range coefficient): parsed, not applied — FFmpeg, the reference,
     // does not apply it (synthetic `dynf` stream).
-    if p.dynf {
+    if p.dynamic_range_present {
         let _range = br.read(8);
     }
-    if p.cpf {
+    if p.crc_present {
         let _sicrc = br.read(16);
     }
     if br.overrun() {
-        return Err(DecodeError::InvalidData("side information past frame end"));
+        return Err(DecodeError::Invalid("side information past frame end"));
     }
 
     // --- audio data arrays (Table 5-29) ---
@@ -334,9 +337,7 @@ pub(crate) fn decode_subframe(
     for ch in 0..nch {
         for b in hdr.nsubs[ch] as usize..32 {
             let row = buf.row_mut(slot0 + ch, b);
-            row[HIST + t0..HIST + t0 + nsamp]
-                .iter_mut()
-                .for_each(|v| *v = 0.0);
+            row[HIST + t0..HIST + t0 + nsamp].fill(0.0);
         }
     }
     for ch in 0..nch {
@@ -352,14 +353,14 @@ pub(crate) fn decode_subframe(
         }
     }
     if let Some(lfe) = lfe {
-        let count = 2 * p.lff as usize * nssc;
+        let count = 2 * p.lfe_mode as usize * nssc;
         let mut q = [0i32; 64];
         for v in q.iter_mut().take(count) {
             *v = br.read_signed(8);
         }
         let si = br.read(8) as usize;
         if si >= 125 {
-            return Err(DecodeError::InvalidData("LFE scale index"));
+            return Err(DecodeError::Invalid("LFE scale index"));
         }
         let s = SCALE_7BIT[si] as f32 * 0.035;
         for k in 0..count {
@@ -386,27 +387,8 @@ pub(crate) fn decode_subframe(
                     } else {
                         0
                     };
-                    let nh = books::huffman_sel_count(abits);
-                    if abits <= 10 && sel < nh {
-                        let book = books::sample_book(abits, sel)
-                            .ok_or(DecodeError::InvalidData("sample codebook"))?;
-                        for v in &mut q {
-                            *v = br.huff(book);
-                        }
+                    if read_indices(br, abits, sel, &mut q, "sample codebook", "block code")? {
                         adj = hdr.adj[ch][abits as usize - 1];
-                    } else if abits <= 7 {
-                        let bc = books::block_code(abits);
-                        for blk in 0..2 {
-                            let digits = bc
-                                .split(br.read(bc.bits))
-                                .ok_or(DecodeError::InvalidData("block code"))?;
-                            q[blk * 4..blk * 4 + 4].copy_from_slice(&digits);
-                        }
-                    } else {
-                        let bits = abits - 3;
-                        for v in &mut q {
-                            *v = br.read_signed(bits);
-                        }
                     }
                 }
                 let tm = side.tmode[ch][n] as usize;
@@ -423,49 +405,97 @@ pub(crate) fn decode_subframe(
                     row[base + m] = sat24(q[m] as f32 * scale);
                 }
                 if side.pmode[ch][n] {
-                    let c = &ADPCM_VQ[side.pvq[ch][n] as usize];
-                    let c = [
-                        f32::from(c[0]) * (1.0 / 8192.0),
-                        f32::from(c[1]) * (1.0 / 8192.0),
-                        f32::from(c[2]) * (1.0 / 8192.0),
-                        f32::from(c[3]) * (1.0 / 8192.0),
-                    ];
                     // History lives immediately before `base` (previous subsubframe,
                     // subframe or, through the HIST area, the previous frame).
-                    for m in base..base + 8 {
-                        let p = c[0] * row[m - 1]
-                            + c[1] * row[m - 2]
-                            + c[2] * row[m - 3]
-                            + c[3] * row[m - 4];
-                        row[m] = sat24(row[m] + p);
-                    }
+                    adpcm(row, base..base + 8, side.pvq[ch][n]);
                 }
             }
         }
-        if (ssf == nssc - 1 || p.aspf) && br.read(16) != 0xFFFF {
-            return Err(DecodeError::InvalidData("DSYNC"));
+        if (ssf == nssc - 1 || p.sync_each_subsubframe) && br.read(16) != 0xFFFF {
+            return Err(DecodeError::Invalid("DSYNC"));
         }
     }
     if br.overrun() {
-        return Err(DecodeError::InvalidData("audio data past frame end"));
+        return Err(DecodeError::Invalid("audio data past frame end"));
     }
     // Joint intensity (C.3.4): copy scaled source subbands.
     for ch in 0..nch {
         if hdr.joinx[ch] > 0 {
             let src = hdr.joinx[ch] as usize - 1;
             for n in hdr.nsubs[ch] as usize..nsubs_all[src] as usize {
-                let js = side.jscale[ch][n];
-                let mut tmp = [0f32; 32];
-                {
-                    let srow = buf.row(src, n);
-                    for m in 0..nsamp {
-                        tmp[m] = sat24(srow[HIST + t0 + m] * js);
-                    }
-                }
-                let row = buf.row_mut(slot0 + ch, n);
-                row[HIST + t0..HIST + t0 + nsamp].copy_from_slice(&tmp[..nsamp]);
+                joint_copy(buf, src, slot0 + ch, n, side.jscale[ch][n], t0, nsamp);
             }
         }
     }
     Ok(())
+}
+
+/// Reads the eight quantization indices of one subband and subsubframe into `q`
+/// (Table 5-29): Huffman codes from codebook `sel` of quantizer group `abits` (1..=26),
+/// else a block code (`abits` up to 7), else linear codes. Returns whether a Huffman
+/// codebook coded them; the errors name the failing codebook and block code.
+#[inline(always)]
+pub(crate) fn read_indices(
+    br: &mut BitReader<'_>,
+    abits: u32,
+    sel: u32,
+    q: &mut [i32; 8],
+    codebook_error: &'static str,
+    block_code_error: &'static str,
+) -> Result<bool, DecodeError> {
+    let nh = books::huffman_sel_count(abits);
+    if abits <= 10 && sel < nh {
+        let book = books::sample_book(abits, sel).ok_or(DecodeError::Invalid(codebook_error))?;
+        for v in q {
+            *v = br.huff(book);
+        }
+        Ok(true)
+    } else if abits <= 7 {
+        let bc = books::block_code(abits);
+        for blk in 0..2 {
+            let digits = bc
+                .split(br.read(bc.bits))
+                .ok_or(DecodeError::Invalid(block_code_error))?;
+            q[blk * 4..blk * 4 + 4].copy_from_slice(&digits);
+        }
+        Ok(false)
+    } else {
+        let bits = abits - 3;
+        for v in q {
+            *v = br.read_signed(bits);
+        }
+        Ok(false)
+    }
+}
+
+/// Inverse ADPCM (C.3.3) of `row[span]` with prediction vector `pvq`; each sample is
+/// predicted from the four before it.
+#[inline(always)]
+pub(crate) fn adpcm(row: &mut [f32], span: core::ops::Range<usize>, pvq: u16) {
+    let c = ADPCM_VQ[pvq as usize].map(|v| f32::from(v) * (1.0 / 8192.0));
+    for m in span {
+        let p = c[0] * row[m - 1] + c[1] * row[m - 2] + c[2] * row[m - 3] + c[3] * row[m - 4];
+        row[m] = sat24(row[m] + p);
+    }
+}
+
+/// Joint intensity (C.3.4): samples `t0 .. t0 + nsamp` of band `band` of slot `dst`
+/// become those of slot `src` scaled by `js`.
+#[inline(always)]
+pub(crate) fn joint_copy(
+    buf: &mut SubBuf,
+    src: usize,
+    dst: usize,
+    band: usize,
+    js: f32,
+    t0: usize,
+    nsamp: usize,
+) {
+    let mut tmp = [0f32; 32];
+    let srow = buf.row(src, band);
+    for m in 0..nsamp {
+        tmp[m] = sat24(srow[HIST + t0 + m] * js);
+    }
+    let row = buf.row_mut(dst, band);
+    row[HIST + t0..HIST + t0 + nsamp].copy_from_slice(&tmp[..nsamp]);
 }

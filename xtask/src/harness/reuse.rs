@@ -35,8 +35,9 @@ pub const RESULT: &str = "gate-result.json";
 /// the build's shared inputs ([`super::provenance::shared_inputs`]): the code
 /// that measures, records and grades, the oracles, the reviewed input lists and
 /// the observers it loads. Any change re-measures every feature.
-const CODE: [&str; 14] = [
+const CODE: [&str; 15] = [
     "xtask/src",
+    "crates/harness-protocol/test-support",
     "harness/oracles.py",
     "harness/fate/samples.json",
     "harness/fonts/corpus.json",
@@ -70,7 +71,12 @@ impl Key {
     ) -> R<Self> {
         let files = files
             .iter()
-            .map(|path| Ok((relative(root, path), Value::str(file_sha(path)?))))
+            .map(|path| {
+                Ok((
+                    relative(root, path),
+                    Value::str(crate::files::sha256(path)?),
+                ))
+            })
             .collect::<R<Vec<_>>>()?;
         let workers = workers
             .iter()
@@ -92,7 +98,9 @@ impl Key {
                 Value::object([
                     (
                         "observer_sha256",
-                        observer.map_or(Ok(Value::Null), |p| file_sha(&p).map(Value::str))?,
+                        observer.map_or(Ok(Value::Null), |p| {
+                            crate::files::sha256(&p).map(Value::str)
+                        })?,
                     ),
                     ("probe_sha256", optional_sha(&harness.join("memory-check"))?),
                 ]),
@@ -138,7 +146,7 @@ impl Key {
             .map(|report| {
                 let result = read(report.parent().unwrap_or(Path::new(".")))?;
                 let bytes = if report.is_file() {
-                    Value::str(file_sha(report)?)
+                    Value::str(crate::files::sha256(report)?)
                 } else {
                     result.get("report_sha256").cloned().unwrap_or(Value::Null)
                 };
@@ -322,7 +330,7 @@ pub fn record(output: &Path, key: &Key, status: i32, reused: Option<Value>) -> R
     let report = output.join("report.json");
     let report_sha256 = match &reused {
         Some(cited) => cited.get("report_sha256").cloned().unwrap_or(Value::Null),
-        None if report.is_file() => Value::str(file_sha(&report)?),
+        None if report.is_file() => Value::str(crate::files::sha256(&report)?),
         None => Value::Null,
     };
     let result = Value::object([
@@ -334,12 +342,12 @@ pub fn record(output: &Path, key: &Key, status: i32, reused: Option<Value>) -> R
         ("components", key.components.clone()),
     ]);
     fs::create_dir_all(output).map_err(|e| format!("{}: {e}", output.display()))?;
-    crate::corpus::write_json(&output.join(RESULT), &result)
+    json::write(&output.join(RESULT), &result)
 }
 
 /// The gate result recorded in `directory`.
 pub fn read(directory: &Path) -> R<Value> {
-    crate::checks::read_json(&directory.join(RESULT))
+    json::read(&directory.join(RESULT))
 }
 
 /// Whether `directory` holds a reused result rather than a measurement.
@@ -360,7 +368,7 @@ pub fn checked(directory: &Path, status: i32) -> R<()> {
     fields.retain(|(key, _)| key != "status" && key != "cases_checked");
     fields.push(("status".into(), Value::int(status)));
     fields.push(("cases_checked".into(), Value::Bool(true)));
-    crate::corpus::write_json(&directory.join(RESULT), &Value::Object(fields))
+    json::write(&directory.join(RESULT), &Value::Object(fields))
 }
 
 /// Whether the reused result in `directory` is one whose cases a gate run checked.
@@ -389,16 +397,17 @@ pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
         if result.get("reused").is_some_and(|r| *r != Value::Null) {
             continue;
         }
+        let component = |name: &str| {
+            result
+                .get("components")
+                .and_then(|c| c.get(name))
+                .cloned()
+                .unwrap_or(Value::Null)
+        };
         results.push(Value::object([
             ("path", Value::str(path)),
-            (
-                "command",
-                result
-                    .get("components")
-                    .and_then(|c| c.get("command"))
-                    .cloned()
-                    .unwrap_or(Value::Null),
-            ),
+            ("command", component("command")),
+            ("target", component("target")),
             ("key", result.get("key").cloned().unwrap_or(Value::Null)),
             (
                 "status",
@@ -418,13 +427,9 @@ pub fn listed(entries: &[(String, Vec<u8>)]) -> R<Vec<Value>> {
     Ok(results)
 }
 
-fn file_sha(path: &Path) -> R<String> {
-    sha256::file_hex(path).map_err(|e| format!("{}: {e}", path.display()))
-}
-
 fn optional_sha(path: &Path) -> R<Value> {
     if path.is_file() {
-        file_sha(path).map(Value::str)
+        crate::files::sha256(path).map(Value::str)
     } else {
         Ok(Value::Null)
     }
@@ -465,7 +470,7 @@ pub fn python() -> R<Value> {
 
 /// A worker's bytes and, on Linux, every shared library its loader resolves.
 fn worker(path: &Path) -> R<Value> {
-    let mut fields = vec![("sha256", Value::str(file_sha(path)?))];
+    let mut fields = vec![("sha256", Value::str(crate::files::sha256(path)?))];
     #[cfg(unix)]
     if cfg!(target_os = "linux") {
         let linked = super::linux::linked_libraries(path, None)?;
@@ -520,7 +525,11 @@ fn code(root: &Path) -> R<Value> {
     files.dedup();
     let mut all = sha256::Sha256::default();
     for file in &files {
-        let line = format!("{}  {}\n", file_sha(file)?, relative(root, file));
+        let line = format!(
+            "{}  {}\n",
+            crate::files::sha256(file)?,
+            relative(root, file)
+        );
         all.update(line.as_bytes());
     }
     Ok(Value::object([
@@ -618,12 +627,12 @@ mod tests {
         ]);
         let file = root.join(crate::evidence::SETS).join("run.json");
         fs::create_dir_all(file.parent().unwrap()).unwrap();
-        crate::corpus::write_json(&file, &set).unwrap();
+        json::write(&file, &set).unwrap();
     }
 
     #[test]
     fn only_kept_sets_are_reused_and_full_measures() {
-        let root = crate::walk::scratch("gate-reuse");
+        let root = crate::files::scratch("gate-reuse");
         let key = Key {
             sha256: "k".repeat(64),
             components: Value::object([("command", Value::str("report --benchmark"))]),
@@ -656,7 +665,7 @@ mod tests {
 
     #[test]
     fn a_reused_step_whose_set_cannot_be_restored_is_measured() {
-        let root = crate::walk::scratch("gate-unrestorable");
+        let root = crate::files::scratch("gate-unrestorable");
         let key = Key {
             sha256: "u".repeat(64),
             components: Value::object([("command", Value::str("capture qualify"))]),
@@ -679,7 +688,7 @@ mod tests {
         ]);
         let index = root.join(crate::evidence::SETS).join("gone.json");
         fs::create_dir_all(index.parent().unwrap()).unwrap();
-        crate::corpus::write_json(&index, &set).unwrap();
+        json::write(&index, &set).unwrap();
         let output = root.join("timing");
         let measured = std::cell::Cell::new(false);
         let status = restoring_step(&root, &output, &key, false, || {
@@ -720,7 +729,7 @@ mod tests {
 
     #[test]
     fn a_grade_key_binds_the_reports_it_joins() {
-        let root = crate::walk::scratch("gate-grade-key");
+        let root = crate::files::scratch("gate-grade-key");
         let collection = root.join("timing");
         let key = |sha: &str| Key {
             sha256: sha.repeat(64),
@@ -738,7 +747,10 @@ mod tests {
         assert_ne!(first, key("g").with_inputs(&[&report]).unwrap().sha256);
         // A reused collection has no report and binds the cited report's hash.
         let reused = root.join("reused");
-        let cited = Value::object([("report_sha256", Value::str(file_sha(&report).unwrap()))]);
+        let cited = Value::object([(
+            "report_sha256",
+            Value::str(crate::files::sha256(&report).unwrap()),
+        )]);
         record(&reused, &key("t"), 0, Some(cited)).unwrap();
         assert_eq!(
             key("g")
@@ -752,7 +764,7 @@ mod tests {
 
     #[test]
     fn sets_list_their_fresh_results() {
-        let root = crate::walk::scratch("gate-results");
+        let root = crate::files::scratch("gate-results");
         let key = Key {
             sha256: "k".repeat(64),
             components: Value::object([("command", Value::str("grade"))]),

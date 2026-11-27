@@ -1,8 +1,8 @@
 """Shared helpers of the Parametric Stereo signal-side recovery.
 
 Streams come from harness/codecs/aac/ps/psgen.py. The reference (FFMPEG, the pinned 9.0.2
-decode build) decodes them; this decoder's `ps_input` example dumps the QMF slots handed to
-PS (PS_INPUT, by default target/release/examples/ps_input).
+decode build) decodes them. PS_INPUT names the decoder's unit test executable
+that writes the QMF slots handed to PS.
 
 `fit` is the main tool: time-domain least squares of a reference output channel as the
 64-band synthesis of known slots plus unknown complex coefficients times known slot
@@ -17,7 +17,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..', '..', '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'harness', 'codecs', 'aac', 'ps'))
 os.environ.setdefault('FFMPEG', os.path.join(ROOT, '.research', 'reference-decode', 'install', 'bin', 'ffmpeg'))
-os.environ.setdefault('PS_INPUT', os.path.join(ROOT, 'target', 'release', 'examples', 'ps_input'))
 
 import numpy as np  # noqa: E402
 

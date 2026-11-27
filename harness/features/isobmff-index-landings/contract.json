@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "id": "isobmff-index-landings",
+  "gate": "required",
+  "operation": "isobmff-index-landings",
+  "candidate": "isobmff-views-worker",
+  "worker_operation": "index-landings-",
+  "runner": "cargo xtask report",
+  "reference": "ffmpeg-isobmff-views-native",
+  "contract": [
+    "Read the named sidx or tfra box at its manifest offset and length. The reference opens the same preloaded movie with +noparse+nofillin.",
+    "For sidx, use a fresh backward seek per authored target and read one packet. Kind 3 compares the track ID, indexed byte range, presentation ticks in the fixture's media timescale, and whether the seek lands within the segment range. The candidate expects a direct media reference.",
+    "For tfra, use use_mfra_for=dts and read the first packet of the named track in each authored fragment range. Kind 3 compares the track ID, the fragment start from that declared range, and first-packet decode ticks against the tfra time. The manifest holds the fragment ranges independently of the candidate parser.",
+    "The cases carry track ID, work quantum and ordered triples of byte start, exclusive end and timestamp after the index extent. Kind 7 marks completion and kind 8 refusal."
+  ],
+  "required_profiles": [
+    "sidx",
+    "tfra"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "tfra-landings",
+        "tfra-shifted-landings",
+        "sidx-v0-landings",
+        "sidx-v1-landings"
+      ],
+      "cause": "the reference reads these boxes inside opening or seeking a movie"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "tfra-landings",
+        "tfra-shifted-landings",
+        "sidx-v0-landings",
+        "sidx-v1-landings"
+      ],
+      "cause": "the reference reads these boxes inside opening or seeking a movie"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "tfra-landings",
+        "tfra-shifted-landings",
+        "sidx-v0-landings",
+        "sidx-v1-landings"
+      ],
+      "cause": "the reference reads these boxes inside opening or seeking a movie"
+    }
+  ]
+}

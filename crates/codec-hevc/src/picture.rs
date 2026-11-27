@@ -2,10 +2,10 @@
 
 use std::sync::{Arc, Mutex, Weak};
 
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// Sample storage type: u8 for 8-bit streams, u16 for 9..10-bit streams.
-pub trait Pixel:
+pub(crate) trait Pixel:
     crate::kernels::Kernels + Copy + Default + Send + Sync + 'static + PartialEq + core::fmt::Debug
 {
     fn to_i32(self) -> i32;
@@ -28,7 +28,7 @@ impl Pixel for u8 {
     fn view(f: &AnyFrame) -> Option<&Frame<Self>> {
         match f {
             AnyFrame::U8(f) => Some(f),
-            _ => None,
+            AnyFrame::U16(_) => None,
         }
     }
     fn slot(pool: &FramePool) -> &Mutex<Option<Frame<Self>>> {
@@ -49,7 +49,7 @@ impl Pixel for u16 {
     fn view(f: &AnyFrame) -> Option<&Frame<Self>> {
         match f {
             AnyFrame::U16(f) => Some(f),
-            _ => None,
+            AnyFrame::U8(_) => None,
         }
     }
     fn slot(pool: &FramePool) -> &Mutex<Option<Frame<Self>>> {
@@ -58,22 +58,22 @@ impl Pixel for u16 {
 }
 
 #[derive(Debug)]
-pub struct Plane<P> {
-    pub data: BudgetVec<P>,
-    pub stride: usize,
-    pub width: usize,
-    pub height: usize,
+pub(crate) struct Plane<P> {
+    pub(crate) data: BudgetVec<P>,
+    pub(crate) stride: usize,
+    pub(crate) width: usize,
+    pub(crate) height: usize,
 }
 
 impl<P: Pixel> Plane<P> {
-    pub fn try_new(
+    pub(crate) fn try_new(
         budget: &Budget,
         width: usize,
         height: usize,
         fill: P,
-    ) -> Result<Self, StorageError> {
+    ) -> Result<Self, Error> {
         let stride = (width + 31) & !31;
-        let len = stride.checked_mul(height).ok_or(StorageError::Overflow)?;
+        let len = stride.checked_mul(height).ok_or(Error::Overflow)?;
         Ok(Plane {
             data: BudgetVec::try_filled(budget, fill, len)?,
             stride,
@@ -86,7 +86,7 @@ impl<P: Pixel> Plane<P> {
 #[cfg(test)]
 impl<P: Pixel> Plane<P> {
     /// A plane on its own unlimited pool, for the micro-benchmarks.
-    pub fn new(width: usize, height: usize, fill: P) -> Self {
+    pub(crate) fn new(width: usize, height: usize, fill: P) -> Self {
         Self::try_new(&Budget::new(usize::MAX).unwrap(), width, height, fill).unwrap()
     }
 }
@@ -94,27 +94,27 @@ impl<P: Pixel> Plane<P> {
 /// Three sample planes. They carry their charge, so a frame stays charged wherever it
 /// is kept: DPB, frame pool or a caller's picture.
 #[derive(Debug)]
-pub struct Frame<P> {
-    pub planes: [Plane<P>; 3],
+pub(crate) struct Frame<P> {
+    pub(crate) planes: [Plane<P>; 3],
 }
 
 impl<P: Pixel> Frame<P> {
     /// A 4:2:0 frame.
-    pub fn try_new(
+    pub(crate) fn try_new(
         budget: &Budget,
         width: usize,
         height: usize,
         fill: P,
-    ) -> Result<Self, StorageError> {
+    ) -> Result<Self, Error> {
         let chroma = (width / 2, height / 2);
         Self::with_planes(budget, [(width, height), chroma, chroma], fill)
     }
     /// A frame of planes of the given (width, height).
-    pub fn with_planes(
+    pub(crate) fn with_planes(
         budget: &Budget,
         sizes: [(usize, usize); 3],
         fill: P,
-    ) -> Result<Self, StorageError> {
+    ) -> Result<Self, Error> {
         let [(w0, h0), (w1, h1), (w2, h2)] = sizes;
         Ok(Frame {
             planes: [
@@ -124,14 +124,14 @@ impl<P: Pixel> Frame<P> {
             ],
         })
     }
-    pub fn same_geometry(&self, w: usize, h: usize) -> bool {
+    pub(crate) fn same_geometry(&self, w: usize, h: usize) -> bool {
         self.planes[0].width == w && self.planes[0].height == h
     }
 }
 
 /// A decoded frame of either sample type.
 #[derive(Debug)]
-pub enum AnyFrame {
+pub(crate) enum AnyFrame {
     U8(Frame<u8>),
     U16(Frame<u16>),
 }
@@ -139,7 +139,7 @@ pub enum AnyFrame {
 /// A decoder's spare frames, one per sample type, as in a buffer pool: a frame returns
 /// here when its last holder (the DPB or a caller's picture) drops it.
 #[derive(Debug, Default)]
-pub struct FramePool {
+pub(crate) struct FramePool {
     u8: Mutex<Option<Frame<u8>>>,
     u16: Mutex<Option<Frame<u16>>>,
 }
@@ -147,7 +147,7 @@ pub struct FramePool {
 impl FramePool {
     /// The spare frame of this sample type if it has this luma size; a spare of another
     /// size is released.
-    pub fn take<P: Pixel>(&self, width: usize, height: usize) -> Option<Frame<P>> {
+    pub(crate) fn take<P: Pixel>(&self, width: usize, height: usize) -> Option<Frame<P>> {
         P::slot(self)
             .lock()
             .ok()?
@@ -155,12 +155,20 @@ impl FramePool {
             .filter(|f| f.same_geometry(width, height))
     }
 
-    fn put(&self, frame: AnyFrame) {
-        fn keep<P>(slot: &Mutex<Option<Frame<P>>>, frame: Frame<P>) {
+    fn put(&self, frame: &mut AnyFrame) {
+        fn keep<P>(slot: &Mutex<Option<Frame<P>>>, frame: &mut Frame<P>) {
             if let Ok(mut spare) = slot.lock()
                 && spare.is_none()
             {
-                *spare = Some(frame);
+                *spare = Some(Frame {
+                    planes: frame.planes.each_mut().map(|plane| {
+                        let empty = BudgetVec::new(plane.data.budget());
+                        Plane {
+                            data: std::mem::replace(&mut plane.data, empty),
+                            ..*plane
+                        }
+                    }),
+                });
             }
         }
         match frame {
@@ -172,16 +180,15 @@ impl FramePool {
 
 /// A frame shared by the DPB and the output pictures that show it.
 #[derive(Debug)]
-pub struct SharedFrame {
-    /// Taken only by `drop`.
-    frame: Option<AnyFrame>,
+pub(crate) struct SharedFrame {
+    frame: AnyFrame,
     pool: Weak<FramePool>,
 }
 
 impl SharedFrame {
-    pub fn new(frame: AnyFrame, pool: &Arc<FramePool>) -> Arc<Self> {
+    pub(crate) fn new(frame: AnyFrame, pool: &Arc<FramePool>) -> Arc<Self> {
         Arc::new(SharedFrame {
-            frame: Some(frame),
+            frame,
             pool: Arc::downgrade(pool),
         })
     }
@@ -192,30 +199,29 @@ impl core::ops::Deref for SharedFrame {
 
     #[inline]
     fn deref(&self) -> &AnyFrame {
-        #[allow(clippy::expect_used)] // Only `drop` takes the frame.
-        self.frame.as_ref().expect("frame present until dropped")
+        &self.frame
     }
 }
 
 impl Drop for SharedFrame {
     fn drop(&mut self) {
-        if let (Some(frame), Some(pool)) = (self.frame.take(), self.pool.upgrade()) {
-            pool.put(frame);
+        if let Some(pool) = self.pool.upgrade() {
+            pool.put(&mut self.frame);
         }
     }
 }
 
 /// Motion vector in quarter luma samples.
 #[derive(Clone, Copy, Default, PartialEq, Eq, Debug)]
-pub struct Mv {
-    pub x: i16,
-    pub y: i16,
+pub(crate) struct Mv {
+    pub(crate) x: i16,
+    pub(crate) y: i16,
 }
 
 impl Mv {
-    pub const ZERO: Mv = Mv { x: 0, y: 0 };
+    pub(crate) const ZERO: Mv = Mv { x: 0, y: 0 };
     #[inline(always)]
-    pub fn new(x: i32, y: i32) -> Mv {
+    pub(crate) fn new(x: i32, y: i32) -> Mv {
         Mv {
             x: x as i16,
             y: y as i16,
@@ -226,9 +232,9 @@ impl Mv {
 /// Motion of one 4x4 luma block. `ref_idx[l] < 0` means list l is unused; the matching mv is zero.
 #[derive(Clone, Copy, Eq, Debug)]
 #[repr(C)]
-pub struct PuMotion {
-    pub mv: [Mv; 2],
-    pub ref_idx: [i8; 2],
+pub(crate) struct PuMotion {
+    pub(crate) mv: [Mv; 2],
+    pub(crate) ref_idx: [i8; 2],
 }
 
 impl PartialEq for PuMotion {
@@ -258,37 +264,35 @@ impl PuMotion {
         )
     }
     #[inline(always)]
-    pub fn is_inter(&self) -> bool {
+    pub(crate) fn is_inter(&self) -> bool {
         self.ref_idx[0] >= 0 || self.ref_idx[1] >= 0
     }
 }
 
 /// Collocated motion (16x16 granularity) kept with a reference picture for TMVP.
 #[derive(Debug, Clone, Copy, Default)]
-pub struct ColMv {
-    pub mv: [Mv; 2],
-    pub ref_poc: [i32; 2],
+pub(crate) struct ColMv {
+    pub(crate) mv: [Mv; 2],
+    pub(crate) ref_poc: [i32; 2],
     /// bit0/1: predFlagL0/L1, bit2/3: L0/L1 reference was long-term.
-    pub flags: u8,
+    pub(crate) flags: u8,
 }
 
-#[allow(dead_code)]
+/// Collocated motion of a picture, `w16` blocks to a row.
 #[derive(Debug)]
-pub struct ColMotion {
-    pub w16: usize,
-    pub h16: usize,
-    pub data: BudgetVec<ColMv>,
+pub(crate) struct ColMotion {
+    pub(crate) w16: usize,
+    pub(crate) data: BudgetVec<ColMv>,
 }
 
 impl ColMotion {
     /// Default (unused) motion for a picture of this luma size.
-    pub fn try_new(budget: &Budget, width: usize, height: usize) -> Result<Self, StorageError> {
+    pub(crate) fn try_new(budget: &Budget, width: usize, height: usize) -> Result<Self, Error> {
         let w16 = width.div_ceil(16);
         let h16 = height.div_ceil(16);
-        let len = w16.checked_mul(h16).ok_or(StorageError::Overflow)?;
+        let len = w16.checked_mul(h16).ok_or(Error::Overflow)?;
         Ok(ColMotion {
             w16,
-            h16,
             data: BudgetVec::try_filled(budget, ColMv::default(), len)?,
         })
     }

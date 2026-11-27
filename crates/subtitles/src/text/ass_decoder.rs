@@ -3,7 +3,7 @@
 //!
 //! The decoder opens with the codec configuration, which is the subtitle
 //! header, and optionally a charset label (`sub_charenc`); a label the
-//! receiver's repertoire lacks ([`receiver_charset_with_glibc_euc_kr`])
+//! receiver's repertoire lacks ([`receiver_charset`])
 //! refuses the open. Each packet then gives at most one subtitle:
 //!
 //! - an empty packet gives none;
@@ -16,8 +16,8 @@
 use super::Limits;
 use super::charset::{Charset, CharsetJob, CharsetStatus};
 use super::decoded::{Clock, Subtitle};
-use super::receiver_charset::receiver_charset_with_glibc_euc_kr;
-use super::unicode::cancelled;
+use super::receiver_charset::receiver_charset;
+use crate::cancelled;
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Bytes, Error, Result, TimeBase, WorkBudget};
 
@@ -32,9 +32,9 @@ pub struct Options {
 #[derive(Debug)]
 pub enum Status {
     /// The work budget ran out; poll again.
-    Pending,
+    Yield,
     /// The packet is decoded, to a subtitle or to none.
-    Decoded(Option<Subtitle>),
+    Ready(Option<Subtitle>),
     /// No packet is being decoded.
     NeedInput,
 }
@@ -49,6 +49,7 @@ pub struct Decoder {
     charset: Option<(Bytes, Charset)>,
     /// The clock of the packet being decoded.
     clock: Clock,
+    // One enum of these (repr(u8), stored per arm, one loop): +7 per packet (+0.92%).
     /// Converting the packet from the label's charset.
     converter: Option<CharsetJob>,
     /// Checking the text, with how many of its bytes are paid for.
@@ -68,12 +69,7 @@ impl Decoder {
         limits: Limits,
     ) -> Result<Self> {
         let charset = label
-            .map(|label| {
-                Ok::<_, Error>((
-                    label.clone(),
-                    receiver_charset_with_glibc_euc_kr(label.as_ref())?,
-                ))
-            })
+            .map(|label| Ok::<_, Error>((label.clone(), receiver_charset(label.as_ref())?)))
             .transpose()?;
         Ok(Self {
             pool: pool.clone(),
@@ -120,11 +116,11 @@ impl Decoder {
     pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<Status> {
         cancelled(cancel)?;
         if std::mem::take(&mut self.nothing) {
-            return Ok(Status::Decoded(None));
+            return Ok(Status::Ready(None));
         }
         if let Some(converter) = self.converter.as_mut() {
             match converter.poll(work, cancel) {
-                Ok(CharsetStatus::Pending) => return Ok(Status::Pending),
+                Ok(CharsetStatus::Pending) => return Ok(Status::Yield),
                 Ok(CharsetStatus::Ready) => {
                     self.check = Some((converter.take_output(cancel)?.utf8, 0));
                     self.converter = None;
@@ -134,7 +130,7 @@ impl Decoder {
                     self.converter = None;
                     return match error {
                         // The charset refuses the packet.
-                        Error::Invalid(_) | Error::Truncated => Ok(Status::Decoded(None)),
+                        Error::Invalid(_) | Error::Truncated => Ok(Status::Ready(None)),
                         error => Err(error),
                     };
                 }
@@ -146,7 +142,7 @@ impl Decoder {
         *paid +=
             usize::try_from(work.take((text.len() - *paid) as u64)).map_err(|_| Error::Overflow)?;
         if *paid < text.len() {
-            return Ok(Status::Pending);
+            return Ok(Status::Yield);
         }
         let Some((text, _)) = self.check.take() else {
             return Ok(Status::NeedInput);
@@ -158,7 +154,7 @@ impl Decoder {
             .unwrap_or(text.len());
         let valid =
             std::str::from_utf8(&text.as_ref()[..end]).is_ok_and(|text| !text.contains('\u{fffe}'));
-        Ok(Status::Decoded(if valid {
+        Ok(Status::Ready(if valid {
             Some(Subtitle::at(
                 text.slice(0..end)?,
                 self.clock,

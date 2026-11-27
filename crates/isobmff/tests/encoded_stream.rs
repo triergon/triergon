@@ -1,21 +1,22 @@
-mod common;
+use crate::common;
 use common::{child, children, roots, table};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, WorkBudget,
 };
 use triergon_isobmff::{
-    BoxView, ConfigurationLimits, SampleTable, TrackHeader,
-    compat::mov::{
-        encoded::{EncodedEntryKind, EncodedStream, EncodedStreamJob, EncodedStreamProfile},
-        packets::CursorStatus,
-    },
+    CursorStatus,
+    boxes::BoxView,
+    compat::mov::encoded::{EncodedEntryKind, EncodedStream, EncodedStreamJob},
+    config::ConfigurationLimits,
+    movie::TrackHeader,
+    table::SampleTable,
 };
-const AVC: &[u8] = include_bytes!("fixtures/encoded-v1/control-avc-aac-front.mp4");
-const HEVC: &[u8] = include_bytes!("fixtures/encoded-v1/control-hevc-aac-front.mp4");
-const AAC: &[u8] = include_bytes!("fixtures/encoded-v1/control-aac-front.mp4");
-const AC3: &[u8] = include_bytes!("fixtures/encoded-v1/control-ac3-front.mp4");
-const EAC3: &[u8] = include_bytes!("fixtures/encoded-v1/control-eac3-front.mp4");
+const AVC: &[u8] = include_bytes!("fixtures/encoded-stream/control-avc-aac-front.mp4");
+const HEVC: &[u8] = include_bytes!("fixtures/encoded-stream/control-hevc-aac-front.mp4");
+const AAC: &[u8] = include_bytes!("fixtures/encoded-stream/control-aac-front.mp4");
+const AC3: &[u8] = include_bytes!("fixtures/encoded-stream/control-ac3-front.mp4");
+const EAC3: &[u8] = include_bytes!("fixtures/encoded-stream/control-eac3-front.mp4");
 struct Source {
     pool: Budget,
     header: TrackHeader,
@@ -71,7 +72,6 @@ impl Source {
             input,
             Some(*b"isom"),
             ConfigurationLimits::default(),
-            EncodedStreamProfile,
         )
         .unwrap()
     }
@@ -97,7 +97,7 @@ fn config(data: &Source, kind: &[u8; 4], skip: usize) -> BoxView {
         .children(skip, triergon_isobmff::Limits::default())
         .unwrap();
     loop {
-        if let triergon_isobmff::BoxStep::Box(b) = scan.poll(&mut WorkBudget::new(16)).unwrap()
+        if let triergon_isobmff::Next::Item(b) = scan.poll(&mut WorkBudget::new(16)).unwrap()
             && b.header().kind == *kind
         {
             return b;
@@ -286,8 +286,7 @@ fn foreign_pool_is_rejected_before_config_scanning() {
             &p.table,
             &i,
             Some(*b"isom"),
-            ConfigurationLimits::default(),
-            EncodedStreamProfile
+            ConfigurationLimits::default()
         ),
         Err(Error::ForeignPool)
     ));
@@ -300,15 +299,7 @@ fn config_limit_is_a_resource_error_with_literal_source_untouched() {
         max_config_bytes: 1,
         ..ConfigurationLimits::default()
     };
-    let mut j = EncodedStreamJob::new(
-        &p.header,
-        &p.table,
-        &i,
-        Some(*b"isom"),
-        limits,
-        EncodedStreamProfile,
-    )
-    .unwrap();
+    let mut j = EncodedStreamJob::new(&p.header, &p.table, &i, Some(*b"isom"), limits).unwrap();
     assert!(matches!(
         complete(&mut j, &mut i, 1),
         Err(Error::Limit { maximum: 1, .. })
@@ -323,15 +314,7 @@ fn descriptor_limit_bounds_actual_nested_records() {
         max_descriptors: 1,
         ..ConfigurationLimits::default()
     };
-    let mut j = EncodedStreamJob::new(
-        &p.header,
-        &p.table,
-        &i,
-        Some(*b"isom"),
-        limits,
-        EncodedStreamProfile,
-    )
-    .unwrap();
+    let mut j = EncodedStreamJob::new(&p.header, &p.table, &i, Some(*b"isom"), limits).unwrap();
     assert_eq!(
         complete(&mut j, &mut i, 1).unwrap_err(),
         Error::Limit {
@@ -374,8 +357,7 @@ fn unproven_brand_remains_refused_without_source_rewrite() {
             &p.table,
             &i,
             Some(*b"qt  "),
-            ConfigurationLimits::default(),
-            EncodedStreamProfile
+            ConfigurationLimits::default()
         ),
         Err(Error::Unsupported(_))
     ));

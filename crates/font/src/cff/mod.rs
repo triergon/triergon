@@ -1,8 +1,11 @@
 //! CFF and CFF2 outlines in OpenType (Adobe Technical Note 5176; OpenType `CFF2`).
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
 mod charstring;
 
-pub use charstring::{CharstringBounds, CharstringOperator, OperatorSet};
+pub use charstring::CharstringBounds;
+#[cfg(feature = "reference-trace")]
+pub use charstring::OperatorSet;
 mod dict;
 mod hint;
 mod index;
@@ -10,9 +13,9 @@ mod matrix;
 mod number;
 mod path;
 
+use crate::fixed::wrap32::mul_div;
 use crate::fixed::{Scale, div_fix, mul_fix};
 use crate::glyf::narrow;
-use crate::long::mul_div;
 use crate::outline::{Outline, Point};
 use crate::read::{Reader, slice, u16_at, u32_at};
 use crate::sfnt::Table;
@@ -36,8 +39,6 @@ pub(crate) enum Version {
 
 /// Format ceilings: FDSelect indices are 8-bit in CFF, 16-bit in CFF2.
 const MAX_CFF_FONT_DICTS: u32 = 256;
-/// No glyph has this SID; glyph counts stay below it.
-const NO_GLYPH: u16 = u16::MAX;
 const MAX_CFF2_FONT_DICTS: u32 = 65536;
 
 /// What a glyph's Font DICT provides; a font without Font DICTs has one, from
@@ -57,8 +58,8 @@ struct Private {
     hints: HintDict,
 }
 
-/// A face's encoding as FreeType lists it (`cff_encoding_load`): the glyph
-/// of each code, for the Adobe charmap a name-keyed CFF face gets.
+/// A face's encoding (TN 5176 section 12): the glyph of each code, for the
+/// Adobe charmap a name-keyed CFF face gets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Encoding {
     /// The Adobe encoding id: 0 Standard, 1 Expert, 2 Custom.
@@ -71,6 +72,21 @@ pub(crate) struct Encoding {
 struct FdSelect {
     offset: usize,
     format: u8,
+}
+
+/// The lowest glyph with a charset SID. The glyph count bounds its index below u16::MAX.
+#[repr(transparent)]
+#[derive(Clone, Copy, Debug)]
+struct SidGlyph(u16);
+
+impl SidGlyph {
+    // A one-based optional index cost up to 0.1002% more instructions.
+    const MISSING: Self = Self(u16::MAX);
+
+    #[inline]
+    fn glyph(self) -> Option<u32> {
+        (self.0 != Self::MISSING.0).then_some(u32::from(self.0))
+    }
 }
 
 /// A parsed CFF or CFF2 table. Object data stays in the font bytes.
@@ -87,9 +103,8 @@ pub(crate) struct Cff {
     /// The charset: the SID of each glyph, or its CID in a CID-keyed font;
     /// empty for CFF2, which has none.
     sids: BudgetVec<u16>,
-    /// The lowest glyph of each SID of a name-keyed face, [`NO_GLYPH`] for
-    /// none (`cff_charset_compute_cids`).
-    glyphs_by_sid: BudgetVec<u16>,
+    /// The lowest glyph of each SID of a name-keyed face.
+    glyphs_by_sid: BudgetVec<SidGlyph>,
     /// The encoding of a name-keyed CFF face that maps a code.
     encoding: Option<Encoding>,
     cid: bool,
@@ -100,10 +115,10 @@ pub(crate) struct Cff {
     /// The face's units per em, from `head`, which bound the hinted scale.
     face_units_per_em: u16,
     /// Region scalars of each ItemVariationData at the default instance, in
-    /// 16.16, as `cff_blend_build_vector` computes them.
+    /// 16.16 ([`region_scalar`]).
     scalars: BudgetVec<Fixed>,
     variation_data: BudgetVec<(u32, u32)>,
-    /// The axes of the face's `fvar`, zero without one (FreeType's `lenNDV`).
+    /// The axes of the face's `fvar`, zero without one.
     fvar_axes: u16,
     /// The axes of the variation store's regions.
     store_axes: u16,
@@ -202,50 +217,8 @@ impl Cff {
                 cff.encoding = cff.read_encoding(bytes, top.encoding)?;
             }
         }
-        let font_dicts = top.ros || version == Version::Cff2;
-        if font_dicts {
-            let mut array = Reader::at(
-                bytes,
-                top.fd_array.ok_or(Error::Invalid("CFF without FDArray"))?,
-            )?;
-            let fonts = Index::parse(&mut array, version)?;
-            let ceiling = match version {
-                Version::Cff1 => MAX_CFF_FONT_DICTS,
-                Version::Cff2 => MAX_CFF2_FONT_DICTS,
-            };
-            if fonts.len() == 0 || fonts.len() > ceiling {
-                return Err(Error::Invalid("CFF FDArray size"));
-            }
-            charge(
-                work,
-                usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?,
-            )?;
-            cff.font_dicts
-                .try_reserve_exact(usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?)?;
-            for i in 0..fonts.len() {
-                let font = cff.font_dict_entries(fonts.get(bytes, i)?, Kind::Font, work)?;
-                // A Font DICT with its own ROS has no Private DICT to FreeType.
-                let (location, matrix) = (font.private.filter(|_| !font.ros), font.matrix);
-                // FreeType concatenates with the Top DICT's matrix only when the
-                // Top DICT has one, and normalises copies of it again.
-                let matrix = match (matrix, top.matrix) {
-                    (Some(own), Some(_)) => own.after(&top_matrix),
-                    (Some(own), None) => own,
-                    (None, _) => top_matrix,
-                };
-                let private = cff.private_dict(bytes, location, work)?;
-                cff.font_dicts
-                    .try_push(FontDict {
-                        private,
-                        matrix: matrix.normalized(),
-                    })
-                    .map_err(|e| e.error)?;
-            }
-            match top.fd_select {
-                Some(offset) => cff.fd_select = Some(cff.check_fd_select(bytes, offset)?),
-                None if fonts.len() == 1 => {}
-                None => return Err(Error::Invalid("CFF without FDSelect")),
-            }
+        if top.ros || version == Version::Cff2 {
+            cff.read_font_dicts(bytes, &top, top_matrix, work)?;
         } else {
             let private = cff.private_dict(bytes, top.private, work)?;
             cff.font_dicts
@@ -256,6 +229,59 @@ impl Cff {
                 .map_err(|e| e.error)?;
         }
         Ok(cff)
+    }
+
+    /// Reads the FDArray of a CID-keyed or CFF2 face, each Font DICT with
+    /// its Private DICT and its matrix after the Top DICT's normalised
+    /// `top_matrix`, and the FDSelect that chooses among them.
+    fn read_font_dicts(
+        &mut self,
+        bytes: &[u8],
+        top: &Top,
+        top_matrix: FontMatrix,
+        work: &mut WorkBudget,
+    ) -> Result<()> {
+        let version = self.version;
+        let mut array = Reader::at(
+            bytes,
+            top.fd_array.ok_or(Error::Invalid("CFF without FDArray"))?,
+        )?;
+        let fonts = Index::parse(&mut array, version)?;
+        let ceiling = match version {
+            Version::Cff1 => MAX_CFF_FONT_DICTS,
+            Version::Cff2 => MAX_CFF2_FONT_DICTS,
+        };
+        if fonts.len() == 0 || fonts.len() > ceiling {
+            return Err(Error::Invalid("CFF FDArray size"));
+        }
+        let count = usize::try_from(fonts.len()).map_err(|_| Error::Overflow)?;
+        charge(work, count)?;
+        self.font_dicts.try_reserve_exact(count)?;
+        for i in 0..fonts.len() {
+            let font = self.font_dict_entries(fonts.get(bytes, i)?, Kind::Font, work)?;
+            // A Font DICT with its own ROS has no Private DICT to FreeType.
+            let (location, matrix) = (font.private.filter(|_| !font.ros), font.matrix);
+            // FreeType concatenates with the Top DICT's matrix only when the
+            // Top DICT has one, and normalises copies of it again.
+            let matrix = match (matrix, top.matrix) {
+                (Some(own), Some(_)) => own.after(&top_matrix),
+                (Some(own), None) => own,
+                (None, _) => top_matrix,
+            };
+            let private = self.private_dict(bytes, location, work)?;
+            self.font_dicts
+                .try_push(FontDict {
+                    private,
+                    matrix: matrix.normalized(),
+                })
+                .map_err(|e| e.error)?;
+        }
+        match top.fd_select {
+            Some(offset) => self.fd_select = Some(self.check_fd_select(bytes, offset)?),
+            None if fonts.len() == 1 => {}
+            None => return Err(Error::Invalid("CFF without FDSelect")),
+        }
+        Ok(())
     }
 
     pub(crate) const fn glyph_count(&self) -> u32 {
@@ -270,10 +296,10 @@ impl Cff {
         self.version
     }
 
-    /// Parses a DICT of `kind` as `cff_parser_run` does: entries FreeType
-    /// does not know in it are skipped, and one with fewer operands than
-    /// FreeType reads fails the parse. `weights` gives the region scalars a
-    /// CFF2 Private DICT's `blend` applies.
+    /// Parses a DICT of `kind`: entries [`op::min_operands`] does not know
+    /// in it are skipped, and one with fewer operands than it asks for fails
+    /// the parse. `weights` gives the region scalars a CFF2 Private DICT's
+    /// `blend` applies.
     fn dict<'a, 's>(
         &'s self,
         bytes: &'a [u8],
@@ -300,8 +326,8 @@ impl Cff {
         }
     }
 
-    /// The entries of the Top DICT, or of a Font DICT, which FreeType reads
-    /// as a Top DICT in CFF (`cff_subfont_load`).
+    /// The entries of the Top DICT, or of a Font DICT, which is read as a
+    /// Top DICT in CFF.
     fn font_dict_entries(&self, bytes: &[u8], kind: Kind, work: &mut WorkBudget) -> Result<Top> {
         let mut top = Top {
             charstring_type: 2,
@@ -319,7 +345,7 @@ impl Cff {
                 op::FD_ARRAY => top.fd_array = Some(first.unsigned()),
                 op::FD_SELECT => top.fd_select = Some(first.unsigned()),
                 op::VSTORE => top.vstore = Some(first.unsigned()),
-                // A registry of 0xFFFF marks no ROS (`cid_registry`).
+                // A registry of 0xFFFF marks no ROS.
                 op::ROS => top.ros = first.integer() as u32 != 0xffff,
                 op::SYNTHETIC_BASE => top.synthetic = true,
                 op::CHARSTRING_TYPE => top.charstring_type = first.integer(),
@@ -336,17 +362,15 @@ impl Cff {
         Ok(top)
     }
 
-    /// The Private DICT at `location` (size, offset), read as
-    /// `cff_load_private_dict` reads it: none, or one at offset or size zero,
-    /// leaves no local subroutines and zeros for the hinter's values; else the
-    /// DICT's entries over FreeType's defaults.
+    /// The Private DICT at `location` (size, offset): none, or one at offset
+    /// or size zero, leaves no local subroutines and zeros for the hinter's
+    /// values; else the DICT's entries over the defaults.
     ///
-    /// FreeType parses it when it opens the face without a design vector, so
-    /// that every `blend` weighs its deltas zero, and reads its local
-    /// subroutines and `vsindex` from that parse. Each glyph load of a face
-    /// with variations and `fvar` parses it again with the design vector, and
-    /// the hinter takes its values from that parse, unsanitised up to the
-    /// error should it fail (`cf2_font_setup` ignores the error).
+    /// A first parse weighs the deltas of every `blend` zero, and gives the
+    /// local subroutines and `vsindex`. In a face with variations and `fvar`
+    /// a second parse applies the region scalars of the default instance,
+    /// and the hinter takes its values from that one, uncorrected up to the
+    /// error should it fail.
     fn private_dict(
         &self,
         table: &[u8],
@@ -379,8 +403,8 @@ impl Cff {
     }
 
     /// One parse of a Private DICT's `bytes` with `weights` for its blends:
-    /// what it read, and how it ended. The hinter's values are corrected as
-    /// `cff_load_private_dict` corrects them only when the parse succeeds.
+    /// what it read, and how it ended. The hinter's values are corrected
+    /// ([`HintDict::sanitize`]) only when the parse succeeds.
     fn read_private<'s>(
         &'s self,
         bytes: &[u8],
@@ -408,7 +432,7 @@ impl Cff {
                 op::BLUE_SCALE => hints.blue_scale = operands[0].fixed(3),
                 op::BLUE_SHIFT => hints.blue_shift = operands[0].integer(),
                 op::BLUE_FUZZ => hints.blue_fuzz = operands[0].integer(),
-                // FreeType stores LanguageGroup in an int.
+                // LanguageGroup keeps its low 32 bits.
                 op::LANGUAGE_GROUP => hints.language_group = operands[0].integer() as i32,
                 _ => {}
             }
@@ -531,30 +555,26 @@ impl Cff {
         Ok(&self.scalars.as_slice()[first..first + len])
     }
 
-    /// The first glyph whose charset SID is `sid`, for `seac`
-    /// (`cff_lookup_glyph_by_stdcharcode`).
+    /// The first glyph whose charset SID is `sid`, for `seac` and encodings.
     pub(super) fn glyph_for_sid(&self, sid: u16) -> Option<u32> {
-        let glyph = *self.glyphs_by_sid.get(usize::from(sid))?;
-        (glyph != NO_GLYPH).then_some(u32::from(glyph))
+        self.glyphs_by_sid.get(usize::from(sid))?.glyph()
     }
 
     /// Fills [`Self::glyphs_by_sid`] from the charset.
     fn index_sids(&mut self, work: &mut WorkBudget) -> Result<()> {
         let most = self.sids.iter().copied().max().map_or(0, usize::from);
         charge(work, self.sids.len() + most)?;
-        self.glyphs_by_sid.try_resize(most + 1, NO_GLYPH)?;
+        self.glyphs_by_sid.try_resize(most + 1, SidGlyph::MISSING)?;
         for (glyph, &sid) in self.sids.iter().enumerate().rev() {
-            // Glyph counts stay below NO_GLYPH.
-            self.glyphs_by_sid[usize::from(sid)] = glyph as u16;
+            self.glyphs_by_sid[usize::from(sid)] = SidGlyph(glyph as u16);
         }
         Ok(())
     }
 
-    /// The glyph names in index order, as FreeType reads them for its
-    /// Unicode charmap (`cff_sid_to_glyph_name`): each glyph's charset SID as
-    /// a standard string below 391, else as an object of the string INDEX,
-    /// up to a NUL; `None` beyond the strings. A CID-keyed font's CIDs are
-    /// read as SIDs too. Empty for CFF2.
+    /// The glyph names in index order, for a Unicode charmap: each glyph's
+    /// charset SID as a standard string below 391, else as an object of the
+    /// string INDEX, up to a NUL; `None` beyond the strings. A CID-keyed
+    /// font's CIDs are read as SIDs too. Empty for CFF2.
     pub(crate) fn glyph_names<'a>(
         &'a self,
         data: &'a [u8],
@@ -581,8 +601,8 @@ impl Cff {
         self.encoding.as_ref()
     }
 
-    /// `cff_charset_load`: the SID of every glyph, from a charset table
-    /// (formats 0, 1 and 2) or a predefined one, which must cover the glyphs.
+    /// Reads the SID of every glyph from a charset table (formats 0, 1 and
+    /// 2) or a predefined one, which must cover the glyphs.
     fn read_charset(&mut self, table: &[u8], offset: usize, work: &mut WorkBudget) -> Result<()> {
         let count = usize::try_from(self.glyph_count).map_err(|_| Error::Overflow)?;
         charge(work, count)?;
@@ -631,10 +651,10 @@ impl Cff {
         Ok(())
     }
 
-    /// `cff_encoding_load`: the glyph of each code, from an encoding table
-    /// (formats 0 and 1, with supplements) or the Standard or Expert encoding
-    /// through the charset; `None` when no code has a glyph, where FreeType
-    /// lists no Adobe charmap.
+    /// Reads the glyph of each code from an encoding table (formats 0 and 1,
+    /// with supplements) or the Standard or Expert encoding through the
+    /// charset; `None` when no code has a glyph, where FreeType lists no
+    /// Adobe charmap.
     fn read_encoding(&self, table: &[u8], offset: usize) -> Result<Option<Encoding>> {
         let sids = self.sids.as_slice();
         let count = sids.len();
@@ -647,7 +667,7 @@ impl Cff {
                 } else {
                     &crate::postscript::EXPERT_ENCODING
                 };
-                // The lowest glyph of each SID (`cff_charset_compute_cids`).
+                // The lowest glyph of each SID.
                 let mut coded = 0;
                 for (code, &sid) in encoding.iter().enumerate() {
                     if sid == 0 {
@@ -707,6 +727,7 @@ impl Cff {
     }
 
     /// The operators `glyph`'s program executes; `outline` is scratch storage.
+    #[cfg(feature = "reference-trace")]
     pub(crate) fn operators(
         &self,
         data: &[u8],
@@ -775,13 +796,13 @@ impl Cff {
         Ok(())
     }
 
-    /// Loads `glyph` into `outline` as FreeType's default load leaves it in
-    /// the glyph slot (`FT_LOAD_DEFAULT`: Adobe's hinter, without stem
-    /// darkening), before any grid fitting of its metrics: the charstring is
-    /// hinted at cf2's scale, a 64th of the 16.16 `scale` rounded, into 26.6
-    /// pixels, which then go through its Font DICT's FontMatrix and are moved
-    /// by the matrix offset in font units, unscaled. A Font DICT with other
-    /// units per em adjusts the scale first, as [`Self::load`] does.
+    /// Loads `glyph` into `outline` hinted, as FreeType's default load leaves
+    /// it (Adobe's hinter, without stem darkening), before any grid fitting
+    /// of its metrics: the charstring is hinted at a 64th of the 16.16
+    /// `scale`, rounded, into 26.6 pixels, which then go through its Font
+    /// DICT's FontMatrix and are moved by the matrix offset in font units,
+    /// unscaled. A Font DICT with other units per em adjusts the scale first,
+    /// as [`Self::load`] does.
     ///
     /// The hinter refuses scales beyond 2000 pixels per em, which then load as
     /// [`Self::load`] loads them, as FreeType retries them unhinted; a scale
@@ -798,10 +819,10 @@ impl Cff {
     ) -> Result<()> {
         let table = self.table.bytes(data);
         let (matrix, adjusted) = self.placement(table, glyph, scale)?;
-        // `cf2_getScaleAndHintFlag`, in 32 bits.
+        // A 64th of the scale, rounded, in 32 bits.
         let hinted = |s: i64| (s as u32).wrapping_add(32).cast_signed() / 64;
         let (x, y) = (hinted(adjusted.x), hinted(adjusted.y));
-        // `cf2_checkTransform`.
+        // The hinter needs positive scales.
         if x <= 0 || y <= 0 {
             return Err(Error::Invalid("CFF hinting scale below 1/64"));
         }
@@ -901,19 +922,17 @@ fn private_location(operands: &[Operand<'_>]) -> Result<(usize, usize)> {
     Ok((size as usize, offset as usize))
 }
 
-/// `cff_blend_build_vector`'s factor for the region whose `axes` axes
-/// `axis` reads, at the default instance: zero without `fvar`, where FreeType
-/// has no design vector; else, at a coordinate of zero on every axis, one,
-/// scaled down by each axis that peaks away from zero with a range around
-/// it, and zero when such an axis's range excludes zero.
+/// The scalar of the region whose `axes` axes `axis` reads, at the default
+/// instance: zero without `fvar`; else, at a coordinate of zero on every
+/// axis, one, scaled down by each axis that peaks away from zero with a
+/// range around it, and zero when such an axis's range excludes zero.
 fn region_scalar(fvar_axes: u16, axes: u16, axis: &mut Reader<'_>) -> Result<Fixed> {
     if fvar_axes == 0 {
         return Ok(0);
     }
     let mut scalar: i64 = 0x10000;
     for _ in 0..axes {
-        // F2Dot14 coordinates; FreeType's 16.16 copies scale each ratio by
-        // four, which leaves `FT_MulDiv` unchanged.
+        // F2Dot14 coordinates, used as they are: only their ratios matter.
         let [start, peak, end] = [axis.i16()?, axis.i16()?, axis.i16()?].map(i64::from);
         if peak == 0 {
             continue;
@@ -983,7 +1002,7 @@ mod authoring;
 
 #[cfg(test)]
 mod tests {
-    use super::authoring::{CffProgram, Part, charstring, number};
+    use super::authoring::{CffProgram, charstring, number};
     use super::{Cff, FdSelect, HintDict, Version, dict, fd_index, region_scalar};
     use crate::fixed::Scale;
     use crate::outline::Outline;
@@ -992,11 +1011,11 @@ mod tests {
     use crate::{GlyphId, Limits};
     use triergon_core::{Budget, Error, Result, WorkBudget};
 
-    /// A name-keyed CFF table whose glyph 1 is `glyph`, with `private` added
-    /// to its Private DICT, at 1000 units per em.
-    fn table(glyph: &[Part], private: Vec<u8>) -> Vec<u8> {
+    /// A name-keyed CFF table whose glyph 1 is the charstring `glyph`, with
+    /// `private` added to its Private DICT, at 1000 units per em.
+    fn table(glyph: &str, private: Vec<u8>) -> Vec<u8> {
         CffProgram {
-            glyphs: vec![charstring(&[Op(14)]), charstring(glyph)],
+            glyphs: vec![charstring("endchar"), charstring(glyph)],
             global: Vec::new(),
             local: Vec::new(),
             charset: None,
@@ -1009,6 +1028,17 @@ mod tests {
         .build()
     }
 
+    /// `table`, a whole name-keyed CFF table, at 1000 units per em.
+    fn parsed(table: &[u8]) -> Result<Cff> {
+        let budget = Budget::new(1 << 20).unwrap();
+        let whole = Table {
+            offset: 0,
+            len: table.len(),
+        };
+        let mut work = WorkBudget::new(1 << 20);
+        Cff::parse(table, whole, Version::Cff1, 1000, 0, &budget, &mut work)
+    }
+
     /// The points of glyph 1 at the 16.16 `scale`, hinted or not.
     fn points(table: &[u8], scale: i64, hinted: bool) -> Vec<(i32, i32)> {
         try_points(table, scale, hinted).unwrap()
@@ -1016,13 +1046,8 @@ mod tests {
 
     /// The points of glyph 1, or why it does not load.
     fn try_points(table: &[u8], scale: i64, hinted: bool) -> Result<Vec<(i32, i32)>> {
-        let budget = Budget::new(1 << 20).unwrap();
-        let mut work = WorkBudget::new(1 << 20);
-        let whole = Table {
-            offset: 0,
-            len: table.len(),
-        };
-        let cff = Cff::parse(table, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parsed(table).unwrap();
+        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
         let mut outline = Outline::new(&budget);
         let (glyph, scale) = (GlyphId(1), Scale { x: scale, y: scale });
         let limits = Limits::default();
@@ -1040,16 +1065,10 @@ mod tests {
             .collect())
     }
 
-    use Part::{Byte, N, Op};
-
     /// A rectangle from (0, `bottom`), 100 wide, through `heights` above it.
-    fn rectangle(bottom: i16, heights: &[i16]) -> Vec<Part> {
-        let mut parts = vec![N(0), N(bottom), Op(21), N(100), Op(6)];
-        for &height in heights {
-            parts.extend([N(height), Op(7)]);
-        }
-        parts.extend([N(-100), Op(6), Op(14)]);
-        parts
+    fn rectangle(bottom: i16, heights: &[i16]) -> String {
+        let heights: String = heights.iter().map(|h| format!("{h} vlineto ")).collect();
+        format!("0 {bottom} rmoveto 100 hlineto {heights}-100 hlineto endchar")
     }
 
     /// Two in 16.16, whose 64th FreeType's hinter scales by: 2048, exactly a
@@ -1089,12 +1108,8 @@ mod tests {
     #[test]
     fn a_missing_or_empty_private_dict_reads_as_none() {
         let glyph = table(&rectangle(0, &[50]), Vec::new());
-        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parsed(&glyph).unwrap();
+        let mut work = WorkBudget::new(1 << 20);
         // Offset zero with a size, size zero, or none: nothing is read.
         for location in [Some((5, 0)), Some((0, 40)), None] {
             let private = cff.private_dict(&glyph, location, &mut work).unwrap();
@@ -1105,14 +1120,10 @@ mod tests {
 
     /// The unhinted points of glyph 1, `glyph` run as a CFF2 charstring
     /// over a variation store of one region that weighs one.
-    fn cff2_points(glyph: &[Part]) -> Result<Vec<(i32, i32)>> {
+    fn cff2_points(glyph: &str) -> Result<Vec<(i32, i32)>> {
         let table = table(glyph, Vec::new());
+        let mut cff = parsed(&table)?;
         let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: table.len(),
-        };
-        let mut cff = Cff::parse(&table, whole, Version::Cff1, 1000, 0, &budget, &mut work)?;
         cff.version = Version::Cff2;
         cff.scalars.try_push(0x10000).map_err(|e| e.error)?;
         cff.variation_data.try_push((0, 1)).map_err(|e| e.error)?;
@@ -1135,53 +1146,34 @@ mod tests {
 
     #[test]
     fn charstring_vsindex_follows_freetypes_cff2_interpreter() {
-        // rmoveto 0 100; 10 5 1 blend (15 with the region's 5); hlineto; vlineto 50.
-        let path = [
-            N(0),
-            N(100),
-            Op(21),
-            N(10),
-            N(5),
-            N(1),
-            Op(16),
-            Op(6),
-            N(50),
-            Op(7),
-        ];
+        // 10 5 1 blend: 15 with the region's 5.
+        let path = "0 100 rmoveto 10 5 1 blend hlineto 50 vlineto";
         let drawn = [(0, 200), (30, 200), (30, 300)];
-        assert_eq!(cff2_points(&path), Ok(drawn.to_vec()));
+        assert_eq!(cff2_points(path), Ok(drawn.to_vec()));
         // A negative vsindex is ignored.
         assert_eq!(
-            cff2_points(&[&[N(-1), Op(15)][..], &path].concat()),
+            cff2_points(&format!("-1 vsindex {path}")),
             Ok(drawn.to_vec())
         );
         // One outside the variation store fails only at a blend.
-        let outside = [N(5), Op(15)];
         assert_eq!(
-            cff2_points(&[&outside[..], &path].concat()),
+            cff2_points(&format!("5 vsindex {path}")),
             Err(Error::Invalid("CFF2 vsindex outside the variation store"))
         );
-        let without_blend = [N(0), N(100), Op(21), N(15), Op(6), N(50), Op(7)];
         assert_eq!(
-            cff2_points(&[&outside[..], &without_blend].concat()),
+            cff2_points("5 vsindex 0 100 rmoveto 15 hlineto 50 vlineto"),
             Ok(drawn.to_vec())
         );
         // vsindex after a blend is refused.
         assert_eq!(
-            cff2_points(&[&path[..], &[N(0), Op(15)]].concat()),
+            cff2_points(&format!("{path} 0 vsindex")),
             Err(Error::Invalid("CFF2 vsindex after blend"))
         );
     }
 
     #[test]
     fn top_dict_entries_read_as_freetype_reads_them() {
-        let glyph = table(&rectangle(0, &[50]), Vec::new());
-        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let cff = Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let cff = parsed(&table(&rectangle(0, &[50]), Vec::new())).unwrap();
         let top =
             |bytes: &[u8]| cff.font_dict_entries(bytes, dict::Kind::Top, &mut WorkBudget::new(100));
         // An offset reads the first of its operands.
@@ -1212,14 +1204,8 @@ mod tests {
 
     #[test]
     fn a_failed_private_dict_reparse_keeps_what_it_read_unsanitised() {
-        let glyph = table(&rectangle(0, &[50]), Vec::new());
-        let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-        let whole = Table {
-            offset: 0,
-            len: glyph.len(),
-        };
-        let mut cff =
-            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).unwrap();
+        let mut cff = parsed(&table(&rectangle(0, &[50]), Vec::new())).unwrap();
+        let mut work = WorkBudget::new(1 << 20);
         cff.version = Version::Cff2;
         // BlueShift 2000, then a blend whose blend vector cannot be built.
         let bytes = [28, 0x07, 0xd0, 12, 10, 139, 139, 140, 23];
@@ -1239,15 +1225,7 @@ mod tests {
 
     #[test]
     fn private_dict_entries_freetype_reads_need_their_operand() {
-        let parse = |private: Vec<u8>| {
-            let glyph = table(&rectangle(0, &[50]), private);
-            let (budget, mut work) = (Budget::new(1 << 20).unwrap(), WorkBudget::new(1 << 20));
-            let whole = Table {
-                offset: 0,
-                len: glyph.len(),
-            };
-            Cff::parse(&glyph, whole, Version::Cff1, 1000, 0, &budget, &mut work).map(|_| ())
-        };
+        let parse = |private: Vec<u8>| parsed(&table(&rectangle(0, &[50]), private)).map(|_| ());
         // StdHW, StdVW, ForceBold, ForceBoldThreshold, lenIV,
         // ExpansionFactor, initialRandomSeed, defaultWidthX, nominalWidthX.
         for operator in [
@@ -1286,16 +1264,12 @@ mod tests {
 
     #[test]
     fn a_glyph_without_stems_scales_uniformly_at_the_hinted_scale() {
-        // rmoveto 10 20, hlineto 100, rlineto 50 50.
-        let glyph = table(
-            &[N(10), N(20), Op(21), N(100), Op(6), N(50), N(50), Op(5)],
-            Vec::new(),
-        );
+        let glyph = table("10 20 rmoveto 100 hlineto 50 50 rlineto", Vec::new());
         assert_eq!(points(&glyph, TWO, true), [(20, 40), (220, 40), (320, 140)]);
         assert_eq!(points(&glyph, TWO, false), points(&glyph, TWO, true));
         // At 100000 the hinter scales by (100000 + 32) / 64 = 1563: 110 units
         // are 110 × 1563 = 171930 in 16.16, 167 in 26.6 after `>> 10`, where
-        // the unhinted FT_MulFix(110, 100000) rounds to 168.
+        // the unhinted 110 × 100000 / 65536 rounds to 168.
         assert_eq!(
             points(&glyph, 100_000, true),
             [(15, 30), (167, 30), (244, 106)]
@@ -1310,12 +1284,13 @@ mod tests {
     fn a_stem_pair_moves_its_nearer_edge_onto_a_pixel() {
         // hstem 100 50: edges at 100 × 2048 = 3.125 and 4.6875 pixels. The
         // initial map holds only the synthetic edge at zero, which places the
-        // stem where the scale does; `cf2_hintmap_adjustHints` moves the pair
+        // stem where the scale does; adjusting the map moves the pair
         // down by 0.125 (less than up by 0.3125) to 3 and 4.5625 pixels, 192
         // and 292 in 26.6, and points below follow at the nominal scale.
-        let mut glyph = vec![N(100), N(50), Op(1)];
-        glyph.extend(rectangle(100, &[50]));
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            &format!("100 50 hstem {}", rectangle(100, &[50])),
+            Vec::new(),
+        );
         assert_eq!(
             points(&glyph, TWO, true),
             [(0, 192), (200, 192), (200, 292), (0, 292)]
@@ -1334,11 +1309,11 @@ mod tests {
         // to 9.4375 and 11, 604 and 704 in 26.6. The point at 150 ends the
         // line before the second mask, so the first map still places it, and
         // the closing line ends where the first map put the start.
-        let mut glyph = vec![N(100), N(50), N(150), N(50), Op(18), Op(19), Byte(0x80)];
-        let mut path = rectangle(100, &[50, 150, 50]);
-        path.splice(7..7, [Op(19), Byte(0x40)]);
-        glyph.extend(path);
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            "100 50 150 50 hstemhm hintmask 0x80 0 100 rmoveto 100 hlineto 50 vlineto \
+             hintmask 0x40 150 vlineto 50 vlineto -100 hlineto endchar",
+            Vec::new(),
+        );
         assert_eq!(
             points(&glyph, TWO, true),
             [
@@ -1362,9 +1337,7 @@ mod tests {
         // glyph's other points lie below the map's only edge and keep the
         // nominal scale from it: 0 maps to 16 - 505 / 32 pixels, 14 in 26.6.
         let blues = [number(-10), number(10), number(500), number(10), vec![6]].concat();
-        let mut glyph = vec![N(505), N(-20), Op(1)];
-        glyph.extend(rectangle(0, &[505]));
-        let glyph = table(&glyph, blues);
+        let glyph = table(&format!("505 -20 hstem {}", rectangle(0, &[505])), blues);
         assert_eq!(
             points(&glyph, TWO, true),
             [(0, 14), (200, 14), (200, 1024), (0, 1024)]
@@ -1378,9 +1351,10 @@ mod tests {
     #[test]
     fn sizes_beyond_2000_pixels_per_em_load_unhinted() {
         // (8388672 + 32) / 64 = 131073 is above 2000 / 1000 in 16.16.
-        let mut glyph = vec![N(100), N(50), Op(1)];
-        glyph.extend(rectangle(100, &[50]));
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            &format!("100 50 hstem {}", rectangle(100, &[50])),
+            Vec::new(),
+        );
         let big = 8_388_672;
         assert_eq!(points(&glyph, big, true), points(&glyph, big, false));
         assert_eq!(points(&glyph, big, false)[1], (12800, 12800));
@@ -1388,33 +1362,19 @@ mod tests {
 
     /// `count` horizontal stems 10 units high, 5 apart, declared by `hstem`
     /// operators of at most 20 stems each.
-    fn many_stems(count: i16) -> Vec<Part> {
-        let mut parts = Vec::new();
-        for first in (0..count).step_by(20) {
-            for _ in first..(first + 20).min(count) {
-                parts.extend([N(5), N(10)]);
-            }
-            parts.push(Op(1));
-        }
-        parts
+    fn many_stems(count: usize) -> String {
+        let hstem = |first: usize| "5 10 ".repeat((count - first).min(20)) + "hstem ";
+        (0..count).step_by(20).map(hstem).collect()
     }
 
     #[test]
     fn stems_declared_after_the_first_move_are_ignored() {
         // Eight stems take one mask byte. A ninth after the move would make
         // the hint mask two bytes long and swallow the hlineto's operand.
-        let mut glyph = many_stems(8);
-        glyph.extend([
-            N(0),
-            N(100),
-            Op(21),
-            N(300),
-            N(50),
-            Op(1),
-            Op(19),
-            Byte(0xff),
-        ]);
-        glyph.extend([N(100), Op(6), N(50), Op(7), N(-100), Op(6), Op(14)]);
+        let glyph = format!(
+            "{}0 100 rmoveto 300 50 hstem hintmask 0xff 100 hlineto 50 vlineto -100 hlineto endchar",
+            many_stems(8)
+        );
         let glyph = table(&glyph, Vec::new());
         let square = [(0, 200), (200, 200), (200, 300), (0, 300)];
         assert_eq!(points(&glyph, TWO, false), square);
@@ -1425,10 +1385,11 @@ mod tests {
     fn a_later_mask_with_operands_reads_no_mask_bytes() {
         // After the first mask fixes the stems, `1 2 hintmask` is skipped and
         // the bytes after it run as charstring: vlineto 50.
-        let mut glyph = vec![N(100), N(50), Op(18), Op(19), Byte(0x80)];
-        glyph.extend([N(0), N(100), Op(21), N(100), Op(6), N(1), N(2), Op(19)]);
-        glyph.extend([N(50), Op(7), N(-100), Op(6), Op(14)]);
-        let glyph = table(&glyph, Vec::new());
+        let glyph = table(
+            "100 50 hstemhm hintmask 0x80 0 100 rmoveto 100 hlineto 1 2 hintmask \
+             50 vlineto -100 hlineto endchar",
+            Vec::new(),
+        );
         let square = [(0, 200), (200, 200), (200, 300), (0, 300)];
         assert_eq!(points(&glyph, TWO, false), square);
         assert_eq!(points(&glyph, TWO, true).len(), 4);
@@ -1436,12 +1397,12 @@ mod tests {
 
     #[test]
     fn more_than_96_stems_fail_only_once_a_mask_or_move_uses_them() {
-        let unused = [many_stems(100), vec![Op(14)]].concat();
+        let unused = many_stems(100) + "endchar";
         assert_eq!(
             try_points(&table(&unused, Vec::new()), TWO, false),
             Ok(Vec::new())
         );
-        let moved = [many_stems(100), rectangle(0, &[50])].concat();
+        let moved = many_stems(100) + &rectangle(0, &[50]);
         for hinted in [false, true] {
             assert_eq!(
                 try_points(&table(&moved, Vec::new()), TWO, hinted),
@@ -1449,7 +1410,7 @@ mod tests {
             );
         }
         // 96 stems still load.
-        let most = [many_stems(96), rectangle(0, &[50])].concat();
+        let most = many_stems(96) + &rectangle(0, &[50]);
         assert_eq!(points(&table(&most, Vec::new()), TWO, false).len(), 4);
     }
 

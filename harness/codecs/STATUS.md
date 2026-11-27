@@ -198,9 +198,3 @@ or in the 32-bit ARMv7 user space.
 - `xll_51_24_48_none.core.dts` carries no DTS core substream, only the lossless
   extension, which FFmpeg decodes (3,072 samples of 5.1) and this decoder does not
   implement; `summarize` counts it out of set, never as a pass.
-- `ps-open-noext-after-error.adts`, `ps-open-dt-envelope-reference.adts`,
-  `ps-open-sbr-after-missing.adts` and `ps-open-sbr-truncated.adts`
-  ([aac/ps-open-manifest.json](aac/ps-open-manifest.json)): open Parametric Stereo and
-  SBR cases, the manifest's `open_cases`: crafted streams of paths the probes did not
-  recover, which `summarize` requires to keep failing; their numbers are in the known
-  differences of [crates/codec-aac](../../crates/codec-aac/README.md).

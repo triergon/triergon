@@ -36,9 +36,16 @@ fn clip16(v: i32) -> i32 {
 // are zero and skipped. The even half is computed in place in out[0..N/2] and then
 // combined, so no temporary needs initialization.
 
+/// The `L` lanes of `s` from `off`.
 #[inline(always)]
 fn lane_row<const L: usize>(s: &[i32], off: usize) -> &[i32; L] {
-    s[off..off + L].try_into().unwrap()
+    &s[off..off + L].as_chunks::<L>().0[0]
+}
+
+/// The `L` lanes of `s` from `off`, writable.
+#[inline(always)]
+fn lane_row_mut<const L: usize>(s: &mut [i32], off: usize) -> &mut [i32; L] {
+    &mut s[off..off + L].as_chunks_mut::<L>().0[0]
 }
 
 #[inline(always)]
@@ -91,10 +98,8 @@ macro_rules! pass_n {
                     }
                     k += 2;
                 }
-                let e: &mut [i32; L] = (&mut lo[i * L..i * L + L]).try_into().unwrap();
-                let d: &mut [i32; L] = (&mut hi[(H - 1 - i) * L..(H - 1 - i) * L + L])
-                    .try_into()
-                    .unwrap();
+                let e: &mut [i32; L] = lane_row_mut(lo, i * L);
+                let d: &mut [i32; L] = lane_row_mut(hi, (H - 1 - i) * L);
                 for x in 0..L {
                     let ev = e[x];
                     e[x] = ev + o[x];
@@ -110,13 +115,13 @@ pass_n!(pass32, 32, pass16, 1);
 
 /// Reusable transform temporaries (no per-block initialization).
 #[derive(Debug)]
-pub struct TransformScratch {
+pub(crate) struct TransformScratch {
     gt: Vec<i32>,
     out: Vec<i32>,
 }
 
 impl TransformScratch {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         TransformScratch {
             gt: vec![0; 32 * 32],
             out: vec![0; 32 * 32],
@@ -137,9 +142,10 @@ macro_rules! idct_n {
             const N: usize = $n;
             let TransformScratch { gt, out } = ts;
             // Stage 1 on L lanes (columns 0..L hold all non-zero coefficients); writes the
-            // clipped (8-314) result transposed: gt[x * N + y] = g[y][x].
+            // clipped (8-314) result transposed: gt[x * N + y] = g[y][x]. The last lane count
+            // is N, which holds every column.
             $(
-                if max_x < $lim {
+                if $lim == N || max_x < $lim {
                     const L: usize = $lim;
                     $pass::<L>(coef, N, max_y + 1, out);
                     for y in 0..N {
@@ -150,9 +156,7 @@ macro_rules! idct_n {
                     }
                 } else
             )*
-            {
-                unreachable!()
-            }
+            {}
             // Stage 2: rows of g are rows of gt; lanes run over y. out[x * N + y] = r[y][x].
             $pass::<N>(gt, N, max_x + 1, out);
             let rnd = 1 << (bd_shift - 1);
@@ -196,8 +200,7 @@ fn idst4(coef: &[i32], bd_shift: u32, res: &mut [i32]) {
 /// Compute the residual for a transform block into `res` (row-major, stride n).
 /// `coef` holds scaled coefficients d (clause 8.6.3 output).
 #[inline(never)]
-#[allow(clippy::too_many_arguments)]
-pub fn inverse_transform(
+pub(crate) fn inverse_transform(
     coef: &[i32],
     log2: u32,
     max_x: usize,
@@ -222,7 +225,7 @@ pub fn inverse_transform(
 
 /// DC-only inverse DCT value (all residual samples equal).
 #[inline]
-pub fn dc_only_value(dc: i32, bit_depth: u32) -> i32 {
+pub(crate) fn dc_only_value(dc: i32, bit_depth: u32) -> i32 {
     let bd_shift = 20 - bit_depth;
     let g = clip16((64 * dc + 64) >> 7);
     (64 * g + (1 << (bd_shift - 1))) >> bd_shift
@@ -230,7 +233,7 @@ pub fn dc_only_value(dc: i32, bit_depth: u32) -> i32 {
 
 /// Transform skip residual (8-298, 8-299) for nTbS = 4: r = (d << 7 + rnd) >> bdShift.
 #[inline(never)]
-pub fn transform_skip(coef: &[i32], log2: u32, bit_depth: u32, res: &mut [i32]) {
+pub(crate) fn transform_skip(coef: &[i32], log2: u32, bit_depth: u32, res: &mut [i32]) {
     let n = 1usize << log2;
     let ts_shift = 5 + log2;
     let bd_shift = 20 - bit_depth;
@@ -242,7 +245,7 @@ pub fn transform_skip(coef: &[i32], log2: u32, bit_depth: u32, res: &mut [i32]) 
 
 /// Add a residual block to the prediction already stored in the plane (8.6.7), clipping.
 #[inline]
-pub fn add_residual<P: Pixel>(
+pub(crate) fn add_residual<P: Pixel>(
     plane: &mut Plane<P>,
     x0: usize,
     y0: usize,
@@ -262,7 +265,7 @@ pub fn add_residual<P: Pixel>(
 }
 
 #[inline]
-pub fn add_constant<P: Pixel>(
+pub(crate) fn add_constant<P: Pixel>(
     plane: &mut Plane<P>,
     x0: usize,
     y0: usize,

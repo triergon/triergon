@@ -1,5 +1,5 @@
 //! The decoder's channel buffers, charged to its budget.
-use triergon_codec::{Budget, BudgetVec, StorageError};
+use triergon_codec::{Budget, BudgetVec, Error};
 
 /// One block of restored samples per channel the frame needs at once: a plain channel,
 /// and a side channel (33-bit for 32-bit samples). Buffers grow to the largest block seen
@@ -21,20 +21,17 @@ impl Scratch {
     }
 
     /// The plain channel, `len` samples.
-    pub(crate) fn plain(&mut self, len: usize) -> Result<&mut [i32], StorageError> {
+    pub(crate) fn plain(&mut self, len: usize) -> Result<&mut [i32], Error> {
         block(&mut self.plain, len)
     }
 
     /// The plain channel and a side channel that fits `i32`.
-    pub(crate) fn pair(&mut self, len: usize) -> Result<(&mut [i32], &mut [i32]), StorageError> {
+    pub(crate) fn pair(&mut self, len: usize) -> Result<(&mut [i32], &mut [i32]), Error> {
         Ok((block(&mut self.plain, len)?, block(&mut self.side, len)?))
     }
 
     /// The plain channel and a 33-bit side channel.
-    pub(crate) fn wide_pair(
-        &mut self,
-        len: usize,
-    ) -> Result<(&mut [i32], &mut [i64]), StorageError> {
+    pub(crate) fn wide_pair(&mut self, len: usize) -> Result<(&mut [i32], &mut [i64]), Error> {
         Ok((
             block(&mut self.plain, len)?,
             block(&mut self.wide_side, len)?,
@@ -43,10 +40,7 @@ impl Scratch {
 }
 
 /// The first `len` samples of `buffer`, grown to hold them.
-fn block<T: Copy + Default>(
-    buffer: &mut BudgetVec<T>,
-    len: usize,
-) -> Result<&mut [T], StorageError> {
+fn block<T: Copy + Default>(buffer: &mut BudgetVec<T>, len: usize) -> Result<&mut [T], Error> {
     if buffer.len() < len {
         buffer.try_resize(len, T::default())?;
     }

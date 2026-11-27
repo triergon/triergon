@@ -3,7 +3,7 @@
 #![forbid(unsafe_code)]
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::{Error, Result, WorkBudget};
-use triergon_framing::DtsPacking;
+use triergon_framing::dts::DtsPacking;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Discovered {

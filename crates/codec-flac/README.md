@@ -17,7 +17,7 @@ fn decode(configuration: &[u8], frames: &[&[u8]]) -> Result<(), DecodeError> {
     let mut float = AudioFrame::default();
     let mut integer = decoder.integer_frame();
     for au in frames {
-        let info = decoder.decode_float(au, &mut float)?; // or AudioDecoder::decode
+        let info = decoder.decode(au, &mut float)?; // or AudioDecoder::decode
         decoder.decode_integer(au, &mut integer)?; // integer.plane(0), ...
         let _ = (info.sample_rate, info.bits_per_sample, info.layout);
     }
@@ -41,7 +41,7 @@ channel counts that change between frames.
 
 ## Behaviour and limits
 
-- `decode_float` scales as FFmpeg converts its FLAC decoder output to `f32`: up to 16
+- `decode` scales as FFmpeg converts its FLAC decoder output to `f32`: up to 16
   bits per sample the samples go through 16-bit (`(x << (16 - bits)) as i16 / 2^15`),
   above that through 32-bit (`(x << (32 - bits)) as f32 / 2^31`, which rounds 25- to
   32-bit samples to `f32`). `decode_integer` returns the samples themselves.
@@ -52,7 +52,7 @@ channel counts that change between frames.
   (sample bits + coefficient precision + log2 order <= 32) allows it, else in 64 bits;
   fixed predictors always use 32-bit arithmetic, which is exact modulo 2^32.
 - Following FFmpeg 9.0.2's decoder: the frame CRC-16 is not checked by default
-  (`CrcPolicy::Ignore`; `with_crc_policy(CrcPolicy::Reject)` refuses mismatches with
+  (`compat::ffmpeg::CrcPolicy::Ignore`; `with_crc_policy(CrcPolicy::Reject)` refuses mismatches with
   `CrcMismatch`); a frame whose sample size differs from STREAMINFO's (or, without one,
   from the first frame's) is refused as `Unsupported`; so are negative LPC shifts. A
   STREAMINFO maximum block size below 16, a block above it, a predictor order above the
@@ -77,7 +77,23 @@ channel counts that change between frames.
   outputs with the channel buffers of 32-bit stereo and a buffer's copy while it grows;
   `with_limits` and `new_in` set another limit or a shared pool.
 
-## Known gaps
+## Conformance
+
+RFC 9639. Test vectors (outside git): the IETF CELLAR decoder testbench (`subset`,
+`uncommon`, `faulty`; CC0) and the streams `harness/codecs/flac/flac_vectors.py generate`
+makes with FFmpeg's and the reference `flac` encoder, compared with FFmpeg's decoder in
+[harness/codecs](../../harness/codecs/STATUS.md). The `flac-crc-reject` lane compares the
+retained frame counts and PCM with FFmpeg under `crccheck+explode`, both refusing a frame
+whose CRC fails. The
+[integer PCM comparison](../../harness/features/flac-integer/contract.json) checks every
+sample against the encoder's STREAMINFO checksum, including the low bits of 32-bit
+samples, an unconfigured decoder's rate and layout change, and a clean frame, the same
+frame with one footer bit flipped and a clean frame after it under each CRC policy. A
+file with front left, top back centre and top back right speakers decodes to FFmpeg's
+native PCM; its stereo mix is produced where the reference's stereo path refuses the
+layout. Results are in [docs/status.md](../../docs/status.md).
+
+Where the output differs from FFmpeg's:
 
 - FFmpeg drops the channel mask of a stream whose channel count changes within the
   frames its demuxer probes (it labels even the first frames with the default layout);
@@ -85,11 +101,3 @@ channel counts that change between frames.
 - Malformed streams whose decoded samples exceed their sample size are reproduced as
   FFmpeg wraps them in the 16- or 32-bit output, but the choice between 32- and 64-bit
   LPC accumulation is only known to match FFmpeg for valid streams.
-
-## Standards
-
-RFC 9639. Test vectors (outside git): the IETF CELLAR decoder testbench (`subset`,
-`uncommon`, `faulty`; CC0) and the streams `harness/codecs/flac/flac_vectors.py generate`
-makes with FFmpeg's and the reference `flac` encoder. Verification:
-[harness/codecs](../../harness/codecs/STATUS.md); results in
-[docs/status.md](../../docs/status.md).

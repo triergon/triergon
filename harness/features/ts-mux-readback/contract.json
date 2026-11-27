@@ -1,0 +1,143 @@
+{
+  "schema": 1,
+  "id": "ts-mux-readback",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "candidate": "transport-views-worker",
+  "worker_operation": "ts-mux-",
+  "reference": "ffmpeg-transport-views-raw-native",
+  "operation": "ts-mux-readback",
+  "corpus_directory": ".research/mux-views",
+  "required_profiles": [
+    "single-program",
+    "mux-config-refusal"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "contract": [
+    "The candidate calls Muxer::new and write_picture for every authored picture, then polls TransportStream to logical EOF over the resulting TS188 bytes. The reference demuxes those same muxed bytes with the pinned FFmpeg 9.0.2 decode profile's MPEG-TS demuxer and +noparse+nofillin.",
+    "Each case supplies default or decimal TSID, ONID, program, PMT PID, video PID and stream type followed by provider and service names. Each input picture has big-endian signed 64-bit PTS and DTS in 90 kHz ticks, a one-byte key indicator, a big-endian 32-bit payload length and the coded picture bytes.",
+    "Packet rows (kind 1) fold PID, optional PTS and DTS, flags, first carrier offset and payload length and all payload bytes, in order. Candidate clocks are raw period-zero PES values. Bit 0 compares the transport random-access indicator. On the reference side, read this bit at the demuxed packet position after verifying the TS sync, PID and payload start. Other public packet flags still compare.",
+    "After draining, catalogue rows (kind 5) fold the program number and PMT PID, each stream PID and tag, then the provider and service tags with presence, length and bytes. The candidate reads the names from the emitted SDT service descriptor, across the SDT's carriers, without the 0x15 UTF-8 selector of EN 300 468 Annex A. A clean EOF adds kind 7.",
+    "Check the candidate's original wire against each input picture. Require SDT at 45,000 DTS ticks, PAT and PMT at 9,000 ticks or at a transition to a key picture, initial tables in SDT/PAT/PMT order, per-PID continuity, and exact section CRC and stuffing. Check first-carrier PCR and random access, unbounded video PES headers, both coded timestamps and every coded picture byte across all its carriers.",
+    "A refused MuxConfig emits one kind 8 row. When the candidate supplies no TS, the reference runs its own muxer against the same configuration. Header refusal with zero output emits kind 8. Successful TS output emits kind 9. The refusal cases cover zero program number, reserved or colliding PIDs, a control character in a name and name length; AVC, a non-ASCII name and names that need two SDT carriers are admitted and read back as the other cases are."
+  ],
+  "pin_note": "Pins are recorded by transport-views manifest --record from the decode demuxer for read-back and its muxer for configuration admission.",
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "default",
+        "program-42",
+        "program-65535",
+        "sdt-full",
+        "sdt-empty",
+        "default-continuation",
+        "program-42-continuation",
+        "program-65535-continuation",
+        "sdt-full-continuation",
+        "sdt-empty-continuation"
+      ],
+      "cause": "The capture pipeline measures muxing and this reference demuxes"
+    },
+    {
+      "bound": "runtime",
+      "cases": [
+        "refuse-program-zero",
+        "refuse-pmt-low",
+        "refuse-pmt-null",
+        "refuse-video-low",
+        "refuse-video-null",
+        "refuse-pid-collision",
+        "refuse-stream-type",
+        "refuse-provider-control",
+        "refuse-service-non-ascii",
+        "refuse-name-too-long",
+        "refuse-sdt-overflow"
+      ],
+      "cause": "A refused configuration produces no TS to demux"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "default",
+        "program-42",
+        "program-65535",
+        "sdt-full",
+        "sdt-empty",
+        "default-continuation",
+        "program-42-continuation",
+        "program-65535-continuation",
+        "sdt-full-continuation",
+        "sdt-empty-continuation"
+      ],
+      "cause": "The capture pipeline measures muxing and this reference demuxes"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "refuse-program-zero",
+        "refuse-pmt-low",
+        "refuse-pmt-null",
+        "refuse-video-low",
+        "refuse-video-null",
+        "refuse-pid-collision",
+        "refuse-stream-type",
+        "refuse-provider-control",
+        "refuse-service-non-ascii",
+        "refuse-name-too-long",
+        "refuse-sdt-overflow"
+      ],
+      "cause": "A refused configuration produces no TS to demux"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "default",
+        "program-42",
+        "program-65535",
+        "sdt-full",
+        "sdt-empty",
+        "default-continuation",
+        "program-42-continuation",
+        "program-65535-continuation",
+        "sdt-full-continuation",
+        "sdt-empty-continuation"
+      ],
+      "cause": "The capture pipeline measures muxing and this reference demuxes"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "refuse-program-zero",
+        "refuse-pmt-low",
+        "refuse-pmt-null",
+        "refuse-video-low",
+        "refuse-video-null",
+        "refuse-pid-collision",
+        "refuse-stream-type",
+        "refuse-provider-control",
+        "refuse-service-non-ascii",
+        "refuse-name-too-long",
+        "refuse-sdt-overflow"
+      ],
+      "cause": "A refused configuration produces no TS to demux"
+    }
+  ],
+  "open_refusals": [
+    {
+      "reason": "MuxConfig refuses a name with a control character (triergon-mpegts README, Writing TS)",
+      "clause": "ETSI EN 300 468 V1.17.1 \u00a76.2.33 and Annex A; a C0 code such as TAB after the first byte has no meaning in character table 00",
+      "class": "unsupported",
+      "detail": "service name encoding: control character",
+      "cases": [
+        "refuse-provider-control"
+      ]
+    }
+  ]
+}

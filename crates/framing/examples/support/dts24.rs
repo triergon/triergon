@@ -1,6 +1,6 @@
 //! Isolated semantic view. No C layout/FFI.
 use std::io::{self, Write};
-use triergon_framing::{DtsCoreField as F, DtsCoreHeader, DtsInspection};
+use triergon_framing::dts::{DtsCoreField as F, DtsCoreHeader, DtsInspection};
 
 pub const NAMES: [&str; 24] = [
     "normal_frame",

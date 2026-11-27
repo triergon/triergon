@@ -20,7 +20,7 @@ use std::process::{Command, Stdio};
 use super::build::{Candidate, cargo_rustc, workers};
 use super::gate_build;
 use super::link_order;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256;
 
 type R<T> = Result<T, String>;
@@ -120,7 +120,7 @@ impl Training {
 
     fn load(root: &Path) -> R<Self> {
         let path = root.join(MANIFEST);
-        let document = crate::checks::read_json(&path)?;
+        let document = json::read(&path)?;
         let fail = |problem: String| format!("{}: {problem}", path.display());
         let directory = document
             .get("directory")

@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "id": "quicktime-sound-description",
+  "gate": "required",
+  "operation": "qt-sound",
+  "candidate": "isobmff-views-worker",
+  "worker_operation": "qt-sound-",
+  "oracle": "qt-sound-v0",
+  "contract": [
+    "Compare each version 0 QuickTime sound entry with an independent reading of the versioned sound sample description.",
+    "Fold track and description ordinals, format, revision, vendor, channels, sample bits, signed compression ID, packet size, exact 16.16 sample rate, and the supported PCM layout and its frame width. Emit a refusal for another sound version and preserve raw version 0 fields for unsupported PCM layouts."
+  ],
+  "required_profiles": [
+    "pcm"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 1,
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch"
+      ],
+      "cause": "the public demuxer has no equivalent source field view"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch"
+      ],
+      "cause": "the public demuxer has no equivalent source field view"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "pcm-description-1-2-1-unused3",
+        "pcm-long-chunk-2049",
+        "pcm-multi-8k-u8-and-48k-twos",
+        "pcm-s16be-mono-end",
+        "pcm-s16be-stereo-front",
+        "pcm-u8-mono-front",
+        "pcm-u8-stereo-end",
+        "compression-and-packet-size",
+        "fractional-rate",
+        "partial-frame",
+        "raw-16bit-4ch",
+        "raw-8bit-0ch",
+        "raw-8bit-3ch",
+        "sound-v1",
+        "sound-v2",
+        "sowt-16bit-2ch",
+        "sowt-24bit-7ch",
+        "sowt-32bit-8ch",
+        "twos-24bit-5ch",
+        "twos-32bit-6ch",
+        "twos-8bit-1ch"
+      ],
+      "cause": "the public demuxer has no equivalent source field view"
+    }
+  ]
+}

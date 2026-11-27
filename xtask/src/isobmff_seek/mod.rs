@@ -16,7 +16,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::checks::read_json;
 use crate::harness::worker::Finished;
 use crate::harness::{
     acceptance, comparison, gate_build, memory, provenance, report, reuse, timing,
@@ -77,7 +76,7 @@ fn document(root: &Path, name: &str, expected: &str) -> R<Value> {
     if actual != expected {
         return Err(format!("{path}: contract or membership changed"));
     }
-    read_json(&root.join(path))
+    json::read(&root.join(path))
 }
 
 fn is_range_plan(case: &Case) -> bool {
@@ -431,10 +430,10 @@ fn range_plan_matches(case: &Case, candidate: &Finished, reference: &Finished) -
             .to_vec()
     };
     let (planned, delivered) = (packets(&plan), packets(&seek));
-    plan.get("operation").and_then(Value::as_str) == Some("source-range-plan-consumer-v33")
+    plan.get("operation").and_then(Value::as_str) == Some("range-plan")
         && plan.get("status").and_then(Value::as_str) == Some("Planned")
         && plan.get("plan_complete") == Some(&Value::Bool(true))
-        && seek.get("operation").and_then(Value::as_str) == Some("mov-native-seek-consumer-v33")
+        && seek.get("operation").and_then(Value::as_str) == Some("mov-seek")
         && seek.get("seek_result").and_then(integer) == Some(0)
         && seek.get("delivery_limit_reached") == Some(&Value::Bool(true))
         && work(&plan, true)
@@ -570,7 +569,7 @@ pub fn main(root: &Path, args: &[String]) -> R<i32> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
     let options = options(&root, args)?;
     let suite = Suite::load(&root)?;
-    let policy = read_json(&root.join("harness/policy.json"))?;
+    let policy = json::read(&root.join("harness/policy.json"))?;
     let build = build(&root)?;
     if let Some(parent) = options.output.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -944,14 +943,14 @@ mod tests {
         };
         let plan = |rows: &[String]| {
             finished(format!(
-                "{{\"operation\":\"source-range-plan-consumer-v33\",\"status\":\"Planned\",\"packets\":[{}],\"plan_complete\":true,{}}}",
+                "{{\"operation\":\"range-plan\",\"status\":\"Planned\",\"packets\":[{}],\"plan_complete\":true,{}}}",
                 rows.join(","),
                 work(true)
             ))
         };
         let seek = |rows: &[String]| {
             finished(format!(
-                "{{\"operation\":\"mov-native-seek-consumer-v33\",\"seek_result\":0,\"packets\":[{}],\"delivery_limit_reached\":true,{}}}",
+                "{{\"operation\":\"mov-seek\",\"seek_result\":0,\"packets\":[{}],\"delivery_limit_reached\":true,{}}}",
                 rows.join(","),
                 work(false)
             ))

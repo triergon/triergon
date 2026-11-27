@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "id": "nal-config-inputs",
+  "runner": "cargo xtask report",
+  "gate": "required",
+  "operation": "nal-config",
+  "candidate": "framing-views-worker",
+  "worker_operation": "nal-config-",
+  "reference": "ffmpeg-framing-views-native",
+  "contract": [
+    "Read Annex B configuration with AnnexBConfigParser and compare ordered parameter sets with the side data produced by extract_extradata. When extraction produces no side data for an isolated HEVC VPS, compare its bytes through a single-array hvcC conversion without inserting other parameter sets. Otherwise absence of configuration side data or a remaining non-parameter NAL is a refusal. AnnexBWriter must emit the four-byte start code before each candidate parameter set. The complete NAL sequences of configuration blobs also run as length-prefixed samples.",
+    "For declared avcC and hvcC layouts, verify the retained record through Configuration::declared_record and DeclaredConfigParser. Fold kind 2 with the retained length and bytes, using the padded input record handed to the reference filter. The reference converts the record through MP4-to-Annex-B initialization; a nonempty record passed through byte for byte supplies no converted units. Both sides refuse ranges that extend outside the record. The candidate also checks the type, completeness and relative ranges of the caller's declaration.",
+    "For layout mode an independent range reader validates the caller’s array ranges, NAL length fields and fixed NAL headers. Fold kind 6 with sample length width, kind 4 with declared type, completeness (2 means absent), bounds and every array byte, and kind 5 with length-field start, payload bounds, type mismatch and the length-field bytes before folding that NAL. Both modes retain and fold the complete record.",
+    "Fold kind 1 with parameter set or NAL type and the length and bytes, including the header. Remove start codes and Annex B zero padding, including a terminal run of at least three zero bytes. Fold kind 7 with unit count or kind 8 on refusal. Kind 3 preserves output that did not convert to Annex B.",
+    "Input loading and reading the caller declarations take place outside the operation. Parser and filter setup, writing, folding and teardown are inside."
+  ],
+  "required_profiles": [
+    "annexb",
+    "declared"
+  ],
+  "required_targets": [
+    "aarch64-unknown-linux-gnu",
+    "thumbv7neon-unknown-linux-gnueabihf"
+  ],
+  "iterations": 50,
+  "minimum_pairs": 30,
+  "confidence": 0.95,
+  "open_deviations": [
+    {
+      "reading": "The declared-layout reader returns every declared array; the reference converts the record and refuses array types its definition does not allow",
+      "clause": "ISO/IEC 14496-15 HEVCDecoderConfigurationRecord array fields, as documented by DeclaredConfigParser; ITU-T H.265 Table 7-1; the record's NAL_unit_type is restricted to VPS, SPS, PPS and SEI, which the reference's conversion enforces, while the declared-layout reader answers another question: the ranges the record declares",
+      "candidate": "retains the record and all declared ranges, including an unknown empty array",
+      "reference": "retains the record but refuses conversion at an unknown array declaration",
+      "cases": [
+        "declared-hevc-config-unknown_empty",
+        "declared-opaque-arrays"
+      ]
+    },
+    {
+      "reading": "The AVC SPS extension remains visible",
+      "clause": "ISO/IEC 14496-15 AVCDecoderConfigurationRecord FRExt syntax, as documented by AvcConfigParser and DeclaredConfigParser",
+      "candidate": "writes the type-13 SPS extension in order",
+      "reference": "omits the SPS extension",
+      "cases": [
+        "declared-sequence-extension"
+      ]
+    },
+    {
+      "reading": "A trailing Annex B start code needs a NAL header",
+      "clause": "ITU-T H.264 clause B.2 and H.265 clause B.3 (the start-code prefix precedes a NAL unit)",
+      "candidate": "refuses the configuration ending in an unpaired prefix",
+      "reference": "extracts the preceding parameter sets despite the trailing prefix",
+      "cases": [
+        "avc-aud0-dangling-prefix",
+        "hevc-aud0-dangling-prefix",
+        "avc-authored-dangling-prefix"
+      ]
+    }
+  ],
+  "open_unmeasured": [
+    {
+      "bound": "runtime",
+      "cases": [
+        "declared-avc-width1", "declared-avc-width2", "declared-avc-width3", "declared-avc-width4", "declared-avc-config-empty",
+        "declared-avc-config-sps_only", "declared-avc-config-pps_only", "declared-avc-config-duplicate", "declared-avc-config-multi", "declared-avc-no-extra",
+        "declared-avc-annexb-extra", "declared-hevc-flush", "declared-hevc-no-extra", "declared-hevc-annexb-extra", "declared-hevc-width1",
+        "declared-hevc-width2", "declared-hevc-width3", "declared-hevc-config-empty", "declared-hevc-config-sei", "declared-hevc-config-duplicate",
+        "declared-hevc-config-unknown_empty", "declared-sequence-extension", "declared-avc-profile-extension-0-bytes", "declared-avc-profile-extension-1-bytes", "declared-avc-profile-extension-2-bytes",
+        "declared-avc-profile-extension-3-bytes", "declared-avc-profile-extension-4-bytes", "declared-avc-profile-extension-missing-entry", "avc-aud0-three-byte", "avc-aud0-four-byte",
+        "avc-aud0-leading-zeroes", "avc-aud0-trailing-zeroes", "avc-aud0-aud-sei", "avc-aud0-duplicate", "avc-aud0-dangling-prefix",
+        "avc-aud0-first-set-cut-05", "avc-aud0-first-set-cut-06", "avc-aud0-first-set-cut-07", "avc-aud0-first-set-cut-08", "avc-aud0-first-set-cut-09",
+        "avc-aud0-first-set-cut-10", "avc-aud0-first-set-cut-11", "avc-aud0-first-set-cut-12", "avc-aud0-first-set-cut-13", "avc-aud0-first-set-cut-14",
+        "avc-aud0-first-set-cut-15", "avc-aud0-first-set-cut-16", "avc-aud0-first-set-cut-17", "avc-aud0-first-set-cut-18", "avc-aud0-first-set-cut-19",
+        "avc-aud0-first-set-cut-20", "avc-aud0-first-set-cut-21", "avc-aud0-first-set-cut-22", "avc-aud0-first-set-cut-23", "avc-aud0-first-set-cut-24",
+        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27",
+        "hevc-aud0-three-byte", "hevc-aud0-four-byte",
+        "hevc-aud0-leading-zeroes", "hevc-aud0-trailing-zeroes", "hevc-aud0-aud-sei", "hevc-aud0-duplicate", "hevc-aud0-dangling-prefix",
+        "hevc-aud0-first-set-cut-06", "hevc-aud0-first-set-cut-07", "hevc-aud0-first-set-cut-08", "hevc-aud0-first-set-cut-09", "hevc-aud0-first-set-cut-10",
+        "hevc-aud0-first-set-cut-11", "hevc-aud0-first-set-cut-12", "hevc-aud0-first-set-cut-13", "hevc-aud0-first-set-cut-14", "hevc-aud0-first-set-cut-15",
+        "hevc-aud0-first-set-cut-16", "hevc-aud0-first-set-cut-17", "hevc-aud0-first-set-cut-18", "hevc-aud0-first-set-cut-19", "hevc-aud0-first-set-cut-20",
+        "hevc-aud0-first-set-cut-21", "hevc-aud0-first-set-cut-22", "hevc-aud0-first-set-cut-23", "hevc-aud0-first-set-cut-24", "hevc-aud0-first-set-cut-25",
+        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27",
+        "avc-authored-three-byte", "avc-authored-four-byte", "avc-authored-leading-zeroes", "avc-authored-trailing-zeroes", "avc-authored-aud-sei",
+        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
+        "avc-authored-first-set-cut-08", "avc-annex-prefix-3", "avc-annex-prefix-4", "avc-annex-mixed-padding", "avc-annex-eof-1-payload-zeros",
+        "avc-annex-eof-2-payload-zeros", "hevc-annex-prefix-3", "hevc-annex-prefix-4", "hevc-annex-mixed-padding", "hevc-annex-eof-1-payload-zeros",
+        "hevc-annex-eof-2-payload-zeros", "declared-opaque-test-layout", "declared-invalid-range", "declared-opaque-arrays"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "runtime",
+      "cases": [
+        "avc-aud0-first-set-cut-00", "avc-aud0-first-set-cut-01", "avc-aud0-first-set-cut-02", "avc-aud0-first-set-cut-03", "avc-aud0-first-set-cut-04",
+        "avc-aud0-no-sets",
+        "hevc-aud0-first-set-cut-00",
+        "hevc-aud0-first-set-cut-01", "hevc-aud0-first-set-cut-02", "hevc-aud0-first-set-cut-03", "hevc-aud0-first-set-cut-04", "hevc-aud0-first-set-cut-05",
+        "hevc-aud0-no-sets"
+      ],
+      "cause": "both workers refuse the input"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "declared-avc-width1", "declared-avc-width2", "declared-avc-width3", "declared-avc-width4", "declared-avc-config-empty",
+        "declared-avc-config-sps_only", "declared-avc-config-pps_only", "declared-avc-config-duplicate", "declared-avc-config-multi", "declared-avc-no-extra",
+        "declared-avc-annexb-extra", "declared-hevc-flush", "declared-hevc-no-extra", "declared-hevc-annexb-extra", "declared-hevc-width1",
+        "declared-hevc-width2", "declared-hevc-width3", "declared-hevc-config-empty", "declared-hevc-config-sei", "declared-hevc-config-duplicate",
+        "declared-hevc-config-unknown_empty", "declared-sequence-extension", "declared-avc-profile-extension-0-bytes", "declared-avc-profile-extension-1-bytes", "declared-avc-profile-extension-2-bytes",
+        "declared-avc-profile-extension-3-bytes", "declared-avc-profile-extension-4-bytes", "declared-avc-profile-extension-missing-entry", "avc-aud0-three-byte", "avc-aud0-four-byte",
+        "avc-aud0-leading-zeroes", "avc-aud0-trailing-zeroes", "avc-aud0-aud-sei", "avc-aud0-duplicate", "avc-aud0-dangling-prefix",
+        "avc-aud0-first-set-cut-05", "avc-aud0-first-set-cut-06", "avc-aud0-first-set-cut-07", "avc-aud0-first-set-cut-08", "avc-aud0-first-set-cut-09",
+        "avc-aud0-first-set-cut-10", "avc-aud0-first-set-cut-11", "avc-aud0-first-set-cut-12", "avc-aud0-first-set-cut-13", "avc-aud0-first-set-cut-14",
+        "avc-aud0-first-set-cut-15", "avc-aud0-first-set-cut-16", "avc-aud0-first-set-cut-17", "avc-aud0-first-set-cut-18", "avc-aud0-first-set-cut-19",
+        "avc-aud0-first-set-cut-20", "avc-aud0-first-set-cut-21", "avc-aud0-first-set-cut-22", "avc-aud0-first-set-cut-23", "avc-aud0-first-set-cut-24",
+        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27",
+        "hevc-aud0-three-byte", "hevc-aud0-four-byte",
+        "hevc-aud0-leading-zeroes", "hevc-aud0-trailing-zeroes", "hevc-aud0-aud-sei", "hevc-aud0-duplicate", "hevc-aud0-dangling-prefix",
+        "hevc-aud0-first-set-cut-06", "hevc-aud0-first-set-cut-07", "hevc-aud0-first-set-cut-08", "hevc-aud0-first-set-cut-09", "hevc-aud0-first-set-cut-10",
+        "hevc-aud0-first-set-cut-11", "hevc-aud0-first-set-cut-12", "hevc-aud0-first-set-cut-13", "hevc-aud0-first-set-cut-14", "hevc-aud0-first-set-cut-15",
+        "hevc-aud0-first-set-cut-16", "hevc-aud0-first-set-cut-17", "hevc-aud0-first-set-cut-18", "hevc-aud0-first-set-cut-19", "hevc-aud0-first-set-cut-20",
+        "hevc-aud0-first-set-cut-21", "hevc-aud0-first-set-cut-22", "hevc-aud0-first-set-cut-23", "hevc-aud0-first-set-cut-24", "hevc-aud0-first-set-cut-25",
+        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27",
+        "avc-authored-three-byte", "avc-authored-four-byte", "avc-authored-leading-zeroes", "avc-authored-trailing-zeroes", "avc-authored-aud-sei",
+        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
+        "avc-authored-first-set-cut-08", "avc-annex-prefix-3", "avc-annex-prefix-4", "avc-annex-mixed-padding", "avc-annex-eof-1-payload-zeros",
+        "avc-annex-eof-2-payload-zeros", "hevc-annex-prefix-3", "hevc-annex-prefix-4", "hevc-annex-mixed-padding", "hevc-annex-eof-1-payload-zeros",
+        "hevc-annex-eof-2-payload-zeros", "declared-opaque-test-layout", "declared-invalid-range", "declared-opaque-arrays"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "heap",
+      "cases": [
+        "avc-aud0-first-set-cut-00", "avc-aud0-first-set-cut-01", "avc-aud0-first-set-cut-02", "avc-aud0-first-set-cut-03", "avc-aud0-first-set-cut-04",
+        "avc-aud0-no-sets",
+        "hevc-aud0-first-set-cut-00",
+        "hevc-aud0-first-set-cut-01", "hevc-aud0-first-set-cut-02", "hevc-aud0-first-set-cut-03", "hevc-aud0-first-set-cut-04", "hevc-aud0-first-set-cut-05",
+        "hevc-aud0-no-sets"
+      ],
+      "cause": "both workers refuse the input"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "declared-avc-width1", "declared-avc-width2", "declared-avc-width3", "declared-avc-width4", "declared-avc-config-empty",
+        "declared-avc-config-sps_only", "declared-avc-config-pps_only", "declared-avc-config-duplicate", "declared-avc-config-multi", "declared-avc-no-extra",
+        "declared-avc-annexb-extra", "declared-hevc-flush", "declared-hevc-no-extra", "declared-hevc-annexb-extra", "declared-hevc-width1",
+        "declared-hevc-width2", "declared-hevc-width3", "declared-hevc-config-empty", "declared-hevc-config-sei", "declared-hevc-config-duplicate",
+        "declared-hevc-config-unknown_empty", "declared-sequence-extension", "declared-avc-profile-extension-0-bytes", "declared-avc-profile-extension-1-bytes", "declared-avc-profile-extension-2-bytes",
+        "declared-avc-profile-extension-3-bytes", "declared-avc-profile-extension-4-bytes", "declared-avc-profile-extension-missing-entry", "avc-aud0-three-byte", "avc-aud0-four-byte",
+        "avc-aud0-leading-zeroes", "avc-aud0-trailing-zeroes", "avc-aud0-aud-sei", "avc-aud0-duplicate", "avc-aud0-dangling-prefix",
+        "avc-aud0-first-set-cut-05", "avc-aud0-first-set-cut-06", "avc-aud0-first-set-cut-07", "avc-aud0-first-set-cut-08", "avc-aud0-first-set-cut-09",
+        "avc-aud0-first-set-cut-10", "avc-aud0-first-set-cut-11", "avc-aud0-first-set-cut-12", "avc-aud0-first-set-cut-13", "avc-aud0-first-set-cut-14",
+        "avc-aud0-first-set-cut-15", "avc-aud0-first-set-cut-16", "avc-aud0-first-set-cut-17", "avc-aud0-first-set-cut-18", "avc-aud0-first-set-cut-19",
+        "avc-aud0-first-set-cut-20", "avc-aud0-first-set-cut-21", "avc-aud0-first-set-cut-22", "avc-aud0-first-set-cut-23", "avc-aud0-first-set-cut-24",
+        "avc-aud0-first-set-cut-25", "avc-aud0-first-set-cut-26", "avc-aud0-first-set-cut-27",
+        "hevc-aud0-three-byte", "hevc-aud0-four-byte",
+        "hevc-aud0-leading-zeroes", "hevc-aud0-trailing-zeroes", "hevc-aud0-aud-sei", "hevc-aud0-duplicate", "hevc-aud0-dangling-prefix",
+        "hevc-aud0-first-set-cut-06", "hevc-aud0-first-set-cut-07", "hevc-aud0-first-set-cut-08", "hevc-aud0-first-set-cut-09", "hevc-aud0-first-set-cut-10",
+        "hevc-aud0-first-set-cut-11", "hevc-aud0-first-set-cut-12", "hevc-aud0-first-set-cut-13", "hevc-aud0-first-set-cut-14", "hevc-aud0-first-set-cut-15",
+        "hevc-aud0-first-set-cut-16", "hevc-aud0-first-set-cut-17", "hevc-aud0-first-set-cut-18", "hevc-aud0-first-set-cut-19", "hevc-aud0-first-set-cut-20",
+        "hevc-aud0-first-set-cut-21", "hevc-aud0-first-set-cut-22", "hevc-aud0-first-set-cut-23", "hevc-aud0-first-set-cut-24", "hevc-aud0-first-set-cut-25",
+        "hevc-aud0-first-set-cut-26", "hevc-aud0-first-set-cut-27",
+        "avc-authored-three-byte", "avc-authored-four-byte", "avc-authored-leading-zeroes", "avc-authored-trailing-zeroes", "avc-authored-aud-sei",
+        "avc-authored-duplicate", "avc-authored-dangling-prefix", "avc-authored-first-set-cut-06", "avc-authored-first-set-cut-07",
+        "avc-authored-first-set-cut-08", "avc-annex-prefix-3", "avc-annex-prefix-4", "avc-annex-mixed-padding", "avc-annex-eof-1-payload-zeros",
+        "avc-annex-eof-2-payload-zeros", "hevc-annex-prefix-3", "hevc-annex-prefix-4", "hevc-annex-mixed-padding", "hevc-annex-eof-1-payload-zeros",
+        "hevc-annex-eof-2-payload-zeros", "declared-opaque-test-layout", "declared-invalid-range", "declared-opaque-arrays"
+      ],
+      "cause": "awaiting isolated AArch64 and ARMv7 gate hosts"
+    },
+    {
+      "bound": "total_rss",
+      "cases": [
+        "avc-aud0-first-set-cut-00", "avc-aud0-first-set-cut-01", "avc-aud0-first-set-cut-02", "avc-aud0-first-set-cut-03", "avc-aud0-first-set-cut-04",
+        "avc-aud0-no-sets",
+        "hevc-aud0-first-set-cut-00",
+        "hevc-aud0-first-set-cut-01", "hevc-aud0-first-set-cut-02", "hevc-aud0-first-set-cut-03", "hevc-aud0-first-set-cut-04", "hevc-aud0-first-set-cut-05",
+        "hevc-aud0-no-sets"
+      ],
+      "cause": "both workers refuse the input"
+    }
+  ]
+}

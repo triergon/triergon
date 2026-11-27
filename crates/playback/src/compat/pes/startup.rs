@@ -1,0 +1,424 @@
+//! The startup context a bound demux PES engine needs, read from the source before
+//! playback: a finite entity read whole through its confirmed end within one input
+//! window, or an M2TS prefix, after which the source reads on.
+use super::PidSelection;
+use crate::engine::ts::{Binding, TsEngine};
+use crate::{
+    Engine, Format, Player, PlayerPolicy, Result, Selection, SourceOwner, probe::SelectedInput,
+};
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::source::{Source, SourceReply};
+use triergon_core::{BudgetVec, Error, InputCursor, InputRequest, InputWindow, WorkBudget};
+use triergon_mpegts::{
+    PacketFormat, ParseLimits,
+    clock::SourceTimePolicy,
+    compat::input::{InputBootstrap, InputContext, InputStep},
+    compat::pes::RegisteredCarriage,
+};
+/// One step of a TS [`Startup`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartupStep {
+    /// The work budget ran out or the source is pending: advance again.
+    Yield,
+    /// The window is read and the source is pending on the end of file: advance again
+    /// once it can reply.
+    NeedEof,
+    /// The startup context is known: call `finish`.
+    Ready,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u8)]
+enum Phase {
+    Window,
+    Prefix,
+    Eof,
+    Bootstrap,
+    Ready,
+    Failed,
+}
+
+/// Reads the startup context of a TS input before playback: a finite entity read
+/// whole up to its confirmed end, or an M2TS prefix ([`Self::new_m2ts_prefix`]).
+#[derive(Debug)]
+pub struct Startup<S: Source> {
+    // An inline bootstrap phase raises M2TS startup instruction counts by 14% through a copy.
+    input: InputCursor,
+    source: SourceOwner<S>,
+    format: PacketFormat,
+    bootstrap: Option<InputBootstrap>,
+    prefix: Option<PrefixRead>,
+    eof_request: Option<InputRequest>,
+    context: Option<InputContext>,
+    phase: Phase,
+}
+/// A TS input with its startup context, ready for a player.
+#[derive(Debug)]
+pub struct BoundInput<S: Source> {
+    input: InputCursor,
+    source: SourceOwner<S>,
+    format: PacketFormat,
+    context: InputContext,
+}
+impl<S: Source> Startup<S> {
+    /// Startup of a finite TS entity that fits the input window and ends with a
+    /// confirmed end of file. Fails with `Invalid` unless `selected` is a TS input at
+    /// offset zero.
+    pub fn new(selected: SelectedInput<S>) -> Result<Self> {
+        let Format::Ts(format) = selected.format else {
+            return Err(Error::Invalid("PES startup requires a selected TS input"));
+        };
+        if selected.input.position() != 0 {
+            return Err(Error::Invalid("PES startup requires input at offset zero"));
+        }
+        Ok(Self {
+            input: selected.input,
+            source: selected.source,
+            format,
+            bootstrap: None,
+            prefix: None,
+            eof_request: None,
+            context: None,
+            phase: Phase::Window,
+        })
+    }
+    /// Read one bounded M2TS probe from a fresh selected Source. The cursor
+    /// must admit an 8 KiB input window. Individual replies may be smaller.
+    pub fn new_m2ts_prefix(selected: SelectedInput<S>) -> Result<Self> {
+        if selected.format != Format::Ts(PacketFormat::M2ts192)
+            || !selected.input.buffered().is_empty()
+            || selected.input.request().maximum < InputBootstrap::M2TS_PREFIX_BYTES
+        {
+            return Err(Error::Unsupported(
+                "M2TS prefix needs an unbuffered M2TS input with an 8192-byte window",
+            ));
+        }
+        let bytes = BudgetVec::new(selected.input.budget());
+        let mut startup = Self::new(selected)?;
+        startup.phase = Phase::Prefix;
+        startup.prefix = Some(PrefixRead {
+            bytes,
+            pending: None,
+        });
+        Ok(startup)
+    }
+
+    /// Reads within `w`. A failure closes the source and is final, except backpressure
+    /// or an allocation failure while reading an M2TS prefix.
+    pub fn advance(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<StartupStep> {
+        if self.phase == Phase::Failed {
+            return Err(Error::Closed);
+        }
+        let result = self.inner(w, c);
+        let retry = self.phase == Phase::Prefix
+            && matches!(&result, Err(Error::Backpressure { .. } | Error::Allocation));
+        if result.is_err() && !retry {
+            self.phase = Phase::Failed;
+            self.source.close();
+        }
+        result
+    }
+    fn inner(&mut self, w: &mut WorkBudget, c: &AtomicBool) -> Result<StartupStep> {
+        if c.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        if w.remaining() == 0 {
+            return Ok(StartupStep::Yield);
+        }
+        if self.phase == Phase::Ready {
+            return Ok(StartupStep::Ready);
+        }
+        let input = &mut self.input;
+        let source = &mut self.source;
+        if self.phase == Phase::Prefix {
+            let prefix = self.prefix.as_mut().ok_or(Error::Closed)?;
+            if let Some(bootstrap) = prefix.poll(input, source, w, c)? {
+                self.bootstrap = Some(bootstrap);
+                self.prefix = None;
+                self.phase = Phase::Bootstrap;
+            }
+            return Ok(StartupStep::Yield);
+        }
+        if self.phase == Phase::Window {
+            let request = input.request();
+            match source.poll(&request, w, c)? {
+                SourceReply::Pending => return Ok(StartupStep::Yield),
+                SourceReply::Failed {
+                    source,
+                    token,
+                    failure,
+                } => {
+                    input.fail(source, token, failure)?;
+                    return Err(failure.into());
+                }
+                SourceReply::End { source, token } => {
+                    input.finish(source, token)?;
+                    return Err(Error::Unsupported("empty entity at PES startup"));
+                }
+                SourceReply::Data(window) => {
+                    if window.bytes().is_empty() {
+                        return Ok(StartupStep::Yield);
+                    }
+                    if input
+                        .capabilities()
+                        .length
+                        .is_some_and(|n| n != window.bytes().len() as u64)
+                    {
+                        return Err(Error::Unsupported(
+                            "finite PES startup needs an initial window containing the whole entity",
+                        ));
+                    }
+                    input.provide(&window)?;
+                    let bootstrap = InputBootstrap::new(input, &window, self.format)?;
+                    let mut eof = request;
+                    eof.offset = window.bytes().len() as u64;
+                    eof.maximum = 1;
+                    self.bootstrap = Some(bootstrap);
+                    self.eof_request = Some(eof);
+                    self.phase = Phase::Eof;
+                    return Ok(StartupStep::NeedEof);
+                }
+            }
+        }
+        if self.phase == Phase::Eof {
+            let request = self.eof_request.as_ref().ok_or(Error::Closed)?;
+            match source.poll(request, w, c)? {
+                SourceReply::Pending => return Ok(StartupStep::NeedEof),
+                SourceReply::Failed {
+                    source,
+                    token,
+                    failure,
+                } => {
+                    input.fail(source, token, failure)?;
+                    return Err(failure.into());
+                }
+                SourceReply::Data(window) => {
+                    if window.source != input.source() {
+                        return Err(Error::SourceMismatch);
+                    }
+                    if window.token != input.token() {
+                        return Err(Error::Invalid("stale EOF-probe reply"));
+                    }
+                    if !window.bytes().belongs_to(input.budget()) {
+                        return Err(Error::ForeignPool);
+                    }
+                    if window.offset != request.offset || window.bytes().len() > request.maximum {
+                        return Err(Error::Invalid("EOF-probe range"));
+                    }
+                    if window.bytes().is_empty() {
+                        return Ok(StartupStep::NeedEof);
+                    }
+                    return Err(Error::Unsupported(
+                        "positive-size read found more entity data; finite startup unproven",
+                    ));
+                }
+                SourceReply::End { source, token } => {
+                    self.bootstrap
+                        .as_mut()
+                        .ok_or(Error::Closed)?
+                        .observe_entity_eof(input, source, &token, request.offset)?;
+                    self.eof_request = None;
+                    self.phase = Phase::Bootstrap;
+                }
+            }
+            return Ok(StartupStep::Yield);
+        }
+        match self
+            .bootstrap
+            .as_mut()
+            .ok_or(Error::Closed)?
+            .poll(input, w, c)?
+        {
+            InputStep::NeedEntityEof => Ok(StartupStep::NeedEof),
+            InputStep::Yield => Ok(StartupStep::Yield),
+            InputStep::Ready(context) => {
+                self.context = Some(context);
+                self.phase = Phase::Ready;
+                Ok(StartupStep::Ready)
+            }
+        }
+    }
+    /// The bound input. Fails with `Closed` after a failure and with `Invalid` before
+    /// `Ready`.
+    pub fn finish(self) -> Result<BoundInput<S>> {
+        if self.phase == Phase::Failed {
+            return Err(Error::Closed);
+        }
+        Ok(BoundInput {
+            context: self
+                .context
+                .ok_or(Error::Invalid("PES startup context not ready"))?,
+            input: self.input,
+            source: self.source,
+            format: self.format,
+        })
+    }
+}
+#[derive(Debug)]
+struct PrefixRead {
+    bytes: BudgetVec<u8>,
+    pending: Option<InputWindow>,
+}
+
+impl PrefixRead {
+    fn poll<S: Source>(
+        &mut self,
+        input: &mut InputCursor,
+        source: &mut SourceOwner<S>,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<Option<InputBootstrap>> {
+        let limit = InputBootstrap::M2TS_PREFIX_BYTES;
+        if self.pending.is_none() && self.bytes.len() < limit {
+            let mut request = input.request();
+            request.offset = self.bytes.len() as u64;
+            request.maximum = limit - self.bytes.len();
+            match source.poll(&request, work, cancel)? {
+                SourceReply::Pending => return Ok(None),
+                SourceReply::Failed {
+                    source,
+                    token,
+                    failure,
+                } => {
+                    input.fail(source, token, failure)?;
+                    return Err(failure.into());
+                }
+                SourceReply::End { source, token } => {
+                    if source != request.source {
+                        return Err(Error::SourceMismatch);
+                    }
+                    if token != request.token {
+                        return Err(Error::Invalid("stale M2TS prefix End"));
+                    }
+                    return Err(if input.capabilities().length.is_some() {
+                        Error::Truncated
+                    } else {
+                        Error::Unsupported("source ended before the 8192-byte M2TS prefix")
+                    });
+                }
+                SourceReply::Data(window) => {
+                    if window.source != request.source {
+                        return Err(Error::SourceMismatch);
+                    }
+                    if window.token != request.token
+                        || window.offset != request.offset
+                        || window.bytes().len() > request.maximum
+                    {
+                        return Err(Error::Invalid(
+                            "M2TS prefix reply is outside the requested range",
+                        ));
+                    }
+                    if !window.bytes().belongs_to(input.budget()) {
+                        return Err(Error::ForeignPool);
+                    }
+                    if window.bytes().is_empty() {
+                        return Ok(None);
+                    }
+                    if window.bytes().len() == limit {
+                        input.provide(&window)?;
+                        return Ok(Some(InputBootstrap::new_m2ts_prefix(input, &window)?));
+                    }
+                    self.pending = Some(window);
+                }
+            }
+        }
+        if let Some(window) = self.pending.as_ref() {
+            if work.remaining() == 0 {
+                return Ok(None);
+            }
+            // Reserve once, before consuming any part of the pending reply.
+            // On pressure the source operation is already complete and its
+            // exact owner remains here for retry.
+            self.bytes.try_reserve_exact(limit - self.bytes.len())?;
+            let start = self.bytes.len() - window.offset as usize;
+            let count = work.take((window.bytes().len() - start) as u64) as usize;
+            self.bytes
+                .try_extend_from_slice(&window.bytes().as_ref()[start..start + count])?;
+            if start + count == window.bytes().len() {
+                self.pending = None;
+            }
+        }
+        if self.bytes.len() != limit {
+            return Ok(None);
+        }
+        let builder = std::mem::replace(&mut self.bytes, BudgetVec::new(input.budget()));
+        let bytes = match builder.freeze() {
+            Ok(bytes) => bytes,
+            Err(rejected) => {
+                self.bytes = rejected.value;
+                return Err(rejected.error);
+            }
+        };
+        let window = InputWindow::new(input.source(), input.token(), 0, bytes)?;
+        input.provide(&window)?;
+        Ok(Some(InputBootstrap::new_m2ts_prefix(input, &window)?))
+    }
+}
+
+impl<S: Source> BoundInput<S> {
+    /// The startup context the input was read with.
+    pub fn context(&self) -> &InputContext {
+        &self.context
+    }
+    /// Play the demux PES of the selected PIDs with one program clock and the
+    /// carrier grid established at startup. The source remains open through EOF.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a mismatched startup context, an invalid PID selection,
+    /// or a storage limit.
+    pub fn into_program_player(
+        self,
+        program: u16,
+        limits: ParseLimits,
+        policy: SourceTimePolicy,
+        namespace: triergon_mpegts::psi::DescriptorNamespace,
+        selections: &[PidSelection],
+        player_policy: PlayerPolicy,
+    ) -> Result<Player<S>> {
+        self.context.validate_cursor(&self.input)?;
+        let mut engine = TsEngine::with_selections(
+            self.input,
+            self.format,
+            program,
+            limits,
+            policy,
+            namespace,
+            selections,
+        )?;
+        engine.binding = Binding::Bound(self.context);
+        Player::new(
+            Engine::Ts(engine),
+            self.source,
+            Selection::All,
+            player_policy,
+        )
+    }
+
+    /// A player of `program` with the demux PES of `pid`, whose observer is
+    /// bound to this input's startup context.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the program, clock and player choices of one TS engine"
+    )]
+    pub fn into_player(
+        self,
+        program: u16,
+        limits: ParseLimits,
+        policy: SourceTimePolicy,
+        pid: u16,
+        carriage: RegisteredCarriage,
+        selection: Selection,
+        player_policy: PlayerPolicy,
+    ) -> Result<Player<S>> {
+        let engine = TsEngine::with_bound_input(
+            self.input,
+            self.format,
+            program,
+            limits,
+            policy,
+            PidSelection::registered(pid, carriage),
+            self.context,
+        )?;
+        Player::new(Engine::Ts(engine), self.source, selection, player_policy)
+    }
+}

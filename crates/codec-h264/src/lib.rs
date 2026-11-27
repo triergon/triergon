@@ -4,21 +4,14 @@
     missing_debug_implementations,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::expect_used
+    clippy::unwrap_used,
+    clippy::expect_used,
+    unreachable_pub,
+    missing_docs
 )]
-// Pending: `missing_docs`, `unreachable_pub`, `clippy::unwrap_used`.
-// Pending: these rewrites change the generated code of measured hot paths and are
-// adopted with an A/B timing run.
-#![allow(
-    clippy::bool_to_int_with_if,
-    clippy::manual_slice_fill,
-    clippy::map_unwrap_or,
-    clippy::nonminimal_bool,
-    clippy::overly_complex_bool_expr,
-    clippy::single_match_else,
-    clippy::stable_sort_primitive,
-    clippy::unnested_or_patterns
-)]
+// Sample kernels and per-block steps take their geometry and operands as plain
+// arguments, not parameter structs: the shape the hot paths are measured in.
+#![allow(clippy::too_many_arguments)]
 mod cabac;
 mod cavlc;
 mod deblock;
@@ -32,6 +25,7 @@ mod mbdec;
 mod mbinfo;
 mod mc;
 mod nal;
+mod output;
 mod picture;
 mod ps;
 mod recon;
@@ -44,52 +38,38 @@ mod tables_vlc;
 use dpb::{Current, NewMarking, PicNums, PocState, Stored as _};
 use mbinfo::{MbInfo, MbWidth, SliceDbk};
 use nal::{parse_header, unescape};
-use picture::*;
-use ps::{Pps, Sps};
-use slice::{SliceHeader, SliceType};
+use output::output_picture;
+pub use output::{ColourDescription, Picture, Plane};
+use picture::{
+    Coding, DecodedFields, FrameBuf, FrameStore, MBF_INTRA, Motion, OutputInfo, RefPic, Structure,
+};
+use ps::{PocType, Pps, Sps, Vui};
+use slice::{Mmco, SliceHeader, SliceType};
 use slicedec::{ColInfo, CurPic, Refs, SliceCtx, SliceDecoder, Wp};
 use std::collections::VecDeque;
-use tables::*;
+use std::sync::Arc;
+use tables::{ZIGZAG4, ZIGZAG8, norm_adjust4, norm_adjust8};
 use triergon_bitstream::BitReader;
-use triergon_codec::{
-    Budget, BudgetVec, Colour, DecodeFailure, PictureView, StorageError, VideoDecoder,
-};
-use triergon_framing::AnnexBUnits;
+pub use triergon_codec::{Budget, DecodeError, Error};
+use triergon_codec::{BudgetVec, Colour, PictureView, SampleAspectRatio, VideoDecoder};
+use triergon_framing::avc;
+use triergon_framing::nal::AnnexBUnits;
 use triergon_framing::picture_output::levels::max_dpb_mbs;
 use triergon_framing::picture_output::{
     AvcPicture, DecodedPictures, Leave, Marking, NewPicture, PictureId, View,
 };
-
-/// Decoder error. The decoder never panics on bad input.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    /// A syntactically valid stream uses a feature outside the selected matrix.
-    Unsupported(&'static str),
-    /// The bitstream violates the specification.
-    InvalidData(&'static str),
-    /// A resource cap (dimensions, DPB size) refused the stream.
-    ResourceLimit(&'static str),
-    /// Storage the stream needs does not fit the decoder's budget.
-    Budget(StorageError),
-}
-
-impl From<StorageError> for DecodeError {
-    fn from(error: StorageError) -> Self {
-        DecodeError::Budget(error)
-    }
-}
 
 /// Error of the slice data path, which charges no storage. Without a `Budget` case it keeps
 /// every macroblock-level `Result` as small as before the budget existed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum SliceError {
     Unsupported(&'static str),
-    InvalidData(&'static str),
+    Invalid(&'static str),
 }
 
 impl From<triergon_bitstream::cabac::InvalidOffset> for SliceError {
     fn from(_: triergon_bitstream::cabac::InvalidOffset) -> Self {
-        SliceError::InvalidData("arithmetic code offset out of range")
+        SliceError::Invalid("arithmetic code offset out of range")
     }
 }
 
@@ -97,26 +77,13 @@ impl From<SliceError> for DecodeError {
     fn from(error: SliceError) -> Self {
         match error {
             SliceError::Unsupported(s) => DecodeError::Unsupported(s),
-            SliceError::InvalidData(s) => DecodeError::InvalidData(s),
+            SliceError::Invalid(s) => DecodeError::Invalid(s),
         }
     }
 }
-
-impl std::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DecodeError::Unsupported(s) => write!(f, "unsupported: {s}"),
-            DecodeError::InvalidData(s) => write!(f, "invalid data: {s}"),
-            DecodeError::ResourceLimit(s) => write!(f, "resource limit: {s}"),
-            DecodeError::Budget(error) => write!(f, "storage budget: {error}"),
-        }
-    }
-}
-
-impl std::error::Error for DecodeError {}
 
 /// Storage limits of one decoder.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// Live storage that depends on the stream: frame sample buffers (also while output
     /// pictures share them), motion and macroblock arrays, deblocking state, RBSP and slice
@@ -133,91 +100,12 @@ impl Default for Limits {
     }
 }
 
-/// Colour description from the VUI (Annex E); defaults are "unspecified" (2).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ColourDescription {
-    pub primaries: u8,
-    pub transfer: u8,
-    pub matrix: u8,
-    pub full_range: bool,
-}
-
-impl Default for ColourDescription {
-    fn default() -> Self {
-        ColourDescription {
-            primaries: 2,
-            transfer: 2,
-            matrix: 2,
-            full_range: false,
-        }
-    }
-}
-
-/// One 8-bit sample plane of an output picture. The samples are shared with the decoder's
-/// frame buffer (no copy); `row(y)` returns the `width` visible samples of row `y`.
-#[derive(Clone)]
-pub struct Plane {
-    frame: std::sync::Arc<FrameBuf>,
-    comp: u8,
-    offset: usize,
-    pub width: usize,
-    pub height: usize,
-    pub stride: usize,
-}
-
-impl Plane {
-    fn samples(&self) -> &[u8] {
-        match self.comp {
-            0 => &self.frame.y,
-            1 => &self.frame.cb,
-            _ => &self.frame.cr,
-        }
-    }
-    /// Visible samples of row `y` (`width` bytes).
-    pub fn row(&self, y: usize) -> &[u8] {
-        let o = self.offset + y * self.stride;
-        &self.samples()[o..o + self.width]
-    }
-    /// The plane from its first visible sample (rows `stride` apart).
-    pub fn data(&self) -> &[u8] {
-        &self.samples()[self.offset..]
-    }
-    /// The whole decoded plane, its stride and the index of the first visible
-    /// (cropped) sample: visible sample (x, y) is `raw[offset + y * stride + x]`.
-    pub fn raw(&self) -> (&[u8], usize, usize) {
-        (self.samples(), self.stride, self.offset)
-    }
-}
-
-impl std::fmt::Debug for Plane {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Plane {{ {}x{} stride {} }}",
-            self.width, self.height, self.stride
-        )
-    }
-}
-
-/// A decoded picture in output order (cropped, 8-bit 4:2:0; monochrome streams carry
-/// chroma planes filled with 128 like FFmpeg's yuv420p output).
-#[derive(Clone, Debug)]
-pub struct Picture {
-    pub width: usize,
-    pub height: usize,
-    pub bit_depth: u32,
-    pub planes: [Plane; 3],
-    pub pts: Option<i64>,
-    pub poc: i32,
-    pub sar: (u32, u32),
-    pub colour: ColourDescription,
-    /// The picture was coded as fields (both fields of the output frame).
-    pub interlaced: bool,
-}
-
 /// Where the picture being decoded is kept until it is stored.
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)] // One per decoder, moved once per picture.
+#[expect(
+    clippy::large_enum_variant,
+    reason = "one per decoder, moved once per picture"
+)]
 enum Target {
     /// A frame or first field: the frame store it takes when it is finished.
     New(FrameStore),
@@ -229,30 +117,43 @@ enum Target {
 struct ActivePic {
     pic: CurPic,
     target: Target,
-    sps: Sps,
-    idr: bool,
-    nal_ref_idc: u8,
-    frame_num: u32,
-    field_pic: bool,
-    bottom: bool,
+    sps: Arc<Sps>,
+    /// TopFieldOrderCnt and BottomFieldOrderCnt (8.2.1).
     poc: [i32; 2],
-    frame_num_offset: i32,
-    poc_msb: i32,
-    poc_lsb: u32,
-    delta_poc_bottom: i32,
-    delta_poc: [i32; 2],
-    pps_id: u32,
-    idr_pic_id: u32,
-    /// Marking information from the first slice.
-    sh_first: SliceHeader,
-    max_slice_err: Option<DecodeError>,
+    /// PicOrderCntMsb for pic_order_cnt_type 0, FrameNumOffset for the other types.
+    poc_base: i32,
+    /// The header of the picture's first slice: what later slices are compared with
+    /// (7.4.1.2.4) and the reference marking.
+    sh: SliceHeader,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C)]
+struct PendingField {
+    id: PictureId,
+    structure: Structure,
+    frame_num: u32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Dimensions {
+    mb_width: u32,
+    mb_height: u32,
+}
+
+#[derive(Debug)]
+#[repr(C)]
+struct PictureScratch {
+    mbs: BudgetVec<MbInfo>,
+    slices: BudgetVec<SliceDbk>,
+    dbk: deblock::Progress,
 }
 
 /// H.264 decoder.
 #[derive(Debug)]
 pub struct Decoder {
-    spss: Vec<Option<Box<Sps>>>,
-    ppss: Vec<Option<Box<Pps>>>,
+    spss: Vec<Option<Arc<Sps>>>,
+    ppss: Vec<Option<Arc<Pps>>>,
     /// The decoded picture buffer: its frame stores, their marking and their output.
     dpb: DecodedPictures<FrameStore>,
     /// The frame stores not in the buffer, kept with their storage for reuse.
@@ -268,13 +169,13 @@ pub struct Decoder {
     uid: u32,
     rbsp: BudgetVec<u8>,
     /// The last decoded first field, held from output while it waits for its second
-    /// field: its stored picture, structure (1 top, 2 bottom) and frame_num.
-    pending_field: Option<(PictureId, u8, u32)>,
+    /// field: its stored picture, field and frame_num.
+    pending_field: Option<PendingField>,
     /// Dimensions of the active SPS (to flush on change).
-    cur_dims: Option<(u32, u32)>,
+    cur_dims: Option<Dimensions>,
     pending_pts: Option<i64>,
     /// Macroblock, slice and deblocking arrays of the last picture, reused by the next.
-    pic_scratch: Option<(BudgetVec<MbInfo>, BudgetVec<SliceDbk>, deblock::Progress)>,
+    pic_scratch: Option<PictureScratch>,
     /// The pool every buffer sized from the stream is charged to.
     budget: Budget,
     /// Samples of no picture, for references whose store has none.
@@ -283,10 +184,9 @@ pub struct Decoder {
     mb_samples: inter::MbSamples,
     /// Sample buffers given up by frame stores while an output picture still shared them;
     /// reused once the caller has dropped that picture (avoids reallocating frames).
-    spare_bufs: Vec<std::sync::Arc<FrameBuf>>,
+    spare_bufs: Vec<Arc<FrameBuf>>,
     /// Motion arrays of non-reference pictures (never co-located), kept for reuse.
     spare_motion: Vec<Motion>,
-    errors: u64,
 }
 
 /// Spare buffers kept for reuse beyond the frame stores.
@@ -304,50 +204,6 @@ fn leave<'a>(
     }
 }
 
-/// The cropped output picture of a frame store with order count `poc`, sharing its
-/// samples; none for a non-existing frame.
-fn output_picture(poc: i32, fs: &FrameStore) -> Option<Picture> {
-    if fs.non_existing {
-        return None;
-    }
-    let b = fs.buf.as_ref()?;
-    let (cx, cy, cw, ch) = fs.info.crop;
-    let (cx, cy, cw, ch) = (cx as usize, cy as usize, cw as usize, ch as usize);
-    let (ccw, cch) = (cw / 2, ch / 2);
-    let mk = |comp: u8| -> Plane {
-        if comp == 0 {
-            Plane {
-                frame: b.clone(),
-                comp,
-                offset: cy * b.width + cx,
-                width: cw,
-                height: ch,
-                stride: b.width,
-            }
-        } else {
-            Plane {
-                frame: b.clone(),
-                comp,
-                offset: (cy / 2) * b.cwidth + cx / 2,
-                width: ccw,
-                height: cch,
-                stride: b.cwidth,
-            }
-        }
-    };
-    Some(Picture {
-        width: cw,
-        height: ch,
-        bit_depth: 8,
-        planes: [mk(0), mk(1), mk(2)],
-        pts: fs.pts,
-        poc,
-        sar: fs.info.sar,
-        colour: fs.info.colour,
-        interlaced: fs.coding == Coding::Fields,
-    })
-}
-
 /// Moves a decoded picture's samples and motion into its frame store `fs`. Later pictures
 /// read only the corner blocks of a reference's motion when `compact` (8.4.1.2.1 with
 /// direct_8x8_inference_flag, frame / frame co-location); where the compact copy does not
@@ -357,13 +213,13 @@ fn output_picture(poc: i32, fs: &FrameStore) -> Option<Picture> {
 fn keep_decoded(
     fs: &mut FrameStore,
     pic: CurPic,
+    structure: Structure,
     reference: bool,
     compact: bool,
     spare_motion: &mut Vec<Motion>,
-) -> (BudgetVec<MbInfo>, BudgetVec<SliceDbk>, deblock::Progress) {
-    let structure = pic.structure;
-    let slot = usize::from(structure == 2);
-    fs.buf = Some(std::sync::Arc::new(pic.buf));
+) -> PictureScratch {
+    let slot = usize::from(structure == Structure::Bottom);
+    fs.buf = Some(Arc::new(pic.buf));
     let spare = if reference && !(compact && fs.motion[slot].compact_from(&pic.motion).is_ok()) {
         std::mem::replace(&mut fs.motion[slot], pic.motion)
     } else {
@@ -372,21 +228,25 @@ fn keep_decoded(
     if spare_motion.len() < MAX_SPARE {
         spare_motion.push(spare);
     }
-    fs.fields |= if structure == 0 { 3 } else { structure };
-    (pic.mbs, pic.slices, pic.dbk)
+    fs.fields.include(structure);
+    PictureScratch {
+        mbs: pic.mbs,
+        slices: pic.slices,
+        dbk: pic.dbk,
+    }
 }
 
 /// A sample buffer of the given size: a spare one no output picture shares any more, or a new one.
 fn recycle_buf(
-    spare: &mut Vec<std::sync::Arc<FrameBuf>>,
+    spare: &mut Vec<Arc<FrameBuf>>,
     w: usize,
     h: usize,
     budget: &Budget,
-) -> Result<FrameBuf, StorageError> {
+) -> Result<FrameBuf, Error> {
     if let Some(i) = spare
         .iter()
-        .position(|b| std::sync::Arc::strong_count(b) == 1 && b.width == w && b.height == h)
-        && let Ok(b) = std::sync::Arc::try_unwrap(spare.swap_remove(i))
+        .position(|b| Arc::strong_count(b) == 1 && b.width == w && b.height == h)
+        && let Ok(b) = Arc::try_unwrap(spare.swap_remove(i))
     {
         return Ok(b);
     }
@@ -394,7 +254,7 @@ fn recycle_buf(
 }
 
 /// Keep `b` (still shared by an output picture) as a future spare.
-fn keep_spare(spare: &mut Vec<std::sync::Arc<FrameBuf>>, b: std::sync::Arc<FrameBuf>) {
+fn keep_spare(spare: &mut Vec<Arc<FrameBuf>>, b: Arc<FrameBuf>) {
     if spare.len() >= MAX_SPARE {
         spare.remove(0);
     }
@@ -424,10 +284,8 @@ fn dpb_frames(sps: &Sps) -> usize {
     )
     .unwrap_or(696_320);
     let mut n = (level_mbs / frame_mbs).clamp(1, 16) as usize;
-    if let Some(v) = &sps.vui
-        && v.bitstream_restriction
-    {
-        n = (v.max_dec_frame_buffering as usize)
+    if let Some(restriction) = sps.vui.and_then(|v| v.restriction) {
+        n = (restriction.max_dec_frame_buffering as usize)
             .max(1)
             .max(sps.max_num_ref_frames as usize)
             .min(16);
@@ -444,7 +302,10 @@ impl Default for Decoder {
 impl Decoder {
     /// A decoder with its own pool of the default limit.
     pub fn new() -> Self {
-        #[allow(clippy::expect_used)] // The default limit is far above a pool's own charge.
+        #[expect(
+            clippy::expect_used,
+            reason = "the default limit covers the pool itself"
+        )]
         Self::with_limits(Limits::default()).expect("default storage budget")
     }
 
@@ -478,45 +339,44 @@ impl Decoder {
             mb_samples: inter::MbSamples::new(),
             spare_bufs: Vec::new(),
             spare_motion: Vec::new(),
-            errors: 0,
         }
     }
 
-    /// Feed one Annex-B access unit with its caller timestamp. The picture carried by the
-    /// access unit is completed before returning.
+    /// Decodes one Annex B access unit with its caller timestamp and completes the
+    /// picture before returning.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first NAL unit error and leaves the remaining units unread.
     pub fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         let r = self.send_nals(au, pts);
         self.finish_picture();
         r
     }
 
-    /// Feed Annex-B data without implying an access unit boundary at the end (picture
-    /// boundaries are detected from slice headers, clause 7.4.1.2.4).
+    /// Decodes Annex B data with picture boundaries from slice headers (clause
+    /// 7.4.1.2.4). The end of the buffer does not imply a picture boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first NAL unit error and leaves the remaining units unread.
     pub fn send_nals(&mut self, data: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         self.pending_pts = pts;
-        let mut first_err = None;
         for nal in AnnexBUnits::new(data) {
-            if let Err(e) = self.decode_nal(nal) {
-                self.errors += 1;
-                if first_err.is_none() {
-                    first_err = Some(e);
-                }
-            }
+            self.decode_nal(nal)?;
         }
-        match first_err {
-            Some(e) => Err(e),
-            None => Ok(()),
-        }
+        Ok(())
     }
 
-    /// Feed a single NAL unit (without start code prefix).
+    /// Decodes a single NAL unit without its start code. The supplied timestamp
+    /// applies to a picture started by this unit.
+    ///
+    /// # Errors
+    ///
+    /// The unit is invalid or unsupported, or its storage does not fit the budget.
     pub fn send_nal(&mut self, nal: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         self.pending_pts = pts;
-        let r = self.decode_nal(nal);
-        if r.is_err() {
-            self.errors += 1;
-        }
-        r
+        self.decode_nal(nal)
     }
 
     /// Pop the next picture in output order.
@@ -549,43 +409,38 @@ impl Decoder {
 
     fn decode_nal(&mut self, nal: &[u8]) -> Result<(), DecodeError> {
         let Some(h) = parse_header(nal) else {
-            return Err(DecodeError::InvalidData("forbidden_zero_bit"));
+            return Err(DecodeError::Invalid("forbidden_zero_bit"));
         };
         match h.nal_unit_type {
-            1 | 5 => self.decode_slice_nal(nal, h),
+            avc::SLICE | avc::IDR => self.decode_slice_nal(nal, h),
             2..=4 => Err(DecodeError::Unsupported(
                 "data partitioning (Extended profile)",
             )),
-            7 => {
+            avc::SPS => {
                 self.finish_picture();
                 let len = unescape(&nal[1..], &mut self.rbsp)?;
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let sps = ps::parse_sps(&mut r)?;
                 let id = sps.id as usize;
-                self.spss[id] = Some(Box::new(sps));
+                self.spss[id] = Some(Arc::new(sps));
                 Ok(())
             }
-            8 => {
+            avc::PPS => {
                 self.finish_picture();
                 let len = unescape(&nal[1..], &mut self.rbsp)?;
                 let mut r = BitReader::with_end(&self.rbsp, len * 8);
                 let pps = ps::parse_pps(&mut r, &self.spss)?;
                 let id = pps.id as usize;
-                self.ppss[id] = Some(Box::new(pps));
+                self.ppss[id] = Some(Arc::new(pps));
                 Ok(())
             }
-            9..=11 => {
-                // Access unit delimiter / end of sequence / end of stream: picture boundary.
+            // SEI, access unit delimiter, end of sequence, end of stream: a picture boundary.
+            avc::SEI | avc::AUD | 10 | 11 => {
                 self.finish_picture();
                 Ok(())
             }
-            6 => {
-                self.finish_picture();
-                Ok(())
-            }
-            // SVC / MVC NAL units (prefix, subset SPS, slice extensions) are skipped so the
-            // base view / base layer decodes (Annex G/H NAL types).
-            14 | 15 | 20 | 21 => Ok(()),
+            // Everything else is skipped, among it the SVC / MVC units (prefix, subset SPS,
+            // slice extensions, Annex G/H), so the base view or layer decodes.
             _ => Ok(()),
         }
     }
@@ -615,17 +470,19 @@ impl Decoder {
     fn decode_slice_nal(&mut self, nal: &[u8], h: nal::NalHeader) -> Result<(), DecodeError> {
         let len = unescape(&nal[1..], &mut self.rbsp)?;
         let mut r = BitReader::with_end(&self.rbsp, len * 8);
-        let (_, _, pps_id) = slice::peek_pps_id(&mut r.clone())?;
-        let pps = self.ppss[pps_id as usize]
-            .as_deref()
-            .ok_or(DecodeError::InvalidData("missing PPS"))?
-            .clone();
-        let sps = self.spss[pps.sps_id as usize]
-            .as_deref()
-            .ok_or(DecodeError::InvalidData("missing SPS"))?
-            .clone();
+        let prefix = slice::Prefix::read(&mut r)?;
+        let pps = Arc::clone(
+            self.ppss[prefix.pps_id as usize]
+                .as_ref()
+                .ok_or(DecodeError::Invalid("missing PPS"))?,
+        );
+        let sps = Arc::clone(
+            self.spss[pps.sps_id as usize]
+                .as_ref()
+                .ok_or(DecodeError::Invalid("missing SPS"))?,
+        );
         Self::check_supported(&sps, &pps)?;
-        let sh = slice::parse_slice_header(&mut r, h, &sps, &pps)?;
+        let sh = slice::parse_slice_header(&mut r, prefix, h, &sps, &pps)?;
         if matches!(sh.slice_type, SliceType::SP | SliceType::SI) {
             return Err(DecodeError::Unsupported("SP/SI slices (Extended profile)"));
         }
@@ -633,18 +490,23 @@ impl Decoder {
             // Redundant coded pictures are not needed when the primary picture is intact.
             return Ok(());
         }
-        // New picture detection (7.4.1.2.4).
+        // New picture detection (7.4.1.2.4); a change of pic_parameter_set_id alone does
+        // not start one.
         let new_pic = match &self.active {
             None => true,
             Some(a) => {
+                let a = &a.sh;
                 a.frame_num != sh.frame_num
-                    || a.pps_id != sh.pps_id && false
                     || a.field_pic != sh.field_pic
-                    || (sh.field_pic && a.bottom != sh.bottom_field)
-                    || (a.nal_ref_idc == 0) != (sh.nal.nal_ref_idc == 0)
-                    || (sps.poc_type == 0
-                        && (a.poc_lsb != sh.poc_lsb || a.delta_poc_bottom != sh.delta_poc_bottom))
-                    || (sps.poc_type == 1 && a.delta_poc != sh.delta_poc)
+                    || (sh.field_pic && a.bottom_field != sh.bottom_field)
+                    || (a.nal.nal_ref_idc == 0) != (sh.nal.nal_ref_idc == 0)
+                    || match sps.poc {
+                        PocType::Lsb { .. } => {
+                            a.poc_lsb != sh.poc_lsb || a.delta_poc_bottom != sh.delta_poc_bottom
+                        }
+                        PocType::Cycle { .. } => a.delta_poc != sh.delta_poc,
+                        PocType::FrameNum => false,
+                    }
                     || a.idr != sh.idr
                     || (sh.idr && a.idr && a.idr_pic_id != sh.idr_pic_id)
             }
@@ -657,8 +519,11 @@ impl Decoder {
     }
 
     /// Begin decoding a new picture: frame_num gap handling, POC, frame store allocation.
-    fn start_picture(&mut self, sps: &Sps, sh: &SliceHeader) -> Result<(), DecodeError> {
-        let dims = (sps.pic_width_in_mbs, sps.frame_height_in_mbs());
+    fn start_picture(&mut self, sps: &Arc<Sps>, sh: &SliceHeader) -> Result<(), DecodeError> {
+        let dims = Dimensions {
+            mb_width: sps.pic_width_in_mbs,
+            mb_height: sps.frame_height_in_mbs(),
+        };
         if self.cur_dims.is_some() && self.cur_dims != Some(dims) {
             // Resolution change: output everything and drop the DPB.
             self.close_pending_field();
@@ -669,24 +534,24 @@ impl Decoder {
             // An IDR picture's frame_num starts the count again: no gap to fill.
             self.handle_frame_num_gap(sps, sh)?;
         }
-        let structure: u8 = if !sh.field_pic {
-            0
-        } else if sh.bottom_field {
-            2
-        } else {
-            1
-        };
+        let structure = sh.structure();
         // The second field of the pending first field: opposite parity, same frame_num; the
         // second field of an IDR frame may be IDR too.
         let first = self
             .pending_field
-            .filter(|&(id, par, frame_num)| {
-                structure != 0
-                    && structure != par
-                    && frame_num == sh.frame_num
-                    && (!sh.idr || self.dpb.entries().any(|e| e.id() == id && e.picture().idr))
-            })
-            .map(|(id, _, _)| id);
+            .filter(
+                |&PendingField {
+                     id,
+                     structure: parity,
+                     frame_num,
+                 }| {
+                    structure.is_field()
+                        && structure != parity
+                        && frame_num == sh.frame_num
+                        && (!sh.idr || self.dpb.entries().any(|e| e.id() == id && e.picture().idr))
+                },
+            )
+            .map(|first| first.id);
         if first.is_none() {
             self.close_pending_field();
         }
@@ -707,22 +572,10 @@ impl Decoder {
         self.active = Some(ActivePic {
             pic,
             target,
-            sps: sps.clone(),
-            idr: sh.idr,
-            nal_ref_idc: sh.nal.nal_ref_idc,
-            frame_num: sh.frame_num,
-            field_pic: sh.field_pic,
-            bottom: sh.bottom_field,
+            sps: Arc::clone(sps),
             poc,
-            frame_num_offset: fno,
-            poc_msb: fno,
-            poc_lsb: sh.poc_lsb,
-            delta_poc_bottom: sh.delta_poc_bottom,
-            delta_poc: sh.delta_poc,
-            pps_id: sh.pps_id,
-            idr_pic_id: sh.idr_pic_id,
-            sh_first: sh.clone(),
-            max_slice_err: None,
+            poc_base: fno,
+            sh: sh.clone(),
         });
         Ok(())
     }
@@ -734,7 +587,7 @@ impl Decoder {
         &mut self,
         sps: &Sps,
         sh: &SliceHeader,
-        structure: u8,
+        structure: Structure,
         poc: [i32; 2],
         target: &mut Target,
     ) -> Result<CurPic, DecodeError> {
@@ -745,14 +598,22 @@ impl Decoder {
             // The buffer's room for the picture once it is finished.
             self.dpb.try_reserve(1)?;
         }
-        let h = if structure == 0 { fh } else { fh / 2 };
-        let (mut mbs, mut slices, mut dbk) = self.pic_scratch.take().unwrap_or_else(|| {
+        let h = if structure == Structure::Frame {
+            fh
+        } else {
+            fh / 2
+        };
+        let PictureScratch {
+            mut mbs,
+            mut slices,
+            mut dbk,
+        } = self.pic_scratch.take().unwrap_or_else(|| {
             let budget = &self.budget;
-            (
-                BudgetVec::new(budget),
-                BudgetVec::new(budget),
-                deblock::Progress::new(budget),
-            )
+            PictureScratch {
+                mbs: BudgetVec::new(budget),
+                slices: BudgetVec::new(budget),
+                dbk: deblock::Progress::new(budget),
+            }
         });
         mbs.clear();
         mbs.try_resize(w * h, MbInfo::default())?;
@@ -765,8 +626,8 @@ impl Decoder {
             .unwrap_or_else(|| Motion::empty(&self.budget));
         motion.alloc(w * h)?;
         let fs = target_store(&mut self.dpb, target)
-            .ok_or(DecodeError::InvalidData("first field not stored"))?;
-        let mut buf = match fs.buf.take().map(std::sync::Arc::try_unwrap) {
+            .ok_or(DecodeError::Invalid("first field not stored"))?;
+        let mut buf = match fs.buf.take().map(Arc::try_unwrap) {
             Some(Ok(b)) => b,
             // Still held by an output picture: the second field needs the first field's samples.
             Some(Err(a)) if second_field => match a.try_clone() {
@@ -791,9 +652,9 @@ impl Decoder {
             None => recycle_buf(&mut self.spare_bufs, w * 16, fh * 16, &self.budget)?,
         };
         if second_field {
-            fs.poc[(structure - 1) as usize] = poc[(structure - 1) as usize];
+            fs.poc[structure.index()] = poc[structure.index()];
         } else {
-            fs.fields = 0;
+            fs.fields = DecodedFields::Empty;
             fs.coding = if sh.field_pic {
                 Coding::Fields
             } else if sh.mbaff {
@@ -806,7 +667,7 @@ impl Decoder {
             fs.pts = self.pending_pts;
             fs.non_existing = false;
             fs.idr = sh.idr;
-            let vui = sps.vui.clone().unwrap_or_default();
+            let vui = sps.vui.unwrap_or_else(Vui::inferred);
             fs.info = OutputInfo {
                 crop: sps.crop_rect(),
                 sar: vui.sar,
@@ -864,9 +725,7 @@ impl Decoder {
             }
             if !self.dpb.bump(leave(&mut self.out, &mut self.free)) {
                 // Every store holds a reference picture none of which waits for output.
-                return Err(DecodeError::ResourceLimit(
-                    "decoded picture buffer overflow",
-                ));
+                return Err(DecodeError::Policy("decoded picture buffer overflow"));
             }
         };
         if fs
@@ -878,7 +737,7 @@ impl Decoder {
             fs.buf = None;
             fs.motion = [Motion::empty(&self.budget), Motion::empty(&self.budget)];
             match recycle_buf(&mut self.spare_bufs, w, h, &self.budget) {
-                Ok(buf) => fs.buf = Some(std::sync::Arc::new(buf)),
+                Ok(buf) => fs.buf = Some(Arc::new(buf)),
                 Err(error) => {
                     self.free.push(fs);
                     return Err(error.into());
@@ -923,18 +782,20 @@ impl Decoder {
             let nums = PicNums {
                 frame_num: unused,
                 max_frame_num: max,
-                structure: 0,
+                structure: Structure::Frame,
             };
             let mut entries = dpb::by_number(self.dpb.entries_mut().collect());
             dpb::sliding_window(&mut entries, None, &nums, sps.max_num_ref_frames);
             drop(entries);
             // POC for type != 0 follows frame_num; FrameNumOffset update.
             let fno = if self.poc_state.prev_frame_num > unused {
-                self.poc_state.prev_frame_num_offset + max as i32
+                self.poc_state
+                    .prev_frame_num_offset
+                    .wrapping_add(max as i32)
             } else {
                 self.poc_state.prev_frame_num_offset
             };
-            let poc = if sps.poc_type != 0 {
+            let poc = if !matches!(sps.poc, PocType::Lsb { .. }) {
                 let mut fake = SliceHeader {
                     frame_num: unused,
                     idr: false,
@@ -947,7 +808,7 @@ impl Decoder {
             } else {
                 [0, 0]
             };
-            fs.fields = 3;
+            fs.fields = DecodedFields::Both;
             fs.coding = Coding::Frame;
             fs.frame_num = unused;
             fs.poc = poc;
@@ -979,14 +840,13 @@ impl Decoder {
     /// The pending first field gets no second field: it is output on its own, as a frame
     /// with one decoded field.
     fn close_pending_field(&mut self) {
-        if let Some((id, _, _)) = self.pending_field.take()
+        if let Some(PendingField { id, .. }) = self.pending_field.take()
             && let Some(mut first) = self.dpb.entry(id)
         {
             first.release();
         }
     }
 
-    #[allow(clippy::needless_range_loop)] // indexed form over parallel fixed-size arrays (mirrors the spec loops, keeps the hot loop vectorisable)
     fn decode_slice_data(
         &mut self,
         sps: &Sps,
@@ -995,14 +855,13 @@ impl Decoder {
         len: usize,
     ) -> Result<(), DecodeError> {
         let Some(active) = self.active.as_mut() else {
-            return Err(DecodeError::InvalidData("slice without picture"));
+            return Err(DecodeError::Invalid("slice without picture"));
         };
         let pic = &mut active.pic;
-        let structure = pic.structure;
         let nums = PicNums {
             frame_num: sh.frame_num,
             max_frame_num: sps.max_frame_num(),
-            structure,
+            structure: sh.structure(),
         };
         // The stored frame stores: while a second field is decoded, the first field of its
         // frame is one of them, visible to it.
@@ -1085,7 +944,7 @@ impl Decoder {
         };
         let slice_num = pic.slices.len() as u16;
         if slice_num >= 0xFFFE {
-            return Err(DecodeError::ResourceLimit("too many slices"));
+            return Err(DecodeError::Policy("too many slices"));
         }
         pic.slices
             .try_push(SliceDbk {
@@ -1120,11 +979,7 @@ impl Decoder {
             no_samples: &self.no_samples,
         };
         let mut dec = SliceDecoder::new(&ctx, pic, refs, &self.rbsp, len, &mut self.mb_samples);
-        dec.run().map_err(|e| {
-            let e = DecodeError::from(e);
-            active.max_slice_err = Some(e.clone());
-            e
-        })
+        dec.run().map_err(DecodeError::from)
     }
 
     /// Finish the active picture: deblock, reference marking (8.2.5), then removal (C.4.4),
@@ -1135,8 +990,8 @@ impl Decoder {
         };
         // Conceal undecoded macroblocks minimalistically (keep prediction-free content).
         deblock::finish(&mut a.pic);
-        let structure = a.pic.structure;
-        let is_ref = a.nal_ref_idc != 0;
+        let structure = a.sh.structure();
+        let is_ref = a.sh.nal.nal_ref_idc != 0;
         let compact = a.sps.frame_mbs_only && a.sps.direct_8x8_inference;
         let mut target = a.target;
         let Some(fs) = target_store(&mut self.dpb, &mut target) else {
@@ -1145,14 +1000,15 @@ impl Decoder {
         self.pic_scratch = Some(keep_decoded(
             fs,
             a.pic,
+            structure,
             is_ref,
             compact,
             &mut self.spare_motion,
         ));
         let sps = &a.sps;
-        let sh = &a.sh_first;
+        let sh = &a.sh;
         let nums = PicNums {
-            frame_num: a.frame_num,
+            frame_num: sh.frame_num,
             max_frame_num: sps.max_frame_num(),
             structure,
         };
@@ -1170,7 +1026,7 @@ impl Decoder {
                 Some(at) => Current::Stored(at),
                 None => Current::New(&mut new),
             };
-            if a.idr {
+            if sh.idr {
                 // All other references unused.
                 for (i, e) in entries.iter_mut().enumerate() {
                     if Some(i) != first {
@@ -1190,10 +1046,14 @@ impl Decoder {
                 if sh.adaptive_ref_pic_marking {
                     mmco5 =
                         dpb::apply_mmcos(&mut entries, &mut cur, &nums, sh, &mut self.max_lt_idx);
-                    marked_long = sh.mmcos.iter().any(|m| m.op == 6);
+                    marked_long = sh
+                        .mmcos
+                        .iter()
+                        .any(|m| matches!(m, Mmco::CurrentToLongTerm { .. }));
                 } else {
-                    let first_is_short = first
-                        .is_some_and(|at| entries[at].mark(3 - structure) == Marking::ShortTerm);
+                    let first_is_short = first.is_some_and(|at| {
+                        entries[at].mark(structure.opposite()) == Marking::ShortTerm
+                    });
                     if !first_is_short {
                         dpb::sliding_window(&mut entries, first, &nums, sps.max_num_ref_frames);
                     }
@@ -1207,16 +1067,16 @@ impl Decoder {
         let mut poc = a.poc;
         if mmco5 && let Some(fs) = target_store(&mut self.dpb, &mut target) {
             let temp = match structure {
-                0 => poc[0].min(poc[1]),
-                1 => poc[0],
-                _ => poc[1],
+                Structure::Frame => poc[0].min(poc[1]),
+                Structure::Top => poc[0],
+                Structure::Bottom => poc[1],
             };
-            poc[0] -= temp;
-            poc[1] -= temp;
+            poc[0] = poc[0].wrapping_sub(temp);
+            poc[1] = poc[1].wrapping_sub(temp);
             match structure {
-                0 => fs.poc = poc,
-                1 => fs.poc[0] = poc[0],
-                _ => fs.poc[1] = poc[1],
+                Structure::Frame => fs.poc = poc,
+                Structure::Top => fs.poc[0] = poc[0],
+                Structure::Bottom => fs.poc[1] = poc[1],
             }
             // After mmco 5 the picture is treated as having frame_num 0 (7.4.3).
             fs.frame_num = 0;
@@ -1224,22 +1084,26 @@ impl Decoder {
         if is_ref {
             if mmco5 {
                 self.poc_state.prev_poc_msb = 0;
-                self.poc_state.prev_poc_lsb = if structure != 2 { poc[0] } else { 0 };
+                self.poc_state.prev_poc_lsb = if structure != Structure::Bottom {
+                    poc[0]
+                } else {
+                    0
+                };
             } else {
-                self.poc_state.prev_poc_msb = a.poc_msb;
-                self.poc_state.prev_poc_lsb = a.poc_lsb as i32;
+                self.poc_state.prev_poc_msb = a.poc_base;
+                self.poc_state.prev_poc_lsb = sh.poc_lsb as i32;
             }
-            self.poc_state.prev_ref_frame_num = if mmco5 { 0 } else { a.frame_num };
+            self.poc_state.prev_ref_frame_num = if mmco5 { 0 } else { sh.frame_num };
         }
-        self.poc_state.prev_frame_num_offset = if mmco5 { 0 } else { a.frame_num_offset };
-        self.poc_state.prev_frame_num = if mmco5 { 0 } else { a.frame_num };
+        self.poc_state.prev_frame_num_offset = if mmco5 { 0 } else { a.poc_base };
+        self.poc_state.prev_frame_num = if mmco5 { 0 } else { sh.frame_num };
         self.poc_state.prev_mmco5 = mmco5;
         // Removal before storage (C.4.4): an IDR picture or mmco 5 outputs or discards every
         // prior picture; a second field does neither.
         let second_field = matches!(target, Target::SecondField(_));
         self.dpb.avc_remove(
             AvcPicture {
-                idr: a.idr && !second_field,
+                idr: sh.idr && !second_field,
                 mmco5: mmco5 && !second_field,
                 no_output_of_prior_pics: no_output_prior,
             },
@@ -1247,7 +1111,7 @@ impl Decoder {
         );
         // Storage (C.4.5.1, C.4.5.2): every picture waits for output; a first field is
         // held from bumping until its second field joins it or none comes.
-        let field = (structure != 0).then(|| dpb::parity(structure));
+        let field = structure.is_field().then(|| structure.parity());
         self.pending_field = None;
         match target {
             Target::New(mut fs) => {
@@ -1265,7 +1129,11 @@ impl Decoder {
                 match self.dpb.store(stored, fs) {
                     Ok(id) => {
                         if field.is_some() {
-                            self.pending_field = Some((id, structure, a.frame_num));
+                            self.pending_field = Some(PendingField {
+                                id,
+                                structure,
+                                frame_num: sh.frame_num,
+                            });
                         }
                     }
                     Err(refused) => self.free.push(refused.picture),
@@ -1274,9 +1142,9 @@ impl Decoder {
             Target::SecondField(id) => {
                 if let Some(mut first) = self.dpb.entry(id) {
                     let second = NewPicture {
-                        poc: first.picture().poc[(structure - 1) as usize],
+                        poc: first.picture().poc[structure.index()],
                         output: true,
-                        marking: first.marking(dpb::parity(structure)),
+                        marking: first.marking(structure.parity()),
                         field,
                         hold: false,
                     };
@@ -1289,26 +1157,22 @@ impl Decoder {
         let dpb_size = dpb_frames(sps);
         let reorder = sps
             .vui
-            .as_ref()
-            .filter(|v| v.bitstream_restriction)
-            .map(|v| v.max_num_reorder_frames as usize);
+            .and_then(|v| v.restriction)
+            .map(|r| r.max_num_reorder_frames as usize);
         while (self.dpb.len() > dpb_size || reorder.is_some_and(|r| self.dpb.bumpable() > r))
             && self.dpb.bump(leave(&mut self.out, &mut self.free))
         {}
-    }
-
-    /// Number of NAL units that failed to decode so far (diagnostics).
-    pub fn error_count(&self) -> u64 {
-        self.errors
     }
 }
 
 /// The session view of the decoder. A received picture is held until the next call, so
 /// its frame buffer returns to the spare pool exactly when the inherent API's would.
 impl VideoDecoder for Decoder {
-    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeFailure> {
+    type Error = DecodeError;
+
+    fn send(&mut self, au: &[u8], pts: Option<i64>) -> Result<(), DecodeError> {
         self.held = None;
-        Decoder::send(self, au, pts).map_err(DecodeFailure::from_error)
+        Decoder::send(self, au, pts)
     }
     fn receive(&mut self) -> Option<PictureView<'_>> {
         self.held = self.out.pop_front();
@@ -1331,7 +1195,7 @@ impl VideoDecoder for Decoder {
                 plane(&picture.planes[2]),
             ],
             pts: picture.pts,
-            sar: picture.sar,
+            sar: SampleAspectRatio::new(picture.sar.0, picture.sar.1),
             colour: Colour {
                 matrix: picture.colour.matrix,
                 full_range: picture.colour.full_range,

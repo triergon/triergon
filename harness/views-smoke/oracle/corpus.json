@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "directory": "harness/views-smoke",
+  "cases": [
+    {
+      "id": "checksum",
+      "profile": "smoke",
+      "file": "input.txt",
+      "sha256": "21f4204bd8ac81d9c0da9341adb14a097b74399045619ab7ceba4ed072dbd219",
+      "rights": "authored-synthetic",
+      "expected": {
+        "trace_sha256": "b0f3e3e9c6b3e0d7c5d4de4056f2316489e49bec45fad4d8d9a01f4df0e2a261"
+      }
+    }
+  ]
+}

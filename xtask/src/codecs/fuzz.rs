@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 
 use super::equivalence::cargo_build;
-use crate::json::Value;
+use crate::json::{self, Value};
 use crate::sha256::hex;
 
 /// Lanes of `harness/codecs/correctness-manifest.json` and their `codec-worker` operation.
@@ -58,7 +58,7 @@ pub fn run(
     if !status.success() {
         return Err(format!("checked codec-worker build: {status}"));
     }
-    let manifest = crate::checks::read_json(&root.join(MANIFEST))?;
+    let manifest = json::read(&root.join(MANIFEST))?;
     let mut seeds = Vec::new();
     let mut largest = 0;
     for vector in manifest
@@ -131,7 +131,7 @@ pub fn run(
     ]);
     let path =
         std::env::temp_dir().join(format!("triergon-codec-fuzz-{}.json", std::process::id()));
-    crate::corpus::write_json(&path, &campaign_manifest)?;
+    json::write(&path, &campaign_manifest)?;
     let result = crate::fuzz::campaign(
         root,
         &crate::fuzz::Campaign {

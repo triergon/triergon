@@ -1,4 +1,4 @@
-use triergon_codec::{AudioFrame, Budget, StorageError};
+use triergon_codec::{AudioFrame, Budget, Error};
 
 #[test]
 fn resizing_charges_the_whole_frame_before_it_grows() {
@@ -29,12 +29,12 @@ fn a_frame_above_the_budget_is_refused_with_the_charge_unchanged() {
     let before = charge.bytes();
     assert!(matches!(
         frame.try_resize(8, 1024, &mut charge),
-        Err(StorageError::Limit { .. })
+        Err(Error::Limit { .. })
     ));
     assert_eq!(charge.bytes(), before);
     assert!(frame.planes.iter().all(|p| p.len() == 1024));
     assert_eq!(
         frame.try_resize(usize::MAX, 1, &mut charge),
-        Err(StorageError::Overflow)
+        Err(Error::Overflow)
     );
 }

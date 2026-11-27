@@ -1,4 +1,5 @@
 //! `[Style.]Field=Value` overrides, libass's `ass_process_force_style`.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::{Result, WorkBudget};
 

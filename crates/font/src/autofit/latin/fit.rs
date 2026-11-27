@@ -1,14 +1,16 @@
 //! Grid-fitting a glyph with the latin writing system, as FreeType's
-//! default load (`FT_LOAD_TARGET_NORMAL`) runs it: stems are adjusted to
-//! whole pixels, without snapping to standard widths and without the light,
-//! monochrome and LCD modes' variations.
+//! default load runs it: stems are adjusted to whole pixels, without
+//! snapping to standard widths and without the light, monochrome and LCD
+//! modes' variations.
+//!
+//! Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 
-use super::super::hints::{Dimension, Edge, GlyphHints, Point, Segment, edge};
+use super::super::hints::{Dimension, Edge, EdgeFlags, GlyphHints, Point, Segment};
 use super::super::style::NONBASE;
 use super::super::tables::{SCRIPTS, STYLES};
 use super::adjust;
 use super::{Axis, Metrics, analysis};
-use crate::long::{abs, mul_div, pix_round, wrap};
+use crate::fixed::wrap32::{abs, mul_div, pix_round, wrap};
 use crate::work::charge;
 use triergon_core::{Result, WorkBudget};
 
@@ -26,18 +28,17 @@ pub(in super::super) enum Scope {
 pub(in super::super) struct Glyph {
     /// Its entry in the style coverage, with its `NONBASE` bit.
     pub(in super::super) coverage: u16,
-    /// Its flags in the adjustment database (`AF_ADJUST_*`), through the
-    /// reverse charmap; zero for none.
+    /// Its flags in the adjustment database, through the reverse charmap;
+    /// zero for none.
     pub(in super::super) adjustment: u16,
-    /// The size's pixels per em (`x_ppem`).
+    /// The size's pixels per em.
     pub(in super::super) ppem: u16,
     /// Whether the face is italic, which turns horizontal hinting off.
     pub(in super::super) italic: bool,
 }
 
-/// `af_latin_hints_apply` after `af_latin_hints_init`: hints the glyph
-/// loaded into `hints` (scaled by the metrics' scales, `x_scale` and the x
-/// height adjusted `y_scale`) with `metrics`, scaled.
+/// Hints the glyph loaded into `hints` (scaled by the metrics' scales,
+/// `x_scale` and the x height adjusted `y_scale`) with `metrics`, scaled.
 ///
 /// Horizontally, unless the face is italic: vertical edges are found and
 /// fitted. Vertically: accents are first prepared as the adjustment
@@ -105,31 +106,30 @@ pub(in super::super) fn apply(
     Ok(())
 }
 
-/// `af_latin_compute_stem_width` for the default load, with stem
-/// adjustment and without snapping: the width of a stem from an edge with
-/// flags `base_flags` moved by `base_delta`, lightly quantized. Widths of
-/// extra light axes and of vertical serifs under three pixels stay;
-/// others grow to 1 pixel (round edges under 1.25 pixel) or 7/8, snap to
-/// the standard width within 5/8 pixel, keep small fractions under three
-/// pixels, and round above, less part of the base edge's move at under 30
-/// pixels per em. A width of `FT_LONG_MIN` stays negative when made
-/// positive, as FreeType's does.
+/// The width of a stem for the default load, with stem adjustment and
+/// without snapping: that of a stem from an edge with flags `base_flags`
+/// moved by `base_delta`, lightly quantized. Widths of extra light axes and
+/// of vertical serifs under three pixels stay; others grow to 1 pixel
+/// (round edges under 1.25 pixel) or 7/8, snap to the standard width within
+/// 5/8 pixel, keep small fractions under three pixels, and round above,
+/// less part of the base edge's move at under 30 pixels per em. A width of
+/// `i32::MIN` stays negative when made positive.
 fn stem_width(
     axis: &Axis,
     dim: Dimension,
     ppem: u16,
     width: i64,
     base_delta: i64,
-    base_flags: u8,
-    stem_flags: u8,
+    base_flags: EdgeFlags,
+    stem_flags: EdgeFlags,
 ) -> i64 {
     if axis.extra_light {
         return width;
     }
     let vertical = dim == Dimension::Vertical;
     let mut dist = abs(width);
-    if !(stem_flags & edge::SERIF != 0 && vertical && dist < 3 * 64) {
-        if base_flags & edge::ROUND != 0 {
+    if !(stem_flags.contains(EdgeFlags::SERIF) && vertical && dist < 3 * 64) {
+        if base_flags.contains(EdgeFlags::ROUND) {
             if dist < 80 {
                 dist = 64;
             }
@@ -183,8 +183,7 @@ struct Fitter<'a> {
 }
 
 impl Fitter<'_> {
-    /// `af_latin_align_linked_edge`: places edge `stem` at its fitted stem
-    /// width from edge `base`.
+    /// Places edge `stem` at its fitted stem width from edge `base`.
     fn align_linked(&mut self, base: usize, stem: usize) {
         let (base_edge, stem_edge) = (self.edges[base], self.edges[stem]);
         let dist = wrap(stem_edge.opos - base_edge.opos);
@@ -201,7 +200,7 @@ impl Fitter<'_> {
         self.edges[stem].pos = wrap(base_edge.pos + fitted);
     }
 
-    /// `af_latin_compute_stem_width` between two edges, from nowhere.
+    /// The fitted stem width between two edges, taking the first as unmoved.
     fn width(&self, from: usize, to: usize) -> i64 {
         let (a, b) = (self.edges[from], self.edges[to]);
         stem_width(
@@ -219,16 +218,244 @@ impl Fitter<'_> {
     /// of their end points, as the points hold them now.
     fn extent(&self, e: usize) -> (i64, i64) {
         let edge = self.edges[e];
-        let ends = [self.segments[edge.first], self.segments[edge.last]];
+        let ends = [self.segments[edge.first.0], self.segments[edge.last.0]];
         ends.iter()
             .flat_map(|s| [self.points[s.first].v, self.points[s.last].v])
             .fold((i64::MAX, i64::MIN), |(min, max), v| {
                 (min.min(v), max.max(v))
             })
     }
+    /// Places blue edges and fits their opposite edges at the stem width.
+    #[inline]
+    fn align_blues(&mut self, anchor: &mut Option<usize>) {
+        for e in 0..self.edges.len() {
+            if self.edges[e].flags.contains(EdgeFlags::DONE) {
+                continue;
+            }
+            let mut link = self.edges[e].link.map(|link| link.0);
+            // A stem with a neutral and another blue zone keeps the other;
+            // with two neutral ones, the first.
+            if let Some(l) = link
+                && self.edges[e].blue_edge.is_some()
+                && self.edges[l].blue_edge.is_some()
+            {
+                if self.edges[l].flags.contains(EdgeFlags::NEUTRAL) {
+                    self.edges[l].blue_edge = None;
+                    self.edges[l].flags.remove(EdgeFlags::NEUTRAL);
+                } else if self.edges[e].flags.contains(EdgeFlags::NEUTRAL) {
+                    self.edges[e].blue_edge = None;
+                    self.edges[e].flags.remove(EdgeFlags::NEUTRAL);
+                }
+            }
+            let (blued, blue) = if let Some(blue) = self.edges[e].blue_edge {
+                (e, blue)
+            } else if let Some((l, blue)) =
+                link.and_then(|l| self.edges[l].blue_edge.map(|b| (l, b)))
+            {
+                // The other edge of the stem is in a zone.
+                link = Some(e);
+                (l, blue)
+            } else {
+                continue;
+            };
+            self.edges[blued].pos = blue;
+            self.edges[blued].flags.insert(EdgeFlags::DONE);
+            if let Some(other) = link
+                && self.edges[other].blue_edge.is_none()
+            {
+                self.align_linked(blued, other);
+                self.edges[other].flags.insert(EdgeFlags::DONE);
+            }
+            if anchor.is_none() {
+                *anchor = Some(e);
+            }
+        }
+    }
+
+    /// Fits stems in edge order around the first fitted edge.
+    #[inline]
+    fn fit_stems(&mut self, anchor: &mut Option<usize>, top_to_bottom: bool) -> bool {
+        let count = self.edges.len();
+        // Whether `pos` lies before the position `limit` in the edges' order.
+        let before = |pos: i64, limit: i64| {
+            if top_to_bottom {
+                pos > limit
+            } else {
+                pos < limit
+            }
+        };
+        let mut has_non_stem_edges = false;
+        for e in 0..count {
+            if self.edges[e].flags.contains(EdgeFlags::DONE) {
+                continue;
+            }
+            let Some(link) = self.edges[e].link.map(|link| link.0) else {
+                has_non_stem_edges = true;
+                continue;
+            };
+            if self.edges[link].blue_edge.is_some() {
+                // FreeType does not expect this.
+                self.align_linked(link, e);
+                self.edges[e].flags.insert(EdgeFlags::DONE);
+                continue;
+            }
+            let (edge, other) = (self.edges[e], self.edges[link]);
+            let org_len = wrap(other.opos - edge.opos);
+            let cur_len = self.width(e, link);
+            // Stems up to a pixel wide centre between pixels; up to 1.5 pixels,
+            // off centre.
+            let (u_off, d_off) = if cur_len <= 64 { (32, 32) } else { (38, 26) };
+            let centred = |org_center: i64| {
+                let pos = pix_round(org_center);
+                let error1 = abs(org_center - (pos - u_off));
+                let error2 = abs(org_center - (pos + d_off));
+                wrap(if error1 < error2 {
+                    pos - u_off
+                } else {
+                    pos + d_off
+                })
+            };
+            let Some(a) = *anchor else {
+                // The first stem.
+                if cur_len < 96 {
+                    let center = centred(wrap(edge.opos + (org_len >> 1)));
+                    self.edges[e].pos = wrap(center - cur_len / 2);
+                    self.edges[link].pos = wrap(self.edges[e].pos + cur_len);
+                } else {
+                    self.edges[e].pos = pix_round(edge.opos);
+                }
+                *anchor = Some(e);
+                self.edges[e].flags.insert(EdgeFlags::DONE);
+                self.align_linked(e, link);
+                continue;
+            };
+            let anchor_edge = self.edges[a];
+            let org_pos = wrap(anchor_edge.pos + (edge.opos - anchor_edge.opos));
+            let org_center = wrap(org_pos + (org_len >> 1));
+            if other.flags.contains(EdgeFlags::DONE) {
+                self.edges[e].pos = wrap(other.pos - cur_len);
+            } else if cur_len < 96 {
+                let center = centred(org_center);
+                self.edges[e].pos = wrap(center - cur_len / 2);
+                self.edges[link].pos = wrap(center + cur_len / 2);
+            } else {
+                // Round the nearer end, keeping the width.
+                let pos1 = pix_round(org_pos);
+                let delta1 = abs(pos1 + (cur_len >> 1) - org_center);
+                let pos2 = wrap(pix_round(org_pos + org_len) - cur_len);
+                let delta2 = abs(pos2 + (cur_len >> 1) - org_center);
+                self.edges[e].pos = if delta1 < delta2 { pos1 } else { pos2 };
+                self.edges[link].pos = wrap(self.edges[e].pos + cur_len);
+            }
+            self.edges[e].flags.insert(EdgeFlags::DONE);
+            self.edges[link].flags.insert(EdgeFlags::DONE);
+            if e > 0 && before(self.edges[e].pos, self.edges[e - 1].pos) {
+                // Unless the stem would (almost, by 1/4 pixel) disappear.
+                let previous = self.edges[e - 1].pos;
+                if abs(self.edges[link].pos - previous) > 16 {
+                    self.edges[e].pos = previous;
+                }
+            }
+        }
+        has_non_stem_edges
+    }
+
+    #[inline]
+    fn balance_three_stems(&mut self) {
+        let count = self.edges.len();
+        // A lowercase m: six vertical edges sans serif, twelve with. Its three
+        // stems keep their even spacing if they had it.
+        if self.dim == Dimension::Horizontal && (count == 6 || count == 12) {
+            let (e1, e2, e3) = if count == 6 { (0, 2, 4) } else { (1, 5, 9) };
+            let dist1 = self.edges[e2].opos - self.edges[e1].opos;
+            let dist2 = self.edges[e3].opos - self.edges[e2].opos;
+            if abs(dist1 - dist2) < 8 {
+                let delta = self.edges[e3].pos - (2 * self.edges[e2].pos - self.edges[e1].pos);
+                let shift = |edge: &mut Edge| edge.pos = wrap(edge.pos - delta);
+                shift(&mut self.edges[e3]);
+                if let Some(link) = self.edges[e3].link.map(|link| link.0) {
+                    shift(&mut self.edges[link]);
+                }
+                // The serifs move with the stem.
+                if count == 12 {
+                    shift(&mut self.edges[8]);
+                    shift(&mut self.edges[11]);
+                }
+                self.edges[e3].flags.insert(EdgeFlags::DONE);
+                if let Some(link) = self.edges[e3].link.map(|link| link.0) {
+                    self.edges[link].flags.insert(EdgeFlags::DONE);
+                }
+            }
+        }
+    }
+
+    /// Follows the stem for a nearby serif and places standalone edges.
+    #[inline]
+    fn fit_remaining(&mut self, anchor: &mut Option<usize>) {
+        let count = self.edges.len();
+        // Serifs and single edges. None of them has a link, so FreeType's
+        // checks against crossing a neighbour never apply here.
+        for e in 0..count {
+            if self.edges[e].flags.contains(EdgeFlags::DONE) {
+                continue;
+            }
+            let mut delta = 1000;
+            if let Some(serif) = self.edges[e].serif.map(|serif| serif.0) {
+                delta = wrap(self.edges[serif].opos - self.edges[e].opos);
+                let (top, bottom) = if delta < 0 {
+                    delta = wrap(-delta);
+                    (e, serif)
+                } else {
+                    (serif, e)
+                };
+                if delta < 64 + 32 {
+                    // Not a real serif if an edge between the two overlaps
+                    // them, such as an accent near its base.
+                    let (top_min, top_max) = self.extent(top);
+                    let (bottom_min, bottom_max) = self.extent(bottom);
+                    let (min_pos, max_pos) = (top_min.min(bottom_min), top_max.max(bottom_max));
+                    let overlapped = (bottom + 1..top).any(|between| {
+                        let (e_min, e_max) = self.extent(between);
+                        !((e_min < min_pos && e_max < min_pos)
+                            || (e_min > max_pos && e_max > max_pos))
+                    });
+                    if overlapped {
+                        continue;
+                    }
+                }
+            }
+            let opos = self.edges[e].opos;
+            if delta < 64 + 16 {
+                // A serif within 1.25 pixels of its base follows it.
+                let base = self.edges[self.edges[e].serif.map_or(e, |serif| serif.0)];
+                self.edges[e].pos = wrap(base.pos + (opos - base.opos));
+            } else if let Some(a) = *anchor {
+                let done = |i: &usize| self.edges[*i].flags.contains(EdgeFlags::DONE);
+                let previous = (0..e).rev().find(done);
+                let next = (e + 1..count).find(done);
+                self.edges[e].pos = wrap(if let (Some(b), Some(n)) = (previous, next) {
+                    // Between the fitted edges around it.
+                    let (b, n) = (self.edges[b], self.edges[n]);
+                    if n.opos == b.opos {
+                        b.pos
+                    } else {
+                        b.pos + mul_div(opos - b.opos, n.pos - b.pos, n.opos - b.opos)
+                    }
+                } else {
+                    // From the anchor, in half pixels.
+                    let anchor = self.edges[a];
+                    anchor.pos + ((opos - anchor.opos + 16) & !31)
+                });
+            } else {
+                self.edges[e].pos = pix_round(opos);
+                *anchor = Some(e);
+            }
+            self.edges[e].flags.insert(EdgeFlags::DONE);
+        }
+    }
 }
 
-/// `af_latin_hint_edges`: fits the edges of `dim`.
+/// Fits the edges of `dim` to the pixel grid.
 ///
 /// Horizontal edges in blue zones go to the zones' fitted positions first,
 /// with the other edge of their stem at the stem's width. Then every stem
@@ -257,229 +484,22 @@ fn hint_edges(
         dim,
         ppem,
     };
-    let top_to_bottom = dim == Dimension::Vertical && top_to_bottom;
-    // Whether `pos` lies before the position `limit` in the edges' order.
-    let before = |pos: i64, limit: i64| {
-        if top_to_bottom {
-            pos > limit
-        } else {
-            pos < limit
-        }
-    };
-    let mut anchor: Option<usize> = None;
-    let mut has_non_stem_edges = false;
-
+    let mut anchor = None;
     if dim == Dimension::Vertical {
-        for e in 0..count {
-            if fit.edges[e].flags & edge::DONE != 0 {
-                continue;
-            }
-            let mut link = fit.edges[e].link;
-            // A stem with a neutral and another blue zone keeps the other;
-            // with two neutral ones, the first.
-            if let Some(l) = link
-                && fit.edges[e].blue_edge.is_some()
-                && fit.edges[l].blue_edge.is_some()
-            {
-                if fit.edges[l].flags & edge::NEUTRAL != 0 {
-                    fit.edges[l].blue_edge = None;
-                    fit.edges[l].flags &= !edge::NEUTRAL;
-                } else if fit.edges[e].flags & edge::NEUTRAL != 0 {
-                    fit.edges[e].blue_edge = None;
-                    fit.edges[e].flags &= !edge::NEUTRAL;
-                }
-            }
-            let (blued, blue) = if let Some(blue) = fit.edges[e].blue_edge {
-                (e, blue)
-            } else if let Some((l, blue)) =
-                link.and_then(|l| fit.edges[l].blue_edge.map(|b| (l, b)))
-            {
-                // The other edge of the stem is in a zone.
-                link = Some(e);
-                (l, blue)
-            } else {
-                continue;
-            };
-            fit.edges[blued].pos = blue;
-            fit.edges[blued].flags |= edge::DONE;
-            if let Some(other) = link
-                && fit.edges[other].blue_edge.is_none()
-            {
-                fit.align_linked(blued, other);
-                fit.edges[other].flags |= edge::DONE;
-            }
-            if anchor.is_none() {
-                anchor = Some(e);
-            }
-        }
+        fit.align_blues(&mut anchor);
     }
-
-    // The other stems, in order.
-    for e in 0..count {
-        if fit.edges[e].flags & edge::DONE != 0 {
-            continue;
-        }
-        let Some(link) = fit.edges[e].link else {
-            has_non_stem_edges = true;
-            continue;
-        };
-        if fit.edges[link].blue_edge.is_some() {
-            // FreeType does not expect this.
-            fit.align_linked(link, e);
-            fit.edges[e].flags |= edge::DONE;
-            continue;
-        }
-        let (edge, other) = (fit.edges[e], fit.edges[link]);
-        let org_len = wrap(other.opos - edge.opos);
-        let cur_len = fit.width(e, link);
-        // Stems up to a pixel wide centre between pixels; up to 1.5 pixels,
-        // off centre.
-        let (u_off, d_off) = if cur_len <= 64 { (32, 32) } else { (38, 26) };
-        let centred = |org_center: i64| {
-            let pos = pix_round(org_center);
-            let error1 = abs(org_center - (pos - u_off));
-            let error2 = abs(org_center - (pos + d_off));
-            wrap(if error1 < error2 {
-                pos - u_off
-            } else {
-                pos + d_off
-            })
-        };
-        let Some(a) = anchor else {
-            // The first stem.
-            if cur_len < 96 {
-                let center = centred(wrap(edge.opos + (org_len >> 1)));
-                fit.edges[e].pos = wrap(center - cur_len / 2);
-                fit.edges[link].pos = wrap(fit.edges[e].pos + cur_len);
-            } else {
-                fit.edges[e].pos = pix_round(edge.opos);
-            }
-            anchor = Some(e);
-            fit.edges[e].flags |= edge::DONE;
-            fit.align_linked(e, link);
-            continue;
-        };
-        let anchor_edge = fit.edges[a];
-        let org_pos = wrap(anchor_edge.pos + (edge.opos - anchor_edge.opos));
-        let org_center = wrap(org_pos + (org_len >> 1));
-        if other.flags & edge::DONE != 0 {
-            fit.edges[e].pos = wrap(other.pos - cur_len);
-        } else if cur_len < 96 {
-            let center = centred(org_center);
-            fit.edges[e].pos = wrap(center - cur_len / 2);
-            fit.edges[link].pos = wrap(center + cur_len / 2);
-        } else {
-            // Round the nearer end, keeping the width.
-            let pos1 = pix_round(org_pos);
-            let delta1 = abs(pos1 + (cur_len >> 1) - org_center);
-            let pos2 = wrap(pix_round(org_pos + org_len) - cur_len);
-            let delta2 = abs(pos2 + (cur_len >> 1) - org_center);
-            fit.edges[e].pos = if delta1 < delta2 { pos1 } else { pos2 };
-            fit.edges[link].pos = wrap(fit.edges[e].pos + cur_len);
-        }
-        fit.edges[e].flags |= edge::DONE;
-        fit.edges[link].flags |= edge::DONE;
-        if e > 0 && before(fit.edges[e].pos, fit.edges[e - 1].pos) {
-            // Unless the stem would (almost, by 1/4 pixel) disappear.
-            let previous = fit.edges[e - 1].pos;
-            if abs(fit.edges[link].pos - previous) > 16 {
-                fit.edges[e].pos = previous;
-            }
-        }
-    }
-
-    // A lowercase m: six vertical edges sans serif, twelve with. Its three
-    // stems keep their even spacing if they had it.
-    if dim == Dimension::Horizontal && (count == 6 || count == 12) {
-        let (e1, e2, e3) = if count == 6 { (0, 2, 4) } else { (1, 5, 9) };
-        let dist1 = fit.edges[e2].opos - fit.edges[e1].opos;
-        let dist2 = fit.edges[e3].opos - fit.edges[e2].opos;
-        if abs(dist1 - dist2) < 8 {
-            let delta = fit.edges[e3].pos - (2 * fit.edges[e2].pos - fit.edges[e1].pos);
-            let shift = |edge: &mut Edge| edge.pos = wrap(edge.pos - delta);
-            shift(&mut fit.edges[e3]);
-            if let Some(link) = fit.edges[e3].link {
-                shift(&mut fit.edges[link]);
-            }
-            // The serifs move with the stem.
-            if count == 12 {
-                shift(&mut fit.edges[8]);
-                shift(&mut fit.edges[11]);
-            }
-            fit.edges[e3].flags |= edge::DONE;
-            if let Some(link) = fit.edges[e3].link {
-                fit.edges[link].flags |= edge::DONE;
-            }
-        }
-    }
-
+    let has_non_stem_edges =
+        fit.fit_stems(&mut anchor, dim == Dimension::Vertical && top_to_bottom);
+    fit.balance_three_stems();
     if has_non_stem_edges || anchor.is_none() {
-        // Serifs and single edges. None of them has a link, so FreeType's
-        // checks against crossing a neighbour never apply here.
-        for e in 0..count {
-            if fit.edges[e].flags & edge::DONE != 0 {
-                continue;
-            }
-            let mut delta = 1000;
-            if let Some(serif) = fit.edges[e].serif {
-                delta = wrap(fit.edges[serif].opos - fit.edges[e].opos);
-                let (top, bottom) = if delta < 0 {
-                    delta = wrap(-delta);
-                    (e, serif)
-                } else {
-                    (serif, e)
-                };
-                if delta < 64 + 32 {
-                    // Not a real serif if an edge between the two overlaps
-                    // them, such as an accent near its base.
-                    let (top_min, top_max) = fit.extent(top);
-                    let (bottom_min, bottom_max) = fit.extent(bottom);
-                    let (min_pos, max_pos) = (top_min.min(bottom_min), top_max.max(bottom_max));
-                    let overlapped = (bottom + 1..top).any(|between| {
-                        let (e_min, e_max) = fit.extent(between);
-                        !((e_min < min_pos && e_max < min_pos)
-                            || (e_min > max_pos && e_max > max_pos))
-                    });
-                    if overlapped {
-                        continue;
-                    }
-                }
-            }
-            let opos = fit.edges[e].opos;
-            if delta < 64 + 16 {
-                // `af_latin_align_serif_edge`: follow the serif's base.
-                let base = fit.edges[fit.edges[e].serif.unwrap_or(e)];
-                fit.edges[e].pos = wrap(base.pos + (opos - base.opos));
-            } else if let Some(a) = anchor {
-                let done = |i: &usize| fit.edges[*i].flags & edge::DONE != 0;
-                let previous = (0..e).rev().find(done);
-                let next = (e + 1..count).find(done);
-                fit.edges[e].pos = wrap(if let (Some(b), Some(n)) = (previous, next) {
-                    // Between the fitted edges around it.
-                    let (b, n) = (fit.edges[b], fit.edges[n]);
-                    if n.opos == b.opos {
-                        b.pos
-                    } else {
-                        b.pos + mul_div(opos - b.opos, n.pos - b.pos, n.opos - b.opos)
-                    }
-                } else {
-                    // From the anchor, in half pixels.
-                    let anchor = fit.edges[a];
-                    anchor.pos + ((opos - anchor.opos + 16) & !31)
-                });
-            } else {
-                fit.edges[e].pos = pix_round(opos);
-                anchor = Some(e);
-            }
-            fit.edges[e].flags |= edge::DONE;
-        }
+        fit.fit_remaining(&mut anchor);
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::super::super::hints::{Dimension, Width, edge};
+    use super::super::super::hints::{Dimension, EdgeFlags, Width};
     use super::super::Axis;
     use super::stem_width;
 
@@ -500,36 +520,50 @@ mod tests {
     #[test]
     fn stems_are_quantized_lightly() {
         let h = Dimension::Horizontal;
+        let plain = EdgeFlags::EMPTY;
         let standard = axis(Some(100), false);
         // Near the standard width: snapped to it.
-        assert_eq!(stem_width(&standard, h, 20, 120, 0, 0, 0), 100);
-        assert_eq!(stem_width(&standard, h, 20, -120, 0, 0, 0), -100);
+        assert_eq!(stem_width(&standard, h, 20, 120, 0, plain, plain), 100);
+        assert_eq!(stem_width(&standard, h, 20, -120, 0, plain, plain), -100);
         // Under three pixels: whole pixels plus small fractions.
-        assert_eq!(stem_width(&standard, h, 20, 150, 0, 0, 0), 128 + 10);
-        assert_eq!(stem_width(&standard, h, 20, 170, 0, 0, 0), 128 + 54);
+        assert_eq!(stem_width(&standard, h, 20, 150, 0, plain, plain), 128 + 10);
+        assert_eq!(stem_width(&standard, h, 20, 170, 0, plain, plain), 128 + 54);
         // Above: rounded, less part of the base edge's move at 20 ppem.
         assert_eq!(
-            stem_width(&standard, h, 20, 300, 40, 0, 0),
+            stem_width(&standard, h, 20, 300, 40, plain, plain),
             (300 - 20 + 32) & !63
         );
         // Without standard widths only the minimum applies.
         assert_eq!(
-            stem_width(&axis(None, false), h, 20, 30, 0, edge::ROUND, 0),
+            stem_width(&axis(None, false), h, 20, 30, 0, EdgeFlags::ROUND, plain),
             64
         );
-        assert_eq!(stem_width(&axis(None, false), h, 20, 30, 0, 0, 0), 56);
+        assert_eq!(
+            stem_width(&axis(None, false), h, 20, 30, 0, plain, plain),
+            56
+        );
         // Extra light axes and short vertical serifs keep their widths.
-        assert_eq!(stem_width(&axis(Some(100), true), h, 20, 30, 0, 0, 0), 30);
+        assert_eq!(
+            stem_width(&axis(Some(100), true), h, 20, 30, 0, plain, plain),
+            30
+        );
         let v = Dimension::Vertical;
-        assert_eq!(stem_width(&standard, v, 20, 30, 0, 0, edge::SERIF), 30);
+        assert_eq!(
+            stem_width(&standard, v, 20, 30, 0, plain, EdgeFlags::SERIF),
+            30
+        );
     }
 
     #[test]
-    fn a_width_of_ft_long_min_stays_negative() {
-        // FT_ABS leaves FT_LONG_MIN negative, under the 7/8 pixel minimum,
-        // which then applies: -56, where 64-bit arithmetic keeps the width.
+    fn the_smallest_32_bit_width_stays_negative() {
+        // Made positive in 32 bits the width stays negative, under the 7/8
+        // pixel minimum, which then applies: -56, where 64 bits keep the width.
         let width = i64::from(i32::MIN);
         let h = Dimension::Horizontal;
-        assert_eq!(stem_width(&axis(None, false), h, 20, width, 0, 0, 0), -56);
+        let plain = EdgeFlags::EMPTY;
+        assert_eq!(
+            stem_width(&axis(None, false), h, 20, width, 0, plain, plain),
+            -56
+        );
     }
 }

@@ -1,5 +1,5 @@
-//! Type 2 charstrings (Adobe Technical Note 5177) and CFF2 charstrings, evaluated
-//! in 16.16 fixed point as FreeType's CFF engine evaluates them.
+//! Type 2 charstrings (Adobe Technical Note 5177) and CFF2 charstrings,
+//! evaluated in 16.16. Translated from FreeType 2.15.0 (see `docs/provenance.md`).
 //!
 //! Stem hints and masks go to the glyph path, which hints with them at a size
 //! and otherwise only needs the mask lengths. As in FreeType, the stems are
@@ -10,6 +10,36 @@
 //! stack, as FreeType accepts both.
 //! Arithmetic wraps at 32 bits and rounds as FreeType's does; operands are not
 //! typed, so an integer operator accepts any number and rounds it.
+//!
+//! # What a glyph observes
+//!
+//! The outline is FreeType 2.15.0's for any charstring, valid or not. Another
+//! reader of charstrings may differ in each of these:
+//!
+//! - **Numbers.** 16.16 in 32 bits: sums wrap, `mul`, `div` and `sqrt` round,
+//!   and an index or count is its operand rounded and kept to 16 bits.
+//! - **Stack.** 48 operands in CFF and 513 in CFF2, with 32 transient slots;
+//!   one operand more fails the glyph.
+//! - **Subroutines.** Numbers are biased by the INDEX's count (TN 5177 4.7).
+//!   CFF nests 16 calls, local and global together, where TN 5177 states 10;
+//!   both versions also stop at the face's `Limits::depth`.
+//! - **Work.** Each operator and operand costs a unit of the caller's
+//!   `WorkBudget`; no fixed count of operations ends a glyph.
+//! - **End.** A charstring that runs out of bytes ends as `endchar` would, a
+//!   subroutine as `return` would. A reserved two-byte operator fails a CFF
+//!   glyph and clears a CFF2 stack, as do the arithmetic, storage and
+//!   conditional operators of Type 2 in CFF2, which does not run them.
+//! - **Hints.** A mask over more than 96 stems fails the glyph.
+//! - **`seac`.** `endchar` with four operands besides a width draws the
+//!   accent, at its offset, and then the base, each found through the
+//!   standard encoding and the charset; nested, or in a CID-keyed face, it
+//!   fails the glyph.
+//! - **Points.** [`outline`] gives whole font units: a contour starts at its
+//!   first segment, a zero-length line is dropped, and closing drops a final
+//!   point equal to the first and a contour of one point. [`bounds`] gives
+//!   the box of every point drawn, control points included, in unrounded
+//!   16.16 before the FontMatrix.
+//! - **`random`** is a linear congruential sequence of this crate's own.
 //!
 //! Bytes decode into [`Token`]s first; each operator family has its own handler.
 
@@ -25,7 +55,7 @@ use crate::read::Reader;
 use crate::work::charge;
 use triergon_core::{Error, Result, WorkBudget};
 
-/// Nested subroutine calls FreeType's CFF engine allows (`CF2_MAX_SUBR`). TN 5177
+/// Nested subroutine calls allowed, as many as FreeType allows. TN 5177
 /// Appendix B states 10, but real fonts nest deeper and FreeType renders them.
 const MAX_SUBR_DEPTH: u32 = 16;
 /// TN 5177 Appendix B: transient slots.
@@ -37,8 +67,7 @@ const fn int(v: i32) -> Fixed {
     v.wrapping_shl(16)
 }
 
-/// A charstring number as an integer, rounded and narrowed to 16 bits
-/// (`cf2_fixedToInt`).
+/// A charstring number as an integer, rounded and narrowed to 16 bits.
 const fn to_int(v: Fixed) -> i32 {
     (((v.cast_unsigned()).wrapping_add(0x8000) >> 16) as u16).cast_signed() as i32
 }
@@ -55,7 +84,7 @@ const fn truth(b: bool) -> Fixed {
 /// A charstring operator (TN 5177 Appendix A; CFF2 adds `vsindex` and `blend`
 /// and drops `return` and `endchar`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CharstringOperator {
+pub(crate) enum CharstringOperator {
     HStem,
     VStem,
     HStemHm,
@@ -108,9 +137,10 @@ pub enum CharstringOperator {
     Roll,
 }
 
+#[cfg(feature = "reference-trace")]
 impl CharstringOperator {
-    /// Every operator, in [`Self::name`] order of the specification's tables.
-    pub const ALL: [Self; 50] = [
+    /// Every operator, in the order of the specification's tables.
+    const ALL: [Self; 50] = [
         Self::HStem,
         Self::VStem,
         Self::HStemHm,
@@ -164,7 +194,7 @@ impl CharstringOperator {
     ];
 
     /// The operator's name in TN 5177.
-    pub const fn name(self) -> &'static str {
+    const fn name(self) -> &'static str {
         match self {
             Self::HStem => "hstem",
             Self::VStem => "vstem",
@@ -222,7 +252,9 @@ impl CharstringOperator {
     const fn bit(self) -> u64 {
         1 << self as u8
     }
+}
 
+impl CharstringOperator {
     /// The one-byte operator `byte`, or `None` for numbers, the escape byte and
     /// reserved values.
     const fn one_byte(byte: u8, version: Version) -> Option<Self> {
@@ -290,24 +322,33 @@ impl CharstringOperator {
     }
 }
 
-/// A set of charstring operators, such as those one glyph's program uses.
+/// A set of charstring operators, such as those one glyph's program executes
+/// ([`Font::charstring_operators`](crate::Font::charstring_operators)).
+#[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct OperatorSet(u64);
 
+#[cfg(feature = "reference-trace")]
 impl OperatorSet {
-    pub const fn contains(self, op: CharstringOperator) -> bool {
-        self.0 & op.bit() != 0
-    }
-
+    /// The operators of either set.
     #[must_use]
     pub const fn union(self, other: Self) -> Self {
         Self(self.0 | other.0)
     }
 
-    pub fn iter(self) -> impl Iterator<Item = CharstringOperator> {
+    /// The Type 2 and CFF2 operators outside the set.
+    #[must_use]
+    pub const fn complement(self) -> Self {
+        Self(!self.0 & ((1 << CharstringOperator::ALL.len()) - 1))
+    }
+
+    /// The names of the set's operators as TN 5177 and the CFF2 chapter spell
+    /// them, in the order of their tables.
+    pub fn names(self) -> impl Iterator<Item = &'static str> {
         CharstringOperator::ALL
             .into_iter()
-            .filter(move |&op| self.contains(op))
+            .filter(move |op| self.0 & op.bit() != 0)
+            .map(CharstringOperator::name)
     }
 }
 
@@ -330,6 +371,7 @@ pub(super) trait Observe {
 
 impl Observe for () {}
 
+#[cfg(feature = "reference-trace")]
 impl Observe for OperatorSet {
     fn operator(&mut self, op: CharstringOperator) {
         self.0 |= op.bit();
@@ -337,13 +379,17 @@ impl Observe for OperatorSet {
 }
 
 /// The box of every point a glyph's program draws, control points included, in
-/// 16.16 charstring coordinates before any FontMatrix: the bounds HarfBuzz
-/// takes CFF glyph extents from. A subpath's start counts once it draws.
+/// 16.16 charstring coordinates before any FontMatrix. A subpath's start
+/// counts once it draws.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CharstringBounds {
+    /// The least x coordinate of any point.
     pub x_min: i32,
+    /// The least y coordinate of any point.
     pub y_min: i32,
+    /// The greatest x coordinate of any point.
     pub x_max: i32,
+    /// The greatest y coordinate of any point.
     pub y_max: i32,
 }
 
@@ -432,6 +478,7 @@ pub(super) fn outline(
 
 /// The operators `glyph`'s program executes, including subroutines and `seac`
 /// components, into an outline that is then discarded.
+#[cfg(feature = "reference-trace")]
 pub(super) fn operators(
     cff: &Cff,
     table: &[u8],

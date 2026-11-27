@@ -38,9 +38,8 @@
 //! [`DecodedPictures::store`] stores a picture without any process, for a
 //! caller that drives output itself with [`DecodedPictures::bump`] and the
 //! counts [`DecodedPictures::len`] and [`DecodedPictures::bumpable`]. Storing
-//! is the only step that takes
-//! memory; [`DecodedPictures::try_reserve`] takes it ahead, for a caller whose
-//! step must not fail once it has changed the buffer.
+//! is the only step that takes memory; [`DecodedPictures::try_reserve`] takes
+//! it ahead, for a caller whose step must not fail once it has changed the buffer.
 //!
 //! The processes follow the specifications. FFmpeg's decoders were observed
 //! to output in other ways (see the caption extraction of `triergon-subtitles`
@@ -57,8 +56,7 @@
 //!   more than C.5.2.2 allows after it applies (pass
 //!   [`HevcLimits::max_dec_pic_buffering`] as `None` to leave the specified
 //!   check out).
-//! * [`LateOutput`]: a picture that leaves after a picture with a higher
-//!   order count has been output is dropped; observed for H.264.
+//! * [`LateOutput`]: drops a picture that leaves out of order; observed for H.264.
 //!
 //! [`order`] derives the picture order counts, with the observed H.264 rules
 //! as options: [`order::AfterMmco5::CodedLsb`] and
@@ -74,10 +72,22 @@ use triergon_core::{Budget, BudgetVec, Error, Result};
 pub enum Leave<'a, P> {
     /// Output by the bumping process: cropped and output, and marked as not
     /// needed for output. It stays stored while it is used for reference.
-    Output { poc: i32, picture: &'a P },
+    Output {
+        /// PicOrderCnt( ) of the picture.
+        poc: i32,
+        /// Its payload, lent for the call.
+        picture: &'a P,
+    },
     /// Its buffer is emptied. `output` says whether it was output before;
     /// a picture removed while still needed for output is discarded.
-    Removed { poc: i32, picture: P, output: bool },
+    Removed {
+        /// PicOrderCnt( ) of the picture.
+        poc: i32,
+        /// Its payload, given back.
+        picture: P,
+        /// Whether the bumping process output it before.
+        output: bool,
+    },
 }
 
 /// A stored picture, named for as long as it is stored.
@@ -87,16 +97,21 @@ pub struct PictureId(u32);
 /// How a field or frame is marked for reference (H.264 8.2.5, H.265 8.3.2).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Marking {
+    /// Unused for reference.
     #[default]
     Unused,
+    /// Used for short-term reference.
     ShortTerm,
+    /// Used for long-term reference.
     LongTerm,
 }
 
 /// A field of a frame.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Parity {
+    /// The top field.
     Top,
+    /// The bottom field.
     Bottom,
 }
 
@@ -140,6 +155,7 @@ impl<P> Stored<P> {
 pub struct Entry<'a, P>(&'a mut Stored<P>);
 
 impl<P> Entry<'_, P> {
+    /// The name the picture has while it is stored.
     #[must_use]
     pub fn id(&self) -> PictureId {
         self.0.id
@@ -151,6 +167,8 @@ impl<P> Entry<'_, P> {
         self.0.poc
     }
 
+    /// The marking of `field`. A frame is stored with both fields marked
+    /// alike, a field picture with the field it lacks unused.
     #[must_use]
     pub fn marking(&self, field: Parity) -> Marking {
         self.0.marking[field.index()]
@@ -164,25 +182,27 @@ impl<P> Entry<'_, P> {
         }
     }
 
-    /// Either field is used for reference.
+    #[cfg(test)]
     #[must_use]
-    pub fn is_reference(&self) -> bool {
+    fn is_reference(&self) -> bool {
         self.0.reference()
     }
 
-    /// Marked as "needed for output".
+    #[cfg(test)]
     #[must_use]
-    pub fn is_waiting(&self) -> bool {
+    fn is_waiting(&self) -> bool {
         self.0.waiting
     }
 
+    #[cfg(test)]
     #[must_use]
-    pub fn was_output(&self) -> bool {
+    fn was_output(&self) -> bool {
         self.0.output
     }
 
+    #[cfg(test)]
     #[must_use]
-    pub fn is_held(&self) -> bool {
+    fn is_held(&self) -> bool {
         self.0.held
     }
 
@@ -192,11 +212,13 @@ impl<P> Entry<'_, P> {
         self.0.held = false;
     }
 
+    /// The payload stored with the picture.
     #[must_use]
     pub fn picture(&self) -> &P {
         &self.0.picture
     }
 
+    /// The payload stored with the picture, for the caller to change.
     pub fn picture_mut(&mut self) -> &mut P {
         &mut self.0.picture
     }
@@ -230,6 +252,7 @@ impl<P> Entry<'_, P> {
 pub struct View<'a, P>(&'a Stored<P>);
 
 impl<'a, P> View<'a, P> {
+    /// The name the picture has while it is stored.
     #[must_use]
     pub fn id(&self) -> PictureId {
         self.0.id
@@ -241,6 +264,7 @@ impl<'a, P> View<'a, P> {
         self.0.poc
     }
 
+    /// The marking of `field`, as [`Entry::marking`] reads it.
     #[must_use]
     pub fn marking(&self, field: Parity) -> Marking {
         self.0.marking[field.index()]
@@ -269,7 +293,7 @@ pub struct NewPicture {
     pub output: bool,
     /// Its marking after decoding; `Unused` for a non-reference picture.
     pub marking: Marking,
-    /// The field, for a field picture.
+    /// Field parity for a field picture, or `None` for a frame.
     pub field: Option<Parity>,
     /// Kept out of bumping until [`Entry::release`] or its second field.
     pub hold: bool,
@@ -278,7 +302,9 @@ pub struct NewPicture {
 /// A picture the buffer did not take, given back.
 #[derive(Debug)]
 pub struct Refused<P> {
+    /// The pool's refusal of the memory for one more picture.
     pub error: Error,
+    /// The payload of the picture that was not stored.
     pub picture: P,
 }
 
@@ -288,6 +314,7 @@ pub enum StoreError<P> {
     /// Every frame buffer holds a picture used for reference and none waits
     /// for output: the stream overflows the buffer.
     Full(P),
+    /// The pool refused the memory for one more picture.
     Refused(Refused<P>),
 }
 
@@ -305,7 +332,7 @@ pub struct HevcLimits {
     /// `sps_max_dec_pic_buffering_minus1 + 1`, or `None` to leave the
     /// fullness condition of C.5.2.2 out.
     pub max_dec_pic_buffering: Option<u32>,
-    /// `sps_max_num_reorder_pics`.
+    /// Most pictures that may wait for output before reorder bumping.
     pub max_num_reorder: u32,
     /// `SpsMaxLatencyPictures` (7-9), `None` when
     /// `sps_max_latency_increase_plus1` is 0.
@@ -349,6 +376,7 @@ pub struct HevcPicture {
 /// What C.4.4 needs of the current H.264 picture.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct AvcPicture {
+    /// An IDR picture.
     pub idr: bool,
     /// The picture has `memory_management_control_operation` equal to 5.
     pub mmco5: bool,
@@ -358,6 +386,7 @@ pub struct AvcPicture {
 }
 
 impl<P> DecodedPictures<P> {
+    /// An empty buffer whose storage is charged to `pool`.
     #[must_use]
     pub fn new(pool: &Budget) -> Self {
         Self {
@@ -366,20 +395,20 @@ impl<P> DecodedPictures<P> {
         }
     }
 
-    /// The pictures stored: the DPB fullness.
+    /// Number of occupied picture slots, including pictures kept for reference after output.
     #[must_use]
     pub fn len(&self) -> usize {
         self.stored.len()
     }
 
+    /// True when no picture is stored.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.stored.is_empty()
     }
 
-    /// The pictures needed for output.
     #[must_use]
-    pub fn waiting(&self) -> usize {
+    fn waiting(&self) -> usize {
         self.stored.iter().filter(|p| p.waiting).count()
     }
 
@@ -405,22 +434,19 @@ impl<P> DecodedPictures<P> {
         self.stored.iter().map(|p| &p.picture)
     }
 
-    /// Makes room for `additional` more pictures: storing them then neither
-    /// allocates nor fails, whatever leaves the buffer in between.
-    ///
-    /// # Errors
-    ///
-    /// When the pool refuses the memory; the buffer is left as it was.
+    /// Makes room for `additional` more pictures: storing them then neither allocates
+    /// nor fails, whatever leaves the buffer in between. Fails when the pool refuses
+    /// the memory; the buffer is left as it was.
     pub fn try_reserve(&mut self, additional: usize) -> Result<()> {
         self.stored.try_reserve(additional)
     }
 
-    /// The stored picture `id`.
+    /// Borrows `id` for reading and marking. Returns `None` if it is absent.
     pub fn entry(&mut self, id: PictureId) -> Option<Entry<'_, P>> {
         self.stored.iter_mut().find(|p| p.id == id).map(Entry)
     }
 
-    /// The payload of the stored picture `id`, borrowed for as long as the buffer is.
+    /// Borrows the payload of `id` mutably. Returns `None` for an absent picture.
     pub fn picture_mut(&mut self, id: PictureId) -> Option<&mut P> {
         self.stored
             .iter_mut()
@@ -428,8 +454,7 @@ impl<P> DecodedPictures<P> {
             .map(|p| &mut p.picture)
     }
 
-    /// Removes the stored picture `id` without output and gives its payload
-    /// back.
+    /// Removes `id` without output and gives its payload back, if it was stored.
     pub fn take(&mut self, id: PictureId) -> Option<P> {
         let at = self.stored.iter().position(|p| p.id == id)?;
         self.stored.as_mut_slice()[at..].rotate_left(1);
@@ -454,11 +479,8 @@ impl<P> DecodedPictures<P> {
         self.retain_references(|_, _| false);
     }
 
-    /// Stores a picture without bumping or removal, and names it.
-    ///
-    /// # Errors
-    ///
-    /// When the pool refuses the memory; the picture is given back.
+    /// Stores a picture without bumping or removal, and names it. Fails when the pool
+    /// refuses the memory; the picture is given back.
     pub fn store(
         &mut self,
         new: NewPicture,
@@ -596,11 +618,9 @@ impl<P> DecodedPictures<P> {
     /// without being stored when the buffer is full (C.4.5.2): then `None`.
     /// A non-reference picture that is not output is not stored either.
     ///
-    /// # Errors
-    ///
-    /// [`StoreError::Full`] when every buffer holds a reference picture and
-    /// none waits for output; [`StoreError::Refused`] when the pool refuses
-    /// the memory. The picture is given back.
+    /// Fails with [`StoreError::Full`] when every buffer holds a reference picture and
+    /// none waits for output; [`StoreError::Refused`] when the pool refuses the memory.
+    /// The picture is given back.
     pub fn avc_store(
         &mut self,
         current: NewPicture,
@@ -648,9 +668,7 @@ impl<P> DecodedPictures<P> {
     /// own before it joins; otherwise the pair waits for output when the
     /// field's OutputFlag is 1 ([`Entry::pair`]).
     ///
-    /// # Errors
-    ///
-    /// When `first` is not stored; the field is given back.
+    /// Fails when `first` is not stored; the field is given back.
     pub fn avc_store_second_field(
         &mut self,
         first: PictureId,
@@ -677,9 +695,7 @@ impl<P> DecodedPictures<P> {
     /// needed for output, stored after bumping while the buffer of
     /// `dpb_frames` frame buffers is full.
     ///
-    /// # Errors
-    ///
-    /// As [`DecodedPictures::avc_store`].
+    /// Fails as [`DecodedPictures::avc_store`] does.
     pub fn avc_store_gap_frame(
         &mut self,
         poc: i32,
@@ -734,13 +750,10 @@ impl<P> DecodedPictures<P> {
         }
     }
 
-    /// H.265 C.3.4 and C.5.2.3: stores the current picture (marked as used
-    /// for short-term reference, and needed for output when PicOutputFlag is
-    /// 1), then bumps while too many pictures wait or one waits too long.
-    ///
-    /// # Errors
-    ///
-    /// When the pool refuses the memory; the picture is given back.
+    /// H.265 C.3.4 and C.5.2.3: stores the current picture (marked as used for
+    /// short-term reference, and needed for output when PicOutputFlag is 1), then bumps
+    /// while too many pictures wait or one waits too long. Fails when the pool refuses
+    /// the memory; the picture is given back.
     pub fn hevc_store(
         &mut self,
         poc: i32,
@@ -818,12 +831,6 @@ impl LateOutput {
     #[must_use]
     pub fn is_late(&self, poc: i32) -> bool {
         self.last.is_some_and(|last| poc < last)
-    }
-
-    /// The order count of the last picture admitted.
-    #[must_use]
-    pub fn last(&self) -> Option<i32> {
-        self.last
     }
 
     /// A new output order begins.

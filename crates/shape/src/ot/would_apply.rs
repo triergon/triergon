@@ -1,6 +1,7 @@
 //! Whether a substitution lookup would apply to a glyph sequence on its own,
 //! without a buffer: HarfBuzz's `hb_ot_layout_lookup_would_substitute`, which
 //! the Indic shaper asks to learn which consonants have special forms.
+//! Translated from HarfBuzz 14.6.0 (see `docs/provenance.md`).
 
 use super::context::{self, FirstGlyph, Rule};
 use super::data::Data;

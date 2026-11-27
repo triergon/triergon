@@ -4,8 +4,9 @@
 use triergon_bitstream::LsbReader;
 use triergon_codec::{Budget, BudgetVec};
 
+use crate::DecodeError;
+use crate::setup::{ilog, push};
 use crate::window::Block;
-use crate::{DecodeError, ilog, push};
 
 /// One square-polar coupling step.
 #[derive(Clone, Copy, Debug)]

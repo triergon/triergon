@@ -4,6 +4,7 @@
 use crate::SliceError;
 use crate::cabac::Cabac;
 use crate::cavlc::{self, CavlcTables};
+use crate::mbdec::Cavlc;
 use crate::mbinfo::*;
 use crate::picture::*;
 use crate::slice::{SliceHeader, SliceType};
@@ -23,65 +24,68 @@ pub(crate) type WeightTable = [[[(i32, i32); 3]; 32]; 2];
 
 /// Immutable per-slice decoding parameters.
 pub(crate) struct SliceCtx {
-    pub sh: SliceHeader,
-    pub slice_num: u16,
-    pub cabac: bool,
-    pub constrained_intra: bool,
-    pub t8x8_mode: bool,
-    pub chroma: bool,
-    pub chroma_qp_off: [i32; 2],
+    pub(crate) sh: SliceHeader,
+    pub(crate) slice_num: u16,
+    pub(crate) cabac: bool,
+    pub(crate) constrained_intra: bool,
+    pub(crate) t8x8_mode: bool,
+    pub(crate) chroma: bool,
+    pub(crate) chroma_qp_off: [i32; 2],
     /// LevelScale4x4: [iYCbCr + 3 * inter][qP % 6][raster].
-    pub ls4: Box<[[[i32; 16]; 6]; 6]>,
+    pub(crate) ls4: Box<[[[i32; 16]; 6]; 6]>,
     /// LevelScale8x8: [inter][qP % 6][raster].
-    pub ls8: Box<[[[i32; 64]; 6]; 2]>,
-    pub ref_list: [Vec<RefPic>; 2],
-    pub direct_8x8_inference: bool,
-    pub wp: Wp,
+    pub(crate) ls8: Box<[[[i32; 64]; 6]; 2]>,
+    pub(crate) ref_list: [Vec<RefPic>; 2],
+    pub(crate) direct_8x8_inference: bool,
+    pub(crate) wp: Wp,
     /// Explicit weights: [list][refIdxWP] = (luma w, o), (cb w, o), (cr w, o).
-    pub weights: Box<WeightTable>,
-    pub log_wd: [u32; 2],
+    pub(crate) weights: Box<WeightTable>,
+    pub(crate) log_wd: [u32; 2],
     /// Colocated picture motion for temporal/spatial direct: see `ColPic`.
-    pub col: Option<ColInfo>,
+    pub(crate) col: Option<ColInfo>,
 }
 
 /// Information about RefPicList1[0] for direct prediction.
 #[derive(Clone, Copy, Debug)]
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct ColInfo {
     /// Position in the decoded picture buffer of the frame store holding RefPicList1[0].
-    pub idx: usize,
-    /// Parity of RefPicList1[0] (0 frame, 1 top, 2 bottom).
-    pub parity: u8,
-    pub short_term: bool,
+    pub(crate) idx: usize,
+    /// RefPicList1[0]: a frame or one of its fields.
+    pub(crate) parity: Structure,
+    pub(crate) short_term: bool,
 }
 
 /// The picture being decoded.
 #[derive(Debug)]
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct CurPic {
     /// Position in the decoded picture buffer of the current frame's first field, while
     /// its second field is decoded into the same frame buffer.
-    pub first_field: Option<usize>,
-    pub buf: FrameBuf,
-    pub motion: Motion,
-    pub mbs: BudgetVec<MbInfo>,
+    pub(crate) first_field: Option<usize>,
+    pub(crate) buf: FrameBuf,
+    pub(crate) motion: Motion,
+    pub(crate) mbs: BudgetVec<MbInfo>,
+    pub(crate) slices: BudgetVec<SliceDbk>,
+    pub(crate) dbk: crate::deblock::Progress,
     /// Width in MBs and height in MBs of this picture (field: half the frame height).
-    pub w: MbWidth,
-    pub h: usize,
-    /// 0 frame, 1 top field, 2 bottom field.
-    pub structure: u8,
-    pub mbaff: bool,
-    pub poc: [i32; 2],
-    pub slices: BudgetVec<SliceDbk>,
-    pub decoded_mbs: usize,
-    pub chroma: bool,
-    pub dbk: crate::deblock::Progress,
+    pub(crate) w: MbWidth,
+    pub(crate) h: usize,
+    pub(crate) poc: [i32; 2],
+    pub(crate) decoded_mbs: usize,
+    pub(crate) mbaff: bool,
+    pub(crate) chroma: bool,
+    pub(crate) structure: Structure,
 }
 
 impl CurPic {
     pub(crate) fn pic_poc(&self) -> i32 {
         match self.structure {
-            1 => self.poc[0],
-            2 => self.poc[1],
-            _ => self.poc[0].min(self.poc[1]),
+            Structure::Top => self.poc[0],
+            Structure::Bottom => self.poc[1],
+            Structure::Frame => self.poc[0].min(self.poc[1]),
         }
     }
 }
@@ -90,9 +94,9 @@ impl CurPic {
 #[derive(Clone, Copy)]
 pub(crate) struct Refs<'a> {
     /// The stored frame stores, by position in the decoded picture buffer.
-    pub dpb: &'a [&'a FrameStore],
+    pub(crate) dpb: &'a [&'a FrameStore],
     /// Stands in for the samples of a store that has none; callers check first.
-    pub no_samples: &'a FrameBuf,
+    pub(crate) no_samples: &'a FrameBuf,
 }
 
 impl<'a> Refs<'a> {
@@ -104,54 +108,57 @@ impl<'a> Refs<'a> {
 
 /// Geometry of a macroblock in the current picture's planes.
 #[derive(Clone, Copy, Debug, Default)]
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct MbGeom {
-    pub mbx: usize,
+    pub(crate) mbx: usize,
     /// Luma y of the MB's first row in its own (field or frame) coordinates.
-    pub y_pic: usize,
-    pub off_y: usize,
-    pub stride_y: usize,
-    pub off_c: usize,
-    pub stride_c: usize,
-    /// The MB samples belong to a field (field picture or MBAFF field MB): parity 1 top 2 bottom.
-    pub field_parity: u8,
+    pub(crate) y_pic: usize,
+    pub(crate) off_y: usize,
+    pub(crate) stride_y: usize,
+    pub(crate) off_c: usize,
+    pub(crate) stride_c: usize,
+    /// The field the MB samples belong to (field picture or MBAFF field MB), else `Frame`.
+    pub(crate) field_parity: Structure,
 }
 
 /// Neighbouring macroblock addresses (6.4.9 / 6.4.10) of the current MB; None = unavailable.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct NbAddr {
-    pub a: Option<usize>,
-    pub b: Option<usize>,
-    pub c: Option<usize>,
-    pub d: Option<usize>,
+    pub(crate) a: Option<usize>,
+    pub(crate) b: Option<usize>,
+    pub(crate) c: Option<usize>,
+    pub(crate) d: Option<usize>,
 }
 
+// repr(C) in the measured field order: the macroblock functions load neighbouring fields together.
+#[repr(C)]
 pub(crate) struct SliceDecoder<'a> {
-    pub s: &'a SliceCtx,
-    pub pic: &'a mut CurPic,
-    pub refs: Refs<'a>,
-    pub vlc: &'static CavlcTables,
-    pub br: BitReader<'a>,
-    pub cabac: Option<Cabac<'a>>,
-    pub cur: usize,
-    pub nb: NbAddr,
-    pub geom: MbGeom,
-    pub qp: i32,
-    pub prev_qp_delta_nz: bool,
-    pub mb: crate::mbdec::MbData,
-    /// MBAFF: field flag decoded ahead for a skipped top MB (CAVLC) or for the pair (CABAC).
-    pub pending_field: Option<bool>,
-    pub last_mb_in_slice: usize,
-    /// Spatial direct (refIdx, mvp, directZero) of the current MB.
-    pub spatial_cache: Option<([i32; 2], [[i32; 2]; 2], bool)>,
+    pub(crate) nb: NbAddr,
+    pub(crate) s: &'a SliceCtx,
+    pub(crate) pic: &'a mut CurPic,
+    pub(crate) refs: Refs<'a>,
+    pub(crate) vlc: &'static CavlcTables,
+    pub(crate) br: BitReader<'a>,
+    /// Prediction of the current macroblock when it may read its own picture.
+    pub(crate) mb_out: &'a mut crate::inter::MbSamples,
+    pub(crate) cur: usize,
+    pub(crate) geom: MbGeom,
+    pub(crate) last_mb_in_slice: usize,
+    /// Second-list prediction scratch for motion compensation.
+    pub(crate) mc_tmp: crate::inter::McTmp,
     /// Whole-MB motion (refIdx and vector per list, refIdx -1 = list unused) when the MB is
     /// predicted as one 16x16 block, recorded while deriving it for motion compensation.
-    pub mb_motion: Option<([i32; 2], [[i32; 2]; 2])>,
+    pub(crate) mb_motion: Option<([i32; 2], [[i32; 2]; 2])>,
+    pub(crate) mb: crate::mbdec::MbData,
+    /// Spatial direct (refIdx, mvp, directZero) of the current MB.
+    pub(crate) spatial_cache: Option<([i32; 2], [[i32; 2]; 2], bool)>,
+    pub(crate) qp: i32,
+    pub(crate) prev_qp_delta_nz: bool,
     /// Some reference is the first field of the current frame (second-field decoding).
-    pub self_ref_possible: bool,
-    /// Second-list prediction scratch for motion compensation.
-    pub mc_tmp: crate::inter::McTmp,
-    /// Prediction of the current macroblock when it may read its own picture.
-    pub mb_out: &'a mut crate::inter::MbSamples,
+    pub(crate) self_ref_possible: bool,
+    /// MBAFF: field flag decoded ahead for a skipped top MB (CAVLC) or for the pair (CABAC).
+    pub(crate) pending_field: Option<bool>,
 }
 
 impl<'a> SliceDecoder<'a> {
@@ -178,7 +185,6 @@ impl<'a> SliceDecoder<'a> {
             refs,
             vlc: cavlc::tables(),
             br,
-            cabac: None,
             cur: 0,
             nb: NbAddr::default(),
             geom: MbGeom::default(),
@@ -268,7 +274,7 @@ impl<'a> SliceDecoder<'a> {
                     stride_y: sy * 2,
                     off_c: (py * 16 + bot) * sc + mbx * 8,
                     stride_c: sc * 2,
-                    field_parity: 1 + bot as u8,
+                    field_parity: Structure::FIELDS[bot],
                 }
             } else {
                 MbGeom {
@@ -278,12 +284,12 @@ impl<'a> SliceDecoder<'a> {
                     stride_y: sy,
                     off_c: (py * 16 + bot * 8) * sc + mbx * 8,
                     stride_c: sc,
-                    field_parity: 0,
+                    field_parity: Structure::Frame,
                 }
             }
         } else {
             let (mbx, mby) = p.w.split(addr);
-            if p.structure == 0 {
+            if p.structure == Structure::Frame {
                 MbGeom {
                     mbx,
                     y_pic: mby * 16,
@@ -291,10 +297,10 @@ impl<'a> SliceDecoder<'a> {
                     stride_y: sy,
                     off_c: mby * 8 * sc + mbx * 8,
                     stride_c: sc,
-                    field_parity: 0,
+                    field_parity: Structure::Frame,
                 }
             } else {
-                let par = (p.structure - 1) as usize;
+                let par = p.structure.index();
                 MbGeom {
                     mbx,
                     y_pic: mby * 16,
@@ -530,10 +536,10 @@ impl<'a> SliceDecoder<'a> {
 
     fn begin_mb(&mut self, addr: usize) -> Result<(), SliceError> {
         if addr >= self.pic_size() {
-            return Err(SliceError::InvalidData("slice runs past picture end"));
+            return Err(SliceError::Invalid("slice runs past picture end"));
         }
         if self.pic.mbs[addr].slice != 0 {
-            return Err(SliceError::InvalidData("macroblock decoded twice"));
+            return Err(SliceError::Invalid("macroblock decoded twice"));
         }
         self.cur = addr;
         let mut info = MbInfo {
@@ -547,7 +553,7 @@ impl<'a> SliceDecoder<'a> {
                 self.pic.mbs[addr - 1].field
             };
         } else {
-            info.field = self.pic.structure != 0;
+            info.field = self.pic.structure.is_field();
         }
         self.pic.mbs[addr] = info;
         self.compute_nb();
@@ -565,81 +571,111 @@ impl<'a> SliceDecoder<'a> {
 
     /// Decode all macroblocks of the slice (7.3.4 slice_data()).
     pub(crate) fn run(&mut self) -> Result<(), SliceError> {
-        let sh = &self.s.sh;
-        let mbaff = self.pic.mbaff;
-        let cabac = self.s.cabac;
-        let mut addr = sh.first_mb as usize * (1 + mbaff as usize);
-        let is_i = sh.slice_type.is_intra();
-        if cabac {
-            self.br.align(8);
-            let start = self.br.position() / 8;
-            let len = self.br.end() / 8;
-            let init_idx = if is_i {
-                0
-            } else {
-                sh.cabac_init_idc as usize + 1
-            };
-            self.cabac = Some(Cabac::new(
-                self.br.data(),
-                start,
-                len,
-                sh.slice_qp,
-                init_idx,
-            )?);
+        let s = self.s;
+        let sh = &s.sh;
+        let first = sh.first_mb as usize * (1 + self.pic.mbaff as usize);
+        if !s.cabac {
+            return self.run_cavlc(first);
         }
+        self.br.align(8);
+        let start = self.br.position() / 8;
+        let len = self.br.end() / 8;
+        let init_idx = if sh.slice_type.is_intra() {
+            0
+        } else {
+            sh.cabac_init_idc as usize + 1
+        };
+        let mut cabac = Cabac::new(self.br.data(), start, len, sh.slice_qp, init_idx)?;
+        self.run_cabac(&mut cabac, first)
+    }
+
+    /// The CAVLC macroblock loop from address `addr`.
+    fn run_cavlc(&mut self, mut addr: usize) -> Result<(), SliceError> {
+        let mbaff = self.pic.mbaff;
+        let is_i = self.s.sh.slice_type.is_intra();
+        let mut more = true;
+        let mut prev_skipped = false;
+        while more {
+            if !is_i {
+                let run = self.br.ue() as usize;
+                if run > self.pic_size() {
+                    return Err(SliceError::Invalid("mb_skip_run"));
+                }
+                prev_skipped = run > 0;
+                for i in 0..run {
+                    self.pending_field = None;
+                    self.begin_mb(addr)?;
+                    if mbaff && addr & 1 == 0 && i + 1 == run && self.br.more_rbsp_data() {
+                        // The bottom MB is coded and its mb_field_decoding_flag follows.
+                        let f = self.br.bit();
+                        self.pending_field = Some(f);
+                        self.set_field(f);
+                    }
+                    self.decode_skip_mb()?;
+                    self.finish_mb();
+                    addr += 1;
+                }
+                if run > 0 {
+                    more = self.br.more_rbsp_data();
+                }
+            }
+            if more {
+                let pend = self.pending_field;
+                self.begin_mb(addr)?;
+                self.pending_field = pend;
+                if mbaff && (addr & 1 == 0 || prev_skipped) {
+                    let f = match self.pending_field.take() {
+                        Some(f) => f,
+                        None => self.br.bit(),
+                    };
+                    self.set_field(f);
+                }
+                self.pending_field = None;
+                self.decode_coded_mb(&mut Cavlc)?;
+                self.finish_mb();
+            }
+            more = self.br.more_rbsp_data();
+            if self.br.overrun() {
+                return Err(SliceError::Invalid("CAVLC data overrun"));
+            }
+            addr += 1;
+        }
+        Ok(())
+    }
+
+    /// The CABAC macroblock loop from address `addr`.
+    fn run_cabac(&mut self, c: &mut Cabac<'_>, mut addr: usize) -> Result<(), SliceError> {
+        let mbaff = self.pic.mbaff;
+        let is_i = self.s.sh.slice_type.is_intra();
         let mut more = true;
         let mut prev_skipped = false;
         let mut bottom_skip: Option<bool> = None;
         while more {
             let mut skip_flag = false;
             if !is_i {
-                if !cabac {
-                    let run = self.br.ue() as usize;
-                    if run > self.pic_size() {
-                        return Err(SliceError::InvalidData("mb_skip_run"));
+                let pend = self.pending_field;
+                self.begin_mb(addr)?;
+                skip_flag = match bottom_skip.take() {
+                    Some(v) if addr & 1 == 1 => v,
+                    _ => self.decode_skip_flag_cabac(c),
+                };
+                if skip_flag && mbaff && addr & 1 == 0 {
+                    let (bs, f) = self.cabac_mbaff_lookahead(c);
+                    bottom_skip = Some(bs);
+                    self.pending_field = f;
+                    if let Some(f) = f {
+                        self.set_field(f);
                     }
-                    prev_skipped = run > 0;
-                    for i in 0..run {
-                        self.pending_field = None;
-                        self.begin_mb(addr)?;
-                        if mbaff && addr & 1 == 0 && i + 1 == run && self.br.more_rbsp_data() {
-                            // The bottom MB is coded and its mb_field_decoding_flag follows.
-                            let f = self.br.bit();
-                            self.pending_field = Some(f);
-                            self.set_field(f);
-                        }
-                        self.decode_skip_mb()?;
-                        self.finish_mb();
-                        addr += 1;
-                    }
-                    if run > 0 {
-                        more = self.br.more_rbsp_data();
-                    }
-                } else {
-                    let pend = self.pending_field;
-                    self.begin_mb(addr)?;
-                    skip_flag = match bottom_skip.take() {
-                        Some(v) if addr & 1 == 1 => v,
-                        _ => self.decode_skip_flag_cabac(),
-                    };
-                    if skip_flag && mbaff && addr & 1 == 0 {
-                        let (bs, f) = self.cabac_mbaff_lookahead();
-                        bottom_skip = Some(bs);
-                        self.pending_field = f;
-                        if let Some(f) = f {
-                            self.set_field(f);
-                        }
-                    } else if addr & 1 == 1 {
-                        self.pending_field = pend;
-                    }
-                    more = !skip_flag;
-                    if skip_flag {
-                        self.decode_skip_mb()?;
-                    }
+                } else if addr & 1 == 1 {
+                    self.pending_field = pend;
+                }
+                more = !skip_flag;
+                if skip_flag {
+                    self.decode_skip_mb()?;
                 }
             }
             if more {
-                if is_i || !cabac {
+                if is_i {
                     let pend = self.pending_field;
                     self.begin_mb(addr)?;
                     self.pending_field = pend;
@@ -647,42 +683,25 @@ impl<'a> SliceDecoder<'a> {
                 if mbaff && (addr & 1 == 0 || prev_skipped) {
                     let f = match self.pending_field.take() {
                         Some(f) => f,
-                        None => {
-                            if cabac {
-                                self.decode_field_flag_cabac()
-                            } else {
-                                self.br.bit()
-                            }
-                        }
+                        None => self.decode_field_flag_cabac(c),
                     };
                     self.set_field(f);
                 }
                 self.pending_field = None;
-                self.decode_coded_mb()?;
-                if !cabac {
-                    self.finish_mb();
-                }
+                self.decode_coded_mb(c)?;
             }
-            if !cabac {
-                more = self.br.more_rbsp_data();
-                if self.br.overrun() {
-                    return Err(SliceError::InvalidData("CAVLC data overrun"));
-                }
+            if !is_i {
+                prev_skipped = skip_flag;
+            }
+            if mbaff && addr & 1 == 0 {
+                more = true;
             } else {
-                if !is_i {
-                    prev_skipped = skip_flag;
+                more = c.terminate() == 0;
+                if c.overrun() {
+                    return Err(SliceError::Invalid("CABAC data overrun"));
                 }
-                if mbaff && addr & 1 == 0 {
-                    more = true;
-                } else {
-                    let c = self.cabac.as_mut().unwrap();
-                    more = c.terminate() == 0;
-                    if c.overrun() {
-                        return Err(SliceError::InvalidData("CABAC data overrun"));
-                    }
-                }
-                self.finish_mb();
             }
+            self.finish_mb();
             addr += 1;
         }
         Ok(())
@@ -696,7 +715,7 @@ impl<'a> SliceDecoder<'a> {
 
     /// CABAC MBAFF: the top MB is skipped; decode the bottom MB's mb_skip_flag (and
     /// mb_field_decoding_flag when it is not skipped) so the pair's field mode is known.
-    fn cabac_mbaff_lookahead(&mut self) -> (bool, Option<bool>) {
+    fn cabac_mbaff_lookahead(&mut self, c: &mut Cabac<'_>) -> (bool, Option<bool>) {
         let top = self.cur;
         let bot = top + 1;
         let saved_top = self.pic.mbs[top];
@@ -712,9 +731,9 @@ impl<'a> SliceDecoder<'a> {
         };
         self.cur = bot;
         self.compute_nb();
-        let bot_skip = self.decode_skip_flag_cabac();
+        let bot_skip = self.decode_skip_flag_cabac(c);
         let f = if !bot_skip {
-            Some(self.decode_field_flag_cabac())
+            Some(self.decode_field_flag_cabac(c))
         } else {
             None
         };

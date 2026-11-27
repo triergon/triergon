@@ -3,11 +3,12 @@
 //! results against the feature contract. Failures are recorded, never dropped.
 
 pub mod acceptance;
-pub mod bounds;
+pub(crate) mod bounds;
 pub mod build;
-pub mod comparison;
+pub(crate) mod comparison;
 pub mod diff;
 pub mod features;
+mod fold_refusal;
 pub mod gate_build;
 pub mod grade;
 pub mod link_corpus;
@@ -17,18 +18,21 @@ pub mod linux;
 #[cfg(test)]
 mod linux_tests;
 pub mod manifest;
+pub mod measured;
 pub mod memory;
 pub mod oracle;
+pub mod oracle_compare;
 pub mod parity;
 pub mod policy;
 pub mod preflight;
 pub mod provenance;
+pub mod registry;
 pub mod report;
 pub mod reuse;
 pub mod screen;
 #[cfg(test)]
 mod tests;
 pub mod timing;
-pub mod validation;
+pub(crate) mod validation;
 pub mod vectors;
 pub mod worker;

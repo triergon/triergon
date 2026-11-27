@@ -1,4 +1,5 @@
 //! Offsetting cubic splines.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::Result;
 
@@ -223,6 +224,10 @@ struct Shift {
 impl Shift {
     /// The best fit for the offset's radius, when its radial error is below
     /// `err_c`.
+    #[allow(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "a NaN error fails the tolerance check"
+    )]
     fn fit(frame: &Frame, err_c: f64) -> Option<Self> {
         let Frame { c, s, dc, ds } = *frame;
         let t = (ds[0] + ds[1]) / (dc[0] + dc[1]);
@@ -293,6 +298,10 @@ impl Spline for Cubic {
         self.normals
     }
 
+    #[allow(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "unordered control distances require a split"
+    )]
     fn plan(&self, tolerances: &Tolerances, sides: Sides) -> Plan<Self::Controls> {
         let [n0, n1] = self.normals;
         let middle = self.legs[1];

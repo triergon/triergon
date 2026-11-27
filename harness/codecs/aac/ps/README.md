@@ -11,8 +11,8 @@ cargo xtask codecs aac-ps-tables           # rerun the recovery, write the table
 cargo xtask codecs aac-ps-tables --check   # rerun every step, compare with the committed tables
 ```
 
-The command builds the `ps_input` example (feature `inspect`, which dumps the QMF slots
-this decoder hands to PS), runs `recover_tables.py` and writes
+The command builds the AAC unit tests to capture the QMF slots this decoder hands
+to PS, runs `recover_tables.py` and writes
 `crates/codec-aac/src/huffman_probed.rs` and `crates/codec-aac/src/sbr/ps/tables.rs`.
 A write reuses the steps whose JSON an earlier run left in the work directory
 (`target/aac-ps-tables`, or `--work DIR`); `--check` empties the step directories and
@@ -34,7 +34,7 @@ needs Python 3 with numpy.
 - **Signal fits** (`signal/pslib.py`): the reference output of each channel is the 64-band
   QMF synthesis (`psmodel.py`, this decoder's synthesis in float64) of the PS output
   slots. Models linear in their unknowns are fitted exactly in the time domain, from the
-  PS input that `ps_input` dumps (with neutral PS the reference output equals its
+  PS input captured by the unit test (with neutral PS the reference output equals its
   synthesis to -134 dB). Fit residuals reach the float32 floor, about 1e-8 rms on 0.03 rms
   signals.
 
@@ -181,48 +181,49 @@ a frame that overran its extension.
   dropped as well, with and without PS. o00 (the stream: 8.4e-5 to 8.9e-9), o31 (ICC 4
   and 7 at 1.1e-8; FIXVAR before the frame, v1 and v2), o32 (random streams). Only
   kx = 32 is probed.
+- **IPD/OPD after an error frame.** An error frame resets the IPD/OPD values to index 0
+  and keeps the last extension's enable bit. A header without the extension after it runs
+  IPD/OPD index 0 (o41: bit-identical to an extension with the enable bit 1 and every
+  index 0, 7.2e-3 from one with the bit 0), and a time-differential IPD/OPD envelope after
+  it reads index 0 (o42: bit-identical to the same values coded frequency-differentially;
+  against the values before the error 1.3e-2). This path's stream is
+  `ps-open-noext-after-error` of [../ps-open-manifest.json](../ps-open-manifest.json).
+- **The time-differential reference per envelope index.** IID and ICC values are kept in
+  one array of 34 per envelope index; a frame writes the first entries of its band count
+  into the array of each envelope it codes, and its envelope 0 is coded against the array
+  of the previous frame's last coded envelope. Above the previous frame's band count an
+  envelope therefore reads what the last frame with as many bands wrote at that index (0
+  if none did). o41: a 1-envelope 20-band frame, a 4-envelope 10-band frame, then a
+  dt-coded 20-band frame reads 0 above band 10 (envelope 3's array was never written
+  there); o43: a 4-envelope 20-band frame, then a 1- or 2-envelope 10-band frame, then a
+  dt-coded 20-band frame reads the first frame's envelope 0 or 1 above band 10, and its
+  last envelope is rejected at 1.2e-2 to 2.7e-2. With one array per parameter the decoder
+  missed these shapes; `ps-open-dt-envelope-reference` of the open manifest is o40's
+  stream of it (from a random stream).
+- **SBR after a frame without its SBR element.** Such a frame leaves the last envelope
+  border and the band limits of the frame before it in place, and the high band it carries
+  into the next frame is zero. So when the frame before it had an envelope ending after
+  the border (FIXVAR, 3 time slots), the next frame's first slots take that border and
+  zero there. `ps-open-sbr-after-missing` (HE-AAC v1, kx = 32) matches the reference
+  bit-identically with this rule; with the border reset by the missing frame, as before,
+  it missed by 81 LSB in that frame, and with the border kept and the earlier high band
+  kept as well by 59 LSB. With and without PS alike.
+- **An SBR payload that does not parse.** The payload is skipped and the frame is output
+  as one without SBR data (the core through the SBR banks, no high band), as a decoder
+  without SBR skips the extension; the access unit is not refused. The reference reports
+  reading past the SBR data and an invalid envelope value and outputs the frame;
+  `ps-open-sbr-truncated` (the first 30 bits kept, neutral PS) then matches it
+  bit-identically. Refusing the access unit had left the output a frame short from there.
 
-The crafted streams of these paths are vectors of the aac lane
+The crafted streams of the other paths are vectors of the aac lane
 ([../correctness-manifest.json](../../correctness-manifest.json), files in `vectors/`).
 
 ## Not recovered
 
-- A header without the PS extension after an error frame, while IPD/OPD was on
-  (`ps-open-noext-after-error`): 8.9e-3 rms in that frame and more in the next. The
-  decoder keeps the last extension's enable bit and its IPD/OPD values. The reference's
-  output there is bit-identical to an extension with the enable bit 1 and every index 0
-  (o41). It differs from one with the enable bit 0 by 7.2e-3. Without the error frame, or
-  with an extension in that frame, the decoder matches. Whether the error frame or the
-  missing extension resets the values is not separated.
-- A time-differential IID envelope after a frame with more envelopes and fewer coded bands
-  (`ps-open-dt-envelope-reference`, from a random stream; 7.4e-3 rms, and the composed model
-  misses the same way). In the hand-built shape of o41 the frames are:
-  - a 1-envelope 20-band frame;
-  - a 4-envelope 10-band frame;
-  - a dt-coded 20-band frame.
-
-  There the reference's output is bit-identical to the following rule. The dt reference is
-  kept per envelope index: one array of 34 per envelope, of which a frame writes the first
-  n entries of each of its envelopes. Envelope 0 is coded against the array of the previous
-  frame's last envelope. Entries 10..19 of envelope 3's array were never written, so they
-  are 0. The decoder keeps one array per parameter and takes entries 10..19 from the
-  20-band frame's last envelope. With a 4-envelope 20-band frame first, both agree. Only
-  this shape is checked.
-- SBR, with and without PS: the frame after a missing SBR element, when the frame before
-  the missing one had an envelope ending after the frame border (FIXVAR, 3 time slots), in
-  `ps-open-sbr-after-missing` (HE-AAC v1). The missing frame itself matches since the
-  decoder drops the overlapping high band there too (o31). The next frame misses by 2.8e-4, and
-  about 1.6e-7 persists in later frames (o31, o40). That level is about the lowest noise
-  floor. The cause is not probed; candidates are SBR state carried over the missing frame:
-  the noise and sinusoid indices, or the high-frequency generator's history.
-- An SBR payload cut short (`ps-open-sbr-truncated`: the first 30 bits kept, neutral PS).
-  The reference reports reading past the SBR data and an invalid envelope value, and still
-  outputs the frame. This decoder refuses the access unit, so its output is one frame short
-  from there, which accounts for the 2.4e-2 rms and more. What the reference outputs in that
-  frame is not probed. The same holds without PS (o31 trunc).
 - IPD/OPD in frames without the PS extension mixed with multi-envelope frames and mode
-  changes (o22 with `PSW=0`, up to 8.5e-3). The first case above is
-  one shape of it; the others are not reduced.
+  changes (o22 with `PSW=0`, up to 8.5e-3). `ps-open-noext-after-error` was one shape of
+  it; the others are not reduced.
 
-The crafted streams of these cases are the open cases of
-[../ps-open-manifest.json](../ps-open-manifest.json) (files in `open/`).
+[../ps-open-manifest.json](../ps-open-manifest.json) holds the crafted streams of the
+paths recovered last (files in `open/`); its `open_cases` list is empty, and an open case
+found later is registered there.

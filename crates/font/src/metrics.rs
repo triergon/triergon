@@ -1,6 +1,7 @@
 //! The face-wide tables: `head`, `hhea` and `vhea`, `maxp`, `OS/2`, and `hmtx`
 //! and `vmtx` (OpenType).
 
+use crate::Bounds;
 use crate::read::{Reader, u16_at, u32_at};
 use crate::sfnt::Table;
 use triergon_core::{Error, Result};
@@ -11,7 +12,7 @@ pub(crate) struct Head {
     /// Bit 3: scale by integer pixels per em.
     pub(crate) flags: u16,
     pub(crate) units_per_em: u16,
-    pub(crate) bounds: [i16; 4],
+    pub(crate) bounds: Bounds,
     pub(crate) mac_style: MacStyle,
     /// `indexToLocFormat` is not 0: 32-bit `loca` offsets.
     pub(crate) long_offsets: bool,
@@ -26,7 +27,7 @@ pub(crate) fn head(data: &[u8]) -> Result<Head> {
         return Err(Error::Invalid("unitsPerEm outside 16..16384"));
     }
     r.skip(16)?; // created, modified
-    let bounds = [r.i16()?, r.i16()?, r.i16()?, r.i16()?];
+    let bounds = Bounds::read(&mut r)?;
     let mac_style = MacStyle(r.u16()?);
     r.skip(4)?; // lowestRecPPEM, fontDirectionHint
     // FreeType reads every format other than 0 as long offsets.
@@ -52,20 +53,19 @@ pub(crate) struct Hhea {
     pub(crate) metrics: u32,
 }
 
-/// A metrics header and the table of its records as FreeType's
-/// `sfnt_load_face` finds them (`tt_face_load_hhea`, `tt_face_load_hmtx`):
-/// the lower-case header (`hhea` or `vhea`) with the lower-case records, else
-/// the extended upper-case header with the upper-case records. `None` when
-/// either is missing.
+/// A metrics header and the table of its records: the lower-case header
+/// (`hhea` or `vhea`) with the lower-case records, else the extended
+/// upper-case header with the upper-case records. `None` when either is
+/// missing.
 ///
-/// FreeType reads the header's 34 bytes and its record count, 16-bit or for
-/// an extended header 32-bit, from the file at the table's offset rather than
-/// from the table: a short header reads on into the bytes after it.
+/// The header's 34 bytes and its record count, 16-bit or for an extended
+/// header 32-bit, are read from the file at the table's offset rather than
+/// from the table: a short header reads on into the bytes after it, as
+/// FreeType reads it.
 ///
 /// # Errors
 ///
-/// `Invalid` when the header runs past the end of the file, where FreeType
-/// fails to open the face.
+/// `Invalid` when the header runs past the end of the file.
 pub(crate) fn header_and_records(
     file: &[u8],
     header: [Option<Table>; 2],
@@ -115,17 +115,29 @@ pub(crate) fn glyph_count(data: &[u8]) -> Result<u16> {
 /// The `OS/2` fields a face exposes. Fields a table version lacks are zero.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Os2 {
+    /// The table version.
     pub version: u16,
+    /// `usWeightClass`: 1 to 1000, 400 regular and 700 bold.
     pub weight_class: u16,
+    /// `usWidthClass`: 1 (ultra-condensed) to 9 (ultra-expanded).
     pub width_class: u16,
+    /// `fsType`: the embedding licensing bits.
     pub fs_type: u16,
+    /// `yStrikeoutSize`: the strikeout's thickness in font units.
     pub strikeout_size: i16,
+    /// `yStrikeoutPosition`: the strikeout's top above the baseline.
     pub strikeout_position: i16,
+    /// `fsSelection`.
     pub selection: FsSelection,
+    /// `sTypoAscender`.
     pub typo_ascender: i16,
+    /// `sTypoDescender`, negative below the baseline.
     pub typo_descender: i16,
+    /// `sTypoLineGap`.
     pub typo_line_gap: i16,
+    /// `usWinAscent`.
     pub win_ascent: u16,
+    /// `usWinDescent`, positive below the baseline.
     pub win_descent: u16,
 }
 
@@ -225,9 +237,8 @@ pub(crate) fn underline(data: Option<&[u8]>) -> (i16, i16) {
     }
 }
 
-/// Whether `post` declares the face fixed pitch (`isFixedPitch`), which
-/// FreeType reports as `FT_FACE_FLAG_FIXED_WIDTH`; false when the table is
-/// absent or shorter than its 32-byte header.
+/// Whether `post` declares the face fixed pitch (`isFixedPitch`); false when
+/// the table is absent or shorter than its 32-byte header.
 pub(crate) fn fixed_pitch(data: Option<&[u8]>) -> bool {
     match data {
         Some(post) if post.len() >= 32 => u32_at(post, 12).is_some_and(|v| v != 0),

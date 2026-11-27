@@ -1,10 +1,12 @@
 //! Self-authored synthetic syncframes: framing, CRC policy, truncation/concealment and
 //! typed errors. The frames are built bit by bit from the A/52:2018 syntax tables.
 
-use triergon_codec::{Budget, StorageError};
+use triergon_bitstream::crc::crc16_a52 as crc16;
+use triergon_codec::{Budget, Error};
+use triergon_codec_ac3::compat::ffmpeg::Policy;
 use triergon_codec_ac3::{
-    AudioFrame, Compat, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, Limits,
-    NoiseMode, Speaker, StreamType, Syntax, access_unit_len, crc16, parse_header,
+    AudioFrame, CrcPolicy, DecodeError, Decoder, DecoderOptions, Feature, Limits, NoiseMode,
+    Speaker, StreamType, Syntax, access_unit_len, parse_header,
 };
 
 #[derive(Default)]
@@ -170,14 +172,13 @@ fn decodes_silent_mono_frame() {
     assert!(info.concealed.is_none());
     assert_eq!(info.dialnorm, 27);
     assert_eq!(out.layout.speakers(), &[Speaker::FrontCenter]);
-    assert_eq!(triergon_codec_ac3::layout_name(&out.layout), "mono");
+    assert_eq!(out.layout.name(), "mono");
     assert_eq!(out.samples_per_channel, 1536);
     assert!(out.planes[0].iter().all(|&v| v == 0.0));
     assert!(info.downmix.is_none());
-    // Appending a second frame.
     dec.decode(&mono_frame(0), &mut out).unwrap();
-    assert_eq!(out.samples_per_channel, 3072);
-    assert_eq!(out.planes[0].len(), 3072);
+    assert_eq!(out.samples_per_channel, 1536);
+    assert_eq!(out.planes[0].len(), 1536);
 }
 
 #[test]
@@ -204,7 +205,7 @@ fn compatible_reset_replays_the_first_dithered_frame() {
 #[test]
 fn noise_off_keeps_bap_zero_silent_with_either_compatibility_setting() {
     let frame = mono_frame_with_dither(0, true);
-    for compat in [Compat::Specification, Compat::Reference] {
+    for compat in [Policy::Specification, Policy::Reference] {
         let mut decoder = Decoder::new().with_options(DecoderOptions {
             compat,
             noise: NoiseMode::Off,
@@ -267,16 +268,33 @@ fn truncated_ac3_frame_repeats_last_block() {
         })
     ));
     assert_eq!(out.samples_per_channel, 1536);
+    assert_eq!(info.dialnorm, 27);
+}
+
+#[test]
+fn a_rejecting_decoder_refuses_a_truncated_frame_it_cannot_check() {
+    let mut dec = Decoder::new().with_options(DecoderOptions {
+        crc: CrcPolicy::Reject,
+        ..Default::default()
+    });
+    let mut out = AudioFrame::default();
+    dec.decode(&mono_frame(0), &mut out).unwrap();
+    out.clear();
+    assert_eq!(
+        dec.decode(&mono_frame(0)[..100], &mut out).err(),
+        Some(DecodeError::Truncated {
+            needed: 128,
+            available: 100
+        })
+    );
+    assert_eq!(out.samples_per_channel, 0);
 }
 
 #[test]
 fn invalid_block_data_is_concealed() {
     let mut out = AudioFrame::default();
     let info = Decoder::new().decode(&mono_frame(61), &mut out).unwrap();
-    assert_eq!(
-        info.concealed,
-        Some(DecodeError::InvalidData("chbwcod > 60"))
-    );
+    assert_eq!(info.concealed, Some(DecodeError::Invalid("chbwcod > 60")));
     assert_eq!(out.samples_per_channel, 1536);
 }
 
@@ -293,7 +311,7 @@ fn typed_header_errors() {
     f[4] = 38; // frmsizecod 38 does not exist
     assert!(matches!(
         dec.decode(&f, &mut out).err(),
-        Some(DecodeError::InvalidData(_))
+        Some(DecodeError::Invalid(_))
     ));
     // bsid 9 (half-rate AC-3) decodes like FFmpeg 9.0.2 (tests/reduced_rate.rs).
     let mut f = mono_frame(0);
@@ -357,19 +375,22 @@ fn eac3_truncation_and_substream_errors() {
 }
 
 #[test]
-fn output_layout_mismatch_is_refused() {
+fn decoding_replaces_output_and_a_refusal_empties_it() {
     let mut dec = Decoder::new();
     let mut out = AudioFrame::default();
-    dec.decode(&mono_frame(0), &mut out).unwrap();
+    let frame = mono_frame(0);
+    let mono = dec.decode(&frame, &mut out).unwrap();
     out.layout =
         triergon_codec_ac3::ChannelLayout::new([Speaker::FrontLeft, Speaker::FrontRight]).unwrap();
+    let again = dec.decode(&frame, &mut out).unwrap();
     assert_eq!(
-        dec.decode(&mono_frame(0), &mut out).err(),
-        Some(DecodeError::OutputLayoutMismatch)
+        (out.layout, out.samples_per_channel),
+        (mono.layout, again.samples)
     );
-    dec.reset();
-    out.clear();
-    assert!(dec.decode(&mono_frame(0), &mut out).is_ok());
+    assert_eq!(out.planes[0].len(), mono.samples);
+    assert_eq!(dec.decode(&[], &mut out).err(), Some(DecodeError::Empty));
+    assert_eq!(out.samples_per_channel, 0);
+    assert!(out.planes.iter().all(Vec::is_empty));
 }
 
 #[test]
@@ -380,7 +401,7 @@ fn a_refused_output_charge_is_a_typed_error_and_decoding_resumes() {
     let held = budget.reserve(budget.available() - 1024).unwrap();
     assert!(matches!(
         decoder.decode(&mono_frame(0), &mut out),
-        Err(DecodeError::Budget(StorageError::Backpressure { .. }))
+        Err(DecodeError::Budget(Error::Backpressure { .. }))
     ));
     drop(held);
     out.clear();
@@ -397,10 +418,7 @@ fn a_limit_below_the_frame_refuses_and_a_shared_pool_returns_to_idle() {
     .unwrap()
     .decode(&mono_frame(0), &mut out)
     .unwrap_err();
-    assert!(matches!(
-        error,
-        DecodeError::Budget(StorageError::Limit { .. })
-    ));
+    assert!(matches!(error, DecodeError::Budget(Error::Limit { .. })));
     let budget = Budget::new(1 << 20).unwrap();
     let idle = budget.used();
     let mut decoder = Decoder::new_in(&budget);

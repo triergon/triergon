@@ -1,11 +1,28 @@
 //! Pair kerning from the OpenType `kern` table (Microsoft version 0, format 0).
 //!
-//! Horizontal, non-minimum format 0 subtables are used; their values add up unless
-//! a subtable sets the override bit, which replaces the sum so far. A pair count
-//! that exceeds its subtable is cut to the pairs present. At most 32 subtables are
-//! read; the table version is not checked. These rules, and searching unordered
-//! pairs linearly, follow FreeType. Apple's version 1 table and the other formats
-//! are not read; GPOS kerning is shaping.
+//! # What a lookup observes
+//!
+//! [`Kern::pair`] gives one value for a glyph pair, in font units, with
+//! FreeType 2.15.0's result for any table. It does not apply kerning to a run
+//! of glyphs, which a shaper does by its own rules (over which glyphs, split
+//! between them how, and with which subtables):
+//!
+//! - **Table.** The version is not checked: the subtable count is the second
+//!   16-bit word, so Apple's version 1 table, with its 32-bit version, reads
+//!   as having no subtables. At most 32 subtables are read, and a table too
+//!   short for its header has none.
+//! - **Subtables.** One is used when the high byte of its coverage (the
+//!   format) is 0 and it is horizontal and not minimum; cross-stream is not
+//!   looked at. A subtable of 14 bytes or fewer ends the table; one running
+//!   past the table is cut at its end.
+//! - **Pairs.** A pair count beyond the subtable is cut to the pairs present.
+//!   Pairs in ascending order are searched by bisection, others linearly for
+//!   the first match.
+//! - **Value.** The values of the subtables that list the pair add up in
+//!   table order; a subtable with the override bit replaces the sum so far.
+//!   A pair no subtable lists is 0.
+//!
+//! The other formats and GPOS kerning are not read.
 
 use crate::GlyphId;
 use crate::read::{Reader, slice, u16_at, u32_at};
@@ -49,8 +66,8 @@ impl Kern {
     ) -> Result<Self> {
         let mut kern = Self::new(budget);
         let bytes = slice(data, table.offset, table.len)?;
-        // FreeType skips the version; Apple's 32-bit version 1 then reads as
-        // a table without subtables.
+        // The version is skipped; Apple's 32-bit version 1 then reads as a
+        // table without subtables.
         let Some(count) = u16_at(bytes, 2) else {
             return Ok(kern);
         };

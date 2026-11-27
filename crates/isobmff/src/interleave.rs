@@ -1,22 +1,27 @@
-//! Source-only interleaving over the independently parsed compact sample indexes.
+//! Samples across tracks. [`SourceTrack`] names one track's regular table and fragments,
+//! [`TrackSampleCursor`] reads one track as stored, and [`PhysicalSampleCursor`] merges
+//! tracks in ascending byte order. The format states each sample's address but no merged
+//! order; this one is byte order, not FFmpeg's interleaving, which
+//! [`compat::mov`](crate::compat::mov) reproduces.
 //!
-//! Apple QTFF establishes the chunk/sample byte addresses, not a mandated merged
-//! demux packet schedule. This module implements an explicitly selected physical
-//! address order. It does not claim the reference MOV reader's default interleaving.
+//! Specification: Apple QuickTime File Format (chunk and sample addresses).
 use crate::{
-    BoxHeader, FragmentCursor, FragmentIndex, Sample, SampleCursor, SampleStep, SampleTable,
-    SpanStep, TimingRunPolicy, TimingRunSurplus, fragment::RunPosition, regular::SampleRanges,
+    CursorStatus, Next, Sample,
+    boxes::BoxHeader,
+    fragment::{FragmentCursor, FragmentIndex, RunPosition},
+    sample::{SampleSpan, require_range_within},
+    table::{SampleCursor, SampleRanges, SampleTable, TimingRunPolicy, TimingRunSurplus},
 };
 use std::{
+    num::NonZeroU64,
     ops::Range,
     sync::atomic::{AtomicBool, Ordering},
 };
 use triergon_core::{Budget, BudgetVec, Error, Result, WorkBudget};
 
-/// Borrowed indexes for one track in one already established source entity.
-/// The caller supplies fragments in source order and establishes the same-source
-/// association. Data-reference resolution and source/request tokens remain core
-/// input/caller responsibilities, not track IDs or configuration epochs.
+/// One track's borrowed indexes: its regular sample table, if any, and fragment indexes
+/// in file order, of which those of other tracks are passed over. The caller makes sure
+/// all of them come from the same source.
 #[derive(Clone, Copy, Debug)]
 pub struct SourceTrack<'a> {
     track_id: u32,
@@ -24,6 +29,7 @@ pub struct SourceTrack<'a> {
     fragments: &'a [FragmentIndex],
 }
 impl<'a> SourceTrack<'a> {
+    /// The track with `track_ID` `track_id`; `Error::Invalid` for zero.
     pub fn new(
         track_id: u32,
         regular: Option<&'a SampleTable>,
@@ -38,11 +44,10 @@ impl<'a> SourceTrack<'a> {
             fragments,
         })
     }
-    pub fn track_id(self) -> u32 {
+    pub(crate) fn track_id(self) -> u32 {
         self.track_id
     }
-    // Borrow the existing format indexes for source seek planning. No new
-    // storage, transport identity, sample array or demux scheduling view.
+    // The borrowed indexes, for source seek planning.
     pub(crate) fn regular_index(self) -> Option<&'a SampleTable> {
         self.regular
     }
@@ -60,9 +65,9 @@ impl<'a> SourceTrack<'a> {
     }
 }
 
-/// One track's original sample sequence: regular samples, then the matching
-/// fragment indexes in the caller's established order. No edit repetition,
-/// source clock filling, cross-track ordering or expanded sample array.
+/// Reads one track's samples as stored: the regular table's, then those of its fragments
+/// in the order given. Edits are not applied and unknown times stay unknown. A failure is
+/// kept for later polls.
 #[derive(Clone, Debug)]
 pub struct TrackSampleCursor<'a> {
     source: SourceTrack<'a>,
@@ -72,6 +77,7 @@ pub struct TrackSampleCursor<'a> {
     failed: Option<Error>,
 }
 impl<'a> TrackSampleCursor<'a> {
+    /// A cursor from the track's first sample.
     pub fn new(source: SourceTrack<'a>) -> Self {
         Self {
             source,
@@ -105,10 +111,8 @@ impl<'a> TrackSampleCursor<'a> {
             failed: None,
         }
     }
-    /// Container-local append unit that produced the last fragment Sample:
-    /// ordinal in the supplied fragment slice, then run ordinal in that index.
-    /// This borrows existing cursor state in O(1), without an input token, epoch,
-    /// clock inference, source-coordinate uniqueness assumption or index scan.
+    /// Where the last fragment sample came from: its 0-based position in the given
+    /// fragments and its 0-based run in that index; `None` outside the fragments.
     pub(crate) fn active_fragment_run(&self) -> Option<(usize, usize)> {
         self.current.as_ref().and_then(|cursor| {
             self.next_fragment
@@ -116,8 +120,10 @@ impl<'a> TrackSampleCursor<'a> {
                 .map(|fragment| (fragment, cursor.run_index()))
         })
     }
+    /// The next sample, for one work unit per sample and per fragment run and fragment
+    /// index passed.
     #[inline]
-    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    pub fn poll(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -127,25 +133,25 @@ impl<'a> TrackSampleCursor<'a> {
         }
         result
     }
-    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<SampleStep> {
+    fn poll_inner(&mut self, work: &mut WorkBudget) -> Result<Next<Sample>> {
         loop {
             if let Some(regular) = &mut self.regular {
                 match regular.poll(work)? {
-                    SampleStep::End => self.regular = None,
+                    Next::End => self.regular = None,
                     other => return Ok(other),
                 }
             }
             if let Some(current) = &mut self.current {
                 match current.poll(work)? {
-                    SampleStep::End => self.current = None,
+                    Next::End => self.current = None,
                     other => return Ok(other),
                 }
             }
             let Some(fragment) = self.source.fragments.get(self.next_fragment) else {
-                return Ok(SampleStep::End);
+                return Ok(Next::End);
             };
             if !work.try_charge(1) {
-                return Ok(SampleStep::Yield);
+                return Ok(Next::Yield);
             }
             self.next_fragment += 1;
             if fragment.track_id() == self.source.track_id {
@@ -177,25 +183,25 @@ impl<'a> TrackSpans<'a> {
     }
     /// The next span of at most `maximum` samples, charging a work unit for each
     /// sample and for each run and fragment index passed.
-    pub(crate) fn poll(&mut self, maximum: u64, work: &mut WorkBudget) -> Result<SpanStep> {
+    pub(crate) fn poll(&mut self, maximum: u64, work: &mut WorkBudget) -> Result<Next<SampleSpan>> {
         loop {
             if let Some(regular) = &mut self.regular {
                 match regular.next_span(maximum, work)? {
-                    SpanStep::End => self.regular = None,
+                    Next::End => self.regular = None,
                     other => return Ok(other),
                 }
             }
             if let Some((index, position)) = &mut self.current {
                 match index.next_span(position, maximum, work)? {
-                    SpanStep::End => self.current = None,
+                    Next::End => self.current = None,
                     other => return Ok(other),
                 }
             }
             let Some(fragment) = self.source.fragments.get(self.next_fragment) else {
-                return Ok(SpanStep::End);
+                return Ok(Next::End);
             };
             if !work.try_charge(1) {
-                return Ok(SpanStep::Yield);
+                return Ok(Next::Yield);
             }
             self.next_fragment += 1;
             if fragment.track_id() == self.source.track_id {
@@ -205,9 +211,12 @@ impl<'a> TrackSpans<'a> {
     }
 }
 
+/// Bounds of a [`PhysicalSampleCursor`].
 #[derive(Clone, Copy, Debug)]
 pub struct PhysicalInterleaveLimits {
+    /// Most tracks merged; default 64.
     pub max_tracks: usize,
+    /// Most samples across all tracks; default 1,000,000.
     pub max_samples: u64,
 }
 impl Default for PhysicalInterleaveLimits {
@@ -219,18 +228,13 @@ impl Default for PhysicalInterleaveLimits {
     }
 }
 
+/// A sample of a merge, with its track.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InterleavedSample {
+    /// `track_ID` of the sample's track.
     pub track_id: u32,
+    /// The sample as its track's cursor reports it.
     pub sample: Sample,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum InterleaveStatus {
-    Yield,
-    Ready,
-    /// All supplied source indexes ended. This is not an I/O EOF observation.
-    End,
 }
 
 #[derive(Debug)]
@@ -241,13 +245,26 @@ struct Slot<'a> {
     ended: bool,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Phase {
-    ValidateMedia,
+#[derive(Clone, Copy, Debug)]
+struct SampleOrder {
+    start: u64,
+    ordinal: NonZeroU64,
+}
+
+#[derive(Debug)]
+#[repr(u8)]
+enum Phase<'a> {
+    ValidateMedia(&'a [Range<u64>]),
     ValidateEnter,
     ValidateRead,
-    ValidateBounds,
-    ValidateOrder,
+    ValidateBounds {
+        media: &'a [Range<u64>],
+        sample: SampleOrder,
+        end: u64,
+        low: usize,
+        high: usize,
+    },
+    ValidateOrder(SampleOrder),
     Fill,
     ReadHead,
     Select,
@@ -255,21 +272,23 @@ enum Phase {
     End,
 }
 
-/// Bounded physical-order merge, suitable for feeding the existing SampleReader.
+/// Merges tracks into one sequence in ascending byte order of sample start, so that
+/// payloads can be read one after another with
+/// [`SampleReader`](crate::payload::SampleReader).
 ///
-/// Before exposing the first sample, a work-bounded metadata pass verifies every
-/// track's nondecreasing sample start address, increasing source ordinal and the
-/// cumulative sample limit. A backward source track remains accessible through
-/// TrackSampleCursor but is unsupported by this physical merge; no silently
-/// incorrect prefix is exposed. This is a selected traversal limit, not a claim
-/// that such file layout violates the format.
+/// Before the first sample, a work-bounded pass over the metadata checks that each track's
+/// samples start at nondecreasing offsets with increasing ordinals, the sample limit and,
+/// with media extents, that every sample lies in an `mdat`. A track whose samples go
+/// backwards in the file is valid but cannot be read one after another: polling returns
+/// `Error::Unsupported` before any sample, and a cursor with media extents can then
+/// continue the merge with [`resume_in_decode_order`](Self::resume_in_decode_order) or
+/// track by track with [`resume_in_track_order`](Self::resume_in_track_order).
 ///
-/// The second pass retains one metadata head per track and one waiting output;
-/// all variable storage is charged to core BudgetVec. No sample/payload expansion
-/// or timestamp sorting occurs. Equal addresses follow the supplied track order,
-/// including zero-size samples. Per-sample selection is O(number of tracks).
-/// `new` validates metadata traversal only; `new_with_media_extents` also checks
-/// actual self-contained payload ranges before any physical-layout refusal.
+/// The merge then keeps one sample per track and one ready sample, charged to the budget,
+/// and sorts nothing by time. Equal start offsets, zero-size samples included, follow the
+/// given track order. Each sample costs two work units per track on top of its own
+/// track's read. Poll until [`CursorStatus::Ready`], then take the sample with
+/// [`take_sample`](Self::take_sample).
 #[derive(Debug)]
 pub struct PhysicalSampleCursor<'a> {
     slots: BudgetVec<Slot<'a>>,
@@ -277,22 +296,19 @@ pub struct PhysicalSampleCursor<'a> {
     forward_media: Option<ForwardRegularMdat>,
     deferred_media: bool,
     limits: PhysicalInterleaveLimits,
-    phase: Phase,
+    phase: Phase<'a>,
     index: usize,
-    best: Option<usize>,
-    previous_start: Option<u64>,
-    previous_ordinal: Option<u64>,
+    /// The slot whose head starts first among those compared, with that start.
+    best: Option<(usize, u64)>,
+    previous: Option<SampleOrder>,
     validated: u64,
-    pending_validation: Option<Sample>,
-    extent_low: usize,
-    extent_high: usize,
     layout_error: Option<Error>,
     ready: Option<InterleavedSample>,
     failed: Option<Error>,
 }
 
-/// Evidence for the first finite MDAT of a forward-only regular movie.
-/// Later sample declarations are pending until their actual MDAT is read.
+/// The first `mdat` of a forward-only source whose movie comes first, with the source
+/// length if known. Samples after it can be checked only once their own `mdat` is read.
 #[derive(Clone, Copy, Debug)]
 pub struct ForwardRegularMdat {
     first_start: u64,
@@ -300,6 +316,8 @@ pub struct ForwardRegularMdat {
     source_length: Option<u64>,
 }
 impl ForwardRegularMdat {
+    /// From the first `mdat`'s header. `Error::Invalid` for another box type or an extent
+    /// past `source_length`, `Error::Unsupported` for an `mdat` of unknown size.
     pub fn new(header: BoxHeader, source_length: Option<u64>) -> Result<Self> {
         if header.kind != *b"mdat" {
             return Err(Error::Invalid("forward regular media header"));
@@ -331,21 +349,19 @@ impl ForwardRegularMdat {
 }
 
 impl<'a> PhysicalSampleCursor<'a> {
-    /// Metadata-only source traversal. The caller retains responsibility for
-    /// establishing self-contained media containment before accessing payloads.
+    /// A merge that checks the metadata only: the caller checks that samples lie inside
+    /// an `mdat` before reading them. Fails as
+    /// [`with_timing_policy`](Self::with_timing_policy) does under the default policy.
     pub fn new(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
         limits: PhysicalInterleaveLimits,
     ) -> Result<Self> {
-        Self::with_timing_policy(budget, tracks, None, limits, TimingRunPolicy::Strict)
+        Self::with_timing_policy(budget, tracks, None, limits, TimingRunPolicy::default())
     }
-    /// Borrow checked source-entity mdat payload extents without copying them.
-    /// Their bounds, nonoverlap and ascending order are validated during poll.
-    /// A resumable binary search checks every source sample's full containment;
-    /// only after all supplied tracks pass may a backward physical-layout policy
-    /// refusal be returned. Resource/structural failures still stop immediately.
-    /// Empty samples at an extent endpoint use Sample::require_within semantics.
+    /// Checks samples during polling against ascending, disjoint `mdat` payload extents.
+    /// A sample outside the extents is invalid. Backward layout is refused after every
+    /// track's ranges have been checked.
     pub fn new_with_media_extents(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
@@ -357,29 +373,14 @@ impl<'a> PhysicalSampleCursor<'a> {
             tracks,
             Some(media_extents),
             limits,
-            TimingRunPolicy::Strict,
+            TimingRunPolicy::default(),
         )
     }
-    /// Preserve regular table declarations beyond the observed first MDAT.
-    /// The caller must admit each deferred row against a real later extent
-    /// before reading or publishing its payload.
-    pub fn new_forward_regular(
-        budget: &Budget,
-        tracks: &[SourceTrack<'a>],
-        media: &'a [Range<u64>],
-        bounds: ForwardRegularMdat,
-        limits: PhysicalInterleaveLimits,
-    ) -> Result<Self> {
-        Self::new_forward_regular_with_timing_policy(
-            budget,
-            tracks,
-            media,
-            bounds,
-            limits,
-            TimingRunPolicy::Strict,
-        )
-    }
-    /// Apply the selected timing policy to forward media range validation.
+    /// A merge for a forward-only source whose movie comes first: `media` must be exactly
+    /// the first `mdat`'s extent that `bounds` records, and samples after it that fit the
+    /// source are deferred (see [`deferred_media`](Self::deferred_media)). The timing
+    /// policy is as for [`with_timing_policy`](Self::with_timing_policy);
+    /// `Error::Unsupported` for tracks with fragments.
     pub fn new_forward_regular_with_timing_policy(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
@@ -397,13 +398,15 @@ impl<'a> PhysicalSampleCursor<'a> {
         cursor.forward_media = Some(bounds);
         Ok(cursor)
     }
-    /// Indicates that the completed metadata pass contains deferred ranges.
+    /// Whether the metadata pass found samples after the first `mdat`, whose ranges are
+    /// checked only when their `mdat` is read.
     pub fn deferred_media(&self) -> bool {
         self.deferred_media
     }
-    /// Traverse checked tracks using the selected timing coverage policy.
-    /// Compatibility playback can validate the physical ranges of a bounded
-    /// prefix. The default constructors require exact timing coverage.
+    /// A merge with optional `media_extents` and a chosen timing policy; only under
+    /// [`TimingRunPolicy::Strict`] is a table with surplus timing runs refused.
+    /// `Error::Limit` above `max_tracks`; `Error::Invalid` for a repeated track ID or,
+    /// under the strict policy, a table whose timing runs are not exact.
     pub fn with_timing_policy(
         budget: &Budget,
         tracks: &[SourceTrack<'a>],
@@ -448,8 +451,8 @@ impl<'a> PhysicalSampleCursor<'a> {
             forward_media: None,
             deferred_media: false,
             limits,
-            phase: if media_extents.is_some() {
-                Phase::ValidateMedia
+            phase: if let Some(media) = media_extents {
+                Phase::ValidateMedia(media)
             } else if tracks.is_empty() {
                 Phase::End
             } else {
@@ -457,27 +460,34 @@ impl<'a> PhysicalSampleCursor<'a> {
             },
             index: 0,
             best: None,
-            previous_start: None,
-            previous_ordinal: None,
+            previous: None,
             validated: 0,
-            pending_validation: None,
-            extent_low: 0,
-            extent_high: 0,
             layout_error: None,
             ready: None,
             failed: None,
         })
     }
-    /// Metadata samples encountered by preflight, including a failing sample if
-    /// polling returns an error. After successful preflight this is the full count.
+    /// Samples the metadata pass has visited, one that failed it included; after the
+    /// pass, the total across tracks.
     pub fn validated_samples(&self) -> u64 {
         self.validated
     }
-    /// Resume at the first validated sample after a physical-layout refusal.
-    /// Samples are then emitted in catalogue track order, with original ordinals
-    /// within each track. Callers needing physical order must sort the result.
+    /// Continues in track order after a backward-layout refusal, if all samples were
+    /// checked against media extents and no media is deferred. Returns `false` without
+    /// advancing in any other state.
     pub fn resume_in_track_order(&mut self) -> bool {
-        if self.phase != Phase::ValidateEnter
+        self.resume(Phase::TrackOrder)
+    }
+    /// Continues the merge after a backward-layout refusal, on the conditions of
+    /// [`resume_in_track_order`](Self::resume_in_track_order): every track stays in
+    /// decode order and the next sample is the one that starts first among the tracks,
+    /// so a backward track's samples are not in ascending byte order (ISO/IEC 14496-12
+    /// puts no order on where samples lie).
+    pub fn resume_in_decode_order(&mut self) -> bool {
+        self.resume(Phase::Fill)
+    }
+    fn resume(&mut self, phase: Phase<'a>) -> bool {
+        if !matches!(self.phase, Phase::ValidateEnter)
             || self.index != self.slots.len()
             || self.layout_error.is_none()
             || self.failed != self.layout_error
@@ -487,9 +497,11 @@ impl<'a> PhysicalSampleCursor<'a> {
         }
         self.failed = None;
         self.index = 0;
-        self.phase = Phase::TrackOrder;
+        self.phase = phase;
         true
     }
+    /// The sample a [`CursorStatus::Ready`] poll announced; `Error::Invalid` when none is
+    /// ready.
     pub fn take_sample(&mut self) -> Result<InterleavedSample> {
         if let Some(error) = self.failed {
             return Err(error);
@@ -498,7 +510,9 @@ impl<'a> PhysicalSampleCursor<'a> {
             .take()
             .ok_or(Error::Invalid("no ready interleaved sample"))
     }
-    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<InterleaveStatus> {
+    /// One bounded step; `Error::Cancelled` once `cancel` is set. A failure is kept for
+    /// later polls.
+    pub fn poll(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         if let Some(error) = self.failed {
             return Err(error);
         }
@@ -508,30 +522,25 @@ impl<'a> PhysicalSampleCursor<'a> {
         }
         result
     }
-    fn poll_inner(
-        &mut self,
-        work: &mut WorkBudget,
-        cancel: &AtomicBool,
-    ) -> Result<InterleaveStatus> {
+    // One loop over the phases: `Fill`, `ReadHead` and `Select` run per sample, and moving
+    // the validation phases out of the loop changes their code.
+    fn poll_inner(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<CursorStatus> {
         loop {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
             if self.ready.is_some() {
-                return Ok(InterleaveStatus::Ready);
+                return Ok(CursorStatus::Ready);
             }
-            match self.phase {
-                Phase::ValidateMedia => {
-                    let media = self
-                        .media_extents
-                        .ok_or(Error::Invalid("missing media extents"))?;
+            match &mut self.phase {
+                Phase::ValidateMedia(media) => {
                     if self.index == media.len() {
                         self.index = 0;
                         self.phase = Phase::ValidateEnter;
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     let extent = &media[self.index];
                     if extent.start > extent.end
@@ -553,22 +562,21 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     self.phase = Phase::ValidateRead;
                 }
                 Phase::ValidateRead => {
                     let slot = &mut self.slots.as_mut_slice()[self.index];
                     match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(InterleaveStatus::Yield),
-                        SampleStep::End => {
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::End => {
                             slot.cursor = TrackSampleCursor::new(slot.source);
                             self.index += 1;
-                            self.previous_start = None;
-                            self.previous_ordinal = None;
+                            self.previous = None;
                             self.phase = Phase::ValidateEnter;
                         }
-                        SampleStep::Sample(sample) => {
+                        Next::Item(sample) => {
                             self.validated =
                                 self.validated.checked_add(1).ok_or(Error::Overflow)?;
                             if self.validated > self.limits.max_samples {
@@ -579,62 +587,63 @@ impl<'a> PhysicalSampleCursor<'a> {
                                         .map_err(|_| Error::Overflow)?,
                                 });
                             }
-                            if sample.range.start > sample.range.end || sample.ordinal == 0 {
-                                return Err(Error::Invalid("source sample range/ordinal"));
-                            }
-                            self.pending_validation = Some(sample);
-                            self.extent_low = 0;
-                            self.extent_high = self.media_extents.map_or(0, |media| media.len());
-                            self.phase = if self.media_extents.is_some() {
-                                Phase::ValidateBounds
+                            let start = sample.range.start;
+                            let end = sample.range.end;
+                            let ordinal = NonZeroU64::new(sample.ordinal)
+                                .filter(|_| start <= end)
+                                .ok_or(Error::Invalid("source sample range/ordinal"))?;
+                            let sample = SampleOrder { start, ordinal };
+                            self.phase = if let Some(media) = self.media_extents {
+                                Phase::ValidateBounds {
+                                    media,
+                                    sample,
+                                    end,
+                                    low: 0,
+                                    high: media.len(),
+                                }
                             } else {
-                                Phase::ValidateOrder
+                                Phase::ValidateOrder(sample)
                             };
                         }
                     }
                 }
-                Phase::ValidateBounds => {
-                    let media = self
-                        .media_extents
-                        .ok_or(Error::Invalid("missing media extents"))?;
-                    let sample = self
-                        .pending_validation
-                        .as_ref()
-                        .ok_or(Error::Invalid("missing media validation sample"))?;
-                    if self.extent_low < self.extent_high {
+                Phase::ValidateBounds {
+                    media,
+                    sample,
+                    end,
+                    low,
+                    high,
+                } => {
+                    if *low < *high {
                         if !work.try_charge(1) {
-                            return Ok(InterleaveStatus::Yield);
+                            return Ok(CursorStatus::Yield);
                         }
-                        let mid = self.extent_low + (self.extent_high - self.extent_low) / 2;
-                        if media[mid].start <= sample.range.start {
-                            self.extent_low = mid.checked_add(1).ok_or(Error::Overflow)?;
+                        let mid = *low + (*high - *low) / 2;
+                        if media[mid].start <= sample.start {
+                            *low = mid.checked_add(1).ok_or(Error::Overflow)?;
                         } else {
-                            self.extent_high = mid;
+                            *high = mid;
                         }
                         continue;
                     }
-                    let selected = self
-                        .extent_low
+                    let selected = low
                         .checked_sub(1)
                         .ok_or(Error::Invalid("sample outside self-contained mdat"))?;
+                    let range = sample.start..*end;
                     if self
                         .forward_media
-                        .is_some_and(|bounds| bounds.can_defer(&sample.range))
+                        .is_some_and(|bounds| bounds.can_defer(&range))
                     {
                         self.deferred_media = true;
                     } else {
-                        sample.require_within(media[selected].clone())?;
+                        require_range_within(&range, media[selected].clone())?;
                     }
-                    self.phase = Phase::ValidateOrder;
+                    self.phase = Phase::ValidateOrder(*sample);
                 }
-                Phase::ValidateOrder => {
-                    let sample = self
-                        .pending_validation
-                        .take()
-                        .ok_or(Error::Invalid("missing source validation sample"))?;
+                Phase::ValidateOrder(sample) => {
                     if self
-                        .previous_start
-                        .is_some_and(|start| sample.range.start < start)
+                        .previous
+                        .is_some_and(|prior| sample.start < prior.start)
                     {
                         let error = Error::Unsupported(
                             "physical merge needs nondecreasing per-track source offsets",
@@ -647,13 +656,12 @@ impl<'a> PhysicalSampleCursor<'a> {
                         self.layout_error = Some(error);
                     }
                     if self
-                        .previous_ordinal
-                        .is_some_and(|ordinal| sample.ordinal <= ordinal)
+                        .previous
+                        .is_some_and(|prior| sample.ordinal <= prior.ordinal)
                     {
                         return Err(Error::Invalid("source sample ordinal not increasing"));
                     }
-                    self.previous_start = Some(sample.range.start);
-                    self.previous_ordinal = Some(sample.ordinal);
+                    self.previous = Some(*sample);
                     self.phase = Phase::ValidateRead;
                 }
                 Phase::Fill => {
@@ -664,7 +672,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     let slot = &self.slots.as_slice()[self.index];
                     if slot.ended || slot.head.is_some() {
@@ -678,16 +686,16 @@ impl<'a> PhysicalSampleCursor<'a> {
                 Phase::ReadHead => {
                     let slot = &mut self.slots.as_mut_slice()[self.index];
                     match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(InterleaveStatus::Yield),
-                        SampleStep::Sample(sample) => slot.head = Some(sample),
-                        SampleStep::End => slot.ended = true,
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::Item(sample) => slot.head = Some(sample),
+                        Next::End => slot.ended = true,
                     }
                     self.index += 1;
                     self.phase = Phase::Fill;
                 }
                 Phase::Select => {
                     if self.index == self.slots.len() {
-                        let Some(selected) = self.best else {
+                        let Some((selected, _)) = self.best else {
                             self.phase = Phase::End;
                             continue;
                         };
@@ -705,24 +713,13 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     }
                     if !work.try_charge(1) {
-                        return Ok(InterleaveStatus::Yield);
+                        return Ok(CursorStatus::Yield);
                     }
                     let slots = self.slots.as_slice();
                     if let Some(head) = &slots[self.index].head {
-                        let earlier = match self.best {
-                            Some(best) => {
-                                head.range.start
-                                    < slots[best]
-                                        .head
-                                        .as_ref()
-                                        .ok_or(Error::Invalid("missing comparison source head"))?
-                                        .range
-                                        .start
-                            }
-                            None => true,
-                        };
-                        if earlier {
-                            self.best = Some(self.index);
+                        let start = head.range.start;
+                        if self.best.is_none_or(|(_, earliest)| start < earliest) {
+                            self.best = Some((self.index, start));
                         }
                     }
                     self.index += 1;
@@ -733,9 +730,9 @@ impl<'a> PhysicalSampleCursor<'a> {
                         continue;
                     };
                     match slot.cursor.poll(work)? {
-                        SampleStep::Yield => return Ok(InterleaveStatus::Yield),
-                        SampleStep::End => self.index += 1,
-                        SampleStep::Sample(sample) => {
+                        Next::Yield => return Ok(CursorStatus::Yield),
+                        Next::End => self.index += 1,
+                        Next::Item(sample) => {
                             self.ready = Some(InterleavedSample {
                                 track_id: slot.source.track_id,
                                 sample,
@@ -743,7 +740,7 @@ impl<'a> PhysicalSampleCursor<'a> {
                         }
                     }
                 }
-                Phase::End => return Ok(InterleaveStatus::End),
+                Phase::End => return Ok(CursorStatus::End),
             }
         }
     }

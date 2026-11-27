@@ -3,12 +3,12 @@ mod common;
 use common::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_core::container::{
-    CodecId, ContainerReader, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
+    CodecId, ContainerReader, Event, PacketInfo, SeekMethod, SeekPolicy, SeekRequest, TrackInfo,
 };
 use triergon_core::{Budget, Error, Step, Time, WorkBudget};
 use triergon_elementary::{
-    Ac3, Adts, BlockingReader, Flac, FlacBlockKind, Format, Limits, MpegAudio, Reader, SeekBasis,
-    TagKind,
+    Ac3, Adts, BlockingReader, Flac, FlacBlockKind, Format, Kind, Limits, MpegAudio, Reader,
+    SeekBasis, TagKind, probe,
 };
 
 /// The same packets whatever the window size and step work, for a known and for an
@@ -83,6 +83,50 @@ fn mpeg_audio_frames_follow_their_headers_after_tags() {
     );
     assert_eq!((track.sample_rate(), track.channels()), (44100, Some(2)));
     assert!(track.configuration().is_empty());
+}
+
+#[test]
+fn a_tag_entry_is_retried_after_backpressure() {
+    let tag = id3v2(1);
+    let audio = mp3_stream(3);
+    let file = [tag.as_slice(), audio.as_slice()].concat();
+    let cancel = AtomicBool::new(false);
+    for retained_metadata_bytes in [0, tag.len()] {
+        let limits = Limits {
+            retained_metadata_bytes,
+            ..Limits::default()
+        };
+        let pool = Budget::new(4096).unwrap();
+        let mut reader = Reader::<MpegAudio>::new(
+            &pool,
+            triergon_core::SourceId(1),
+            capabilities(&file, true),
+            limits,
+            4096,
+        )
+        .unwrap();
+        let request = reader.request();
+        supply(&mut reader, &pool, &file, &request, 4096);
+        let held = pool.reserve(pool.available()).unwrap();
+        assert!(matches!(
+            reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
+            Step::Backpressure(_)
+        ));
+        assert!(reader.tags().is_empty());
+        drop(held);
+        assert!(matches!(
+            reader.step(&mut WorkBudget::new(4096), &cancel).unwrap(),
+            Step::Ready(Event::Other(triergon_elementary::ReaderEvent::Opened))
+        ));
+        let [entry] = reader.tags() else {
+            panic!("expected one tag")
+        };
+        assert_eq!((entry.offset, entry.len), (0, tag.len() as u64));
+        assert_eq!(
+            entry.bytes.as_deref(),
+            (retained_metadata_bytes != 0).then_some(tag.as_slice())
+        );
+    }
 }
 
 #[test]
@@ -210,6 +254,30 @@ fn a_damaged_flac_frame_ends_at_the_header_that_numbers_on() {
 }
 
 #[test]
+fn frames_of_a_stream_written_before_the_blocking_bit_are_timed_by_sample_number() {
+    // STREAMINFO declares block sizes 256 to 4096 while every frame leaves the blocking
+    // strategy bit clear: the coded numbers are sample numbers (RFC 9639 Appendix B.1).
+    let sizes = [(12, 4096), (11, 2048), (12, 4096), (10, 1024)];
+    let mut file = flac_head(11264, &[]);
+    file[8..12].copy_from_slice(&[0x01, 0x00, 0x10, 0x00]);
+    let mut first = 0;
+    for (i, (code, samples)) in sizes.into_iter().enumerate() {
+        file.extend(flac_frame_coded(first, code, 400 + i));
+        first += samples;
+    }
+    let reading = invariant::<Flac>(&file);
+    let times: Vec<_> = reading
+        .packets
+        .iter()
+        .map(|p| (p.pts, p.duration))
+        .collect();
+    assert_eq!(
+        times,
+        [(0, 4096), (4096, 2048), (6144, 4096), (10240, 1024)]
+    );
+}
+
+#[test]
 fn adts_frames_drop_junk_and_keep_a_truncated_tail() {
     let mut file = id3v2(4);
     for i in 0..8 {
@@ -224,6 +292,41 @@ fn adts_frames_drop_junk_and_keep_a_truncated_tail() {
     assert_eq!(lens, [200, 201, 202, 203, 204, 205, 206, 207, 120]);
     assert_eq!(reading.packets[4].offset, 14 + 200 + 201 + 202 + 203 + 50);
     assert_eq!(reading.packets[8].pts, 8 * 1024);
+}
+
+#[test]
+fn an_adts_stream_that_changes_its_sampling_frequency_is_refused_there() {
+    let mut file = Vec::new();
+    for i in 0..4 {
+        file.extend(adts_frame(i, 200));
+    }
+    for i in 4..8 {
+        // Sampling frequency index 7 (22050 Hz) after index 4 (44100 Hz).
+        let mut frame = adts_frame(i, 180);
+        frame[2] = (frame[2] & !0x3c) | (7 << 2);
+        file.extend(frame);
+    }
+    for (work, most) in [(1 << 30, usize::MAX), (64, 3)] {
+        let pool = Budget::new(16 << 20).unwrap();
+        let mut reader = open::<Adts>(&pool, &file, true);
+        let cancel = AtomicBool::new(false);
+        let mut lens = Vec::new();
+        let error = loop {
+            match reader.step(&mut WorkBudget::new(work), &cancel) {
+                Ok(Step::Ready(Event::Packet(packet))) => lens.push(Seen::of(&packet).len),
+                Ok(Step::Ready(_) | Step::Yield) => {}
+                Ok(Step::NeedInput(request)) => supply(&mut reader, &pool, &file, &request, most),
+                Ok(Step::End(_)) => panic!("the frames after the change were dropped"),
+                Ok(Step::Backpressure(pressure)) => panic!("{pressure:?}"),
+                Err(error) => break error,
+            }
+        };
+        assert_eq!(lens, [200; 4]);
+        assert_eq!(
+            error,
+            Error::Unsupported("ADTS sequence with another sampling frequency or ID")
+        );
+    }
 }
 
 #[test]
@@ -343,6 +446,73 @@ fn an_mpeg_audio_seek_says_what_its_landing_rests_on() {
 }
 
 #[test]
+fn a_bitrate_seek_across_junk_lands_on_the_packet_the_junk_starts() {
+    // 128 kbit/s at 44.1 kHz: frame k starts at byte k * 18432000 / 44100, padded as an
+    // encoder pads; 500 bytes of junk sit where frame 50 would start.
+    let start = |k: u32| u64::from(k) * 18_432_000 / 44_100;
+    let frame = |k: u32| mp3_frame(k, start(k + 1) - start(k) == 418);
+    let mut file: Vec<u8> = (0..50).flat_map(frame).collect();
+    file.extend(vec![0x55; 500]);
+    file.extend((50..100).flat_map(frame));
+    let linear = read_file::<MpegAudio>(&file, 1 << 30, usize::MAX, true).unwrap();
+    assert_eq!(linear.packets[50].offset, start(50));
+    let requested = Time::new(1_319_183, 1_000_000).unwrap();
+    let (reading, detail) = seek::<MpegAudio>(
+        &file,
+        (1_319_183, 1_000_000),
+        SeekPolicy::PreviousRandomAccess,
+    );
+    // The estimate past the junk would land on frame 51; the packet the junk starts holds
+    // frame 50, which the estimate at the jump names.
+    assert_eq!(detail.basis, SeekBasis::Bitrate);
+    assert_eq!(detail.receipt.landing, Time::new(50 * 1152, 44100).unwrap());
+    assert!(detail.receipt.landing <= requested);
+    assert_eq!(reading.packets, linear.packets[50..]);
+}
+
+#[test]
+fn a_bitrate_seek_inside_a_frame_lands_on_a_complete_packet() {
+    let jump = 50 * 18_432_000 / 44_100;
+    for (padded, short, into_frame) in [(46, 0, 1), (47, 4, 208)] {
+        let mut file = Vec::new();
+        for index in 0..80 {
+            let pad = index < padded || index == 50;
+            let mut frame = mp3_frame(index, pad);
+            if (1..=short).contains(&index) {
+                frame[2] = (frame[2] & 0x0f) | 0x80; // 112 kbit/s
+                frame.truncate(365 + usize::from(pad));
+            }
+            file.extend(frame);
+        }
+        let linear = read_file::<MpegAudio>(&file, 1 << 30, usize::MAX, true).unwrap();
+        assert_eq!(jump - linear.packets[50].offset, into_frame);
+        let (reading, detail) = seek::<MpegAudio>(
+            &file,
+            (1_319_183, 1_000_000),
+            SeekPolicy::PreviousRandomAccess,
+        );
+        assert_eq!(detail.basis, SeekBasis::Exact);
+        assert_eq!(detail.receipt.method, SeekMethod::Restart);
+        assert_eq!(detail.receipt.landing, Time::new(50 * 1152, 44100).unwrap());
+        assert_eq!(reading.packets, linear.packets[50..]);
+    }
+}
+
+#[test]
+fn a_seek_to_zero_starts_after_the_mpeg_information_frame() {
+    let audio = mp3_stream(20);
+    let mut source = mp3_info(20, (audio.len() + 417) as u32, 576, 1260);
+    let first_audio = source.len();
+    source.extend(audio);
+    let (reading, detail) = seek::<MpegAudio>(&source, (0, 1), SeekPolicy::PreviousRandomAccess);
+    assert_eq!(reading.packets[0].offset, first_audio as u64);
+    assert_eq!(reading.packets[0].pts, 0);
+    assert_eq!(reading.packets[0].start_trim, Some(1105));
+    assert_eq!(detail.basis, SeekBasis::Exact);
+    assert!(detail.receipt.replays_from_start);
+}
+
+#[test]
 fn an_adts_seek_counts_frames_from_the_start() {
     let file: Vec<u8> = (0..100)
         .flat_map(|i| adts_frame(i, 150 + i as usize % 40))
@@ -352,6 +522,7 @@ fn an_adts_seek_counts_frames_from_the_start() {
     assert_eq!(reading.packets[0].pts, 42 * 1024);
     assert_eq!(detail.receipt.method, SeekMethod::Restart);
     assert_eq!(detail.basis, SeekBasis::Exact);
+    assert!(!detail.receipt.replays_from_start);
 }
 
 #[test]
@@ -439,29 +610,110 @@ fn cancellation_is_sticky_until_reset() {
 }
 
 #[test]
+fn seeking_cannot_clear_a_reader_error() {
+    let file = mp3_stream(4);
+    let pool = Budget::new(16 << 20).unwrap();
+    let mut reader = open::<MpegAudio>(&pool, &file, true);
+    let unreadable = vec![0; file.len()];
+    let error = read(&mut reader, &pool, &unreadable, 1 << 20, 4096).unwrap_err();
+    assert_eq!(error, Error::Invalid("no frame in the source"));
+    assert_eq!(
+        reader
+            .request_seek(SeekRequest {
+                track: triergon_elementary::TRACK,
+                target: Time::new(0, 1).unwrap(),
+                policy: SeekPolicy::PreviousRandomAccess,
+            })
+            .unwrap_err(),
+        error
+    );
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        reader.step(&mut WorkBudget::new(1), &cancel).unwrap_err(),
+        error
+    );
+    reader.reset().unwrap();
+    assert_eq!(
+        read(&mut reader, &pool, &file, 1 << 20, 4096)
+            .unwrap()
+            .packets
+            .len(),
+        4
+    );
+}
+
+#[test]
+fn sequential_open_reads_packets_and_refuses_seeking() {
+    let file = mp3_stream(4);
+    let mut reader =
+        BlockingReader::<MpegAudio, _>::open(file.as_slice(), Limits::default()).unwrap();
+    let cancel = AtomicBool::new(false);
+    assert_eq!(
+        reader
+            .seek(
+                SeekRequest {
+                    track: triergon_elementary::TRACK,
+                    target: Time::new(0, 1).unwrap(),
+                    policy: SeekPolicy::PreviousRandomAccess,
+                },
+                &cancel,
+            )
+            .unwrap_err(),
+        Error::Unsupported("seeking a sequential source")
+    );
+    assert!(reader.next_packet(&cancel).unwrap().is_some());
+}
+
+#[test]
 fn the_blocking_reader_reads_and_seeks() {
     let file: Vec<u8> = (0..60).flat_map(ac3_frame).collect();
     let mut reader =
-        BlockingReader::<Ac3, _>::open(std::io::Cursor::new(file), Limits::default()).unwrap();
+        BlockingReader::<Ac3, _>::open_seekable(std::io::Cursor::new(file), Limits::default())
+            .unwrap();
+    let cancel = AtomicBool::new(false);
     let mut count = 0;
-    while reader.next_packet().unwrap().is_some() {
+    while reader.next_packet(&cancel).unwrap().is_some() {
         count += 1;
     }
     assert_eq!(count, 60);
     let receipt = reader
-        .seek(SeekRequest {
-            track: triergon_elementary::TRACK,
-            target: Time::new(1, 2).unwrap(),
-            policy: SeekPolicy::PreviousRandomAccess,
-        })
+        .seek(
+            SeekRequest {
+                track: triergon_elementary::TRACK,
+                target: Time::new(1, 2).unwrap(),
+                policy: SeekPolicy::PreviousRandomAccess,
+            },
+            &cancel,
+        )
         .unwrap();
     // Sample 24000 is in frame 15 of 1536 samples.
     assert_eq!(receipt.landing, Time::new(15 * 1536, 48000).unwrap());
-    let next = reader.next_packet().unwrap().unwrap();
-    assert_eq!(
-        triergon_core::container::PacketInfo::pts(&next),
-        Some(15 * 1536)
-    );
+    let next = reader.next_packet(&cancel).unwrap().unwrap();
+    assert_eq!(next.pts(), Some(15 * 1536));
+    assert_eq!(next.dts(), None);
+}
+
+#[test]
+fn adts_and_ac3_after_other_bytes_are_recognised_by_three_frames() {
+    let adts: Vec<u8> = (0..3).flat_map(|i| adts_frame(i, 300)).collect();
+    let ac3: Vec<u8> = (0..3).flat_map(ac3_frame).collect();
+    let eac3: Vec<u8> = (0..3).flat_map(|i| eac3_frame(i, false)).collect();
+    for (frames, len, kind) in [
+        (adts, 300, Kind::Adts),
+        (ac3, 512, Kind::Ac3),
+        (eac3, 256, Kind::Ac3),
+    ] {
+        for junk in [1, 7, 32, 1024] {
+            let mut file = vec![0x5a; junk];
+            file.extend(&frames);
+            assert_eq!(probe(&file), Some(kind), "{kind:?} after {junk} bytes");
+            assert_eq!(probe(&file[..junk + 2 * len]), None, "two {kind:?} frames");
+        }
+    }
+    // The readers read what the probe recognises.
+    let mut file = vec![0x5a; 7];
+    file.extend((0..3).flat_map(|i| adts_frame(i, 300)));
+    assert_eq!(invariant::<Adts>(&file).packets.len(), 3);
 }
 
 #[test]
@@ -475,6 +727,7 @@ fn readers_are_concrete_container_readers() {
         triergon_core::SourceId(1),
         capabilities(&[], false),
         Limits::default(),
+        64 << 10,
     )
     .unwrap();
     assert_eq!(tracks(&reader), 0);
@@ -563,4 +816,82 @@ fn a_flac_stream_whose_first_block_is_not_streaminfo_is_refused() {
         error,
         Error::Invalid("FLAC first metadata block is not STREAMINFO")
     );
+}
+
+#[test]
+fn request_names_the_current_input_after_a_short_window() {
+    let input = mp3_stream(3);
+    let pool = Budget::new(1 << 20).unwrap();
+    let cancel = AtomicBool::new(false);
+    let mut reader = open::<MpegAudio>(&pool, &input, true);
+    for offset in 0..2 {
+        let Step::NeedInput(needed) = reader.step(&mut WorkBudget::new(100), &cancel).unwrap()
+        else {
+            panic!("expected a byte request");
+        };
+        let request = reader.request();
+        assert_eq!(
+            (
+                request.source,
+                &request.token,
+                request.offset,
+                request.maximum
+            ),
+            (needed.source, &needed.token, offset, needed.maximum)
+        );
+        supply(&mut reader, &pool, &input, &request, 1);
+    }
+}
+
+#[test]
+fn first_frame_headers_and_lame_tag_remain_available_after_opening() {
+    let mut mp3 = mp3_info(3, 417 * 4, 576, 700);
+    mp3.extend(mp3_stream(3));
+    let cancel = AtomicBool::new(false);
+    let mut mpeg =
+        BlockingReader::<MpegAudio, _>::open_seekable(std::io::Cursor::new(mp3), Limits::default())
+            .unwrap();
+    assert!(mpeg.next_packet(&cancel).unwrap().is_some());
+    let facts = mpeg.reader().format();
+    let header = facts.header().unwrap();
+    assert_eq!(
+        (header.sample_rate, header.bitrate_kbps, header.channels()),
+        (44100, 128, 2)
+    );
+    let lame = facts.lame().unwrap();
+    assert_eq!((lame.encoder_delay, lame.encoder_padding), (576, 700));
+
+    let aac: Vec<_> = (0..3).flat_map(|n| adts_frame(n, 32)).collect();
+    let mut adts =
+        BlockingReader::<Adts, _>::open_seekable(std::io::Cursor::new(aac), Limits::default())
+            .unwrap();
+    assert!(adts.next_packet(&cancel).unwrap().is_some());
+    assert_eq!(adts.reader().format().header().unwrap().frame_length(), 32);
+
+    let ac3: Vec<_> = (0..3).flat_map(ac3_frame).collect();
+    let mut a52 =
+        BlockingReader::<Ac3, _>::open_seekable(std::io::Cursor::new(ac3), Limits::default())
+            .unwrap();
+    assert!(a52.next_packet(&cancel).unwrap().is_some());
+    assert_eq!(a52.reader().format().header().unwrap().blocks, 6);
+}
+
+#[test]
+fn reset_forgets_the_last_seek() {
+    let file = mp3_stream(100);
+    let pool = Budget::new(64 << 20).unwrap();
+    let mut reader = open::<MpegAudio>(&pool, &file, true);
+    read(&mut reader, &pool, &file, 1 << 20, 4096).unwrap();
+    let request = reader
+        .request_seek(SeekRequest {
+            track: triergon_elementary::TRACK,
+            target: Time::new(1, 1).unwrap(),
+            policy: SeekPolicy::PreviousRandomAccess,
+        })
+        .unwrap();
+    supply(&mut reader, &pool, &file, &request, 4096);
+    read(&mut reader, &pool, &file, 1 << 20, 4096).unwrap();
+    assert!(reader.last_seek().is_some());
+    reader.reset().unwrap();
+    assert!(reader.last_seek().is_none());
 }

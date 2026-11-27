@@ -1,0 +1,240 @@
+//! The PES header of the packet being cut.
+use super::body::CONTINUATION_WITHOUT_PACKET;
+use super::{Arena, DemuxObserver, Follow};
+use crate::pes::{HEADER_MAX, START_CODE_PREFIX, parse_header, parse_timed_header};
+use crate::{SourceRange, commit_range, limit, prepare_range};
+use std::sync::atomic::{AtomicBool, Ordering};
+use triergon_core::{Error, Result, WorkBudget};
+
+/// A PES that does not begin with the start code prefix.
+const START_CODE: Error = Error::Invalid(crate::pes::START_CODE);
+/// A PES whose optional header runs past its declared length.
+const EXCEEDS_LENGTH: Error = Error::Invalid("PES header exceeds length");
+
+impl DemuxObserver {
+    fn finish_header(&mut self) -> Result<()> {
+        let header = parse_header(&self.budget, &self.raw_header[..self.header_used])?;
+        if header.stream_id != self.scope.stream_id {
+            return Err(Error::Unsupported(
+                "PES header stream ID disagrees with the selected carriage",
+            ));
+        }
+        self.body_limit = self
+            .declared_total
+            .map(|total| total.checked_sub(self.header_used).ok_or(EXCEEDS_LENGTH))
+            .transpose()?;
+        self.header = Some(header);
+        Ok(())
+    }
+
+    /// Whether `error` drops the PES being cut, or the carrier that continues one dropped
+    /// before; when it does, the PES state is cleared to wait for the next payload unit
+    /// start. A dropped PES leaves no origin until the next one begins.
+    pub(super) fn drops_unparsed(&mut self, error: Error) -> bool {
+        if error == CONTINUATION_WITHOUT_PACKET {
+            return self.follow == Follow::SkipToStart && self.origin.is_none();
+        }
+        if !(error == START_CODE || error == EXCEEDS_LENGTH)
+            || !self.active
+            || self.header.is_some()
+        {
+            return false;
+        }
+        self.active = false;
+        self.follow = Follow::SkipToStart;
+        self.origin = None;
+        self.header_used = 0;
+        self.header_target = 6;
+        self.declared_total = None;
+        self.header_ranges.clear();
+        true
+    }
+
+    /// Read a timestamp-only header from one carrier when its whole validation
+    /// fits. The ordinary staged parser handles incomplete or invalid headers.
+    pub(super) fn complete_timed_header(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(Error::Invalid("PES observer input missing"))?;
+        let payload = pending
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("PES observer payload missing"))?;
+        let bytes = &payload[pending.position..];
+        let Some((header, declared)) = parse_timed_header(bytes, self.limits.pes_bytes, work)
+        else {
+            return Ok(false);
+        };
+        if header.stream_id != self.scope.stream_id || (declared.is_none() && self.finite_private())
+        {
+            return Ok(false);
+        }
+        let used = header.as_bytes().len();
+        let charge = used as u64 + 3;
+        let extent = SourceRange {
+            entity: self.scope.entity,
+            offset: pending
+                .carrier
+                .payload_source_offset
+                .checked_add(pending.position as u64)
+                .ok_or(Error::Overflow)?,
+            bytes: used,
+        };
+        extent.end()?;
+        if !self.reserve(Arena::Header, work, cancel)? || !work.try_charge(charge) {
+            return Ok(false);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        debug_assert!(self.header_ranges.is_empty());
+        self.header_ranges
+            .try_push(extent)
+            .map_err(|error| error.error)?;
+        self.header_used = used;
+        self.header_target = used;
+        self.declared_total = declared;
+        self.body_limit = declared.map(|total| total - used);
+        self.header = Some(header);
+        self.pending
+            .as_mut()
+            .ok_or(Error::Invalid("PES observer input missing"))?
+            .position += used;
+        Ok(true)
+    }
+
+    pub(super) fn poll_header(
+        &mut self,
+        work: &mut WorkBudget,
+        cancel: &AtomicBool,
+    ) -> Result<bool> {
+        if self.header_used == 0 && self.complete_timed_header(work, cancel)? {
+            return Ok(true);
+        }
+        self.poll_staged_header(work, cancel)
+    }
+
+    /// Reads a header byte range at a time, for the headers one carrier does not
+    /// hold whole or that the whole-header path refuses. Kept apart from that path.
+    #[inline(never)]
+    fn poll_staged_header(&mut self, work: &mut WorkBudget, cancel: &AtomicBool) -> Result<bool> {
+        if self.header_used == self.header_target {
+            if !work.try_charge(1) {
+                return Ok(false);
+            }
+            match self.header_used {
+                6 => {
+                    if self.raw_header[..3] != START_CODE_PREFIX {
+                        return Err(START_CODE);
+                    }
+                    if self.raw_header[3] != self.scope.stream_id {
+                        return Err(Error::Unsupported(
+                            "PES header stream ID disagrees with the selected carriage",
+                        ));
+                    }
+                    let length =
+                        usize::from(u16::from_be_bytes([self.raw_header[4], self.raw_header[5]]));
+                    if length == 0 && self.finite_private() {
+                        return Err(self.finite_private_error(
+                            "private audio PES requires a declared packet length",
+                            "DVB subtitle PES requires a declared packet length",
+                        ));
+                    }
+                    if length != 0 {
+                        let total = length + 6;
+                        if total > self.limits.pes_bytes {
+                            return Err(limit(total, self.limits.pes_bytes));
+                        }
+                        if total < 9 {
+                            return Err(Error::Invalid("PES optional-header length"));
+                        }
+                        self.declared_total = Some(total);
+                    }
+                    self.header_target = 9;
+                }
+                9 => {
+                    self.header_target = 9 + usize::from(self.raw_header[8]);
+                    if self.header_target > self.limits.pes_bytes {
+                        return Err(limit(self.header_target, self.limits.pes_bytes));
+                    }
+                    if self
+                        .declared_total
+                        .is_some_and(|total| self.header_target > total)
+                    {
+                        return Err(EXCEEDS_LENGTH);
+                    }
+                    if self.header_target == 9 {
+                        self.finish_header()?;
+                    }
+                }
+                _ => self.finish_header()?,
+            }
+            return Ok(true);
+        }
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(Error::Invalid("PES observer input missing"))?;
+        let payload = pending
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("PES observer payload missing"))?;
+        if pending.position == payload.len() {
+            self.pending = None;
+            return Ok(true);
+        }
+        let extent = SourceRange {
+            entity: self.scope.entity,
+            offset: pending
+                .carrier
+                .payload_source_offset
+                .checked_add(pending.position as u64)
+                .ok_or(Error::Overflow)?,
+            bytes: 1,
+        };
+        let merge = self.header_ranges.as_slice().last().is_some_and(|last| {
+            last.entity == extent.entity && last.end().ok() == Some(extent.offset)
+        });
+        if !merge && !self.reserve(Arena::Header, work, cancel)? {
+            return Ok(false);
+        }
+        if !work.try_charge(1) {
+            return Ok(false);
+        }
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(Error::Invalid("PES observer input missing"))?;
+        let payload = pending
+            .payload
+            .as_ref()
+            .ok_or(Error::Invalid("PES observer payload missing"))?
+            .as_ref();
+        let count = (self.header_target - self.header_used)
+            .min(payload.len() - pending.position)
+            .min(work.remaining().min(HEADER_MAX as u64) as usize + 1);
+        let bytes = &payload[pending.position..pending.position + count];
+        let extent = SourceRange {
+            bytes: count,
+            ..extent
+        };
+        let merge = prepare_range(&mut self.header_ranges, extent, self.limits.source_spans)?;
+        if cancel.load(Ordering::Relaxed) {
+            return Err(Error::Cancelled);
+        }
+        commit_range(&mut self.header_ranges, extent, merge)?;
+        self.raw_header[self.header_used..self.header_used + count].copy_from_slice(bytes);
+        work.take(count as u64 - 1);
+        self.header_used += count;
+        self.pending
+            .as_mut()
+            .ok_or(Error::Invalid("PES observer input missing"))?
+            .position += count;
+        Ok(true)
+    }
+}

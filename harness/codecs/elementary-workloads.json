@@ -1,0 +1,115 @@
+{
+ "schema": "triergon.codecs.workloads.v1",
+ "note": "The candidate reads complete ADTS, AC-3 and E-AC-3 access units through the elementary reader before decoding. The reference uses the corresponding codec parser before decoding.",
+ "open_workloads": [],
+ "workloads": [
+  {
+   "id": "aac-lc-5.1",
+   "path": ".research/codec-inputs/aac-lc-5.1.aac",
+   "sha256": "266795d0d249358e1773ea2ff575d1c49730ae2a6f7f5b7b93129323cdfe8839",
+   "bytes": 484341,
+   "operation": "audio-aac",
+   "iterations": 4,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "aac-lc-stereo",
+   "path": ".research/codec-inputs/aac-lc-stereo.aac",
+   "sha256": "8211fabe2b5d6448420e31cae63839be4f876ad9a54a70a2a53bf31620e74537",
+   "bytes": 163539,
+   "operation": "audio-aac",
+   "iterations": 8,
+   "origin": "self-generated on the development host from FFmpeg lavfi testsrc2/sine (rights: own); generator commands in harness/codecs/workloads.md"
+  },
+  {
+   "id": "aac-he-stereo",
+   "path": ".research/codec-inputs/al_sbr_cm_48_2.adts",
+   "sha256": "0d17bc6adcb8dbebc4c5f1dc447d8631d0b1e0797ba5c3a4884e0e58230440d8",
+   "bytes": 198304,
+   "operation": "audio-aac",
+   "iterations": 4,
+   "origin": "FATE aac/al_sbr_cm_48_2 (rights unreviewed), HE-AAC v1 (SBR) stereo at 48 kHz, ADTS copied out with the decode profile's ffmpeg (-map 0:a:0 -c:a copy -f adts): the AAC lane's correctness vector of the same hash"
+  },
+  {
+   "id": "aac-he-5.1",
+   "path": ".research/codec-inputs/al_sbr_cm_48_5.1.adts",
+   "sha256": "2f756af575771e9890c97841c13c555612599ce85e82af47df175a1e0e16d6a8",
+   "bytes": 520018,
+   "operation": "audio-aac",
+   "iterations": 2,
+   "origin": "FATE aac/al_sbr_cm_48_5.1 (rights unreviewed), HE-AAC v1 (SBR) 5.1 at 48 kHz, ADTS copied out with the decode profile's ffmpeg (-map 0:a:0 -c:a copy -f adts): the AAC lane's correctness vector of the same hash"
+  },
+  {
+   "id": "aac-hev2-stereo",
+   "path": ".research/codec-inputs/al_sbr_ps_06_new.adts",
+   "sha256": "cc7e5b18455c04c76efa8a87bf7db40f297fb38aa56b93d4bd7f97a397b4fa87",
+   "bytes": 55767,
+   "operation": "audio-aac",
+   "iterations": 8,
+   "origin": "FATE aac/al_sbr_ps_06_new (rights unreviewed), HE-AAC v2 (SBR and Parametric Stereo), ADTS copied out with the decode profile's ffmpeg (-map 0:a:0 -c:a copy -f adts): the AAC lane's correctness vector of the same hash"
+  },
+  {
+   "id": "ac3-5.1-448",
+   "path": ".research/fate-samples/ac3/monsters_inc_5.1_448_small.ac3",
+   "sha256": "74fefeef070f663378a0864beb064cf88ee1186152f7ac320984af15be2f22db",
+   "bytes": 100000,
+   "operation": "audio-ac3",
+   "iterations": 16,
+   "origin": "FATE (rights unreviewed)"
+  },
+  {
+   "id": "ac3-2.0-192",
+   "path": ".research/fate-samples/ac3/monsters_inc_2.0_192_small.ac3",
+   "sha256": "4df071457c23d1a39fe52322892bc9333921ad6dfc8f87ffa0797bdfb5101bae",
+   "bytes": 100000,
+   "operation": "audio-ac3",
+   "iterations": 16,
+   "origin": "FATE (rights unreviewed)"
+  },
+  {
+   "id": "ac3-4.0",
+   "path": ".research/fate-samples/ac3/millers_crossing_4.0.ac3",
+   "sha256": "faa06c7b1ccbc5cf3c7897afb50004dd3d49feaa19d26bdeb03dc9bb4ec20802",
+   "bytes": 95232,
+   "operation": "audio-ac3",
+   "iterations": 16,
+   "origin": "FATE (rights unreviewed)"
+  },
+  {
+   "id": "eac3-7.1",
+   "path": ".research/fate-samples/eac3/the_great_wall_7.1.eac3",
+   "sha256": "d698981ddc1c10e65d234dd6a02ff2b0f4c88787595c9d3e5adf7f097f2c9e50",
+   "bytes": 723456,
+   "operation": "audio-eac3",
+   "iterations": 8,
+   "origin": "FATE (rights unreviewed)"
+  },
+  {
+   "id": "eac3-5.1-spx",
+   "path": ".research/fate-samples/eac3/csi_miami_5.1_256_spx_small.eac3",
+   "sha256": "84f50317a49a98509bf174ace814b39860e6ab2a1d61bdbd10ada9081f2bb2b3",
+   "bytes": 48128,
+   "operation": "audio-eac3",
+   "iterations": 16,
+   "origin": "FATE (rights unreviewed)"
+  },
+  {
+   "id": "eac3-stereo-spx",
+   "path": ".research/fate-samples/eac3/csi_miami_stereo_128_spx.eac3",
+   "sha256": "f96b45fa4d249522cd83dea009cd528ce552ec9d947e03cdecab44652bc86ecb",
+   "bytes": 333664,
+   "operation": "audio-eac3",
+   "iterations": 4,
+   "origin": "FATE (rights unreviewed)"
+  },
+  {
+   "id": "eac3-5.1-1536",
+   "path": ".research/fate-samples/eac3/serenity_english_5.1_1536_small.eac3",
+   "sha256": "3d81c22610a2602b7799ec5e59c2677e8ab23e03e4abc03c2a16b683aa3d5f0a",
+   "bytes": 99328,
+   "operation": "audio-eac3",
+   "iterations": 16,
+   "origin": "FATE (rights unreviewed)"
+  }
+ ]
+}

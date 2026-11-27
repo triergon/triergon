@@ -1,12 +1,13 @@
-mod common;
+use crate::common;
 use common::child;
 use triergon_core::{Budget, Time, TimeBase, WorkBudget};
 use triergon_isobmff::{
-    EditList, Limits, SampleStep, TrackHeader,
+    Limits, Next,
     compat::mov::{
         edits::ProjectedEdit,
         packets::{PacketProjector, PacketView, StreamView},
     },
+    movie::{EditList, TrackHeader},
 };
 
 fn source_sample(name: &str, ordinal: u64) -> (triergon_isobmff::Sample, Option<u32>) {
@@ -27,9 +28,9 @@ fn source_sample(name: &str, ordinal: u64) -> (triergon_isobmff::Sample, Option<
     let mut locate = table.locate(ordinal).unwrap();
     let sample = loop {
         match locate.poll(&mut WorkBudget::new(1)).unwrap() {
-            SampleStep::Sample(s) => break s,
-            SampleStep::Yield => {}
-            SampleStep::End => panic!(),
+            Next::Item(s) => break s,
+            Next::Yield => {}
+            Next::End => panic!(),
         }
     };
     (sample, table.sync_entry_count())
@@ -145,7 +146,7 @@ fn source_edit_points_produce_observed_demux_clock_and_discard_views() {
 fn demux_duration_can_follow_occurrence_clock_without_changing_decode_delta() {
     let (sample, sync) = source_sample("r-edits-repeat", 6);
     let mapping = ProjectedEdit {
-        entry: triergon_isobmff::EditEntry {
+        entry: triergon_isobmff::movie::EditEntry {
             segment_duration: 2000,
             media_time: 3000,
             rate_integer: 1,

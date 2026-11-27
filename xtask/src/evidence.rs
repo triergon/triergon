@@ -11,7 +11,8 @@
 //! Every upload lands under `qualification/`, which the archive expires 90 days
 //! after upload. A set moves under `evidence/`, which is kept, only when a result
 //! cites it, so nothing is kept that nothing cites. A set's index entry lists the
-//! gate results it holds, which later gate runs reuse once it is kept.
+//! gate results it holds, which later gate runs reuse once it is kept, each with
+//! its gate target and what it measured, which the status tables are rendered from.
 
 use std::fs::{self, File};
 use std::io::{self, BufWriter, Read, Write};
@@ -19,7 +20,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::archive::{TarFiles, TarReader};
-use crate::json::Value;
+use crate::harness::bounds::{CaseBounds, case_bounds};
+use crate::harness::measured::{Measured, Source};
+use crate::harness::policy::Policy;
+use crate::harness::reuse;
+use crate::json::{self, Value};
 use crate::sha256;
 
 /// The index's own fields: its schema, where keys lie, and how identifiers were
@@ -52,7 +57,7 @@ pub fn set(root: &Path, name: &str) -> Result<Value, String> {
     if !root.join(&path).is_file() {
         return Err(format!("{name} is not in the evidence index ({path})"));
     }
-    let set = crate::checks::read_json(&root.join(&path)).map_err(|e| format!("{path}: {e}"))?;
+    let set = json::read(&root.join(&path))?;
     if s(&set, "name") != Some(name) {
         return Err(format!("{path} does not hold set {name}"));
     }
@@ -425,8 +430,8 @@ fn aws_cp(from: &str, to: &str) -> Result<(), String> {
 /// `cargo xtask evidence upload SET ARCHIVE`: upload a packed set under
 /// `qualification/SET/`, where it expires 90 days after upload unless promoted,
 /// and print the entry to add to the index.
-pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
-    let (key, entry) = entry(name, archive, None)?;
+pub fn upload(root: &Path, name: &str, archive: &Path) -> Result<String, String> {
+    let (key, entry) = entry(root, name, archive, None)?;
     let location = archive_location()?;
     aws_cp(&archive.display().to_string(), &format!("{location}/{key}"))?;
     Ok(entry)
@@ -436,8 +441,14 @@ pub fn upload(name: &str, archive: &Path) -> Result<String, String> {
 /// `qualification/` it goes to, without uploading: for a host that packs a set but
 /// holds no archive credentials, whose upload streams through another machine.
 /// `key` names another key under `qualification/` that the pack was or will be
-/// uploaded to, ending in the pack's SHA-256 and suffix as every key does.
-pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, String), String> {
+/// uploaded to, ending in the pack's SHA-256 and suffix as every key does. Results
+/// are graded against `root`'s policy for what they measured.
+pub fn entry(
+    root: &Path,
+    name: &str,
+    archive: &Path,
+    key: Option<&str>,
+) -> Result<(String, String), String> {
     if name.is_empty()
         || !name
             .bytes()
@@ -473,7 +484,7 @@ pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, S
             ));
         }
     };
-    let results = gate_results(archive, compression)?;
+    let results = gate_results(archive, compression, Policy::load(root)?)?;
     let mut entry = vec![
         ("name", Value::str(name)),
         ("path", Value::str(name)),
@@ -487,66 +498,251 @@ pub fn entry(name: &str, archive: &Path, key: Option<&str>) -> Result<(String, S
         entry.push(("results", Value::Array(results)));
     }
     let entry = Value::object(entry);
-    Ok((key, crate::json::to_python(&entry, Some(1))))
+    Ok((key, json::to_python(&entry, Some(1))))
 }
 
-/// The fresh gate results a packed set holds ([`crate::harness::reuse`]), which a
-/// later gate run reuses once the set is kept.
-fn gate_results(archive: &Path, compression: Compression) -> Result<Vec<Value>, String> {
-    struct Results {
-        entries: Vec<(String, Vec<u8>)>,
-        current: bool,
+/// The fresh gate results a packed set holds ([`reuse::listed`]), which a later gate
+/// run reuses once the set is kept, each with what it measured ([`Measured`]) where
+/// its command measures, graded against `policy`. The pack is read twice: for the
+/// results, then for the reports beside them, each summarised as it is read.
+fn gate_results(
+    archive: &Path,
+    compression: Compression,
+    policy: Policy,
+) -> Result<Vec<Value>, String> {
+    let mut results = Vec::new();
+    read_pack(
+        archive,
+        compression,
+        |path| path.rsplit('/').next() == Some(reuse::RESULT),
+        |path, data| {
+            results.push((path, data));
+            Ok(())
+        },
+    )?;
+    let mut listed = reuse::listed(&results)?;
+    // Each result's directory and where its command writes what it measured.
+    let sources: Vec<Option<(String, Source)>> = listed
+        .iter()
+        .map(|result| {
+            let path = result.get("path").and_then(Value::as_str)?;
+            let command = result.get("command").and_then(Value::as_str)?;
+            let directory = path.rsplit_once('/').map_or("", |(directory, _)| directory);
+            Some((directory.to_owned(), Source::of(command)?))
+        })
+        .collect();
+    if sources.iter().all(Option::is_none) {
+        return Ok(listed);
     }
-    impl TarFiles for Results {
-        fn begin(&mut self, path: &str, _: u64) -> Result<(), String> {
-            self.current = path.rsplit('/').next() == Some(crate::harness::reuse::RESULT);
-            if self.current {
-                self.entries
-                    .push((path.trim_start_matches("./").to_owned(), Vec::new()));
+    let mut cases: Vec<Vec<CaseBounds>> = listed.iter().map(|_| Vec::new()).collect();
+    read_pack(
+        archive,
+        compression,
+        |path| reads(&sources, path).next().is_some(),
+        |path, data| {
+            for (index, source, file) in reads(&sources, &path) {
+                let rows = source
+                    .rows(file, &data)
+                    .map_err(|e| format!("{path}: {e}"))?;
+                cases[index].extend(rows.iter().filter_map(case_bounds));
             }
+            Ok(())
+        },
+    )?;
+    for ((result, source), cases) in listed.iter_mut().zip(&sources).zip(&cases) {
+        if let (Some(_), Value::Object(fields)) = (source, result)
+            && let Some(measured) = Measured::of_cases(cases, policy)
+        {
+            fields.push(("measured".into(), measured.to_value()));
+        }
+    }
+    Ok(listed)
+}
+
+/// Each result, by its index, whose measurements `path` holds: its source and the
+/// file's path below the result's directory.
+fn reads<'a>(
+    sources: &'a [Option<(String, Source)>],
+    path: &'a str,
+) -> impl Iterator<Item = (usize, Source, &'a str)> + 'a {
+    sources
+        .iter()
+        .enumerate()
+        .filter_map(move |(index, source)| {
+            let (directory, source) = source.as_ref()?;
+            let file = below(path, directory).filter(|file| source.reads(file))?;
+            Some((index, *source, file))
+        })
+}
+
+/// `path` below `directory` of a pack (the pack's root for an empty one).
+fn below<'a>(path: &'a str, directory: &str) -> Option<&'a str> {
+    if directory.is_empty() {
+        Some(path)
+    } else {
+        path.strip_prefix(directory)?.strip_prefix('/')
+    }
+}
+
+/// Hands `each` every file of a pack whose path, without a leading `./`, `keep`
+/// accepts, with its bytes, in the pack's order, one file at a time.
+fn read_pack(
+    archive: &Path,
+    compression: Compression,
+    keep: impl Fn(&str) -> bool,
+    each: impl FnMut(String, Vec<u8>) -> Result<(), String>,
+) -> Result<(), String> {
+    struct Kept<K, E> {
+        keep: K,
+        each: E,
+        current: Option<(String, Vec<u8>)>,
+    }
+    impl<K: Fn(&str) -> bool, E: FnMut(String, Vec<u8>) -> Result<(), String>> TarFiles for Kept<K, E> {
+        fn begin(&mut self, path: &str, _: u64) -> Result<(), String> {
+            let path = path.trim_start_matches("./");
+            self.current = (self.keep)(path).then(|| (path.to_owned(), Vec::new()));
             Ok(())
         }
         fn data(&mut self, chunk: &[u8]) -> Result<(), String> {
-            if self.current {
-                self.entries
-                    .last_mut()
-                    .expect("begun")
-                    .1
-                    .extend_from_slice(chunk);
+            if let Some((_, data)) = &mut self.current {
+                data.extend_from_slice(chunk);
             }
             Ok(())
         }
         fn end(&mut self) -> Result<(), String> {
-            self.current = false;
-            Ok(())
+            match self.current.take() {
+                Some((path, data)) => (self.each)(path, data),
+                None => Ok(()),
+            }
         }
     }
-    let mut tar = TarReader::new(Results {
-        entries: Vec::new(),
-        current: false,
+    let mut tar = TarReader::new(Kept {
+        keep,
+        each,
+        current: None,
     });
     compression.unpack(archive, &mut tar)?;
-    crate::harness::reuse::listed(&tar.finish()?.entries)
+    tar.finish().map(drop)
 }
 
 /// `cargo xtask evidence promote SET`: copy an indexed set from `qualification/`
 /// to `evidence/` inside the archive, then record the new key and retention in
 /// its file. Promote a set when a result cites it.
 pub fn promote(root: &Path, name: &str) -> Result<String, String> {
-    set(root, name)?;
-    let relative = set_path(name)?;
-    let path = root.join(&relative);
-    let text = fs::read_to_string(&path).map_err(|e| format!("{relative}: {e}"))?;
-    let mut set = crate::json::parse_strict(&text).map_err(|e| format!("{relative}: {e}"))?;
-    if crate::json::to_python(&set, Some(1)) + "\n" != text {
-        return Err(format!("{relative} is not in its canonical layout"));
-    }
+    let mut set = canonical_set(root, name)?;
     let (from, to) = promote_set(&mut set, name)?;
     let location = archive_location()?;
     aws_cp(&format!("{location}/{from}"), &format!("{location}/{to}"))?;
-    fs::write(&path, crate::json::to_python(&set, Some(1)) + "\n")
-        .map_err(|e| format!("{relative}: {e}"))?;
+    write_set(root, name, &set)?;
     Ok(format!("{name}: {from} -> {to}"))
+}
+
+/// The set `name` of the index, read strictly from a file in its canonical layout,
+/// for a command that rewrites it.
+fn canonical_set(root: &Path, name: &str) -> Result<Value, String> {
+    set(root, name)?;
+    let relative = set_path(name)?;
+    let text = fs::read_to_string(root.join(&relative)).map_err(|e| format!("{relative}: {e}"))?;
+    let set = json::parse_strict(&text).map_err(|e| format!("{relative}: {e}"))?;
+    if json::to_python(&set, Some(1)) + "\n" != text {
+        return Err(format!("{relative} is not in its canonical layout"));
+    }
+    Ok(set)
+}
+
+fn write_set(root: &Path, name: &str, set: &Value) -> Result<(), String> {
+    let relative = set_path(name)?;
+    fs::write(root.join(&relative), json::to_python(set, Some(1)) + "\n")
+        .map_err(|e| format!("{relative}: {e}"))
+}
+
+/// `cargo xtask evidence measure [SET...]`: record in the index entries of the named
+/// sets, or of every kept set listing a result without its gate target, each result's
+/// target and what it measured, as `evidence entry` records them for a new set, read
+/// from the set's archived pack. Every other field of each result must be the one the
+/// pack holds. A pack this downloads is removed once read. Reports each set it
+/// records, then fails naming every set it could not.
+pub fn measure(root: &Path, names: &[String]) -> Result<String, String> {
+    let policy = Policy::load(root)?;
+    let names: Vec<String> = if names.is_empty() {
+        sets(root)?
+            .iter()
+            .filter(|set| s(set, "retention") == Some(Retention::Kept.label()))
+            .filter(|set| {
+                set.get("results")
+                    .and_then(Value::as_array)
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|result| result.get("target").is_none())
+            })
+            .filter_map(|set| s(set, "name").map(str::to_owned))
+            .collect()
+    } else {
+        names.to_vec()
+    };
+    let mut lines = Vec::new();
+    let mut failed = Vec::new();
+    for name in &names {
+        match measure_set(root, name, policy) {
+            Ok(line) => lines.push(line),
+            Err(error) => failed.push(format!("{name}: {error}")),
+        }
+    }
+    let done = format!("{} of {} sets recorded", lines.len(), names.len());
+    lines.extend(failed.iter().cloned());
+    lines.push(done);
+    if failed.is_empty() {
+        Ok(lines.join("\n"))
+    } else {
+        Err(lines.join("\n"))
+    }
+}
+
+fn measure_set(root: &Path, name: &str, policy: Policy) -> Result<String, String> {
+    let mut set = canonical_set(root, name)?;
+    let (cached, _) = cache_path(root, &set)?;
+    let downloaded = !cached.is_file();
+    let (pack, compression) = download(root, &set)?;
+    let fresh = gate_results(&pack, compression, policy);
+    if downloaded {
+        let _ = fs::remove_file(&pack);
+    }
+    let fresh = fresh?;
+    let Some(Value::Array(results)) = members_mut(&mut set, "results") else {
+        return Err("the index lists no gate results of it".into());
+    };
+    if results.len() != fresh.len() {
+        return Err(format!(
+            "the index lists {} gate results, the pack holds {}",
+            results.len(),
+            fresh.len()
+        ));
+    }
+    let same =
+        |a: &Value, b: &Value| a.get("path") == b.get("path") && a.get("key") == b.get("key");
+    let mut measured = 0;
+    for result in results.iter_mut() {
+        let path = s(result, "path").unwrap_or_default().to_owned();
+        let read = fresh
+            .iter()
+            .find(|candidate| same(result, candidate))
+            .ok_or_else(|| format!("{path}: the pack holds no such result"))?;
+        let Value::Object(fields) = &*result else {
+            return Err(format!("{path}: not an object"));
+        };
+        for (key, value) in fields {
+            if key != "target" && key != "measured" && read.get(key) != Some(value) {
+                return Err(format!("{path}: {key} differs from the pack's"));
+            }
+        }
+        measured += usize::from(read.get("measured").is_some());
+        *result = read.clone();
+    }
+    write_set(root, name, &set)?;
+    Ok(format!(
+        "{name}: {} results, {measured} with what they measured",
+        fresh.len()
+    ))
 }
 
 /// Rewrite set `name` as kept, returning its old and new keys.
@@ -613,15 +809,13 @@ pub const ADDRESSES: &str = ".research/evidence-addresses";
 /// in [`ADDRESSES`] or else from the archive with the `aws` CLI, and checked
 /// against the SHA-256 the index records.
 fn download(root: &Path, set: &Value) -> Result<(PathBuf, Compression), String> {
+    let (download, compression) = cache_path(root, set)?;
     let (key, expected) = (
         s(set, "key").ok_or("set without key")?,
         s(set, "sha256").ok_or("set without sha256")?,
     );
-    let compression =
-        Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
-    let cache = root.join(".research/evidence-cache");
-    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
-    let download = cache.join(format!("{expected}{}", compression.suffix()));
+    let cache = download.parent().expect("a file of the cache");
+    fs::create_dir_all(cache).map_err(|e| e.to_string())?;
     if !download.is_file() {
         let partial = cache.join(format!("{expected}.{}.part", std::process::id()));
         let name = s(set, "name").unwrap_or_default();
@@ -640,6 +834,21 @@ fn download(root: &Path, set: &Value) -> Result<(PathBuf, Compression), String> 
         return Err(format!("{key}: SHA-256 differs from the index"));
     }
     Ok((download, compression))
+}
+
+/// Where [`download`] keeps the pack of `set`, and how it is compressed.
+fn cache_path(root: &Path, set: &Value) -> Result<(PathBuf, Compression), String> {
+    let (key, expected) = (
+        s(set, "key").ok_or("set without key")?,
+        s(set, "sha256").ok_or("set without sha256")?,
+    );
+    let compression =
+        Compression::of(key).ok_or_else(|| format!("{key}: not a .tar.gz or .tar.zst"))?;
+    let cache = root.join(".research/evidence-cache");
+    Ok((
+        cache.join(format!("{expected}{}", compression.suffix())),
+        compression,
+    ))
 }
 
 /// The address [`ADDRESSES`] gives set `name`, if the file lists it.
@@ -699,7 +908,7 @@ pub fn restorable(root: &Path) -> Result<Vec<(String, String)>, String> {
                 .and_then(Value::as_array)
                 .unwrap_or_default()
                 .iter()
-                .any(crate::harness::reuse::restored)
+                .any(reuse::restored)
         })
         .filter_map(|set| Some((s(set, "name")?.to_owned(), s(set, "key")?.to_owned())))
         .collect())
@@ -931,404 +1140,4 @@ fn unzstd(input: File, out: &mut impl Write) -> Result<(), String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn pack<W: Write>(dir: &Path, out: W) -> Result<W, String> {
-        pack_files(&files(dir)?, out, "the pack")
-    }
-
-    #[test]
-    fn packs_are_deterministic_and_round_trip() {
-        let dir = crate::walk::scratch("evidence");
-        let long = "a".repeat(120);
-        fs::create_dir_all(dir.join("x/.hidden")).unwrap();
-        fs::create_dir_all(dir.join(&long)).unwrap();
-        fs::write(dir.join("x/.hidden/f.json"), b"{}\n").unwrap();
-        fs::write(dir.join("b.txt"), vec![7u8; 200_000]).unwrap();
-        fs::write(dir.join(&long).join(format!("{long}.json")), b"long").unwrap();
-        fs::write(dir.join("empty"), b"").unwrap();
-        let first = pack(&dir, Vec::new()).unwrap();
-        assert_eq!(first, pack(&dir, Vec::new()).unwrap());
-        let tar = crate::archive::gunzip(&first, 1 << 30).unwrap();
-        let entries = crate::archive::tar_files(&tar).unwrap();
-        let names: Vec<_> = entries.iter().map(|e| e.path.clone()).collect();
-        assert_eq!(
-            names,
-            [
-                format!("{long}/{long}.json"),
-                "b.txt".to_owned(),
-                "empty".to_owned(),
-                "x/.hidden/f.json".to_owned()
-            ]
-        );
-        assert_eq!(entries[1].data.len(), 200_000);
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    /// The pack of a fixed tree, byte for byte: stored gzip blocks, a pax record,
-    /// a ustar prefix, a hidden file, an empty file and an executable one.
-    #[test]
-    fn pack_bytes_are_fixed() {
-        let dir = crate::walk::scratch("evidence-golden");
-        let long = "a".repeat(120);
-        let paxed = format!("d/{}", "e".repeat(150));
-        let tree: [(&str, Vec<u8>, u32); 6] = [
-            ("x/.hidden/f.json", b"{}\n".to_vec(), 0o644),
-            (
-                "b.txt",
-                (0..200_000u32).map(|i| (i * 7 % 251) as u8).collect(),
-                0o644,
-            ),
-            (&format!("{long}/{long}.json"), b"long".to_vec(), 0o644),
-            ("empty", Vec::new(), 0o644),
-            ("tool.sh", b"#!/bin/sh\n".to_vec(), 0o755),
-            (&paxed, b"pax".to_vec(), 0o644),
-        ];
-        for (path, data, mode) in &tree {
-            let file = dir.join(path);
-            fs::create_dir_all(file.parent().unwrap()).unwrap();
-            fs::write(&file, data).unwrap();
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                fs::set_permissions(&file, fs::Permissions::from_mode(*mode)).unwrap();
-            }
-            #[cfg(not(unix))]
-            let _ = mode;
-        }
-        let out = dir.with_extension("tar.gz");
-        let digest = pack_command(&dir, &out).unwrap();
-        assert_eq!(sha256::file_hex(&out).unwrap(), digest);
-        #[cfg(unix)]
-        assert_eq!(
-            digest,
-            "4a08933099a9a4b3771bee9e2223824efd7b39413ca17547e4e60fcfafce4fcd"
-        );
-        fs::remove_file(out).unwrap();
-
-        // A missing directory fails before OUT exists.
-        let missing = dir.join("missing");
-        let target = dir.join("never.tar.gz");
-        let error = pack_command(&missing, &target).unwrap_err();
-        assert!(error.contains("missing"), "{error}");
-        assert!(!target.exists() && !dir.join("never.tar.gz.part").exists());
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn zstd_sets_unpack_through_the_system_zstd() {
-        let dir = crate::walk::scratch("evidence-zstd");
-        fs::create_dir_all(dir.join("in/a")).unwrap();
-        fs::write(dir.join("in/a/f.json"), b"{}\n").unwrap();
-        fs::write(dir.join("in/b.bin"), vec![3u8; 70_000]).unwrap();
-        let tar =
-            crate::archive::gunzip(&pack(&dir.join("in"), Vec::new()).unwrap(), 1 << 30).unwrap();
-        fs::write(dir.join("set.tar"), &tar).unwrap();
-        let status = Command::new("zstd")
-            .args(["--quiet", "-19"])
-            .arg(dir.join("set.tar"))
-            .arg("-o")
-            .arg(dir.join("set.tar.zst"))
-            .status()
-            .expect("zstd is installed");
-        assert!(status.success());
-        assert_eq!(Compression::of("x/abc.tar.zst"), Some(Compression::Zstd));
-        assert_eq!(Compression::of("x/abc.tar.gz"), Some(Compression::Gzip));
-        assert_eq!(Compression::of("x/abc.tar.xz"), None);
-        let mut unpacked = Vec::new();
-        Compression::Zstd
-            .unpack(&dir.join("set.tar.zst"), &mut unpacked)
-            .unwrap();
-        assert_eq!(unpacked, tar);
-        let entries = crate::archive::tar_files(&unpacked).unwrap();
-        let names: Vec<_> = entries.iter().map(|e| e.path.as_str()).collect();
-        assert_eq!(names, ["a/f.json", "b.bin"]);
-        fs::write(dir.join("bad.tar.zst"), b"not zstd").unwrap();
-        assert!(
-            Compression::Zstd
-                .unpack(&dir.join("bad.tar.zst"), &mut Vec::new())
-                .is_err()
-        );
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    /// A gate shard's pack is `tar -cf - .` of its run directory through zstd, so
-    /// its names start with `./`; a reused step restores its own directory alone.
-    #[test]
-    fn a_kept_shard_pack_restores_one_step_directory() {
-        let root = crate::walk::scratch("evidence-restore");
-        let run = root.join("run");
-        for (file, text) in [
-            ("capture-c01-timing/identity.json", "{}"),
-            ("capture-c01-timing/c01/timing.json", "{\"case\": 1}"),
-            ("capture-c01/result.json", "{}"),
-            ("capture-inputs/noise.rgba", "pixels"),
-        ] {
-            fs::create_dir_all(run.join(file).parent().unwrap()).unwrap();
-            fs::write(run.join(file), text).unwrap();
-        }
-        let tar = root.join("shard.tar");
-        let packed = Command::new("tar")
-            .env("COPYFILE_DISABLE", "1")
-            .arg("-cf")
-            .arg(&tar)
-            .arg("-C")
-            .arg(&run)
-            .arg(".")
-            .status()
-            .expect("tar is installed");
-        assert!(packed.success());
-        let compressed = Command::new("zstd")
-            .arg("--quiet")
-            .arg(&tar)
-            .arg("-o")
-            .arg(root.join("shard.tar.zst"))
-            .status()
-            .expect("zstd is installed");
-        assert!(compressed.success());
-        let sha = sha256::file_hex(&root.join("shard.tar.zst")).unwrap();
-        let cache = root.join(".research/evidence-cache");
-        fs::create_dir_all(&cache).unwrap();
-        fs::rename(
-            root.join("shard.tar.zst"),
-            cache.join(format!("{sha}.tar.zst")),
-        )
-        .unwrap();
-        let index = |retention: &str| {
-            let set = Value::object([
-                ("name", Value::str("shard")),
-                ("path", Value::str("shard")),
-                ("retention", Value::str(retention)),
-                ("key", Value::str(format!("evidence/shard/{sha}.tar.zst"))),
-                ("sha256", Value::str(&sha)),
-            ]);
-            let file = root.join(SETS).join("shard.json");
-            fs::create_dir_all(file.parent().unwrap()).unwrap();
-            crate::corpus::write_json(&file, &set).unwrap();
-        };
-        index("retained");
-        let into = root.join("restored");
-        assert_eq!(
-            restore(&root, "shard", "capture-c01-timing", &into).unwrap(),
-            2
-        );
-        assert_eq!(
-            fs::read_to_string(into.join("c01/timing.json")).unwrap(),
-            "{\"case\": 1}"
-        );
-        assert!(into.join("identity.json").is_file());
-        assert!(!into.join("result.json").exists() && !into.join("noise.rgba").exists());
-        assert!(restore(&root, "shard", "capture-c02-timing", &root.join("none")).is_err());
-        index("90 days");
-        assert!(restore(&root, "shard", "capture-c01-timing", &root.join("again")).is_err());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn the_pack_name_picks_its_compression() {
-        let dir = crate::walk::scratch("evidence-pack-zstd");
-        fs::create_dir_all(dir.join("in/a")).unwrap();
-        fs::write(dir.join("in/a/f.json"), b"{}\n").unwrap();
-        fs::write(dir.join("in/b.json"), "[1, 2, 3]\n".repeat(50_000)).unwrap();
-        let (gz, zst) = (dir.join("set.tar.gz"), dir.join("set.tar.zst"));
-        pack_command(&dir.join("in"), &gz).unwrap();
-        let digest = pack_command(&dir.join("in"), &zst).unwrap();
-        assert_eq!(sha256::file_hex(&zst).unwrap(), digest);
-        assert_eq!(
-            &fs::read(&zst).unwrap()[..4],
-            b"\x28\xb5\x2f\xfd",
-            "a zstd frame"
-        );
-        assert!(fs::metadata(&zst).unwrap().len() * 20 < fs::metadata(&gz).unwrap().len());
-        // The same tar inside either compression.
-        let (mut from_gz, mut from_zst) = (Vec::new(), Vec::new());
-        Compression::Gzip.unpack(&gz, &mut from_gz).unwrap();
-        Compression::Zstd.unpack(&zst, &mut from_zst).unwrap();
-        assert_eq!(from_gz, from_zst);
-        for name in ["set.tar", "set.tgz", "set.tar.xz"] {
-            let error = pack_command(&dir.join("in"), &dir.join(name)).unwrap_err();
-            assert!(error.contains(".tar.gz or .tar.zst"), "{error}");
-            assert!(!dir.join(name).exists());
-        }
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn stored_gzip_blocks_split_at_the_block_size_whatever_the_writes() {
-        for len in [0, 1, STORED_BLOCK, STORED_BLOCK + 1, 2 * STORED_BLOCK] {
-            let data: Vec<u8> = (0..len).map(|i| (i * 7 % 251) as u8).collect();
-            let mut expected = vec![0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 255];
-            let blocks: Vec<&[u8]> = data.chunks(STORED_BLOCK).collect();
-            for (at, block) in blocks.iter().enumerate() {
-                let n = block.len() as u16;
-                expected.push(u8::from(at + 1 == blocks.len()));
-                expected.extend(n.to_le_bytes());
-                expected.extend((!n).to_le_bytes());
-                expected.extend(*block);
-            }
-            if blocks.is_empty() {
-                expected.extend([1, 0, 0, 0xff, 0xff]);
-            }
-            expected.extend(crate::zlib::crc32(&data).to_le_bytes());
-            expected.extend((len as u32).to_le_bytes());
-            let mut gzip = GzipStored::new(Vec::new()).unwrap();
-            for piece in data.chunks(4_099) {
-                gzip.write_all(piece).unwrap();
-            }
-            let streamed = gzip.finish().unwrap();
-            assert_eq!(streamed, expected, "{len} bytes");
-            assert_eq!(crate::archive::gunzip(&streamed, 1 << 20).unwrap(), data);
-        }
-    }
-
-    #[test]
-    fn an_entry_takes_the_key_its_pack_lies_at() {
-        let dir = crate::walk::scratch("evidence-entry");
-        fs::create_dir_all(dir.join("set/memory/f")).unwrap();
-        fs::write(dir.join("set/run.log"), b"done\n").unwrap();
-        let out = dir.join("set.tar.gz");
-        let sha = pack_command(&dir.join("set"), &out).unwrap();
-        let (own, _) = entry("gate-shard", &out, None).unwrap();
-        assert_eq!(own, format!("qualification/gate-shard/{sha}.tar.gz"));
-        let at = format!("qualification/gate-runs/run-1/shard-1/{sha}.tar.gz");
-        let (key, printed) = entry("gate-shard", &out, Some(&at)).unwrap();
-        assert_eq!(key, at);
-        assert!(printed.contains(&format!("\"key\": \"{at}\"")), "{printed}");
-        for wrong in [
-            format!("evidence/gate-runs/run-1/shard-1/{sha}.tar.gz"),
-            "qualification/gate-runs/run-1/shard-1.tar.gz".to_owned(),
-            format!("qualification/gate-runs/run-1/shard-1/{sha}.tar.zst"),
-            format!("qualification/gate-runs/run-1/x{sha}.tar.gz"),
-        ] {
-            assert!(entry("gate-shard", &out, Some(&wrong)).is_err(), "{wrong}");
-        }
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn promotion_moves_an_expiring_set_under_evidence() {
-        let parse = |text| crate::json::parse_strict(text).unwrap();
-        let mut a =
-            parse(r#"{"name": "a", "retention": "90 days", "key": "qualification/a/0.tar.gz"}"#);
-        assert_eq!(
-            promote_set(&mut a, "a").unwrap(),
-            (
-                "qualification/a/0.tar.gz".into(),
-                "evidence/a/0.tar.gz".into()
-            )
-        );
-        assert_eq!(s(&a, "key"), Some("evidence/a/0.tar.gz"));
-        assert_eq!(s(&a, "retention"), Some("retained"));
-        assert!(promote_set(&mut a, "a").unwrap_err().contains("not under"));
-        let mut b =
-            parse(r#"{"name": "b", "retention": "retained", "key": "evidence/b/1.tar.gz"}"#);
-        assert!(promote_set(&mut b, "b").unwrap_err().contains("not under"));
-    }
-
-    #[test]
-    fn a_set_is_read_from_its_own_file_by_name() {
-        let root = crate::walk::scratch("evidence-sets");
-        fs::create_dir_all(root.join(SETS)).unwrap();
-        for (file, name) in [("b", "b"), ("a", "a"), ("c", "other")] {
-            fs::write(
-                root.join(format!("{SETS}/{file}.json")),
-                format!("{{\"name\": \"{name}\"}}\n"),
-            )
-            .unwrap();
-        }
-        assert_eq!(s(&set(&root, "a").unwrap(), "name"), Some("a"));
-        assert!(
-            set(&root, "d")
-                .unwrap_err()
-                .contains("not in the evidence index")
-        );
-        assert!(set(&root, "c").unwrap_err().contains("does not hold set c"));
-        assert!(set(&root, "../a").unwrap_err().contains("not a set's name"));
-        assert!(sets(&root).unwrap_err().contains("does not hold set c"));
-        fs::remove_file(root.join(format!("{SETS}/c.json"))).unwrap();
-        let names: Vec<_> = sets(&root)
-            .unwrap()
-            .iter()
-            .map(|set| s(set, "name").unwrap().to_owned())
-            .collect();
-        assert_eq!(names, ["a", "b"]);
-        fs::write(root.join(format!("{SETS}/notes.txt")), "").unwrap();
-        assert!(sets(&root).unwrap_err().contains("not a set's file"));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn the_index_lists_every_archived_file_once() {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .to_path_buf();
-        let Ok(index) = crate::checks::read_json(&root.join(INDEX)) else {
-            return;
-        };
-        let canonical = |path: &str, value: &Value| {
-            assert_eq!(
-                crate::json::to_python(value, Some(1)) + "\n",
-                fs::read_to_string(root.join(path)).unwrap(),
-                "{path} must stay in its canonical layout, which `evidence promote` rewrites"
-            );
-        };
-        canonical(INDEX, &index);
-        assert!(index.get("sets").is_none(), "{INDEX}: sets lie in {SETS}");
-        let sets = sets(&root).unwrap();
-        assert!(!sets.is_empty());
-        let mut paths = std::collections::BTreeSet::new();
-        let mut kept_results = std::collections::BTreeMap::new();
-        for set in &sets {
-            let name = s(set, "name").unwrap();
-            canonical(&set_path(name).unwrap(), set);
-            if s(set, "retention") == Some(Retention::Kept.label()) {
-                for result in set
-                    .get("results")
-                    .and_then(Value::as_array)
-                    .unwrap_or_default()
-                {
-                    let key = s(result, "key").unwrap();
-                    if let Some(other) = kept_results.insert(key.to_owned(), name.to_owned()) {
-                        // Reuse takes a key's result from the one kept set that lists it.
-                        assert_eq!(other, name, "result {key} is kept in {other} and {name}");
-                    }
-                }
-            }
-            let sha = s(set, "sha256").unwrap();
-            assert!(sha.len() == 64 && sha.bytes().all(|b| b.is_ascii_hexdigit()));
-            let key = s(set, "key").unwrap();
-            assert!(
-                [".tar.gz", ".tar.zst"]
-                    .iter()
-                    .any(|ext| key.ends_with(&format!("{sha}{ext}")))
-            );
-            let retention = Retention::of_key(key)
-                .unwrap_or_else(|| panic!("{key}: neither under qualification/ nor evidence/"));
-            assert_eq!(
-                s(set, "retention"),
-                Some(retention.label()),
-                "{key}: retention must follow the prefix"
-            );
-            let files = set.get("files");
-            assert!(
-                files.is_none_or(|files| files.as_array().is_some()),
-                "{}: `files` must list {{path, sha256}} objects",
-                s(set, "name").unwrap()
-            );
-            for file in files.and_then(Value::as_array).unwrap_or_default() {
-                assert!(
-                    s(file, "sha256").is_some(),
-                    "{} has no sha256",
-                    s(file, "path").unwrap()
-                );
-                let path = s(file, "path").unwrap();
-                assert!(paths.insert(path.to_owned()), "{path} listed twice");
-                if path.starts_with("research/") {
-                    assert!(!root.join(path).exists(), "{path} is still tracked");
-                }
-            }
-        }
-    }
-}
+mod tests;

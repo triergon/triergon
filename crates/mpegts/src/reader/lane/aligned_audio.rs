@@ -121,6 +121,9 @@ impl<const HEADER_BYTES: usize, Header: Copy> Reader<HEADER_BYTES, Header> {
             self.check_size(size)?;
             if size <= buffered.len() && size as u64 <= work.remaining() {
                 let offset = self.input.position();
+                // Returning the other steps measured +0.082%, `Yield` +0.067%, falling through
+                // +0.24%, a cold refusal +1.82% (more readers inline into `Framer::step`). The
+                // typed form is an infallible read of buffered bytes in core's cursor.
                 let Step::Ready(bytes) = self.input.read_span(size, work, cancel)? else {
                     unreachable!("the complete audio frame is buffered");
                 };
@@ -174,7 +177,7 @@ impl<const HEADER_BYTES: usize, Header: Copy> Reader<HEADER_BYTES, Header> {
         let bytes = match std::mem::replace(&mut self.buffer, buffer).freeze() {
             Ok(bytes) => bytes,
             Err(error) => {
-                self.buffer = error.buffer;
+                self.buffer = error.value;
                 return Err(error.error);
             }
         };

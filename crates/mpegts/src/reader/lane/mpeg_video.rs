@@ -4,7 +4,8 @@
 //! fields. H.222.0 Table 2-34 identifies stream types 1 and 2; PES alignment
 //! alone never proves a picture boundary. Slice payloads remain coded bytes.
 use super::{Piece, pes_storage::Storage};
-use crate::Pes;
+use crate::pes::{Pes, stream_id};
+use crate::psi::stream_type;
 use crate::reader::{MpegPictureCoding, MpegVideoPicture};
 use std::sync::atomic::{AtomicBool, Ordering};
 use triergon_bitstream::bits_at;
@@ -26,15 +27,22 @@ enum Phase {
 }
 
 #[derive(Default)]
+enum Output {
+    #[default]
+    Scanning,
+    Borrowing,
+    Auditing(Storage),
+    Copying(BudgetVec<u8>),
+}
+
+#[derive(Default)]
 pub(super) struct Reader {
     scan: usize,
     span: usize,
     offset: usize,
     prefix: u32,
     header: [u8; 12],
-    validated: bool,
-    buffer: Option<BudgetVec<u8>>,
-    storage: Option<Storage>,
+    output: Output,
     start: usize,
     phase: Phase,
     width: u16,
@@ -59,9 +67,9 @@ impl Reader {
         if cancel.load(Ordering::Relaxed) {
             return Err(Error::Cancelled);
         }
-        let piece = pieces.as_slice().last().expect("pending MPEG video PES");
+        let piece = pieces.as_slice().last().ok_or(Error::Truncated)?;
         let pes = piece.source.pes();
-        if !(0xe0..=0xef).contains(&pes.header.stream_id)
+        if !stream_id::VIDEO.contains(&pes.header.stream_id)
             || pes.header.declared_packet_length == 0
             // The short-picture profile bounds payloads to transport capacity
             // minus the minimum nine-byte PES header, independent of splits.
@@ -72,7 +80,7 @@ impl Reader {
         }
         // Scan source spans directly. Only the fixed header prefix is retained;
         // coded slices are never staged in a PES-sized parsing buffer.
-        while !self.validated && self.scan < pes.payload_len {
+        while matches!(self.output, Output::Scanning) && self.scan < pes.payload_len {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
             }
@@ -104,7 +112,7 @@ impl Reader {
                 self.header[..3].copy_from_slice(&[0, 0, 1]);
             }
         }
-        if !self.validated {
+        if matches!(self.output, Output::Scanning) {
             if !work.try_charge(1) {
                 return Ok(None);
             }
@@ -112,7 +120,11 @@ impl Reader {
             if self.slices == 0 || !matches!(self.phase, Phase::End) {
                 return Err(PROFILE);
             }
-            self.validated = true;
+            self.output = if pes.spans().len() == 1 {
+                Output::Borrowing
+            } else {
+                Output::Auditing(Storage::new(pes, pieces, Some(pes.payload_len))?)
+            };
             self.span = 0;
             self.offset = 0;
         }
@@ -167,25 +179,24 @@ impl Reader {
         work: &mut WorkBudget,
         cancel: &AtomicBool,
     ) -> Result<Option<Bytes>> {
-        if pes.spans().len() == 1 {
+        if matches!(self.output, Output::Borrowing) {
             return Ok(Some(pes.spans()[0].payload_bytes()?));
         }
-        if self.storage.is_none() {
-            self.storage = Some(Storage::new(pes, pieces, Some(pes.payload_len))?);
-        }
-        let storage = self.storage.as_mut().expect("MPEG picture storage check");
-        if !storage.step(pes, work, cancel)? {
-            return Ok(None);
-        }
-        storage.check_limit(pieces.budget())?;
-        if self.buffer.is_none() {
+        if let Output::Auditing(storage) = &mut self.output {
+            if !storage.step(pes, work, cancel)? {
+                return Ok(None);
+            }
+            storage.check_limit(pieces.budget())?;
             if !work.try_charge(1) {
                 return Ok(None);
             }
             let mut buffer = BudgetVec::new(pieces.budget());
             buffer.try_reserve_exact(pes.payload_len)?;
-            self.buffer = Some(buffer);
+            self.output = Output::Copying(buffer);
         }
+        let Output::Copying(buffer) = &mut self.output else {
+            return Err(Error::Truncated);
+        };
         while let Some(span) = pes.spans().get(self.span) {
             if cancel.load(Ordering::Relaxed) {
                 return Err(Error::Cancelled);
@@ -195,10 +206,7 @@ impl Reader {
             if count == 0 {
                 return Ok(None);
             }
-            self.buffer
-                .as_mut()
-                .expect("MPEG picture buffer")
-                .try_extend_from_slice(&source[self.offset..self.offset + count])?;
+            buffer.try_extend_from_slice(&source[self.offset..self.offset + count])?;
             self.offset += count;
             if self.offset == source.len() {
                 self.span += 1;
@@ -208,10 +216,13 @@ impl Reader {
         if !work.try_charge(1) {
             return Ok(None);
         }
-        match self.buffer.take().expect("MPEG picture buffer").freeze() {
+        let Output::Copying(buffer) = std::mem::take(&mut self.output) else {
+            return Err(Error::Truncated);
+        };
+        match buffer.freeze() {
             Ok(bytes) => Ok(Some(bytes)),
             Err(error) => {
-                self.buffer = Some(error.buffer);
+                self.output = Output::Copying(error.value);
                 Err(error.error)
             }
         }
@@ -231,14 +242,19 @@ impl Reader {
                     || self.height == 0
                     || self.height > 2800
                     || !(1..=8).contains(&self.rate)
-                    || !(1..=if stream_type == 2 { 4 } else { 14 }).contains(&bits(24, 4)?)
+                    || !(1..=if stream_type == stream_type::MPEG2_VIDEO {
+                        4
+                    } else {
+                        14
+                    })
+                        .contains(&bits(24, 4)?)
                     || bits(32, 18)? == 0
                 {
                     return Err(PROFILE);
                 }
                 self.phase = Phase::AfterSequence;
             }
-            (Phase::AfterSequence, 0xb5) if stream_type == 2 => {
+            (Phase::AfterSequence, 0xb5) if stream_type == stream_type::MPEG2_VIDEO => {
                 // Main Profile, progressive 4:2:0, base dimensions and frame rate.
                 if length != 6
                     || bits(0, 4)? != 1
@@ -261,7 +277,7 @@ impl Reader {
                 self.phase = Phase::Group;
             }
             (Phase::AfterSequence | Phase::Setup | Phase::Group, 0x00)
-                if stream_type == 1 || self.mpeg2 =>
+                if stream_type == stream_type::MPEG1_VIDEO || self.mpeg2 =>
             {
                 // H.262 §6.2.3: predictive headers carry forward and, for B,
                 // backward vector fields before extra_bit_picture. MPEG-2

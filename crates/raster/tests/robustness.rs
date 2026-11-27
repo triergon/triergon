@@ -165,9 +165,10 @@ fn rasteriser_work_follows_the_tiles_filled() {
 #[test]
 fn composition_work_follows_the_summed_area() {
     use triergon_core::{Budget, Error, WorkBudget};
-    use triergon_raster::{
-        Effects, FrameScale, GlyphRequest, Outline, Placement, Raster, Run, Shape, Vector,
+    use triergon_raster::compat::libass::{
+        Composite, Effects, FrameScale, GlyphRequest, Placement, Run,
     };
+    use triergon_raster::{Outline, Raster, Shape, Vector};
     let budget = Budget::new(1 << 30).unwrap();
     let mut raster = Raster::new(&budget, Limits::default());
     let mut outline = Outline::new(&budget);
@@ -198,14 +199,8 @@ fn composition_work_follows_the_summed_area() {
             outline_scale: [1.0; 2],
             outline_offset: [0.0; 2],
         };
-        let request = GlyphRequest {
-            shape: &square,
-            placement,
-            frame,
-            effects: &effects,
-            karaoke: false,
-        };
-        glyphs.extend(raster.render(&request, &mut run, &mut work).unwrap());
+        let request = GlyphRequest::new(&square, &placement, &frame, &effects);
+        glyphs.extend(run.render(&mut raster, &request, &mut work).unwrap());
     }
     assert_eq!(glyphs.len(), 2);
 
@@ -214,13 +209,12 @@ fn composition_work_follows_the_summed_area() {
     // before it is allocated.
     let peak = budget.peak();
     let mut work = WorkBudget::new(1 << 16);
-    let refused = raster.compose(&effects, &frame, &glyphs, &mut work);
+    let refused = Composite::new(&mut raster, &effects, &frame, &glyphs, &mut work);
     assert_eq!(refused.err(), Some(Error::Policy("raster work")));
     assert!(budget.peak() < peak + (1 << 20), "peak {}", budget.peak());
 
     let mut work = WorkBudget::new(1 << 40);
-    let fill = raster
-        .compose(&effects, &frame, &glyphs, &mut work)
+    let fill = Composite::new(&mut raster, &effects, &frame, &glyphs, &mut work)
         .unwrap()
         .fill
         .unwrap();

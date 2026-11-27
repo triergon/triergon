@@ -14,7 +14,7 @@
 use std::io::Write;
 
 use triergon::{Budget, CodecId, ContainerReader, MediaKind, PacketInfo, TrackInfo};
-use triergon_codec::{AudioDecoder, AudioFrame};
+use triergon_codec::AudioFrame;
 use triergon_codec_mp3::Decoder;
 
 fn main() {
@@ -73,7 +73,7 @@ fn main() {
         }
         index += 1;
         match decoder.decode(packet.payload(), &mut frame) {
-            Ok(_) => {
+            Ok(()) => {
                 frames += 1;
                 samples += frame.samples_per_channel;
                 first.get_or_insert((frame.sample_rate, frame.planes.len()));
@@ -87,7 +87,7 @@ fn main() {
             }
             Err(error) => {
                 errors += 1;
-                last_error = error.0;
+                last_error = format!("{error:?}");
             }
         }
     }

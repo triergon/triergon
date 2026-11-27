@@ -8,7 +8,7 @@ use triergon_core::{Budget, Error, InputCursor, Step, WorkBudget};
 use triergon_harness_protocol::digest::signed;
 pub(crate) use triergon_mpegts::compat::opaque_video::RecoveryTrigger as Trigger;
 use triergon_mpegts::compat::opaque_video::{OpaqueRecovery, RecoveredOpaque};
-use triergon_mpegts::compat::pes::{DemuxClock, TransportObservation};
+use triergon_mpegts::compat::pes::{DemuxClock, RecoveredPes};
 use triergon_mpegts::{PacketFormat, ParseLimits};
 
 pub(crate) fn project(
@@ -71,7 +71,7 @@ fn fold(
         .ok_or("empty opaque payload")?;
     let mut work = WorkBudget::new(1);
     let (pid, pts, dts, position, stream_id) = match first {
-        TransportObservation::Accepted(packet) => {
+        RecoveredPes::Accepted(packet) => {
             let time = clock
                 .project_header(
                     packet.pid,
@@ -89,7 +89,7 @@ fn fold(
                 packet.stream_id,
             )
         }
-        TransportObservation::Faulted(packet) => {
+        RecoveredPes::Faulted(packet) => {
             let time = clock
                 .project_transport_fault(packet, &mut work, cancel)?
                 .ok_or("opaque fault clock yielded on its grant")?;
@@ -101,7 +101,7 @@ fn fold(
                 packet.stream_id,
             )
         }
-        TransportObservation::PesFault(packet) => {
+        RecoveredPes::PesFault(packet) => {
             let time = clock
                 .project_pes_fault(packet, &mut work, cancel)?
                 .ok_or("opaque PES clock yielded on its grant")?;

@@ -1,37 +1,48 @@
 //! Original EN 300 468 6.2.41/Table 99 source views. No inner subtitle parsing.
-use super::{Descriptor, ElementaryStream};
+use super::{Descriptor, ElementaryStream, descriptor_tag, stream_type};
 use triergon_core::{Error, Result};
 
-/// Out-of-band interpretation, kept separate from source descriptor bytes.
-/// Neither a tag, a filename, registration nor a private_data_specifier proves DVB.
+/// Which system's private descriptors and stream types the caller says the transport
+/// follows. The stream itself cannot prove it: neither a tag, a registration nor a
+/// private data specifier establishes DVB.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DescriptorNamespace {
+    /// No out-of-band context: DVB and ATSC private descriptors stay opaque.
     #[default]
     Unspecified,
+    /// The caller has identified the transport as DVB, with the evidence it relies on.
+    // A fieldless DVB variant measured +0.144% on short transport fault reads.
     Dvb(DvbNamespaceEvidence),
     /// The caller has identified the transport as ATSC. Private audio
     /// stream types follow A/53 Part 3 §5.7 in this namespace.
     Atsc,
 }
 
-/// The coordinator must retain the actual service/profile evidence in its
-/// operation contract. These variants record its declaration, not on-wire proof.
+/// What the caller's DVB declaration rests on. Both values mean the same to the parser;
+/// they record the caller's reason, not anything on the wire.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DvbNamespaceEvidence {
+    /// The caller declared a DVB transport profile for the input.
     CallerDeclaredTransportProfile,
+    /// An out-of-band service contract establishes DVB signalling.
     OutOfBandServiceContract,
 }
 
-/// Original descriptor TLV and body borrowed from charged PMT storage.
+/// A DVB subtitling descriptor (tag 0x59, EN 300 468 §6.2.41), borrowed from the PMT's
+/// descriptor bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSubtitling<'a> {
+    /// The whole descriptor: tag, length and body.
     pub source: &'a [u8],
+    /// The descriptor body: a whole number of 8-byte service entries.
     pub data: &'a [u8],
 }
 impl<'a> DvbSubtitling<'a> {
+    /// The number of 8-byte service entries, at most 31.
     pub fn service_count(self) -> usize {
         self.data.len() / 8
     }
+    /// Iterates the service entries in source order.
     pub fn services(self) -> DvbSubtitlingServices<'a> {
         DvbSubtitlingServices {
             remaining: self.data,
@@ -39,14 +50,18 @@ impl<'a> DvbSubtitling<'a> {
     }
 }
 
+/// One 8-byte service entry of a DVB subtitling descriptor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSubtitlingService<'a> {
+    /// The entry's 8 source bytes.
     pub source: &'a [u8],
-    /// Raw ISO 639-2/ISO 8859-1 bytes, including unrecognised/malformed codes.
+    /// The ISO 639-2 language code as its three source bytes, unchecked.
     pub language_code: [u8; 3],
-    /// Original byte, including reserved/unrecognised values.
+    /// The subtitling type byte (EN 300 468 Table 26), reserved values included.
     pub subtitling_type: u8,
+    /// The 16-bit page identifier for this service's display composition.
     pub composition_page_id: u16,
+    /// The 16-bit page identifier for additional subtitle data used by this service.
     pub ancillary_page_id: u16,
 }
 impl<'a> DvbSubtitlingService<'a> {
@@ -60,13 +75,14 @@ impl<'a> DvbSubtitlingService<'a> {
             ancillary_page_id: u16::from_be_bytes([source[6], source[7]]),
         })
     }
-    /// Syntax annotation only; reserved types remain observable. This does not
-    /// validate the inner stream or establish that an ancillary page is present.
+    /// Whether `subtitling_type` lies in 0x10..=0x2F, the DVB subtitle types, reserved values in
+    /// that range included. It says nothing of the subtitle stream or of an ancillary page.
     pub fn has_dvb_subtitling_type(self) -> bool {
         (0x10..=0x2f).contains(&self.subtitling_type)
     }
 }
 
+/// Iterator over the service entries of a DVB subtitling descriptor.
 #[derive(Clone, Debug)]
 pub struct DvbSubtitlingServices<'a> {
     remaining: &'a [u8],
@@ -87,10 +103,10 @@ impl ExactSizeIterator for DvbSubtitlingServices<'_> {}
 impl std::iter::FusedIterator for DvbSubtitlingServices<'_> {}
 
 impl<'a> Descriptor<'a> {
-    /// Explicit DVB interpretation; ordinary unscoped descriptor parsing keeps
-    /// this tag opaque. A u8 descriptor length allows at most 31 complete entries.
+    /// Borrow the DVB subtitle service table, of at most 31 eight-byte entries.
+    /// A wrong tag, body beyond 255 bytes or incomplete entry returns `Invalid`.
     pub fn dvb_subtitling(self) -> Result<DvbSubtitling<'a>> {
-        if self.tag != 0x59 {
+        if self.tag != descriptor_tag::DVB_SUBTITLING {
             return Err(Error::Invalid("DVB subtitling descriptor tag"));
         }
         if self.data.len() > 255 || !self.data.len().is_multiple_of(8) {
@@ -103,45 +119,47 @@ impl<'a> Descriptor<'a> {
     }
 }
 
-/// Source signalling, not an assertion of payload/decoder conformance.
+/// What a stream's DVB signalling identifies ([`ElementaryStream::codec_identification`]),
+/// from the PMT alone; the payload is not inspected.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CodecIdentification {
+    /// The signalling does not identify the codec.
     Unknown,
+    /// Stream type 0x06 with DVB subtitling services and no DVB audio descriptor.
     DvbSubtitles,
+    /// DVB subtitling services together with a DVB AC-3 or E-AC-3 descriptor on the same stream.
     ConflictingDvbSignalling,
 }
 
+/// Counts of the DVB subtitling signalling on one elementary stream.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct DvbSubtitlingSignalling {
-    /// All occurrences, including empty and duplicate descriptors.
+    /// Subtitling descriptors on the stream, empty and duplicate ones included.
     pub descriptors: usize,
-    /// All entries in source order, without deduplication/selection.
+    /// Service entries across those descriptors, duplicates included.
     pub services: usize,
+    /// Whether the stream also carries a DVB AC-3 or E-AC-3 descriptor alongside subtitling
+    /// services.
     pub audio_conflict: bool,
 }
 
-/// A partial demux view, not a complete container/decoder operation.
-/// Multi-service behaviour is unknown.
+/// Which streams [`ElementaryStream::dvb_single_service_view`] projects: only one that signals a
+/// single subtitling service.
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DvbViewProfile {
+    /// The view of a stream that signals a single subtitling service.
     SingleService,
 }
-#[cfg(feature = "reference-trace")]
-impl DvbViewProfile {
-    pub fn reference_revision(self) -> &'static str {
-        match self {
-            Self::SingleService => "d32b387f2b0a484599d4587d651891f0c63c4238",
-        }
-    }
-}
-
+/// The single-service view of a DVB subtitling descriptor, as the reference demuxer exports it.
 #[cfg(feature = "reference-trace")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DvbSingleServiceView<'a> {
-    pub profile: DvbViewProfile,
+    profile: DvbViewProfile,
+    /// The service entry the view is taken from.
     pub source: DvbSubtitlingService<'a>,
-    /// compID_be, ancillaryID_be, type. Raw language stays in `source`.
+    /// The composition and ancillary page IDs, big endian, then the subtitling type; the
+    /// language code stays in `source`.
     pub bytes: [u8; 5],
 }
 
@@ -156,7 +174,7 @@ pub(super) struct DvbSummary {
 impl DvbSummary {
     pub(super) fn observe(&mut self, descriptor: Descriptor<'_>, offset: usize) -> Result<()> {
         match descriptor.tag {
-            0x59 => {
+            descriptor_tag::DVB_SUBTITLING => {
                 let count = descriptor.dvb_subtitling()?.service_count();
                 let descriptors = self.descriptors.checked_add(1).ok_or(Error::Overflow)?;
                 let services = self.services.checked_add(count).ok_or(Error::Overflow)?;
@@ -167,7 +185,7 @@ impl DvbSummary {
                 self.descriptors = descriptors;
                 self.services = services;
             }
-            0x6a | 0x7a => self.audio_present = true,
+            descriptor_tag::DVB_AC3 | descriptor_tag::DVB_EAC3 => self.audio_present = true,
             _ => {}
         }
         Ok(())
@@ -175,11 +193,13 @@ impl DvbSummary {
 }
 
 impl ElementaryStream {
+    /// The descriptor namespace the PMT was parsed with.
     pub fn descriptor_namespace(&self) -> DescriptorNamespace {
         self.namespace
     }
-    /// None means the operation did not establish DVB context, not no services.
-    /// Raw ordered TLVs (including private namespace changes) remain in descriptors().
+    /// Counts of this stream's DVB subtitling descriptors and services; `None` when the PMT was
+    /// not parsed in a DVB namespace, which says nothing of its services. The descriptors stay
+    /// in [`Self::descriptors`].
     pub fn dvb_subtitling_signalling(&self) -> Option<DvbSubtitlingSignalling> {
         if !matches!(self.namespace, DescriptorNamespace::Dvb(_)) {
             return None;
@@ -190,11 +210,13 @@ impl ElementaryStream {
             audio_conflict: self.dvb.services != 0 && self.dvb.audio_present,
         })
     }
+    /// What the stream's DVB signalling identifies, from its stream type and subtitling
+    /// descriptors.
     pub fn codec_identification(&self) -> CodecIdentification {
         let Some(facts) = self.dvb_subtitling_signalling() else {
             return CodecIdentification::Unknown;
         };
-        if self.stream_type != 0x06 || facts.services == 0 {
+        if self.stream_type != stream_type::PES_PRIVATE_DATA || facts.services == 0 {
             CodecIdentification::Unknown
         } else if facts.audio_conflict {
             CodecIdentification::ConflictingDvbSignalling
@@ -202,10 +224,9 @@ impl ElementaryStream {
             CodecIdentification::DvbSubtitles
         }
     }
-    /// Explicit single-descriptor/single-service codec parameters view. Additional
-    /// ES context TLVs are unprobed and unsupported by this view. No first-service
-    /// fallback, language conversion, PES envelope stripping or DTS inference.
-    /// Wider field values are unverified; only six inputs were probed.
+    /// Project the five codec parameter bytes for a DVB private stream whose descriptor
+    /// loop consists of one subtitling descriptor with one service. Other signalling
+    /// returns `Unsupported`.
     #[cfg(feature = "reference-trace")]
     pub fn dvb_single_service_view(
         &self,
@@ -217,7 +238,7 @@ impl ElementaryStream {
             || self.descriptor_bytes.len() != 10
         {
             return Err(Error::Unsupported(
-                "D0 single-service DVB native view context",
+                "DVB codec parameters require one subtitling descriptor with one service",
             ));
         }
         let start = self

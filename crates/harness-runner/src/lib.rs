@@ -10,13 +10,24 @@
     clippy::expect_used
 )]
 
+pub mod records;
+mod table;
+
+pub use table::{Action, Operation, Prepare, dispatch, serve, smoke};
+
+use std::cell::Cell;
+use std::fmt::{self, Display};
 use std::io::{self, Write};
-use std::ops::RangeInclusive;
+use std::ops::{Deref, DerefMut, RangeInclusive};
 use std::path::Path;
-use std::time::Instant;
+use std::process::ExitCode;
+use std::time::{Duration, Instant};
 use triergon_core::Budget;
-use triergon_harness_protocol::digest::fold;
+use triergon_harness_protocol::digest::{fold, fold_bytes};
 use triergon_harness_protocol::push_quoted;
+
+/// How often one invocation may run its operation.
+const ITERATIONS: RangeInclusive<u64> = 1..=1_000_000;
 
 /// A worker result; errors end the process with their message.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -85,29 +96,67 @@ impl<'a> Invocation<'a> {
             line
         };
         let (mode, rest) = args.split_first().ok_or_else(usage)?;
-        let (path, rest) = rest.split_first().ok_or_else(usage)?;
-        let (mode, iterations, rest) = match mode.strip_prefix(prefix) {
-            Some("bench") => {
+        let action = mode.strip_prefix(prefix).ok_or_else(usage)?;
+        let invocation = Self::parse_mode(action, rest, trace.then_some("trace"), usage)?;
+        if !arguments.contains(&invocation.arguments.len()) {
+            return Err(usage().into());
+        }
+        invocation.check_iterations(usage)?;
+        Ok(invocation)
+    }
+
+    /// Parse a mode and the following file, optional bench count and operation arguments.
+    /// `trace` gives the spelling for record output, if supported. The caller validates
+    /// operation arguments and the iteration bound in the order its command line requires.
+    ///
+    /// # Errors
+    ///
+    /// Returns the usage message for missing words or unknown modes, or the integer
+    /// parser's error for a malformed bench count.
+    pub fn parse_mode<T: Into<Box<dyn std::error::Error>>>(
+        action: &str,
+        args: &'a [String],
+        trace: Option<&str>,
+        usage: impl Fn() -> T,
+    ) -> Result<Self> {
+        let usage = || -> Box<dyn std::error::Error> { usage().into() };
+        let (path, rest) = args.split_first().ok_or_else(usage)?;
+        let (mode, iterations, arguments) = match action {
+            "bench" => {
                 let (count, rest) = rest.split_first().ok_or_else(usage)?;
                 (Mode::Bench, count.parse::<u64>()?, rest)
             }
-            Some("fold") => (Mode::Fold, 1, rest),
-            Some("memory") => (Mode::Memory, 1, rest),
-            Some("trace") if trace => (Mode::Trace, 1, rest),
-            _ => return Err(usage().into()),
+            "fold" => (Mode::Fold, 1, rest),
+            "memory" => (Mode::Memory, 1, rest),
+            action if trace == Some(action) => (Mode::Trace, 1, rest),
+            _ => return Err(usage()),
         };
-        if !arguments.contains(&rest.len()) || !(1..=1_000_000).contains(&iterations) {
-            return Err(usage().into());
-        }
         Ok(Self {
             mode,
             path,
             iterations,
-            arguments: rest,
+            arguments,
         })
     }
 
-    /// The input file, refused when it is larger than `limit` bytes.
+    /// Require between one and one million iterations, inclusive.
+    ///
+    /// # Errors
+    ///
+    /// Returns the supplied usage message when the count is out of range.
+    pub fn check_iterations<T: Into<Box<dyn std::error::Error>>>(
+        &self,
+        usage: impl FnOnce() -> T,
+    ) -> Result<()> {
+        if ITERATIONS.contains(&self.iterations) {
+            Ok(())
+        } else {
+            Err(usage().into())
+        }
+    }
+
+    /// The input file, refused when its metadata reports more than `limit` bytes.
+    /// This preserves the invocation's `input limit` diagnostic before the read.
     ///
     /// # Errors
     ///
@@ -117,6 +166,133 @@ impl<'a> Invocation<'a> {
             return Err("input limit".into());
         }
         Ok(std::fs::read(self.path)?)
+    }
+}
+
+/// Run a command on the words after its program name and report its error.
+pub fn command(
+    name: Option<&str>,
+    failure: u8,
+    run: impl FnOnce(&[String]) -> Result<()>,
+) -> ExitCode {
+    let args: Vec<_> = std::env::args().skip(1).collect();
+    match run(&args) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => failed(name, failure, error),
+    }
+}
+
+/// Write one diagnostic to stderr and return the worker's failure status.
+#[expect(
+    clippy::print_stderr,
+    reason = "the worker CLI reports failures on stderr"
+)]
+pub fn failed(name: Option<&str>, status: u8, error: impl Display) -> ExitCode {
+    match name {
+        Some(name) => eprintln!("{name}: {error}"),
+        None => eprintln!("{error}"),
+    }
+    ExitCode::from(status)
+}
+
+/// One boundary of an allocation observation.
+#[derive(Clone, Copy, Debug)]
+pub enum Boundary {
+    /// Start observing allocations.
+    Begin,
+    /// Stop observing allocations.
+    End,
+}
+
+impl Boundary {
+    /// The protocol marker, including its line feed.
+    pub const fn line(self) -> &'static [u8] {
+        match self {
+            Self::Begin => b"TRIERGON_BEGIN_V1\n",
+            Self::End => b"TRIERGON_END_V1\n",
+        }
+    }
+
+    /// Write and flush this boundary before the worker continues.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's write or flush error.
+    pub fn mark(self, out: &mut impl Write) -> io::Result<()> {
+        out.write_all(self.line())?;
+        out.flush()
+    }
+}
+
+/// Monotonic time between operation boundaries chosen by the worker.
+#[derive(Debug)]
+pub struct Timer(Option<Instant>);
+
+impl Timer {
+    /// Start the timed interval, or leave it inactive for an untimed mode.
+    #[inline]
+    pub fn start(timed: bool) -> Self {
+        Self(timed.then(Instant::now))
+    }
+
+    /// Read the elapsed duration, or zero for an inactive timer.
+    #[inline]
+    pub fn elapsed(&self) -> Duration {
+        self.0.map_or(Duration::ZERO, |begin| begin.elapsed())
+    }
+}
+
+/// The timing line of the decoder and media workers, with elapsed nanoseconds before
+/// the work counters.
+#[derive(Debug)]
+pub struct BenchLine {
+    /// Include the leading schema field used by the decoder and media workers.
+    pub schema: bool,
+    /// Number of operations.
+    pub iterations: u64,
+    /// Time spent in the measured interval, in nanoseconds.
+    pub elapsed_ns: u128,
+    /// Output units.
+    pub packets: u64,
+    /// Output bytes.
+    pub bytes: u64,
+    /// Digest of the work.
+    pub digest: u64,
+}
+
+impl BenchLine {
+    /// Build a schema-bearing timing line from the packet, byte and digest totals.
+    pub const fn with_schema(
+        iterations: u64,
+        elapsed_ns: u128,
+        (packets, bytes, digest): (u64, u64, u64),
+    ) -> Self {
+        Self {
+            schema: true,
+            iterations,
+            elapsed_ns,
+            packets,
+            bytes,
+            digest,
+        }
+    }
+}
+
+impl Display for BenchLine {
+    fn fmt(&self, out: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self {
+            schema,
+            iterations,
+            elapsed_ns,
+            packets,
+            bytes,
+            digest,
+        } = self;
+        let schema = if *schema { "\"schema\":1," } else { "" };
+        write!(
+            out,
+            "{{{schema}\"iterations\":{iterations},\"elapsed_ns\":{elapsed_ns},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest}}}"
+        )
     }
 }
 
@@ -133,14 +309,73 @@ pub struct Totals {
     pub refusal: Option<Box<Refusal>>,
 }
 
+impl Totals {
+    /// Fold one record: its kind, its words and, when it has one, its payload, which
+    /// it counts as one packet of the payload's length.
+    pub fn record(&mut self, kind: u64, words: &[u64], payload: &[u8]) {
+        fold(&mut self.digest, kind);
+        for &word in words {
+            fold(&mut self.digest, word);
+        }
+        if !payload.is_empty() {
+            fold_bytes(&mut self.digest, payload);
+        }
+        self.packets += 1;
+        self.bytes += payload.len() as u64;
+    }
+}
+
+/// What one operation produces when it may meet an unsupported feature while
+/// completing its work: its totals and the feature, which the result line reports
+/// for the first operation that met one.
+// Folding directly into a larger Totals cost up to +0.87% on subtitle workloads.
+#[derive(Debug, Default)]
+pub struct Outcome {
+    /// The operation's packets, bytes and digest.
+    pub totals: Totals,
+    /// An unsupported feature the operation met.
+    pub unsupported: Option<&'static str>,
+}
+
+impl Deref for Outcome {
+    type Target = Totals;
+
+    fn deref(&self) -> &Totals {
+        &self.totals
+    }
+}
+
+impl DerefMut for Outcome {
+    fn deref_mut(&mut self) -> &mut Totals {
+        &mut self.totals
+    }
+}
+
 /// An operation that ended early: its error and the input event it is attributed
 /// to, as a JSON object.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Refusal {
     /// The error, printed as a JSON string.
     pub reason: String,
     /// The input event it is attributed to, a JSON object.
-    pub cause: String,
+    pub cause: RefusalCause,
+}
+
+/// The JSON object that identifies the input event responsible for a refusal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct RefusalCause(String);
+
+impl RefusalCause {
+    /// Wrap an encoded JSON object supplied by the operation.
+    pub fn from_json(object: String) -> Self {
+        Self(object)
+    }
+
+    /// Borrow the encoded object for inclusion in a result line.
+    pub fn as_json(&self) -> &str {
+        &self.0
+    }
 }
 
 /// Run `operation` as often as the invocation asks and print the result line: the
@@ -175,11 +410,20 @@ pub fn measure_with(
     fields: &[(&str, u64)],
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
-    measure_dyn(invocation, name, held, fields, &mut operation)
+    measure_dyn::<false>(
+        invocation.mode,
+        invocation.iterations,
+        name,
+        held,
+        fields,
+        &Cell::new(None),
+        &mut operation,
+    )
 }
 
-/// Measure a workload whose required outcome may be a deterministic refusal.
-/// Execute every planned repetition and retain the first refusal for reporting.
+/// Measure a workload whose required outcome may be a deterministic refusal: run
+/// every planned operation, each of which must end alike, and report the first
+/// refusal.
 ///
 /// # Errors
 ///
@@ -191,59 +435,96 @@ pub fn measure_repeated(
     held: Option<&Budget>,
     mut operation: impl FnMut() -> Result<Totals>,
 ) -> Result<()> {
-    let retained = held.map(Budget::used);
-    let mut runs = 0;
-    let mut first_refusal = None::<Box<Refusal>>;
-    measure(invocation, name, held, || {
-        let mut totals = operation()?;
-        let refusal = totals.refusal.take();
-        if runs == 0 {
-            first_refusal = refusal;
-        } else {
-            match (&first_refusal, refusal) {
-                (None, None) => {}
-                (Some(first), Some(next))
-                    if first.reason == next.reason && first.cause == next.cause => {}
-                _ => return Err("operation outcome changed across repetitions".into()),
-            }
+    measure_dyn::<true>(
+        invocation.mode,
+        invocation.iterations,
+        name,
+        held,
+        &[],
+        &Cell::new(None),
+        &mut operation,
+    )
+}
+
+/// [`measure`] for an operation that may meet an unsupported feature while it
+/// completes: the result line reports the first one met, after the digest.
+///
+/// # Errors
+///
+/// When the operation fails, retains charged storage, or stdout fails.
+pub fn measure_outcome(
+    invocation: &Invocation<'_>,
+    name: &str,
+    held: Option<&Budget>,
+    mut operation: impl FnMut() -> Result<Outcome>,
+) -> Result<()> {
+    measure_outcome_dyn(
+        invocation.mode,
+        invocation.iterations,
+        name,
+        held,
+        &mut operation,
+    )
+}
+
+/// [`measure_outcome`] with the operation behind a reference.
+fn measure_outcome_dyn(
+    mode: Mode,
+    iterations: u64,
+    name: &str,
+    held: Option<&Budget>,
+    operation: &mut dyn FnMut() -> Result<Outcome>,
+) -> Result<()> {
+    let unsupported = Cell::new(None);
+    measure_dyn::<false>(mode, iterations, name, held, &[], &unsupported, &mut || {
+        let outcome = operation()?;
+        if unsupported.get().is_none() {
+            unsupported.set(outcome.unsupported);
         }
-        runs += 1;
-        if runs == invocation.iterations && first_refusal.is_some() {
-            if held.map(Budget::used) != retained {
-                return Err("operation retained charged storage".into());
-            }
-            totals.refusal = first_refusal.take();
-        }
-        Ok(totals)
+        Ok(outcome.totals)
     })
 }
 
 /// [`measure_with`] with the operation behind a reference, so each worker binary
-/// holds one copy of the loop and of the result line.
-fn measure_dyn(
-    invocation: &Invocation<'_>,
+/// holds one copy of the loop and of the result line. `REPEAT` runs every planned
+/// operation when they refuse alike; otherwise the first refusal ends the loop.
+/// `unsupported` is what the line reports as met and unsupported once the loop is
+/// done.
+// The refusal policy is a constant so that the loop of `measure` stays as it is, and
+// the loop stays out of line as it was measured: inlined into the PGS capsule worker's
+// one caller it cost about 70 instructions an operation.
+#[inline(never)]
+fn measure_dyn<const REPEAT: bool>(
+    mode: Mode,
+    iterations: u64,
     name: &str,
     held: Option<&Budget>,
     fields: &[(&str, u64)],
+    unsupported: &Cell<Option<&'static str>>,
     operation: &mut dyn FnMut() -> Result<Totals>,
 ) -> Result<()> {
     let retained = held.map(Budget::used);
-    let memory = invocation.mode == Mode::Memory;
+    let memory = mode == Mode::Memory;
     let mut out = io::stdout().lock();
     if memory {
-        out.write_all(b"TRIERGON_BEGIN_V1\n")?;
-        out.flush()?;
+        Boundary::Begin.mark(&mut out)?;
     }
-    let start = (invocation.mode == Mode::Bench).then(Instant::now);
+    let start = (mode == Mode::Bench).then(Instant::now);
     let (mut packets, mut bytes, mut digest) = (0, 0, 0);
     let (mut runs, mut refusal) = (0, None);
-    while runs < invocation.iterations {
+    while runs < iterations {
         let totals = operation()?;
         runs += 1;
         packets += totals.packets;
         bytes += totals.bytes;
         fold(&mut digest, totals.digest);
-        if totals.refusal.is_some() {
+        if REPEAT {
+            if runs == 1 {
+                refusal = totals.refusal;
+            } else if totals.refusal != refusal {
+                return Err("operation outcome changed across repetitions".into());
+            }
+        } else if totals.refusal.is_some() {
             refusal = totals.refusal;
             break;
         }
@@ -253,9 +534,55 @@ fn measure_dyn(
     }
     let elapsed = start.map_or(0, |begin| begin.elapsed().as_nanos());
     if memory {
-        out.write_all(b"TRIERGON_END_V1\n")?;
-        out.flush()?;
+        Boundary::End.mark(&mut out)?;
     }
+    write_result(
+        &mut out,
+        name,
+        runs,
+        elapsed,
+        &Totals {
+            packets,
+            bytes,
+            digest,
+            refusal,
+        },
+        fields,
+        unsupported.get(),
+    )?;
+    Ok(())
+}
+
+/// Write and flush the standard summary after the operation has completed.
+///
+/// # Errors
+///
+/// Returns the stream's write or flush error.
+pub fn write_summary(
+    out: &mut impl Write,
+    name: &str,
+    iterations: u64,
+    elapsed_ns: u128,
+    totals: &Totals,
+) -> io::Result<()> {
+    write_result(out, name, iterations, elapsed_ns, totals, &[], None)
+}
+
+fn write_result(
+    out: &mut impl Write,
+    name: &str,
+    runs: u64,
+    elapsed: u128,
+    totals: &Totals,
+    fields: &[(&str, u64)],
+    unsupported: Option<&str>,
+) -> io::Result<()> {
+    let Totals {
+        packets,
+        bytes,
+        digest,
+        refusal,
+    } = totals;
     let mut line = format!(
         "{{\"schema\":1,\"operation\":\"{name}\",\"iterations\":{runs},\"packets\":{packets},\"bytes\":{bytes},\"digest\":{digest},\"elapsed_ns\":{elapsed},\"eof\":{}",
         refusal.is_none()
@@ -263,16 +590,19 @@ fn measure_dyn(
     for (key, value) in fields {
         line.push_str(&format!(",\"{key}\":{value}"));
     }
+    if let Some(detail) = unsupported {
+        line.push_str(",\"unsupported\":");
+        push_quoted(&mut line, detail);
+    }
     if let Some(refusal) = refusal {
         line.push_str(",\"refusal\":");
         push_quoted(&mut line, &refusal.reason);
         line.push_str(",\"cause\":");
-        line.push_str(&refusal.cause);
+        line.push_str(refusal.cause.as_json());
     }
     line.push('}');
     writeln!(out, "{line}")?;
-    out.flush()?;
-    Ok(())
+    out.flush()
 }
 
 #[cfg(test)]
@@ -293,12 +623,40 @@ mod tests {
             Ok(Totals {
                 refusal: Some(Box::new(Refusal {
                     reason: "control refusal".into(),
-                    cause: "{}".into(),
+                    cause: RefusalCause::from_json("{}".into()),
                 })),
                 ..Totals::default()
             })
         })?;
         assert_eq!(executed, invocation.iterations);
         Ok(())
+    }
+
+    #[test]
+    fn a_refusal_that_changes_between_repetitions_fails() {
+        let invocation = Invocation {
+            mode: Mode::Fold,
+            path: "",
+            iterations: 3,
+            arguments: &[],
+        };
+        let mut executed = 0;
+        let error = measure_repeated(&invocation, "test-refusal", None, || {
+            executed += 1;
+            Ok(Totals {
+                refusal: (executed < 3).then(|| {
+                    Box::new(Refusal {
+                        reason: "control refusal".into(),
+                        cause: RefusalCause::from_json("{}".into()),
+                    })
+                }),
+                ..Totals::default()
+            })
+        })
+        .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "operation outcome changed across repetitions"
+        );
     }
 }

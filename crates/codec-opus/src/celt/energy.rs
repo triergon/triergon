@@ -158,3 +158,58 @@ pub(super) fn amplitudes(energy: &[f32; BANDS], bands: Range<usize>, out: &mut [
 pub(super) fn exp2(x: f32) -> f32 {
     (core::f64::consts::LN_2 * f64::from(x)).exp() as f32
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The coarse energies of a frame whose bits ran out: every band's delta is -1, and
+    /// the deltas accumulate across bands with the decay `beta`, onto `alpha` times
+    /// the previous frame's energy (floored at -9).
+    fn starved_coarse(intra: bool, previous: f32) -> [f32; BANDS] {
+        let mut energy = [[previous; BANDS]; 2];
+        decode_coarse(
+            &mut RangeDecoder::new(&[]),
+            &mut energy,
+            0..BANDS,
+            intra,
+            1,
+            3,
+        );
+        energy[0]
+    }
+
+    #[test]
+    fn coarse_energy_predicts_across_bands_and_from_the_previous_frame() {
+        for (intra, alpha, beta) in [(true, 0.0, BETA_INTRA), (false, PRED_COEF[3], BETA_COEF[3])] {
+            for previous in [0.0, 4.0, -20.0] {
+                let mut prev = 0f32;
+                for (band, &energy) in starved_coarse(intra, previous).iter().enumerate() {
+                    let expected = alpha * previous.max(-9.0) + prev - 1.0;
+                    assert_eq!(energy, expected, "intra {intra}, band {band}");
+                    prev = prev - 1.0 + beta;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn amplitudes_add_the_band_mean_and_are_capped_at_2_to_the_32() {
+        let mut out = [1.0; BANDS];
+        amplitudes(&[0.0; BANDS], 2..19, &mut out);
+        for (band, &amplitude) in out.iter().enumerate() {
+            let expected = if (2..19).contains(&band) {
+                exp2(E_MEANS[band])
+            } else {
+                0.0
+            };
+            assert_eq!(amplitude, expected, "band {band}");
+        }
+        amplitudes(&[100.0; BANDS], 0..BANDS, &mut out);
+        assert_eq!(out, [4_294_967_296.0; BANDS]);
+        assert_eq!(
+            [exp2(-1.0), exp2(0.0), exp2(1.0), exp2(10.0)],
+            [0.5, 1.0, 2.0, 1024.0]
+        );
+    }
+}

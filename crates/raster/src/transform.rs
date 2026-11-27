@@ -5,6 +5,7 @@
 //! pixel, and the remaining matrix is rounded to steps that keep the position
 //! error near 1/8 pixel. [`BitmapTransform`] is that quantised transform, and
 //! [`BitmapTransform::restore`] rebuilds the matrix the bitmap is drawn with.
+//! Translated from libass 0.17.5 (see `docs/provenance.md`).
 
 use triergon_core::round_ties_even_i32;
 
@@ -12,8 +13,9 @@ use crate::fp;
 use crate::geometry::{Rect, Vector};
 use crate::shape::Shape;
 
-/// Transform error estimate, in 1/64 pixel.
-const POSITION_PRECISION: f64 = 8.0;
+/// Transform error estimate, in 1/64 pixel: the error quantised transforms,
+/// border strokes and blurs are sized to.
+pub(crate) const POSITION_PRECISION: f64 = 8.0;
 /// The largest perspective magnification relative to the box centre.
 pub(crate) const MAX_PERSP_SCALE: f64 = 16.0;
 /// log2 of the sub-pixel steps per pixel: 1/8 pixel.
@@ -87,7 +89,7 @@ pub struct Quantized {
 
 impl Quantized {
     /// `shape` under `matrix` (outline units to frame 26.6) quantised on its
-    /// own, without a run, as libass quantises the drawing of a vector clip.
+    /// own, without a run: how the drawing of a vector clip is quantised.
     /// `None` when the transform is degenerate or out of range.
     pub fn standalone(shape: &Shape, matrix: &Matrix) -> Option<Self> {
         BitmapTransform::quantize(matrix, shape.cbox(), None).map(|q| q.placed)
@@ -131,6 +133,10 @@ impl BitmapTransform {
     /// Quantises `m` for an outline with control box `cbox`, placed against the
     /// remainder of the run it continues (`None` for a run's first bitmap, or a
     /// bitmap of its own). `None` when the transform is degenerate or too large.
+    #[allow(
+        clippy::neg_cmp_op_on_partial_ord,
+        reason = "NaN centres fail the quantization bound"
+    )]
     pub(crate) fn quantize(
         m: &Matrix,
         cbox: &Rect,
@@ -250,5 +256,36 @@ impl BitmapTransform {
             row[2] -= row[0] * x0 + row[1] * y0;
         }
         Matrix(m)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{BitmapTransform, Matrix};
+    use crate::{Rect, Vector};
+
+    fn translation(x: f64, y: f64) -> Matrix {
+        Matrix([[1.0, 0.0, x], [0.0, 1.0, y], [0.0, 0.0, 1.0]])
+    }
+
+    #[test]
+    fn whole_pixel_moves_change_only_the_position() {
+        let cbox = Rect::new(0, 0, 640, 640);
+        let at = |x| BitmapTransform::quantize(&translation(x, 0.0), &cbox, None).unwrap();
+        let (here, there) = (at(100.0), at(100.0 + 3.0 * 64.0));
+        assert_eq!(here.placed.transform, there.placed.transform);
+        assert_eq!(
+            there.placed.position,
+            Vector::new(here.placed.position.x + 3, here.placed.position.y)
+        );
+        let nudged = at(100.0 + 8.0);
+        assert_ne!(here.placed.transform, nudged.placed.transform);
+    }
+
+    #[test]
+    fn a_transform_without_depth_is_not_quantised() {
+        let mut m = translation(0.0, 0.0);
+        m.0[2][2] = 0.0;
+        assert!(BitmapTransform::quantize(&m, &Rect::new(0, 0, 64, 64), None).is_none());
     }
 }

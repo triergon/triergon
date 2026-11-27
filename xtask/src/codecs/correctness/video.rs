@@ -317,6 +317,10 @@ pub(super) fn decoder(
 /// Compare the fixed 1920x1080 RGBA worker output. Count differing bytes and
 /// track the largest delta directly in the borrowed frames.
 pub(super) fn output(ours: Frames, reference: Frames) -> Result<Value, Stop> {
+    rgba(ours, reference, false)
+}
+
+pub(super) fn rgba(ours: Frames, reference: Frames, timeline: bool) -> Result<Value, Stop> {
     let (mut first, mut differing, mut worst) = (None, 0, 0u8);
     let compared = compare(ours, reference, |n, a, b| {
         differing += 1;
@@ -363,7 +367,7 @@ pub(super) fn output(ours: Frames, reference: Frames) -> Result<Value, Stop> {
     } else {
         "fail"
     };
-    Ok(Value::object([
+    let mut row = vec![
         ("status", Value::str(status)),
         ("pictures_ref", Value::int(compared.frames_ref)),
         ("pictures_ours", Value::int(compared.frames_ours)),
@@ -389,7 +393,15 @@ pub(super) fn output(ours: Frames, reference: Frames) -> Result<Value, Stop> {
             "reference_stderr_tail",
             Value::str(python::tail(&compared.reference.stderr, 300)),
         ),
-    ]))
+    ];
+    if timeline {
+        row.push(("timeline", Value::Array(json_lines(&compared.ours.stderr))));
+        row.push((
+            "reference_timeline",
+            Value::Array(json_lines(&compared.reference.stderr)),
+        ));
+    }
+    Ok(Value::object(row))
 }
 
 #[cfg(test)]

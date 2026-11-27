@@ -1,15 +1,13 @@
 //! Resource/error-priority guard.
 //! No clock/measurement proves the bound: metadata discovery must not be needed
 //! to refuse a slice whose header count already exceeds the explicit policy.
-mod common;
+use crate::common;
 use common::{child, roots};
 use std::sync::atomic::AtomicBool;
 use triergon_core::{Budget, Error, WorkBudget};
 use triergon_isobmff::{
     BuildStatus, Limits,
-    compat::mov::recovery::{
-        DescriptionContext, DescriptionRecoveryBuilder, DescriptionRecoveryProfile,
-    },
+    compat::mov::recovery::{DescriptionContext, DescriptionRecoveryBuilder},
     reference_trace::mov::transport::{RootWalkTransportBuilder, RootWalkTransportProfile},
 };
 
@@ -25,13 +23,7 @@ fn excess_root_count_refuses_before_metadata_discovery_with_explicit_limit() {
     let trak = child(movie, b"trak").unwrap();
     let mdia = child(&trak, b"mdia").unwrap();
     let stbl = child(&child(&mdia, b"minf").unwrap(), b"stbl").unwrap();
-    let mut table = DescriptionRecoveryBuilder::new(
-        stbl,
-        pool.clone(),
-        Limits::default(),
-        DescriptionRecoveryProfile,
-    )
-    .unwrap();
+    let mut table = DescriptionRecoveryBuilder::new(stbl, pool.clone(), Limits::default()).unwrap();
     while table
         .poll(&mut WorkBudget::new(1), &AtomicBool::new(false))
         .unwrap()
@@ -39,9 +31,9 @@ fn excess_root_count_refuses_before_metadata_discovery_with_explicit_limit() {
     {}
     let table = table.finish().unwrap();
     for has_mdat in [false, true] {
-        let mut headers = [*ftyp.header(); 17];
+        let mut headers = [*ftyp.header(); 65];
         if has_mdat {
-            headers[16] = *mdat.header();
+            headers[64] = *mdat.header();
         }
         let before = pool.used();
         let error = RootWalkTransportBuilder::new(
@@ -61,7 +53,7 @@ fn excess_root_count_refuses_before_metadata_discovery_with_explicit_limit() {
             error,
             Error::Limit {
                 requested: headers.len(),
-                maximum: 16
+                maximum: 64
             },
             "root-count policy must precede optional/invalid metadata discovery"
         );

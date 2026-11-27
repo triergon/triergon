@@ -3,8 +3,10 @@ use triergon_core::{
     Budget, Error, InputCursor, SourceCapabilities, SourceFailure, SourceId, Step, WorkBudget,
 };
 use triergon_isobmff::{
-    Access, BoxEvent, BoxHeader, BoxReader, MediaDataPolicy, Sample, SampleReader,
-    compat::mov::recovery::{PartialSampleReader, PayloadBounds, RunRecoveryProfile},
+    Access, Sample,
+    boxes::{BoxEvent, BoxHeader, BoxReader, MediaDataPolicy},
+    compat::mov::recovery::{PartialSampleReader, PayloadBounds},
+    payload::SampleReader,
 };
 fn sample(range: Range<u64>) -> Sample {
     Sample {
@@ -89,29 +91,29 @@ fn oversized_metadata_is_never_an_eof_media_recovery() {
 #[test]
 fn physical_bounds_do_not_rewrite_declared_range_or_create_missing_bytes() {
     let s = sample(8..20);
-    let b = PayloadBounds::from_source(&s, 8..20, 14, 12, RunRecoveryProfile).unwrap();
+    let b = PayloadBounds::from_source(&s, 8..20, 14, 12).unwrap();
     assert_eq!(b.declared, 8..20);
     assert_eq!(b.available, Some(8..14));
     assert!(b.incomplete_at_known_eof);
     assert_eq!(s.range, 8..20);
-    let b = PayloadBounds::from_source(&s, 8..20, 8, 12, RunRecoveryProfile).unwrap();
+    let b = PayloadBounds::from_source(&s, 8..20, 8, 12).unwrap();
     assert_eq!(b.available, None);
 }
 #[test]
 fn bounds_keep_declared_limit_and_media_validation_before_clamping() {
     let s = sample(8..20);
     assert!(matches!(
-        PayloadBounds::from_source(&s, 8..20, 9, 11, RunRecoveryProfile),
+        PayloadBounds::from_source(&s, 8..20, 9, 11),
         Err(Error::Limit {
             requested: 12,
             maximum: 11
         })
     ));
-    assert!(PayloadBounds::from_source(&s, 9..20, 14, 12, RunRecoveryProfile).is_err());
+    assert!(PayloadBounds::from_source(&s, 9..20, 14, 12).is_err());
     let p = Budget::new(4096).unwrap();
     let mut i = input(&p, None);
     assert!(matches!(
-        PartialSampleReader::new(&mut i, s, 8..20, 12, RunRecoveryProfile),
+        PartialSampleReader::new(&mut i, s, 8..20, 12),
         Err(Error::Unsupported(_))
     ));
 }
@@ -121,8 +123,7 @@ fn partial_bytes_use_exact_backing_and_source_fields_survive_input_and_reader_dr
     let initial = p.used();
     let mut i = input(&p, Some(14));
     let source = sample(8..20);
-    let mut r =
-        PartialSampleReader::new(&mut i, source.clone(), 8..20, 12, RunRecoveryProfile).unwrap();
+    let mut r = PartialSampleReader::new(&mut i, source.clone(), 8..20, 12).unwrap();
     let packet = loop {
         match r
             .poll(&mut i, &mut WorkBudget::new(1), &AtomicBool::new(false))
@@ -153,8 +154,7 @@ fn partial_bytes_use_exact_backing_and_source_fields_survive_input_and_reader_dr
 fn cancellation_and_transport_failure_remain_sticky_errors() {
     let p = Budget::new(4096).unwrap();
     let mut i = input(&p, Some(14));
-    let mut r =
-        PartialSampleReader::new(&mut i, sample(8..20), 8..20, 12, RunRecoveryProfile).unwrap();
+    let mut r = PartialSampleReader::new(&mut i, sample(8..20), 8..20, 12).unwrap();
     assert!(matches!(
         r.poll(&mut i, &mut WorkBudget::new(0), &AtomicBool::new(true)),
         Err(Error::Cancelled)
@@ -164,8 +164,7 @@ fn cancellation_and_transport_failure_remain_sticky_errors() {
         Err(Error::Cancelled)
     ));
     let mut i = input(&p, Some(14)); // independent transport-failure control
-    let mut r =
-        PartialSampleReader::new(&mut i, sample(8..20), 8..20, 12, RunRecoveryProfile).unwrap();
+    let mut r = PartialSampleReader::new(&mut i, sample(8..20), 8..20, 12).unwrap();
     let q = i.request();
     i.fail(q.source, q.token, SourceFailure::Transport).unwrap();
     assert!(matches!(
@@ -177,8 +176,7 @@ fn cancellation_and_transport_failure_remain_sticky_errors() {
 fn partial_freeze_backpressure_retains_same_transaction_and_real_bytes() {
     let p = Budget::new(4096).unwrap();
     let mut i = input(&p, Some(14));
-    let mut r =
-        PartialSampleReader::new(&mut i, sample(8..20), 8..20, 12, RunRecoveryProfile).unwrap();
+    let mut r = PartialSampleReader::new(&mut i, sample(8..20), 8..20, 12).unwrap();
     let q = i.request();
     i.provide_inline(q.source, q.token, q.offset, &[8, 9, 10, 11])
         .unwrap();
