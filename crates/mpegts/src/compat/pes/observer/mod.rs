@@ -467,10 +467,11 @@ const _: () = assert!(size_of::<PayloadFormat>() == size_of::<bool>());
 /// ([`DemuxPacket`]), beside the caller's strict source view: the caller pushes each carrier
 /// of that PID with its [`SourceContext`] and polls for packets. It holds one pushed carrier
 /// at a time, charged to its budget, and changes nothing in the source view.
-// `repr(C)` keeps the field offsets the compiler chose for the hot assembly paths;
-// `follow` and `time_base` take bytes of the trailing padding.
+// On 64-bit targets `repr(C)` keeps the field offsets the compiler chose for the hot
+// assembly paths, and `follow` and `time_base` take bytes of the trailing padding. This
+// order would pad a 32-bit layout, so there the compiler orders the fields.
 #[derive(Debug)]
-#[repr(C)]
+#[cfg_attr(target_pointer_width = "64", repr(C))]
 pub struct DemuxObserver {
     last_input: Option<(u64, u64)>,
     origin: Option<SourceLocation>,
